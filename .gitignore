@@ -3,8 +3,15 @@
 deno.lock.bak
 coverage/
 
+# Build output
+bin/
+dist/
+ui/dist/
+
 # Node (present only if npm packages are used)
 node_modules/
+ui/node_modules/
+desktop/node_modules/
 
 # Editors / OS
 .DS_Store

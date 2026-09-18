@@ -5,7 +5,7 @@
   "tasks": {
     "run": "deno task build && ./bin/mothx",
     "start": "deno run -A src/main.ts",
-    "build": "deno compile -A --include src/platform/busybox_assets --include src/context/tokenizerdata -o bin/mothx src/main.ts",
+    "build": "deno compile -A --include src/platform/busybox_assets --include src/context/tokenizerdata --include src/stats/dashboard.html --include src/stats/mothx.png --include src/stats/mothx-small.ico --include src/skills/builtin -o bin/mothx src/main.ts",
     "serve": "deno task ui-build && deno task build && ./bin/mothx serve",
     "install": "deno install -g -A -n mothx src/main.ts",
     "test": "deno test -A",
@@ -31,14 +31,26 @@
       "bin/",
       "dist/",
       "ui/dist/",
-      "ui/node_modules/"
+      "ui/node_modules/",
+      "src/platform/busybox_assets/",
+      "src/context/tokenizerdata/",
+      "src/stats/dashboard.html",
+      "src/skills/builtin/"
     ]
   },
   "lint": {
     "rules": {
       "tags": ["recommended"]
     },
-    "exclude": ["bin/", "dist/", "ui/dist/", "ui/node_modules/"]
+    "exclude": [
+      "bin/",
+      "dist/",
+      "ui/dist/",
+      "ui/node_modules/",
+      "src/platform/busybox_assets/",
+      "src/context/tokenizerdata/",
+      "src/skills/builtin/"
+    ]
   },
   "compilerOptions": {
     "strict": true,
