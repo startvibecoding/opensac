@@ -1,0 +1,12 @@
+# Deno
+.deno/
+deno.lock.bak
+coverage/
+
+# Node (present only if npm packages are used)
+node_modules/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
