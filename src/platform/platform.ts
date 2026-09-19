@@ -537,3 +537,98 @@ export function isExecutable(mode: number): boolean {
   if (isWindows()) return true; // Simplified, matching the Go original.
   return (mode & 0o111) !== 0;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Embedded Windows BusyBox (ported from internal/platform/busybox_windows.go
+// and busybox_other.go).
+// ─────────────────────────────────────────────────────────────────────────────
+
+let busyboxOnce = false;
+let busyboxPathValue = "";
+let busyboxErr: Error | undefined;
+
+/**
+ * Extracts the embedded BusyBox executable for the current Windows
+ * architecture into the Windows config bin directory when it is missing.
+ * Non-Windows platforms report success with no path.
+ */
+export function ensureWindowsBusybox(): Error | undefined {
+  if (busyboxOnce) return busyboxErr;
+  busyboxOnce = true;
+  if (!isWindows()) return undefined;
+  try {
+    busyboxPathValue = ensureWindowsBusyboxPath();
+  } catch (err) {
+    busyboxErr = err instanceof Error ? err : new Error(String(err));
+  }
+  return busyboxErr;
+}
+
+/** Reports whether a busybox path is available. */
+export interface BusyboxPathResult {
+  path: string;
+  ok: boolean;
+}
+
+/** Returns the extracted BusyBox path when available. */
+export function windowsBusyboxPath(): BusyboxPathResult {
+  if (ensureWindowsBusybox() != null) return { path: "", ok: false };
+  if (busyboxPathValue === "") return { path: "", ok: false };
+  return { path: busyboxPathValue, ok: true };
+}
+
+function busyboxAssetForArch(): { name: string; data: Uint8Array } | undefined {
+  switch (goarch()) {
+    case "amd64":
+      return {
+        name: "busybox64u.exe",
+        data: Deno.readFileSync(
+          new URL("./busybox_assets/busybox64u.exe", import.meta.url),
+        ),
+      };
+    case "386":
+      return {
+        name: "busybox32u.exe",
+        data: Deno.readFileSync(
+          new URL("./busybox_assets/busybox32u.exe", import.meta.url),
+        ),
+      };
+    default:
+      return undefined;
+  }
+}
+
+function ensureWindowsBusyboxPath(): string {
+  const asset = busyboxAssetForArch();
+  if (asset === undefined) return "";
+
+  const dir = path.join(configDir(), "bin");
+  Deno.mkdirSync(dir, { recursive: true });
+
+  const target = path.join(dir, asset.name);
+  try {
+    const info = Deno.statSync(target);
+    if (info.isDirectory) {
+      throw new Error(`busybox path is a directory: ${target}`);
+    }
+    return target;
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) {
+      throw err;
+    }
+  }
+
+  const tmp = Deno.makeTempFileSync({ dir, prefix: ".busybox-" });
+  try {
+    Deno.writeFileSync(tmp, asset.data);
+    Deno.chmodSync(tmp, 0o755);
+    Deno.renameSync(tmp, target);
+  } finally {
+    try {
+      Deno.removeSync(tmp);
+    } catch {
+      // Best-effort cleanup.
+    }
+  }
+  return target;
+}

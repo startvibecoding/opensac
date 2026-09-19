@@ -224,6 +224,22 @@ export function newManagerWithOptions(
   return new Manager(projectDir, opts);
 }
 
+/** Returns a human-readable description of the sandbox state. */
+export function formatSandboxInfo(s: Sandbox | undefined): string {
+  if (!s || s.level() === Level.None) return "🔓 No sandbox";
+
+  const available = s.isAvailable() ? "✓" : "✗";
+  const name = s.name();
+  switch (s.level()) {
+    case Level.Strict:
+      return `🔒 Strict sandbox [${name}: ${available}] - read-only project, host network`;
+    case Level.Standard:
+      return `🔒 Standard sandbox [${name}: ${available}] - read-write project, host network`;
+    default:
+      return "🔓 No sandbox";
+  }
+}
+
 // Forward declarations resolved by ./platform.ts and ./none.ts to avoid an
 // import cycle between the manager and its backends.
 import { newNoneSandbox } from "./none.ts";

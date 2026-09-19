@@ -1,0 +1,94 @@
+// Translated from internal/agent/follow_up_test.go (pure cases that do not
+// require the agent loop). The Go tests also cover the loop wake path; that
+// lands with the core loop port.
+
+import { assert, assertEquals } from "@std/assert";
+import type { Message } from "../provider/types.ts";
+import {
+  MemberStatusDone,
+  newMemberCompletion,
+  newMemberMailbox,
+} from "./mailbox.ts";
+import { composeFollowUps } from "./followup.ts";
+
+Deno.test("composeFollowUps returns undefined without a mailbox", () => {
+  assertEquals(composeFollowUps(null), undefined);
+});
+
+Deno.test("composeFollowUps returns pending completions", async () => {
+  const mbox = newMemberMailbox();
+  const hook = composeFollowUps(mbox)!;
+  assertEquals(await hook(undefined), null);
+
+  mbox.enqueue(
+    {
+      ...newMemberCompletion(),
+      memberId: "pm",
+      status: MemberStatusDone,
+      payload: "PRD 已完成",
+    },
+  );
+  const messages = await hook(undefined);
+  assert(messages != null);
+  assertEquals(messages!.length, 1);
+  assert(messages![0].content!.includes("[MEMBER_COMPLETION]"));
+});
+
+Deno.test("composeFollowUps waits for running children then returns completion", async () => {
+  const mbox = newMemberMailbox();
+  mbox.setRunningPredicate(() => true);
+  const hook = composeFollowUps(mbox)!;
+
+  const done = hook(undefined);
+  mbox.enqueue(
+    newMemberCompletion2("agent-child-1", "Alice", "member result"),
+  );
+  const messages = await done;
+  assert(messages != null);
+  assertEquals(messages!.length, 1);
+  assert(messages![0].content!.includes("[MEMBER_COMPLETION]"));
+});
+
+Deno.test("composeFollowUps keeps adapter steering responsive", async () => {
+  const mbox = newMemberMailbox();
+  mbox.setRunningPredicate(() => true);
+
+  let pending: Message[] = [];
+  const adapter = (): Message[] => {
+    const messages = pending;
+    pending = [];
+    return messages;
+  };
+  const hook = composeFollowUps(mbox, adapter)!;
+
+  const done = hook(undefined);
+  pending = [{ role: "user", content: "steer", timestamp: new Date() }];
+  const messages = await done;
+  assert(messages != null);
+  assertEquals(messages![0].content, "steer");
+});
+
+Deno.test("composeFollowUps ignores cancellation while waiting", async () => {
+  const mbox = newMemberMailbox();
+  mbox.setRunningPredicate(() => true);
+  const hook = composeFollowUps(mbox)!;
+
+  const controller = new AbortController();
+  const done = hook(controller.signal);
+  setTimeout(() => controller.abort(), 20);
+  assertEquals(await done, null);
+});
+
+function newMemberCompletion2(
+  memberId: string,
+  displayName: string,
+  payload: string,
+) {
+  return {
+    ...newMemberCompletion(),
+    memberId,
+    displayName,
+    status: MemberStatusDone,
+    payload,
+  };
+}

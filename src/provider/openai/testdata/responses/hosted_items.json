@@ -1,0 +1,30 @@
+[
+  {
+    "id": "file_search_fixture_1",
+    "type": "file_search_call",
+    "status": "completed",
+    "results": [
+      {
+        "file_id": "file_fixture_1",
+        "filename": "guide.md",
+        "score": 0.95,
+        "text": "fixture result"
+      }
+    ]
+  },
+  {
+    "id": "code_fixture_1",
+    "type": "code_interpreter_call",
+    "status": "completed",
+    "container_id": "container_fixture_1",
+    "outputs": [
+      { "type": "image", "url": "https://files.example.test/plot.png" }
+    ]
+  },
+  {
+    "id": "image_fixture_1",
+    "type": "image_generation_call",
+    "status": "completed",
+    "result": "aW1n"
+  }
+]

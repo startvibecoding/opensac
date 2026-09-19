@@ -1,0 +1,72 @@
+{
+  "message_id": 42,
+  "from_user_id": "fixture-sender",
+  "to_user_id": "fixture-bot",
+  "create_time_ms": 1720000000000,
+  "message_type": 1,
+  "context_token": "fixture-context-token",
+  "item_list": [
+    {
+      "type": 2,
+      "image_item": {
+        "media": {
+          "encrypt_query_param": "fixture-image-param",
+          "aes_key": "not-used-image-key"
+        },
+        "aeskey": "30313233343536373839616263646566",
+        "mid_size": 32
+      }
+    },
+    {
+      "type": 3,
+      "voice_item": {
+        "media": {
+          "encrypt_query_param": "fixture-voice-param",
+          "aes_key": "MzAzMTMyMzMzNDM1MzYzNzM4Mzk2MTYyNjM2NDY1NjY="
+        },
+        "file_name": "voice.amr",
+        "duration": 1200
+      }
+    },
+    {
+      "type": 4,
+      "file_item": {
+        "media": {
+          "encrypt_query_param": "fixture-file-param",
+          "aes_key": "MzAzMTMyMzMzNDM1MzYzNzM4Mzk2MTYyNjM2NDY1NjY="
+        },
+        "file_name": "notes.txt",
+        "len": "23"
+      }
+    },
+    {
+      "type": 5,
+      "video_item": {
+        "media": {
+          "encrypt_query_param": "fixture-video-param",
+          "aes_key": "MzAzMTMyMzMzNDM1MzYzNzM4Mzk2MTYyNjM2NDY1NjY="
+        },
+        "file_name": "clip.mp4",
+        "video_size": 32
+      }
+    },
+    {
+      "type": 6,
+      "ref_msg": {
+        "item_list": [
+          {
+            "type": 4,
+            "file_item": {
+              "media": {
+                "encrypt_query_param": "fixture-quoted-file-param",
+                "aes_key": "MzAzMTMyMzMzNDM1MzYzNzM4Mzk2MTYyNjM2NDY1NjY="
+              },
+              "file_name": "quoted.txt",
+              "len": "7"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

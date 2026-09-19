@@ -1,0 +1,29 @@
+{
+  "package": "@tencent-weixin/openclaw-weixin",
+  "version": "2.4.6",
+  "author": "Tencent",
+  "npmIntegrity": "sha512-qw9k3PLTiMWGNjjsknHgcTManH1w4j+Ji1ArWIaYLKCq3aFRsVwcqnPi127bvOoVMJGW4dbyJ8NECEMgoO+iRw==",
+  "tarballSHA512": "ab0f64dcf2d388c5863638ec9271e071331a9c7d70e23f898b502b5886982ca0aadda151b15c1caa73e2d76edbbcea15309196e1d6f227c344084320a0efa247",
+  "gitHead": "b72f4dc0766f83a79a32962e8314e3c0e61787a3",
+  "source": "https://github.com/Tencent/openclaw-weixin/tree/b72f4dc0766f83a79a32962e8314e3c0e61787a3",
+  "retrievedAt": "2026-08-28",
+  "evidenceFiles": [
+    "src/api/api.ts",
+    "src/api/types.ts",
+    "src/cdn/upload.ts",
+    "src/cdn/cdn-upload.ts",
+    "src/messaging/send.ts"
+  ],
+  "sourceContract": {
+    "getUploadURLMethod": "POST",
+    "cdnUploadMethod": "POST",
+    "noNeedThumb": true,
+    "aesKeyEncoding": "base64-ascii-hex",
+    "imageMediaType": 1,
+    "videoMediaType": 2,
+    "fileMediaType": 3,
+    "ambiguousClientID": "uncertain"
+  },
+  "realBotVerified": false,
+  "notes": "Sanitized source-derived contract fixture. Real Bot method, thumbnail, size-limit, and duplicate-client-id behavior remain external verification items."
+}

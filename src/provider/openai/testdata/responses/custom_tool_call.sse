@@ -1,0 +1,12 @@
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"ctc_fixture_1","type":"custom_tool_call","call_id":"call_fixture_1","name":"shell_script","status":"in_progress"}}
+
+event: response.custom_tool_call_input.delta
+data: {"type":"response.custom_tool_call_input.delta","item_id":"ctc_fixture_1","output_index":0,"delta":"echo "}
+
+event: response.custom_tool_call_input.done
+data: {"type":"response.custom_tool_call_input.done","item_id":"ctc_fixture_1","output_index":0,"input":"echo fixture"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"ctc_fixture_1","type":"custom_tool_call","call_id":"call_fixture_1","name":"shell_script","status":"completed","input":"echo fixture"}}
+

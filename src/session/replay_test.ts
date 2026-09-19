@@ -1,0 +1,238 @@
+// Ported from internal/session/session_test.go and content_override_test.go
+// (replay core).
+//
+// The Go tests drive replay through the session Manager; the not-yet-ported
+// Manager is replaced with direct entry slices so the portable replay engine is
+// exercised on its own.
+
+import { assert, assertEquals } from "@std/assert";
+import {
+  entryCompaction,
+  entryContentOverride,
+  entryMessage,
+  type MessageEntry,
+} from "./entry.ts";
+import { newCost, newUserMessage } from "../provider/types.ts";
+import type { Message } from "../provider/types.ts";
+import {
+  buildReplayState,
+  getEntryMetadata,
+  lastSummarizedEntryIDLocked,
+  latestCompactionLocked,
+} from "./replay.ts";
+
+function messageEntry(
+  id: string,
+  parentId: string | null,
+  message: Message,
+): MessageEntry {
+  return {
+    type: entryMessage,
+    id,
+    parentId,
+    timestamp: new Date("2026-01-01T00:00:00Z"),
+    message,
+  };
+}
+
+Deno.test("buildReplayState returns messages with entry IDs", () => {
+  const entries = [
+    messageEntry("e1", null, newUserMessage("hello")),
+    messageEntry("e2", "e1", newUserMessage("world")),
+  ];
+  const state = buildReplayState(entries);
+  assertEquals(state.messages.length, 2);
+  assertEquals(state.messages[0].content, "hello");
+  assertEquals(state.entryIDs, ["e1", "e2"]);
+});
+
+Deno.test("content override replaces message but preserves the target entry ID", () => {
+  const original: Message = {
+    role: "toolResult",
+    content: "[Image file: /tmp/x.png]",
+    toolCallId: "call-1",
+    toolName: "read",
+    timestamp: new Date(),
+    contents: [{
+      type: "image",
+      image: { data: "AAAA", mimeType: "image/png", width: 4, height: 4 },
+    }],
+  };
+  const replacement: Message = {
+    role: "toolResult",
+    content: "[Image file: /tmp/x.png]\n\n[image unavailable]",
+    toolCallId: "call-1",
+    toolName: "read",
+    timestamp: new Date(),
+  };
+  const entries = [
+    messageEntry("e1", null, newUserMessage("look")),
+    messageEntry("e2", "e1", original),
+    {
+      type: entryContentOverride,
+      id: "override-1",
+      parentId: "e2",
+      timestamp: new Date(),
+      targetEntryId: "e2",
+      message: replacement,
+      reason: "rejected",
+    },
+  ];
+  const state = buildReplayState(entries);
+  assertEquals(state.messages.length, 2);
+  assertEquals(state.messages[1].contents, undefined);
+  assert(state.messages[1].content!.includes("image unavailable"));
+  assertEquals(state.messages[1].toolCallId, "call-1");
+  assertEquals(state.messages[1].toolName, "read");
+  assertEquals(state.entryIDs, ["e1", "e2"]);
+});
+
+Deno.test("compaction with empty first-kept entry collapses to the summary", () => {
+  const entries = [
+    messageEntry("e1", null, newUserMessage("a")),
+    messageEntry("e2", "e1", newUserMessage("b")),
+    {
+      type: entryCompaction,
+      id: "c1",
+      parentId: "e2",
+      timestamp: new Date(),
+      summary: "summarized",
+      firstKeptEntryId: "",
+      tokensBefore: 100,
+    },
+  ];
+  const state = buildReplayState(entries);
+  assertEquals(state.messages.length, 1);
+  assertEquals(state.messages[0].content, "summarized");
+  assert(state.messages[0].systemInjected === true);
+  assertEquals(state.entryIDs, [""]);
+});
+
+Deno.test("compaction keeps the tail after first-kept and drops usage", () => {
+  const used = newUserMessage("kept");
+  used.usage = {
+    input: 5,
+    output: 1,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 6,
+    cost: newCost(),
+  };
+  const entries = [
+    messageEntry("e1", null, newUserMessage("dropped")),
+    messageEntry("e2", "e1", used),
+    messageEntry("e3", "e2", newUserMessage("tail")),
+    {
+      type: entryCompaction,
+      id: "c1",
+      parentId: "e3",
+      timestamp: new Date(),
+      summary: "summary",
+      firstKeptEntryId: "e2",
+      tokensBefore: 100,
+    },
+  ];
+  const state = buildReplayState(entries);
+  assertEquals(state.messages.length, 3);
+  assertEquals(state.messages[0].content, "summary");
+  assertEquals(state.messages[1].content, "kept");
+  assertEquals(state.messages[1].usage, undefined);
+  assertEquals(state.messages[2].content, "tail");
+  assertEquals(state.entryIDs, ["", "e2", "e3"]);
+});
+
+Deno.test("compaction with a missing first-kept entry keeps the full history", () => {
+  const entries = [
+    messageEntry("e1", null, newUserMessage("a")),
+    {
+      type: entryCompaction,
+      id: "c1",
+      parentId: "e1",
+      timestamp: new Date(),
+      summary: "s",
+      firstKeptEntryId: "missing",
+      tokensBefore: 1,
+    },
+  ];
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const state = buildReplayState(entries);
+    assertEquals(state.messages.length, 1);
+    assertEquals(state.messages[0].content, "a");
+    assertEquals(state.entryIDs, ["e1"]);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+Deno.test("replay isolates cloned messages from stored entries", () => {
+  const stored = newUserMessage("hello");
+  stored.contents = [{ type: "text", text: "hello" }];
+  const state = buildReplayState([messageEntry("e1", null, stored)]);
+  state.messages[0].contents![0].text = "mutated";
+  assertEquals(stored.contents![0].text, "hello");
+});
+
+Deno.test("latestCompactionLocked returns the newest compaction entry", () => {
+  const entries = [
+    {
+      type: entryCompaction,
+      id: "c1",
+      parentId: null,
+      timestamp: new Date(),
+      summary: "first",
+      firstKeptEntryId: "",
+      tokensBefore: 1,
+    },
+    messageEntry("e1", null, newUserMessage("x")),
+    {
+      type: entryCompaction,
+      id: "c2",
+      parentId: "e1",
+      timestamp: new Date(),
+      summary: "second",
+      firstKeptEntryId: "",
+      tokensBefore: 2,
+    },
+  ];
+  const [entry, ok] = latestCompactionLocked(entries);
+  assert(ok);
+  assertEquals(entry.id, "c2");
+  const [empty, missing] = latestCompactionLocked([]);
+  assertEquals(missing, false);
+  assertEquals(empty.id, "");
+});
+
+Deno.test("lastSummarizedEntryIDLocked resolves the boundary message", () => {
+  const entries = [
+    messageEntry("e1", null, newUserMessage("a")),
+    messageEntry("e2", "e1", newUserMessage("b")),
+    messageEntry("e3", "e2", newUserMessage("c")),
+  ];
+  // The entry immediately before the first kept boundary is the last one a
+  // compaction folded into its summary.
+  assertEquals(lastSummarizedEntryIDLocked(entries, "e3"), "e2");
+  // An empty boundary resolves the newest message entry.
+  assertEquals(lastSummarizedEntryIDLocked(entries, ""), "e3");
+});
+
+Deno.test("getEntryMetadata reads id/type/parent/time from a plain entry", () => {
+  const ts = new Date("2026-02-03T04:05:06Z");
+  const meta = getEntryMetadata({
+    type: "message",
+    id: "e1",
+    parentId: "p1",
+    timestamp: ts,
+  });
+  assertEquals(meta, {
+    id: "e1",
+    type: "message",
+    parentID: "p1",
+    timestamp: ts,
+  });
+  const missing = getEntryMetadata({});
+  assertEquals(missing.id, "");
+  assertEquals(missing.type, "");
+  assertEquals(missing.parentID, null);
+});

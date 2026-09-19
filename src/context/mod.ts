@@ -1,0 +1,50 @@
+// Public surface of src/context (ported from internal/context).
+
+export {
+  calculateContextTokens,
+  type ContextUsage,
+  contextUsageFromMessages,
+  estimateContextTokens,
+  estimateContextTokensWithEstimator,
+  estimateTokens,
+  shouldCompact,
+  shouldCompactPercent,
+} from "./context.ts";
+export {
+  compact,
+  type CompactionResult,
+  type CompactionSettings,
+  type CompactOptions,
+  compactWithLegacyInterface,
+  compactWithOptions,
+  type CompressionTemplate,
+  compressLargeToolResults,
+  type CutPointResult,
+  defaultCompactionSettings,
+  defaultLargeToolResultTokens,
+  defaultMaxCompactionSummaryTokens,
+  findCutPoint,
+  findCutPointWithEstimator,
+  findTurnStartIndex,
+  findValidCutPoints,
+  generateSummary,
+  generateSummaryInsertThenCompress,
+  generateSummaryInsertThenCompressWithTemplate,
+  hasCompactableMessages,
+  maxParallelToolCompactions,
+  normalizeCompactionSettings,
+  resolveCompressionTemplate,
+  serializeConversation,
+  summarizeToolResult,
+  summarizeToolResultOnce,
+} from "./compaction.ts";
+export { deepSeekTokenCount } from "./deepseek_tokenizer.ts";
+export {
+  estimateGuardTokens,
+  estimateTextTokens,
+  GenericTokenEstimator,
+  genericTokenEstimator,
+  ModelAwareTokenEstimator,
+  resolveTokenEstimator,
+  type TokenEstimator,
+} from "./tokenizer.ts";

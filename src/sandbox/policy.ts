@@ -78,7 +78,7 @@ export function normalizeOptions(
   return result;
 }
 
-function normalizeTmpSize(value: string | undefined): string {
+export function normalizeTmpSize(value: string | undefined): string {
   if (!value || value.trim() === "") return "100000000";
   const bytes = parseTmpSize(value);
   if (bytes === 0) {

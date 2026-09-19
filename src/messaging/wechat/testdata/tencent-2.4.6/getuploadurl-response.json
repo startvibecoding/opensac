@@ -1,0 +1,5 @@
+{
+  "upload_param": "fixture-upload-param",
+  "thumb_upload_param": "",
+  "upload_full_url": "https://cdn.example.invalid/c2c/upload?fixture=full-url"
+}

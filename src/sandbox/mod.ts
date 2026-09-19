@@ -5,6 +5,7 @@ export {
   type CommandCleanupProvider,
   type CommandSpec,
   type ExecOpts,
+  formatSandboxInfo,
   type GitAccessSandbox,
   Level,
   levelString,
@@ -18,6 +19,7 @@ export {
 export {
   canonicalSandboxPath,
   normalizeOptions,
+  normalizeTmpSize,
   parseTmpSize,
   pathsOverlap,
 } from "./policy.ts";
@@ -27,7 +29,19 @@ export {
   gitAccessRequired,
   isGitDeniedPath,
 } from "./git.ts";
+export { protectedGitPaths, uniquePaths } from "./git_paths.ts";
 export { newNoneSandbox, NoneSandbox } from "./none.ts";
+export {
+  type BwrapCapabilities,
+  bwrapCapabilitiesComplete,
+  BwrapSandbox,
+  findBwrap,
+  newBwrapSandbox,
+  newBwrapSandboxWithOptions,
+  probeBwrapCapabilities,
+} from "./bwrap.ts";
+export { MacSandbox, newMacSandbox, newMacSandboxWithOptions } from "./mac.ts";
+export { newWinSandbox, WinSandbox } from "./windows.ts";
 export {
   newPlatformSandbox,
   newPlatformSandboxWithOptions,

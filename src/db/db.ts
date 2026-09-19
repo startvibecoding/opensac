@@ -418,7 +418,10 @@ function openOnce(
 function applyPragmas(connection: DB, opts: Options): void {
   connection.exec(`PRAGMA busy_timeout(${BUSY_TIMEOUT_MS})`);
   connection.exec(`PRAGMA synchronous(${synchronousMode()})`);
-  if (opts.foreignKeys) connection.exec("PRAGMA foreign_keys(1)");
+  // node:sqlite enables foreign key enforcement by default, but the canonical
+  // session database keeps it disabled (project policy enforces referential
+  // integrity in the repository layer). Only a private derived store may opt in.
+  connection.exec(`PRAGMA foreign_keys(${opts.foreignKeys ? 1 : 0})`);
 }
 
 /**

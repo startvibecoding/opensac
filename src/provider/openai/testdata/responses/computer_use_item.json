@@ -1,0 +1,10 @@
+{
+  "type": "response.output_item.done",
+  "output_index": 0,
+  "item": {
+    "id": "computer_fixture_1",
+    "type": "computer_call",
+    "status": "completed",
+    "action": { "type": "screenshot", "secret": "redact-me" }
+  }
+}

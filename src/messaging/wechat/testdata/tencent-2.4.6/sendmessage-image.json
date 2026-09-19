@@ -1,0 +1,23 @@
+{
+  "msg": {
+    "to_user_id": "fixture-target",
+    "client_id": "fixture-client-id",
+    "message_type": 2,
+    "message_state": 2,
+    "context_token": "fixture-context-token",
+    "run_id": "fixture-run-id",
+    "item_list": [
+      {
+        "type": 2,
+        "image_item": {
+          "media": {
+            "encrypt_query_param": "fixture-download-param",
+            "aes_key": "MzAzMTMyMzMzNDM1MzYzNzM4Mzk2MTYyNjM2NDY1NjY=",
+            "encrypt_type": 1
+          },
+          "mid_size": 32
+        }
+      }
+    ]
+  }
+}

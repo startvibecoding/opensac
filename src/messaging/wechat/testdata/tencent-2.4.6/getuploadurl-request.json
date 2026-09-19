@@ -1,0 +1,10 @@
+{
+  "filekey": "fixture-file-key",
+  "media_type": 1,
+  "to_user_id": "fixture-target",
+  "rawsize": 18,
+  "rawfilemd5": "fixture-md5",
+  "filesize": 32,
+  "no_need_thumb": true,
+  "aeskey": "30313233343536373839616263646566"
+}

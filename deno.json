@@ -10,7 +10,7 @@
     "install": "deno install -g -A -n mothx src/main.ts",
     "test": "deno test -A",
     "test:architecture": "deno test -A src/architecture/",
-    "check": "deno check src/",
+    "check": "deno check src/ sdk/",
     "fmt": "deno fmt",
     "lint": "deno lint",
     "fuzz": "deno test -A --filter fuzz src/esm src/mcp src/util",
@@ -28,12 +28,14 @@
     "exclude": [
       "*.md",
       "docs/",
+      ".mothx/",
       "bin/",
       "dist/",
       "ui/dist/",
       "ui/node_modules/",
       "src/platform/busybox_assets/",
       "src/context/tokenizerdata/",
+      "src/expert/builtin/",
       "src/stats/dashboard.html",
       "src/skills/builtin/"
     ]
@@ -43,17 +45,20 @@
       "tags": ["recommended"]
     },
     "exclude": [
+      ".mothx/",
       "bin/",
       "dist/",
       "ui/dist/",
       "ui/node_modules/",
       "src/platform/busybox_assets/",
       "src/context/tokenizerdata/",
+      "src/expert/builtin/",
       "src/skills/builtin/"
     ]
   },
   "compilerOptions": {
     "strict": true,
+    "jsx": "react",
     "lib": ["deno.window", "dom", "dom.iterable", "esnext"]
   },
   "imports": {
@@ -70,6 +75,12 @@
     "@std/http": "jsr:@std/http@^1",
     "@db/sqlite": "jsr:@db/sqlite@^0.12",
     "@cliffy/command": "jsr:@cliffy/command@^1",
-    "ink": "npm:ink@^5"
+    "ink": "npm:ink@^5",
+    "react": "npm:react@^18",
+    "react/": "npm:/react@^18/",
+    "@types/react": "npm:@types/react@^18",
+    "@types/react/": "npm:/@types/react@^18/",
+    "imagescript": "npm:imagescript@^1",
+    "@jsquash/webp": "npm:@jsquash/webp@^1"
   }
 }
