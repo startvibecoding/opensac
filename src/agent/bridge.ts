@@ -5,10 +5,14 @@
 // of converters in the top-level `bootstrap` package; this port preserves that
 // split because `src/agent` may not depend on `src/bootstrap`.
 //
-// The `AgentAdapter` (which wraps the internal `Agent` struct) is intentionally
-// deferred until the core loop (`agent.ts`) lands. See backlog #19.
+// `AgentAdapter` wraps the internal `Agent` so it satisfies the public
+// `sdk/agent.Agent`/`QuestionHandler` interface; Go's `<-chan agentpkg.Event`
+// maps to wrapping the internal `AsyncIterable<Event>` with `eventToPublic`.
 
 import {
+  type Agent as PublicAgent,
+  type AgentContext as PublicAgentContext,
+  type AgentID as PublicAgentID,
   type Attachment as PublicAttachment,
   type ChatParams as PublicChatParams,
   type ContentBlock as PublicContentBlock,
@@ -53,6 +57,7 @@ import {
   newCostBreakdown,
   type PlanStep as PublicPlanStep,
   type Provider as PublicProvider,
+  type QuestionHandler as PublicQuestionHandler,
   streamDone as publicStreamDone,
   streamError as publicStreamError,
   type StreamEvent as PublicStreamEvent,
@@ -96,6 +101,7 @@ import {
   type Usage as InternalUsage,
 } from "../provider/mod.ts";
 import type { FileDiff, TaskPlan } from "../tools/mod.ts";
+import type { Agent } from "./agent.ts";
 import {
   type Event,
   EventAgentEnd,
@@ -964,4 +970,112 @@ function encodeArguments(value: unknown): Uint8Array | undefined {
     return undefined;
   }
   return new TextEncoder().encode(JSON.stringify(value));
+}
+
+// --- AgentAdapter wraps the internal Agent to satisfy the public interface ---
+
+/**
+ * AgentAdapter wraps an internal `Agent` and satisfies the public
+ * `sdk/agent.Agent` (and optional `QuestionHandler`) interface. Go's
+ * `WrapEventChan` projection maps to lazily converting each internal event to
+ * the public event type as it is yielded.
+ */
+export class AgentAdapter implements PublicAgent, PublicQuestionHandler {
+  readonly inner: Agent;
+
+  constructor(inner: Agent) {
+    this.inner = inner;
+  }
+
+  id(): PublicAgentID {
+    return this.inner.id();
+  }
+
+  parentId(): PublicAgentID {
+    return this.inner.parentId();
+  }
+
+  abort(): void {
+    this.inner.abort();
+  }
+
+  handleApprovalResponse(approvalId: string, approved: boolean): void {
+    this.inner.handleApprovalResponse(approvalId, approved);
+  }
+
+  handleQuestionResponse(questionId: string, answer: string): void {
+    this.inner.handleQuestionResponse(questionId, answer);
+  }
+
+  /**
+   * Exposes the atomic answer delivery to callers that answer on another
+   * agent's behalf; intentionally not part of the public `QuestionHandler`
+   * interface so existing implementers keep compiling.
+   */
+  deliverQuestionAnswer(questionId: string, answer: string): boolean {
+    return this.inner.deliverQuestionAnswer(questionId, answer);
+  }
+
+  run(userMsg: string, abort?: AbortSignal): AsyncIterable<PublicEvent> {
+    return wrapEventIterable(this.inner.run(userMsg, abort));
+  }
+
+  runWithMessages(
+    messages: PublicMessage[],
+    abort?: AbortSignal,
+  ): AsyncIterable<PublicEvent> {
+    return wrapEventIterable(
+      this.inner.runWithMessages(messagesFromPublic(messages) ?? [], abort),
+    );
+  }
+
+  getMessages(): PublicMessage[] {
+    return messagesToPublic(this.inner.getMessages()) ?? [];
+  }
+
+  setMessages(msgs: PublicMessage[]): void {
+    this.inner.setMessages(messagesFromPublic(msgs) ?? []);
+  }
+
+  getContextUsage(): PublicContextUsage | undefined {
+    return contextUsageToPublic(this.inner.getContextUsage());
+  }
+
+  loadHistoryMessages(messages: PublicMessage[]): void {
+    this.inner.loadHistoryMessages(messagesFromPublic(messages) ?? []);
+  }
+
+  getContext(): PublicAgentContext {
+    const x = this.inner.getContext();
+    if (x === null) {
+      return { systemPrompt: "", messages: [], tools: [] };
+    }
+    return {
+      systemPrompt: x.systemPrompt,
+      messages: messagesToPublic(x.messages) ?? [],
+      tools: [],
+    };
+  }
+
+  setContext(ctx: PublicAgentContext): void {
+    this.inner.setContext({
+      systemPrompt: ctx.systemPrompt,
+      messages: messagesFromPublic(ctx.messages) ?? [],
+      tools: [],
+    });
+  }
+}
+
+/** Creates an adapter that wraps an internal Agent. */
+export function newAgentAdapter(a: Agent): AgentAdapter {
+  return new AgentAdapter(a);
+}
+
+/** Projects the internal event stream onto the public event vocabulary. */
+async function* wrapEventIterable(
+  events: AsyncIterable<Event>,
+): AsyncIterable<PublicEvent> {
+  for await (const e of events) {
+    yield eventToPublic(e);
+  }
 }

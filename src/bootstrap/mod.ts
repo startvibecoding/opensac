@@ -7,11 +7,13 @@
 // importing internal packages.
 //
 // The internal agent builder hook (`agent.setBuilderFunc`) is registered by
-// `src/agent` once backlog #19 lands; until then `Builder.build()` throws the
-// standard "internal builder is not registered" error.
+// importing `src/agent/factory.ts`, whose module-level call mirrors the Go
+// `internal/agent` `init()` that `bootstrap` blank-imports.
 
 // Register the concrete provider factories (each module self-registers).
 import "../provider/factory/mod.ts";
+// Register the internal agent builder hook (agent.setBuilderFunc).
+import "../agent/factory.ts";
 
 export {
   ProviderAdapter,

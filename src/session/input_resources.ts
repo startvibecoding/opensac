@@ -7,6 +7,31 @@ import { InputResourceDAO, isNoRows, type Tx } from "../dao/mod.ts";
 import { writeRootDatabase } from "./database.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 
+// Go persists this timestamp with `time.RFC3339Nano`, and ListEvents orders by
+// `timestamp ASC, id ASC`. A `Date` only carries millisecond precision, so two
+// lifecycle events created in the same millisecond would tie on `timestamp` and
+// fall back to the id tiebreak, losing creation order. Emit a nanosecond
+// fraction (monotonic within a millisecond) so durable order matches Go while
+// the parsed instant stays on the same millisecond.
+let lastTimestampMs = Number.NEGATIVE_INFINITY;
+let lastTimestampSubMs = 0;
+
+function formatInputResourceTimestamp(timestamp: Date): string {
+  const ms = timestamp.getTime();
+  if (!Number.isFinite(ms)) return timestamp.toISOString();
+  let subMs = 0;
+  if (ms === lastTimestampMs) {
+    subMs = lastTimestampSubMs + 1;
+    if (subMs > 999_999) subMs = 999_999;
+  }
+  lastTimestampMs = ms;
+  lastTimestampSubMs = subMs;
+  // Drop the trailing `Z`, keep the millisecond fraction, then append the
+  // sub-millisecond nanosecond digits (nine fractional digits total).
+  const base = new Date(ms).toISOString().slice(0, -1);
+  return `${base}${String(subMs).padStart(6, "0")}Z`;
+}
+
 /** The canonical lifecycle projection for one Runtime materialized resource. */
 export interface InputResourceEvent {
   id: string;
@@ -47,7 +72,7 @@ export function appendInputResourceEventTx(
     runId: event.runId,
     eventType: event.eventType,
     status: event.status,
-    timestamp: timestamp.toISOString(),
+    timestamp: formatInputResourceTimestamp(timestamp),
     data,
   });
 }

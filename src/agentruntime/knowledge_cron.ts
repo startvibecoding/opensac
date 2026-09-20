@@ -1,0 +1,67 @@
+// Ported from internal/agentruntime/knowledge_cron.go.
+//
+// Namespaced scheduled reindex jobs inside the shared cron store. The store is
+// keyed only by sessionDir, so every scheduler process (ACP, serve) can claim a
+// namespaced job; each must route it through `RunKnowledgeBaseCronJob` instead
+// of executing the job prompt as an ordinary agent run inside the knowledge
+// source directory.
+//
+// Deviations: `context.Context` maps to an optional `AbortSignal`; the Go
+// `(handled, response, error)` triple maps to a `KnowledgeBaseCronOutcome`
+// value object plus a thrown `Error`.
+
+import {
+  errKnowledgeBaseServiceNil,
+  KnowledgeIndexJob,
+} from "./knowledge_index_job.ts";
+import type { KnowledgeBaseService } from "./knowledgebase.ts";
+import { SourceCron } from "./source.ts";
+
+export const KnowledgeBaseCronJobPrefix = "knowledge-base-index:";
+
+/** The result of attempting to route one cron job. */
+export interface KnowledgeBaseCronOutcome {
+  handled: boolean;
+  response: string;
+}
+
+/** Derives the shared cron identity of one knowledge base's reindex schedule. */
+export function KnowledgeBaseCronJobID(knowledgeBaseID: string): string {
+  return KnowledgeBaseCronJobPrefix + knowledgeBaseID.trim();
+}
+
+/** Extracts the knowledge base identity from a namespaced cron job ID. */
+export function KnowledgeBaseIDFromCronJobID(
+  jobID: string,
+): { id: string; ok: boolean } {
+  const ok = jobID.startsWith(KnowledgeBaseCronJobPrefix);
+  const id = jobID.slice(KnowledgeBaseCronJobPrefix.length).trim();
+  return { id: ok ? id : "", ok: ok && id !== "" };
+}
+
+/**
+ * Wakes one namespaced reindex through the same background job machinery as
+ * manual scans, so Cron only records the scheduling outcome while the canonical
+ * durable Run stays Runtime-owned. It reports `handled=false` for job IDs
+ * outside the knowledge namespace so a shared scheduler falls back to its own
+ * execution path. Passing the process-wide cached service keeps scheduled scans
+ * deduplicated against manual scans and visible to progress polling.
+ */
+export async function RunKnowledgeBaseCronJob(
+  ctx: AbortSignal | undefined,
+  service: KnowledgeBaseService | null,
+  jobID: string,
+): Promise<KnowledgeBaseCronOutcome> {
+  const { id, ok } = KnowledgeBaseIDFromCronJobID(jobID);
+  if (!ok) return { handled: false, response: "" };
+  if (service === null) {
+    throw errKnowledgeBaseServiceNil;
+  }
+  const job: KnowledgeIndexJob = service.startIndex(ctx, id, SourceCron);
+  const snapshot = await job.wait(ctx);
+  return {
+    handled: true,
+    response: `indexed knowledge base ${id}: ${snapshot.fileCount} files, ` +
+      `${snapshot.chunkCount} chunks`,
+  };
+}

@@ -156,6 +156,57 @@ export function normalizeToolCallArguments(
   return [null, null];
 }
 
+let toolCallFallbackCounter = 0;
+
+/**
+ * nextToolCallFallbackID returns a process-wide unique fallback ID for a
+ * provider tool call that arrived without an ID. This is the TS projection of
+ * Go's atomic `provider.NextToolCallFallbackID`.
+ */
+export function nextToolCallFallbackID(prefix: string): string {
+  toolCallFallbackCounter += 1;
+  return `${prefix}_${toolCallFallbackCounter}`;
+}
+
+/**
+ * normalizeMessage returns a deep-enough copy of msg for safe persistence and
+ * replay. It repairs every embedded tool call while leaving the caller's
+ * message and argument buffers untouched. The returned notices identify tool
+ * calls that were repaired so the Agent can make the recovery visible to the
+ * model instead of silently changing a request.
+ *
+ * This is the TS projection of Go's `provider.NormalizeMessage`.
+ */
+export function normalizeMessage(msg: Message): [Message, string[]] {
+  const normalized: Message = { ...msg };
+  const notices: string[] = [];
+  const contents = msg.contents;
+  if (contents === undefined || contents.length === 0) {
+    return [normalized, notices];
+  }
+  const out: ContentBlock[] = [];
+  for (const block of contents) {
+    const cloned = cloneContentBlock(block);
+    if (cloned.toolCall !== undefined && cloned.toolCall !== null) {
+      const call = { ...cloned.toolCall };
+      const emptyBefore = typeof call.arguments === "string" &&
+        call.arguments.length === 0;
+      const [_args, err] = normalizeToolCallArguments(call);
+      if (emptyBefore || err !== null) {
+        let notice = `tool ${JSON.stringify(call.name)}`;
+        notice += err !== null
+          ? ": invalid JSON arguments"
+          : ": empty arguments";
+        notices.push(notice);
+      }
+      cloned.toolCall = call;
+    }
+    out.push(cloned);
+  }
+  normalized.contents = out;
+  return [normalized, notices];
+}
+
 /**
  * retryCompatibilityStatus renders the status line used for compatibility with
  * adapters that only understand the retry status message.

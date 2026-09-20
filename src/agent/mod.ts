@@ -1,13 +1,13 @@
 // Public surface of src/agent (ported from internal/agent).
 //
-// NOTE: the core loop (`Agent.Run*`/`loop`) and the event-producing pipeline
-// are not yet ported, but the `Agent` instance model, constructors, frozen
-// prompt, history/context accessors, and the image-admission gate now live in
-// `agent.ts` (with the remaining `Agent`-bound `agent_context.ts` methods
-// deferred). The approval/question coordination, sub-agents, factory, and
-// manager modules are not yet ported. The bridge conversions (`bridge.ts`) are
-// ported except for `AgentAdapter`, which wraps the pending run entry points.
-// See docs/proposal/go-to-deno-migration.md backlog #19.
+// The core loop (`Agent.Run*`/`loop`), the event-producing pipeline, the
+// Agent-bound approval/question coordination, the request-assembly and
+// compaction/recovery paths, the tool-execution/durable-claim paths, and the
+// AgentAdapter bridge are ported. `manager.ts` (AgentManager), `factory.ts`
+// (AgentFactory + public Builder registration), and `subagent.ts` (the
+// sub-agent tools) complete the Agent Core; the background Responses tool-call
+// methods remain deferred. See docs/proposal/go-to-deno-migration.md backlog
+// #19.
 
 export * from "./events.ts";
 export * from "./agent.ts";
@@ -32,3 +32,6 @@ export * from "./system_prompt.ts";
 export * from "./tool_launch.ts";
 export * from "./provider.ts";
 export * from "./external_tool_adapter.ts";
+export * from "./manager.ts";
+export * from "./factory.ts";
+export * from "./subagent.ts";

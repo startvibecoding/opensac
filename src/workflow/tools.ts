@@ -1,14 +1,28 @@
-// Ported from internal/workflow/tools.go (minus the agent-bound workflow_run
-// execution and AgentHost, which depend on the not-yet-ported Agent Core).
+// Ported from internal/workflow/tools.go.
 //
 // `json.RawMessage` parameter schemas map to plain JSON objects; the Go error
-// returns map to `throw`. `workflow_run`'s metadata, parameters, guidelines and
-// execution-timeout override are ported so the tool surface is stable, but its
-// `execute` (and `AgentHost`/`registerWorkflowTools`' run registration) await
-// backlog #19 (`internal/agent`).
+// returns map to `throw`. `workflow_run` executes worker agents through the
+// shared `AgentHost`/`AgentManager` (`./agent_host.ts`), mirroring the Go
+// binding to `internal/agent`.
 
 import { configDir } from "../config/settings.ts";
 import * as path from "@std/path";
+import type { AgentID } from "../../sdk/agent/types.ts";
+import {
+  type Event as PublicEvent,
+  eventDone,
+  eventError,
+  eventStatus,
+} from "../../sdk/agent/mod.ts";
+import {
+  agentIDFromToolContext,
+  type EventSink,
+  eventSinkFromToolContext,
+  parentModeFromToolContext,
+  parentRunContextFromToolContext,
+} from "../agent/agent.ts";
+import type { AgentManager } from "../agent/manager.ts";
+import { forwardChildAgentEvent } from "../agent/subagent.ts";
 import {
   newTextToolResult,
   type Registry,
@@ -17,6 +31,7 @@ import {
   type ToolResult,
 } from "../tools/tool.ts";
 import { type ActiveRegistry, newActiveRegistry } from "./active.ts";
+import { AgentHost } from "./agent_host.ts";
 import { lintEvalTimeoutMs } from "./js.ts";
 import { Runner } from "./runner.ts";
 import { FileStore } from "./store.ts";
@@ -24,6 +39,9 @@ import {
   type AgentResult,
   type AgentTask,
   type Host,
+  isCanceled,
+  type ProgressEvent,
+  type RunState,
   statusCanceled,
   statusDone,
   statusError,
@@ -203,13 +221,19 @@ export class LintTool implements Tool {
 
 /** Runs a JavaScript workflow DSL script that orchestrates worker agents. */
 export class RunTool implements Tool {
-  // The manager/store/active fields mirror the Go tool; `execute` awaits the
-  // Agent Core (backlog #19).
+  #manager?: AgentManager;
+  #store?: Store;
+  #active: ActiveRegistry;
+
   constructor(
-    _manager?: unknown,
-    _store?: Store,
-    _active?: ActiveRegistry,
-  ) {}
+    manager?: AgentManager,
+    store?: Store,
+    active?: ActiveRegistry,
+  ) {
+    this.#manager = manager;
+    this.#store = store;
+    this.#active = active ?? newActiveRegistry();
+  }
 
   name(): string {
     return "workflow_run";
@@ -269,15 +293,71 @@ export class RunTool implements Tool {
     return { durationMs: seconds * 1000, provided: true };
   }
 
-  execute(
-    _ctx: ToolContext,
-    _params: Record<string, unknown>,
+  async execute(
+    ctx: ToolContext,
+    params: Record<string, unknown>,
   ): Promise<ToolResult> {
-    return Promise.reject(
-      new Error(
-        "workflow_run requires the Agent Core runtime (backlog #19)",
-      ),
-    );
+    let source = typeof params.source === "string" ? params.source : "";
+    source = source.trim();
+    if (source === "") throw new Error("source is required");
+
+    const [parentId] = agentIDFromToolContext(ctx);
+    const [parentSink] = eventSinkFromToolContext(ctx);
+    const [parentRunCtx] = parentRunContextFromToolContext(ctx);
+    const [parentMode] = parentModeFromToolContext(ctx);
+
+    const host = new AgentHost();
+    host.manager = this.#manager;
+    host.parentId = parentId ?? "";
+    host.parentMode = parentMode ?? "";
+    host.parentSink = parentSink;
+    host.parentRunCtx = parentRunCtx;
+
+    const runner = new Runner({
+      host,
+      store: this.#store,
+      active: this.#active,
+      progress: (ev: ProgressEvent) => {
+        const sink: EventSink | undefined = parentSink;
+        if (sink === undefined || (ev.runId ?? "") === "") return;
+        let msg = (ev.message ?? "").trim();
+        if (msg === "") {
+          msg = [ev.phase ?? "", ev.task ?? "", ev.status ?? ""]
+            .join(" ")
+            .trim();
+        }
+        let eventType = eventStatus;
+        let eventErr: Error | undefined;
+        if ((ev.phase ?? "") === "" && (ev.task ?? "") === "") {
+          switch (ev.status) {
+            case statusDone:
+              eventType = eventDone;
+              break;
+            case statusError:
+            case statusCanceled:
+              eventType = eventError;
+              if (msg !== "") eventErr = new Error(msg);
+              break;
+          }
+        }
+        forwardChildAgentEvent(sink, `workflow:${ev.runId}` as AgentID, {
+          type: eventType,
+          statusMessage: msg,
+          error: eventErr,
+        } as PublicEvent);
+      },
+    });
+
+    try {
+      const state = await runner.run(source, ctx.signal);
+      return runToolResult(state);
+    } catch (err) {
+      const state = (err as { workflowState?: RunState }).workflowState;
+      if (isCanceled(err) && state !== undefined) {
+        return runToolResult(state);
+      }
+      throw err;
+    }
   }
 }
 
@@ -393,9 +473,9 @@ export function newLintTool(): LintTool {
   return new LintTool();
 }
 
-/** Constructs the run tool. Its execution awaits backlog #19. */
+/** Constructs the run tool. */
 export function newRunTool(
-  manager?: unknown,
+  manager?: AgentManager,
   store?: Store,
   active?: ActiveRegistry,
 ): RunTool {
@@ -404,7 +484,7 @@ export function newRunTool(
 
 /** Constructs the run tool with an explicit active registry. */
 export function newRunToolWithActive(
-  manager?: unknown,
+  manager?: AgentManager,
   store?: Store,
   active?: ActiveRegistry,
 ): RunTool {
@@ -423,13 +503,15 @@ export function newCancelTool(active?: ActiveRegistry): CancelTool {
 
 /**
  * Registers the workflow tools. `workflow_lint`, `workflow_status`, and
- * `workflow_cancel` are registered; `workflow_run` is registered only when a
- * manager is supplied, since its execution awaits the Agent Core (#19).
+ * `workflow_cancel` are always registered; `workflow_run` is registered only
+ * when a manager is supplied, matching the Go `RegisterTools` requirement that
+ * the run tool has an AgentManager. (The Go helper returns early when the
+ * manager is nil; here the read-only tools stay available without one.)
  */
 export function registerWorkflowTools(
   registry: Registry | undefined,
   opts: {
-    manager?: unknown;
+    manager?: AgentManager;
     store?: Store;
     active?: ActiveRegistry;
   } = {},
@@ -443,6 +525,25 @@ export function registerWorkflowTools(
   }
   registry.register(newStatusTool(store));
   registry.register(newCancelTool(active));
+}
+
+/** Serializes a completed workflow run into the `workflow_run` tool result. */
+export function runToolResult(state: RunState): ToolResult {
+  return newTextToolResult(JSON.stringify({
+    id: state.id,
+    name: state.name,
+    status: state.status,
+    results: summarizeResults(state),
+  }));
+}
+
+/** Maps each stored result key to its terminal status. */
+export function summarizeResults(state: RunState): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, result] of Object.entries(state.results ?? {})) {
+    out[key] = result.status;
+  }
+  return out;
 }
 
 function numericParam(v: unknown): number | undefined {
