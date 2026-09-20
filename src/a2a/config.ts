@@ -102,3 +102,55 @@ export async function initA2AConfig(force: boolean): Promise<string> {
   await saveConfig(p, cfg);
   return p;
 }
+
+/**
+ * Loads a2a.json, returning defaults when the file does not exist. Malformed
+ * JSON or non-object documents surface as errors.
+ */
+export function loadConfig(p: string): Config {
+  let text: string;
+  try {
+    text = Deno.readTextFileSync(p);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return defaultConfig();
+    throw new Error(`read a2a config: ${(err as Error).message}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    throw new Error(`parse a2a config: ${(err as Error).message}`);
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("a2a config must be a JSON object");
+  }
+  const root = parsed as Record<string, unknown>;
+  const cfg = defaultConfig();
+  if (typeof root["enabled"] === "boolean") {
+    cfg.enabled = root["enabled"];
+  }
+  if (typeof root["port"] === "number") cfg.port = root["port"];
+  if (typeof root["host"] === "string") cfg.host = root["host"];
+  if (typeof root["auth_token"] === "string") {
+    cfg.auth_token = root["auth_token"];
+  }
+  if (typeof root["work_dir"] === "string") {
+    cfg.work_dir = root["work_dir"];
+  }
+  if (
+    root["agent_card"] !== null &&
+    typeof root["agent_card"] === "object" &&
+    !Array.isArray(root["agent_card"])
+  ) {
+    const card = root["agent_card"] as Record<string, unknown>;
+    cfg.agent_card = {};
+    if (typeof card["name"] === "string") cfg.agent_card.name = card["name"];
+    if (typeof card["description"] === "string") {
+      cfg.agent_card.description = card["description"];
+    }
+    if (typeof card["version"] === "string") {
+      cfg.agent_card.version = card["version"];
+    }
+  }
+  return cfg;
+}

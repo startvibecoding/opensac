@@ -161,6 +161,12 @@ export class Server {
     }
   }
 
+  /** Resolves when the HTTP server terminates. */
+  finished(): Promise<void> {
+    if (this.#httpServer === null) return Promise.resolve();
+    return this.#httpServer.finished;
+  }
+
   /** The bound address, available after {@link start}. */
   boundAddr(): string {
     const addr = this.#httpServer?.addr as

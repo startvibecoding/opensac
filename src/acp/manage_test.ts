@@ -507,18 +507,12 @@ Deno.test("manage application patch updates defaults and rejects unknown fields"
   });
 });
 
-Deno.test("manage router reports unported families and unknown methods", () => {
+Deno.test("manage router rejects unknown methods", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("MOTHX_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, Deno.makeTempDirSync());
 
-    assertEquals(
-      manageError(
-        callManage(server, output, 1, "mothx/manage/cron/list", {}),
-      ).code,
-      "manage_method_unavailable",
-    );
     assertEquals(
       manageError(
         callManage(server, output, 2, "mothx/manage/bogus", {}),

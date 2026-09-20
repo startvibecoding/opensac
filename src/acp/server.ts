@@ -799,6 +799,15 @@ export class AcpServer {
   reader: ACPLineReader | null = null;
   permissionTimeoutMs = 0;
   questionTimeoutMs = 0;
+  // Phase 3 management-plane cron runtime (manage.go): lazily started SQLite
+  // store + scheduler, plus the AgentManager dedicated to cron runs.
+  cronScheduler: import("../cron/scheduler.ts").Scheduler | null = null;
+  cronStore: import("../cron/cron.ts").CronStore | null = null;
+  cronAgentMgr: AgentManager | null = null;
+  /** Process-wide cached Runtime knowledge-base service. */
+  knowledgeService:
+    | import("../agentruntime/knowledgebase.ts").KnowledgeBaseService
+    | null = null;
 
   // ─── transport and notification glue ──────────────────────────────────────
 

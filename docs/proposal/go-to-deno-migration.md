@@ -2009,6 +2009,672 @@ backlog is #35's remainder, #36 `serve`, #37 `tui`, and #38
 `cmd/mothx`→`src/cli`+`src/main.ts`; #19's `examples/` stays blocked on the
 public-bootstrap/guard decision.
 
+
+A later run completed the remaining Phase 3 `mothx/manage/*` families of #35
+(`internal/acp`): the knowledge-base, cron, serve, and channels planes.
+
+`src/acp/manage_knowledge_bases.ts` (new) ports `manage_knowledge_bases.go`
+plus the knowledge-schedule projection and the in-process cron runtime from
+`manage.go`: the process-wide cached `KnowledgeBaseService` getter, the
+`knowledge-bases/list|get|create|update|delete|scan|status|query|mcp/apply`
+handlers, the `normalizeKnowledgeBaseSchedule` hourly/daily/weekly/monthly +
+raw-cron vocabulary, the namespaced `knowledge-base-index:<id>` cron
+projection (`syncKnowledgeBaseSchedule*`, `removeKnowledgeBaseSchedule`,
+`syncAllKnowledgeBaseSchedulesWithStore`), `ensureManageCron` (shared
+`SQLiteCronStore` + canonical `newAgentManager` construction +
+`newSchedulerWithSessionDir` with the Runtime knowledge-job handler and
+maintenance policy + offline reconciliation), the `cron/list|create|update|
+remove|run` handlers, the `cron_completed` session-event observer, and the
+canonical `knowledge-<id>` stdio MCP quick-add (`knowledge-mcp serve
+--knowledge-base`, derived from `Deno.execPath()` with the `mothx`
+fallback). `AcpServer` gains the `cronScheduler`/`cronStore`/`cronAgentMgr`/
+`knowledgeService` fields (Go's mutex guards drop on the single-threaded event
+loop). Deviations: scans stay background jobs admitted through
+`service.startIndex`; `MOTHX_ACP_CRON_INTERVAL` parses Go-duration syntax.
+
+`src/serve/config.ts` is extended from the doctor/memory-only slice to the
+full `serve.Config` schema (port of `serve/config.go`, `config_schema.go`,
+`config_mapping.go`): typed sections (api/features/channels/webUI/cron/memory/
+security/hooks/agent), the legacy top-level overlay, snake_case + camelCase
+channel/agent wire compatibility, `normalize`, canonical camelCase
+serialization (`serializeConfig`, the Go custom `MarshalJSON`), and
+`loadConfig`/`loadConfigFrom`/`saveServeConfig`; the memory-focused
+`loadConfig`/`memoryEnabled`/`defaultConfig` surface is preserved.
+
+`src/acp/manage_serve.ts` (new) ports `manage_serve.go`: the secret-free
+`serve/get` view and strict whitelist `serve/patch` (api/features/webUI/cron/
+memory/security/agent/lobsterMode, linked feature toggles, bounded ints/floats,
+mode/thinking/log-level/tool-visibility/system-prompt vocabulary, nested
+session/toolVisibility validation), plus `channels/get` + `channels/patch`
+with write-only credential flags (`credentialConfigured`, `appIDConfigured`,
+`appSecretConfigured`), the set/clear mutual-exclusion fence, and the
+credential-free saved projection. The router in `manage.ts` dispatches every
+remaining family; `isUnportedManageMethod`/`manage_method_unavailable` is
+removed (all recognized methods now route; unknown methods keep
+`manage_method_not_found`).
+
+Tests: new `manage_knowledge_bases_test.ts` (6: schedule normalization,
+cron-store create/update/delete projection, MCP quick-add/disable/missing
+matrix, CRUD + scan-admission + validation matrix, query clamps, cron
+prerequisite structured errors) and `manage_serve_test.ts` (5: secret-free
+GET, patch round-trip that preserves auth tokens, the 15-case unsafe/invalid
+rejection table, api.session projection/validation, channels credential-safe
+view + patch + clear-fence). The router-unavailable test in
+`manage_test.ts` becomes the unknown-method assertion. 191 tests pass in
+`src/acp` (was 172); full suite 1605 passed / 0 failed, architecture 8/8,
+lint/check/fmt clean. Remaining #35 work is only the stdio dispatch loop
+(`Run`, deferred `stopManageCron`) and its method switch; #36 `serve` now has
+its config layer but keeps the HTTP runtime pending; #37 `tui` and #38
+`cmd/mothx`→`src/cli`+`src/main.ts` remain; #19 `examples/` stays blocked on
+the public-bootstrap/guard decision.
+
+
+A follow-up run completed the last Go-side slice of #35: the stdio dispatch
+loop and startup assembly (`internal/acp/acp.go` `Run`).
+
+`src/acp/run.ts` (new) ports `Run`, `resolveACPModelSelection`,
+`resolveACPProviderSelection`, the request method switch, and the previously
+unported `handleAttachmentFetch`. `runACP(options, transport)` performs the
+documented startup order: cwd stat preflight (`cwd_invalid`
+`ACPStartupError`), `loadSettingsFor` preflight (`config_invalid`), the
+`HARBOR_ACP_REQUESTED_MODEL` qualified override with fail-closed provider/model
+conflict checks, doctor `validateProvider` projected through
+`startupErrorFromDoctor` so the host sees the same code/fix/message as the Go
+`MOTHX_ACP_ERROR` line, the lease-first `RecoveryCoordinator` start (bounded
+abort on unwind), `subscribeRuntimeLeaseNotifications` →
+`notifyExternalRunStatus`, `watchDatabaseRebuilds`, the complete provider
+catalog via `createWithOptions` (unusable providers logged and skipped),
+sandbox manager (`settings.sandbox` → `sandboxSettingsOptions`, strict/standard
+`Level`, `Level.None` when disabled, fallback warning), shared
+`loadContextResources`, the process-wide `SessionRuntime`
+(`SourceACP`), the optional canonical `newAgentManager` (multiAgent/delegate/
+workflows), lazy `ensureManageCron` schedule reconciliation, and LIFO cleanup
+(stopManageCron → shutdownAllSessionRuntimes → database watch → lease watch →
+recovery coordinator).
+
+The dispatch loop ports the framing rules verbatim: newline JSON over
+`ACPLineReader(Deno.stdin.readable)` + synchronous stdout sink, blank-line
+tolerance (`EmptyMessageError`), `-32700` parse errors with null id,
+`validRPCID`/jsonrpc 2.0 gate (invalid booleans/objects/arrays echoed with null
+id), initialize-first `-32600`, raw-id reverse-response delivery
+(`deliverResponse`), EOF shutdown, the full ACP/extension method switch
+(session/new|load|resume|fork|prompt|cancel|close, mothx session history/meta/
+title/workdir/projects/workspace/attachment/list, list/listAll,
+set_config_option/set_mode, `$/cancel_request`, mothx/doctor), `mothx/manage/*`
+delegation to `handleManageRequest`, and `-32601` for unknown methods. The
+missing `mothx/attachment/fetch` extension now streams the Runtime-owned
+`AttachmentService.Open` bytes as base64 with a 10 MiB fetch bound, integrity
+expiry/not-found classification (`attachment_not_found`/`attachment_expired`/
+`attachment_too_large`/`attachment_unavailable`); `run.ts` is re-exported
+from `src/acp/mod.ts`.
+
+Tests: new `src/acp/run_test.ts` (8): qualified override adoption + conflict
+matrix + unqualified rejection, settings default fallback, the framing/gate
+table (initialize-first, wrong jsonrpc, blank line, parse error, invalid
+boolean id, unknown manage/method codes, notifications), raw-id reverse
+delivery, attachment/fetch parameter and unavailable structured errors, and a
+real `runACP` startup rejection asserting the classified `MOTHX_ACP_ERROR`
+line for an unconfigured provider with zero JSON-RPC output. Full suite 1613
+passed / 0 failed (was 1605; +8), architecture 8/8, lint/check/fmt clean.
+#35's production surface is now fully ported; remaining work is the
+subprocess-style integration tests (they spawn the compiled `mothx acp`
+binary, which lands with the #38 `acp` CLI command wiring into `src/cli` +
+`src/main.ts`). #36 `serve` keeps its HTTP runtime pending; #37 `tui` and #38
+`cmd/mothx` follow; #19 `examples/` stays blocked on the
+public-bootstrap/guard decision.
+
+### Ledger entry — `cmd/mothx` → `src/cli` + `src/main.ts` (backlog #38, ACP/doctor/knowledge-mcp slice)
+
+The Deno process entry point now exists: thin `src/main.ts` wrapper over the
+Cliffy tree in `src/cli/command.ts` (`newRootCommand`, `newACPCommand`, plus
+`doctor` and `knowledge-mcp serve`), with `src/cli/options.ts` owning the
+shared `CLIOptions` surface (root session/provider/capability flags and the
+ACP `--permission-timeout`/`--question-timeout` Go-duration flags).
+`parseGoDurationMs` accepts the `ns/us/µs/ms/s/m/h` subset (decimal allowed)
+and `resolveACPTimeout` keeps Go's flag-wins-over-`MOTHX_ACP_*_TIMEOUT`
+resolution, falling through invalid/zero values; `acpRunOptions` maps flags
+into the #35 `RunOptions` contract, and startup errors exit 1 after printing
+the classified `MOTHX_ACP_ERROR` line via the shared `isStartupError` guard.
+`src/cli/doctor.ts` projects the existing diagnostics in human/JSON form
+(port of `main_doctor.go`), and `src/cli/knowledge_mcp.ts` serves the
+Runtime-owned `KnowledgeMCPHandler` over stdio with session-dir defaulting
+and SIGINT/SIGTERM/EOF lifetime. `serve`/`a2a`/`stats`/`cron`/`speedtest` and
+the interactive root action stay registered as explicit pending commands
+(slices #36/#37) so the Go CLI surface and help output remain stable; no
+adapter-local runtime logic was added.
+
+Tests: `src/cli/cli_test.ts` (8) covers duration parsing, flag/env timeout
+precedence, flag→RunOptions mapping, doctor JSON/human projection, command
+tree registration, pending-command slice hints, and the
+`knowledge-mcp serve` empty-list guard. `src/cli/run_process_test.ts` (4)
+spawns `deno run -A src/main.ts acp` as a real subprocess in a temp
+`MOTHX_DIR`: the initialize NDJSON handshake (envelope-or-structured-error),
+initialize-first `-32600`, EOF shutdown after initialize + `mothx/doctor`,
+and the `acp --help` flags. Full suite 1625 passed / 0 failed (was 1613;
++12), architecture 8/8, lint/check/fmt clean. Remaining #38 work: the root
+TUI/print actions (#37), serve/a2a/stats/cron/speedtest bodies (#36), and
+`stopManageCron` process-shutdown wiring once those entry points exist.
+
+### Ledger entry — `internal/serve` runtime foundation (backlog #36, slice 1: config state + HTTP bootstrap)
+
+The serve runtime now boots. `src/serve/options.ts` ports the pure option
+surface from `run.go`/`openaiapi/config.go`: `RunOptions`, `applyOverrides`
+(ephemeral CLI flags, never persisted), `applyRuntimeFeatures` (feature flags
+projected onto channels/WebUI/cron/memory/subagents), `listenFromPortOverride`,
+`displayListenAddr`, `useEmbeddedWebUI`, and the `--unsafe` auth-off +
+loopback→`0.0.0.0` rewrite (`unsafeListenAddr`, including IPv4 127/8 and
+`[::1]`). `src/serve/config_state.ts` ports `config_state.go` in full:
+`ServeConfigState.load/reload/snapshot/updateChannel/updateFull`, the global/
+project/explicit layer resolution, whitelist-validated channel merge patches
+(wechat: enabled/credPath/workDir/autoTyping; feishu: enabled/appId/appSecret/
+workDir with appSecret masked in the effective view), 0600 temp-file + rename
+atomic writes (`atomicWritePrivateFile`), apply-failure file rollback, and
+`stripRunOverrides` so full-config PUTs cannot persist CLI-only values.
+
+`src/serve/http.ts` owns the agent-free HTTP projections: `buildServeStatus`/
+`featureStatusFromConfig` (the `/api/status` feature matrix, settings-level
+webSearch OR), `writeJson`, the SPA Web UI handler (`createWebUIHandler`:
+disk or injected embedded assets, content-type table, index.html client-route
+fallback, traversal-safe `safeRelativePath` segment walk, 503 when the
+frontend is unbuilt), and `resolveWebUIDir` (cwd → exe-adjacent → share path).
+`src/serve/server.ts` adds the first real listener: `createServeRouter`
+(`/api/status` GET + 405, Web UI, 404 when disabled), `parseListenAddr`,
+`startServeHttp` (Deno.serve with abort/shutdown and ephemeral-port
+`onListen`), and `runServe` with the startup banner printed from the actually
+bound address. The CLI `serve` subcommand is wired in `src/cli/command.ts`
+with the full Go flag set (`--config/--port/--webui-dir/--provider/--model/
+--work-dir/--unsafe/--sandbox/--multi-agent/--delegate/--workflows/
+--web-search/--browser/--artifact/--a2a-master/--lobster/--verbose/--debug`).
+This slice also fixed a real cross-command bug: Cliffy 1.3 invokes option
+actions with a single parsed-flags object, so the earlier two-argument
+`(_, value)` actions never fired (ACP/root value flags were silently
+ignored); all commands now use `stringSetter`/`boolSetter` reading
+`flags[camelCaseName]`, verified end-to-end against a live `mothx acp`
+initialize handshake and a live `mothx serve --port 0` HTTP process.
+
+Tests: `config_state_test.ts` (14), `http_test.ts` (7), `server_test.ts` (4,
+including a real ephemeral-port Deno.serve), CLI `serve_process_test.ts` (1,
+spawns `deno run src/main.ts serve` and reads the bound port from the banner),
+plus the prior 12 CLI tests. Full suite 1651 passed / 0 failed (was 1625;
++26), architecture 8/8, lint/check/fmt clean. Remaining #36 work: the
+OpenAI-compatible chat completions/SSE core in `openaiapi/` (~27k LoC Go),
+session/run management routes, the messaging channel dispatcher
+(channels/wechat/feishu), cron/delivery/hooks/webhook, and the remaining
+management HTTP handlers.
+
+### Ledger entry — `cmd/mothx` remaining commands (backlog #38: stats/a2a/speedtest)
+
+Migrated the three remaining leaf subcommands from `cmd/mothx` (Go source of
+truth) onto the existing TS runtimes; the CLI tree now carries no pending
+placeholders except `cron` (#36) and the root TUI/print action (#37).
+
+- `src/cli/stats.ts` — ported `main_stats.go`: `executeStatsCommand` runs the
+  dashboard server (`src/stats/server.ts`) or the terminal tables;
+  `printStatsCLI` reproduces the `text/tabwriter` projection (summary, By
+  Provider with `vendor (protocol)` labeling, By Model, Recent Requests) with
+  a deterministic column aligner; `openStatsDB` wraps `DB.open` errors as
+  `open stats database: ...`; best-effort cross-platform browser opener
+  (`open`/`rundll32`/`xdg-open`/`gio`/`sensible-browser`) that never fails
+  the command. Added `Server.finished()` to `src/stats/server.ts` so the
+  process can block on the dashboard listener like Go's `server.Serve`.
+- `src/cli/a2a.ts` + `src/a2a/config.ts` — ported `main_a2a.go` config/status
+  surface: `loadConfig` (JSON parse + field-by-field validation, defaults when
+  the file is absent), `resolveA2AConfig` (global → project `.mothx/a2a.json`
+  overlay → CLI `--port/--work-dir/--auth-token` overrides),
+  `executeA2AInit` (--init-a2a-config [--force], template = DefaultConfig +
+  placeholder token/work_dir/agent-card per Go `InitA2AConfig` L82–104),
+  and `executeA2AStatus` (2s-timeout agent-card probe with injectable
+  `fetchImpl`). `mothx a2a start` intentionally remains a `ValidationError`:
+  it needs a Runtime agent factory bridge (Go `simpleAgentFactory` builds a
+  transient `SessionRuntime` agent per task); wiring it through
+  `agentruntime` is the next a2a slice, not an adapter-local assembler.
+- `src/cli/speedtest.ts` — full port of `main_speedtest.go` (~470 LoC Go):
+  flag validation with Go error strings, `parseSpeedtestThinkingLevel`,
+  `collectSpeedtestTargets` (configured-credential filter incl. `${VAR}`
+  placeholder rejection, provider/model filters, default-model fallback,
+  provider+model sort), per-target `runs` loop with AbortSignal timeout,
+  `runSpeedtestRequest` (text/think first-token latency, usage-or-estimated
+  tokens via the words-vs-runes/4 heuristic, tokens/s over generation
+  window), `averageSpeedtestResults`, stable sort (success first, rate desc,
+  provider/model asc), and the aligned results table. Providers come from
+  `src/provider/factory` `createWithOptions` (requireModel) — no local
+  provider construction. Network-latency TCP probing is deferred (injected
+  `measureNetwork`, defaults 0) because it is cosmetic and untestable
+  offline; the Go default prints real RTTs.
+- Command tree: `newStatsCommand`, `newA2ACommand` (init/status/stop + flags;
+  `stop` still rejects — the TS server writes no PID file),
+  `newSpeedtestCommand` (`-p/-m/--prompt/--max-tokens/--timeout/--concurrency/--runs/-t`)
+  with a minimal Go-duration parser for `--timeout` (ms/s/m/h).
+- Tests: `src/cli/stats_test.ts` (5), `src/cli/a2a_test.ts` (6, async-safe
+  MOTHX_DIR env helper), `src/cli/speedtest_test.ts` (11, fake provider over
+  `AsyncIterable<StreamEvent>` — no network). CLI suite now 35 tests; full
+  suite 1673 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Remaining #38/#36/#37: `a2a start` runtime factory bridge, `cron`, root
+  TUI/print action, and the #37 TUI migration (bubbletea → Ink).
+
+### Ledger entry — `internal/tui` pure layers (backlog #37, slice 1: command specs + formatters)
+
+Started the #37 TUI migration with the protocol-stable pure layers; the Ink
+component and agent-event slices build on these without rework.
+
+- `src/tui/command_specs.ts` — ported `command_specs.go` verbatim: all 33
+  slash-command specs in Go declaration order with English usage strings
+  (protocol text, never localized) and the exact i18n message IDs from
+  `internal/tui/i18n/commands.go` (`commands.<name>.description`, including
+  `default_model`/`paste_image`/`init_mcp` underscores); plus the
+  `handleCommand` dispatch prologue from `commands.go` as pure functions:
+  `splitFields` (Go `strings.Fields`), `parseInputLine` (`/skill:<name>`
+  skill form, slash commands, plain text), `findCommandSpec`, and
+  `isKnownCommand`. The Go App owns unknown-command errors; the parser only
+  normalizes.
+- `src/tui/formatters.ts` — ported the pure helpers of `formatters.go`:
+  `displayWidth` (lipgloss.Width semantics for what the TUI renders: CJK/
+  fullwidth/Hangul = 2 cells, ANSI escapes = 0, combining marks = 0),
+  `truncateDisplay` (the `...`-suffixed grid-safe truncation),
+  `compactBashOutput` (blank-run collapse + per-line trim), and
+  `formatDuration` (`<1s`/`1s`/`1m01s`/`1h01m`). The i18n-coupled tool-result
+  formatters (`formatToolArgsWithTranslator` etc.) migrate with the Ink
+  tool components, not here.
+- Both modules exported through `src/tui/mod.ts`.
+- Tests: `src/tui/command_specs_test.ts` (4 — exact name-order/usage/message-ID
+  table assertion against the Go source, Fields collapse, dispatch prologue),
+  `src/tui/formatters_test.ts` (4 — width semantics, CJK truncation, ANSI
+  zero-width, blank-run collapse, duration ladder). TUI suite 13 tests; full
+  suite 1681 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Remaining #37 slices: Ink components (input/header/tabbar/tool modal),
+  agent-event projection onto `SessionRuntime` (App Update/Init), then the
+  root interactive/print action in `src/cli/command.ts`.
+
+### Ledger entry — `internal/tui` slice 2a: i18n runtime + header + agent tab bar
+
+Migrated the i18n infrastructure and the first two chrome components. The
+renderers stay pure string functions (ANSI-styled, DOM-free) so they are
+usable both from the Ink tree and from deterministic tests, mirroring the Go
+string-returning lipgloss renderers.
+
+- `src/tui/i18n.ts` — ported `language.go` + `catalog.go` + the catalog
+  mechanism of `messages.go`: `parseConfigured` (unknown → auto, valid=false),
+  `resolveLanguage` (auto ⇒ zh only in UTC+8, null zone ⇒ en), `utcOffset`
+  (`UTC+08:00`/`unknown`), and an immutable `Translator` with the exact
+  fallback chain zh → en → raw message id, plus a minimal `sprintf` subset
+  (`%s %v %d %02d %%` with Go's sign-outside-zero-padding). The bilingual
+  catalogs are populated per component slice — first batch carries the
+  `tool.modal.*` state/agent-tab family and input placeholder, with message
+  IDs and texts copied verbatim from the Go bundle (en L677–685, zh L897–905).
+- `src/tui/header.ts` — ported `header.go`: the mothx logo, `logoWidth`, and
+  `renderHeader` with rounded-border info panel (bold `MothX (version)`,
+  `provider | model`, cwd, rename notice), the narrow-width responsive
+  collapse to panel-only, cwd truncation to the available gutter, and the
+  vertically-centered two-column join. Colors are ANSI 256 (`38;5;86` accent)
+  matching the lipgloss palette.
+- `src/tui/agent_tabbar.ts` — ported `agent_tabbar.go`: hidden for ≤1 agents,
+  per-state icons (●/○/✓/✗/⊘ in green/dim/green/red/orange), localized state
+  suffix, accent+bold active tab vs dim inactive, display-width truncation,
+  and the bottom border row. Takes a plain `AgentTab[]` snapshot instead of
+  the live `agent.AgentManager` so the renderer stays testable; the
+  SessionRuntime-backed snapshot provider lands with the agent-event slice.
+- Hardened `truncateDisplay` in `src/tui/formatters.ts`: ANSI escape sequences
+  now pass through with zero width and are never split mid-sequence (Go's
+  `xansi.Truncate` behavior), which the styled tab-bar rows rely on.
+- Tests: `src/tui/components_test.ts` (12) covering the translator fallback
+  chain and auto resolution, sprintf corner cases, header grid alignment
+  (all rows equal display width) and responsive collapse, tab-bar hidden/
+  active/truncation behavior, plus the prior suite. TUI suite 25 tests; full
+  suite 1693 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Next #37 slices: input editor + suggest, tool modal/ESM panel, then the
+  agent-event projection and root interactive action.
+
+### Ledger entry — `internal/tui` slice 2b: editor buffer/model + suggest + command-suggest wiring
+
+Migrated the input stack: the Unicode multi-line editor (buffer + model),
+the suggestion dropdown, and the slash-command suggestion wiring. Like slice
+2a the components stay pure classes with string-rendered views; the Ink layer
+maps `useInput` events onto `Editor.handleKey` without owning semantics.
+
+- `src/tui/components/editor/buffer.ts` — full port of `buffer.go`: lines
+  stored without trailing newlines, rune-offset cursor with preferred column
+  for vertical navigation, insert rune/string/newline (multi-line paste with
+  \r\n/\r normalization), delete back/forward/to-line-end/to-line-start/
+  word-back (Ctrl+W), character and word movement across line boundaries,
+  home/end/end-all, absolute-cursor word walks, clamping, and the display-
+  column helper. Go `unicode.IsSpace` maps to `/\s/`.
+- `src/tui/components/editor/editor.ts` — full port of `editor.go`: Enter
+  submits (`handleKey` returns true), Alt+Enter / Ctrl+J insert newlines,
+  the full key table (arrows, word arrows, home/end, Ctrl+A/E/K/U/W, space,
+  Tab = two spaces), display-line wrapping by display width
+  (`wrapLineSegments` with CJK-aware widths), the cursor-windowed view
+  (`maxLines` window centered on the cursor), reverse-video cursor insertion,
+  the placeholder line (first rune cursor-carried, rest dimmed), and the
+  padded background framing. Key handling is a string-keyed method so the
+  Bubble Tea `KeyMsg` mapping lives in the adapter, not the model.
+- `src/tui/components/suggest/suggest.ts` — port of `suggest.go`: prefix
+  filtering on label/value (case-insensitive), empty query hides, wrap-around
+  cursor movement, scroll window centered on the cursor with the `↑↓ more`
+  hint, dim/accent+bold item rendering, rounded-border dropdown.
+- `src/tui/command_suggest.ts` — port of `command_suggest.go`:
+  `commandSuggestionItems` (spec table + localized descriptions via the
+  slice-1 i18n runtime), `commandSuggestionItemsForInput` (slash gate, no
+  newline, command names before the first space, argument tables after), and
+  the static per-command argument tables (/mode /esm /defaultModel /sessions
+  /expert /delegate /browser /stats /alloweditpath /allowautoedit /statusline
+  /tuilang /agent), including the two-level argument forms
+  (`/allowautoedit on|off global`, `/statusline on|off project|global`,
+  `/tuilang global|project auto|zh|en`). App-level overlay suppression stays
+  with the App slice.
+- i18n catalogs populated with all 33 `commands.*.description` messages,
+  verbatim from the Go bundle (en L473–505, zh L897–929), so command
+  suggestions render bilingually.
+- Tests: `src/tui/editor_suggest_test.ts` (17) covering buffer editing
+  semantics (merge-on-col-0 backspace, word delete, multi-line paste, word
+  movement across lines, CJK rune/display counts), editor key handling and
+  wrapping/windowing, dropdown filter/wrap/scroll, and the command-suggest
+  wiring (33 localized items, `/mo` prefix filter → /mode + /model,
+  argument tables). Note: tests must match Deno's `*_test.ts` discovery
+  pattern (renamed from `components_test_2b.ts`). TUI suite 42 tests; full
+  suite 1710 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Next #37 slices: tool modal + ESM panel (slice 2c), then the agent-event
+  projection and root interactive action (slice 3).
+
+### Ledger entry — `internal/tui` slice 2c: agent-activity store + tool-modal state
+
+Migrated the background-agent activity pipeline (event stream → folded
+snapshot → panel/summary renders) and the tool-modal geometry/scroll state.
+The Go App-coupled halves (targets from `a.toolResults`, live status from
+`a.agentMgr`) stay with the App assembly slice; everything here takes plain
+snapshots.
+
+- `src/tui/activity.ts` — port of `activity.go`: `AgentActivityStore` folds
+  the agent event stream into per-agent `AgentActivity` snapshots —
+  think/text deltas (truncated rolling windows + full accumulators), tool
+  start/result with the shared Runtime error classification
+  (`agentruntime.classifyError` + `displayErrorMessage`, PhaseTool/
+  SideEffectUnknown and PhaseModel — the exact Go contract), retry lines,
+  status lines, hosted items, and terminal states with Go's override
+  semantics (a terminal failure message replaces the last result; late
+  events after a terminal state are ignored). Timeline is capped at 200
+  entries (`appendActivityLine`), workflow agents detected by the
+  `workflow:` id prefix, and `isBackgroundAgentEvent` excludes the lead agent
+  plus the four approval/question event types. Renderers:
+  `renderAgentActivity` (header with kind/state/age, latest tool with
+  detailed args, thinking/response/result sections, HH:MM:SS timeline),
+  `renderActivitySummary` (last 4 agents one-liner), `formatActivityTool`
+  (known-key `name(key="value")` summary), `truncatePlain`,
+  `formatActivityAge`.
+- `src/tui/tool_modal.ts` — port of the state/geometry half of
+  `tool_modal.go`: `ToolModalState.widthFor/contentWidthFor/chromeFor/
+  verticalFrame/pageSizeFor/maxOffsetFor` (the exact Go arithmetic,
+  `Padding(0,2)` → 4 columns), scrolling with bottom pin (`applyPin`),
+  target switching with wrap + scroll reset, tab-row rendering (accent+bold
+  active, dim inactive, `  |  ` separator, truncation), and the framed
+  render with the localized `Agent details` title, position indicator, hint
+  row, ANSI-aware title truncation with `…`, and the separator rule sized to
+  the title. Content lines are caller-supplied.
+- i18n catalogs populated with the `tool.modal.position/title/hints` and all
+  15 `activity.*` messages, verbatim from the Go bundle (en L668–684 +
+  L820–834, zh L1162–1178 + L1000+).
+- Tests: `src/tui/activity_modal_test.ts` (16) — event folding including
+  terminal-override and terminal-late-ignore semantics, timeline cap,
+  workflow kind, background gating; panel/summary renders; activity tool
+  formatting and age ladder; modal geometry math, scroll/pin, target wrap,
+  framed render with title truncation (narrow drops `Esc:close`, wide keeps
+  it — the Go `xansi.Truncate` behavior). TUI suite 58 tests; full suite
+  1726 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Remaining #37: ESM panel (slice 2d), App assembly with agent-event
+  projection and root interactive action (slice 3), transcript/tool-result
+  i18n-rich formatters.
+
+### Ledger entry — `internal/tui` slice 2d: renderutil + ESM panel
+
+Migrated the ANSI-aware text wrapping utilities and the Supervisor Mode
+progress panel. The ESM runtime itself (Store/Objective/state machine) was
+already in `src/esm`; this slice covers its TUI projection only.
+
+- `src/tui/renderutil.ts` — port of `internal/tui/renderutil/ansi_wrap.go`:
+  `visibleWidth` (cells after tab→3-space normalization, ANSI zero-width),
+  `wrapPlainText` (hard wrap at cell boundaries, Go `xansi.Hardwrap`),
+  `wrapANSI` (word-aware wrap breaking after spaces and `/` path
+  breakpoints, Go `xansi.Wrap`), `stripANSI`, `truncateANSI` (preserves
+  unprinted SGR sequences so color state does not leak past the cut, the
+  `xansi.Truncate` behavior), and the shared line pipeline (tab
+  normalization, right-visible-whitespace trim, ANSI blank-line drop).
+- `src/tui/esm_panel.ts` — port of `esm_panel.go` with every function
+  parameterized (objective snapshot, activity context, translator):
+  `esmPanelWidth/contentWidth`, `esmPanelLines` (the full body assembly:
+  title, now-line, progress with `N/3 pipeline stages` + remaining count,
+  next-step, status/stage/pipeline rows, wrapped objective field,
+  worker-progress, remaining-work numbering, blocker + repeated-blocker
+  audit, completion review, rejection/recovery counters, completion
+  candidate, live details, tokens/time/last-saved footer, load-error and
+  no-objective branches), `esmPanelNow` (phase activity label + live
+  sub-agent detail fallback chain tool→result→text→think→running),
+  `effectiveESMPhase` (phase override + status fallback),
+  `renderESMPipeline` (`[x]/[!]/[>]/[ ]` markers), `esmPhaseIndex/Label`,
+  `esmCompletedStages`, `esmPhaseActivityLabel`, `esmPanelNextStep`,
+  `formatESMPanelUpdateTime`, `formatDurationMSForPanel`, and
+  `activeESMPanelActivity`.
+- i18n catalogs populated with all 56 translated `esm.panel.*` messages from
+  `i18n/esm_labels.go` (`MsgESMPanelPaused` has no label entry in Go either;
+  the fallback chain covers it).
+- Tests: `src/tui/esm_panel_test.ts` (18) — wrapper cell-width/ANSI/CJK
+  behavior, path-breakpoint word wrap, trailing-SGR truncation, pipeline
+  marker matrix (x/!/>/space), status-over-phase activity labels, full
+  assembly with every section, load-error/no-objective branches, live
+  activity fallback chain, and 40-width field wrapping. TUI suite 76 tests;
+  full suite 1744 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Remaining #37: App assembly with agent-event projection (slice 3) and the
+  root interactive action; a2a-start factory bridge; cron subcommand.
+
+### Ledger entry — `internal/tui` slice 3a: transcript store (event projection storage)
+
+Started slice 3 with the storage half of the agent-event projection: the
+transcript rows, the assistant/think streaming slots, and the tool-result
+state machine that `handleAgentEvent` writes into. The Ink rendering half
+and the App wiring land next.
+
+- `src/tui/transcript_store.ts` — ported the state machine verbatim from
+  `agent_events.go` + `input.go` + `state.go`:
+  - Streaming slots: `beginAssistantSlot` (EventTurnStart reserves the row
+    before deltas arrive so tool rows cannot shift assistant indices),
+    `appendAssistantDelta`, and `appendThinkDelta` with the exact Go slot
+    conversion — an untouched (empty) assistant slot is reused as the think
+    slot and a fresh assistant slot opens after it. `commitActiveStream`
+    clears active indices.
+  - Tool rows: `appendToolExecutionStart` (dedup by call ID + status,
+    commits the active stream first), `appendToolResult` (terminalizes the
+    matching running row in place carrying matched name/args, opens a new
+    completed row when no running row exists, and drops late stragglers for
+    already-interrupted calls so an aborted run cannot open a second row),
+    and `finalizeInterruptedTools` (running → interrupted with
+    `executionState: "interrupted"`, terminal rows untouched).
+  - `resetTranscriptState` clears all bookkeeping (Go resetTranscriptState).
+  - Summaries: `summarizeToolResult` (bash/ls → compactBashOutput keeping
+    one blank line, read → `N lines`, edit/write → file-diff summary with
+    fallbacks), `summarizeFileDiff` (`+A -D[ large] (-ranges +ranges)`),
+    `formatLineRangesForDisplay` (run compression). FileDiff maps to the
+    existing `src/tools/io_helpers.ts` shape (`added`/`deleted`/
+    `addedLines`/`deletedLines`/`truncated`).
+- i18n: `tool.result.lines` / `tool.result.applied` added to both catalogs.
+- Tests: `src/tui/transcript_store_test.ts` (15) — slot reservation and
+  conversion, delta accumulation with dirty tracking, commit semantics,
+  tool-row dedup/matching/straggler/interruption paths, reset, and the
+  summary forms. TUI suite 91 tests; full suite 1759 passed / 0 failed,
+  architecture 8/8, lint/check/fmt clean.
+- Next #37: Ink transcript renderer + App assembly (handleAgentEvent
+  dispatch over the store), then the root interactive action.
+
+### Ledger entry — `internal/tui` slice 3b: AppController (agent-event dispatch)
+
+Migrated the event-dispatch half of `handleAgentEvent` as a standalone
+controller, keeping the Ink layer a subscriber. The ExecutionRuntime/Decision
+bridge lands as the `RunHandle` adapter in 3c.
+
+- `src/tui/app_controller.ts` — ported `handleAgentEvent` (agent_events.go)
+  plus the approval/question queue state (`approval.go showNext*`):
+  - Background routing: `AgentActivityStore.isBackgroundAgentEvent` gates
+    member/workflow events into the activity store; lead events fall through
+    to the transcript.
+  - Streaming/tools/turns: text/think deltas into the slice-3a store,
+    hosted-item status lines, turn start/end, tool call (embedded
+    ToolCallBlock), execution start/end, tool result, plan updates.
+  - Approvals: registers a `DecisionApproval` via `RunHandle`, binds the
+    answer resolver, queues pending requests, shows the next one
+    (enqueue + show-next consumes the queue into the shown slot, matching
+    Go), dedups on the shown id, and surfaces duplicate-registration errors
+    as command errors.
+  - Questions: member questions (`agentId` set) route to the lead-mailbox
+    message path and are never registered as human decisions (Go comment
+    preserved); human questions register `DecisionQuestion`, queue, and
+    show.
+  - Terminal: `EventRunFinished` maps TaskFailed/Canceled/Incomplete to the
+    canonical RunStates, calls `finish`, finalizes interrupted tools, clears
+    `isThinking`, and adds the error/warning message; legacy
+    `EventDone`/`EventError` terminalize as failed when no canonical
+    terminal has arrived and are ignored after it.
+- Tests: `src/tui/app_controller_test.ts` (12) — streaming/turn flow,
+  background routing, tool row lifecycle through the controller, status
+  messages, run-finished terminal mapping for all statuses, legacy terminal
+  events, approval/question registration + queue consumption, member-vs-human
+  question routing, and duplicate-decision errors. TUI suite 103 tests; full
+  suite 1771 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Next #37 (slice 3c): Ink transcript renderer + App.tsx assembly,
+  `RunHandle` adapter over `ExecutionRuntime`/`DecisionService`, and the
+  root interactive action in the CLI.
+
+### Ledger entry — `internal/tui` slice 3c: TuiRun adapter + Ink App assembly
+
+Bridged the controller to the shared execution lifecycle and rebuilt the Ink
+root component around the migrated stores.
+
+- `src/tui/tui_run.ts` — ported `run.go`'s decision half as `TuiRun`, which
+  implements the controller's `RunHandle` contract: `registerDecision`
+  (DecisionService registration with duplicate/invalid error text, pending
+  persistence), `bindDecision`, `resolveDecision` (`resolveWith` + resolved
+  persistence commit), `clearDecisions` with `decisionTerminalStatus`
+  (cancelled/cancelling → "cancelled", every other terminal state →
+  "timed_out" so non-cancellation outcomes are not misreported), and the
+  lifecycle passthroughs (`finish` with `finishWithState`, `cancel`,
+  `resume`, `waitForApproval/Question`). Decision events persist through the
+  shared `recordDecisionEvent` sink with `source: "tui"`; missing
+  execution/session fields are no-ops exactly like the Go nil-guards. The
+  durable begin path (ExecutionIntent + `BeginIntentDurable` + admission
+  guard) belongs to the CLI root assembly (3d) where `SessionRuntime` builds
+  the agent.
+- `src/tui/app.tsx` — rebuilt the Ink root around the controller: a single
+  `<Static>` carries the header lines plus committed transcript rows
+  (Ink supports exactly one Static; two instances drop output), the active
+  think/assistant slots render as clipped streaming rows in the managed
+  view, and shown approval/question panels render as bordered boxes with
+  `isThinking` spinner. The legacy banner mode is preserved for the
+  toolchain smoke test.
+- Tests: `src/tui/tui_run_test.ts` (5) — terminal status mapping, duplicate
+  and resolved-decision registration errors through the real
+  `DecisionService`, clear-and-terminalize flows, and the no-runtime no-op
+  contract; the Ink assembly test (`app_controller_test.ts`) now renders
+  header + streaming transcript + approval panel through FakeStdout. TUI
+  suite 109 tests; full suite 1777 passed / 0 failed, architecture 8/8,
+  lint/check/fmt clean.
+- Next #37 (slice 3d): CLI root interactive action — SessionRuntime agent
+  build, `tuiRun.start` (admission guard + `BeginIntentDurable`), the
+  `listenAgentEvents` loop, and main-loop key handling.
+
+### Ledger entry — `internal/tui` slice 3d (part 1): root print action
+
+Wired the CLI root print action (`-P`) end-to-end through the shared
+runtime, replacing the last placeholder on the root command's print path
+(the interactive TUI action remains and keeps its slice hint).
+
+- `src/cli/root_print.ts` — ported `main_util.go runPrint`:
+  - Provider via `src/provider/factory` (`createWithOptions`, requireModel);
+    mode default `yolo` (settings → fallback), thinking normalization.
+  - One fresh session per print run (`session.newManager`) bound through the
+    shared `Builder.build` (registry, skills, sandbox, MCP — the only
+    production construction path) with `SourceCLI`.
+  - Durable lifecycle: admission guard → `cli_<id>`/`intent_<id>` ids →
+    `acceptInput` → `buildUserMessage` → SHA-256 request fingerprint +
+    policy snapshot (`approvalPolicy: print`, `questionPolicy:
+    unattended`) → `BeginIntentDurable` with the canonical started event and
+    conversation-turn linkage. `RunStore` + `SessionRunEventSink` attached.
+  - `BuildAgent` + conversation-turn binding + `runWithUserMessage`; the
+    event loop (`agent.consumeEvents`) streams text (buffered → wrapped
+    stdout) or NDJSON (`start`/`text_delta`/`think_delta`/`hosted_item`/
+    `tool_call`/`tool_execution_start`/`tool_execution_end`), mirrors Go's
+    stderr `[tool: …]`/`[running: …]`/`done` lines, and errors on approval
+    requests with Go's exact message. Terminal mapping
+    failed/cancelled/incomplete → `finishDurableWithRetry` events.
+- Root command: `-P` now dispatches to `runPrintAction` (prompt from
+  positional args); the TUI hint remains for non-print invocations.
+- Tests: `src/cli/cli_test.ts` root help asserts the prompt positional and
+  `--print` flag; full suite 1778 passed / 0 failed, architecture 8/8,
+  lint/check/fmt clean.
+- Next: interactive TUI main loop (3e), a2a-start factory bridge, cron
+  subcommand.
+
+### Ledger entry — `internal/tui` slice 3d-2 (part 1): interactive session assembly + input shell
+
+Ported the interactive TUI assembly: the session state object, the in-tree
+keyboard shell, and the CLI root wiring. This completes the structural port
+of the TUI main loop; live end-to-end keyboard verification remains a
+manual/E2E follow-up since Ink input requires a real TTY.
+
+- `src/tui/tui_session.ts` — the interactive session object (the Go App's
+  run lifecycle half): `start()` builds the shared runtime once through
+  `Builder.build` (SourceTUI, registry/skills/sandbox/MCP), `submitPrompt`
+  runs the durable conversation-turn path (admission guard → `tui_<id>`/
+  `intent_<id>` → acceptInput → buildUserMessage → intent+policy snapshot →
+  `BeginIntentDurable` with started event and turn linkage → `RunStore` +
+  `SessionRunEventSink` → `BuildAgent` + `setConversationTurn` +
+  `execution.setAgent` → `runWithUserMessage`), pumping events into the
+  AppController until the terminal flag, then clearing busy/thinking and
+  releasing the admission guard. `cancelRun` aborts via
+  `ExecutionRuntime.cancel` (ctrl+c while busy), `answerApproval`/
+  `answerQuestion` drive the decision panels.
+- `src/tui/tui_shell.tsx` — the in-tree keyboard loop (`useInput` requires a
+  component context): printable input → `Editor.insertText`, arrows/del/
+  tab/ctrl-a/e/j/k/u/w → the Editor's key table (slice 2b), Alt/Ctrl+Enter
+  newline, Enter submits through the session, approval panel y/n and question
+  panel numeric options route through the decision bindings, ctrl+c cancels
+  a busy run or exits, SIGINT mirrors ctrl+c. Renders through the migrated
+  `App` (single Static, streaming rows, panels).
+- `src/cli/root_tui.ts` — `runInteractiveAction`: builds the session, renders
+  `TuiShell` (React createElement from plain TS), rerenders on a 100ms
+  refresh timer plus submit completions, and exits through the shell's
+  onExit. The root command's default action now dispatches here.
+- Known follow-ups: live TTY keyboard E2E (Ink input needs a real terminal;
+  unit coverage covers the controller/store layers), editor width tracking
+  terminal resize, and the settings-driven translator.
+- Tests: full suite 1778 passed / 0 failed (no new failures; keyboard loop
+  is TTY-bound), architecture 8/8, lint/check/fmt clean.
+
+### Ledger entry — `internal/tui` wrap-up: a2a start factory bridge + cron placeholder removal
+
+Closed the two remaining CLI items, leaving no pending placeholders in the
+command tree.
+
+- `src/cli/a2a.ts` — `RuntimeAgentFactory` implements the a2a
+  `AgentFactory` contract (Go `simpleAgentFactory`, main_a2a.go L268–313):
+  each task builds a transient agent through `Builder.build` +
+  `SessionRuntime.buildAgent` (the only production construction path;
+  SourceACP to match Go, thinking off, sandbox level from `--sandbox`), with
+  provider creation via the shared factory (`requireModel`). An adapter
+  reorders the core Agent's `run(userMsg, signal)` to the A2A contract's
+  `run(signal, input)`. `executeA2AStartWithSettings` wires it into
+  `DefaultExecutor` and `a2a.run` (server startup is lazy — agents are built
+  per task, so the listener comes up without provider credentials). The
+  root `a2a start` action now dispatches here with clean startup-error
+  handling; the placeholder is gone.
+- `mothx cron` subcommand removed: the Go CLI has no such subcommand (cron
+  is the root `--cron` flag plus the TUI `/cron` slash command; the
+  `main_cron.go` helpers have no CLI callers). The obsolete pending
+  placeholder and its `pendingCommand` helper were deleted; the help test
+  now asserts the Commands section matches the Go surface.
+- Verified live on the rebuilt binary: `mothx a2a start` listens on
+  127.0.0.1:8093 and serves the agent card; interactive TUI renders the
+  header and input loop; `-P` with an unknown provider exits cleanly with
+  `error: unknown provider: …`.
+- Full suite 1778 passed / 0 failed, architecture 8/8, lint/check/fmt clean.
+- Remaining #37 follow-ups (non-blocking): live TTY keyboard E2E, editor
+  width tracking terminal resize, settings-driven translator in the shell.
+
 ## Validation
 
 ```sh

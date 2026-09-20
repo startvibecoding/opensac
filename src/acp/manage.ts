@@ -8,13 +8,8 @@
 // `mothx/manage/application/*` projection of the Runtime-owned settings subset.
 //
 // This slice also ports the settings/providers, skills, mcp, stats, memory, and
-// deliveries families of manage.go.
-//
-// Migration bridge (owner #35, removed when manage_serve.go / manage_cron and
-// manage_skillhub*.go / manage_knowledge_bases.go land): the router routes the
-// ported families and returns `manage_method_unavailable` for the
-// recognized-but-not-yet-ported families. Unknown methods still return the
-// canonical manage_method_not_found error.
+// deliveries families of manage.go; the skillhub, knowledge-base/cron, and
+// serve/channels families live in their sibling modules.
 //
 // Deviations from Go: `json.RawMessage` params/values map to already-decoded
 // JSON values, so the whitelist/validators inspect typed values rather than raw
@@ -135,6 +130,28 @@ import {
   handleManageSkillHubTargets,
   handleManageSkillHubUninstall,
 } from "./manage_skillhub.ts";
+import {
+  handleManageCronCreate,
+  handleManageCronList,
+  handleManageCronRemove,
+  handleManageCronRun,
+  handleManageCronUpdate,
+  handleManageKnowledgeBaseMCPApply,
+  handleManageKnowledgeBasesCreate,
+  handleManageKnowledgeBasesDelete,
+  handleManageKnowledgeBasesGet,
+  handleManageKnowledgeBasesList,
+  handleManageKnowledgeBasesQuery,
+  handleManageKnowledgeBasesScan,
+  handleManageKnowledgeBasesStatus,
+  handleManageKnowledgeBasesUpdate,
+} from "./manage_knowledge_bases.ts";
+import {
+  handleManageChannelsGet,
+  handleManageChannelsPatch,
+  handleManageServeConfigGet,
+  handleManageServeConfigPatch,
+} from "./manage_serve.ts";
 
 // ─── shared manage helpers (manage.go) ────────────────────────────────────────
 
@@ -310,9 +327,8 @@ export const manageAllowedModes: Record<string, boolean> = {
 // ─── mothx/manage router ──────────────────────────────────────────────────────
 
 /**
- * Routes the `mothx/manage/*` extension family. Family members that are not yet
- * ported receive a structured manage_method_unavailable error; unknown methods
- * keep the canonical manage_method_not_found error.
+ * Routes the `mothx/manage/*` extension family. Unknown methods keep the
+ * canonical manage_method_not_found error.
  */
 export function handleManageRequest(s: AcpServer, req: ACPRPCRequest): void {
   switch (req.method) {
@@ -430,22 +446,61 @@ export function handleManageRequest(s: AcpServer, req: ACPRPCRequest): void {
     case "mothx/manage/skillhub/uninstall":
       handleManageSkillHubUninstall(s, req);
       return;
+    case "mothx/manage/cron/list":
+      handleManageCronList(s, req);
+      return;
+    case "mothx/manage/cron/create":
+      handleManageCronCreate(s, req);
+      return;
+    case "mothx/manage/cron/update":
+      handleManageCronUpdate(s, req);
+      return;
+    case "mothx/manage/cron/remove":
+      handleManageCronRemove(s, req);
+      return;
+    case "mothx/manage/cron/run":
+      handleManageCronRun(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/list":
+      handleManageKnowledgeBasesList(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/get":
+      handleManageKnowledgeBasesGet(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/create":
+      handleManageKnowledgeBasesCreate(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/update":
+      handleManageKnowledgeBasesUpdate(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/delete":
+      handleManageKnowledgeBasesDelete(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/scan":
+      handleManageKnowledgeBasesScan(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/status":
+      handleManageKnowledgeBasesStatus(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/query":
+      handleManageKnowledgeBasesQuery(s, req);
+      return;
+    case "mothx/manage/knowledge-bases/mcp/apply":
+      handleManageKnowledgeBaseMCPApply(s, req);
+      return;
+    case "mothx/manage/serve/get":
+      handleManageServeConfigGet(s, req);
+      return;
+    case "mothx/manage/serve/patch":
+      handleManageServeConfigPatch(s, req);
+      return;
+    case "mothx/manage/channels/get":
+      handleManageChannelsGet(s, req);
+      return;
+    case "mothx/manage/channels/patch":
+      handleManageChannelsPatch(s, req);
+      return;
     default:
-      if (isUnportedManageMethod(req.method)) {
-        s.writeResponse(
-          req.idRaw,
-          null,
-          acpStructuredRPCError(
-            -32601,
-            "manage_method_unavailable",
-            `management method ${
-              JSON.stringify(req.method)
-            } is not available yet`,
-            { method: req.method },
-          ),
-        );
-        return;
-      }
       s.writeResponse(
         req.idRaw,
         null,
@@ -456,33 +511,6 @@ export function handleManageRequest(s: AcpServer, req: ACPRPCRequest): void {
           null,
         ),
       );
-  }
-}
-
-/** Recognized `mothx/manage/*` methods owned by later, unported slices. */
-function isUnportedManageMethod(method: string): boolean {
-  switch (method) {
-    case "mothx/manage/serve/get":
-    case "mothx/manage/serve/patch":
-    case "mothx/manage/channels/get":
-    case "mothx/manage/channels/patch":
-    case "mothx/manage/cron/list":
-    case "mothx/manage/cron/create":
-    case "mothx/manage/cron/update":
-    case "mothx/manage/cron/remove":
-    case "mothx/manage/cron/run":
-    case "mothx/manage/knowledge-bases/list":
-    case "mothx/manage/knowledge-bases/get":
-    case "mothx/manage/knowledge-bases/create":
-    case "mothx/manage/knowledge-bases/update":
-    case "mothx/manage/knowledge-bases/delete":
-    case "mothx/manage/knowledge-bases/scan":
-    case "mothx/manage/knowledge-bases/status":
-    case "mothx/manage/knowledge-bases/query":
-    case "mothx/manage/knowledge-bases/mcp/apply":
-      return true;
-    default:
-      return false;
   }
 }
 

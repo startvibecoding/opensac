@@ -22,3 +22,4 @@ export * from "./extensions.ts";
 export * from "./manage.ts";
 export * from "./manage_skillhub.ts";
 export * from "./server.ts";
+export * from "./run.ts";
