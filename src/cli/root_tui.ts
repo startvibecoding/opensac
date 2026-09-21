@@ -1,6 +1,6 @@
 // Ported from cmd/mothx/main.go runInteractive: the CLI root interactive
-// action. Assembles the TUISession (shared runtime + controller + editor),
-// renders the TuiShell, and lets the in-component useInput loop drive input.
+// action. Assembles the TUISession (shared runtime + controller + input state),
+// renders the TuiShell, and lets the shell's raw-stdin loop drive input.
 // React createElement is used because this module is plain TS (no .tsx).
 
 import React from "react";
@@ -46,15 +46,6 @@ export function applyEditorWidth(
   return next;
 }
 
-/** Re-reads the terminal width and applies it; returns the new width, or null
- * when the width did not change. */
-function trackTerminalResize(
-  editor: { setWidth(w: number): unknown },
-  previous: number,
-): number | null {
-  return applyEditorWidth(editor, previous, terminalWidth());
-}
-
 /** Runs the interactive TUI until the user exits (Go runInteractive). */
 export async function runInteractiveAction(
   options: TUIOptions,
@@ -68,8 +59,8 @@ export async function runInteractiveAction(
   await session.start();
 
   let width = terminalWidth();
-  // The editor draws its own 2-cell horizontal frame inside a rounded border.
-  session.editor.setWidth(width - 2);
+  // The input state frames the editor inside a rounded border (2 columns).
+  session.setEditorWidth(width);
 
   let version = 0;
   const rerender = () => {
@@ -81,7 +72,7 @@ export async function runInteractiveAction(
         version,
         width,
         onSubmit: (text: string) => {
-          void session.submitPrompt(text);
+          void session.handleSubmit(text);
         },
         onExit: () => {
           sessionEnded.resolve();
@@ -93,9 +84,10 @@ export async function runInteractiveAction(
   // Track terminal resize (Go tea.WindowSizeMsg → SetWidth + rerender):
   // SIGWINCH fires on every resize while a real terminal is attached.
   const onResize = () => {
-    const next = trackTerminalResize(session.editor, width);
-    if (next === null) return;
+    const next = terminalWidth();
+    if (next === width) return;
     width = next;
+    session.setEditorWidth(width);
     rerender();
   };
   let removeResizeListener = () => {};
@@ -112,7 +104,7 @@ export async function runInteractiveAction(
   const refreshTimer = setInterval(rerender, 100);
   // Cursor blink for the editor input box.
   const blinkTimer = setInterval(() => {
-    session.editor.blinkCursor();
+    session.input.editor.blinkCursor();
   }, CURSOR_BLINK_INTERVAL_MS);
 
   const sessionEnded = Promise.withResolvers<void>();
@@ -123,7 +115,7 @@ export async function runInteractiveAction(
       version,
       width,
       onSubmit: (text: string) => {
-        void session.submitPrompt(text);
+        void session.handleSubmit(text);
       },
       onExit: () => {
         sessionEnded.resolve();
@@ -137,4 +129,23 @@ export async function runInteractiveAction(
   clearInterval(blinkTimer);
   removeResizeListener();
   instance.unmount();
+
+  if (session.reloadRequested) {
+    await reloadProcess();
+  }
+}
+
+/** Re-executes the current binary with the same arguments (/reload). */
+async function reloadProcess(): Promise<void> {
+  const executable = Deno.execPath();
+  const command = new Deno.Command(executable, {
+    args: Deno.args,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const status = await command.spawn().status;
+  if (!status.success) {
+    throw new Error(`reload exited with code ${status.code}`);
+  }
 }

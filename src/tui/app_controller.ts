@@ -45,6 +45,12 @@ export interface RunHandle {
   bindDecision(id: string, resolve: (value: string) => void): void;
   /** Terminalizes the run with the canonical RunState. */
   finish(state: RunState): void;
+  /** Marks the durable run as waiting on an approval (optional). */
+  waitForApproval?(): void;
+  /** Marks the durable run as waiting on a question (optional). */
+  waitForQuestion?(): void;
+  /** Returns the durable run to active execution after an answer (optional). */
+  resume?(): void;
 }
 
 export interface PendingApproval {
@@ -69,6 +75,10 @@ export interface AppControllerCallbacks {
   scheduleRender(): void;
   /** Spinner kick while thinking (Go tickSpinner). */
   tickSpinner?(): void;
+  /** Delivers a resolved approval to the owning (lead or member) agent. */
+  deliverApproval?(approvalID: string, approved: boolean): void;
+  /** Delivers a resolved question answer to the owning agent. */
+  deliverQuestion?(questionID: string, answer: string): void;
 }
 
 export class AppController {
@@ -109,6 +119,11 @@ export class AppController {
   attachRun(run: RunHandle | undefined): void {
     this.#run = run;
     this.runTerminalHandled = false;
+  }
+
+  /** The handle of the currently attached run, if any. */
+  currentRunHandle(): RunHandle | undefined {
+    return this.#run;
   }
 
   get runAttached(): boolean {
@@ -249,8 +264,11 @@ export class AppController {
       }
       this.#run.bindDecision(next.approvalID, (value) => {
         const approved = value !== "false";
+        this.#cb.deliverApproval?.(next.approvalID, approved);
         this.resolveApproval(next.approvalID, approved);
+        this.#run?.resume?.();
       });
+      this.#run.waitForApproval?.();
     }
     this.approvalQueue.push(next);
     if (!this.waitingForApproval) this.showNextApproval();
@@ -294,9 +312,10 @@ export class AppController {
         return;
       }
       this.#run.bindDecision(event.questionId ?? "", (value) => {
-        // Routed back through the agent by the App assembly (3c).
-        void value;
+        this.#cb.deliverQuestion?.(event.questionId ?? "", value);
+        this.#run?.resume?.();
       });
+      this.#run.waitForQuestion?.();
     }
     this.questionQueue.push({
       questionID: event.questionId ?? "",

@@ -111,3 +111,48 @@ export {
 } from "./tui_run.ts";
 export { TUISession } from "./tui_session.ts";
 export { inputFooter, TuiShell } from "./tui_shell.tsx";
+export { type InputAction, InputState } from "./input_state.ts";
+export {
+  coalesceSplitPaste,
+  type KeyEvent,
+  type KeyName,
+  splitInputChunk,
+} from "./keys.ts";
+export { PasteStore } from "./paste.ts";
+export {
+  type CommandHost,
+  type CommandResult,
+  dispatchCommand,
+  helpText,
+} from "./commands.ts";
+export { TuiCommands } from "./tui_commands.ts";
+export {
+  Dialog,
+  type DialogController,
+  type DialogItem,
+  type DialogOutcome,
+  type DialogPage,
+  formatAge,
+  MAX_VISIBLE_ITEMS,
+  visibleRange,
+} from "./dialog.ts";
+export {
+  AuthDialog,
+  DefaultModelDialog,
+  type DialogHost,
+  EnvDialog,
+  ModelDialog,
+  SessionsDialog,
+  SettingsDialog,
+  TuiLangDialog,
+} from "./dialogs.ts";
+export {
+  readClipboardImage,
+  TuiSessionCommands,
+  type TuiSessionLike,
+} from "./tui_session_commands.ts";
+export {
+  formatSessionEntry,
+  listManagerSessions,
+  renderSessionList,
+} from "./session_commands.ts";

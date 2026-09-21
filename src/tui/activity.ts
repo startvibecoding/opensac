@@ -83,6 +83,12 @@ export class AgentActivityStore {
     return this.#activities.size;
   }
 
+  /** Drops every tracked activity (Go /clear). */
+  clear(): void {
+    this.#activities.clear();
+    this.#order = [];
+  }
+
   /** Whether this event belongs to a background/team agent (not the lead). */
   static isBackgroundAgentEvent(event: Event, leadAgentId?: string): boolean {
     if (!event.agentId) return false;
