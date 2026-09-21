@@ -7,11 +7,7 @@
 // use). Swap the vendor/baseURL for anthropic or any OpenAI-compatible
 // endpoint.
 
-import {
-  eventAgentEnd,
-  eventTextDelta,
-  newBuilder,
-} from "../sdk/agent/mod.ts";
+import { eventAgentEnd, eventTextDelta, newBuilder } from "../sdk/agent/mod.ts";
 import "../bootstrap.ts";
 
 const apiKey = Deno.env.get("OPENAI_API_KEY") ?? "";

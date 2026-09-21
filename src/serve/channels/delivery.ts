@@ -16,7 +16,7 @@
 
 import { createHash } from "node:crypto";
 import {
-  type Event,
+  type Agent,
   EventAgentStart,
   EventBudgetPressure,
   EventCompactionEnd,
@@ -37,61 +37,72 @@ import {
   newAgentAdapter,
   registerDelegateSubAgentTool,
   registerSubAgentTools,
+  subAgentToolNames,
   TaskCanceled,
   TaskFailed,
   TaskIncomplete,
   TaskSuccess,
-  type Agent,
 } from "../../agent/mod.ts";
 import type {
   AfterToolCallContext,
-  BeforeToolCallContext,
-  ToolCallBlockResult,
+  ToolCallResult,
 } from "../../agent/agent.ts";
-import { newAgentManager } from "../../agentruntime/agent_manager.ts";
 import {
   acquireExecutionAdmission,
   attachSessionResources,
   classifyError,
   createSession,
-  type DeliveryCapability,
+  DecisionQuestion,
   DeliveryCoordinator,
   deliveryOperationText,
-  displayErrorMessage,
   type DeliveryPlan,
+  displayErrorMessage,
+  type ErrorInfo,
   ExecutionRuntime,
   findIdempotentRun,
   getDurableRun,
   idempotencyKeyFingerprint,
-  inspectSessionExecution,
-  type InputIngress,
-  type InputStream,
   type InputSubmission,
+  inspectSessionExecution,
   loadContextResources,
-  ModeYolo,
   openSession,
   PhaseContext,
   PhaseModel,
   PhasePersistence,
   PhaseTransport,
-  type PlanDeliveryResult,
   planDelivery,
+  type PlanDeliveryResult,
   resourceIds,
   type RunEvent,
-  type RunState,
   RunStore,
+  type SessionAttachment,
   SessionExecutionIdle,
   SessionExecutionReserved,
-  SessionRunEventSink,
+  type SessionExecutionSnapshot,
   sessionHasTeamExpert,
-  type SessionAttachment,
+  SessionRunEventSink,
   type SessionStopResult,
   sourceFromChannelType,
-  SourceUnknown,
-  type ThinkingLevel,
 } from "../../agentruntime/mod.ts";
-import type { Registry } from "../../tools/tool.ts";
-import { A2ADispatchTool, type A2ADispatcher } from "../../tools/mod.ts";
+import { acquireSessionMutation } from "../../agentruntime/execution_admission.ts";
+import {
+  SessionStopAccepted,
+  SessionStopNoActiveRun,
+  SessionStopOwnedElsewhere,
+  SessionStopRecoveryStarted,
+  SessionStopRemoteAccepted,
+  SessionStopRemoteUnsupported,
+  SessionStopReserved,
+} from "../../agentruntime/execution_stop.ts";
+import { type ArtifactCollector } from "../../agentruntime/artifact.ts";
+import { buildRegistry } from "../../agentruntime/registry.ts";
+import { newRunContext } from "../../agent/run_context.ts";
+import type { Registry, ToolContext } from "../../tools/tool.ts";
+import {
+  type A2ADispatcher,
+  A2ADispatchTool,
+  type AgentEntry,
+} from "../../tools/mod.ts";
 import { newA2AManager } from "../../a2a/master.ts";
 import { newCronTool } from "../../cron/tool.ts";
 import { newSessionScopedStoreWithWorkDir } from "../../cron/session_store.ts";
@@ -101,22 +112,20 @@ import { registerWorkflowTools } from "../../workflow/tools.ts";
 import { Level, newManagerWithOptions } from "../../sandbox/sandbox.ts";
 import { sandboxOptionsFromSettings } from "../../agentruntime/session_runtime.ts";
 import {
-  generateID,
-  runUserEntryID,
   findBinding,
-  rotateBoundSession,
+  generateID,
+  getChannelToolGeneration,
+  listChannelTools,
   type Manager as SessionManager,
+  rotateBoundSession,
+  runUserEntryID,
 } from "../../session/mod.ts";
 import {
   type DeliveryOperation,
   ErrDeliveryOperationBusy,
   getDeliveryOperation,
 } from "../../session/delivery_store.ts";
-import type {
-  Attachment,
-  Message,
-  Provider,
-} from "../../provider/mod.ts";
+import type { Attachment, Message } from "../../provider/mod.ts";
 import {
   type InboundMessage,
   type MessageResponse,
@@ -129,24 +138,28 @@ import {
   channelFailureInfo,
   channelMessageIdempotencyKey,
   channelRunState,
+  channelSafeSubAgentEvent,
   effectiveChannelMode,
   formatRetryProgress,
   formatToolProgress,
-  channelSafeSubAgentEvent,
+  IncompleteRunError,
   isIncompleteRunError,
   newChannelRunFailure,
 } from "./run_helpers.ts";
 import {
-  channelRunSource,
+  type AgentApprovalHandler,
   channelAttachmentIngresses,
-} from "./dispatcher.ts";
-import type {
-  AgentApprovalHandler,
+  channelRunSource,
   ChannelSession,
-  ChannelSessionLease,
-  Dispatcher,
+  type ChannelSessionLease,
+  type ChannelToolDefinition,
+  type Dispatcher,
+  ErrSessionRunBusy,
+  esmSteeringMessages,
+  isMultiAgentToolName,
+  loadA2AAgentList,
 } from "./dispatcher.ts";
-import { ErrSessionRunBusy, loadA2AAgentList } from "./dispatcher.ts";
+import { defaultConfig, withConfigMethods } from "./config.ts";
 import { sessionKey } from "./session_paths.ts";
 import { reconcileCompletedBackgroundRun } from "./background_recovery.ts";
 import {
@@ -188,13 +201,13 @@ export class ChannelDeliveryController {
     return this.#coordinator.owner;
   }
 
-  async claim(
+  claim(
     _signal: AbortSignal | undefined,
     operationID: string,
   ): Promise<DeliveryOperation | null> {
-    if (operationID.trim() === "") return null;
+    if (operationID.trim() === "") return Promise.resolve(null);
     const existing = this.#claims.get(operationID);
-    if (existing !== undefined) return { ...existing };
+    if (existing !== undefined) return Promise.resolve({ ...existing });
     let claimed: DeliveryOperation;
     try {
       claimed = this.#coordinator.claim(operationID, new Date());
@@ -209,7 +222,7 @@ export class ChannelDeliveryController {
             current !== null &&
             (current.status === "delivered" || current.status === "unsupported")
           ) {
-            return current;
+            return Promise.resolve(current);
           }
         } catch {
           // fall through to the original error
@@ -218,7 +231,7 @@ export class ChannelDeliveryController {
       throw err;
     }
     this.#claims.set(operationID, claimed);
-    return { ...claimed };
+    return Promise.resolve({ ...claimed });
   }
 
   complete(
@@ -318,7 +331,13 @@ export class ChannelDeliveryController {
             );
             return;
           }
-          this.complete(signal, claimed, status, providerMessageID, failureCode);
+          this.complete(
+            signal,
+            claimed,
+            status,
+            providerMessageID,
+            failureCode,
+          );
         })();
       },
     };
@@ -332,13 +351,12 @@ export class ChannelDeliveryController {
     intent: DeliveryPlan["intent"],
   ): OutboundAttachment {
     const transport = decodeTransportContext(intent.transportContext);
-    const self = this;
     let prepared = false;
     const prepare = (signal: AbortSignal): Promise<void> => {
       if (prepared) return Promise.resolve();
       return (async () => {
         if (upload.id !== "") {
-          await self.claim(signal, upload.id);
+          await this.claim(signal, upload.id);
         }
         prepared = true;
       })();
@@ -365,9 +383,9 @@ export class ChannelDeliveryController {
       ) => {
         void (async () => {
           try {
-            const uploadClaim = await self.claim(signal, upload.id);
+            const uploadClaim = await this.claim(signal, upload.id);
             if (uploadClaim !== null) {
-              self.progress(
+              this.progress(
                 signal,
                 uploadClaim,
                 status,
@@ -391,19 +409,18 @@ export class ChannelDeliveryController {
       ) => {
         void (async () => {
           try {
-            const uploadClaim = await self.claim(signal, upload.id);
+            const uploadClaim = await this.claim(signal, upload.id);
             if (uploadClaim !== null) {
               uploadClaim.providerAssetId = providerAssetID;
               uploadClaim.providerState = providerState;
-              self.complete(signal, uploadClaim, status, "", failureCode);
+              this.complete(signal, uploadClaim, status, "", failureCode);
             }
           } catch {
             // ignored
           }
         })();
       },
-      prepareSend: (signal) =>
-        this.claim(signal, send.id).then(() => {}),
+      prepareSend: (signal) => this.claim(signal, send.id).then(() => {}),
       completeSend: (
         signal,
         status,
@@ -413,10 +430,10 @@ export class ChannelDeliveryController {
       ) => {
         void (async () => {
           try {
-            const sendClaim = await self.claim(signal, send.id);
+            const sendClaim = await this.claim(signal, send.id);
             if (sendClaim !== null) {
               sendClaim.providerState = providerState;
-              self.complete(
+              this.complete(
                 signal,
                 sendClaim,
                 status,
@@ -441,17 +458,17 @@ export class ChannelDeliveryController {
       complete: (signal, status, providerMessageID, failureCode) => {
         void (async () => {
           try {
-            const uploadClaim = await self.claim(signal, upload.id);
+            const uploadClaim = await this.claim(signal, upload.id);
             if (uploadClaim !== null) {
-              self.complete(signal, uploadClaim, status, "", failureCode);
+              this.complete(signal, uploadClaim, status, "", failureCode);
             }
           } catch {
             // ignored
           }
           try {
-            const sendClaim = await self.claim(signal, send.id);
+            const sendClaim = await this.claim(signal, send.id);
             if (sendClaim !== null) {
-              self.complete(
+              this.complete(
                 signal,
                 sendClaim,
                 status,
@@ -483,7 +500,9 @@ function decodeTransportContext(raw: unknown): TransportContext {
 
 function encodeProviderState(state: unknown): Uint8Array {
   const value = state === undefined || state === null ? "" : state;
-  return new TextEncoder().encode(typeof value === "string" ? value : JSON.stringify(value));
+  return new TextEncoder().encode(
+    typeof value === "string" ? value : JSON.stringify(value),
+  );
 }
 
 // --- Route identity -----------------------------------------------------------
@@ -496,7 +515,10 @@ function encodeProviderState(state: unknown): Uint8Array {
  * both fields, and other transports retain their user ID.
  */
 export function channelRouteID(msg: InboundMessage): string {
-  if ((msg.platform === "feishu" || msg.platform === "wechat") && msg.chatID !== "") {
+  if (
+    (msg.platform === "feishu" || msg.platform === "wechat") &&
+    msg.chatID !== ""
+  ) {
     return msg.chatID;
   }
   return msg.userID;
@@ -599,7 +621,9 @@ export async function handleDelivery(
     lease = null;
   }
   if (sess === null || releaseRuntime === null || !promoted || lease === null) {
-    throw new Error("session changed while message was waiting for runtime lock");
+    throw new Error(
+      "session changed while message was waiting for runtime lock",
+    );
   }
   // This is intentionally resolved at execution time as well as on creation
   // and /mode: old bindings, recovery, and external submissions must not
@@ -734,7 +758,7 @@ async function runDelivery(
   if (existing !== null) {
     // The original inbound event already has a canonical Run. A retry is
     // acknowledged without sending a second channel response.
-    return {};
+    return { text: "" };
   }
   execution.setRunStore(new RunStore(d.sessionDir));
   execution.setEventSink(new SessionRunEventSink(d.sessionDir));
@@ -838,9 +862,24 @@ async function runDelivery(
   try {
     let result: ChannelRunResult;
     try {
-      result = await runAgent(d, runSignal, sess, userMessage, msg.progressFunc ?? null);
+      result = await runAgent(
+        d,
+        runSignal,
+        sess,
+        userMessage,
+        msg.progressFunc ?? null,
+      );
     } catch (err) {
-      const finishErr = await finishRun(d, execution, runID, runSource, modelID, sess, err, null);
+      const finishErr = await finishRun(
+        d,
+        execution,
+        runID,
+        runSource,
+        modelID,
+        sess,
+        err,
+        null,
+      );
       if (finishErr !== null) {
         console.error(`[channels] finish failed Run ${runID}: ${finishErr}`);
       }
@@ -868,9 +907,19 @@ async function runDelivery(
         caption: result.text,
         attachments: result.artifacts,
         capability,
+        createdAt: runStartedAt,
       });
     } catch (planErr) {
-      const finishErr = await finishRun(d, execution, runID, runSource, modelID, sess, planErr, null);
+      const finishErr = await finishRun(
+        d,
+        execution,
+        runID,
+        runSource,
+        modelID,
+        sess,
+        planErr,
+        null,
+      );
       if (finishErr !== null) {
         console.error(`[channels] finish failed Run ${runID}: ${finishErr}`);
       }
@@ -880,15 +929,30 @@ async function runDelivery(
     const fallbackText = planned.fallbackText;
     if (fallbackText !== "") {
       const frozen = decodeTransportContext(plan.intent.transportContext);
-      const frozenRecord = (plan.intent.transportContext ?? {}) as Record<string, unknown>;
+      const frozenRecord = (plan.intent.transportContext ?? {}) as Record<
+        string,
+        unknown
+      >;
       frozenRecord["fallback"] = fallbackText;
       void frozen;
-      plan = { ...plan, intent: { ...plan.intent, transportContext: frozenRecord } };
+      plan = {
+        ...plan,
+        intent: { ...plan.intent, transportContext: frozenRecord },
+      };
     }
     const planPtr = plan.operations.length > 0 ? plan : null;
-    const finishErr = await finishRun(d, execution, runID, runSource, modelID, sess, null, planPtr);
+    const finishErr = await finishRun(
+      d,
+      execution,
+      runID,
+      runSource,
+      modelID,
+      sess,
+      null,
+      planPtr,
+    );
     if (finishErr !== null) throw new Error(finishErr);
-    return await projectDelivery(d, signal, sess, msg, result, plan, fallbackText);
+    return projectDelivery(d, signal, sess, msg, result, plan, fallbackText);
   } finally {
     if (sess.runID === runID) {
       sess.runID = "";
@@ -1027,7 +1091,13 @@ export async function rotateSession(
     }
     const workDir = d.platformWorkDir(platform);
     try {
-      rotateBoundSession(workDir, d.sessionDir, platform, userID, current.sessionId);
+      rotateBoundSession(
+        workDir,
+        d.sessionDir,
+        platform,
+        userID,
+        current.sessionId,
+      );
     } catch (err) {
       releaseIdentity();
       releaseRuntime();
@@ -1046,7 +1116,7 @@ export async function rotateSession(
 // --- Delivery projection -------------------------------------------------------
 
 /** projectDelivery maps the durable plan onto the transport response. */
-export async function projectDelivery(
+export function projectDelivery(
   d: Dispatcher,
   signal: AbortSignal,
   sess: ChannelSession | null,
@@ -1054,7 +1124,7 @@ export async function projectDelivery(
   result: ChannelRunResult,
   plan: DeliveryPlan,
   fallbackText: string,
-): Promise<MessageResponse> {
+): MessageResponse {
   const response: MessageResponse = { text: result.text };
   if (fallbackText !== "") {
     response.text = response.text !== ""
@@ -1100,7 +1170,9 @@ export async function projectDelivery(
     artifacts.set(artifact.id, artifact);
   }
   for (const operation of plan.operations) {
-    if (operation.operationKind !== "send_artifact" || operation.artifactId === "") {
+    if (
+      operation.operationKind !== "send_artifact" || operation.artifactId === ""
+    ) {
       continue;
     }
     let artifact = artifacts.get(operation.artifactId);
@@ -1112,7 +1184,9 @@ export async function projectDelivery(
         );
       } catch (err) {
         throw new Error(
-          `resolve delivery artifact ${operation.artifactId}: ${errorMessage(err)}`,
+          `resolve delivery artifact ${operation.artifactId}: ${
+            errorMessage(err)
+          }`,
         );
       }
     }
@@ -1271,7 +1345,7 @@ export async function resolveSession(
 
   const sbMgr = newManagerWithOptions(
     workDir,
-    sandboxOptionsFromSettings(d.settings),
+    sandboxOptionsFromSettings(d.settings?.sandbox),
   );
   if (sandboxEnabled) {
     try {
@@ -1281,7 +1355,9 @@ export async function resolveSession(
     }
     const fallback = sbMgr.fallbackError();
     if (fallback !== undefined) {
-      console.error(`[channels] sandbox unavailable; using direct execution: ${fallback}`);
+      console.error(
+        `[channels] sandbox unavailable; using direct execution: ${fallback}`,
+      );
     }
   } else {
     try {
@@ -1352,7 +1428,9 @@ export async function resolveSession(
         }
         let registerMultiAgent = false;
         for (const name of definitions.keys()) {
-          if (isMultiAgentToolName(name) && toolEnabled(name, multiAgentEnabled)) {
+          if (
+            isMultiAgentToolName(name) && toolEnabled(name, multiAgentEnabled)
+          ) {
             registerMultiAgent = true;
             break;
           }
@@ -1403,6 +1481,7 @@ export async function resolveSession(
   );
   try {
     await sessionRuntime.connectConfiguredMCP(undefined, {
+      servers: [],
       optional: true,
       onError: (err: unknown) => {
         console.error(`[channels] connect MCP servers: ${err}`);
@@ -1475,6 +1554,1015 @@ export async function resolveSession(
   d.sessions.set(key, sess);
   console.error(`[channels] session created: ${key} (workDir=${workDir})`);
   return sess;
+}
+
+// --- Command handling -----------------------------------------------------------
+
+const channelCommandHelp = `可用聊天命令：
+/new [force]            - 创建新的会话（force 强制中断正在执行的任务）
+/clear [force]          - 清空当前会话并创建新会话
+/stop                   - 停止当前正在执行的任务
+/status                 - 查看当前会话状态
+/sessions               - 查看当前活跃会话
+/mode [plan|agent|yolo|os] - 查看或切换会话模式
+/compact                - 压缩当前会话上下文
+/help                   - 显示此帮助
+/more                   - 继续接收微信未发送完的消息`;
+
+function channelStopReply(result: SessionStopResult): string {
+  if (
+    result.code === SessionStopAccepted ||
+    result.code === SessionStopRemoteAccepted
+  ) {
+    return "🛑 Stop requested.";
+  }
+  if (result.code === SessionStopRecoveryStarted) {
+    return "🛑 Stale execution recovery requested.";
+  }
+  if (result.code === SessionStopOwnedElsewhere) {
+    return "⏳ This session is running in another MothX process and cannot be stopped here.";
+  }
+  if (result.code === SessionStopRemoteUnsupported) {
+    return "⏳ The detached provider run cannot be stopped from this channel.";
+  }
+  if (result.code === SessionStopReserved) {
+    return "⏳ This session is currently reserved by another operation.";
+  }
+  if (result.code === SessionStopNoActiveRun) {
+    return "No active run to stop.";
+  }
+  return "❌ Unable to confirm the current execution state.";
+}
+
+function channelCommandFailureMessage(err: unknown): string {
+  const info = channelFailureInfo(err, undefined, PhasePersistence);
+  const message = displayErrorMessage(info).trim();
+  if (message !== "") return message;
+  return "The operation could not be completed.";
+}
+
+function rotateHandlerForCommand(
+  d: Dispatcher,
+): (platform: string, userID: string, force: boolean) => Promise<void> {
+  if (d.rotateHandler !== null && d.rotateHandler !== undefined) {
+    return d.rotateHandler;
+  }
+  return (platform, userID, force) => rotateSession(d, platform, userID, force);
+}
+
+/** acquireCommandSession resolves the session and holds its runtime mutation
+ * lease so /mode and /compact mutate a stable execution. */
+async function acquireCommandSession(
+  d: Dispatcher,
+  platform: string,
+  userID: string,
+): Promise<{ sess: ChannelSession; release: () => void } | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let sess: ChannelSession;
+    try {
+      sess = await resolveSession(d, platform, userID);
+    } catch {
+      return null;
+    }
+    const lease = d.acquireSessionLease(
+      sessionKey(platform, userID),
+      platform,
+      userID,
+      sess,
+    );
+    if (lease === null) continue;
+    const sessionID = sess.manager?.getHeader()?.id ?? "";
+    let runtimeGuard;
+    try {
+      runtimeGuard = await acquireSessionMutation(
+        undefined,
+        d.sessionDir,
+        sessionID,
+        { wait: true },
+      );
+    } catch (err) {
+      lease.release();
+      throw err;
+    }
+    const releaseRuntime = () => runtimeGuard.release();
+    if (await lease.promoteAfterRuntimeLock()) {
+      return {
+        sess,
+        release: () => {
+          releaseRuntime();
+          lease.release();
+        },
+      };
+    }
+    releaseRuntime();
+    lease.release();
+  }
+  throw new Error("session changed while waiting for runtime lock");
+}
+
+/** compactSession forces one compaction pass over the session context. */
+async function compactSession(
+  d: Dispatcher,
+  signal: AbortSignal,
+  sess: ChannelSession,
+): Promise<void> {
+  const built = await buildAgent(d, signal, sess, null);
+  if (built === null) {
+    throw new Error("build channel agent failed");
+  }
+  const a = built.agent;
+  try {
+    const replayState = sess.manager?.getReplayState();
+    if (replayState !== undefined && replayState.messages.length > 0) {
+      a.loadHistoryState(replayState.messages, replayState.entryIDs);
+    }
+    // Go drains a buffered event channel; the events are collected and dropped
+    // the same way here.
+    const events: unknown[] = [];
+    const err = await a.compact(
+      newRunContext(signal),
+      () => (events.push(null), true),
+      true,
+    );
+    if (err !== undefined) throw err;
+  } finally {
+    built.cleanup(undefined);
+  }
+}
+
+/** handleCommand processes slash commands from messaging platforms. Every
+ * failure is projected into the reply text; nothing throws to the transport. */
+export async function handleCommand(
+  d: Dispatcher,
+  msg: InboundMessage,
+): Promise<string> {
+  const parts = msg.text.trim().split(/\s+/).filter((p) => p !== "");
+  if (parts.length === 0) return "";
+
+  const cmd = parts[0].toLowerCase();
+  const force = parts.length > 1 && parts[1].toLowerCase() === "force";
+  const findBoundSessionID = (): string => {
+    if (msg.platform !== "wechat" && msg.platform !== "feishu") return "";
+    try {
+      return findBinding(d.sessionDir, msg.platform, msg.userID)?.sessionId ??
+        "";
+    } catch {
+      return "";
+    }
+  };
+  switch (cmd) {
+    case "/help":
+      return channelCommandHelp;
+    case "/new":
+    case "/clear": {
+      const handler = rotateHandlerForCommand(d);
+      try {
+        await handler(msg.platform, msg.userID, force);
+      } catch (err) {
+        if (err === ErrSessionRunBusy) {
+          return "⏳ 上一个任务仍在执行。可先发送 /stop，或使用 /new force 强制创建新会话。";
+        }
+        return `❌ Failed to ${
+          cmd === "/new" ? "create new session" : "clear session"
+        }: ${channelCommandFailureMessage(err)}`;
+      }
+      return cmd === "/new" ? "✅ New session created." : "✅ Session cleared.";
+    }
+    case "/stop": {
+      let sessionID = d.getSession(sessionKey(msg.platform, msg.userID))?.id ??
+        "";
+      if (sessionID === "") sessionID = findBoundSessionID();
+      if (sessionID === "") return "No active session.";
+      let result: SessionStopResult;
+      try {
+        result = await d.requestSessionStop(undefined, sessionID);
+      } catch (err) {
+        return `❌ Unable to stop the current run: ${
+          channelCommandFailureMessage(err)
+        }`;
+      }
+      return channelStopReply(result);
+    }
+    case "/status": {
+      const sess = d.getSession(sessionKey(msg.platform, msg.userID));
+      let sessionID = sess?.id ?? "";
+      if (sessionID === "") sessionID = findBoundSessionID();
+      if (sessionID === "") return "No active session.";
+      let mode = "";
+      let workDir = "";
+      let messageCount = 0;
+      if (sess !== null && sess !== undefined) {
+        mode = sess.mode;
+        workDir = sess.workDir;
+        messageCount = sess.manager?.getMessages().length ?? 0;
+      }
+      let reply =
+        `Session: ${sessionID}\nMode: ${mode}\nMessages: ${messageCount}\nWorkDir: ${workDir}`;
+      let inspection: SessionExecutionSnapshot;
+      try {
+        inspection = inspectSessionExecution(d.sessionDir, sessionID);
+      } catch {
+        return reply + "\nRun: state unavailable (retryable)";
+      }
+      const localRunID = sess?.runID ?? "";
+      const startedAt = sess?.runStartedAt;
+      const lastEventAt = sess?.lastEventAt;
+      if (inspection.activeRun !== undefined && inspection.activeRun !== null) {
+        const runID = inspection.activeRun.id;
+        const status = inspection.running ? "running" : inspection.state;
+        reply +=
+          `\nRun: ${runID} (${status}, owner=${inspection.displayOwnerScope}`;
+        if (
+          sess !== null && sess !== undefined && localRunID === runID &&
+          startedAt !== undefined && !Number.isNaN(startedAt.getTime())
+        ) {
+          const now = Date.now();
+          reply += `, running ${
+            formatElapsed(now - startedAt.getTime())
+          }, last event ${
+            formatElapsed(now - (lastEventAt?.getTime() ?? now))
+          } ago`;
+        }
+        reply += ")";
+      } else if (inspection.state === SessionExecutionReserved) {
+        reply += `\nRun: reserved (owner=${inspection.displayOwnerScope})`;
+      } else if (inspection.state === SessionExecutionIdle) {
+        // A hand-built embedded ChannelSession can have no matching durable
+        // Session row. Preserve its legacy local status until it is persisted;
+        // production sessions always take the canonical branch above.
+        if (
+          !inspection.sessionExists && localRunID !== "" &&
+          startedAt !== undefined && !Number.isNaN(startedAt.getTime())
+        ) {
+          const now = Date.now();
+          reply += `\nRun: ${localRunID} (running ${
+            formatElapsed(now - startedAt.getTime())
+          }, last event ${
+            formatElapsed(now - (lastEventAt?.getTime() ?? now))
+          } ago)`;
+        } else {
+          reply += "\nRun: idle";
+        }
+      } else if (!inspection.sessionExists) {
+        if (localRunID !== "") {
+          const now = Date.now();
+          reply += `\nRun: ${localRunID} (running ${
+            formatElapsed(now - (startedAt?.getTime() ?? now))
+          }, last event ${
+            formatElapsed(now - (lastEventAt?.getTime() ?? now))
+          } ago)`;
+        } else {
+          reply += "\nRun: idle";
+        }
+      } else {
+        reply += `\nRun: ${inspection.state}`;
+      }
+      return reply;
+    }
+    case "/sessions": {
+      const sessions = d.listSessions();
+      if (sessions.length === 0) return "No active sessions.";
+      const lines = sessions.map((s) =>
+        `  • ${s.id} (${
+          s.manager?.getMessages().length ?? 0
+        } msgs, ${s.workDir})`
+      );
+      return `Active sessions (${sessions.length}):\n${lines.join("\n")}`;
+    }
+    case "/mode": {
+      if (parts.length < 2) {
+        const sess = d.getSession(sessionKey(msg.platform, msg.userID));
+        if (sess !== null && sess !== undefined) {
+          return `Current mode: ${
+            effectiveChannelMode(sess.platform, sess.mode)
+          }`;
+        }
+        return "No active session.";
+      }
+      const requested = parts[1].toLowerCase();
+      if (
+        requested === "plan" || requested === "agent" ||
+        requested === "yolo" || requested === "os"
+      ) {
+        let acquired;
+        try {
+          acquired = await acquireCommandSession(d, msg.platform, msg.userID);
+        } catch {
+          return "❌ No active session.";
+        }
+        if (acquired === null) return "❌ No active session.";
+        try {
+          await acquired.sess.lock();
+          try {
+            const resolved = effectiveChannelMode(
+              acquired.sess.platform,
+              requested,
+            );
+            acquired.sess.mode = resolved;
+            if (resolved !== requested) {
+              return "Channel sessions always run in yolo mode.";
+            }
+            return `✅ Mode set to ${resolved}.`;
+          } finally {
+            acquired.sess.unlock();
+          }
+        } finally {
+          acquired.release();
+        }
+      }
+      return "Invalid mode. Use: plan, agent, yolo, os";
+    }
+    case "/compact": {
+      let acquired;
+      try {
+        acquired = await acquireCommandSession(d, msg.platform, msg.userID);
+      } catch {
+        return "❌ No active session.";
+      }
+      if (acquired === null) return "❌ No active session.";
+      try {
+        await acquired.sess.lock();
+        try {
+          try {
+            acquired.sess.manager?.reload();
+          } catch (err) {
+            return `Session reload failed: ${errorMessage(err)}`;
+          }
+          try {
+            await compactSession(
+              d,
+              new AbortController().signal,
+              acquired.sess,
+            );
+          } catch (err) {
+            return `Context compaction failed: ${errorMessage(err)}`;
+          }
+        } finally {
+          acquired.sess.unlock();
+        }
+      } finally {
+        acquired.release();
+      }
+      return "✅ Context compacted.";
+    }
+    default:
+      return `Unknown command: ${cmd}\n${channelCommandHelp}`;
+  }
+}
+
+function formatElapsed(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "0s";
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remSecs = seconds % 60;
+  if (minutes < 60) {
+    return remSecs > 0 ? `${minutes}m${remSecs}s` : `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remMins = minutes % 60;
+  return remMins > 0 ? `${hours}h${remMins}m` : `${hours}h`;
+}
+
+// --- Agent build -----------------------------------------------------------------
+
+function channelAgentHasTool(sess: ChannelSession, name: string): boolean {
+  if (sess.registry === null || sess.registry === undefined) return false;
+  return sess.registry.get(name).ok;
+}
+
+/** buildAgent constructs the per-run Agent through the SessionRuntime and
+ * returns the cleanup that finishes the manager registration. */
+export async function buildAgent(
+  d: Dispatcher,
+  signal: AbortSignal,
+  sess: ChannelSession,
+  approvalHandler: AgentApprovalHandler | null,
+): Promise<{ agent: Agent; cleanup: (err: unknown) => void } | null> {
+  const runtime = d.runtimeSnapshot();
+  let cfg = runtime.cfg;
+  const settings = runtime.settings;
+  if (cfg === null) cfg = withConfigMethods(defaultConfig());
+  if (sess.runtime === null || sess.runtime === undefined) {
+    // Compatibility for adapter-owned test fixtures during the transition.
+    let resources;
+    try {
+      resources = await loadContextResources(
+        settings,
+        sess.workDir,
+        false,
+        runtime.browser,
+      );
+    } catch (err) {
+      console.error(`[channels] load channel fixture resources: ${err}`);
+      return null;
+    }
+    try {
+      sess.runtime = await attachSessionResources({
+        source: sourceFromChannelType(sess.platform),
+        workDir: sess.workDir,
+        manager: sess.manager!,
+        registry: sess.registry!,
+        sandboxMgr: sess.sandboxMgr!,
+        skillsMgr: resources.skillsMgr,
+        extraContext: resources.extraContext,
+        ruleContent: resources.ruleContent,
+        settings,
+        browser: runtime.browser,
+        artifactEnabled: runtime.artifact,
+      });
+    } catch (err) {
+      console.error(`[channels] attach channel fixture runtime: ${err}`);
+      return null;
+    }
+  }
+
+  // Prompt gating flags must reflect the tools actually present in the
+  // session registry. Per-session tool config can enable or disable
+  // sub-agent/delegate/workflow tools individually (and wechat/feishu
+  // sessions drop explicitly disabled tools), so derive the flags from the
+  // registry instead of the dispatcher-level multiAgent flag alone.
+  const hasTool = (name: string): boolean => channelAgentHasTool(sess, name);
+
+  const activeRunID = sess.runID;
+  let intentID = "";
+  if (activeRunID !== "") {
+    try {
+      const run = getDurableRun(d.sessionDir, activeRunID);
+      if (run !== null) intentID = run.intentId;
+    } catch {
+      // Go ignores the durable lookup failure.
+    }
+  }
+  let a: Agent;
+  try {
+    a = sess.runtime.buildAgent({
+      provider: runtime.provider ?? undefined,
+      providerName: runtime.providerName,
+      model: runtime.model ?? undefined,
+      settings,
+      allow: runtime.allow,
+      mode: sess.mode,
+      thinkingLevel: settings.defaultThinkingLevel,
+      multiAgent: hasTool("subagent_spawn"),
+      delegateMode: hasTool("delegate_subagent"),
+      workflows: hasTool("workflow_run"),
+      approvalHandler: approvalHandler ?? undefined,
+      getSteeringMessages: esmSteeringMessages(d, sess) ?? undefined,
+      conversationTurnId: "turn-" + intentID,
+      intentId: intentID,
+      runId: activeRunID,
+      conversationTurn: true,
+      runtimeOwnsTurnEnd: true,
+      maxIterations: cfg.agent.maxTurns,
+      contextPressure: cfg.agent.contextPressureThreshold,
+      budgetPressure: cfg.agent.budgetPressureThreshold,
+      // Deviation: Go's blocking pre-tool hook needs an async admission hook,
+      // which the Agent build options do not offer yet (the TS hook script
+      // runner is async). The post-tool hook stays fire-and-forget like Go.
+      afterToolCall: (
+        ctx: AfterToolCallContext,
+      ): ToolCallResult | undefined => {
+        const current = d.runtimeSnapshot();
+        if (
+          current.hooksMgr !== null && current.hooksMgr !== undefined &&
+          current.hooksMgr.hasPostHook()
+        ) {
+          const argsMap = (ctx.args ?? {}) as Record<string, unknown>;
+          const errMsg = ctx.isError ? ctx.result.content : "";
+          void current.hooksMgr.postToolCall(
+            signal,
+            ctx.toolCall.name,
+            argsMap,
+            ctx.result.content,
+            errMsg,
+            sess.platform,
+            sess.userID,
+          );
+        }
+        return undefined;
+      },
+    });
+  } catch (err) {
+    console.error(`[channels] build channel agent: ${err}`);
+    return null;
+  }
+
+  const agentMgr = sess.agentMgr ?? runtime.agentMgr;
+  if (agentMgr !== null && agentMgr !== undefined) {
+    agentMgr.register(newAgentAdapter(a));
+    d.agentSessions.set(String(a.id()), sess.id);
+  }
+  const cleanup = (_err: unknown): void => {
+    if (agentMgr !== null && agentMgr !== undefined) {
+      // Finish first: terminal child transitions fired from it must still
+      // resolve this root agent to its session.
+      agentMgr.finish(a.id(), _err instanceof Error ? _err : undefined);
+      d.releaseAgentSession(agentMgr, a.id());
+    }
+  };
+
+  if (sess.forceCompact) {
+    a.setForceCompact();
+    sess.forceCompact = false;
+  }
+
+  const replayState = sess.manager?.getReplayState();
+  if (replayState !== undefined && replayState.messages.length > 0) {
+    a.loadHistoryState(replayState.messages, replayState.entryIDs);
+  }
+
+  return { agent: a, cleanup };
+}
+
+// --- Run loop ---------------------------------------------------------------------
+
+function nonDeliverableAttachments(items: Attachment[]): Attachment[] {
+  return items.filter((item) => item.kind !== "image" && item.kind !== "file");
+}
+
+/** materializeChannelArtifacts accepts provider-native attachments into the
+ * Runtime-owned attachment store; failures never fail the run. */
+async function materializeChannelArtifacts(
+  d: Dispatcher,
+  sess: ChannelSession,
+  items: Attachment[],
+): Promise<SessionAttachment[]> {
+  if (
+    sess.runtime === null || sess.runtime === undefined ||
+    !sess.runtime.artifactCapabilitySnapshot() || sess.runID === "" ||
+    items.length === 0
+  ) {
+    return [];
+  }
+  const runtime = d.runtimeSnapshot();
+  if (runtime.provider === null) return [];
+  const seen = new Set<string>();
+  const artifacts: SessionAttachment[] = [];
+  for (const item of items) {
+    if (item.kind !== "image" && item.kind !== "file") continue;
+    if (item.providerRef === "") continue;
+    const key = item.kind + ":" + item.providerRef;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    try {
+      const record = await sess.runtime.acceptProviderAttachment(
+        undefined,
+        sess.runID,
+        runtime.provider,
+        item,
+      );
+      artifacts.push(record);
+    } catch (err) {
+      // Keep the model response successful: an optional artifact delivery
+      // must not retroactively fail the canonical Agent run. The raw
+      // provider reference is deliberately not exposed to the user.
+      console.error(
+        `[channels] materialize provider attachment ${item.kind}: ${err}`,
+      );
+    }
+  }
+  return artifacts;
+}
+
+async function collectChannelArtifacts(
+  d: Dispatcher,
+  sess: ChannelSession,
+  collector: ArtifactCollector | null,
+  items: Attachment[],
+): Promise<SessionAttachment[]> {
+  if (
+    sess.runtime === null || sess.runtime === undefined ||
+    !sess.runtime.artifactCapabilitySnapshot()
+  ) {
+    return [];
+  }
+  const artifacts = collector?.artifacts() ?? [];
+  return [...artifacts, ...await materializeChannelArtifacts(d, sess, items)];
+}
+
+/** runAgent executes the agent loop synchronously (for messaging platforms). */
+async function runAgent(
+  d: Dispatcher,
+  signal: AbortSignal,
+  sess: ChannelSession,
+  userMessage: Message,
+  progress: ((text: string) => void) | null,
+): Promise<ChannelRunResult> {
+  if (sess.runtime === null || sess.runtime === undefined) {
+    throw new Error("channel session runtime is unavailable");
+  }
+  const artifacts = sess.runtime.beginArtifactCollection(sess.runID);
+  try {
+    const built = await buildAgent(
+      d,
+      signal,
+      sess,
+      messagingApprovalHandler(d, sess, progress),
+    );
+    if (built === null) {
+      throw new Error("build channel agent failed");
+    }
+    const a = built.agent;
+    try {
+      try {
+        if (sess.execution !== null && sess.execution !== undefined) {
+          sess.execution.setAgent(a);
+        }
+        // Publish the agent handle so cancellation and the watchdog can abort
+        // waits that do not observe the run signal.
+        if (sess.runID !== "" && sess.runAgent === null) {
+          sess.runAgent = a;
+        }
+
+        const eventCh = a.runWithUserMessage(userMessage, signal);
+
+        const response: string[] = [];
+        let thinkBuf = "";
+        let eventCount = 0;
+        let toolCount = 0;
+        const attachments: Attachment[] = [];
+        let terminalSeen = false;
+        let terminalInfo: ErrorInfo | undefined;
+        const pendingToolArgs = new Map<string, Record<string, unknown>>();
+        const flushThink = () => {
+          if (progress !== null && thinkBuf !== "") {
+            let text = thinkBuf;
+            if (text.length > 500) text = text.slice(0, 500) + "...";
+            progress("💭 " + text);
+            thinkBuf = "";
+          }
+        };
+        for await (const ev of eventCh) {
+          eventCount++;
+          sess.lastEventAt = new Date();
+          // Child-agent events are progress notifications, not events from the
+          // channel's main agent. Never append child text to the main response
+          // or treat a child timeout as a failure of the parent run.
+          if (ev.agentId !== undefined && ev.agentId !== "") {
+            const sessionID = sess.manager?.getHeader()?.id ?? "";
+            if (
+              ev.error !== undefined && ev.error !== null &&
+              (ev.type === EventError || ev.type === EventRunFinished)
+            ) {
+              console.error(
+                `[channels] Sub-agent ${ev.agentId} for ${sess.platform}/${sess.userID} failed: ${ev.error}`,
+              );
+            }
+            d.notifySubAgentObserver(sessionID, channelSafeSubAgentEvent(ev));
+            d.notifyRunObserver(sessionID);
+            if (
+              ev.type === EventError && progress !== null &&
+              ev.error !== undefined && ev.error !== null
+            ) {
+              const info = channelFailureInfo(ev.error, undefined, PhaseModel);
+              progress(
+                `⚠️ Sub-agent ${ev.agentId}: ${displayErrorMessage(info)}`,
+              );
+            }
+            continue;
+          }
+          if (sess.execution !== null && sess.execution !== undefined) {
+            let observation;
+            try {
+              observation = sess.execution.observeAgentEvent(ev);
+            } catch (observeErr) {
+              console.error(
+                `[channels] observe agent event for ${sess.runID}: ${observeErr}`,
+              );
+            }
+            if (observation?.error !== undefined) {
+              terminalInfo = observation.error;
+            }
+          }
+          switch (ev.type) {
+            case EventAgentStart:
+              // RunWithUserMessage persists the inbound message before entering
+              // the loop, so this is the first safe point to sync it to WebUI.
+              d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+              break;
+            case EventThinkDelta:
+              thinkBuf += ev.thinkDelta ?? "";
+              break;
+            case EventTextDelta:
+              flushThink();
+              response.push(ev.textDelta ?? "");
+              break;
+            case EventHostedItem: {
+              if (progress !== null && ev.hostedItem !== undefined) {
+                const typeName = (ev.hostedItem.type ?? "").trim();
+                const status = (ev.hostedItem.status ?? "").trim();
+                if (typeName !== "" || status !== "") {
+                  progress(`Hosted tool ${typeName}: ${status}`);
+                }
+              }
+              break;
+            }
+            case EventTurnEnd:
+              // The assistant turn has been appended to SQLite before this
+              // event is emitted. Publish here so WebUI subscribers see each
+              // channel turn, including tool-call turns, instead of waiting
+              // for EventDone.
+              d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+              break;
+            case EventQuestionRequest: {
+              const questionID = ev.questionId ?? "";
+              registerChannelDecision(d, sess, questionID, DecisionQuestion);
+              persistChannelDecisionRequestWithDeadline(
+                d,
+                sess,
+                questionID,
+                DecisionQuestion,
+                {
+                  question: ev.questionText ?? "",
+                  options: ev.questionOptions ?? [],
+                  context: ev.questionContext ?? "",
+                },
+                new Date(),
+              );
+              sess.execution?.waitForQuestion(sess.runID);
+              sess.decisions?.bind(questionID, (answer: string) => {
+                a.handleQuestionResponse(questionID, answer);
+              });
+              d.notifyQuestionObserver(sess.manager?.getHeader()?.id ?? "", ev);
+              try {
+                sess.decisions?.resolveWith(
+                  {
+                    id: questionID,
+                    kind: DecisionQuestion,
+                    status: "cancelled",
+                    value: "",
+                  },
+                  () => {
+                    persistChannelDecision(
+                      d,
+                      sess,
+                      questionID,
+                      DecisionQuestion,
+                      "cancelled",
+                      "",
+                      null,
+                    );
+                  },
+                );
+              } catch (err) {
+                console.error(
+                  `[channels] resolve question ${questionID}: ${err}`,
+                );
+              }
+              sess.execution?.resume(sess.runID);
+              break;
+            }
+            case EventToolExecutionStart:
+              if (
+                ev.toolCallId !== undefined && ev.toolCallId !== "" &&
+                ev.toolArgs !== undefined
+              ) {
+                pendingToolArgs.set(ev.toolCallId, ev.toolArgs);
+              }
+              break;
+            case EventToolExecutionEnd: {
+              flushThink();
+              toolCount++;
+              if (progress !== null) {
+                const args = pendingToolArgs.get(ev.toolCallId ?? "");
+                if (ev.toolCallId !== undefined) {
+                  pendingToolArgs.delete(ev.toolCallId);
+                }
+                const line = formatToolProgress(ev, args ?? {});
+                if (line !== "") progress(line);
+              }
+              break;
+            }
+            case EventContextPressure:
+            case EventBudgetPressure:
+              // Forward pressure warnings to messaging platform
+              if (
+                progress !== null && ev.pressureMessage !== undefined &&
+                ev.pressureMessage !== ""
+              ) {
+                progress("\n" + ev.pressureMessage);
+              }
+              console.error(
+                `[channels] ${ev.pressureType} pressure event for ${sess.platform}/${sess.userID}: ${ev.pressureMessage}`,
+              );
+              break;
+            case EventCompactionStart:
+              if (progress !== null) {
+                progress("🗜️ Compacting context...");
+              }
+              break;
+            case EventCompactionEnd:
+              if (progress !== null) {
+                if (ev.error !== undefined && ev.error !== null) {
+                  const info = channelFailureInfo(
+                    ev.error,
+                    undefined,
+                    PhaseContext,
+                  );
+                  console.error(
+                    `[channels] Context compaction for ${sess.platform}/${sess.userID} failed: ${ev.error}`,
+                  );
+                  progress(
+                    `⚠️ Context compaction failed: ${
+                      displayErrorMessage(info)
+                    }`,
+                  );
+                } else if (
+                  ev.statusMessage !== undefined && ev.statusMessage !== ""
+                ) {
+                  progress("🗜️ " + ev.statusMessage);
+                }
+              }
+              break;
+            case EventStatus:
+              // Surface context-recovery notices (overflow
+              // compaction/truncation) so unattended channel users can see why
+              // a reply was delayed. Retry state is emitted separately as
+              // EventRetry with stable metadata.
+              if (ev.retryStatus === true) break;
+              if (progress !== null && ev.statusMessage !== undefined) {
+                if (ev.statusMessage.startsWith("Context recovery:")) {
+                  progress("🗜️ " + ev.statusMessage);
+                } else if (ev.statusMessage.startsWith("⚠️")) {
+                  progress(ev.statusMessage);
+                }
+              }
+              break;
+            case EventRetry:
+              if (progress !== null) {
+                progress(formatRetryProgress(ev));
+              }
+              break;
+            case EventRunFinished: {
+              terminalSeen = true;
+              if (ev.status === TaskFailed || ev.status === TaskCanceled) {
+                flushThink();
+                let runErr: unknown;
+                if (ev.error !== undefined && ev.error !== null) {
+                  runErr = ev.error;
+                } else if (ev.status === TaskCanceled) {
+                  runErr = new DOMException("context canceled", "AbortError");
+                } else {
+                  runErr = new Error("agent run failed");
+                }
+                d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+                console.error(
+                  `[channels] Agent run ${ev.status} for ${sess.platform}/${sess.userID}: ${
+                    String(runErr)
+                  }`,
+                );
+                throw newChannelRunFailure(runErr, terminalInfo, PhaseModel);
+              }
+              if (ev.status === TaskIncomplete) {
+                d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+                attachments.push(...(ev.attachments ?? []));
+                await collectChannelArtifacts(d, sess, artifacts, attachments);
+                throw new IncompleteRunError();
+              }
+              if (ev.status === TaskSuccess) {
+                d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+                attachments.push(...(ev.attachments ?? []));
+              }
+              break;
+            }
+            case EventError: {
+              if (terminalSeen) break;
+              flushThink();
+              if (ev.error !== undefined && ev.error !== null) {
+                d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+                console.error(
+                  `[channels] Agent error for ${sess.platform}/${sess.userID}: ${ev.error}`,
+                );
+                throw newChannelRunFailure(ev.error, terminalInfo, PhaseModel);
+              }
+              // An error event without an error payload is a protocol
+              // violation, never a successful completion.
+              d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+              console.error(
+                `[channels] Agent error event without detail for ${sess.platform}/${sess.userID}`,
+              );
+              throw newChannelRunFailure(
+                new Error("error event without error detail"),
+                terminalInfo,
+                PhaseTransport,
+              );
+            }
+            case EventDone:
+              if (terminalSeen) break;
+              d.notifyRunObserver(sess.manager?.getHeader()?.id ?? "");
+              attachments.push(...(ev.attachments ?? []));
+              break;
+            default:
+              break;
+          }
+        }
+
+        if (!terminalSeen) {
+          // Channel closed without a terminal event — protocol failure, never
+          // success.
+          console.error(
+            `[channels] Agent event stream closed without terminal result for ${sess.platform}/${sess.userID}`,
+          );
+          const runErr = new Error(
+            "event stream closed without terminal result",
+          );
+          const classification = {
+            code: "event_stream_interrupted",
+            type: "transport_error",
+            phase: PhaseTransport,
+            messageKey: "run.error.streamInterrupted",
+            message: "The run stopped before it could finish.",
+          };
+          let info = classifyError(runErr, classification);
+          try {
+            info = sess.execution?.recordFailure(runErr, classification) ??
+              info;
+          } catch (recordErr) {
+            console.error(
+              `[channels] record interrupted stream for ${sess.runID}: ${recordErr}`,
+            );
+          }
+          terminalInfo = info;
+          throw newChannelRunFailure(runErr, terminalInfo, PhaseTransport);
+        }
+
+        let result = response.join("");
+        console.error(
+          `[channels] Agent completed for ${sess.platform}/${sess.userID}: events=${eventCount}, tools=${toolCount}, response_len=${result.length}`,
+        );
+
+        // If agent produced no text but executed tools, provide a fallback
+        // summary
+        if (result === "" && toolCount > 0) {
+          result = `✅ Done (${toolCount} tool calls completed)`;
+        }
+        const attachmentText = formatAttachmentSummary(
+          nonDeliverableAttachments(attachments),
+        );
+        if (attachmentText !== "") {
+          if (result !== "") result += "\n\n";
+          result += attachmentText;
+        }
+
+        return {
+          text: result,
+          artifacts: await collectChannelArtifacts(
+            d,
+            sess,
+            artifacts,
+            attachments,
+          ),
+        };
+      } finally {
+        // Go's deferred pair: clearChannelDecisions runs before cleanup.
+        clearChannelDecisions(d, sess);
+        built.cleanup(undefined);
+      }
+    } finally {
+      if (sess.runAgent === a) {
+        sess.runAgent = null;
+      }
+    }
+  } finally {
+    artifacts?.close();
+  }
+}
+
+// --- A2A master tool ---------------------------------------------------------------
+
+/** registerA2AMasterTool installs the A2A dispatch tool when the master flag
+ * is enabled for the channel session. */
+function registerA2AMasterTool(d: Dispatcher, registry: Registry): void {
+  if (!d.a2aMaster) return;
+  let a2aListCfg;
+  try {
+    a2aListCfg = loadA2AAgentList();
+  } catch (err) {
+    throw new Error(`load a2a-list.json: ${errorMessage(err)}`);
+  }
+  const a2aMgr = newA2AManager(a2aListCfg);
+  registry.register(new A2ADispatchTool(new A2ADispatcherAdapter(a2aMgr)));
+}
+
+class A2ADispatcherAdapter implements A2ADispatcher {
+  #mgr: ReturnType<typeof newA2AManager>;
+
+  constructor(mgr: ReturnType<typeof newA2AManager>) {
+    this.#mgr = mgr;
+  }
+
+  list(): AgentEntry[] {
+    return this.#mgr.list().map((e) => ({ name: e.name, url: e.url }));
+  }
+
+  dispatch(ctx: ToolContext, name: string, message: string): Promise<string> {
+    return this.#mgr.dispatch(
+      ctx.signal ?? new AbortController().signal,
+      name,
+      message,
+    );
+  }
 }
 
 function errorMessage(err: unknown): string {

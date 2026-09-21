@@ -5,7 +5,7 @@
 //
 // The message-delivery path (HandleMessage/HandleDelivery/resolveSession/
 // buildAgent/runAgent/handleCommand/artifact materialization/A2A master tool)
-// lands with its own slices; the watchdog, decision persistence, background
+// lives in delivery.ts; the watchdog, decision persistence, background
 // recovery, and webhook handler live beside this module as functions that take
 // the Dispatcher first (a TS class cannot be spread across the Go package's
 // files, mirroring the openaiapi projection).

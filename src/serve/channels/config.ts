@@ -74,7 +74,7 @@ export interface CronConfig {
 /** MemoryConfig defines persistent memory settings. */
 export interface MemoryConfig {
   enabled: boolean;
-  /** Empty = auto-discover .mothx/memory.md → <GLOBAL_DIR>/memory.md. */
+  /** Empty = auto-discover .opensac/memory.md → <GLOBAL_DIR>/memory.md. */
   path: string;
 }
 

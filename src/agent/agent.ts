@@ -4514,6 +4514,12 @@ export class Agent {
       ch({ type: EventError, error: maxErr, stopReason: "max_iterations" });
       ch(this.agentEndEvent());
     } finally {
+      // Go's `defer cancelRun()`: the loop-owned run context is cancelled when
+      // the loop returns, so spawned children whose runs derive from it are
+      // cancelled with the parent run instead of leaking past its end.
+      if (!runAbort.signal.aborted) {
+        runAbort.abort(new DOMException("context canceled", "AbortError"));
+      }
       this.setRunContext(undefined);
       removeAbortListeners();
     }

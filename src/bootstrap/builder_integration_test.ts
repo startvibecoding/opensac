@@ -7,6 +7,7 @@ import { assert, assertEquals } from "@std/assert";
 import {
   eventAgentEnd,
   eventTextDelta,
+  type ModelInfo,
   newBuilder,
   roleUser,
   streamDone,
@@ -18,6 +19,16 @@ import {
 // resolution hook, and the internal agent builder (Go's bootstrap init()).
 import "../../bootstrap.ts";
 
+const testModel: ModelInfo = {
+  id: "test-model",
+  name: "test-model",
+  provider: "test",
+  reasoning: false,
+  input: ["text"],
+  contextWindow: 0,
+  maxTokens: 0,
+};
+
 Deno.test("bootstrap facade registers the internal agent builder", () => {
   const agent = newBuilder()
     .withProvider({
@@ -25,8 +36,8 @@ Deno.test("bootstrap facade registers the internal agent builder", () => {
         yield { type: streamDone };
       },
       name: () => "test",
-      models: () => [],
-      getModel: () => undefined,
+      models: () => [testModel],
+      getModel: (id) => (id === testModel.id ? testModel : undefined),
     })
     .withWorkDir(Deno.makeTempDirSync())
     .build();
@@ -46,8 +57,8 @@ Deno.test("built agent runs one turn through the provider bridge", async () => {
         yield { type: streamDone };
       },
       name: () => "test",
-      models: () => [],
-      getModel: () => undefined,
+      models: () => [testModel],
+      getModel: (id) => (id === testModel.id ? testModel : undefined),
     })
     .withWorkDir(Deno.makeTempDirSync())
     .build();

@@ -67,7 +67,7 @@ class EchoProvider implements Provider {
         cacheRead: 0,
         cacheWrite: 0,
         totalTokens: 2,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
     };
     yield { type: streamDone };

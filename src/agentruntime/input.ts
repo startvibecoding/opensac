@@ -13,7 +13,7 @@
 
 import { createHash } from "node:crypto";
 import * as path from "@std/path";
-import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
+import { AttachmentDAO, type AttachmentRecord, ErrNoRows } from "../dao/mod.ts";
 import { generateID } from "../session/entry.ts";
 import { queryRootDatabase, writeRootDatabase } from "../session/database.ts";
 import {
@@ -260,7 +260,7 @@ export class AttachmentService {
       const stored = new AttachmentDAO(db.db).find(sessionID, attachmentID);
       record = recordFromDAO(stored);
     });
-    if (record === null) throw new Error("attachment not found");
+    if (record === null) throw ErrNoRows;
     return record;
   }
 

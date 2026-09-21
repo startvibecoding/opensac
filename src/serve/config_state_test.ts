@@ -2,7 +2,7 @@
 // listen-address classification, and the writable-layer config state
 // (channel/full patch persistence, rollback, ephemeral override stripping).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import * as path from "@std/path";
 import {
   applyOverrides,
@@ -142,7 +142,7 @@ Deno.test("config state uses explicit path layer and loads overrides", () => {
   assertEquals(state.snapshot().api.listen, ":7100");
 });
 
-Deno.test("updateChannel validates whitelist and persists writable layer", () => {
+Deno.test("updateChannel validates whitelist and persists writable layer", async () => {
   const dir = Deno.makeTempDirSync();
   const explicit = path.join(dir, "serve.json");
   Deno.writeTextFileSync(explicit, JSON.stringify({}));
@@ -166,7 +166,7 @@ Deno.test("updateChannel validates whitelist and persists writable layer", () =>
     "enabled must be a boolean",
   );
 
-  const response = state.updateChannel(
+  const response = await state.updateChannel(
     "wechat",
     JSON.stringify({ enabled: true, workDir: "/srv", autoTyping: true }),
   );
@@ -183,13 +183,13 @@ Deno.test("updateChannel validates whitelist and persists writable layer", () =>
   );
 });
 
-Deno.test("feishu patch masks appSecret in the effective view", () => {
+Deno.test("feishu patch masks appSecret in the effective view", async () => {
   const dir = Deno.makeTempDirSync();
   const explicit = path.join(dir, "serve.json");
   const opts = defaultRunOptions();
   opts.configPath = explicit;
   const state = withMothxDir(dir, () => ServeConfigState.load(opts));
-  state.updateChannel(
+  await state.updateChannel(
     "feishu",
     JSON.stringify({ appId: "cli-x", appSecret: "s3cr3t" }),
   );
@@ -202,7 +202,7 @@ Deno.test("feishu patch masks appSecret in the effective view", () => {
   assert(!("appSecret" in view));
 });
 
-Deno.test("updateChannel rolls the file back when apply fails", () => {
+Deno.test("updateChannel rolls the file back when apply fails", async () => {
   const dir = Deno.makeTempDirSync();
   const explicit = path.join(dir, "serve.json");
   const original = JSON.stringify({ listen: "127.0.0.1:7000" });
@@ -210,23 +210,22 @@ Deno.test("updateChannel rolls the file back when apply fails", () => {
   const opts = defaultRunOptions();
   opts.configPath = explicit;
   const state = withMothxDir(dir, () => ServeConfigState.load(opts));
-  assertThrows(
-    () => {
+  await assertRejects(
+    () =>
       state.updateChannel(
         "wechat",
         JSON.stringify({ workDir: "/x" }),
         () => {
           throw new Error("platform restart failed");
         },
-      );
-    },
+      ),
     Error,
     "apply channel config",
   );
   assertEquals(Deno.readTextFileSync(explicit), original);
 });
 
-Deno.test("updateFull persists and strips ephemeral CLI overrides", () => {
+Deno.test("updateFull persists and strips ephemeral CLI overrides", async () => {
   const dir = Deno.makeTempDirSync();
   const explicit = path.join(dir, "serve.json");
   Deno.writeTextFileSync(
@@ -237,7 +236,7 @@ Deno.test("updateFull persists and strips ephemeral CLI overrides", () => {
   opts.configPath = explicit;
   opts.port = "9999";
   const state = withMothxDir(dir, () => ServeConfigState.load(opts));
-  const returned = state.updateFull(
+  const returned = await state.updateFull(
     JSON.stringify({ listen: ":9999", provider: "p", model: "m" }),
   );
   // Effective memory config carries the CLI port override.
@@ -250,19 +249,18 @@ Deno.test("updateFull persists and strips ephemeral CLI overrides", () => {
   assertEquals(persisted.model, "m");
 });
 
-Deno.test("updateFull rolls back when apply fails", () => {
+Deno.test("updateFull rolls back when apply fails", async () => {
   const dir = Deno.makeTempDirSync();
   const explicit = path.join(dir, "serve.json");
   Deno.writeTextFileSync(explicit, JSON.stringify({ provider: "old" }));
   const opts = defaultRunOptions();
   opts.configPath = explicit;
   const state = withMothxDir(dir, () => ServeConfigState.load(opts));
-  assertThrows(
-    () => {
+  await assertRejects(
+    () =>
       state.updateFull(JSON.stringify({ provider: "new" }), () => {
         throw new Error("runtime rejected");
-      });
-    },
+      }),
     Error,
     "apply serve config",
   );

@@ -19,6 +19,7 @@ import {
 import {
   applyOverrides,
   applyRuntimeFeatures,
+  defaultRunOptions,
   type RunOptions,
 } from "./options.ts";
 import * as stdPath from "@std/path";
@@ -109,6 +110,27 @@ export class ServeConfigState {
     return state;
   }
 
+  /**
+   * lazy ports Go's `&ServeConfigState{Effective: cfg, WritablePath: path,
+   * WritableLayer: layer}` literal: the in-memory fallback used while the
+   * process never loaded a config state (channelRuntime.configStateSnapshot).
+   * No document is read; updates serialize the effective config as-is.
+   */
+  static lazy(
+    effective: ServeConfig,
+    writablePath: string,
+    writableLayer: ConfigLayer,
+  ): ServeConfigState {
+    const overrides = defaultRunOptions();
+    return new ServeConfigState(
+      effective,
+      writablePath,
+      writableLayer,
+      overrides,
+      overrides.configPath,
+    );
+  }
+
   /** Reloads the writable layer and reapplies overrides/feature projection. */
   reload(): void {
     this.effective = this.explicitPath !== ""
@@ -125,14 +147,16 @@ export class ServeConfigState {
 
   /**
    * Applies a whitelisted channel merge-patch, persists the writable document,
-   * and invokes `apply` (which must not perform network I/O). A failed apply
-   * restores the previous file.
+   * and invokes `apply` (which performs no file I/O of its own). The apply may
+   * be asynchronous — Go's apply callback blocks on the platform startup
+   * handshake, so the Deno projection awaits it inside the same file
+   * transaction; a rejection restores the previous file.
    */
-  updateChannel(
+  async updateChannel(
     platform: string,
     body: Uint8Array | string,
-    apply?: (cfg: ServeConfig) => void,
-  ): ChannelConfigPatchResponse {
+    apply?: (cfg: ServeConfig) => void | Promise<void>,
+  ): Promise<ChannelConfigPatchResponse> {
     const patch = parseChannelConfigPatch(platform, body);
 
     let oldData: Uint8Array | undefined;
@@ -182,7 +206,7 @@ export class ServeConfigState {
     this.writeConfigFile(new TextEncoder().encode(data));
     if (apply !== undefined) {
       try {
-        apply(candidate);
+        await apply(candidate);
       } catch (err) {
         this.restoreConfigFile(oldData);
         throw new Error(`apply channel config: ${(err as Error).message}`);
@@ -203,10 +227,10 @@ export class ServeConfigState {
    * Persists a complete serve configuration through the same
    * serialize/apply/rollback boundary as channel updates.
    */
-  updateFull(
+  async updateFull(
     body: Uint8Array | string,
-    apply?: (cfg: ServeConfig) => void,
-  ): ServeConfig {
+    apply?: (cfg: ServeConfig) => void | Promise<void>,
+  ): Promise<ServeConfig> {
     const candidate = decodeConfigBytes(body);
 
     let oldData: Uint8Array | undefined;
@@ -244,7 +268,7 @@ export class ServeConfigState {
     );
     if (apply !== undefined) {
       try {
-        apply(candidate);
+        await apply(candidate);
       } catch (err) {
         this.restoreConfigFile(oldData);
         throw new Error(`apply serve config: ${(err as Error).message}`);

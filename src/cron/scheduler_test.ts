@@ -22,7 +22,19 @@ import {
   MaintenanceStorageReconcileJobName,
   MaintenanceStorageReconcileSchedule,
 } from "../agentruntime/maintenance_cron.ts";
-import { closeDatabases } from "../session/mod.ts";
+import {
+  closeDatabases,
+  listSessionRunEvents,
+  lockRuntime,
+} from "../session/mod.ts";
+import { createBound, newManager } from "../session/manager.ts";
+import { newAgentFactory } from "../agent/factory.ts";
+import { newAgentManager } from "../agent/manager.ts";
+import { emptyCompaction } from "../agent/agent_testutil.ts";
+import { defaultSettings } from "../config/settings.ts";
+import { newMockProvider } from "../provider/mock.ts";
+import type { Model } from "../provider/types.ts";
+import { streamDone, streamTextDelta } from "../provider/mod.ts";
 import type { CronJob } from "./cron.ts";
 import { normalizeJobSchedule } from "./schedule.ts";
 import {
@@ -635,3 +647,152 @@ function writeMaintenanceArtifactDirectory(
   Deno.utimeSync(dir, stamp, stamp);
   return file;
 }
+
+// --- Scheduler/SessionRuntime integration (cron_test.go leftovers, ported
+// once the SessionRuntime slice landed) ---
+
+function cronTestModel(): Model {
+  return {
+    id: "mock-model",
+    name: "Mock",
+    provider: "",
+    reasoning: false,
+    input: [],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 100_000,
+    maxTokens: 0,
+  };
+}
+
+function cronTestFactory(
+  sessionDir: string,
+  mock: ReturnType<typeof newMockProvider>,
+  model: Model,
+) {
+  const settings = defaultSettings();
+  settings.sessionDir = sessionDir;
+  return newAgentFactory(
+    mock,
+    model,
+    settings,
+    undefined,
+    "",
+    "",
+    undefined,
+    emptyCompaction(),
+    undefined,
+  );
+}
+
+Deno.test("SchedulerLocalJobWaitsForSessionRuntimeLock", async () => {
+  const tmp = Deno.makeTempDirSync({ prefix: "mothx-cron-lock-" });
+  const mgr = newManager(tmp, tmp);
+  mgr.init();
+  const sessionID = mgr.getHeader()!.id;
+  const store = newSQLiteCronStore(tmp);
+  const job = store.create({
+    id: "job-lock",
+    sessionId: sessionID,
+    prompt: "run once",
+    enabled: true,
+    oneShot: true,
+  });
+
+  const model = cronTestModel();
+  const mock = newMockProvider("mock", [model], [
+    { type: streamTextDelta, textDelta: "done" },
+    { type: streamDone, stopReason: "stop" },
+  ]);
+  const factory = cronTestFactory(tmp, mock, model);
+  const sched = newSchedulerWithSessionDir(
+    store,
+    newAgentManager(factory),
+    1_000,
+    tmp,
+  );
+  let completions = 0;
+  sched.setCompletionObserver(() => {
+    completions++;
+  });
+
+  const release = await lockRuntime(tmp, job.sessionId!);
+  try {
+    const runPromise = sched.executeJob({ ...job });
+
+    // While the session runtime lock is held the cron job must not run.
+    await new Promise((r) => setTimeout(r, 100));
+    assertEquals(
+      completions,
+      0,
+      "cron job ran while the runtime lock was held",
+    );
+
+    release();
+
+    // Starting a local agent also initializes the session runtime and SQLite
+    // stores. Keep the assertion focused on eventual execution after the lock
+    // is released rather than imposing a tight limit.
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("cron job did not run after lock release")),
+        10_000,
+      );
+    });
+    await Promise.race([runPromise, timeout]);
+
+    assertEquals(mock.getCallCount(), 1);
+    const events = listSessionRunEvents(tmp, sessionID);
+    assertEquals(events.length, 2);
+    assertEquals(events[0].source, "cron");
+    assertEquals(events[0].eventType, "started");
+    assertEquals(events[1].eventType, "finished");
+    const eventData = events[0].data as Record<string, string>;
+    assertEquals(eventData["cronJobId"], job.id);
+    assertEquals(eventData["cronJobName"], job.name ?? "");
+  } finally {
+    release();
+    closeDatabases();
+  }
+});
+
+Deno.test("SchedulerBoundChannelJobUsesForcedRuntimePolicy", async () => {
+  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-cron-bound-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "mothx-cron-work-" });
+  const bound = createBound(workDir, sessionDir, "wechat", "cron-policy-user");
+  const boundID = bound.getHeader()!.id;
+  const store = newSQLiteCronStore(sessionDir);
+  const job = store.create({
+    id: "job-bound-policy",
+    sessionId: boundID,
+    workDir,
+    prompt: "run once",
+    mode: "agent",
+    enabled: true,
+    oneShot: true,
+  });
+
+  const model = cronTestModel();
+  const mock = newMockProvider("mock", [model], [
+    { type: streamTextDelta, textDelta: "done" },
+    { type: streamDone, stopReason: "stop" },
+  ]);
+  const factory = cronTestFactory(sessionDir, mock, model);
+  const scheduler = newSchedulerWithSessionDir(
+    store,
+    newAgentManager(factory),
+    1_000,
+    sessionDir,
+  );
+  try {
+    await scheduler.executeJob({ ...job });
+
+    const events = listSessionRunEvents(sessionDir, boundID);
+    assertEquals(events.length, 2);
+    for (const event of events) {
+      assertEquals(event.source, "wechat");
+      assertEquals(event.mode, "yolo");
+    }
+  } finally {
+    closeDatabases();
+  }
+});

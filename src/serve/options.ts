@@ -26,6 +26,13 @@ export interface RunOptions {
   lobster: boolean;
   verbose: boolean;
   debug: boolean;
+  /** Go RunOptions.Shutdown: external graceful-termination request. */
+  shutdown?: AbortSignal;
+  /** Go RunOptions.OnReady: fired with the assembled API server + dispatcher. */
+  onReady?: (
+    server: import("./openaiapi/server.ts").Server,
+    dispatcher: import("./channels/mod.ts").Dispatcher | null,
+  ) => void;
 }
 
 export function defaultRunOptions(): RunOptions {

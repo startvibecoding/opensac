@@ -64,7 +64,7 @@ Status: ✅ ported · 🟡 partial · ⬜ not started.
 | 23 | `internal/esm` | 3367 | `src/esm` | ✅ |
 | 24 | `internal/memory` | 829 | `src/memory` | ✅ |
 | 25 | `internal/cron` | 3158 | `src/cron` | ✅ |
-| 26 | `internal/agentruntime` | 21399 | `src/agentruntime` | 🟡 |
+| 26 | `internal/agentruntime` | 21399 | `src/agentruntime` | ✅ |
 | 27 | `internal/messaging` | 4546 | `src/messaging` | ✅ |
 | 28 | `internal/skillhub` | 2788 | `src/skillhub` | ✅ |
 | 29 | `internal/a2a` | 2388 | `src/a2a` | ✅ |
@@ -74,7 +74,7 @@ Status: ✅ ported · 🟡 partial · ⬜ not started.
 | 33 | `internal/update` | 319 | `src/update` | ✅ |
 | 34 | `internal/architecture` | 900 | `src/architecture` | ✅ |
 | 35 | `internal/acp` | 20753 | `src/acp` | ✅ |
-| 36 | `internal/serve` | 46511 | `src/serve` | 🟡 |
+| 36 | `internal/serve` | 46511 | `src/serve` | ✅ |
 | 37 | `internal/tui` | 33096 | `src/tui` | ✅ |
 | 38 | `cmd/mothx` | 5493 | `src/cli` + `src/main.ts` | ✅ |
 
@@ -4221,8 +4221,12 @@ constructs a real Agent; one full turn crosses the provider bridge with
 history recorded). `deno task check` now covers `examples/` and `bootstrap.ts`.
 **Backlog #19 is complete** (`examples/` was its last item). Remaining backlog:
 #26 `agentruntime` remainder, #36 `serve` (channels dispatcher/delivery landed
-through slice 22; platform adapters, logs, and serve management handlers
-remain), and non-blocking TTY follow-ups (#37).
+through slice 23 and the management leaf cluster — platform_supervisor, logs,
+native_directory_picker, mcp_api — through slice 24, see those ledger
+entries; the top-level serve runtime (`run.go`, `cron.go`,
+`delivery_recovery.go`, `session_lifecycle.go`, `skillhub.go`) and the
+`channels_api.go`/`knowledge_bases.go` handlers remain), and non-blocking TTY
+follow-ups (#37).
 
 NOTE (verification status): this run ended before re-running the focused
 suites on the final tree; `deno task check`, the new bootstrap integration
@@ -4230,6 +4234,511 @@ tests, and the pty TUI walkthroughs validated earlier in the run (config
 rename, sandbox fix, print/TUI execution, `❯`/tool-row rendering). Re-run
 `deno task test && deno task test:architecture && deno task lint` after
 pulling.
+
+### Ledger entry — `internal/serve/channels` delivery message path (backlog #36, slice 23: HandleMessage/HandleDelivery + runAgent/buildAgent/handleCommand + artifact materialization + A2A master tool) and verification-gate repair
+
+Continued backlog #36 with slice 23, the delivery half of
+`channels/dispatcher.go`, and repaired the verification gates the previous run
+skipped. (1) `delivery.ts` completes the message path: `HandleMessage` (the
+text-only projection that terminalizes pending attachment deliveries as
+`unsupported`) and `HandleDelivery` (command short-circuit, the 3-attempt
+resolve/lease/admission loop with `promoteAfterRuntimeLock`, execution-time
+`effectiveChannelMode` re-resolution, background-recovery reconciliation, the
+Responses background submitter branch, and `runDelivery` — the durable
+`beginIntentDurable` bookkeeping, idempotency fingerprint, `planDelivery` with
+`createdAt`, `finishRun`, and the `projectDelivery` transport projection);
+`runAgent` (the synchronous event loop: artifact collector around the stream,
+child-agent observation with `channelSafeSubAgentEvent`, question decisions via
+`registerChannelDecision`/`persistChannelDecisionRequestWithDeadline`/bind +
+resolve-with-cancelled, tool/pressure/compaction/retry/status progress,
+terminal `newChannelRunFailure` classification, the interrupted-stream
+`classifyError` + `recordFailure` path, and the no-text tool-summary fallback);
+`buildAgent` (Runtime `buildAgent` options with registry-derived
+multi-agent/delegate/workflow gating, durable intent lookup, agent-manager
+registration + `agentSessions` mapping and the finishing cleanup,
+force-compact, history replay; the fixture-compat `attachSessionResources`
+branch is kept); `collectChannelArtifacts`/
+`materializeChannelArtifacts` over Runtime `beginArtifactCollection` +
+`acceptProviderAttachment` (satisfying the input-contract guard's
+`beginArtifactCollection` requirement); `handleCommand` (/help /new /clear
+/stop /status /sessions /mode /compact with `channelCommandHelp`,
+`channelCommandFailureMessage`, `rotateHandlerForCommand`,
+`acquireCommandSession`, `compactSession`) — the /stop /status /new cases
+deferred from slice 22 land here; `registerA2AMasterTool` with the
+`A2ADispatcherAdapter` over `loadA2AAgentList`; and the durable outbox
+`ChannelDeliveryController` + `resolveSession` (bindings, sandbox manager,
+registry with per-channel tool gating, session runtime, generation) that the
+slice had already staged. Fixes to the staged half: `sandboxOptionsFromSettings(
+d.settings.sandbox)`, `planDelivery` `createdAt`, `MCPPolicy.servers: []`, the
+idempotent-replay `return { text: "" }`, and the `ChannelSession` value import.
+(2) Gate repair beyond channels: the bootstrap builder-integration tests now
+report one scripted `ModelInfo` so `Builder.build()` resolves past the models
+check; `examples/custom_provider.ts` includes `CostBreakdown.total`; the stale
+`.mothx/memory.md` doc comment in `channels/config.ts` becomes `.opensac`.
+(3) Deviations: Go's blocking pre-tool hook is not wired (the TS hook runner is
+async while `AgentBuildOptions.beforeToolCall` is synchronous; the post-tool
+hook stays fire-and-forget like Go); `defer` argument semantics are preserved
+by calling `cleanup(undefined)` as Go's `defer cleanup(runErr)` evaluates the
+argument at defer time; `/stop` and `/mode` spell their inner dispatches as
+helpers/if-chains to satisfy `no-fallthrough`; Go's `runStateMu` critical
+sections collapse into direct field writes (single-threaded event loop).
+(4) Remaining channels debt: the larger Go test halves are not yet translated
+(`dispatcher_test.go` 1589 LOC, `security_integration_test.go`,
+`subagent_terminal_test.go`, `mailbox_ownership_test.go`, `lease_test.go`,
+`question_test.go`, `decision_test.go`, `decision_deadline_test.go`,
+`background_recovery_runtime_test.go`); the TS suite holds 37 translated/focused
+tests. Remaining backlog #36 surface: the top-level serve runtime
+(`run.go` lifecycle, `config_mapping.go`/`config_schema.go`, `cron.go`,
+`delivery_recovery.go`, `session_lifecycle.go`, `logs.go`, `skillhub.go`/
+`skillhub_extra.go`, and the management HTTP handlers `channels_api.go`,
+`knowledge_bases.go`, `mcp_api.go`, `platform_supervisor.go`,
+`native_directory_picker.go`, ~6.5k LOC); platform adapters (wechat/feishu) are
+already ported under `src/messaging`.
+
+### Ledger entry — `internal/serve` management leaf cluster (backlog #36, slice 24: platform_supervisor + logs + native_directory_picker + mcp_api) and slice-23 verification repair
+
+Continued backlog #36 with the leaf management modules that do not need the
+`channelRuntime`, and first repaired slice 23's verification gate: the staged
+channels delivery slice had been left without a final validation pass. This
+run's starting tree was fully green (`deno task check`, `deno task lint`
+(802 files), `deno task test:architecture` 8/8, `deno task test` 2182 passed /
+0 failed), so slice 23 is now verified on the committed-minus-working-tree
+state. (1) `src/serve/platform_supervisor.ts` ports `platform_supervisor.go`:
+the `PlatformSupervisor` as the sole owner of live messaging platform
+instances (`get`/`replace`/`replaceIf`/`removeIf` identity-guarded swaps and
+removals so a late async candidate result cannot overwrite a newer update,
+`snapshot`, and `stopAll` which stops sequentially, keeps the first failure,
+and always clears the registry). Go's nil-receiver guards are dropped (TS
+class instances are non-null) and map iteration is insertion-ordered rather
+than Go's random order. (2) `src/serve/logs.ts` ports `logs.go`: the
+`ServeLogEvent` wire shape (Go `time.Time` maps to ISO strings), the
+`logHistoryLimit=200` ring that never retains `heartbeat` events, the `LogHub`
+with bounded non-blocking fan-out (Go's buffered-32 channel + `select`
+default maps to a per-subscriber push queue with an async iterator),
+subscribe-after-close yields a closed stream, and the `createLogsWebSocketHandler`
+(`/ws/logs`: `connected` event with the status snapshot, history replay, live
+events, 30s heartbeat) over `Deno.upgradeWebSocket` with a narrow
+`statusSnapshot` provider view so the run.go slice registers it later.
+`installLogHub` maps Go's `log.SetOutput(io.MultiWriter(previous, hub))` to a
+module-level process-log-writer seam (`serveLogWrite`) because Deno has no
+interceptable standard logger; the uninstall restores the previous writer and
+closes the hub. (3) `src/serve/directory_picker.ts` ports
+`native_directory_picker.go`: `openNativeDirectoryPicker` over
+`Deno.build.os`, the headless-server `DISPLAY`/`WAYLAND_DISPLAY` guard, the
+zenity/kdialog/yad and osascript candidates with `lookPath`, the Windows
+PowerShell UTF-8 script (default path through the UTF-16 environment block),
+the cancel-vs-launch-failure exit-status rule, trailing-newline-only stripping
+(so full-width and space-padded directory names survive), and
+`appleScriptString` escaping. Go's `exec.Cmd` maps to `Deno.Command` with the
+parent signal; `filepath.Clean` maps to a local separator-aware cleaner. (4)
+`src/serve/mcp_api.ts` ports `mcp_api.go`: `handleMCPConfig` (global
+`mcp.json`), `handleMCPConfigAtPath` (GET serves the normalized config with
+missing-file→empty; PUT decodes with the 1 MiB bound, normalizes, saves
+atomically; unknown methods 405), `loadServeMCPConfig` (Go's `os.ErrNotExist`
+branch maps to `Deno.errors.NotFound`), `handleSessionMCPConfig` (404 on
+unknown session, 400 on ambiguous, 503 without the API server; the session
+path is `workDir/.opensac/mcp.json` via `ProjectDirName`, reproducing Go's
+`filepath.Join(workDir, config.ProjectMCPPath())` cwd-relative join), and
+`sessionWorkDir` (`ErrSessionNotFound`/`ErrActiveSessionIDAmbiguous` identity
+comparison). The Go `*channelRuntime` receiver maps to free functions over
+`Request`/`Response`; the route-table registration lands with the run.go
+slice. New translated tests: `platform_supervisor_test.ts` (3: the two Go
+supervisor cases plus a `replaceIf` stale-candidate guard),
+`directory_picker_test.ts` (3: the UTF-8 script contract, the non-ASCII
+path-byte `printf` case, `appleScriptString` escaping),
+`mcp_api_test.ts` (4: the exact-body PUT/GET round trip, 405, and the
+sessionWorkDir resolve/ambiguous/unknown cases), and `logs_test.ts` (6:
+subscriber fan-out + history replay, the bounded heartbeat-excluded ring,
+line splitting, closed-subscribe, the `installLogHub` seam round trip, and
+the `logs_ws_e2e_test.go` management-event case end-to-end over a real
+`Deno.serve` + WHATWG WebSocket). 16 tests pass in the new files; full suite
+2252 passed / 0 failed, architecture 8/8, lint clean (810 files), fmt/check
+clean. Remaining backlog #36 surface: the top-level serve runtime (`run.go`
+lifecycle incl. `platformTransportChanged`/`channelRuntime` platform
+candidate startup, `cron.go`, `delivery_recovery.go`, `session_lifecycle.go`,
+`skillhub.go`/`skillhub_extra.go`, and the management HTTP handlers
+`channels_api.go`, `knowledge_bases.go`); platform adapters (wechat/feishu)
+are already ported under `src/messaging`, and the larger channels test halves
+remain deferred from slice 23.
+
+### Ledger entry — `internal/serve` top-level runtime mid-layer (backlog #36, slice 25: session_lifecycle + delivery_recovery + cron)
+
+Continued backlog #36 with the three top-level serve runtime modules that do
+not need the full `channelRuntime` struct, unblocking the `run.go` slice. The
+starting tree was verified green first (`deno task check`, `deno task lint`
+(816 files), `deno task test:architecture` 8/8, full suite 2197 passed /
+0 failed). (1) `src/serve/session_lifecycle.ts` ports `session_lifecycle.go`
+in full: the `LifecycleConflict` Error (code + operator message), the
+`SessionPool` projection of Go's structural `DeleteActiveSession` interface,
+and the `SessionLifecycleService` — `delete` (mutation lease → data lock →
+bound-refusal → pool delete → dispatcher cache refresh → `session_deleted`
+event, with the `RuntimeSessionNotFound` fallback for manager-owned test
+doubles), `bind`/`unbind`/`transfer` (runtime lease + shared `IdentityLocks`
+ordering preserved, binding-retry conflict on a changed binding, canonical
+`binding_changed` events with from/to session IDs), and `rotate` (the
+read-binding → runtime lock → re-read-under-identity-lock loop, the
+dispatcher `acquireRuntimeForRotate` path plus the dispatcher-less
+`acquireSessionMutation` fallback with the forced-rotate `RotateForceGraceMS`
+timeout, non-wechat/feishu identities removing the cache entry directly).
+Go's `defer` ordering is reproduced with nested try/finally (runtime guard
+released last). (2) `src/serve/delivery_recovery.ts` ports
+`delivery_recovery.go` over a narrow `DeliveryRecoveryRuntime` view
+(`sessionDir`/`platforms`/`deliveryReopened`): `runDeliveryRecovery` (startup
+sweep + 5s tick loop; the returned promise is the `deliveryDone` projection),
+`reconcileDurableDeliveries` (per connected platform: reopen exhausted
+transient failures, then the shared `DeliveryCoordinator.reconcileDue` with
+the frozen `deliveryRecoveryRequest` projection — plan lookup with
+`ErrDeliveryOperationAbsent`, dependency operation, caption fallback via the
+deterministic assistant entry, artifact kind/filename/media type plus the
+authorized `openArtifact` stream reader — and the missing-plan/
+missing-attachment `delivery_projection_missing` durable failure),
+`reopenFailedDeliveries`/`markDeliveryReopened` (once-per-process reopen
+bookkeeping), `loadAssistantDeliveryCaption` (no latest-entry fallback), and
+`deliveryMessageText`. A fidelity repair came with it:
+`agentruntime/input.ts` `AttachmentService.Get` now throws the DAO
+`ErrNoRows` sentinel like Go instead of a plain "attachment not found"
+Error, so the projection guard's `errors.Is` chain survives. (3)
+`src/serve/cron_api.ts` ports `cron.go`: `cronMaintenancePolicy` (global
+settings → Runtime `MaintenancePolicy`, unreadable file falls back to the
+Runtime default), and `ServeCronState` — the cron half of the Go runtime
+struct (`cronStore`/`cronStorePath`/`cronScheduler` with the store-rotation
+`stopCronSchedulerLocked`) — carrying every handler and helper: `handleCron`
+/`handleCronByID`/`writeCronStatus`/`handleCronCreate`/`handleCronUpdate`/
+`handleCronDelete`/`listCronJobs` (session-scoped stores, maintenance jobs
+hidden, createdAt-desc with ID tiebreak over Go's zero-time semantics) plus
+`cronEnabled`/`cronPath`/`cronRunning`/`cronWorkDirForSession`/
+`validateCronWorkDir` (API allowlist via the shared openaiapi
+`validateWorkDir`, security `allowedWorkDirs` fallback),
+`cronSessionIDFromRequest`, `normalizeCronJobSchedule`, and `publicCronJob`
+(token stripping). The `configSnapshot` callback keeps the module independent
+of the unported `channelRuntime`; the run.go slice composes `ServeCronState`
+instead of reimplementing it. Deviations: `context.Context` maps to optional
+`AbortSignal`s (delivery workers) or Requests (HTTP handlers); `lifecycleConflict`
+becomes a typed Error subclass; Go's map-based reopen bookkeeping becomes a
+Set; `sync.RWMutex` collapses (single-threaded event loop) while the
+spans-await identity locks stay explicit; Go's sync `Scheduler.Stop` maps to
+a fire-and-forget async `stop()`; `time.Time{}` maps to `null` with Go's
+zero-time ordering preserved via the year-1 epoch constant.
+- Tests: `session_lifecycle_test.ts` (5, the full `session_lifecycle_test.go`
+  translation: bound-delete refusal, runtime-locked refusal, pool-failure
+  state preservation, shared-binding rotate with the canonical event, and
+  forced rotate past a busy run), `delivery_recovery_test.ts` (3, including
+  the frozen-caption replay end-to-end over a real session database and
+  connected fake platform), and `cron_api_test.ts` (3: the
+  `cron_maintenance_test.go` translation over `OPENSAC_DIR`, plus focused
+  create/list/update/delete and validation/disabled-state handler cases).
+- Validation: new-module suites 11 passed; full suite 2209 passed / 0 failed;
+  architecture 8/8 (23 steps; the two new 1:1 Go fixtures are documented
+  `legacyTestAllowlist` entries); lint clean (816 files); fmt/check clean.
+  Remaining backlog #36 surface: the top-level serve runtime (`run.go`
+  lifecycle incl. `platformTransportChanged`/`channelRuntime` platform
+  candidate startup, `config_mapping.go`/`config_schema.go` unification,
+  `skillhub.go`/`skillhub_extra.go`, and the management HTTP handlers
+  `channels_api.go`, `knowledge_bases.go`); platform adapters (wechat/feishu)
+  are already ported under `src/messaging`, and the larger channels test
+  halves remain deferred from slice 23.
+
+### Ledger entry — `internal/serve` management handler pair (backlog #36, slice 26: skillhub + skillhub_extra + knowledge_bases)
+
+Continued backlog #36 with the two remaining management HTTP surfaces that do
+not need the full `channelRuntime` struct, leaving only the `run.go` lifecycle
+slice, the `config_mapping.go`/`config_schema.go` unification, and
+`channels_api.go` in the serve backend. (1) `src/serve/skillhub_api.ts` ports
+`skillhub.go` + `skillhub_extra.go` (565 Go LOC) in full: the
+`handleSkillHub` route table (markets/categories/official/search/detail(+
+`/files`)/targets/installed/install/activate/set-active/skillset/uninstall/
+showcase/content, with the bare-405 fallthrough for known paths and the 404
+JSON default) and every helper — `skillHubServiceForRequest` (Runtime settings
+snapshot + whitelist workDir resolution + `Service.forWorkDir` over
+`clientsForSettings`), `parseSkillHubPath` (market/id with PathUnescape
+semantics), `skillHubMarket`, `skillHubQueryInt`, `decodeSkillHubJSON` (the
+1 MiB bounded body with Go's `DisallowUnknownFields` contract reproduced as an
+explicit key check), `writeSkillHubError`'s status mapping
+(allowedWorkDirs/overrides → 403, not-found → 404, refresh-session wrap → 500),
+and `activationName` (basename on install-activate). Handlers are free
+functions over `Server | null` + `Request` (null → 503) because the Go
+receiver only projected the shared openaiapi server; the
+`skillhub_session.ts` functions (resolve/inspect/refresh/refreshMany/
+setActive) are consumed unchanged. (2) `src/serve/knowledge_bases_api.ts`
+ports `knowledge_bases.go` (403 Go LOC) as the composable
+`ServeKnowledgeBaseState`: it owns the Go runtime's knowledge half
+(`knowledgeMu`/`knowledgeService` collapsing into one lazily constructed,
+process-wide cached `KnowledgeBaseService`, required so progress polling sees
+in-flight index jobs) and carries `handleKnowledgeBases` (collection +
+`{id}`/`{id}/{scan|query}` routing with the invalid-path/invalid-ID guards),
+the CRUD handlers over the session-domain `src/session/knowledge_bases.ts`
+APIs, `scanKnowledgeBase` (background `startIndex(SourceWebUI)` + the
+admitted-job progress preference over the admission race), `queryKnowledgeBase`
+(bounded 8/20 limit, empty-query rejection), `runKnowledgeBaseCronJob` (the
+namespaced-job router over the shared Runtime handler),
+`refreshKnowledgeServiceSettings` (never creates, never rebuilds),
+`knowledgeBaseMutation.spec`/`validateWebKnowledgeBaseSpec` (provider/model
+paired, WebUI manual-only cadence), the `knowledgeBaseView` projection
+(config + active snapshot + live `knowledgeIndexView` progress), and
+`writeKnowledgeBaseError`'s status mapping (not-found → 404,
+unindexed/disabled → 409). Deviations: `context.Context` maps to
+`Request.signal`; `writeJSON` maps to the shared `writeJson`; Go's
+`job.Progress()` maps to `viewProgress()`; `time.Time{}` maps to `undefined`;
+the Go `(handled, response, error)` cron triple maps to the existing
+`KnowledgeBaseCronOutcome` value object.
+- Tests: `skillhub_api_test.ts` (6: routing 503/404/405 table, Go-semantics
+  helper units, the strict bounded decode contract, the error-status mapping,
+  and the targets/installed handlers over a real whitelist-free workDir with
+  the local-skill index projection), and `knowledge_bases_api_test.ts` (5:
+  spec validation/defaults, error-status mapping, route rejection table, the
+  full create/list/get/patch/delete round trip over a real per-base SQLite
+  store with the not-found 404 after delete, and the query endpoint's
+  empty-query/unknown-base behavior). The Go package ships no dedicated
+  skillhub HTTP test; `knowledge_bases_test.go` remains behind the
+  unported channelRuntime and lands with the run.go slice.
+- Validation: new-module suites 11 passed; full suite 2220 passed / 0 failed;
+  architecture 8/8 (23 steps); lint clean (820 files); fmt/check clean.
+  Remaining backlog #36 surface: the top-level serve runtime (`run.go`
+  lifecycle incl. `platformTransportChanged`/`channelRuntime` platform
+  candidate startup and `ensureCronScheduler` composition over
+  `ServeCronState`), `config_mapping.go`/`config_schema.go` unification,
+  and `channels_api.go`; platform adapters (wechat/feishu) are already ported
+  under `src/messaging`, and the larger channels test halves remain deferred
+  from slice 23.
+
+### Ledger entry — `internal/serve` channelRuntime lifecycle core (backlog #36, slice 27: run.go lifecycle + channels_api.go)
+
+Continued backlog #36 with slice 27: the `channelRuntime` lifecycle core — the
+part of `run.go` that is not an HTTP handler — plus all of
+`channels_api.go` (578 Go LOC), leaving only run.go's management-handler
+cluster (stats/serve-config/status/projects/sessions/experts/capabilities/
+session-tools/env/settings/memory/browse/routes) and the top-level `Run()`
+assembly in the serve backend. (1) `src/serve/channel_runtime.ts` ports the
+`channelRuntime` struct as a class composing the shared components instead of
+duplicating them: the cron half delegates to `ServeCronState`
+(cronMu/cronStore/cronStorePath/cronScheduler fields, `cronEnabled`,
+`stopCronSchedulerLocked`), the knowledge half to `ServeKnowledgeBaseState`,
+and `startChannels` reproduces the Go constructor (feature projection,
+`newDispatcher` over the shared cron store, identity locks, rotate-handler
+wiring to `SessionLifecycleService.rotate`, `setupCronScheduler` composing the
+Scheduler over the Runtime maintenance policy + `pushBoundSessionResult`
+completion observer + the knowledge-base cron handler, and the durable
+delivery recovery worker). `applyConfigUpdate` runs the Go transaction:
+dispatcher apply → snapshot swap → `syncCronRuntime` →
+`syncPlatformRuntime`, with dispatcher/snapshot rollback when a platform
+candidate fails after acceptance. The platform lifecycle ports
+`restartPlatform`/`startPlatformCandidate`/`finishPlatform`/`runPlatform`
+exactly: failed credentials are a failed candidate (not teardown of a healthy
+instance), readiness-guarded hot replacement via `PlatformSupervisor.replaceIf`
+with legacy immediate promotion for transports without readiness, RemoveIf
+retirement after the receive loop exits, and fallback promotion on live-owner
+failure — Go's `done` channel maps to a promise resolving to the start error.
+Also ported: `buildConfigFromServeConfig`, `buildCronStore`, `cronStorePath`,
+`errorFromRun`, `platformTransportChanged`, `errorString`,
+`pushBoundSessionResult`, `publishChannelStatus`/`publishManagementEvent` over
+the LogHub, `channelStatuses`, `configureAPI` (dispatcher observers as
+projections of the shared openaiapi server), and idempotent `stop`. (2)
+`src/serve/channels_api.ts` ports the wechat-login surface in full: the
+`WechatLoginSession` phase machine (starting/pending/scanned/expired/
+confirmed/error/cancelled with abort-controller cancellation),
+`handleWechatLogin` (GET snapshot / POST start+202 / DELETE cancel / 503
+without runtime / bare 405), `handleWechatLoginQR` (404 without QR, base64
+JSON projection, upstream proxy, inline passthrough), the QR fetch pipeline
+(cookie-jar manual-redirect client replacing Go's jar client, 4 MiB body cap,
+20 s timeout, ilink HTML page handling), the `x/net/html` QR extractor as a
+targeted tag scanner (img/source src-like attrs, og:image/twitter:image meta,
+image rel links, data:/javascript: filtering, base-URL resolution),
+`http.DetectContentType` as magic-byte sniffing over the producible types,
+`wechatLoginSnapshot` (active session over stored credentials),
+`runWechatLogin`/`enableWechatAfterLogin` (the post-login channel patch runs
+through `ServeConfigState.updateChannel` in the same file transaction), and
+`wechatCredPath`/`defaultWechatCredPath`. Shared-component extension: `updateChannel`/`updateFull` now accept an async apply (Go's blocking apply callback
+participates in the file rollback transaction) with existing callers and
+config_state tests updated to await. Deviations: Go's sync.RWMutex/mutex fields
+are not reproduced (synchronous access is atomic on the event loop and no
+guard is held across an await — the Go code unlocks before its async sections
+too); `context.Context` maps to `AbortSignal`; seconds durations map to
+milliseconds; `time.RFC3339` maps to `toISOString`; the lazy
+`ServeConfigState{Effective, WritablePath, explicit}` fallback constructs via
+`ServeConfigState.load`. Fixed en route: the serve config decoder was missing
+the typed nested `api.defaultWorkDir`/`api.workingDir` fields (openaiapi.Config
+json tags), which `buildConfigFromServeConfig`'s workDir projection depends on.
+- Tests: `channel_runtime_test.ts` (12: errorFromRun table,
+  platformTransportChanged identity-field matrix, config projection incl. the
+  workdir fallback chain, cron store/path following the enabled flag,
+  channelStatuses over live platforms with unknown-name append, hub event
+  broadcast, candidate promotion + clean retirement, readiness-failure
+  rollback keeping the healthy owner, legacy no-readiness promotion,
+  live-owner failure fallback promotion, syncCronRuntime teardown/rebuild,
+  and stop's terminal event + recovery-worker abort) and
+  `channels_api_test.ts` (12: errorString, the login phase machine with QR
+  projection and cancellation, qrOpenURL source normalization, inline/data-URL
+  decoders, content sniffing, HTML detection, the QR extractor candidate walk,
+  CookieJar semantics, the login handler surface over null/real runtimes, QR
+  proxy guards/ projections, and the snapshot precedence rules); the async
+  apply rollback paths in `config_state_test.ts` were updated in place.
+- Validation: new-module suites 24 passed; full suite 2244 passed / 0 failed;
+  architecture 8/8 (23 steps); lint clean (824 files); fmt/check clean.
+  Remaining backlog #36 surface: run.go's `channelRuntime` management-handler
+  cluster (`handleStats`/`handleServeConfig`/`handleChannelConfigPatch`/
+  `handleStatus`/`handleSessionToolCatalog`/`handleProjects`/experts/
+  sessions/experts-by-ID/capabilities/channel tools/`handleChannels`/
+  `handleEnv`/`handleSettings`/`handleMemory`/browse roots) with the
+  `activeSessionManager` seam, the `routes()` registration and top-level
+  `Run()` assembly, and `knowledge_bases_test.go` behind the channelRuntime;
+  the larger channels test halves remain deferred from slice 23.
+
+### Ledger entry — `internal/serve` management-handler cluster (backlog #36, slice 28: run.go handlers + routes + Run)
+
+Completed backlog #36's run.go backend with slice 28: the entire
+`channelRuntime` management-handler cluster (~2100 Go LOC), the `routes()`
+registration table, and the top-level `Run()` assembly, closing out the
+`internal/serve` package modulo the deferred channels test halves.
+(1) `src/serve/run_handlers.ts` ports the full handler cluster over the shared
+state: `handleStats` (per-endpoint stats DB projection with the empty/missing
+matrix, `parsePositiveInt`), `handleServeConfig`/`handleChannelConfigPatch`
+(the config-state transaction with the lazy `ServeConfigState` fallback, the
+API apply/rollback half of the Go PUT, the 1 MiB body cap, the restart matrix
+and hub events), `handleStatus`/`statusSnapshot` (CountAll fast path with the
+live-pool fallback over the shared `buildServeStatus`),
+`handleSessionToolCatalog`, channel tools (`channelToolsAppliesTo` over
+`inspectSessionExecution`, GET/PUT with the complete-catalog/unavailable-tool
+contract under `lockSessionData` and the `channel_tools_changed` event),
+`handleProjects`/`handleProjectByID`, `handleSessionBindings`, `handleSessions`
+(paginated DB path with metadata/execution enrichment plus the all/active
+scopes), `handleSessionID`, `handleCapabilities`, the full
+`handleSessionByID` dispatcher (title/metadata, experts including the
+session-scoped GET/PATCH/inspect surface, the fork contract with the complete
+idempotency/error-code matrix over the Runtime fork, approvals, questions,
+ESM, channel-tools, trajectory, export, session MCP, lifecycle bindings
+bind/transfer/unbind, runs list/submit, the stop code→status matrix, runtime
+and capability get/patch, stream, paginated messages, sub-agents, run and
+capability events, tool results, and the lifecycle delete), `handleExperts`
+with `writeExpertHTTPError`, `handleChannels`, the secret-safe `handleEnv`
+(GET/PUT/PATCH with name validation and no value echoes), `handleSettings`
+(knowledge-service refresh, server/dispatcher apply), `handleMemory` over the
+shared store, `handleWebUI`, the browse surface (`handleBrowse`,
+`handleSelectDirectory` with the 5-minute picker window,
+`browseDefaultDir`/`nearestExistingBrowseDir`/`resolveBrowseDir`/
+`browseAllowedRoots`/`browseFilesystemRoots`/`pathWithinAnyRoot` plus the
+inert Windows drive-list port), and `serveRoutes` — the complete `routes()`
+table registered as openaiapi's ExtraRoutes projection. Go's
+`activeSessionManager` interface ladder maps to the nullable `Server` seam
+(`activeSessionManagerFromAPI`), with the one-method `SessionPool` adapter
+delegating delete to the canonical `deleteActiveSession` (the lifecycle
+service now awaits it, preserving the sync test doubles). (2) `src/serve/run.ts`
+ports Go's top-level `Run()`: config state, the webSearch settings override
+(now threaded through `startChannels` as an explicit settings parameter
+instead of a hidden reload), the startup banner (OpenAI API/Web UI/lobster
+mode/config path), the placeholder-token warning (porting config.go's
+`IsPlaceholderAuthToken`/`UsesPlaceholderAuthToken`/warning constant into
+`config.ts`), the LogHub + `installLogHub` + lease-log subscription +
+database-rebuild watch wiring, `startChannels`, and the `openaiapi.run`
+delegation with `extraRoutes`/`onReady` (configure → startPlatforms →
+opts.onReady → the run-complete observer extracting the assistant response
+and the last run-event error before `pushBoundSessionResult`), with Go's
+defers in try/finally. Shared-component extensions only: `ServeConfigState.lazy`
+(Go's struct-literal fallback), the async-tolerant `SessionPool.deleteActiveSession`,
+and serve `RunOptions.shutdown`/`onReady`. Deviations: Go's interface
+assertions are structural, so unavailable capabilities become explicit 501s
+on a null server; `DisallowUnknownFields` on the channel-tools PUT maps to a
+tolerant decode (the catalog-completeness check preserves the contract);
+context-canceled/ deadline-exceeded map to AbortError/TimeoutError names;
+Windows drive enumeration is ported but inert off-Windows; debug pprof and
+VIBECODING_DEBUG are development-only surfaces that are not reproduced.
+- Tests: `run_handlers_test.ts` (22: parse/channelLabel/filter helpers,
+  pathWithinAnyRoot containment, nearestExistingBrowseDir ancestor fallback,
+  env secret-safe view + invalid-name rejection, memory disabled matrix, Web
+  UI 404, status/channels projection, statusSnapshot counts, projects CRUD,
+  session bindings, tool-catalog guard, session-manager 503 degradation,
+  serve-config GET/PUT transaction with state pinning, channel patch restart
+  matrix, browse roots allow/reject, select-directory picker projection,
+  session-by-ID route/fork-contract validation, expert error mapping, and the
+  full routes table registration/dispatch).
+- Validation: serve module suite 511 passed / 0 failed; full suite 2266
+  passed / 0 failed; architecture 8/8 (23 steps); lint clean (827 files);
+  fmt/check clean.
+  Remaining backlog #36 surface: the deferred channels test halves from
+  slice 23 (dispatcher_test.go, security_integration_test.go,
+  subagent_terminal_test.go, mailbox_ownership_test.go, lease_test.go,
+  question_test.go, decision_test.go, decision_deadline_test.go,
+  background_recovery_runtime_test.go) and `knowledge_bases_test.go`'s
+  runtime-dependent halves.
+
+### Ledger entry — `internal/serve` test debt closed (backlog #36 complete: dispatcher/lease/question/mailbox/security/subagent/background-recovery test halves + knowledge_bases runtime halves)
+
+Completed the last of backlog #36: every deferred channels test half from
+slice 23 plus `knowledge_bases_test.go`'s runtime-dependent halves, which
+also closed the last item of backlog #26 (nothing production remains in
+`internal/agentruntime` or `internal/serve`). (1)
+`src/serve/channels/dispatcher_message_test.ts` (~2.1k lines) translates the
+entire deferred half of `dispatcher_test.go` plus
+`mailbox_ownership_test.go`, `security_integration_test.go`, and
+`subagent_terminal_test.go`: the sub-agent channel provider that routes
+responses by request content, the external-subagent integration over
+`openaiapi.newExternalSubAgentServer` (subscribe/poll/terminal-status
+transcript contract), `channelRouteID`, the wechat/feishu `/new` rotation
+matrix over canonical route bindings, `formatAttachmentSummary`
+deduplication, per-operation delivery text projections, channel image
+canonicalization through the Runtime input materializer (`.opensac/tmp/inputs`,
+no opaque reference or provider-native image leakage), the published-artifact
+delivery projection verified through the `DeliveryDAO` (intent + all three
+operations reach `delivered`; no legacy `attachment_deliveries` rows — the
+legacy-recovery projection is the reader because the legacy store exposes no
+list API), channel failure persistence with the structured retry-notice
+progress and the `errorInfo` diagnostic, stale-local-run recovery before
+durable admission, background delegation before the local loop,
+`cancelChannelSessionRun` over a real durable Run,
+cron-only sessions that register the cron tool without sub-agent tools,
+team-expert sessions bound to a session-scoped AgentManager, the full
+tool-catalog/registry contract table, `buildAgent` replay state, ESM steering
+injection, compaction settings, prompt-flag gating by registry contents,
+`/help` and both `/compact` command paths, the background-submit
+dephemeralization, the `ApplySettings` provider retry refresh over a real
+openai-chat provider against a local SSE server, and both security
+integrations (the hard high-risk guard blocking before approval with the
+"channel execution policy blocked high risk bash command" result, and the
+pre-tool-hook fixture — pinned as a documented deviation: the port wires no
+blocking pre-hook, so the tool executes). (2)
+`src/serve/channels/channels_contract_test.ts` translates `lease_test.go`
+(promote-failure pending-entrant underflow, stale-generation rejection,
+invalidated-session eviction deferral), `question_test.go` (question observer
++ decision lifecycle), and `background_recovery_runtime_test.go` (the
+runtime delivery projection replays exactly the canonical transcript text).
+(3) `src/serve/knowledge_bases_api_test.ts` gains the three runtime halves of
+`knowledge_bases_test.go`: the full manage-owned-index lifecycle (create →
+background scan admission → progress polling to a committed snapshot →
+bounded cited query → delete), the scheduled-WebUI-configuration refusal, and
+the knowledge-base cron-job routing through the shared Runtime handler
+(foreign fallthrough, missing-base handled failure, real reindex leaving an
+active snapshot). (4) Production fidelity repair in `src/agent/agent.ts`:
+the internal `loop` now cancels its run-scoped `AbortController` in the
+`finally` block, porting Go's `defer cancelRun()` so spawned children whose
+run signals derive from the parent run context are cancelled with the parent
+run instead of leaking past its end — `subagent_terminal_test.go` guards
+exactly this. Tests: 33 cases in `dispatcher_message_test.ts` (13 steps), 5
+in `channels_contract_test.ts`, and 3 new knowledge-base cases (8 file
+total); full suite 2308 passed / 0 failed; architecture 8/8 (23 steps, one
+documented `legacyTestAllowlist` entry for the stale-run fixture); lint clean
+(829 files); fmt/check clean. Remaining backlog: #37's non-blocking TTY
+follow-ups only; the Go→Deno package backlog table is otherwise fully ✅.
+
+### Ledger entry — `internal/tui` TTY follow-ups closed (settings-driven translator + resize-tracked editor width)
+
+Closed the two unit-testable #37 follow-ups, leaving only the live TTY
+keyboard E2E that intrinsically requires a real terminal.
+
+- `src/tui/tui_session.ts` now builds the shell translator from settings
+  (Go `NewApp`: `i18n.ParseConfigured(settings.TUILang)` → warn
+  `Warning: invalid tuilang %q; using auto` on an invalid value →
+  `i18n.Resolve` once against the local zone), instead of the previous
+  hardcoded `Translator.fromConfig("")`. `src/tui/i18n.ts` gains
+  `localTimeZone()` (the host IANA zone, the Go `time.Local` projection).
+- `src/cli/root_tui.ts` now tracks terminal resize: a `SIGWINCH` listener
+  re-reads `Deno.consoleSize`, applies `applyEditorWidth`
+  (`editor.setWidth(width - 2)`, the Go `WindowSizeMsg → input.SetWidth`
+  projection with the port's 2-cell frame offset), bumps the width prop, and
+  rerenders; the listener is removed on exit and is optional-guarded where
+  SIGWINCH is unsupported (Windows).
+- Tests: `src/tui/tui_translator_test.ts` (5: explicit `zh`/`en` resolution
+  without warnings, invalid value → auto with the exact Go warning text,
+  missing `tuilang` → auto without warning, `localTimeZone` contract, and
+  the resize width application/no-op table).
 
 
 ## Validation

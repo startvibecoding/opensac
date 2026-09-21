@@ -58,6 +58,18 @@ export function utcOffset(now: Date, timeZone: string | null): string {
   return `UTC${m[1]}${m[2]}:${m[3]}`;
 }
 
+/**
+ * The host's local IANA zone (Go time.Local); null when the runtime cannot
+ * resolve one (Go falls back to UTC, which Resolve treats as non-UTC+8).
+ */
+export function localTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function utcOffsetHours(now: Date, timeZone: string): number {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,

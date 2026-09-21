@@ -27,7 +27,7 @@ import {
 import { AppController } from "./app_controller.ts";
 import { TuiRun } from "./tui_run.ts";
 import { Editor } from "./components/editor/editor.ts";
-import { Translator } from "./i18n.ts";
+import { localTimeZone, Translator } from "./i18n.ts";
 import type { AppProps } from "./app.tsx";
 
 export interface TUISessionOptions {
@@ -37,6 +37,25 @@ export interface TUISessionOptions {
   thinking: string;
   workDir: string;
   version: string;
+}
+
+/** Resolves the session translator from settings (Go NewApp: parse
+ * settings.TUILang, warn on an invalid value, resolve once against the local
+ * zone — Go time.Local). Exported for tests. */
+export function tuiTranslatorFromSettings(settings: Settings): Translator {
+  const { translator, valid } = Translator.fromConfig(
+    settings.tuilang ?? "",
+    () => new Date(),
+    localTimeZone(),
+  );
+  if (!valid) {
+    console.error(
+      `Warning: invalid tuilang ${
+        JSON.stringify(settings.tuilang)
+      }; using auto`,
+    );
+  }
+  return translator;
 }
 
 /** One interactive TUI session. */
@@ -76,7 +95,8 @@ export class TUISession {
     this.#thinking = normalizeThinkingLevel(
       options.thinking || settings.defaultThinkingLevel || "",
     ) as ThinkingLevel;
-    const translator = Translator.fromConfig("").translator;
+    // Go NewApp: the settings-driven translator (see tuiTranslatorFromSettings).
+    const translator = tuiTranslatorFromSettings(settings);
     this.controller = new AppController(translator, {
       onMessage: () => {},
       scheduleRender: () => {},

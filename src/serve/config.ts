@@ -599,6 +599,15 @@ function decodeAPI(cfg: ServeConfig, raw: Record<string, unknown>): void {
   if (stringField(raw, "systemPromptMode")) {
     api.systemPromptMode = stringField(raw, "systemPromptMode")!;
   }
+  // Go's typed decode accepts defaultWorkDir/workingDir inside the api object
+  // (openaiapi.Config json tags); the legacy top-level overlay clears
+  // workingDir when the canonical field is present.
+  if (stringField(raw, "defaultWorkDir")) {
+    api.defaultWorkDir = stringField(raw, "defaultWorkDir")!;
+  }
+  if (stringField(raw, "workingDir")) {
+    api.workingDir = stringField(raw, "workingDir")!;
+  }
   if (stringField(raw, "logLevel")) {
     api.logLevel = stringField(raw, "logLevel")!;
   }
@@ -936,4 +945,30 @@ export function loadConfig(): ServeConfig {
  */
 export function memoryEnabled(): boolean {
   return loadConfig().memory.enabled;
+}
+
+// --- placeholder auth token (ports config.go's template-token helpers) --------
+
+/** The API token written by `mothx serve init-config` (Go PlaceholderAuthToken). */
+export const PLACEHOLDER_AUTH_TOKEN =
+  "sk-change-me-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+
+/** Go's PlaceholderAuthTokenWarning startup banner. */
+export const PLACEHOLDER_AUTH_TOKEN_WARNING =
+  `WARNING: serve.json ships the placeholder API token (${PLACEHOLDER_AUTH_TOKEN}),\n` +
+  "         which is public. Replace api.auth.tokens before enabling auth or exposing this server.";
+
+/** Reports whether token is the generated template value. */
+export function isPlaceholderAuthToken(token: string): boolean {
+  return token.trim() === PLACEHOLDER_AUTH_TOKEN;
+}
+
+/**
+ * Reports whether the resolved config enables auth and still ships the
+ * generated template token, which means the API is reachable with a publicly
+ * known key.
+ */
+export function usesPlaceholderAuthToken(cfg: ServeConfig | null): boolean {
+  if (cfg === null || !cfg.api.auth.enabled) return false;
+  return cfg.api.auth.tokens.some((token) => isPlaceholderAuthToken(token));
 }
