@@ -1379,6 +1379,7 @@ function knowledgeBaseIgnoredDirectory(name: string): boolean {
     case ".git":
     case ".hg":
     case ".svn":
+    case ".opensac":
     case ".mothx":
     case "node_modules":
     case "vendor":

@@ -438,7 +438,7 @@ export interface Config {
   session?: SessionManager;
   /** Extra context from files and skills. */
   extraContext?: string;
-  /** Content of .mothx/rule.md (project rules). */
+  /** Content of .opensac/rule.md (project rules). */
   ruleContent?: string;
   expertIdentity?: string;
   expertRoster?: string;

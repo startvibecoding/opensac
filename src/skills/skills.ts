@@ -404,7 +404,7 @@ export function newManagerWithProjectDirs(
 export function projectSkillDirs(projectRoot: string): string[] {
   if (projectRoot === "") return [];
   return [
-    path.join(projectRoot, ".mothx", "skills"),
+    path.join(projectRoot, ".opensac", "skills"),
     path.join(projectRoot, ".skills"),
     path.join(projectRoot, ".agents", "skills"),
     path.join(projectRoot, "skills"),

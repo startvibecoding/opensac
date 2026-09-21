@@ -4,7 +4,7 @@ import * as path from "@std/path";
 import type { InstalledState, Market, SkillSummary } from "./types.ts";
 
 /** Name of the per-skill install metadata file. */
-export const metadataFileName = ".mothx-skillhub.json";
+export const metadataFileName = ".opensac-skillhub.json";
 
 export interface InstallMetadata {
   market: Market;

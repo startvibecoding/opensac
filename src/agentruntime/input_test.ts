@@ -82,7 +82,7 @@ Deno.test("AcceptArtifactStoresPrivateContentAndReopensIt", async () => {
     assertEquals(record.origin, "test");
     assertEquals(record.kind, AttachmentFile);
     assert(record.storageKey.startsWith("artifacts/"));
-    assert(!record.storageKey.startsWith(".mothx/"));
+    assert(!record.storageKey.startsWith(".opensac/"));
     assertEquals(record.bytes, "generated report".length);
     assertEquals(record.sha256.length, 64);
 

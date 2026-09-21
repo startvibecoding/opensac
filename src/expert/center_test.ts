@@ -71,7 +71,7 @@ Deno.test("center list shadow and sort", () => {
     withEnv("MOTHX_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
         const globalDir = path.join(globalRoot, "experts");
-        const projectDir = path.join(projectRoot, ".mothx", "experts");
+        const projectDir = path.join(projectRoot, ".opensac", "experts");
 
         // global shadows builtin frontend-developer and adds a global-only bundle.
         writeLayerBundle(
@@ -171,7 +171,7 @@ Deno.test("center list missing layers tolerated", () => {
 
       withTempDir((projectRoot) => {
         writeLayerBundle(
-          path.join(projectRoot, ".mothx", "experts"),
+          path.join(projectRoot, ".opensac", "experts"),
           "proj-only",
           shadowFiles("proj-only", "项目专属"),
         );
@@ -186,7 +186,7 @@ Deno.test("center list invalid manifest flagged", () => {
   withTempDir((globalRoot) => {
     withEnv("MOTHX_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
-        const projectDir = path.join(projectRoot, ".mothx", "experts");
+        const projectDir = path.join(projectRoot, ".opensac", "experts");
 
         // Broken JSON in the project layer.
         writeLayerBundle(projectDir, "broken-pkg", {
@@ -235,7 +235,7 @@ Deno.test("center get", () => {
 
         // Project layer wins over builtin.
         writeLayerBundle(
-          path.join(projectRoot, ".mothx", "experts"),
+          path.join(projectRoot, ".opensac", "experts"),
           "software-company",
           shadowFiles("software-company", "项目软件公司"),
         );

@@ -683,7 +683,7 @@ function streamAtomicInsert(
   mode: number,
 ): void {
   const dir = path.dirname(p);
-  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".mothx-insert-" });
+  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".opensac-insert-" });
   let tmp: Deno.FsFile | null = null;
   try {
     tmp = Deno.openSync(tmpPath, { write: true, create: true, truncate: true });

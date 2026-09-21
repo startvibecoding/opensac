@@ -78,7 +78,7 @@ Deno.test("InputMaterializerWritesProjectResourceAndManifest", async () => {
         mediaTypeHint: "text/plain",
       }),
     );
-    assert(record.relativePath.startsWith(".mothx/tmp/inputs/"));
+    assert(record.relativePath.startsWith(".opensac/tmp/inputs/"));
     assert(!path.isAbsolute(record.relativePath));
     const contentPath = path.join(workDir, ...record.relativePath.split("/"));
     assertEquals(await Deno.readTextFile(contentPath), "hello input");

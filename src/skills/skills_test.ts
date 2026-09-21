@@ -54,7 +54,7 @@ function memoryFS(files: Record<string, string>): SkillFS {
 Deno.test("projectSkillDirs includes agents skills", () => {
   const root = "/tmp/proj";
   assertEquals(projectSkillDirs(root), [
-    path.join(root, ".mothx", "skills"),
+    path.join(root, ".opensac", "skills"),
     path.join(root, ".skills"),
     path.join(root, ".agents", "skills"),
     path.join(root, "skills"),

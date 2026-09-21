@@ -898,18 +898,35 @@ export function responsesEventItemKey(
 }
 
 export function decodeResponsesOutputItem(
-  raw: string,
+  raw: string | Record<string, unknown>,
   outputIndex: number,
 ): ResponsesResponseItem | undefined {
+  // Go's json.RawMessage is byte-oriented; the port receives either the raw
+  // wire text or the already-parsed response object. Canonicalize once here so
+  // both shapes archive identically.
+  let rawText: string;
   let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return undefined;
+  if (typeof raw === "string") {
+    rawText = raw;
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  } else {
+    try {
+      rawText = JSON.stringify(raw);
+    } catch {
+      return undefined;
+    }
+    parsed = raw;
   }
   const id = typeof parsed["id"] === "string" ? parsed["id"] : "";
   const type = typeof parsed["type"] === "string" ? parsed["type"] : "";
-  const canonical = canonicalResponsesJSON(raw, responsesMaxCanonicalItemBytes);
+  const canonical = canonicalResponsesJSON(
+    rawText,
+    responsesMaxCanonicalItemBytes,
+  );
   if (type === "") {
     return {
       id,

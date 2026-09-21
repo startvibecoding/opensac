@@ -37,7 +37,7 @@ export class Center {
     this.projectDir = projectDir;
   }
 
-  /** Returns <ProjectDir>/.mothx/experts, or "" when the layer is disabled. */
+  /** Returns <ProjectDir>/.opensac/experts, or "" when the layer is disabled. */
   projectExpertsDir(): string {
     if (this.projectDir.trim() === "") return "";
     return projectPathFor(this.projectDir, "experts");

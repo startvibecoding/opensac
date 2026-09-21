@@ -64,7 +64,7 @@ Deno.test("loadConfiguredServers skips disabled entries", () => {
         },
       ],
     });
-    const projectConfigPath = path.join(projectDir, ".mothx", "mcp.json");
+    const projectConfigPath = path.join(projectDir, ".opensac", "mcp.json");
     Deno.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
     Deno.writeTextFileSync(
       projectConfigPath,

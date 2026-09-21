@@ -3340,7 +3340,7 @@ const manageMemoryMaxBytes = 1 << 20;
 /**
  * Resolves memory.md through the same source as serve /api/memory: the serve
  * config's explicit memory path when configured, otherwise the global
- * ~/.mothx/memory.md.
+ * ~/.opensac/memory.md.
  */
 function manageMemoryStore(s: AcpServer): MemoryStore {
   let explicitPath = "";

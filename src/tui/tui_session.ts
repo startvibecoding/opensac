@@ -13,7 +13,12 @@ import type { ExecutionIntent } from "../session/execution_intent.ts";
 import { generateID, runUserEntryID } from "../session/mod.ts";
 import type { Manager } from "../session/manager.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
-import { isArtifactEnabled, loadAllow, type Settings } from "../config/mod.ts";
+import {
+  isArtifactEnabled,
+  loadAllow,
+  sandboxLevelFromSettings,
+  type Settings,
+} from "../config/mod.ts";
 import {
   type Message,
   normalizeThinkingLevel,
@@ -38,7 +43,7 @@ export interface TUISessionOptions {
 export class TUISession {
   readonly controller: AppController;
   readonly editor: Editor;
-  readonly header: AppProps["header"];
+  readonly header: NonNullable<AppProps["header"]>;
   #runtime: Awaited<ReturnType<Builder["build"]>>;
   #manager: Manager;
   #settings: Settings;
@@ -91,9 +96,7 @@ export class TUISession {
   async start(): Promise<void> {
     this.#runtime = await new Builder(
       this.#settings,
-      this.#settings.sandbox?.enabled
-        ? (this.#settings.sandbox.level === "strict" ? 2 : 1)
-        : 0,
+      sandboxLevelFromSettings(this.#settings),
     ).build(undefined, {
       source: SourceTUI,
       workDir: this.#workDir,
@@ -108,11 +111,18 @@ export class TUISession {
     return this.#busy;
   }
 
+  /** The effective execution mode of this session. */
+  get mode(): string {
+    return this.#mode;
+  }
+
   /** Submits one user message as a durable conversation-turn run. */
   async submitPrompt(text: string): Promise<void> {
     if (this.#busy || text.trim() === "") return;
     this.#busy = true;
     this.controller.isThinking = true;
+    // Echo the user turn into the transcript before the run starts.
+    this.controller.addMessage(`❯ ${text}`, "plain");
     const header = this.#manager.getHeader();
     const sessionId = header?.id ?? "";
     if (sessionId === "") {

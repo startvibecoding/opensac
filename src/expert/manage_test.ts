@@ -82,7 +82,7 @@ Deno.test("manager project scope and invalid draft", () => {
       manager.create(ScopeProject, draft);
       const projectPath = path.join(
         project,
-        ".mothx",
+        ".opensac",
         "experts",
         "project-team",
         manifestFileName,

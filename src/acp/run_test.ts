@@ -279,7 +279,11 @@ Deno.test("runACP writes MOTHX_ACP_ERROR for missing provider and exits", async 
   const previousDir = Deno.env.get("MOTHX_DIR");
   Deno.env.set("MOTHX_DIR", configDir);
   const settings = defaultSettings();
-  settings.defaultProvider = "";
+  // settings.json serialization drops empty strings (putNonEmpty), and the
+  // product default ships a configured provider, so force the unconfigured
+  // state with a provider id that cannot resolve — the doctor check classifies
+  // it as a startup error exactly like the Go empty-defaults case.
+  settings.defaultProvider = "unknown-provider-for-preflight-test";
   settings.defaultModel = "";
   saveGlobalSettings(settings);
 

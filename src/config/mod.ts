@@ -64,6 +64,7 @@ export {
   resolveProviderHeaders,
   type ResponsesConfig,
   type RetrySettings,
+  sandboxLevelFromSettings,
   type SandboxSettings,
   sandboxSettingsOptions,
   saveGlobalSettings,

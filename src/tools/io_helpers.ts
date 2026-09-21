@@ -42,7 +42,7 @@ export function writeFileAtomicWithMode(
 ): void {
   const dir = path.dirname(p);
   Deno.mkdirSync(dir, { recursive: true });
-  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".mothx-insert-" });
+  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".opensac-insert-" });
   try {
     Deno.chmodSync(tmpPath, mode & 0o777);
     Deno.writeFileSync(tmpPath, data);

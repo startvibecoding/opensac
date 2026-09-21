@@ -33,7 +33,7 @@ export function configPath(): string {
   return path.join(configDir(), "a2a.json");
 }
 
-/** ProjectConfigPath returns the path to the project-level .mothx/a2a.json. */
+/** ProjectConfigPath returns the path to the project-level .opensac/a2a.json. */
 export function projectConfigPath(): string {
   return projectPath("a2a.json");
 }

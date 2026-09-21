@@ -4,7 +4,7 @@
 
 import * as path from "@std/path";
 
-const APP_DIR_NAME = "mothx";
+const APP_DIR_NAME = "opensac";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OS detection
@@ -214,7 +214,9 @@ export function homeDir(): string {
 
 /** Returns the platform-specific configuration directory. */
 export function configDir(): string {
-  const dir = Deno.env.get("MOTHX_DIR");
+  // OPENSAC_DIR is the primary override; MOTHX_DIR is kept as a legacy
+  // fallback for environments configured before the rename.
+  const dir = Deno.env.get("OPENSAC_DIR") ?? Deno.env.get("MOTHX_DIR");
   if (dir) return dir;
   return configDirForOS(
     goos(),
@@ -239,7 +241,8 @@ function configDirForOS(
 
 /** Reports whether the user selected a custom config dir. */
 export function configDirOverridden(): boolean {
-  return (Deno.env.get("MOTHX_DIR") ?? "") !== "";
+  return ((Deno.env.get("OPENSAC_DIR") ?? Deno.env.get("MOTHX_DIR")) ??
+    "") !== "";
 }
 
 /** Returns the platform-specific data directory. */

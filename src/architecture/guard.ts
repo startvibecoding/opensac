@@ -362,6 +362,12 @@ export const legacyTestAllowlist: Record<string, string> = {
   // exists that adapter tests can use without the legacy session API.
   "src/acp/manage_test.ts":
     "seeds a completed Run so the Runtime delivery-plan ownership check passes",
+  // The 1:1 translation of `watchdog_test.go`: the fixture seeds one running
+  // Run through `session.saveSessionRun`, reads it back with
+  // `session.getSessionRun`, and holds `session.lockRuntime` exactly as the Go
+  // test does. Remove once a test-only RunStore fixture exists.
+  "src/serve/channels/watchdog_test.ts":
+    "seeds and reads one running Run and holds the legacy runtime lock like the Go watchdog fixtures",
 };
 
 function isLegacyTestExempt(rel: string): boolean {

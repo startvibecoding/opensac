@@ -22,7 +22,13 @@ import type { AgentExecutor } from "../a2a/handler.ts";
 import { createWithOptions } from "../provider/factory/factory.ts";
 import { Builder } from "../agentruntime/session_runtime.ts";
 import { SourceACP } from "../agentruntime/source.ts";
-import { isArtifactEnabled, loadAllow, type Settings } from "../config/mod.ts";
+import {
+  isArtifactEnabled,
+  loadAllow,
+  sandboxLevelFromSettings,
+  type Settings,
+} from "../config/mod.ts";
+import { Level } from "../sandbox/mod.ts";
 import { normalizeThinkingLevel } from "../provider/mod.ts";
 
 export interface A2AStartOptions {
@@ -105,7 +111,9 @@ export class RuntimeAgentFactory implements AgentFactory {
       this.#model,
       { requireModel: true },
     );
-    const sandboxLevel = this.#sandbox ? 1 : 0;
+    const sandboxLevel = this.#sandbox
+      ? sandboxLevelFromSettings(this.#settings)
+      : Level.None;
     const runtime = await new Builder(this.#settings, sandboxLevel).build(
       undefined,
       {

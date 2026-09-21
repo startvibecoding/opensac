@@ -84,7 +84,7 @@ function writeExpertFixtures(workDir: string): void {
     persona: string,
     members: string[] = [],
   ): void => {
-    const dir = `${workDir}/.mothx/experts/${name}`;
+    const dir = `${workDir}/.opensac/experts/${name}`;
     Deno.mkdirSync(`${dir}/agents`, { recursive: true, mode: 0o700 });
     let team = "";
     if (members.length > 0) {

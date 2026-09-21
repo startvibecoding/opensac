@@ -53,7 +53,7 @@ export class Store {
 
   /**
    * Finds the memory.md file to use. Priority: explicit path →
-   * .mothx/memory.md → <GLOBAL_DIR>/memory.md. Returns the path and source,
+   * .opensac/memory.md → <GLOBAL_DIR>/memory.md. Returns the path and source,
    * where source is "explicit", "project", "global", or "".
    */
   resolve(): { path: string; source: string } {
@@ -68,7 +68,7 @@ export class Store {
       return { path: this.#explicitPath, source: "explicit" };
     }
 
-    // 2. Project-level: .mothx/memory.md
+    // 2. Project-level: .opensac/memory.md
     let projectPathValue = projectPath("memory.md");
     if (this.#workDir !== "") {
       projectPathValue = projectPathFor(this.#workDir, "memory.md");
@@ -186,17 +186,17 @@ export class Store {
 
   /**
    * Determines where to create a new memory.md. Default: project-level
-   * (.mothx/memory.md). Only uses global if explicitly configured.
+   * (.opensac/memory.md). Only uses global if explicitly configured.
    */
   #defaultWritePath(): string {
     if (this.#explicitPath !== "") {
       return this.#explicitPath;
     }
-    // Default to project-level: workDir/.mothx/memory.md
+    // Default to project-level: workDir/.opensac/memory.md
     if (this.#workDir !== "") {
       return projectPathFor(this.#workDir, "memory.md");
     }
-    // Fallback: cwd/.mothx/memory.md
+    // Fallback: cwd/.opensac/memory.md
     return projectPath("memory.md");
   }
 

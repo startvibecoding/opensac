@@ -31,7 +31,12 @@ import type { ExecutionIntent } from "../session/execution_intent.ts";
 import { generateID, runUserEntryID } from "../session/mod.ts";
 import { resourceIds } from "../agentruntime/input_materializer.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
-import { isArtifactEnabled, loadAllow, type Settings } from "../config/mod.ts";
+import {
+  isArtifactEnabled,
+  loadAllow,
+  sandboxLevelFromSettings,
+  type Settings,
+} from "../config/mod.ts";
 import { normalizeThinkingLevel } from "../provider/mod.ts";
 
 export interface PrintOptions {
@@ -418,9 +423,6 @@ function emitJSON(event: PrintJSONEvent): void {
   console.log(JSON.stringify(event));
 }
 
-function levelFromSettings(
-  settings: Settings,
-): import("../sandbox/mod.ts").Level {
-  if (!settings.sandbox?.enabled) return 0;
-  return settings.sandbox.level === "strict" ? 2 : 1;
+function levelFromSettings(settings: Settings) {
+  return sandboxLevelFromSettings(settings);
 }

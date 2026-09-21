@@ -39,7 +39,7 @@ export interface FileContent {
 
 /** The loaded context files. */
 export interface LoadResult {
-  /** files from ~/.mothx/ */
+  /** files from ~/.opensac/ */
   globalFiles: FileContent[];
   /** files from parent directories */
   parentFiles: FileContent[];
@@ -121,7 +121,7 @@ export function loadContextFiles(
     dir = parent;
   }
 
-  // 3. Load from global config directory (~/.mothx/)
+  // 3. Load from global config directory (~/.opensac/)
   // Only the first matching file is loaded
   if (globalConfigDir !== "") {
     for (const name of uniqueNames) {
@@ -203,7 +203,7 @@ export const defaultRuleContent = `# Project Rules
 - Ask before proceeding when requirements are ambiguous or an action could risk data, secrets, or external state.
 `;
 
-/** Loads .mothx/rule.md from the given working directory. */
+/** Loads .opensac/rule.md from the given working directory. */
 export function loadRuleFile(cwd: string): string {
   const p = ruleFilePath(cwd);
   try {
@@ -219,7 +219,7 @@ export function ruleFilePath(cwd: string): string {
 }
 
 /**
- * Creates .mothx/rule.md with defaultRuleContent.
+ * Creates .opensac/rule.md with defaultRuleContent.
  * Existing files are preserved unless overwrite is true.
  */
 export function ensureRuleFile(

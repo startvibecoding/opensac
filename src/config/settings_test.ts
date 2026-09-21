@@ -560,9 +560,9 @@ Deno.test("skills sparse round trip", () => {
 Deno.test("loadSettingsFor applies env overrides and project settings", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "proj");
-    Deno.mkdirSync(path.join(project, ".mothx"), { recursive: true });
+    Deno.mkdirSync(path.join(project, ".opensac"), { recursive: true });
     Deno.writeTextFileSync(
-      path.join(project, ".mothx", "settings.json"),
+      path.join(project, ".opensac", "settings.json"),
       JSON.stringify({ theme: "light", defaultModel: "proj-model" }),
     );
     Deno.env.set("VIBECODING_PROVIDER", "proj-provider");

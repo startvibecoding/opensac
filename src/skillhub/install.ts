@@ -314,7 +314,7 @@ export function writeMetadata(
     2,
   );
   Deno.writeTextFileSync(
-    path.join(dir, ".mothx-skillhub.json"),
+    path.join(dir, ".opensac-skillhub.json"),
     payload + "\n",
   );
 }

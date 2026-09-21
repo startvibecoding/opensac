@@ -13,6 +13,7 @@ import {
   skillsDir as platformSkillsDir,
 } from "../platform/platform.ts";
 import type { Options as SandboxOptions } from "../sandbox/sandbox.ts";
+import { Level } from "../sandbox/sandbox.ts";
 import { defaultProviderConfigs } from "./provider_defaults.ts";
 import { ProjectDirName, projectPath, projectPathFor } from "./paths.ts";
 
@@ -1412,7 +1413,7 @@ export function saveProjectSettingsPatch(
   );
 }
 
-/** Writes .mothx/settings.json atomically with private permissions. */
+/** Writes .opensac/settings.json atomically with private permissions. */
 export function saveProjectSettings(s: Settings): void {
   if (!s) throw new Error("settings is nil");
   const settingsPath = projectSettingsPath();
@@ -1997,6 +1998,18 @@ export function sandboxSettingsOptions(s: SandboxSettings): SandboxOptions {
     tmpSize: s.tmpSize,
     protectGit: s.protectGit,
   };
+}
+
+/**
+ * Resolves the sandbox Level from settings once for every entry point.
+ * Disabled settings mean direct execution (Level.None); "strict" requires
+ * the strict backend; anything else is the best-effort standard level.
+ */
+export function sandboxLevelFromSettings(
+  settings: Settings | undefined,
+): Level {
+  if (!settings?.sandbox?.enabled) return Level.None;
+  return settings.sandbox.level === "strict" ? Level.Strict : Level.Standard;
 }
 
 /** Returns the configured disabled skill names, or undefined. */

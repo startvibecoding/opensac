@@ -21,7 +21,7 @@ export function agentListConfigPath(): string {
   return path.join(configDir(), "a2a-list.json");
 }
 
-/** ProjectAgentListConfigPath returns the project-level .mothx/a2a-list.json. */
+/** ProjectAgentListConfigPath returns the project-level .opensac/a2a-list.json. */
 export function projectAgentListConfigPath(): string {
   return projectPath("a2a-list.json");
 }

@@ -204,7 +204,7 @@ export class InputMaterializer {
   }
 
   /**
-   * Streams one resource into `.mothx/tmp/inputs` and persists its canonical
+   * Streams one resource into `.opensac/tmp/inputs` and persists its canonical
    * metadata. Stable platform items are idempotent across retries and
    * concurrent deliveries.
    */
@@ -595,7 +595,7 @@ export class InputMaterializer {
 
   private async inputRoot(): Promise<string> {
     const workDir = await Deno.realPath(this.workDir);
-    const root = path.join(workDir, ".mothx", "tmp", "inputs");
+    const root = path.join(workDir, ".opensac", "tmp", "inputs");
     await Deno.mkdir(root, { recursive: true, mode: 0o700 });
     const resolvedRoot = await Deno.realPath(root);
     const rel = path.relative(workDir, resolvedRoot);

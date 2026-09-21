@@ -5,7 +5,7 @@
 ## 工作方式
 
 1. 从用户需求提取团队名称、领队职责、成员职责和协作方式。只有在缺少会改变团队结构的必要信息时才提问；名称未指定时，根据用途生成简短、稳定的 kebab-case ID。
-2. 在当前工作目录创建项目级包：`.mothx/experts/<team-id>/`。这是安装位置，不要写入 MothX 内置目录、全局配置目录或其他项目。
+2. 在当前工作目录创建项目级包：`.opensac/experts/<team-id>/`。这是安装位置，不要写入 MothX 内置目录、全局配置目录或其他项目。
 3. 若目标目录已经存在，先读取并说明冲突；除非用户明确要求更新，绝不覆盖、删除或合并已有主角团。
 4. 写入 `expert.json` 和 `agents/*.md`。清单必须使用 `schemaVersion: 1`、`expertType: "team"`，并让 `name` 与目录名相同；`agentName` 与 `teamInfo.leadAgent` 必须指向领队文件 ID。`teamInfo.memberAgents` 只能列出成员，不能包含领队。
 5. 每个 `agents/<id>.md` 都必须有 YAML frontmatter。至少包含稳定的 `name`、简洁的 `description`、`role`（领队为 `lead`，成员为 `member`）和一个 emoji；正文写清角色边界、输入、交付物、与领队/成员的协作规则。成员不应被指示嵌套派发其他成员。

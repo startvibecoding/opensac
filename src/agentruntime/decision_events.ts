@@ -32,6 +32,13 @@ export const DecisionStatusCancelled = "cancelled";
 export const DecisionStatusTimedOut = "timed_out";
 
 /**
+ * The canonical record-source label adapters project for decision entries
+ * (trajectory windows, transcript filters). Owned here so no adapter
+ * re-spells the envelope vocabulary.
+ */
+export const DecisionRecordSource = "decision";
+
+/**
  * The minimal durable decision envelope: the record under the canonical key.
  * Writers that persist only a decision use it directly; `decisionEventFields`
  * adds an adapter payload.

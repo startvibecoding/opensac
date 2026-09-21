@@ -3,14 +3,14 @@
 import * as path from "@std/path";
 
 /** Project-level configuration directory name. */
-export const ProjectDirName = ".mothx";
+export const ProjectDirName = ".opensac";
 
-/** Returns a project-level path under .mothx in the current working directory. */
+/** Returns a project-level path under .opensac in the current working directory. */
 export function projectPath(...elem: string[]): string {
   return projectPathFor(".", ...elem);
 }
 
-/** Returns a project-level path under `cwd`/.mothx. */
+/** Returns a project-level path under `cwd`/.opensac. */
 export function projectPathFor(cwd: string, ...elem: string[]): string {
   if (cwd === "") cwd = ".";
   return path.join(cwd, ProjectDirName, ...elem);

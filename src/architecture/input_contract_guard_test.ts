@@ -72,7 +72,14 @@ const checks: ContractCheck[] = [
     ],
   },
   {
+    // The channel dispatcher core already owns the attachment-ingress mapping;
+    // HandleMessage/HandleDelivery land in delivery.ts, which must consume the
+    // Runtime input contract (same split as the Go file's delivery path).
     path: "src/serve/channels/dispatcher.ts",
+    requires: ["channelAttachmentIngresses"],
+  },
+  {
+    path: "src/serve/channels/delivery.ts",
     requires: [
       "channelAttachmentIngresses",
       ".acceptInput(",

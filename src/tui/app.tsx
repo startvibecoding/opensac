@@ -13,6 +13,7 @@ import { Box, Static, Text } from "ink";
 import { AppController } from "./app_controller.ts";
 import { renderHeader } from "./header.ts";
 import { displayWidth } from "./formatters.ts";
+import type { TranscriptStore } from "./transcript_store.ts";
 
 export interface AppProps {
   /** The event-dispatch controller owning the transcript. */
@@ -30,6 +31,20 @@ export interface AppProps {
   label?: string;
   /** Visible tail of the transcript when `controller` is absent. */
   visibleRows?: Array<{ id: string; text: string }>;
+}
+
+/** One transcript row with its presentation kind. */
+export interface TranscriptRow {
+  id: string;
+  text: string;
+  kind:
+    | "header"
+    | "plain"
+    | "assistant"
+    | "think"
+    | "tool"
+    | "error"
+    | "warning";
 }
 
 /** Strips ANSI for <Text> children so Ink owns styling. */
@@ -62,14 +77,30 @@ export function App({
   // Rows with an index below the active streaming rows are committed; the
   // active assistant/think slot and running tool rows stay in the managed
   // view. The store's `messages` array is the source of truth: every row is
-  // committed exactly once via <Static>, identified by its index.
-  const committed = store.messages
-    .map((text, index) => ({ id: `row-${index}`, text, index }))
-    .filter((row) =>
-      row.text !== "" && row.index < activeSlotStart(controller)
-    );
+  // committed exactly once via <Static>, identified by its index. Running
+  // tool rows never commit — <Static> is append-only, so a row whose text
+  // will change (running… → summary) must stay in the managed view until it
+  // reaches a terminal state.
+  const slotStart = activeSlotStart(controller);
+  const runningTools = new Set(
+    store.toolResults.filter((r) => r.status === "running").map((r) =>
+      r.msgIndex
+    ),
+  );
+  const committed: TranscriptRow[] = [];
+  const streaming: TranscriptRow[] = [];
+  for (let i = 0; i < store.messages.length; i++) {
+    const resolved = rowTextAt(store, i);
+    if (!resolved) continue;
+    const row: TranscriptRow = {
+      id: `row-${i}`,
+      text: resolved.text,
+      kind: resolved.kind,
+    };
+    if (i < slotStart && !runningTools.has(i)) committed.push(row);
+    else streaming.push(row);
+  }
 
-  const streamingRows = activeStreamingRows(controller);
   // Ink supports a single <Static>; header lines and committed transcript rows
   // share it, header first.
   const headerLines = header
@@ -82,16 +113,20 @@ export function App({
     )
       .split("\n")
       .filter((l) => l !== "")
-      .map((line, i) => ({ id: `header-${i}`, text: line }))
+      .map((line, i): TranscriptRow => ({
+        id: `header-${i}`,
+        text: line,
+        kind: "header",
+      }))
     : [];
   const committedAll = [...headerLines, ...committed];
 
   return (
     <Box flexDirection="column">
       <Static items={committedAll}>
-        {(row) => <Text key={row.id}>{row.text}</Text>}
+        {(row) => renderRow(row, false)}
       </Static>
-      {streamingRows.map((row) => <Text key={row.id}>{plain(row.text)}</Text>)}
+      {streaming.map((row) => renderRow(row, true))}
       {controller.shownApproval && (
         <Box flexDirection="column" borderStyle="round">
           <Text bold>Approval required</Text>
@@ -114,6 +149,68 @@ export function App({
   );
 }
 
+/** Renders one transcript row; streaming rows are clipped and stripped. */
+function renderRow(row: TranscriptRow, streaming: boolean): ReactElement {
+  if (row.kind === "header") {
+    return <Text key={row.id}>{row.text}</Text>;
+  }
+  if (row.kind === "think") {
+    return (
+      <Text key={row.id} dimColor italic>
+        {streaming ? clip(row.text, 4) : row.text}
+      </Text>
+    );
+  }
+  if (row.kind === "tool") {
+    return <Text key={row.id} color="cyan">{row.text}</Text>;
+  }
+  if (row.kind === "error") {
+    return <Text key={row.id} color="red">{row.text}</Text>;
+  }
+  if (row.kind === "warning") {
+    return <Text key={row.id} color="yellow">{row.text}</Text>;
+  }
+  return (
+    <Text key={row.id}>{streaming ? plain(clip(row.text, 6)) : row.text}</Text>
+  );
+}
+
+/**
+ * Resolves the display text of transcript row `index`. Streaming rows keep
+ * their raw text in the store's per-slot builders (assistant/think); tool rows
+ * carry their summary in `toolResults`. Empty placeholders resolve to nothing.
+ */
+function rowTextAt(
+  store: TranscriptStore,
+  index: number,
+): { text: string; kind: TranscriptRow["kind"] } | undefined {
+  const tool = store.toolResults.find((r) => r.msgIndex === index);
+  if (tool) {
+    if (tool.status === "running") {
+      return { text: `⏺ ${tool.toolName} running…`, kind: "tool" };
+    }
+    const state = tool.status === "interrupted"
+      ? "interrupted"
+      : tool.summary !== ""
+      ? tool.summary
+      : "done";
+    const err = tool.toolError !== "" ? ` — error: ${tool.toolError}` : "";
+    return {
+      text: `⏺ ${tool.toolName} ${state}${err}`,
+      kind: tool.status === "interrupted" || err !== "" ? "warning" : "tool",
+    };
+  }
+  const message = store.messages[index];
+  if (message !== undefined && message !== "") {
+    return { text: message, kind: "plain" };
+  }
+  const assistant = store.assistantRaw(index);
+  if (assistant !== "") return { text: assistant, kind: "assistant" };
+  const think = store.thinkRaw(index);
+  if (think !== "") return { text: think, kind: "think" };
+  return undefined;
+}
+
 /** First message index eligible for scrollback commit. */
 function activeSlotStart(controller: AppController): number {
   const { currentAssistantIdx, currentThinkIdx } = controller.store;
@@ -129,24 +226,7 @@ function store_end(controller: AppController): number {
   return controller.store.messages.length;
 }
 
-/** The rows currently streaming (never sent to scrollback). */
-function activeStreamingRows(
-  controller: AppController,
-): Array<{ id: string; text: string }> {
-  const rows: Array<{ id: string; text: string }> = [];
-  const store = controller.store;
-  const { currentAssistantIdx, currentThinkIdx } = store;
-  for (const idx of [currentThinkIdx, currentAssistantIdx]) {
-    if (idx >= 0 && idx < store.messages.length) {
-      const text = store.messages[idx] || store.assistantRaw(idx) ||
-        store.thinkRaw(idx);
-      rows.push({ id: `live-${idx}`, text: clip(text) });
-    }
-  }
-  return rows;
-}
-
-function clip(text: string, maxLines = 8): string {
+function clip(text: string, maxLines = 6): string {
   const lines = plain(text).split("\n");
   if (lines.length <= maxLines) return text;
   return lines.slice(lines.length - maxLines).join("\n") + "\n";

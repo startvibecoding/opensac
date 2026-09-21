@@ -1356,7 +1356,7 @@ Deno.test("manage mcp project scope uses active session work dir", () => {
     );
     assertEquals(result["scope"], "project");
     assertEquals(result["sessionId"], "project-session");
-    const projectPath = path.join(workDir, ".mothx", "mcp.json");
+    const projectPath = path.join(workDir, ".opensac", "mcp.json");
     assertEquals(result["path"], projectPath);
     const project = loadMCPConfig(projectPath);
     assertEquals(project.mcpServers!.length, 1);

@@ -178,7 +178,7 @@ Deno.test("InstallValidatesArchiveAndWritesMetadata", async () => {
     version: "1.0.0",
   });
   client.archive = archive;
-  const target = path.join(await Deno.makeTempDir(), ".mothx", "skills");
+  const target = path.join(await Deno.makeTempDir(), ".opensac", "skills");
   const result = await installSkill(undefined, client, {
     market: "skillhub.cn",
     id: "test-skill",

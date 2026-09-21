@@ -211,7 +211,7 @@ export function matchEditPath(c: AllowConfig, p: string): boolean {
 /**
  * Persists the project config. The project autoEdit key is written only when it
  * was explicitly set at project scope; inherited global state is never copied
- * into .mothx/allow.json as a side effect of editing path rules.
+ * into .opensac/allow.json as a side effect of editing path rules.
  */
 export function saveProject(c: AllowConfig): void {
   writeProjectAllowFile(

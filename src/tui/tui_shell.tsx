@@ -5,7 +5,7 @@
 
 import React, { useEffect } from "react";
 import type { ReactElement } from "react";
-import { Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import { App } from "./app.tsx";
 import type { AppController } from "./app_controller.ts";
 import type { TUISession } from "./tui_session.ts";
@@ -46,19 +46,29 @@ export function TuiShell({
   useInput((input, key) => {
     const controller = session.controller;
 
+    // Ink may deliver batched keystrokes (paste, fast typing, pipes) as one
+    // chunk, e.g. "hi\r" with key.return === false. Treat a trailing CR/LF as
+    // Return and feed only the leading runes to the editor.
+    let printable = input;
+    let isReturn = key.return;
+    while (printable.endsWith("\r") || printable.endsWith("\n")) {
+      isReturn = true;
+      printable = printable.slice(0, -1);
+    }
+
     // Approval panel: y/n
     if (controller.shownApproval) {
-      if (input === "y") session.answerApproval(true);
-      else if (input === "n") session.answerApproval(false);
+      if (printable === "y") session.answerApproval(true);
+      else if (printable === "n") session.answerApproval(false);
       return;
     }
     // Question panel: numeric options
     if (controller.shownQuestion) {
       const options = controller.shownQuestion.options ?? [];
-      const idx = Number.parseInt(input, 10);
+      const idx = Number.parseInt(printable, 10);
       if (!Number.isNaN(idx) && idx >= 1 && idx <= options.length) {
         session.answerQuestion(options[idx - 1]);
-      } else if (key.return && controller.shownQuestion) {
+      } else if (isReturn && controller.shownQuestion) {
         session.answerQuestion("");
       }
       return;
@@ -74,7 +84,12 @@ export function TuiShell({
     }
 
     const editor = session.editor;
-    if (key.return) {
+    // Insert the leading runes first so a batched "hi\r" both types "hi"
+    // and then submits.
+    if (printable && !key.ctrl && !key.meta) {
+      editor.insertText(printable);
+    }
+    if (isReturn) {
       if (key.meta || key.ctrl) {
         editor.insertText("\n");
         return;
@@ -122,18 +137,31 @@ export function TuiShell({
       if (mapped) editor.handleKey(mapped);
       return;
     }
-    if (input && !key.ctrl && !key.meta) {
-      editor.insertText(input);
-    }
   });
 
   // Include `version` so React re-renders when the store changes externally.
   void version;
-  return React.createElement(App, {
-    controller,
-    header: session.header,
-    width,
-  }) as ReactElement;
+  const editorView = session.editor.view();
+  return (
+    <Box flexDirection="column">
+      {React.createElement(App, {
+        controller,
+        header: session.header,
+        width,
+      }) as ReactElement}
+      <Box borderStyle="round" flexDirection="column">
+        <Text>{editorView}</Text>
+      </Box>
+      <Text dimColor>
+        {session.busy
+          ? "working… — ctrl+c cancel run"
+          : "enter send · alt+enter newline · ctrl+c exit"}
+      </Text>
+      <Text dimColor>
+        {`${session.header.providerName}/${session.header.modelName} · mode: ${session.mode}`}
+      </Text>
+    </Box>
+  );
 }
 
 /** Footer line for the editor input area. */

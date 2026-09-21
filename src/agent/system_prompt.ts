@@ -15,7 +15,7 @@ import {
 
 /**
  * Builds the system prompt based on mode and context. ruleContent is the content
- * of .mothx/rule.md (project rules), inserted after the built-in sections but
+ * of .opensac/rule.md (project rules), inserted after the built-in sections but
  * before extraContext (skills + context files like AGENTS.md).
  */
 export function buildSystemPrompt(

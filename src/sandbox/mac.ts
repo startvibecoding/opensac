@@ -119,7 +119,7 @@ export class MacSandbox implements Sandbox {
       allowedPaths.push(
         path.join(home, ".config"),
         path.join(home, ".cache"),
-        path.join(home, ".mothx"),
+        path.join(home, ".opensac"),
       );
     }
     allowedPaths.push(...(this.#options.allowedWrite ?? []));

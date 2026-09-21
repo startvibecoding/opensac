@@ -11,7 +11,6 @@ import {
   renderAgentActivity,
   truncatePlain,
 } from "./activity.ts";
-import type { Event } from "../agent/events.ts";
 import {
   EventDone,
   EventError,
