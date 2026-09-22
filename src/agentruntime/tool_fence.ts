@@ -41,6 +41,8 @@ export function beforeToolExecuteForRuntime(
     const manager = runtime.manager;
     const execution = runtime.execution;
     let runtimeId = runtime.id;
+    // Compatibility: a manager-less or run-less execution (transient/derived
+    // agents) has no durable lease to revalidate and is left unfenced.
     if (
       execution === undefined || manager === undefined ||
       (toolCtx.runId ?? "").trim() === ""

@@ -31,6 +31,8 @@ import {
 } from "./session_options.ts";
 import { attachSessionResources } from "./attach.ts";
 import { buildRegistry } from "./registry.ts";
+import { ExecutionRuntime } from "./execution.ts";
+import { RunStateCancelled } from "./run_state.ts";
 import { SessionRuntime } from "./session_runtime.ts";
 import {
   ModeAgent,
@@ -479,4 +481,32 @@ Deno.test("sessionRuntimeAttachPreparedInputRejectsUnavailable", async () => {
   } finally {
     closeDatabases();
   }
+});
+
+Deno.test("sessionRuntimeShutdownReleasesResourcesAfterTerminalPersistenceFailure", async () => {
+  const runtime = new SessionRuntime();
+  const execution = new ExecutionRuntime();
+  execution.begin(undefined, "run-shutdown");
+  // The loop finishes asynchronously after cancellation while the durable
+  // "cancelling" update keeps failing.
+  execution.setAgent({
+    abort() {
+      setTimeout(() => {
+        execution.finishInMemory("run-shutdown", RunStateCancelled, true);
+      }, 0);
+    },
+  });
+  execution.setRunStore({
+    create() {},
+    update() {
+      throw new Error("database busy");
+    },
+    finish() {},
+  });
+  runtime.setExecution(execution);
+
+  await assertRejects(() => runtime.shutdown(), Error, "database busy");
+  // The loop is gone, so shutdown must still release Runtime-owned resources
+  // instead of leaking MCP clients behind the persistence error.
+  assertEquals(runtime.closed, true);
 });

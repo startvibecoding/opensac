@@ -177,6 +177,9 @@ export class DecisionService {
         this.#resolving.delete(resolution.id);
         throw err;
       }
+      // The resume callback already fired. Drop it so a retry after a failed
+      // commit cannot resume the same decision twice.
+      this.#resolvers.delete(resolution.id);
     }
     if (commit !== undefined) {
       try {
@@ -238,11 +241,28 @@ export class DecisionService {
     return cleared;
   }
 
+  /**
+   * Removes all decisions for a Run like `clearRunWithValue`, invoking bound
+   * resolver callbacks with an empty value so a pending approval/question wait
+   * is never left hanging. A decision whose callback fails stays pending so the
+   * clear can be retried.
+   */
   clearRun(runId: string): DecisionRequest[] {
     if (runId === "") return [];
     const cleared: DecisionRequest[] = [];
     for (const [id, request] of this.#pending) {
       if (request.runId !== runId) continue;
+      const resolver = this.#resolvers.get(id);
+      if (resolver !== undefined) {
+        this.#resolving.add(id);
+        try {
+          resolver("");
+        } catch {
+          this.#resolving.delete(id);
+          continue;
+        }
+        this.#resolving.delete(id);
+      }
       cleared.push(request);
       this.#pending.delete(id);
       this.#resolvers.delete(id);

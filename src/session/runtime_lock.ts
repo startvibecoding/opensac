@@ -397,20 +397,28 @@ export class LeaseHeartbeatScheduler {
   dirKey: string;
   stopped = false;
   #timer: ReturnType<typeof setInterval> | null = null;
+  #renewing = false;
 
   constructor(dirKey: string) {
     this.dirKey = dirKey;
   }
 
   start(): void {
+    if (this.stopped) return;
     if (this.#timer !== null) return;
     this.#timer = setInterval(() => {
+      // The retry budget outlasts one tick; never stack renew batches (and
+      // their 200ms retry polls) on an already busy database.
+      if (this.#renewing) return;
       const leases = snapshotRuntimeLeasesForDir(this.dirKey);
       if (leases.length === 0) {
         if (this.retire()) return;
         return;
       }
-      void this.renew(leases);
+      this.#renewing = true;
+      void this.renew(leases).finally(() => {
+        this.#renewing = false;
+      });
     }, runtimeHeartbeatTiming.everyMs);
     Deno.unrefTimer(this.#timer);
   }

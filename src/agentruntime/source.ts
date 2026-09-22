@@ -306,12 +306,6 @@ export function resolveSource(input: SourceResolutionInput): SourceResolution {
       } conflicts with current runtime source ${JSON.stringify(input.current)}`,
     );
   }
-  if (
-    result.source === SourceUnknown &&
-    !isKnownRequestedSource(input.requested ?? SourceUnknown)
-  ) {
-    result.source = SourceUnknown;
-  }
   return result;
 }
 
@@ -388,19 +382,7 @@ export function resolvePolicy(
       error: new SourceConflictError([...resolved.diagnostics]),
     };
   }
-  if (
-    resolved.source === SourceUnknown && input.requested !== undefined &&
-    input.requested !== SourceUnknown &&
-    !isKnownRequestedSource(input.requested)
-  ) {
-    return {
-      resolution: resolved,
-      mode: "",
-      error: new Error(
-        `unknown runtime source ${JSON.stringify(input.requested)}`,
-      ),
-    };
-  }
+  // Unknown requested sources are already rejected by `validateSourceCandidates`.
   try {
     const mode = policyForSource(resolved.source, defaultMode).resolveMode(
       sessionMode,
@@ -446,19 +428,7 @@ export function resolvePolicyFromSession(
       error,
     };
   }
-  if (
-    resolved.source === SourceUnknown && input.requested !== undefined &&
-    input.requested !== SourceUnknown &&
-    !isKnownRequestedSource(input.requested)
-  ) {
-    return {
-      resolution: resolved,
-      mode: "",
-      error: new Error(
-        `unknown runtime source ${JSON.stringify(input.requested)}`,
-      ),
-    };
-  }
+  // Unknown requested sources are already rejected by `resolveSourceFromSession`.
   try {
     const mode = policyForSource(resolved.source, defaultMode).resolveMode(
       sessionMode,

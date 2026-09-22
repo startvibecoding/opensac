@@ -416,3 +416,55 @@ Deno.test("renewal recovers after repeated timeout ticks", async () => {
     closeAll();
   }
 });
+
+Deno.test("a slow renew batch never overlaps the next tick", async () => {
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const originalEvery = runtimeHeartbeatTiming.everyMs;
+  try {
+    makeSession(sessionDir, "hb-overlap");
+    const dirKey = leaseDirKey(sessionDir);
+    const autoScheduler = leaseHeartbeatSchedulers.get(dirKey);
+    autoScheduler?.stop();
+    // Install a deterministic scheduler this test drives directly.
+    const scheduler = new LeaseHeartbeatScheduler(dirKey);
+    leaseHeartbeatSchedulers.set(dirKey, scheduler);
+
+    const guard = acquireExecutionAdmission(sessionDir, "hb-overlap");
+    try {
+      let inFlight = 0;
+      let maxInFlight = 0;
+      let calls = 0;
+      scheduler.renew = () => {
+        calls++;
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return new Promise<void>((resolve) =>
+          setTimeout(() => {
+            inFlight--;
+            resolve();
+          }, 60)
+        );
+      };
+      runtimeHeartbeatTiming.everyMs = 10;
+      scheduler.start();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      scheduler.stop();
+      assert(calls >= 2, "ticks must keep scheduling renewals");
+      assertEquals(maxInFlight, 1, "renew batches must not overlap");
+
+      // A stopped scheduler must never restart its loop.
+      const settled = calls;
+      scheduler.start();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      assertEquals(calls, settled, "a stopped scheduler must not restart");
+    } finally {
+      guard.release();
+    }
+
+    if (autoScheduler === undefined) leaseHeartbeatSchedulers.delete(dirKey);
+    else leaseHeartbeatSchedulers.set(dirKey, autoScheduler);
+  } finally {
+    runtimeHeartbeatTiming.everyMs = originalEvery;
+    closeAll();
+  }
+});

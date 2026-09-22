@@ -699,10 +699,6 @@ export class ExecutionRuntime {
     const hasRunner = this.running !== null;
     if (!hasRunner) {
       if (!this.activeLocked(runId)) return;
-      if (this.running !== null) {
-        await this.shutdownLoopOwned(ctx, runId, message);
-        return;
-      }
       this.persistShutdownTerminalLocked(runId, message);
       const done = this.finishInMemory(runId, RunStateCancelled, false);
       this.closeDone(done);
@@ -2222,6 +2218,8 @@ function executionRegistrationKey(binding: RuntimeLeaseBinding): string {
 
 /**
  * Resolves the canonical execution state without trusting adapter-local maps.
+ * Reading the snapshot may wake recovery coordinators for orphaned or
+ * recovery-failed Runs.
  */
 export function inspectSessionExecution(
   sessionDir: string,
@@ -2687,7 +2685,13 @@ function isConversationTurnNotOpen(err: unknown): boolean {
 }
 
 function cloneUnknown(value: unknown): unknown {
-  return value;
+  if (value === null || typeof value !== "object") return value;
+  try {
+    return structuredClone(value);
+  } catch {
+    // Non-cloneable payloads (functions, proxies) stay shared by reference.
+    return value;
+  }
 }
 
 function abortReason(signal: AbortSignal | undefined): Error {

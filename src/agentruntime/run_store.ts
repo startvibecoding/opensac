@@ -442,15 +442,12 @@ export class RunStore {
     return finishSessionRunAndConversationTurn(
       this.sessionDir,
       {
-        id: run.id,
-        sessionId: run.sessionId,
+        ...durableRunToSessionRun(run),
         status,
         finishedAt: new Date(),
         error: message,
-        assistantEntryId: run.assistantEntryId,
-        assistantMessage: run.assistantMessage,
         deliveryPlan: sessionDeliveryPlan(run.deliveryPlan),
-      } as SessionRun,
+      },
       sessionRunEventFromRuntime(event),
       run.conversationTurnId,
       status,

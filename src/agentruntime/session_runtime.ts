@@ -314,13 +314,17 @@ export class SessionRuntime {
         }
       }
     }
-    // Do not release MCP/resources while a loop is still active or durable
-    // terminal persistence failed.
+    // Do not release MCP/resources while a loop is still active. Once the
+    // execution is gone, release them even when durable terminal persistence
+    // failed, so a shutdown error cannot leak MCP clients.
     if (shutdownErr === undefined) {
       this.close();
-    } else {
-      throw shutdownErr;
+      return;
     }
+    if (execution === undefined || !execution.active().active) {
+      this.close();
+    }
+    throw shutdownErr;
   }
 
   /**
@@ -1227,6 +1231,8 @@ export class SessionRuntime {
     const submission = emptySubmission(text);
     for (let index = 0; index < ingresses.length; index++) {
       const ingress = { ...ingresses[index] };
+      // `itemIndex` 0 is the "unset" sentinel for non-first items and is
+      // rewritten to the declared order.
       if (ingress.itemIndex === 0 && index !== 0) {
         ingress.itemIndex = index;
       }

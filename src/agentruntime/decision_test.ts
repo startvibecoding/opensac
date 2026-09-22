@@ -279,3 +279,69 @@ Deno.test("DecisionService rehydrate rejects conflict", () => {
     ])
   );
 });
+
+Deno.test("DecisionService clearRun resumes bound waiters", () => {
+  const service = new DecisionService();
+  service.register({
+    id: "approval-clear",
+    runId: "run-clear",
+    kind: DecisionApproval,
+  });
+  let resumed: string | null = null;
+  service.bind("approval-clear", (value) => {
+    resumed = value;
+  });
+  service.register({
+    id: "approval-sticky",
+    runId: "run-clear",
+    kind: DecisionApproval,
+  });
+  service.bind("approval-sticky", () => {
+    throw new Error("resume failed");
+  });
+
+  const cleared = service.clearRun("run-clear");
+  assertEquals(cleared.length, 1);
+  assertEquals(cleared[0].id, "approval-clear");
+  assertEquals(resumed, "");
+  // A decision whose resume callback failed stays pending for a retried clear.
+  const pending = service.pending();
+  assertEquals(pending.length, 1);
+  assertEquals(pending[0].id, "approval-sticky");
+});
+
+Deno.test("DecisionService failed commit retries without double resume", () => {
+  const service = new DecisionService();
+  service.register({
+    id: "approval-commit",
+    runId: "run-commit",
+    kind: DecisionApproval,
+  });
+  let resumes = 0;
+  service.bind("approval-commit", () => {
+    resumes++;
+  });
+
+  assertThrows(() =>
+    service.resolveWith(
+      { id: "approval-commit", status: "resolved", value: "approve" },
+      () => {
+        throw new Error("persist failed");
+      },
+    )
+  );
+  assertEquals(resumes, 1);
+  assertEquals(service.pending().length, 1);
+
+  let commits = 0;
+  const request = service.resolveWith(
+    { id: "approval-commit", status: "resolved", value: "approve" },
+    () => {
+      commits++;
+    },
+  );
+  assertEquals(request.id, "approval-commit");
+  assertEquals(commits, 1);
+  assertEquals(resumes, 1, "the resume callback must fire at most once");
+  assertEquals(service.pending().length, 0);
+});
