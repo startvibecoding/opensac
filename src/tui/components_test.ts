@@ -84,7 +84,7 @@ Deno.test("logoWidth measures the widest logo line in cells", () => {
   const lines = opensacLogo.split("\n");
   assertEquals(lines.length, 5);
   assertEquals(logoWidth(), Math.max(...lines.map(displayWidth)));
-  assertEquals(logoWidth(), 28); // block runes are 1 cell each
+  assertEquals(logoWidth(), 34); // block runes are 1 cell each
 });
 
 Deno.test("renderHeader shows logo and info panel at full width", () => {
@@ -98,7 +98,7 @@ Deno.test("renderHeader shows logo and info panel at full width", () => {
   assert(text.includes("OpenSAC (1.2.3)"), text);
   assert(text.includes("deepseek | v4"), text);
   assert(text.includes("/home/u/proj"), text);
-  assert(text.includes("Make OSCHINA Tokens Harness eXecution"));
+  assert(text.includes("Spring Autumn Cicada"));
   // Rounded border corners present
   assert(text.includes("╭"));
   assert(text.includes("╰"));
@@ -111,7 +111,7 @@ Deno.test("renderHeader collapses to the info panel when narrow", () => {
   const header = renderHeader(40, "1.2.3", "deepseek", "v4", "/very/long/path");
   // deno-lint-ignore no-control-regex
   const text = header.replace(/\u001B\[[0-9;]*m/g, "");
-  // Logo's widest line is 29 cells; 40 < 29 + panel + 2 → logo omitted
+  // Logo's widest line is 34 cells; 40 < 34 + panel + 2 → logo omitted
   assert(!text.includes("██"), text);
   // cwd truncated to fit
   assert(text.split("\n").every((l) => displayWidth(l) <= 42));

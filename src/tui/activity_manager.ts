@@ -205,17 +205,16 @@ export class ActivityManager {
     const items: ActivityItem[] = [];
     const now = Date.now();
 
-    // Add thinking blocks
+    // Add thinking blocks (only streaming ones; completed blocks are in transcript)
     for (const [id, block] of this.#thinking) {
+      if (!block.isStreaming) continue;
       items.push({
         id: `thinking-${id}`,
         type: "thinking",
-        status: block.isStreaming ? "running" : "completed",
+        status: "running",
         content: block.content,
         timestamp: block.startTime,
-        elapsedMs: block.endTime
-          ? block.endTime - block.startTime
-          : now - block.startTime,
+        elapsedMs: now - block.startTime,
       });
     }
 

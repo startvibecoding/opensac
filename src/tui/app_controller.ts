@@ -29,6 +29,7 @@ import {
   TaskSuccess,
 } from "../agent/events.ts";
 import type { RunState } from "../agentruntime/run_state.ts";
+import type { ContextUsage } from "../context/context.ts";
 import {
   DecisionApproval,
   type DecisionKind,
@@ -96,6 +97,8 @@ export class AppController {
   waitingForQuestion = false;
   isThinking = false;
   runTerminalHandled = false;
+  /** Latest provider-reported context usage (mothx a.contextUsage). */
+  contextUsage: ContextUsage | undefined;
 
   readonly approvalQueue: PendingApproval[] = [];
   readonly questionQueue: PendingQuestion[] = [];
@@ -126,6 +129,11 @@ export class AppController {
   /** The translator used for localized labels (Go App.translator). */
   get translator(): Translator {
     return this.#translator;
+  }
+
+  /** Clears the context/cache footer state (Go resetAgent + /clear). */
+  resetContextUsage(): void {
+    this.contextUsage = undefined;
   }
 
   attachRun(run: RunHandle | undefined): void {
@@ -242,6 +250,9 @@ export class AppController {
 
       case EventTurnEnd:
         this.store.commitActiveStream();
+        if (event.contextUsage !== undefined) {
+          this.contextUsage = event.contextUsage;
+        }
         if (this.#thinkBlockOpen) {
           this.activityManager.completeThinking("turn");
           this.#thinkBlockOpen = false;

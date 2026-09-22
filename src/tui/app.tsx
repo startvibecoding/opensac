@@ -111,9 +111,14 @@ export function App({
       kind: resolved.kind,
     };
     if (i < slotStart && !runningTools.has(i)) committed.push(row);
-    // Tool rows in the active area are rendered by the activity timeline;
-    // skip them here so a tool is never shown twice.
-    else if (resolved.kind !== "tool") streaming.push(row);
+    // Rows owned by the activity timeline (tools + the active think slot)
+    // must not also render here, or the same thinking text appears twice.
+    else if (
+      resolved.kind !== "tool" &&
+      !(resolved.kind === "think" && i === store.currentThinkIdx)
+    ) {
+      streaming.push(row);
+    }
   }
 
   // Live per-turn activity timeline (tools + thinking) tracked by the

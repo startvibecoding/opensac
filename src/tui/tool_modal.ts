@@ -235,16 +235,17 @@ function truncateDisplay(s: string, maxWidth: number): string {
 }
 
 function frameBox(content: string, width: number, height: number): string {
-  const inner = width - 2;
+  const inner = Math.max(width - 2, 4);
   const lines = content.split("\n");
   while (lines.length < height) lines.push("");
   const body = lines.map((l) => {
-    const pad = " ".repeat(Math.max(inner - displayWidth(l), 0));
+    // `│ ` + text + padding + ` │` must equal the inner width.
+    const pad = " ".repeat(Math.max(inner - 2 - displayWidth(l), 0));
     return `│ ${l}${pad} │`;
   });
   return [
-    `╭${"─".repeat(inner + 2)}╮`,
+    `╭${"─".repeat(inner)}╮`,
     ...body,
-    `╰${"─".repeat(inner + 2)}╯`,
+    `╰${"─".repeat(inner)}╯`,
   ].join("\n");
 }

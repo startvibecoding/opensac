@@ -42,7 +42,6 @@ import {
 } from "../config/settings.ts";
 import { ensureRuleFile, ruleFilePath } from "../contextfiles/contextfiles.ts";
 import { registerDelegateSubAgentTool } from "../agent/subagent.ts";
-import { newAgentManager } from "../agentruntime/agent_manager.ts";
 import type { AgentManager } from "../agent/manager.ts";
 import { ConfigOptionBrowser } from "../agentruntime/session_options.ts";
 import { ExpertSwitchRequiresForkError } from "../agentruntime/expert.ts";
@@ -92,6 +91,9 @@ interface TUIHost {
   currentSessionID(): string;
   bindManager(manager: SessionManager): Promise<void>;
   setMode(mode: string): void;
+  ensureAgentManager(): import("../agent/manager.ts").AgentManager;
+  startESMContinuationIfIdle(): void;
+  abortESMWorker(): void;
 }
 
 export class TuiCommands {
@@ -100,7 +102,6 @@ export class TuiCommands {
   /** The accumulated extra-context bytes appended by activateSkill. */
   #appendedSkillContext = "";
   #delegateMode = false;
-  #delegateManager: AgentManager | undefined;
   #activeAgent = "main";
   #agent: Agent | undefined;
   #reloadRequested = false;
@@ -361,6 +362,7 @@ export class TuiCommands {
       );
       await this.#host.bindManager(child);
       this.#host.controller.store.resetTranscriptState();
+      this.#host.controller.resetContextUsage();
       return {
         message: tr.text("expert.switched", result.sessionId, id),
       };
@@ -404,6 +406,7 @@ export class TuiCommands {
       );
       await this.#host.bindManager(child);
       this.#host.controller.store.resetTranscriptState();
+      this.#host.controller.resetContextUsage();
       const detail = listForDirDetailed(
         this.#host.workDir,
         this.#host.manager.getSessionDir(),
@@ -451,6 +454,7 @@ export class TuiCommands {
         this.#host.manager.getHeader()?.cwd === "" ? "yolo" : "yolo",
       );
       this.#host.controller.store.resetTranscriptState();
+      this.#host.controller.resetContextUsage();
       return {
         message: tr.text("sessions.switched", detail.id, detail.messageCount),
       };
@@ -465,6 +469,7 @@ export class TuiCommands {
       const manager = createSession({ workDir: this.#host.workDir });
       await this.#host.bindManager(manager);
       this.#host.controller.store.resetTranscriptState();
+      this.#host.controller.resetContextUsage();
       return { message: tr.text("sessions.clear_hint") };
     } catch (err) {
       return { message: (err as Error).message, error: true };
@@ -626,6 +631,7 @@ export class TuiCommands {
             };
           }
           store.resume(sessionID);
+          this.#host.startESMContinuationIfIdle();
           return { message: this.#formatESM(store.get(sessionID)) };
         case "guide":
           if (rest === "") {
@@ -635,6 +641,7 @@ export class TuiCommands {
             };
           }
           store.addGuidance(sessionID, rest);
+          this.#host.startESMContinuationIfIdle();
           return { message: "Guidance queued for the next ESM role run." };
         case "clear":
           if (rest !== "") {
@@ -644,9 +651,11 @@ export class TuiCommands {
             };
           }
           store.clear(sessionID);
+          this.#host.abortESMWorker();
           return { message: "Enable Supervisor Mode cleared." };
         default:
           store.create(sessionID, raw);
+          this.#host.startESMContinuationIfIdle();
           return { message: this.#formatESM(store.get(sessionID)) };
       }
     } catch (err) {
@@ -910,7 +919,7 @@ export class TuiCommands {
     }
   }
 
-  /** Builds the shared AgentManager and registers the blocking delegate tool. */
+  /** Registers the blocking delegate tool on the shared AgentManager. */
   #enableDelegate(): CommandResult {
     const tr = this.#tr();
     const runtime = this.#host.runtime;
@@ -918,22 +927,10 @@ export class TuiCommands {
       return { message: tr.text("agent.manager_unavailable"), error: true };
     }
     try {
-      if (this.#delegateManager === undefined) {
-        const provider = runtime.provider;
-        const model = runtime.model;
-        const settings = runtime.settingsSnapshot();
-        if (provider === null || model === null || settings === null) {
-          return { message: tr.text("agent.manager_unavailable"), error: true };
-        }
-        this.#delegateManager = newAgentManager({
-          runtime,
-          provider,
-          model,
-          settings,
-          delegateEnabled: true,
-        });
-      }
-      registerDelegateSubAgentTool(runtime.registry, this.#delegateManager);
+      registerDelegateSubAgentTool(
+        runtime.registry,
+        this.#host.ensureAgentManager(),
+      );
     } catch (err) {
       return { message: (err as Error).message, error: true };
     }
@@ -1523,8 +1520,10 @@ export class TuiCommands {
   listAgents(): string {
     const tr = this.#tr();
     const lines = [tr.text("agent.multi_status", "main")];
-    const manager = this.#delegateManager;
-    if (manager === undefined) {
+    let manager: AgentManager;
+    try {
+      manager = this.#host.ensureAgentManager();
+    } catch {
       lines.push(`  ${tr.text("agent.manager_unavailable")}`);
       return lines.join("\n");
     }
@@ -1548,8 +1547,10 @@ export class TuiCommands {
   async switchAgent(id: string): Promise<CommandResult> {
     await Promise.resolve();
     const tr = this.#tr();
-    const manager = this.#delegateManager;
-    if (manager === undefined) {
+    let manager: AgentManager;
+    try {
+      manager = this.#host.ensureAgentManager();
+    } catch {
       return { message: tr.text("agent.manager_unavailable"), error: true };
     }
     const [, ok] = manager.get(id);
@@ -1562,8 +1563,10 @@ export class TuiCommands {
   async destroyAgent(id: string): Promise<CommandResult> {
     await Promise.resolve();
     const tr = this.#tr();
-    const manager = this.#delegateManager;
-    if (manager === undefined) {
+    let manager: AgentManager;
+    try {
+      manager = this.#host.ensureAgentManager();
+    } catch {
       return { message: tr.text("agent.manager_unavailable"), error: true };
     }
     try {

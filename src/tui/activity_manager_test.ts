@@ -47,15 +47,22 @@ Deno.test("ActivityManager tracks thinking blocks and clears per turn", () => {
   const am = new ActivityManager();
   am.startThinking("turn");
   am.appendThinking("turn", "why?");
-  am.completeThinking("turn");
-  am.startToolExecution("t1", "bash");
-  const items = am.buildTimeline();
+  // While streaming, thinking should appear in timeline
+  let items = am.buildTimeline();
   const think = items.find((i) => i.type === "thinking");
   assertEquals(think?.content, "why?");
-  assertEquals(think?.status, "completed");
-  assertEquals(items.length, 2);
-  // Stable sort by timestamp keeps the earlier thinking block first.
+  assertEquals(think?.status, "running");
+  assertEquals(items.length, 1);
   assertEquals(items[0].type, "thinking");
+
+  // After completion, thinking should NOT appear in timeline (it's now in transcript)
+  am.completeThinking("turn");
+  am.startToolExecution("t1", "bash");
+  items = am.buildTimeline();
+  assertEquals(items.find((i) => i.type === "thinking"), undefined);
+  assertEquals(items.length, 1); // only the tool
+  assertEquals(items[0].type, "tool");
+
   am.clear();
   assertEquals(am.buildTimeline().length, 0);
   assertEquals(am.hasRunningActivities(), false);

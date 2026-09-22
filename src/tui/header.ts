@@ -6,13 +6,13 @@
 
 import { displayWidth, truncateDisplay } from "./formatters.ts";
 
-export const opensacLogo = `██   ██  ███  ████ █  █ █  █
-███ ███ █   █  ██  █  █  ██
-█ ███ █ █   █  ██  ████  ██
-█  █  █ █   █  ██  █  █ █  █
-█     █  ███   ██  █  █ █  █`;
+export const opensacLogo = ` ██  ███  ████ █  █  ███  ██   ███
+█  █ █  █ █    ██ █ █    █  █ █
+█  █ ███  ███  █ ██  ██  ████ █
+█  █ █    █    █  █    █ █  █ █
+ ██  █    ████ █  █ ███  █  █  ███`;
 
-const renameNotice = "Make OSCHINA Tokens Harness eXecution";
+const renameNotice = "Spring Autumn Cicada";
 
 const accent = "\u001B[38;5;86m";
 const bold = "\u001B[1m";

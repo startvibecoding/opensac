@@ -71,14 +71,37 @@ Deno.test("cron rejects an unknown subcommand", () => {
   assertEquals(result.error, true);
 });
 
+/**
+ * Redirects the config dir to a temp dir for tests that persist settings.
+ * Without this the test writes would land on the developer's real
+ * settings.json (OPENSAC_DIR is the primary config-dir override).
+ */
+function isolateConfigDir(): { restore: () => void } {
+  const dir = Deno.makeTempDirSync();
+  const previous = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", dir);
+  return {
+    restore: () => {
+      if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
+      else Deno.env.set("OPENSAC_DIR", previous);
+      Deno.removeSync(dir, { recursive: true });
+    },
+  };
+}
+
 Deno.test("setDefaultModel validates scope and persists globally", async () => {
-  const { commands, settings } = stub();
-  const bad = await commands.setDefaultModel(["/defaultModel", "nope"]);
-  assertEquals(bad.error, true);
-  const ok = await commands.setDefaultModel(["/defaultModel", "global"]);
-  assertEquals(ok.error, undefined);
-  assertEquals(settings.defaultProvider, settings.defaultProvider);
-  assert(settings.defaultModel !== undefined);
+  const iso = isolateConfigDir();
+  try {
+    const { commands, settings } = stub();
+    const bad = await commands.setDefaultModel(["/defaultModel", "nope"]);
+    assertEquals(bad.error, true);
+    const ok = await commands.setDefaultModel(["/defaultModel", "global"]);
+    assertEquals(ok.error, undefined);
+    assertEquals(settings.defaultProvider, settings.defaultProvider);
+    assert(settings.defaultModel !== undefined);
+  } finally {
+    iso.restore();
+  }
 });
 
 Deno.test("previewPastedImage reports when nothing was pasted", () => {

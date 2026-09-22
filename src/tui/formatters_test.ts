@@ -4,9 +4,12 @@
 
 import { assertEquals } from "@std/assert";
 import {
+  cacheHitPercent,
   compactBashOutput,
   displayWidth,
+  formatCachePercent,
   formatDuration,
+  formatTokens,
   truncateDisplay,
 } from "./formatters.ts";
 
@@ -50,4 +53,34 @@ Deno.test("formatDuration matches the Go status line", () => {
   assertEquals(formatDuration(61_000), "1m01s");
   assertEquals(formatDuration(3_600_000), "1h00m");
   assertEquals(formatDuration(3_660_000), "1h01m");
+});
+
+Deno.test("formatTokens matches the Go compact format", () => {
+  assertEquals(formatTokens(999), "999");
+  assertEquals(formatTokens(1200), "1.2k");
+  assertEquals(formatTokens(12_000), "12k");
+  assertEquals(formatTokens(1_200_000), "1.2M");
+});
+
+Deno.test("formatCachePercent mirrors the Go footer logic", () => {
+  const noUsage = {
+    totalInputTokens: 0,
+    totalCacheRead: 0,
+    totalCacheWrite: 0,
+  };
+  assertEquals(formatCachePercent(noUsage), "");
+  assertEquals(cacheHitPercent(noUsage), -1);
+  const full = {
+    totalInputTokens: 1000,
+    totalCacheRead: 800,
+    totalCacheWrite: 0,
+  };
+  assertEquals(formatCachePercent(full), "Cache: 80%");
+  assertEquals(cacheHitPercent(full), 80);
+  const writeOnly = {
+    totalInputTokens: 0,
+    totalCacheRead: 0,
+    totalCacheWrite: 42,
+  };
+  assertEquals(formatCachePercent(writeOnly), "CacheWrite: 42");
 });

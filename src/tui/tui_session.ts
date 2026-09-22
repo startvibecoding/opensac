@@ -12,7 +12,11 @@ import {
   Builder,
   type SessionRuntime,
 } from "../agentruntime/session_runtime.ts";
-import { SourceTUI } from "../agentruntime/source.ts";
+import { resolveUnattendedMode, SourceTUI } from "../agentruntime/source.ts";
+import { newAgentManager } from "../agentruntime/agent_manager.ts";
+import type { AgentManager } from "../agent/manager.ts";
+import { canAutoRun, Supervisor } from "../esm/mod.ts";
+import { TuiESMRuntimeAdapter } from "./esm_tui_adapter.ts";
 import { ExecutionRuntime } from "../agentruntime/execution.ts";
 import { RunStore } from "../agentruntime/run_store.ts";
 import { SessionRunEventSink } from "../agentruntime/run_event.ts";
@@ -44,7 +48,8 @@ import { AppController } from "./app_controller.ts";
 import { TuiRun } from "./tui_run.ts";
 import { localTimeZone, Translator } from "./i18n.ts";
 import { InputState } from "./input_state.ts";
-import { ToolModalState } from "./tool_modal.ts";
+import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
+import { renderAgentActivity } from "./activity.ts";
 import { esmPanelLines, esmPanelWidth } from "./esm_panel.ts";
 import {
   type CommandHost,
@@ -68,6 +73,7 @@ import type { AppProps } from "./app.tsx";
 import type { Objective } from "../esm/state.ts";
 import { Store as ESMStore } from "../esm/store.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
+import { displayWidth } from "./formatters.ts";
 import { EventError, TaskFailed } from "../agent/events.ts";
 
 export interface TUISessionOptions {
@@ -121,11 +127,26 @@ export class TUISession implements CommandHost {
   #dialog: Dialog | undefined;
   #toolModal: ToolModalState | undefined;
   #esmObjective: Objective | null = null;
+  /**
+   * The ESM role agent currently executing (Go esmActiveAgentID). Set by the
+   * ESM supervisor once the TUI wires role continuation; the panel shows the
+   * agent's live activity when present.
+   */
+  #esmActiveAgentId = "";
   #esmOpen = false;
   #esmScroll = 0;
   #compactMode = false;
   #multiAgent: boolean;
   #reloadRequested = false;
+  /** Lazily-built shared AgentManager (delegate tools + ESM roles). */
+  #agentManager: AgentManager | undefined;
+  /** The running ESM continuation worker, if any. */
+  #esmWorker: { cancel: () => void; done: Promise<void> } | undefined;
+  /** Set when the user aborted the worker; consumed by the idle restart. */
+  #esmCancelRequested = false;
+  /** Terminal size for modal/panel layouts (set by the CLI shell). */
+  #termWidth = 100;
+  #termHeight = 40;
 
   constructor(options: TUISessionOptions, settings: Settings) {
     this.#settings = settings;
@@ -199,6 +220,142 @@ export class TUISession implements CommandHost {
 
   get compactMode(): boolean {
     return this.#compactMode;
+  }
+
+  /** Records the terminal size used by modal and panel layouts. */
+  setTerminalSize(width: number, height: number): void {
+    this.#termWidth = width;
+    this.#termHeight = height;
+  }
+
+  get termWidth(): number {
+    return this.#termWidth;
+  }
+
+  get termHeight(): number {
+    return this.#termHeight;
+  }
+
+  /**
+   * Lazily builds the shared AgentManager on the session Runtime. Used by
+   * /delegate, /agent, and the ESM role runner (Go AgentManager access).
+   */
+  ensureAgentManager(): AgentManager {
+    if (this.#agentManager !== undefined) return this.#agentManager;
+    const runtime = this.#runtime;
+    const provider = runtime.provider;
+    const model = runtime.model;
+    const settings = runtime.settingsSnapshot();
+    if (provider === null || model === null || settings === null) {
+      throw new Error("agent manager runtime is unavailable");
+    }
+    this.#agentManager = newAgentManager({
+      runtime,
+      provider,
+      model,
+      settings,
+      delegateEnabled: true,
+      multiAgentEnabled: this.#multiAgent,
+    });
+    return this.#agentManager;
+  }
+
+  /** True when a bound expert team is active (ESM worker policy input). */
+  teamExpertActive(): boolean {
+    return this.#runtime.teamExpertActive();
+  }
+
+  /** The current ESM continuation worker state (test/session introspection). */
+  get esmWorkerRunning(): boolean {
+    return this.#esmWorker !== undefined;
+  }
+
+  /**
+   * Starts one ESM continuation worker when idle (Go startESMContinuationIfIdle).
+   * The worker loops through supervisor continuations while the objective can
+   * auto-run, so the first /esm <objective> and every /esm resume actually
+   * launch worker/critic/audit role agents instead of only updating the store.
+   */
+  startESMContinuationIfIdle(): void {
+    this.#esmCancelRequested = false;
+    if (this.#esmWorker !== undefined) return;
+    if (this.#busy || this.controller.isThinking) return;
+    const sessionID = this.currentSessionID();
+    if (sessionID === "") return;
+
+    let store: ESMStore;
+    try {
+      store = new ESMStore(this.#manager.getSessionDir());
+      const objective = store.get(sessionID);
+      if (objective === null || !canAutoRun(objective)) return;
+    } catch {
+      return;
+    }
+
+    let manager: AgentManager;
+    try {
+      manager = this.ensureAgentManager();
+    } catch {
+      return;
+    }
+    const mode = resolveUnattendedMode(this.#mode);
+    const adapter = new TuiESMRuntimeAdapter(
+      manager,
+      this,
+      this.#workDir,
+      mode,
+    );
+    const supervisor = new Supervisor({ store, adapter, events: adapter });
+    const controller = new AbortController();
+    const cancel = (): void => controller.abort();
+    const done = (async () => {
+      try {
+        let runID = `esm_${generateID()}`;
+        for (;;) {
+          const result = await supervisor.run(
+            sessionID,
+            runID,
+            this.#workDir,
+            mode,
+            controller.signal,
+          );
+          if (controller.signal.aborted) return;
+          if (result.error !== undefined && result.error !== null) {
+            const message = result.error instanceof Error
+              ? result.error.message
+              : String(result.error);
+            this.controller.addMessage(
+              `ESM continuation stopped: ${message}`,
+              "error",
+            );
+            return;
+          }
+          let objective: Objective | null = null;
+          try {
+            objective = store.get(sessionID);
+          } catch {
+            return;
+          }
+          if (objective === null || !canAutoRun(objective)) return;
+          runID = `esm_${generateID()}`;
+        }
+      } finally {
+        if (this.#esmWorker?.cancel === cancel) {
+          this.#esmWorker = undefined;
+        }
+      }
+    })();
+    this.#esmWorker = { cancel, done };
+  }
+
+  /** Aborts the running ESM continuation worker, if any. */
+  abortESMWorker(): void {
+    if (this.#esmWorker === undefined) return;
+    this.#esmWorker.cancel();
+    this.#esmWorker = undefined;
+    // A user-requested abort must not be immediately undone by the idle
+    // restart that follows the current interactive run.
+    this.#esmCancelRequested = true;
   }
 
   get busy(): boolean {
@@ -285,6 +442,7 @@ export class TUISession implements CommandHost {
     this.#commands.clearActiveSkills();
     this.controller.store.resetTranscriptState();
     this.controller.activities.clear();
+    this.controller.resetContextUsage();
     this.input.paste.reset();
   }
 
@@ -731,9 +889,11 @@ export class TUISession implements CommandHost {
       thinkingLevel: this.#thinking,
       extraContext: this.#runtime.extraContext,
       ruleContent: this.#runtime.ruleContent,
+      hydrateHistory: true,
     });
     agent.setConversationTurn(turnId, intentId, runId);
     this.#agent = agent;
+    this.controller.setLeadAgentId(agent.id());
     this.#commands.setAgent(agent);
     execution.setAgent(agent);
     const events = agent.runWithUserMessage(userMessage);
@@ -760,12 +920,21 @@ export class TUISession implements CommandHost {
       this.#busy = false;
       this.controller.isThinking = false;
       guard.release();
+      // A finished interactive run hands the terminal back to an active ESM
+      // objective (Go finishESMRun continuation), unless the user aborted the
+      // worker during this run.
+      if (this.#esmCancelRequested) {
+        this.#esmCancelRequested = false;
+      } else {
+        this.startESMContinuationIfIdle();
+      }
     }
   }
 
   /** Cancels the active run (ctrl+c while busy). */
   cancelRun(): void {
     this.#currentExecution?.cancel();
+    this.abortESMWorker();
   }
 
   /** Answers the shown approval through the decision binding. */
@@ -888,22 +1057,44 @@ export class TUISession implements CommandHost {
 
   openToolModal(): void {
     const results = this.controller.store.toolResults;
-    if (results.length === 0) {
+    // Targets mirror the Go toolModalTargets: a main entry for the current
+    // transcript's tool results plus one entry per background/sub-agent so
+    // Ctrl+O can inspect each agent's detailed progress.
+    const targets: ToolModalTarget[] = [
+      { id: "main", label: "main", kind: "main" },
+    ];
+    for (const id of this.controller.activities.order) {
+      const act = this.controller.activities.get(id);
+      if (!act) continue;
+      const state = act.state !== "" ? ` ${act.state}` : "";
+      targets.push({
+        id: `agent:${id}`,
+        label: `${id}${state}`,
+        kind: act.kind !== "" ? act.kind : "subagent",
+      });
+    }
+    for (const r of results) {
+      targets.push({
+        id: `tool:${r.toolCallID}`,
+        label: r.toolName,
+        kind: r.toolName,
+      });
+    }
+    if (targets.length === 0) {
       this.controller.addMessage(
         this.translator.text("tool.modal.no_details"),
         "plain",
       );
       return;
     }
-    const modal = new ToolModalState(80, 30);
-    modal.setTargets(
-      results.map((r, i) => ({
-        id: `#${i + 1} ${r.toolName}`,
-        label: r.toolName,
-        kind: r.toolName,
-      })),
-    );
+    const modal = new ToolModalState(this.#termWidth, this.#termHeight);
+    modal.setTargets(targets);
     this.#toolModal = modal;
+  }
+
+  /** Rows available to a modal/panel above the shell chrome. */
+  #panelAvailableHeight(): number {
+    return Math.max(this.#termHeight - 8, 6);
   }
 
   closeToolModal(): void {
@@ -913,7 +1104,7 @@ export class TUISession implements CommandHost {
   toolModalPageSize(): number {
     return this.#toolModal?.pageSizeFor(
       (this.#toolModal.targets.length ?? 0) > 1,
-      30,
+      this.#panelAvailableHeight(),
     ) ?? 1;
   }
 
@@ -932,18 +1123,37 @@ export class TUISession implements CommandHost {
     const modal = this.#toolModal;
     if (!modal) return "";
     const lines = this.#toolModalLines();
-    return modal.render(lines, this.translator, { availableHeight: 30 });
+    return modal.render(lines, this.translator, {
+      availableHeight: this.#panelAvailableHeight(),
+    });
+  }
+
+  /** Test access to the active modal state. */
+  toolModalForTest(): ToolModalState {
+    if (this.#toolModal === undefined) throw new Error("tool modal not open");
+    return this.#toolModal;
   }
 
   #toolModalLines(): string[] {
     const modal = this.#toolModal;
     if (!modal) return [];
     const target = modal.targets[modal.active];
+    if (target === undefined) return [];
+
+    // Sub-agent targets render the full activity snapshot: latest tool with
+    // arguments, thinking, response, result, and the event timeline (Go
+    // renderAgentActivity).
+    if (target.id.startsWith("agent:")) {
+      const agentId = target.id.slice("agent:".length);
+      const act = this.controller.activities.get(agentId);
+      return renderAgentActivity(act, agentId, this.translator).split("\n");
+    }
+
     const results = this.controller.store.toolResults;
-    const entry = results.find((r) =>
-      `#${results.indexOf(r) + 1} ${r.toolName}` === target?.id
-    );
-    const chosen = entry ?? results[results.length - 1];
+    let chosen = results.find((r) => `tool:${r.toolCallID}` === target.id);
+    if (chosen === undefined && target.id === "main") {
+      chosen = results[results.length - 1];
+    }
     if (!chosen) return [];
     const body = chosen.fullContent !== ""
       ? chosen.fullContent
@@ -976,7 +1186,7 @@ export class TUISession implements CommandHost {
 
   scrollESMPanel(delta: number): void {
     const lines = this.#esmPanelLines();
-    const page = 20;
+    const page = this.#esmPanelPageSize();
     this.#esmScroll += delta;
     const max = Math.max(lines.length - page, 0);
     if (this.#esmScroll < 0) this.#esmScroll = 0;
@@ -984,25 +1194,63 @@ export class TUISession implements CommandHost {
   }
 
   esmPanelView(): string {
-    const width = esmPanelWidth(100);
+    const width = esmPanelWidth(this.#termWidth);
+    const inner = Math.max(width - 2, 4);
     const lines = this.#esmPanelLines();
-    const visible = lines.slice(this.#esmScroll, this.#esmScroll + 20);
-    const body = visible.map((l) => `│ ${l}`).join("\n");
-    return `╭${"─".repeat(width)}╮\n${body}\n╰${"─".repeat(width)}╯`;
+    const pageSize = this.#esmPanelPageSize();
+    const visible = lines.slice(this.#esmScroll, this.#esmScroll + pageSize);
+    // Closed rounded frame: `╭─…╮` and `│ … │` both span `width` columns.
+    const body = visible.map((l) => {
+      const pad = " ".repeat(Math.max(inner - 2 - displayWidth(l), 0));
+      return `│ ${l}${pad} │`;
+    });
+    return [
+      `╭${"─".repeat(inner)}╮`,
+      ...body,
+      `╰${"─".repeat(inner)}╯`,
+    ].join("\n");
+  }
+
+  /** Visible rows for the ESM panel, adapted to the terminal height. */
+  #esmPanelPageSize(): number {
+    // Shell chrome below the panel: editor frame (3) + hint (1) + footer (1),
+    // the panel frame (2), and a small margin.
+    return Math.max(this.#termHeight - 12, 4);
   }
 
   #esmPanelLines(): string[] {
+    const activeAgentId = this.esmActiveAgentId;
     return esmPanelLines(
       this.#esmObjective,
-      esmPanelWidth(100),
+      esmPanelWidth(this.#termWidth),
       this.translator,
-      { activeAgentId: "" },
+      {
+        activeAgentId,
+        activity: activeAgentId !== ""
+          ? this.controller.activities.get(activeAgentId)
+          : undefined,
+      },
     );
   }
 
   /** The ESM objective currently bound to this session, if any. */
   get esmObjective(): Objective | null {
     return this.#esmObjective;
+  }
+
+  /** The ESM role agent currently executing, if any. */
+  get esmActiveAgentId(): string {
+    return this.#esmActiveAgentId;
+  }
+
+  /** Tracks the active ESM role agent (Go setActiveESMAgent). */
+  setESMActiveAgent(id: string): void {
+    this.#esmActiveAgentId = id;
+  }
+
+  /** Clears the tracking when `id` is still the active one. */
+  clearESMActiveAgent(id: string): void {
+    if (this.#esmActiveAgentId === id) this.#esmActiveAgentId = "";
   }
 
   // --- Runtime accessors used by the command layer ---------------------------

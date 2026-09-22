@@ -125,3 +125,40 @@ export function formatDuration(ms: number): string {
   const hours = Math.floor(minutes / 60);
   return `${hours}h${String(minutes % 60).padStart(2, "0")}m`;
 }
+
+/** Compact token count: 999 / 1.2k / 12k / 1.2M (Go formatTokens). */
+export function formatTokens(count: number): string {
+  if (count < 1000) return `${count}`;
+  if (count < 10_000) return `${(count / 1000).toFixed(1)}k`;
+  if (count < 1_000_000) return `${Math.floor(count / 1000)}k`;
+  if (count < 10_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  return `${Math.floor(count / 1_000_000)}M`;
+}
+
+export interface CacheUsageInput {
+  totalInputTokens: number;
+  totalCacheRead: number;
+  totalCacheWrite: number;
+}
+
+/**
+ * Cache hit ratio against the full input footprint, or -1 when no usage has
+ * been recorded (Go cacheHitPercent).
+ */
+export function cacheHitPercent(u: CacheUsageInput): number {
+  if (u.totalInputTokens <= 0) return -1;
+  const pct = u.totalCacheRead / u.totalInputTokens * 100;
+  return Math.min(pct, 100);
+}
+
+/**
+ * Cache display line: "Cache: N%", a raw token count, or "" when nothing has
+ * been recorded (Go formatCachePercent).
+ */
+export function formatCachePercent(u: CacheUsageInput): string {
+  const pct = cacheHitPercent(u);
+  if (pct >= 0) return `Cache: ${Math.round(pct)}%`;
+  if (u.totalCacheRead > 0) return `CacheRead: ${u.totalCacheRead}`;
+  if (u.totalCacheWrite > 0) return `CacheWrite: ${u.totalCacheWrite}`;
+  return "";
+}

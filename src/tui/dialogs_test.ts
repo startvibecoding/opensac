@@ -193,7 +193,30 @@ Deno.test("env dialog rejects an invalid variable name", () => {
   assertStringIncludes(dialog.view(90), "Invalid environment variable name");
 });
 
+/** Redirects the config dir to a temp dir for tests that persist settings. */
+function isolateConfigDir(): { restore: () => void } {
+  const dir = Deno.makeTempDirSync();
+  const previous = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", dir);
+  return {
+    restore: () => {
+      if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
+      else Deno.env.set("OPENSAC_DIR", previous);
+      Deno.removeSync(dir, { recursive: true });
+    },
+  };
+}
+
 Deno.test("auth dialog walks provider -> credentials and saves", () => {
+  const iso = isolateConfigDir();
+  try {
+    authDialogWalksAndSaves();
+  } finally {
+    iso.restore();
+  }
+});
+
+function authDialogWalksAndSaves(): void {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new AuthDialog(h, d));
   assertStringIncludes(dialog.view(90), "Connect Provider");
@@ -220,7 +243,7 @@ Deno.test("auth dialog walks provider -> credentials and saves", () => {
   feed(dialog, "\r");
   assertEquals(dialog.closed, true);
   assertEquals(rec.reloads, 1);
-});
+}
 
 Deno.test("auth dialog escape steps back through views", () => {
   const { host: h } = host();

@@ -25,6 +25,7 @@ import type {
 } from "../config/settings.ts";
 import {
   defaultProviderConfigsAll,
+  loadGlobalSettingsSparse,
   saveGlobalSettingsPatch,
 } from "../config/settings.ts";
 import type { DialogItem, DialogPage } from "./dialog.ts";
@@ -1172,9 +1173,13 @@ export class AuthDialog {
     const tr = this.#host.translator;
     const config = providerConfigFromDraft(this.#provider, this.#models);
     try {
-      saveGlobalSettingsPatch({
-        providers: { [this.#providerID]: config },
-      });
+      // saveGlobalSettingsPatch replaces top-level keys wholesale: merge the
+      // edited provider into the existing map, otherwise every other provider
+      // (and its API key) would be wiped from settings.json.
+      const sparse = loadGlobalSettingsSparse();
+      const providers = { ...(sparse.providers ?? {}) };
+      providers[this.#providerID] = config;
+      saveGlobalSettingsPatch({ providers });
     } catch (err) {
       this.#error = tr.text("settings.save_failed", (err as Error).message);
       return;

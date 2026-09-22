@@ -378,11 +378,11 @@ Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
   assertEquals(items.find((i) => i.type === "tool")?.content, "ok");
 
   // Turn end finalizes the open thinking block.
+  // After completion, thinking is removed from timeline (now in transcript).
   c.handleAgentEvent(ev({ type: EventTurnEnd }));
   assertEquals(
-    c.activityManager.buildTimeline().find((i) => i.type === "thinking")
-      ?.status,
-    "completed",
+    c.activityManager.buildTimeline().find((i) => i.type === "thinking"),
+    undefined,
   );
 });
 

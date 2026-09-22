@@ -1723,7 +1723,17 @@ export class SessionRuntime {
       getFollowUpMessages: followUpMessages,
       forcedMode: policy.forcedMode(),
     };
-    return newAgentWithLoopConfig(cfg, registry);
+    const agent = newAgentWithLoopConfig(cfg, registry);
+    // Opt-in history hydration: adapters that replay history themselves
+    // (serve/ACP/channels call loadHistoryState after the build) must keep the
+    // default off, or the replayed turns would be loaded twice.
+    if (opts.hydrateHistory === true && manager !== undefined) {
+      const replay = manager.getReplayState();
+      if (replay.messages.length > 0) {
+        agent.loadHistoryState(replay.messages, replay.entryIDs);
+      }
+    }
+    return agent;
   }
 }
 
@@ -1804,6 +1814,12 @@ export interface AgentBuildOptions {
   runtimeOwnsUserEntry?: boolean;
   userEntryId?: string;
   auxiliaryRole?: boolean;
+  /**
+   * Hydrates the built Agent with the replayed session history (messages and
+   * entry IDs) from the bound manager. Adapters that replay history
+   * themselves after the build must keep this off to avoid double loading.
+   */
+  hydrateHistory?: boolean;
 }
 
 /** Converts the legacy `agent.Config` shape into Runtime-owned build inputs. */

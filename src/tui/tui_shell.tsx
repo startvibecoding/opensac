@@ -15,6 +15,7 @@ import type { AppController } from "./app_controller.ts";
 import type { TUISession } from "./tui_session.ts";
 import type { InputState } from "./input_state.ts";
 import { coalesceSplitPaste, type KeyEvent, splitInputChunk } from "./keys.ts";
+import { formatCachePercent, formatTokens } from "./formatters.ts";
 
 export interface TuiShellProps {
   session: TUISession;
@@ -168,10 +169,36 @@ export function TuiShell({
           : session.translator.text("shell.hint")}
       </Text>
       <Text dimColor>
-        {`${session.header.providerName}/${session.header.modelName} · mode: ${session.mode}`}
+        {`${session.header.providerName}/${session.header.modelName} · mode: ${session.mode}${
+          statusSuffix(controller)
+        }`}
       </Text>
     </Box>
   );
+}
+
+/**
+ * Footer status suffix: context usage and cache hit line (mothx builtin footer
+ * right column). Empty until the first turn reports provider usage.
+ */
+function statusSuffix(controller: AppController): string {
+  const usage = controller.contextUsage;
+  if (usage === undefined) return "";
+  const parts: string[] = [];
+  if (usage.contextWindow > 0) {
+    parts.push(
+      usage.percent !== undefined
+        ? `${usage.percent.toFixed(1)}%/${formatTokens(usage.contextWindow)}`
+        : `?/${formatTokens(usage.contextWindow)}`,
+    );
+  }
+  const cache = formatCachePercent({
+    totalInputTokens: usage.totalTokens,
+    totalCacheRead: usage.cacheRead,
+    totalCacheWrite: usage.cacheWrite,
+  });
+  if (cache !== "") parts.push(cache);
+  return parts.length > 0 ? ` · ${parts.join(" | ")}` : "";
 }
 
 interface ShellHandlers {

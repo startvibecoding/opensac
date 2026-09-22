@@ -5,15 +5,20 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { AuthDialog } from "./auth_dialog.ts";
 import type { AuthHost, AuthPanel } from "./auth_dialog.ts";
-import type { ProviderConfig, Settings } from "../config/settings.ts";
+import {
+  configDir,
+  type ProviderConfig,
+  type Settings,
+} from "../config/settings.ts";
 
 let confirmed = false;
 
 // Intercept saveGlobalSettingsPatch by re-implementing via the real module is
-// not possible without fs; instead drive confirm() through a temp HOME.
+// not possible without fs; instead drive confirm() through an isolated config
+// dir (OPENSAC_DIR is the primary config-dir override).
 const tmpHome = Deno.makeTempDirSync();
-const realHome = Deno.env.get("HOME");
-Deno.env.set("HOME", tmpHome);
+const realHome = Deno.env.get("OPENSAC_DIR");
+Deno.env.set("OPENSAC_DIR", tmpHome);
 
 function makeHost(settings: Settings): AuthHost {
   return {
@@ -227,8 +232,20 @@ Deno.test("confirm persists the provider draft to global settings", async () => 
         baseUrl: "https://example.com/v1",
         models: [],
       } as ProviderConfig,
+      "other-provider": {
+        api: "openai-chat",
+        apiKey: "sk-other-must-survive",
+        baseUrl: "https://other.example.com/v1",
+        models: [],
+      } as ProviderConfig,
     },
   };
+  // The confirm path merges against the on-disk sparse settings (mothx
+  // semantics), so seed the isolated config dir first.
+  Deno.writeTextFileSync(
+    configDir() + "/settings.json",
+    JSON.stringify(settings),
+  );
   const [d, panel] = dialog(settings, "my-provider");
   d.select("credentials");
   d.select("field:provider:apiKey");
@@ -246,6 +263,11 @@ Deno.test("confirm persists the provider draft to global settings", async () => 
   const provider = saved.providers?.["my-provider"];
   assertEquals(provider?.apiKey, "sk-brand-new-value");
   assertEquals(provider?.baseUrl, "https://example.com/v1");
+  // Editing one provider must not wipe the others.
+  assertEquals(
+    saved.providers?.["other-provider"]?.apiKey,
+    "sk-other-must-survive",
+  );
   confirmed = true;
 });
 
@@ -287,7 +309,8 @@ Deno.test("empty float resets the field to auto", () => {
 });
 
 Deno.test("cleanup", () => {
-  if (realHome !== undefined) Deno.env.set("HOME", realHome);
+  if (realHome !== undefined) Deno.env.set("OPENSAC_DIR", realHome);
+  else Deno.env.delete("OPENSAC_DIR");
   Deno.removeSync(tmpHome, { recursive: true });
   assert(confirmed);
 });

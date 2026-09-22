@@ -32,6 +32,17 @@ function terminalWidth(): number {
   return 100;
 }
 
+/** Best-effort terminal row count for panel/modal layouts. */
+function terminalHeight(): number {
+  try {
+    const size = Deno.consoleSize();
+    if (size && size.rows >= 12) return size.rows;
+  } catch {
+    // Non-TTY: fall back to the default height.
+  }
+  return 40;
+}
+
 /** Applies one width change to the editor (Go WindowSizeMsg →
  * input.SetWidth). Returns the applied width, or null when unchanged.
  * Exported for tests. */
@@ -59,8 +70,10 @@ export async function runInteractiveAction(
   await session.start();
 
   let width = terminalWidth();
+  let height = terminalHeight();
   // The input state frames the editor inside a rounded border (2 columns).
   session.setEditorWidth(width);
+  session.setTerminalSize(width, height);
 
   let version = 0;
   const rerender = () => {
@@ -84,10 +97,15 @@ export async function runInteractiveAction(
   // Track terminal resize (Go tea.WindowSizeMsg → SetWidth + rerender):
   // SIGWINCH fires on every resize while a real terminal is attached.
   const onResize = () => {
-    const next = terminalWidth();
-    if (next === width) return;
-    width = next;
-    session.setEditorWidth(width);
+    const nextWidth = terminalWidth();
+    const nextHeight = terminalHeight();
+    if (nextWidth === width && nextHeight === height) return;
+    if (nextWidth !== width) {
+      width = nextWidth;
+      session.setEditorWidth(width);
+    }
+    height = nextHeight;
+    session.setTerminalSize(width, height);
     rerender();
   };
   let removeResizeListener = () => {};
