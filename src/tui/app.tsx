@@ -20,6 +20,8 @@ import { AppController } from "./app_controller.ts";
 import { renderHeader } from "./header.ts";
 import { displayWidth } from "./formatters.ts";
 import type { TranscriptStore } from "./transcript_store.ts";
+import type { Translator } from "./i18n.ts";
+import { formatToolRow } from "./tool_row_format.ts";
 import { CompactThinkingRow } from "./thinking_display.tsx";
 import { CompactToolRow } from "./tool_execution_display.tsx";
 
@@ -39,6 +41,8 @@ export interface AppProps {
   label?: string;
   /** Visible tail of the transcript when `controller` is absent. */
   visibleRows?: Array<{ id: string; text: string }>;
+  /** Compact mode: single-line tool summaries (Go a.compactMode). */
+  compactMode?: boolean;
 }
 
 /** One transcript row with its presentation kind. */
@@ -68,6 +72,7 @@ export function App({
   width = 80,
   label,
   visibleRows = [],
+  compactMode = false,
 }: AppProps): ReactElement {
   if (!controller) {
     // Legacy banner mode (toolchain smoke tests).
@@ -98,7 +103,7 @@ export function App({
   const committed: TranscriptRow[] = [];
   const streaming: TranscriptRow[] = [];
   for (let i = 0; i < store.messages.length; i++) {
-    const resolved = rowTextAt(store, i);
+    const resolved = rowTextAt(store, i, compactMode);
     if (!resolved) continue;
     const row: TranscriptRow = {
       id: `row-${i}`,
@@ -106,7 +111,9 @@ export function App({
       kind: resolved.kind,
     };
     if (i < slotStart && !runningTools.has(i)) committed.push(row);
-    else streaming.push(row);
+    // Tool rows in the active area are rendered by the activity timeline;
+    // skip them here so a tool is never shown twice.
+    else if (resolved.kind !== "tool") streaming.push(row);
   }
 
   // Live per-turn activity timeline (tools + thinking) tracked by the
@@ -191,7 +198,7 @@ export function App({
           ))}
         </Box>
       )}
-      {controller.isThinking && <Text dimColor>⠋ working…</Text>}
+      {controller.isThinking && <Text dimColor>~ working...</Text>}
     </Box>
   );
 }
@@ -227,24 +234,36 @@ function renderRow(row: TranscriptRow, streaming: boolean): ReactElement {
  * their raw text in the store's per-slot builders (assistant/think); tool rows
  * carry their summary in `toolResults`. Empty placeholders resolve to nothing.
  */
+function storeTranslator(store: TranscriptStore): Translator {
+  return store.translator;
+}
+
 function rowTextAt(
   store: TranscriptStore,
   index: number,
+  compact: boolean,
 ): { text: string; kind: TranscriptRow["kind"] } | undefined {
   const tool = store.toolResults.find((r) => r.msgIndex === index);
   if (tool) {
-    if (tool.status === "running") {
-      return { text: `⏺ ${tool.toolName} running…`, kind: "tool" };
-    }
-    const state = tool.status === "interrupted"
-      ? "interrupted"
-      : tool.summary !== ""
-      ? tool.summary
-      : "done";
-    const err = tool.toolError !== "" ? ` — error: ${tool.toolError}` : "";
+    const text = formatToolRow(
+      storeTranslator(store),
+      {
+        toolName: tool.toolName,
+        toolArgs: tool.toolArgs,
+        status: tool.status,
+        summary: tool.summary,
+        fullContent: tool.fullContent,
+        diff: tool.diff,
+        toolError: tool.toolError,
+        executionState: tool.executionState,
+      },
+      compact,
+    );
+    const warning = tool.status === "interrupted" || tool.toolError !== "" ||
+      tool.executionState.toLowerCase() === "failed";
     return {
-      text: `⏺ ${tool.toolName} ${state}${err}`,
-      kind: tool.status === "interrupted" || err !== "" ? "warning" : "tool",
+      text,
+      kind: warning ? "warning" : "tool",
     };
   }
   const message = store.messages[index];

@@ -42,6 +42,8 @@ import {
 } from "../config/settings.ts";
 import { ensureRuleFile, ruleFilePath } from "../contextfiles/contextfiles.ts";
 import { registerDelegateSubAgentTool } from "../agent/subagent.ts";
+import { newAgentManager } from "../agentruntime/agent_manager.ts";
+import type { AgentManager } from "../agent/manager.ts";
 import { ConfigOptionBrowser } from "../agentruntime/session_options.ts";
 import { ExpertSwitchRequiresForkError } from "../agentruntime/expert.ts";
 import { fork, forkWithExpert } from "../agentruntime/fork.ts";
@@ -98,6 +100,8 @@ export class TuiCommands {
   /** The accumulated extra-context bytes appended by activateSkill. */
   #appendedSkillContext = "";
   #delegateMode = false;
+  #delegateManager: AgentManager | undefined;
+  #activeAgent = "main";
   #agent: Agent | undefined;
   #reloadRequested = false;
   #statsServer: StatsServer | undefined;
@@ -864,9 +868,7 @@ export class TuiCommands {
         setProjectAutoEdit(allow, enable);
         saveProject(allow);
       }
-      let msg = `✅ Auto-edit (agent mode): ${
-        enable ? "ON" : "OFF"
-      } [${scope}]`;
+      let msg = `Auto-edit (agent mode): ${enable ? "ON" : "OFF"} [${scope}]`;
       if (globalScope && effective !== enable) {
         msg += ` (effective here: ${
           effective ? "ON" : "OFF"
@@ -895,13 +897,9 @@ export class TuiCommands {
     }
     switch (arg) {
       case "on":
-        // The TUI has no runtime AgentManager wired yet (Go agentMgr == nil),
-        // so delegate mode cannot register its tool here.
-        return {
-          message: tr.text("agent.manager_unavailable"),
-          error: true,
-        };
+        return this.#enableDelegate();
       case "off":
+        this.#host.runtime.registry?.remove("delegate_subagent");
         this.#delegateMode = false;
         return { message: tr.text("delegate.changed", "OFF") };
       default:
@@ -910,6 +908,37 @@ export class TuiCommands {
           error: true,
         };
     }
+  }
+
+  /** Builds the shared AgentManager and registers the blocking delegate tool. */
+  #enableDelegate(): CommandResult {
+    const tr = this.#tr();
+    const runtime = this.#host.runtime;
+    if (runtime.registry === null) {
+      return { message: tr.text("agent.manager_unavailable"), error: true };
+    }
+    try {
+      if (this.#delegateManager === undefined) {
+        const provider = runtime.provider;
+        const model = runtime.model;
+        const settings = runtime.settingsSnapshot();
+        if (provider === null || model === null || settings === null) {
+          return { message: tr.text("agent.manager_unavailable"), error: true };
+        }
+        this.#delegateManager = newAgentManager({
+          runtime,
+          provider,
+          model,
+          settings,
+          delegateEnabled: true,
+        });
+      }
+      registerDelegateSubAgentTool(runtime.registry, this.#delegateManager);
+    } catch (err) {
+      return { message: (err as Error).message, error: true };
+    }
+    this.#delegateMode = true;
+    return { message: tr.text("delegate.changed", "ON") };
   }
 
   browserMode(arg: string): CommandResult {
@@ -1262,7 +1291,7 @@ export class TuiCommands {
             targetDir: this.#skillHubTargetDir(),
             overwrite: parts.includes("--force"),
           });
-          return { message: `✅ Installed ${result.name}` };
+          return { message: `Installed ${result.name}` };
         }
         case "uninstall": {
           if (parts.length < 3) {
@@ -1276,7 +1305,7 @@ export class TuiCommands {
           }
           const { market, id } = TuiCommands.#parseSkillHubID(parts[2]);
           service.uninstall(market as Market, id, this.#skillHubScope());
-          return { message: `✅ Uninstalled ${id}` };
+          return { message: `Uninstalled ${id}` };
         }
         case "skillset": {
           if (parts.length < 3) {
@@ -1494,26 +1523,55 @@ export class TuiCommands {
   listAgents(): string {
     const tr = this.#tr();
     const lines = [tr.text("agent.multi_status", "main")];
-    lines.push(`  ${tr.text("agent.manager_unavailable")}`);
+    const manager = this.#delegateManager;
+    if (manager === undefined) {
+      lines.push(`  ${tr.text("agent.manager_unavailable")}`);
+      return lines.join("\n");
+    }
+    const ids = manager.list();
+    if (ids.length === 0) {
+      lines.push(`  ${tr.text("agent.no_agents")}`);
+      return lines.join("\n");
+    }
+    for (const id of ids) {
+      const [parentID, hasParent] = manager.parent(id);
+      const childCount = manager.childrenOf(id).length;
+      let info = `  ${id} [running]`;
+      if (hasParent) info += ` parent=${parentID}`;
+      if (childCount > 0) info += ` children=${childCount}`;
+      lines.push(info);
+    }
     return lines.join("\n");
   }
 
-  /** Switches the focused agent (Go switchAgent; nil-manager path). */
-  async switchAgent(_id: string): Promise<CommandResult> {
+  /** Switches the focused agent (Go switchAgent). */
+  async switchAgent(id: string): Promise<CommandResult> {
     await Promise.resolve();
-    return {
-      message: this.#tr().text("agent.manager_unavailable"),
-      error: true,
-    };
+    const tr = this.#tr();
+    const manager = this.#delegateManager;
+    if (manager === undefined) {
+      return { message: tr.text("agent.manager_unavailable"), error: true };
+    }
+    const [, ok] = manager.get(id);
+    if (!ok) return { message: tr.text("agent.not_found", id), error: true };
+    this.#activeAgent = id;
+    return { message: tr.text("agent.focused", id) };
   }
 
-  /** Destroys a sub-agent (Go destroyAgent; nil-manager path). */
-  async destroyAgent(_id: string): Promise<CommandResult> {
+  /** Destroys a sub-agent (Go destroyAgent). */
+  async destroyAgent(id: string): Promise<CommandResult> {
     await Promise.resolve();
-    return {
-      message: this.#tr().text("agent.manager_unavailable"),
-      error: true,
-    };
+    const tr = this.#tr();
+    const manager = this.#delegateManager;
+    if (manager === undefined) {
+      return { message: tr.text("agent.manager_unavailable"), error: true };
+    }
+    try {
+      manager.destroy(id);
+    } catch {
+      return { message: tr.text("agent.not_found", id), error: true };
+    }
+    return { message: tr.text("agent.destroyed", id) };
   }
 
   // --- Compaction -----------------------------------------------------------

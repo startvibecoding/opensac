@@ -42,13 +42,13 @@ export interface ToolExecutionDisplayProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ICONS = {
-  running: "◐",
-  completed: "●",
-  error: "✗",
-  interrupted: "⏸",
-  tool: "⏺",
-  expand: "▶",
-  collapse: "▼",
+  running: ">",
+  completed: "o",
+  error: "x",
+  interrupted: "=",
+  tool: "|",
+  expand: "+",
+  collapse: "-",
 };
 
 const COLORS = {
@@ -77,7 +77,6 @@ export function ToolExecutionDisplay({
   showInput = false,
   showResult = true,
 }: ToolExecutionDisplayProps): ReactElement {
-  const icon = ICONS[status];
   const color = COLORS[status];
   const timeStr = elapsedMs ? formatDuration(elapsedMs) : "";
 
@@ -90,7 +89,7 @@ export function ToolExecutionDisplay({
       {/* Header */}
       <Box flexDirection="row">
         <Text color={color} bold>
-          {icon} {displayName}
+          {ICONS[status]} {displayName}
         </Text>
         {displayIntent && <Text dimColor>— {displayIntent}</Text>}
         {timeStr && <Text dimColor>({timeStr})</Text>}

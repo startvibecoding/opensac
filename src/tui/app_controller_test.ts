@@ -167,10 +167,17 @@ Deno.test("legacy EventDone/EventError terminalize when RunFinished is absent", 
   assertEquals(finished, ["failed"]);
   assertEquals(c.runTerminalHandled, true);
   // A trailing legacy EventDone is ignored
-  const { handle: h2, finished: f2 } = runHandle();
-  c.attachRun(h2);
   c.handleAgentEvent(ev({ type: EventDone }));
-  assertEquals(f2, ["failed"]);
+  assertEquals(finished, ["failed"]);
+});
+
+Deno.test("legacy EventDone terminalizes the run as completed", () => {
+  const { c } = controller("lead");
+  const { handle, finished } = runHandle();
+  c.attachRun(handle);
+  c.handleAgentEvent(ev({ type: EventDone }));
+  assertEquals(finished, ["completed"]);
+  assertEquals(c.runTerminalHandled, true);
 });
 
 Deno.test("approval requests register a decision and queue", () => {

@@ -106,6 +106,30 @@ Deno.test("dialog cursor wraps and search filters", () => {
   assertStringIncludes(cleared, "beta");
 });
 
+Deno.test("search selection picks the filtered row, not the unfiltered index", () => {
+  const chosen: string[] = [];
+  const dialog = new Dialog(() => ({
+    page: () => ({
+      title: "T",
+      search: true,
+      items: [
+        { label: "alpha", value: "alpha" },
+        { label: "beta", value: "beta" },
+        { label: "zeta", value: "zeta" },
+      ],
+      hint: "h",
+    }),
+    select: (value) => chosen.push(value),
+    submit: () => {},
+    key: () => {},
+    back: () => {},
+  }));
+  // Filter down to "zeta"; cursor 0 must select zeta, not alpha.
+  feed(dialog, "zeta");
+  feed(dialog, "\r");
+  assertEquals(chosen, ["zeta"]);
+});
+
 Deno.test("model dialog applies the selected model", () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new ModelDialog(h, d));
@@ -169,18 +193,30 @@ Deno.test("env dialog rejects an invalid variable name", () => {
   assertStringIncludes(dialog.view(90), "Invalid environment variable name");
 });
 
-Deno.test("auth dialog walks provider -> key and saves", () => {
+Deno.test("auth dialog walks provider -> credentials and saves", () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new AuthDialog(h, d));
   assertStringIncludes(dialog.view(90), "Connect Provider");
   feed(dialog, "\r"); // Existing Provider
   assertStringIncludes(dialog.view(90), "Choose Provider");
-  feed(dialog, "\r"); // first provider
-  assertStringIncludes(dialog.view(90), "Set API Key");
-  feed(dialog, "\r"); // set key
+  feed(dialog, "\r"); // first provider → group list
+  assertStringIncludes(dialog.view(90), "Credentials");
+  // Cursor starts on API Type; one down reaches Credentials.
+  feed(dialog, "\x1b[B\r");
+  feed(dialog, "\r"); // edit API Key field
+  // Prefilled env references stay visible; ordinary values are masked.
+  assertStringIncludes(dialog.view(90), "API Key");
+  // Clear any prefilled value and type a fresh ordinary key.
+  feed(
+    dialog,
+    "\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f\x7f",
+  );
   feed(dialog, "sk-test-123");
-  // The key input is masked.
   assertStringIncludes(dialog.view(90), "***********");
+  feed(dialog, "\r"); // submit key → credentials list
+  feed(dialog, "\x1b"); // back to group list (cursor reset to top)
+  // Move down to Done (last item) and save.
+  for (let i = 0; i < 8; i++) feed(dialog, "\x1b[B");
   feed(dialog, "\r");
   assertEquals(dialog.closed, true);
   assertEquals(rec.reloads, 1);

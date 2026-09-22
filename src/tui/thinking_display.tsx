@@ -41,11 +41,13 @@ export interface ThinkingIndicatorProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ICONS = {
-  thinking: "💭",
-  expand: "▶",
-  collapse: "▼",
-  streaming: "▊",
+  expand: "+",
+  collapse: "-",
+  streaming: "|",
 };
+
+/** Plain-text prefix shown before a thinking block (no emoji). */
+const THINK_PREFIX = "~";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Thinking Block Component
@@ -73,8 +75,7 @@ export function ThinkingBlock({
     return (
       <Box flexDirection="column">
         <Text dimColor>
-          {ICONS.expand} {ICONS.thinking}{" "}
-          {translator.text("thinking.collapsed")}
+          {ICONS.expand} {THINK_PREFIX} {translator.text("thinking.collapsed")}
           {content.length > 0 && ` (${content.length} chars)`}
           {timeStr && ` (${timeStr})`}
         </Text>
@@ -97,7 +98,7 @@ export function ThinkingBlock({
       {/* Header */}
       <Box flexDirection="row">
         <Text dimColor italic>
-          {ICONS.collapse} {ICONS.thinking} {translator.text("thinking.title")}
+          {ICONS.collapse} {THINK_PREFIX} {translator.text("thinking.title")}
         </Text>
         {timeStr && <Text dimColor>({timeStr})</Text>}
         {isStreaming && <Text color="cyan">{ICONS.streaming}</Text>}
@@ -145,7 +146,7 @@ export function CompactThinkingRow({
 
   return (
     <Text dimColor italic>
-      {ICONS.thinking} {translator.text("thinking.thinking")}
+      {THINK_PREFIX} {translator.text("thinking.thinking")}
       {preview && ` — ${preview}`}
       {timeStr}
       {isStreaming && ` ${ICONS.streaming}`}
@@ -166,7 +167,7 @@ export function ThinkingIndicator({
   return (
     <Box>
       <Text dimColor>
-        {ICONS.thinking} {translator.text("thinking.in_progress")}
+        {THINK_PREFIX} {translator.text("thinking.in_progress")}
       </Text>
     </Box>
   );
@@ -194,7 +195,7 @@ export function StreamingThinking({
   return (
     <Box flexDirection="column">
       <Text dimColor italic>
-        {ICONS.thinking} {translator.text("thinking.streaming")}...
+        {THINK_PREFIX} {translator.text("thinking.streaming")}...
       </Text>
       <Box flexDirection="column" marginLeft={2}>
         {displayLines.map((line, index) => (
@@ -237,7 +238,7 @@ export function ThinkingSummary({
 
   return (
     <Text dimColor>
-      {ICONS.thinking} {blocks.length} {translator.text("thinking.blocks")}
+      {THINK_PREFIX} {blocks.length} {translator.text("thinking.blocks")}
       {totalTime > 0 && ` (${formatDuration(totalTime)}, ${totalChars} chars)`}
     </Text>
   );

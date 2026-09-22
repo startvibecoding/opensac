@@ -137,8 +137,8 @@ Deno.test("renderAgentTabBar renders tabs with state and active highlight", () =
   const bar = renderAgentTabBar(tr, tabs, "lead", 120);
   // deno-lint-ignore no-control-regex
   const text = bar.replace(/\u001B\[[0-9;]*m/g, "");
-  assert(text.includes("[ ● lead ] (running)"), text);
-  assert(text.includes("[ ✓ worker ] (done)"), text);
+  assert(text.includes("[ o lead ] (running)"), text);
+  assert(text.includes("[ + worker ] (done)"), text);
   // Bottom border row
   const [row, border] = bar.split("\n");
   assertEquals(

@@ -26,6 +26,7 @@ import {
   TaskFailed,
   TaskIncomplete,
   type TaskStatus,
+  TaskSuccess,
 } from "../agent/events.ts";
 import type { RunState } from "../agentruntime/run_state.ts";
 import {
@@ -276,7 +277,7 @@ export class AppController {
         this.#handleRunFinished(
           event.type === EventError
             ? { ...event, type: EventRunFinished, status: TaskFailed }
-            : { ...event, type: EventRunFinished, status: TaskFailed },
+            : { ...event, type: EventRunFinished, status: TaskSuccess },
         );
         return;
 
@@ -327,6 +328,16 @@ export class AppController {
     void approved;
   }
 
+  /** Advances the question panel after the shown question is resolved. */
+  resolveQuestion(questionID: string): void {
+    if (this.shownQuestion?.questionID === questionID) {
+      this.shownQuestion = undefined;
+      this.waitingForQuestion = false;
+      this.showNextQuestion();
+    }
+    this.#cb.scheduleRender();
+  }
+
   #handleQuestionRequest(event: Event): void {
     if (event.agentId) {
       // A member's question is addressed to the lead, not the human: the
@@ -353,6 +364,7 @@ export class AppController {
       }
       this.#run.bindDecision(event.questionId ?? "", (value) => {
         this.#cb.deliverQuestion?.(event.questionId ?? "", value);
+        this.resolveQuestion(event.questionId ?? "");
         this.#run?.resume?.();
       });
       this.#run.waitForQuestion?.();

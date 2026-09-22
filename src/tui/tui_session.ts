@@ -68,6 +68,7 @@ import type { AppProps } from "./app.tsx";
 import type { Objective } from "../esm/state.ts";
 import { Store as ESMStore } from "../esm/store.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
+import { EventError, TaskFailed } from "../agent/events.ts";
 
 export interface TUISessionOptions {
   provider: string;
@@ -194,6 +195,10 @@ export class TUISession implements CommandHost {
       this.#mode,
       this.#thinking,
     );
+  }
+
+  get compactMode(): boolean {
+    return this.#compactMode;
   }
 
   get busy(): boolean {
@@ -602,7 +607,7 @@ export class TUISession implements CommandHost {
     if (this.#busy || text.trim() === "") return;
     this.#busy = true;
     this.controller.isThinking = true;
-    this.controller.addMessage(`❯ ${text}`, "plain");
+    this.controller.addMessage(`> ${text}`, "plain");
     const header = this.#manager.getHeader();
     const sessionId = header?.id ?? "";
     if (sessionId === "") {
@@ -737,6 +742,20 @@ export class TUISession implements CommandHost {
         this.controller.handleAgentEvent(event);
         if (this.controller.runTerminalHandled) break;
       }
+    } catch (err) {
+      // A non-terminal rejection (transport error escaping the agent loop,
+      // broken iterator) must not leave the durable run dangling in "running"
+      // with pending decisions: terminalize it canonically as failed.
+      if (!this.controller.runTerminalHandled) {
+        this.controller.handleAgentEvent(
+          {
+            type: EventError,
+            status: TaskFailed,
+            error: err instanceof Error ? err : new Error(String(err)),
+          } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
+        );
+      }
+      throw err;
     } finally {
       this.#busy = false;
       this.controller.isThinking = false;
@@ -774,22 +793,24 @@ export class TUISession implements CommandHost {
   /** Answers the shown question with the chosen option. */
   answerQuestion(value: string): void {
     const shown = this.controller.shownQuestion;
-    if (shown) {
-      try {
-        this.#decisions.resolveWith(
-          { id: shown.questionID, kind: "question", status: "resolved", value },
-        );
-      } catch {
-        // Already resolved/expired: the controller still advances the panel.
-      }
-      this.controller.addMessage(
-        value === "" ? "✅ Answered" : `✅ ${value}`,
-        "plain",
+    if (!shown) return;
+    // Panel advancement (clear shown slot, surface the next queued question)
+    // is owned by the controller via the resolver bound when the request
+    // arrived; this mirrors the approval path.
+    const advance = () => this.controller.resolveQuestion(shown.questionID);
+    try {
+      this.#decisions.resolveWith(
+        { id: shown.questionID, kind: "question", status: "resolved", value },
       );
-      this.controller.waitingForQuestion = false;
-      this.controller.shownQuestion = undefined;
+    } catch {
+      // Already resolved/expired: still advance the panel.
+      advance();
+      return;
     }
-    this.controller.showNextQuestion();
+    this.controller.addMessage(
+      value === "" ? "Answered" : value,
+      "plain",
+    );
   }
 
   /** Escape: abort a pending request, else clear the draft (Go KeyEsc). */
@@ -927,7 +948,7 @@ export class TUISession implements CommandHost {
     const body = chosen.fullContent !== ""
       ? chosen.fullContent
       : chosen.summary;
-    const header = `⏺ ${chosen.toolName} ${chosen.status}`;
+    const header = `| ${chosen.toolName} ${chosen.status}`;
     return [header, "", ...body.split("\n")];
   }
 

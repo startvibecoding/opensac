@@ -84,16 +84,16 @@ export interface TurnCardProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ICONS = {
-  tool: "⏺",
-  thinking: "💭",
-  pending: "○",
-  running: "◐",
-  completed: "●",
-  error: "✗",
-  interrupted: "⏸",
-  expand: "▶",
-  collapse: "▼",
-  chevron: "›",
+  tool: "|",
+  thinking: "~",
+  pending: "o",
+  running: ">",
+  completed: "o",
+  error: "x",
+  interrupted: "=",
+  expand: "+",
+  collapse: "-",
+  chevron: ">",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,9 +250,9 @@ function getActivityIcon(activity: ActivityItem): string {
     case "thinking":
       return ICONS.thinking;
     case "plan":
-      return "📋";
+      return "=";
     case "status":
-      return "ℹ";
+      return "i";
     default:
       return "•";
   }

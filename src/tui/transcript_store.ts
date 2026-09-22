@@ -60,6 +60,11 @@ export class TranscriptStore {
   messages: string[] = [];
   toolResults: ToolResultEntry[] = [];
 
+  /** The translator bound at construction (used by Ink row formatting). */
+  get translator(): Translator {
+    return this.#translator;
+  }
+
   currentAssistantIdx = -1;
   currentThinkIdx = -1;
 

@@ -566,6 +566,11 @@ export class AgentManager {
   }
 
   /** Returns the parent ID of an agent. */
+  /** IDs of the direct children of `id`. */
+  childrenOf(id: AgentID): AgentID[] {
+    return this.children.get(id) ?? [];
+  }
+
   parent(id: AgentID): [AgentID | undefined, boolean] {
     const pid = this.parentOf.get(id);
     return [pid, pid !== undefined];

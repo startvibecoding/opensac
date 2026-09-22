@@ -31,15 +31,15 @@ const reset = "\u001B[0m";
 function stateIcon(state: AgentTabState): string {
   switch (state) {
     case "running":
-      return `${green}●${reset}`;
+      return `${green}o${reset}`;
     case "ready":
-      return `${dim}○${reset}`;
+      return `${dim}.${reset}`;
     case "done":
-      return `${green}✓${reset}`;
+      return `${green}+${reset}`;
     case "error":
-      return `${red}✗${reset}`;
+      return `${red}-${reset}`;
     case "canceled":
-      return `${orange}⊘${reset}`;
+      return `${orange}=${reset}`;
     default:
       return " ";
   }

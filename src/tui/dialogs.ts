@@ -15,7 +15,6 @@ import {
   isProjectDir,
   loadGlobalSettingsSparse,
   loadProjectSettingsSparse,
-  resolveKey,
   saveGlobalSettings,
   saveGlobalSettingsPatch,
   saveProjectSettings,
@@ -500,251 +499,38 @@ export class SessionsDialog implements DialogController {
 
 // --- /auth ------------------------------------------------------------------
 
-type AuthView = "main" | "providers" | "provider" | "key" | "custom-id";
+import { AuthDialog as StructuredAuthDialog } from "./auth_dialog.ts";
 
-/** The `/auth` provider editor: pick a provider, then set its API key. */
+/**
+ * Adapter bridging the generic {@link Dialog} panel (DialogController) to the
+ * structured /auth editor. All navigation, drafts, and persistence are owned
+ * by StructuredAuthDialog; this class only maps the panel protocol.
+ */
 export class AuthDialog implements DialogController {
-  #host: DialogHost;
-  #dialog: Dialog;
-  #view: AuthView = "main";
-  #providerID = "";
-  #error = "";
-  #pendingCustomID = "";
+  #auth: StructuredAuthDialog;
 
   constructor(host: DialogHost, dialog: Dialog, initialProvider = "") {
-    this.#host = host;
-    this.#dialog = dialog;
-    // `/settings <provider>` deep-links into that provider's detail (Go
-    // openSettingsDialog with a provider arg).
-    const provider = initialProvider.trim();
-    if (provider !== "") {
-      this.#providerID = provider;
-      this.#view = "provider";
-      this.#dialog.resetCursor();
-    }
+    this.#auth = new StructuredAuthDialog(host, dialog, initialProvider);
   }
 
   page(): DialogPage {
-    const tr = this.#host.translator;
-    switch (this.#view) {
-      case "main":
-        return {
-          title: tr.text("dialog.auth.title"),
-          items: [
-            {
-              label: tr.text("dialog.auth.existing"),
-              description: tr.text("dialog.auth.existing_desc"),
-              value: "existing",
-            },
-            {
-              label: tr.text("dialog.auth.custom"),
-              description: tr.text("dialog.auth.custom_desc"),
-              value: "custom",
-            },
-          ],
-          hint: tr.text("dialog.auth.hint"),
-          error: this.#error,
-        };
-      case "providers":
-        return {
-          title: tr.text("dialog.auth.providers_title"),
-          search: true,
-          items: providerIDs(this.#host.settings).map((id) => ({
-            label: id,
-            description: this.#providerState(id),
-            value: `provider:${id}`,
-            current: id === this.#host.settings.defaultProvider,
-          })),
-          hint: tr.text("dialog.auth.providers_hint"),
-          error: this.#error,
-        };
-      case "provider": {
-        const configured =
-          resolveKey(this.#host.settings, this.#providerID) !== "";
-        return {
-          title: tr.text("dialog.auth.provider_title", this.#providerID),
-          body: [
-            tr.text(
-              "dialog.auth.provider_state",
-              configured
-                ? tr.text("auth.provider_configured")
-                : tr.text("auth.provider_unconfigured"),
-            ),
-          ],
-          items: [
-            {
-              label: tr.text("dialog.auth.set_key"),
-              description: tr.text("dialog.auth.set_key_desc"),
-              value: "set-key",
-            },
-            {
-              label: tr.text("dialog.auth.use_as_default"),
-              value: "set-default",
-              current: this.#host.settings.defaultProvider === this.#providerID,
-            },
-          ],
-          hint: tr.text("dialog.auth.provider_hint"),
-          error: this.#error,
-        };
-      }
-      case "key":
-        return {
-          title: tr.text("dialog.auth.key_title", this.#providerID),
-          items: [],
-          input: {
-            prompt: tr.text("dialog.auth.key_prompt"),
-            value: this.#dialog.inputValue,
-            placeholder: tr.text("dialog.auth.key_placeholder"),
-            masked: true,
-          },
-          hint: tr.text("dialog.auth.key_hint"),
-          error: this.#error,
-        };
-      case "custom-id":
-        return {
-          title: tr.text("dialog.auth.custom_title"),
-          items: [],
-          input: {
-            prompt: tr.text("dialog.auth.custom_prompt"),
-            value: this.#dialog.inputValue,
-            placeholder: tr.text("dialog.auth.custom_placeholder"),
-          },
-          hint: tr.text("dialog.auth.custom_hint"),
-          error: this.#error,
-        };
-    }
-  }
-
-  #providerState(id: string): string {
-    const pc = getProviderConfig(this.#host.settings, id);
-    const configured = resolveKey(this.#host.settings, id) !== "";
-    const models = pc?.models.length ?? 0;
-    return `${
-      configured
-        ? this.#host.translator.text("auth.provider_configured")
-        : this.#host.translator.text("auth.provider_unconfigured")
-    } · ${models} models`;
+    return this.#auth.page();
   }
 
   select(value: string): void {
-    switch (value) {
-      case "existing":
-        this.#view = "providers";
-        this.#error = "";
-        this.#dialog.resetCursor();
-        return;
-      case "custom":
-        this.#view = "custom-id";
-        this.#error = "";
-        this.#dialog.openInput("");
-        return;
-      case "set-key":
-        this.#view = "key";
-        this.#error = "";
-        this.#dialog.openInput("");
-        return;
-      case "set-default":
-        this.#setDefault();
-        return;
-      default:
-        if (value.startsWith("provider:")) {
-          this.#providerID = value.slice("provider:".length);
-          this.#view = "provider";
-          this.#error = "";
-          this.#dialog.resetCursor();
-        }
-        return;
-    }
+    this.#auth.select(value);
   }
 
-  /** Persists a provider API key into the global settings. */
   submit(value: string): void {
-    const tr = this.#host.translator;
-    if (this.#view === "custom-id") {
-      const id = value.trim();
-      if (id === "") {
-        this.#error = tr.text("dialog.auth.custom_required");
-        return;
-      }
-      this.#pendingCustomID = id;
-      this.#providerID = id;
-      this.#view = "key";
-      this.#error = "";
-      this.#dialog.openInput("");
-      return;
-    }
-    if (this.#view === "key") {
-      const key = value.trim();
-      if (key === "") {
-        this.#error = tr.text("dialog.auth.key_required");
-        return;
-      }
-      try {
-        const sparse = loadGlobalSettingsSparse();
-        const providers = { ...(sparse.providers ?? {}) };
-        const existing = providers[this.#providerID] ?? {
-          models: [],
-        };
-        providers[this.#providerID] = { ...existing, apiKey: key };
-        sparse.providers = providers;
-        saveGlobalSettings(sparse);
-      } catch (err) {
-        this.#error = tr.text(
-          "settings.save_failed",
-          (err as Error).message,
-        );
-        return;
-      }
-      this.#host.reloadSettings();
-      this.#dialog.close(
-        tr.text("dialog.auth.key_saved", this.#providerID),
-      );
-    }
+    this.#auth.submit(value);
   }
 
-  #setDefault(): void {
-    const tr = this.#host.translator;
-    try {
-      const sparse = loadGlobalSettingsSparse();
-      const models = resolvedModels(this.#host.settings, this.#providerID);
-      const modelID = models[0]?.id ?? "";
-      sparse.defaultProvider = this.#providerID;
-      if (modelID !== "") sparse.defaultModel = modelID;
-      saveGlobalSettings(sparse);
-      this.#host.reloadSettings();
-      if (modelID !== "") this.#host.applyModel(this.#providerID, modelID);
-      this.#dialog.close(
-        tr.text("settings.default_model_saved", this.#providerID, "global"),
-      );
-    } catch (err) {
-      this.#error = tr.text("settings.save_failed", (err as Error).message);
-    }
+  key(name: string): void {
+    this.#auth.key(name);
   }
-
-  key(): void {}
 
   back(): void {
-    switch (this.#view) {
-      case "main":
-        this.#dialog.close();
-        return;
-      case "providers":
-        this.#view = "main";
-        break;
-      case "provider":
-        this.#view = "providers";
-        break;
-      case "key":
-        this.#view = this.#pendingCustomID === "" ? "provider" : "custom-id";
-        this.#dialog.closeInput();
-        break;
-      case "custom-id":
-        this.#view = "main";
-        this.#dialog.closeInput();
-        break;
-    }
-    this.#error = "";
-    this.#dialog.resetCursor();
+    this.#auth.back();
   }
 }
 

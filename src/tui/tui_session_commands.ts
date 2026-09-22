@@ -279,10 +279,10 @@ export class TuiSessionCommands {
           const lines = [tr.text("cron.list_title", jobs.length)];
           for (const job of jobs) {
             const status = job.lastStatus === "failed"
-              ? "❌"
+              ? "[failed]"
               : job.enabled === false
-              ? "⏸"
-              : "✅";
+              ? "[paused]"
+              : "[ok]";
             lines.push(
               tr.text(
                 "cron.entry",

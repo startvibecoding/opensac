@@ -207,13 +207,16 @@ export class Dialog {
 
     switch (ev.name) {
       case "up":
-        this.moveCursor(-1, page.items.length);
+        this.moveCursor(-1, this.#visibleItems(page).length);
         return;
       case "down":
-        this.moveCursor(1, page.items.length);
+        this.moveCursor(1, this.#visibleItems(page).length);
         return;
       case "enter": {
-        const item = page.items[this.#cursor];
+        // Select within the same filtered list that is rendered; otherwise a
+        // search query would pick an unfiltered row at the same index.
+        const items = this.#visibleItems(page);
+        const item = items[this.#cursor];
         if (item !== undefined) this.#controller.select(item.value);
         return;
       }
@@ -252,7 +255,11 @@ export class Dialog {
 
     if (page.input !== undefined) {
       const value = this.#inputActive ? this.#inputValue : page.input.value;
-      const shown = page.input.masked === true && value !== ""
+      // Mask ordinary secrets, but leave ${ENV} references readable so users
+      // can keep an existing env-based binding untouched.
+      const keepReadable = page.input.masked === true &&
+        value.startsWith("${") && value.endsWith("}");
+      const shown = page.input.masked === true && value !== "" && !keepReadable
         ? "*".repeat(Array.from(value).length)
         : value;
       const cursor = this.#inputActive ? `${ACCENT}█${RESET}` : "";
@@ -273,7 +280,7 @@ export class Dialog {
       lines.push("");
     }
 
-    const items = this.#filtered(page.items);
+    const items = this.#visibleItems(page);
     if (items.length === 0) {
       lines.push(`${DIM}(no matches)${RESET}`);
     } else {
@@ -323,6 +330,11 @@ export class Dialog {
       item.label.toLowerCase().includes(query) ||
       item.value.toLowerCase().includes(query)
     );
+  }
+
+  /** Items currently visible after search filtering (one source of truth). */
+  #visibleItems(page: DialogPage): DialogItem[] {
+    return this.#filtered(page.items);
   }
 }
 

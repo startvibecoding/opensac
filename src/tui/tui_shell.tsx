@@ -137,6 +137,7 @@ export function TuiShell({
         controller,
         header: session.header,
         width,
+        compactMode: session.compactMode,
       }) as ReactElement}
       {session.toolModalOpen && (
         <Box flexDirection="column">
