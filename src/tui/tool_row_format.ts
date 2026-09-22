@@ -12,6 +12,7 @@
 import type { FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import type { Translator } from "./i18n.ts";
+import { formatDetailedActivityTool } from "./activity.ts";
 
 export type ToolRowStatus = "running" | "completed" | "interrupted";
 
@@ -139,6 +140,15 @@ function runningLine(tr: Translator, input: ToolRowInput): string {
 
 /** Edit/write result with path, diff stat and a unified-diff excerpt. */
 function editedLine(tr: Translator, input: ToolRowInput): string {
+  const header = editHeader(tr, input);
+  const unified = input.diff?.unified?.trim() ?? "";
+  if (unified === "") return header;
+  const excerpt = unifiedDiffExcerpt(unified);
+  return excerpt === "" ? header : `${header}\n${excerpt}`;
+}
+
+/** Edit/write header only: `Edited path (+3 -1)` (Go formatExpandedEditHeader). */
+function editHeader(tr: Translator, input: ToolRowInput): string {
   let p = toolPath(input.toolArgs);
   if (input.diff?.path !== undefined && input.diff.path !== "") {
     p = input.diff.path;
@@ -149,11 +159,43 @@ function editedLine(tr: Translator, input: ToolRowInput): string {
   if (input.diff !== undefined) {
     header += ` (+${input.diff.added} -${input.diff.deleted})`;
   }
+  return header;
+}
 
+/**
+ * Expanded Ctrl+O rendering for one tool row, mirroring the Go
+ * renderExpandedToolResult + formatToolModalContent: a header line, the tool
+ * arguments, `---` plus the full output, and the unified diff when present.
+ */
+export function expandedToolRow(
+  tr: Translator,
+  input: ToolRowInput,
+): string {
+  if (input.status === "running") return runningLine(tr, input);
+
+  let header: string;
+  if (input.toolName === "bash") {
+    header = bashCommandLine(tr, input);
+  } else if (input.status === "interrupted") {
+    header = `${toolHeader(input)} ${tr.text("tool.modal.state.canceled")}`;
+  } else if (input.toolName === "edit" || input.toolName === "write") {
+    header = editHeader(tr, input);
+  } else {
+    header = toolHeader(input);
+  }
+
+  const parts: string[] = [];
+  const args = formatDetailedActivityTool(
+    input.toolName,
+    input.toolArgs,
+  );
+  if (args.trim() !== "" && args !== input.toolName) parts.push(args);
+  if (input.fullContent !== "") parts.push("---", input.fullContent);
   const unified = input.diff?.unified?.trim() ?? "";
-  if (unified === "") return header;
-  const excerpt = unifiedDiffExcerpt(unified);
-  return excerpt === "" ? header : `${header}\n${excerpt}`;
+  if (unified !== "" && input.diff !== undefined) {
+    parts.push(tr.text("tool.modal.diff"), input.diff.unified);
+  }
+  return parts.length === 0 ? header : `${header}\n${parts.join("\n")}`;
 }
 
 const HUNK_RE = /^@@ -([0-9]+)(?:,[0-9]+)? \+([0-9]+)(?:,[0-9]+)? @@/;

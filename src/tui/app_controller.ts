@@ -126,6 +126,11 @@ export class AppController {
     this.#leadAgentId = id;
   }
 
+  /** The lead (interactive) agent ID; background events must not match it. */
+  get leadAgentId(): string | undefined {
+    return this.#leadAgentId;
+  }
+
   /** The translator used for localized labels (Go App.translator). */
   get translator(): Translator {
     return this.#translator;

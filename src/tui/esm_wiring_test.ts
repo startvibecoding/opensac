@@ -57,6 +57,7 @@ Deno.test(
 
 Deno.test("tool modal width and height adapt to the terminal", () => {
   const session = makeSession();
+  session.controller.addMessage("hello");
   session.setTerminalSize(70, 24);
   session.openToolModal();
   const view = session.toolModalView();

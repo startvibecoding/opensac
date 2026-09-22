@@ -2,7 +2,7 @@
 // agent with the full activity snapshot (latest tool, thinking, response,
 // result, event timeline), mirroring the Go renderAgentActivity.
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
@@ -11,6 +11,7 @@ import {
   EventStatus,
   EventTextDelta,
   EventThinkDelta,
+  EventToolExecutionEnd,
   EventToolExecutionStart,
 } from "../agent/events.ts";
 
@@ -82,7 +83,7 @@ Deno.test("tool modal lists sub-agent targets with detailed progress", () => {
   assertStringIncludes(view, "started scan");
 });
 
-Deno.test("tool modal without activity still lists main", () => {
+Deno.test("tool modal refuses to open when there is nothing to show", () => {
   const tr = new Translator("en");
   const controller = new AppController(tr, {
     onMessage: () => {},
@@ -90,6 +91,50 @@ Deno.test("tool modal without activity still lists main", () => {
   });
   const session = makeSession(controller);
   session.openToolModal();
-  const modal = session.toolModalForTest();
-  assertEquals(modal.targets.map((t) => t.id), ["main"]);
+  assertThrows(() => session.toolModalForTest());
 });
+
+Deno.test(
+  "main tab expands tool calls without one tab per tool",
+  () => {
+    const tr = new Translator("en");
+    const controller = new AppController(tr, {
+      onMessage: () => {},
+      scheduleRender: () => {},
+    });
+    controller.addMessage("plain preamble");
+    const ev = (extra: Record<string, unknown>) =>
+      extra as unknown as Parameters<AppController["handleAgentEvent"]>[0];
+    controller.handleAgentEvent(
+      ev({
+        type: EventToolExecutionStart,
+        toolCallId: "tc-9",
+        toolName: "bash",
+        toolArgs: { command: "npm test" },
+      }),
+    );
+    controller.handleAgentEvent(
+      ev({
+        type: EventToolExecutionEnd,
+        toolCallId: "tc-9",
+        toolName: "bash",
+        toolArgs: { command: "npm test" },
+        toolResult: "all 10 tests passed",
+      }),
+    );
+
+    const session = makeSession(controller);
+    session.openToolModal();
+    // Tabs: main + agents only — never one tab per tool call.
+    const modal = session.toolModalForTest();
+    assertEquals(modal.targets.map((t) => t.id), ["main"]);
+
+    // Main renders the expanded transcript: tool header with the command,
+    // then `---` plus the full output.
+    const view = session.toolModalView();
+    assertStringIncludes(view, "[bash]");
+    assertStringIncludes(view, "npm test");
+    assertStringIncludes(view, "all 10 tests passed");
+    assertStringIncludes(view, "plain preamble");
+  },
+);

@@ -50,6 +50,8 @@ import { localTimeZone, Translator } from "./i18n.ts";
 import { InputState } from "./input_state.ts";
 import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
 import { renderAgentActivity } from "./activity.ts";
+import { expandedToolRow } from "./tool_row_format.ts";
+import { wrapANSI } from "./renderutil.ts";
 import { esmPanelLines, esmPanelWidth } from "./esm_panel.ts";
 import {
   type CommandHost,
@@ -1056,36 +1058,51 @@ export class TUISession implements CommandHost {
   }
 
   openToolModal(): void {
-    const results = this.controller.store.toolResults;
-    // Targets mirror the Go toolModalTargets: a main entry for the current
-    // transcript's tool results plus one entry per background/sub-agent so
-    // Ctrl+O can inspect each agent's detailed progress.
-    const targets: ToolModalTarget[] = [
-      { id: "main", label: "main", kind: "main" },
-    ];
-    for (const id of this.controller.activities.order) {
-      const act = this.controller.activities.get(id);
-      if (!act) continue;
-      const state = act.state !== "" ? ` ${act.state}` : "";
-      targets.push({
-        id: `agent:${id}`,
-        label: `${id}${state}`,
-        kind: act.kind !== "" ? act.kind : "subagent",
-      });
-    }
-    for (const r of results) {
-      targets.push({
-        id: `tool:${r.toolCallID}`,
-        label: r.toolName,
-        kind: r.toolName,
-      });
-    }
-    if (targets.length === 0) {
+    const store = this.controller.store;
+    const hasContent = store.messages.length > 0 ||
+      store.toolResults.length > 0 ||
+      this.controller.activities.order.length > 0;
+    if (!hasContent) {
       this.controller.addMessage(
         this.translator.text("tool.modal.no_details"),
         "plain",
       );
       return;
+    }
+    // Tabs mirror the Go toolModalTargets: main (the expanded transcript) plus
+    // one tab per background or managed sub-agent — never one tab per tool
+    // call. The lead agent is the "main" tab and must not repeat.
+    const targets: ToolModalTarget[] = [
+      {
+        id: "main",
+        label: this.translator.text("tool.modal.main"),
+        kind: "main",
+      },
+    ];
+    const lead = this.controller.leadAgentId;
+    const seen = new Set<string>();
+    for (const id of this.controller.activities.order) {
+      if (id === "" || id === lead || seen.has(id)) continue;
+      seen.add(id);
+      const act = this.controller.activities.get(id);
+      const state = act !== undefined && act.state !== ""
+        ? ` ${act.state}`
+        : "";
+      targets.push({
+        id: `agent:${id}`,
+        label: `${id}${state}`,
+        kind: act !== undefined && act.kind !== "" ? act.kind : "subagent",
+      });
+    }
+    try {
+      for (const id of this.ensureAgentManager().list()) {
+        if (id === "" || id === lead || seen.has(id)) continue;
+        seen.add(id);
+        targets.push({ id: `agent:${id}`, label: id, kind: "subagent" });
+      }
+    } catch {
+      // Runtime not built yet; the recorded activities above already cover
+      // every agent that has produced events.
     }
     const modal = new ToolModalState(this.#termWidth, this.#termHeight);
     modal.setTargets(targets);
@@ -1139,27 +1156,79 @@ export class TUISession implements CommandHost {
     if (!modal) return [];
     const target = modal.targets[modal.active];
     if (target === undefined) return [];
+    const width = ToolModalState.contentWidthFor(this.#termWidth);
 
-    // Sub-agent targets render the full activity snapshot: latest tool with
+    // Sub-agent tabs render the full activity snapshot: latest tool with
     // arguments, thinking, response, result, and the event timeline (Go
     // renderAgentActivity).
     if (target.id.startsWith("agent:")) {
       const agentId = target.id.slice("agent:".length);
       const act = this.controller.activities.get(agentId);
-      return renderAgentActivity(act, agentId, this.translator).split("\n");
+      const lines = renderAgentActivity(act, agentId, this.translator).split(
+        "\n",
+      );
+      return this.#wrapModalLines(lines, width);
     }
 
-    const results = this.controller.store.toolResults;
-    let chosen = results.find((r) => `tool:${r.toolCallID}` === target.id);
-    if (chosen === undefined && target.id === "main") {
-      chosen = results[results.length - 1];
+    // Main tab: the expanded transcript (Go buildToolModalLines with
+    // active == 0 — assistant, thinking, plain rows, and every tool call
+    // expanded with args, full output, and diff).
+    return this.#wrapModalLines(this.#expandedTranscriptLines(), width);
+  }
+
+  /** Wraps one block to the modal's content width (Go WrapANSI). */
+  #wrapModalLines(lines: string[], width: number): string[] {
+    return lines.flatMap((l) => wrapANSI(l, width).split("\n"));
+  }
+
+  /** The expanded conversation for the main tab (Go buildToolModalLines). */
+  #expandedTranscriptLines(): string[] {
+    const store = this.controller.store;
+    const parts: string[] = [];
+    for (let i = 0; i < store.messages.length; i++) {
+      const msg = this.#expandedMessageAt(i);
+      if (msg.trim() !== "") parts.push(msg);
     }
-    if (!chosen) return [];
-    const body = chosen.fullContent !== ""
-      ? chosen.fullContent
-      : chosen.summary;
-    const header = `| ${chosen.toolName} ${chosen.status}`;
-    return [header, "", ...body.split("\n")];
+    if (parts.length === 0) {
+      return [this.translator.text("tool.modal.no_conversation")];
+    }
+    const out: string[] = [];
+    parts.forEach((part, i) => {
+      if (i > 0) out.push("");
+      out.push(...part.split("\n"));
+    });
+    return out;
+  }
+
+  /** One transcript row expanded (Go renderExpandedMessageAt). */
+  #expandedMessageAt(idx: number): string {
+    const store = this.controller.store;
+    const tool = store.toolResults.find((r) => r.msgIndex === idx);
+    if (tool !== undefined) {
+      return expandedToolRow(this.translator, {
+        toolName: tool.toolName,
+        toolArgs: tool.toolArgs,
+        status: tool.status,
+        summary: tool.summary,
+        fullContent: tool.fullContent,
+        diff: tool.diff,
+        toolError: tool.toolError,
+        executionState: tool.executionState,
+      });
+    }
+    const assistant = store.assistantRaw(idx);
+    if (assistant !== "") {
+      return `${
+        this.translator.text("transcript.assistant_prefix")
+      }\n${assistant}`;
+    }
+    const think = store.thinkRaw(idx);
+    if (think !== "") {
+      return `${this.translator.text("activity.thinking")}\n${think}`;
+    }
+    const message = store.messages[idx];
+    if (message !== undefined && message !== "") return message;
+    return "";
   }
 
   // --- ESM panel -------------------------------------------------------------

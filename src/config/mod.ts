@@ -110,6 +110,7 @@ export {
   projectMCPPath,
   saveMCPConfig,
 } from "./mcp.ts";
+export { presetModelConfig } from "./model_preset.ts";
 export {
   addBashCommand,
   addBashPrefix,

@@ -28,6 +28,7 @@ import {
   loadGlobalSettingsSparse,
   saveGlobalSettingsPatch,
 } from "../config/settings.ts";
+import { presetModelConfig } from "../config/model_preset.ts";
 import type { DialogItem, DialogPage } from "./dialog.ts";
 
 type TriBool = boolean | null;
@@ -121,6 +122,7 @@ export type AuthView =
   | "api-choice"
   | "model-list"
   | "add-model-id"
+  | "fetch-models"
   | "model-groups"
   | "model-basics"
   | "model-capabilities"
@@ -516,6 +518,9 @@ export class AuthDialog {
   #provider = blankProvider();
   #models: ModelDraft[] = [];
   #currentModelID = "";
+  #fetchedModels: Array<{ id: string; name?: string }> = [];
+  #fetchingModels = false;
+  #fetchError = "";
   /** Active editing field ("<store>:<key>") when the input box is open. */
   #paramField = "";
   /** Auxiliary state for the headers editor: "key" | "value". */
@@ -705,6 +710,19 @@ export class AuthDialog {
           },
         };
 
+      case "fetch-models":
+        return {
+          title: tr.text("dialog.auth.fetch_models_title"),
+          search: true,
+          hint: this.#fetchingModels
+            ? tr.text("dialog.auth.fetch_models_loading")
+            : this.#fetchError !== ""
+            ? this.#fetchError
+            : hint,
+          error: this.#error,
+          items: this.fetchModelItems(),
+        };
+
       case "model-groups":
         return {
           title: tr.text("dialog.auth.model_group_title", this.#currentModelID),
@@ -866,6 +884,7 @@ export class AuthDialog {
     const tr = this.#host.translator;
     const items: DialogItem[] = [
       { label: tr.text("auth.models.add"), value: "model-add" },
+      { label: tr.text("auth.models.fetch_online"), value: "model-fetch" },
     ];
     for (const m of this.#models) {
       items.push({
@@ -876,6 +895,22 @@ export class AuthDialog {
     }
     items.push({ label: tr.text("auth.models.done"), value: "done" });
     return items;
+  }
+
+  fetchModelItems(): DialogItem[] {
+    const tr = this.#host.translator;
+    if (this.#fetchingModels) return [];
+    if (this.#fetchedModels.length === 0) {
+      return [{
+        label: tr.text("dialog.auth.fetch_models_empty"),
+        value: "_empty",
+      }];
+    }
+    return this.#fetchedModels.map((m) => ({
+      label: m.id,
+      description: m.name ?? "",
+      value: `fetched:${m.id}`,
+    }));
   }
 
   modelGroupItems(): DialogItem[] {
@@ -985,6 +1020,27 @@ export class AuthDialog {
       this.#panel.openInput("");
       return;
     }
+    if (value === "model-fetch") {
+      this.#push("fetch-models");
+      this.fetchModels();
+      return;
+    }
+    if (value.startsWith("fetched:")) {
+      const id = value.slice("fetched:".length);
+      if (this.#models.some((m) => m.id === id)) {
+        this.#error = this.#host.translator.text(
+          "dialog.auth.add_model_exists",
+        );
+        return;
+      }
+      const preset = presetModelConfig(this.#providerID, id);
+      const draft = modelDraftFrom(preset);
+      this.#models.push(draft);
+      this.#currentModelID = id;
+      this.#view = "model-groups";
+      this.#panel.resetCursor();
+      return;
+    }
     if (value.startsWith("field:")) {
       this.selectField(value.slice("field:".length));
       return;
@@ -1086,7 +1142,8 @@ export class AuthDialog {
         );
         return;
       }
-      const draft = blankModel(id);
+      const preset = presetModelConfig(this.#providerID, id);
+      const draft = modelDraftFrom(preset);
       this.#models.push(draft);
       this.#currentModelID = id;
       this.#panel.closeInput();
@@ -1190,6 +1247,98 @@ export class AuthDialog {
     this.#panel.close(
       tr.text("dialog.auth.saved", this.#providerID, firstModel),
     );
+  }
+
+  // ── online model fetching ────────────────────────────────────────────────
+
+  async fetchModels(): Promise<void> {
+    this.#fetchingModels = true;
+    this.#fetchError = "";
+    this.#fetchedModels = [];
+    this.#panel.resetCursor();
+
+    try {
+      const baseUrl = this.#provider.baseUrl.replace(/\/$/, "");
+      const apiKey = this.#provider.apiKey;
+      if (!baseUrl) {
+        this.#fetchError = this.#host.translator.text(
+          "dialog.auth.fetch_models_no_url",
+        );
+        this.#fetchingModels = false;
+        return;
+      }
+
+      // Resolve ${ENV} references in apiKey
+      let resolvedKey = apiKey;
+      const envMatch = apiKey.match(/^\$\{([^}]+)}$/);
+      if (envMatch) {
+        resolvedKey = Deno.env.get(envMatch[1]) ?? "";
+      }
+
+      const api = this.#provider.api;
+      let url = "";
+      const headers: Record<string, string> = {};
+
+      if (api === "google-gemini") {
+        url = `${baseUrl}?key=${resolvedKey}`;
+      } else if (api === "anthropic-messages") {
+        // Anthropic doesn't have a public models listing endpoint
+        this.#fetchError = this.#host.translator.text(
+          "dialog.auth.fetch_models_unsupported",
+        );
+        this.#fetchingModels = false;
+        return;
+      } else {
+        // OpenAI-compatible: GET /v1/models
+        url = `${baseUrl}/models`;
+        if (resolvedKey) {
+          headers["Authorization"] = `Bearer ${resolvedKey}`;
+        }
+      }
+
+      // Merge any custom headers
+      for (const [k, v] of Object.entries(this.#provider.headers ?? {})) {
+        headers[k] = v;
+      }
+
+      const resp = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+      if (!resp.ok) {
+        this.#fetchError = this.#host.translator.text(
+          "dialog.auth.fetch_models_failed",
+          resp.status,
+        );
+        this.#fetchingModels = false;
+        return;
+      }
+
+      const body = await resp.json();
+      const models: Array<{ id: string; name?: string }> = [];
+
+      // OpenAI format: { data: [{ id, ... }] }
+      if (Array.isArray(body?.data)) {
+        for (const m of body.data) {
+          if (m?.id) models.push({ id: m.id, name: m.name ?? m.id });
+        }
+      }
+      // Google Gemini format: { models: [{ name, displayName }] }
+      else if (Array.isArray(body?.models)) {
+        for (const m of body.models) {
+          // Google returns "models/xxx", strip the prefix
+          const id = (m.name ?? "").replace(/^models\//, "");
+          if (id) models.push({ id, name: m.displayName ?? id });
+        }
+      }
+
+      models.sort((a, b) => a.id.localeCompare(b.id));
+      this.#fetchedModels = models;
+    } catch (err) {
+      this.#fetchError = this.#host.translator.text(
+        "dialog.auth.fetch_models_error",
+        (err as Error).message,
+      );
+    } finally {
+      this.#fetchingModels = false;
+    }
   }
 }
 
