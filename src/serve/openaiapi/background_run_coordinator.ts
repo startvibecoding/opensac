@@ -450,7 +450,7 @@ export async function executeResponsesBackgroundRunWithConfig(
             {
               responseRunId: run.localRunId,
               responseId: run.responseId,
-              incompleteReason: "mothx_background_run_max_duration",
+              incompleteReason: "opensac_background_run_max_duration",
             },
           );
           return;
@@ -478,7 +478,7 @@ export async function executeResponsesBackgroundRunWithConfig(
             {
               responseRunId: run.localRunId,
               responseId: run.responseId,
-              incompleteReason: "mothx_code_interpreter_timeout",
+              incompleteReason: "opensac_code_interpreter_timeout",
             },
           );
           return;
@@ -1599,7 +1599,7 @@ export async function monitorRecoveredResponsesBackgroundRun(
           {
             responseRunId: responseRun.localRunId,
             responseId: responseRun.responseId,
-            incompleteReason: "mothx_background_run_max_duration",
+            incompleteReason: "opensac_background_run_max_duration",
           },
         );
         return;
@@ -1627,7 +1627,7 @@ export async function monitorRecoveredResponsesBackgroundRun(
           {
             responseRunId: responseRun.localRunId,
             responseId: responseRun.responseId,
-            incompleteReason: "mothx_code_interpreter_timeout",
+            incompleteReason: "opensac_code_interpreter_timeout",
           },
         );
         return;

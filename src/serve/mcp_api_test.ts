@@ -15,7 +15,7 @@ import {
 } from "./openaiapi/session_mgr.ts";
 
 Deno.test("MCP config handler round trip", async () => {
-  const path = await Deno.makeTempDir({ prefix: "mothx-mcp-" }) + "/mcp.json";
+  const path = await Deno.makeTempDir({ prefix: "opensac-mcp-" }) + "/mcp.json";
 
   const put = new Request("http://localhost/api/mcp", {
     method: "PUT",

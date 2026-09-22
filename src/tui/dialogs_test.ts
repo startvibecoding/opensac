@@ -229,16 +229,64 @@ Deno.test("sessions dialog lists, switches, and deletes", () => {
   assertStringIncludes(dialog.view(90), "Sessions");
 });
 
-Deno.test("settings dialog toggles behavior switches", () => {
+Deno.test("settings dialog walks the category tree and cycles fields", () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new SettingsDialog(h, d));
   assertStringIncludes(dialog.view(90), "Settings");
-  feed(dialog, "\x1b[B"); // Behavior
+  // Root → Defaults (index 1 in Go order: providers, defaults, behavior).
+  feed(dialog, "\x1b[B");
   feed(dialog, "\r");
-  assertStringIncludes(dialog.view(90), "Auto-edit");
-  // Toggle auto-edit; the host reloads settings.
+  assertStringIncludes(dialog.view(90), "Default Mode");
+  feed(dialog, "\x1b"); // back to root
+  feed(dialog, "\x1b[B\x1b[B"); // Behavior
+  feed(dialog, "\r");
+  assertStringIncludes(dialog.view(90), "Theme");
+  // Select "Enable Plan Tool" (second row) and cycle it; the host reloads.
+  feed(dialog, "\x1b[B");
   feed(dialog, "\r");
   assertEquals(rec.reloads >= 1, true);
+});
+
+Deno.test("settings dialog done returns to the root then closes", () => {
+  const { host: h } = host();
+  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  feed(dialog, "\x1b[B"); // Defaults
+  feed(dialog, "\r");
+  feed(dialog, "\x1b[B\x1b[B\x1b[B"); // thinking → mode → Done
+  feed(dialog, "\r");
+  assert(!dialog.closed);
+  assertStringIncludes(dialog.view(90), "Settings");
+  feed(dialog, "\x1b"); // close from root
+  assertEquals(dialog.closed, true);
+});
+
+Deno.test("settings dialog third-level input edits a field", () => {
+  const { host: h, rec } = host();
+  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  feed(dialog, "\x1b[B\x1b[B"); // Behavior
+  feed(dialog, "\r");
+  feed(dialog, "\r"); // Theme (first row) → input box
+  feed(dialog, "light");
+  feed(dialog, "\r");
+  assertEquals(rec.reloads >= 1, true);
+});
+
+Deno.test("settings providers hands off to the auth dialog", () => {
+  const { host: h } = host();
+  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  feed(dialog, "\r"); // Providers (first row)
+  assertEquals(dialog.closed, true);
+  assertEquals(dialog.outcome.handoff, "auth");
+});
+
+Deno.test("settings defaults model picker hands off to the default-model dialog", () => {
+  const { host: h } = host();
+  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  feed(dialog, "\x1b[B"); // Defaults
+  feed(dialog, "\r");
+  feed(dialog, "\r"); // Default Provider / Model (first row)
+  assertEquals(dialog.closed, true);
+  assertEquals(dialog.outcome.handoff, "defaultModel");
 });
 
 Deno.test("dialog with no items renders a no-matches line", () => {

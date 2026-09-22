@@ -9,7 +9,7 @@ import {
 } from "./esm_guidance.ts";
 
 Deno.test("ESM guidance lifecycle", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-esm-guidance-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-esm-guidance-" });
   try {
     // Ensures the schema exists before querying.
     assertEquals(listESMGuidance(sessionDir, "missing", "pending", 10), []);

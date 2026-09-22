@@ -6,7 +6,7 @@ import { statusActive } from "./state.ts";
 import { cleanup, makeStore, RuntimeTestAdapter } from "./test_helpers.ts";
 
 Deno.test("TUI and WebUI adapters continue the same persisted objective", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-xadapt-");
+  const { store, sessionID } = makeStore("opensac-esm-xadapt-");
   try {
     store.create(sessionID, "finish shared objective");
     const workerResponse =

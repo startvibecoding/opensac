@@ -11,7 +11,7 @@ import { newCronTool } from "./tool.ts";
 
 function newStore(): SQLiteCronStore {
   return newSQLiteCronStore(
-    Deno.makeTempDirSync({ prefix: "mothx-cron-tool-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-cron-tool-" }),
   );
 }
 

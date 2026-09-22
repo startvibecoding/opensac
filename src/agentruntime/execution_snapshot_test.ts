@@ -121,7 +121,7 @@ function initSession(sessionDir: string, id: string): void {
 }
 
 Deno.test("inspectSessionExecutionTracksLocalLifecycle", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-snapshot-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-local");
     const lease = acquireExecutionAdmission(sessionDir, "snapshot-local");
@@ -222,7 +222,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
     },
   ];
   for (const testCase of cases) {
-    const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-snapshot-" });
+    const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
     try {
       initSession(sessionDir, "snapshot-state");
       const now = new Date();
@@ -283,7 +283,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
 });
 
 Deno.test("inspectSessionExecutionProjectsMutationAsReserved", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-snapshot-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-reserved");
     const lease = acquireMutation(sessionDir, "snapshot-reserved");
@@ -305,7 +305,7 @@ Deno.test("inspectSessionExecutionProjectsMutationAsReserved", () => {
 Deno.test(
   "inspectSessionExecutionRequiresCanonicalRemoteRecordForDetachedState",
   () => {
-    const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-snapshot-" });
+    const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
     try {
       initSession(sessionDir, "snapshot-remote");
       const now = new Date();
@@ -355,7 +355,7 @@ Deno.test(
 );
 
 Deno.test("reattachDurableRunPromotesRecoveryLeaseAndRegistersLocal", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-snapshot-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-reattach");
     const now = new Date();

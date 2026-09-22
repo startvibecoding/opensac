@@ -50,7 +50,7 @@ function backupSessionIds(backupPath: string): string[] {
 }
 
 Deno.test("reset database creates a fresh database when absent", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-reset-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const report = resetDatabase(dir);
     assertEquals(report.databaseBackup, "");
@@ -63,7 +63,7 @@ Deno.test("reset database creates a fresh database when absent", () => {
 });
 
 Deno.test("reset database moves database and preserves previous sessions", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-reset-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     seedSession(dir, "previous-session");
     closeDatabases();
@@ -100,7 +100,7 @@ Deno.test("reset database moves database and preserves previous sessions", () =>
 });
 
 Deno.test("reset database archives orphaned sidecars", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-reset-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
     for (const suffix of databaseSidecarSuffixes) {
@@ -127,7 +127,7 @@ Deno.test("reset database archives orphaned sidecars", () => {
 });
 
 Deno.test("move database files rolls back with the main file first", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-reset-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
     const sources = [dbPath, dbPath + "-wal", dbPath + "-shm"];
@@ -161,7 +161,7 @@ Deno.test("move database files rolls back with the main file first", () => {
 });
 
 Deno.test("reset backup path avoids occupied names", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-reset-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
     const stamp = utcStamp();
@@ -182,7 +182,7 @@ Deno.test("reset backup path avoids occupied names", () => {
 });
 
 Deno.test("reset database reports what it left behind", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-reset-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     Deno.mkdirSync(path.join(dir, "artifacts", "attachment-1"), {
       recursive: true,

@@ -38,7 +38,7 @@ export {
   Translator,
   utcOffset,
 } from "./i18n.ts";
-export { logoWidth, mothxLogo, renderHeader } from "./header.ts";
+export { logoWidth, opensacLogo, renderHeader } from "./header.ts";
 export {
   type AgentTab,
   type AgentTabState,
@@ -68,6 +68,14 @@ export {
   renderAgentActivity,
   truncatePlain,
 } from "./activity.ts";
+export {
+  ActivityManager,
+  formatElapsed,
+  getActivityManager,
+  getToolDisplayName,
+  isParentTool,
+  resetActivityManager,
+} from "./activity_manager.ts";
 export { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
 export {
   stripANSI,

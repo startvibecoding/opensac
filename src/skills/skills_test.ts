@@ -231,8 +231,8 @@ Deno.test("load applies global disabled skills", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const configDir = path.join(tmp, "config");
   Deno.mkdirSync(configDir, { recursive: true });
-  const prev = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", configDir);
+  const prev = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", configDir);
   try {
     const dir = path.join(tmp, "skills");
     writeSkill(dir, "keep", "# Keep\n");
@@ -252,8 +252,8 @@ Deno.test("load applies global disabled skills", () => {
     m.setDisabledSkills([]);
     assert(m.get("drop"));
   } finally {
-    if (prev === undefined) Deno.env.delete("MOTHX_DIR");
-    else Deno.env.set("MOTHX_DIR", prev);
+    if (prev === undefined) Deno.env.delete("OPENSAC_DIR");
+    else Deno.env.set("OPENSAC_DIR", prev);
   }
 });
 

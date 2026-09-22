@@ -87,7 +87,7 @@ interface Fixture {
 }
 
 function newFixture(): Fixture {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-prompt-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-prompt-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
   const workDir = path.join(root, "work");
@@ -144,7 +144,7 @@ async function waitForResponse(
 }
 
 Deno.test("esm steering injects a changed objective exactly once", () => {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-esm-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-esm-" });
   const settings = { sessionDir: root } as unknown as Settings;
   const store = new ESMStore(root);
   store.create("sess-esm", "finish the ACP objective");
@@ -162,7 +162,7 @@ Deno.test("esm steering injects a changed objective exactly once", () => {
 
 Deno.test("esm steering absent without settings or session id", () => {
   assertStrictEquals(esmSteeringMessages(null, "sess"), undefined);
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-esm-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-esm-" });
   assertStrictEquals(
     esmSteeringMessages({ sessionDir: root } as unknown as Settings, ""),
     undefined,
@@ -180,7 +180,7 @@ Deno.test("requestQuestion resolves a selected option", async () => {
   );
   const notification = notificationsOf(
     sink.toString(),
-    "_mothx/request_question",
+    "_opensac/request_question",
   )[0];
   assert(notification !== undefined, "no question request emitted");
   const id = notification.id as string;
@@ -199,7 +199,7 @@ Deno.test("requestQuestion returns empty for a non-option answer", async () => {
   );
   const notification = notificationsOf(
     sink.toString(),
-    "_mothx/request_question",
+    "_opensac/request_question",
   )[0];
   server.deliverResponse(
     JSON.stringify(notification.id),
@@ -220,7 +220,7 @@ Deno.test("$/cancel_request releases a pending question as cancelled", async () 
   );
   const notification = notificationsOf(
     sink.toString(),
-    "_mothx/request_question",
+    "_opensac/request_question",
   )[0];
   server.handleCancelRequest(
     rpc(9, "$/cancel_request", { requestId: notification.id }),

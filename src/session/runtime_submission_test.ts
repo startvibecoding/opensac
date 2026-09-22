@@ -26,7 +26,7 @@ function runInput(
 }
 
 Deno.test("runtime submission reserve and lookup", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     writeRootDatabase(
       sessionDir,

@@ -2,7 +2,7 @@
 // AgentFactory wiring cases). The concurrency case is omitted: Deno is
 // single-threaded, so the manager's map updates are already atomic.
 //
-// The tests isolated under a temp MOTHX_DIR so default-session creation never
+// The tests isolated under a temp OPENSAC_DIR so default-session creation never
 // touches the developer's real config directory.
 
 import { assert, assertEquals, assertFalse, assertThrows } from "@std/assert";
@@ -24,8 +24,8 @@ import { MemberDefRegistry, newMemberDefRegistry } from "./memberdef.ts";
 import { newMemberMailbox } from "./mailbox.ts";
 
 Deno.env.set(
-  "MOTHX_DIR",
-  Deno.makeTempDirSync({ prefix: "mothx-agent-manager-" }),
+  "OPENSAC_DIR",
+  Deno.makeTempDirSync({ prefix: "opensac-agent-manager-" }),
 );
 
 function model(id: string, name: string, provider: string): Model {

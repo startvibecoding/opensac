@@ -84,7 +84,7 @@ function sessionEventParams(
 ): Record<string, unknown>[] {
   const matches: Record<string, unknown>[] = [];
   for (const message of messages) {
-    if (message.method !== "_mothx/session_event") continue;
+    if (message.method !== "_opensac/session_event") continue;
     const params = message.params as Record<string, unknown> | undefined;
     if (params?.event === event) matches.push(params);
   }
@@ -246,7 +246,7 @@ Deno.test("plan update uses the standard plan variant", () => {
   assertEquals(entry.status, "in_progress");
 });
 
-Deno.test("mothx status uses an extension notification", () => {
+Deno.test("opensac status uses an extension notification", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -254,10 +254,10 @@ Deno.test("mothx status uses an extension notification", () => {
     statusMessage: "working",
   });
   const message = parseMessages(output.toString())[0];
-  assertEquals(message.method, "_mothx/session_event");
+  assertEquals(message.method, "_opensac/session_event");
 });
 
-Deno.test("mothx retry uses a structured extension notification", () => {
+Deno.test("opensac retry uses a structured extension notification", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -398,7 +398,7 @@ Deno.test("usage event emits a cumulative usage update", () => {
   assertEquals(cost.currency, "USD");
   assertEquals(cost.amount, 0.00002);
   let meta = (update._meta as Record<string, Record<string, number>>)[
-    "mothx.dev"
+    "opensac.dev"
   ];
   assertEquals(meta.cacheRead, 40);
   assertEquals(meta.cacheWrite, 8);
@@ -422,14 +422,15 @@ Deno.test("usage event emits a cumulative usage update", () => {
     },
   });
   update = lastUpdate(output.toString());
-  meta = (update._meta as Record<string, Record<string, number>>)["mothx.dev"];
+  meta =
+    (update._meta as Record<string, Record<string, number>>)["opensac.dev"];
   assertEquals(meta.cacheRead, 100);
   assertEquals(meta.cacheWrite, 8);
   assertEquals(meta.totalInputTokens, 122);
 });
 
 Deno.test("persisted session usage shares the usage-update baseline", () => {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-usage-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-usage-" });
   const sessionDir = `${root}/sessions`;
   Deno.mkdirSync(sessionDir, { recursive: true });
   const mgr = createSession({
@@ -492,7 +493,7 @@ Deno.test("persisted session usage shares the usage-update baseline", () => {
   });
   const reloaded = lastUpdate(output.toString());
   const meta = (reloaded._meta as Record<string, Record<string, number>>)[
-    "mothx.dev"
+    "opensac.dev"
   ];
   assertEquals(meta.totalInputTokens, 128);
   assertEquals(meta.cacheRead, 100);

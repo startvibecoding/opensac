@@ -60,8 +60,8 @@ function inputTestSession(): {
   workDir: string;
   manager: ReturnType<typeof newManager>;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-rt-root-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "mothx-rt-work-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-rt-root-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "opensac-rt-work-" });
   const manager = newManager(workDir, root);
   manager.init();
   return { root, workDir, manager };

@@ -67,7 +67,7 @@ function makeRun(
 }
 
 Deno.test("ReadSessionExecutionFactsUsesCanonicalRunAndLease", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-facts-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-facts-" });
   try {
     const sessionId = "execution-facts";
     makeSession(sessionDir, sessionId);
@@ -104,7 +104,7 @@ Deno.test("ReadSessionExecutionFactsUsesCanonicalRunAndLease", () => {
 });
 
 Deno.test("ReadSessionExecutionFactsPreservesReleasedLeaseTombstone", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-facts-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-facts-" });
   try {
     const sessionId = "execution-facts-released";
     makeSession(sessionDir, sessionId);
@@ -122,7 +122,7 @@ Deno.test("ReadSessionExecutionFactsPreservesReleasedLeaseTombstone", () => {
 });
 
 Deno.test("ReadSessionExecutionFactsReportsMissingSession", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-facts-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-facts-" });
   try {
     makeSession(sessionDir, "execution-facts-existing");
     const facts = readSessionExecutionFacts(

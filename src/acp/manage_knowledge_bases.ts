@@ -1,5 +1,5 @@
 // Ported from internal/acp/manage_knowledge_bases.go (the knowledge-base
-// family of the `mothx/manage/*` Phase 3 management plane) together with the
+// family of the `opensac/manage/*` Phase 3 management plane) together with the
 // knowledge-base schedule projection from manage.go (`syncKnowledgeBaseSchedule`
 // and the in-process cron runtime it lazily starts).
 //
@@ -12,7 +12,7 @@
 // `context.Background()` maps to an `undefined` `AbortSignal`; Go's
 // `sync.Mutex` guards drop because Deno is single-threaded; Go's `(value,
 // error)` pairs throw typed `Error`s; and `os.Executable()` maps to the
-// current-process path from `Deno.execPath()` with the Go `mothx` fallback.
+// current-process path from `Deno.execPath()` with the Go `opensac` fallback.
 
 import { acpStructuredRPCError } from "./projection.ts";
 import type { ACPRPCRequest } from "./wire.ts";
@@ -196,7 +196,7 @@ function knowledgeBaseMCPCommand(): string {
   } catch {
     // fall through to the default
   }
-  return "mothx";
+  return "opensac";
 }
 
 // ─── schedule projection ─────────────────────────────────────────────────────
@@ -404,9 +404,9 @@ export function syncAllKnowledgeBaseSchedulesWithStore(
 
 const defaultManageCronIntervalMs = 30_000;
 
-/** Resolves the ACP in-process scheduler tick (MOTHX_ACP_CRON_INTERVAL). */
+/** Resolves the ACP in-process scheduler tick (OPENSAC_ACP_CRON_INTERVAL). */
 export function manageCronInterval(): number {
-  const value = (Deno.env.get("MOTHX_ACP_CRON_INTERVAL") ?? "").trim();
+  const value = (Deno.env.get("OPENSAC_ACP_CRON_INTERVAL") ?? "").trim();
   if (value !== "") {
     const parsed = parseGoDurationMs(value);
     if (parsed !== null && parsed > 0) return parsed;
@@ -509,7 +509,7 @@ function observeManageCronJob(
     status: runErr === null ? "success" : "failed",
   };
   if (job.sessionId) params.sessionId = job.sessionId;
-  s.notifyExtension("_mothx/session_event", params);
+  s.notifyExtension("_opensac/session_event", params);
 }
 
 // ─── cron management handlers (manage.go §6.1) ───────────────────────────────

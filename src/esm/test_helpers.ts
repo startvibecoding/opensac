@@ -41,7 +41,7 @@ export function makeObjective(overrides: Partial<Objective> = {}): Objective {
 }
 
 /** Creates a fresh Store backed by a unique temp session dir. */
-export function makeStore(prefix = "mothx-esm-"): {
+export function makeStore(prefix = "opensac-esm-"): {
   store: Store;
   sessionID: string;
   sessionDir: string;

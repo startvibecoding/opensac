@@ -26,8 +26,8 @@ import { openRootDB } from "./root_db.ts";
 import { writeRootDatabase } from "./database.ts";
 
 Deno.test("knowledge base uses dedicated SQLite database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "mothx-root-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Dedicated",
@@ -116,8 +116,8 @@ Deno.test("knowledge base uses dedicated SQLite database", () => {
 });
 
 Deno.test("knowledge snapshot retention keeps only active graph", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "mothx-root-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Retention",
@@ -159,8 +159,8 @@ Deno.test("knowledge snapshot retention keeps only active graph", () => {
 });
 
 Deno.test("knowledge base update invalidates and prunes graph", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "mothx-root-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Reconfigure",
@@ -207,8 +207,8 @@ Deno.test("knowledge base update invalidates and prunes graph", () => {
 });
 
 Deno.test("knowledge base migrates legacy session store into dedicated database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "mothx-root-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const baseID = "legacybase";
     const baseRecord = {
@@ -330,8 +330,8 @@ Deno.test("knowledge base migrates legacy session store into dedicated database"
 });
 
 Deno.test("knowledge graph reuse plan clones only unchanged file subgraph", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "mothx-root-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Incremental",

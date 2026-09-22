@@ -1,6 +1,6 @@
 // Ported from internal/browser/browser.go.
 //
-// The mothx `browser` tool: it controls a Chromium-family browser through the
+// The opensac `browser` tool: it controls a Chromium-family browser through the
 // ported vibe-browser SDK. Registration helpers mirror the Go package.
 //
 // Deviations from Go: `context.Context` maps to the `ToolContext` `AbortSignal`;

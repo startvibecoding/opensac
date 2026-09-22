@@ -306,7 +306,7 @@ async function handleSkillHubTargets(
   );
   const runtime = skillHubRuntime(server);
   const labels = [
-    "MothX project skills",
+    "OpenSAC project skills",
     "Project skills",
     "Agents skills",
     "Generic project skills",

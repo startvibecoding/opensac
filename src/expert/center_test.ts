@@ -68,7 +68,7 @@ function withEnv(key: string, value: string, fn: () => void): void {
 
 Deno.test("center list shadow and sort", () => {
   withTempDir((globalRoot) => {
-    withEnv("MOTHX_DIR", globalRoot, () => {
+    withEnv("OPENSAC_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
         const globalDir = path.join(globalRoot, "experts");
         const projectDir = path.join(projectRoot, ".opensac", "experts");
@@ -158,7 +158,7 @@ Deno.test("center list shadow and sort", () => {
 
 Deno.test("center list missing layers tolerated", () => {
   withTempDir((globalRoot) => {
-    withEnv("MOTHX_DIR", globalRoot, () => {
+    withEnv("OPENSAC_DIR", globalRoot, () => {
       const list = new Center().list();
       assertEquals(list.length, 2);
       assertEquals(list[0].name, "frontend-developer");
@@ -184,7 +184,7 @@ Deno.test("center list missing layers tolerated", () => {
 
 Deno.test("center list invalid manifest flagged", () => {
   withTempDir((globalRoot) => {
-    withEnv("MOTHX_DIR", globalRoot, () => {
+    withEnv("OPENSAC_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
         const projectDir = path.join(projectRoot, ".opensac", "experts");
 
@@ -225,7 +225,7 @@ Deno.test("center list invalid manifest flagged", () => {
 
 Deno.test("center get", () => {
   withTempDir((globalRoot) => {
-    withEnv("MOTHX_DIR", globalRoot, () => {
+    withEnv("OPENSAC_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
         const c = new Center(projectRoot);
         const b = c.get("software-company");

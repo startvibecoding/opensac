@@ -101,9 +101,9 @@ function channelVersion(): string {
 function botAgent(): string {
   const version = semverComponents(channelVersion());
   if (version !== null) {
-    return `MothX/${version[0]}.${version[1]}.${version[2]}`;
+    return `OpenSAC/${version[0]}.${version[1]}.${version[2]}`;
   }
-  return "MothX";
+  return "OpenSAC";
 }
 
 function iLinkClientVersion(): number {

@@ -134,8 +134,8 @@ Deno.test("dispatch loop gates on initialize and validates framing", async () =>
     "\n", // blank line, ignored
     jsonLine({ jsonrpc: "1.0", id: 2, method: "initialize" }), // wrong version
     jsonLine({ jsonrpc: "2.0", id: 3, method: "initialize" }),
-    jsonLine({ jsonrpc: "2.0", id: 4, method: "mothx/manage/bogus" }),
-    jsonLine({ jsonrpc: "2.0", id: 5, method: "mothx/manage/env/get" }),
+    jsonLine({ jsonrpc: "2.0", id: 4, method: "opensac/manage/bogus" }),
+    jsonLine({ jsonrpc: "2.0", id: 5, method: "opensac/manage/env/get" }),
     "{not json\n", // parse error
     jsonLine({ jsonrpc: "2.0", id: 6, method: "no/such/method" }),
     jsonLine({ jsonrpc: "2.0", id: true, method: "initialize" }), // invalid id
@@ -224,7 +224,7 @@ Deno.test("attachment fetch requires sessionId and attachmentId", async () => {
     jsonLine({
       jsonrpc: "2.0",
       id: 2,
-      method: "mothx/attachment/fetch",
+      method: "opensac/attachment/fetch",
       params: { sessionId: "s1" },
     }),
   ]);
@@ -254,7 +254,7 @@ Deno.test("attachment fetch projects unavailable without settings", async () => 
     jsonLine({
       jsonrpc: "2.0",
       id: 2,
-      method: "mothx/attachment/fetch",
+      method: "opensac/attachment/fetch",
       params: { sessionId: "s1", attachmentId: "a1" },
     }),
   ]);
@@ -271,13 +271,13 @@ Deno.test("attachment fetch projects unavailable without settings", async () => 
   assertEquals(data["code"], "attachment_unavailable");
 });
 
-Deno.test("runACP writes MOTHX_ACP_ERROR for missing provider and exits", async () => {
-  // Isolated MOTHX_DIR with default (unconfigured) settings: the startup
+Deno.test("runACP writes OPENSAC_ACP_ERROR for missing provider and exits", async () => {
+  // Isolated OPENSAC_DIR with default (unconfigured) settings: the startup
   // preflight must classify and print the machine-readable error line, then
   // reject.
   const configDir = Deno.makeTempDirSync();
-  const previousDir = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", configDir);
+  const previousDir = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", configDir);
   const settings = defaultSettings();
   // settings.json serialization drops empty strings (putNonEmpty), and the
   // product default ships a configured provider, so force the unconfigured
@@ -306,12 +306,12 @@ Deno.test("runACP writes MOTHX_ACP_ERROR for missing provider and exits", async 
   }
   assert(threw, "runACP must reject when no provider/model is configured");
   assertEquals(sink.toString(), "", "no JSON-RPC output before initialize");
-  if (previousDir === undefined) Deno.env.delete("MOTHX_DIR");
-  else Deno.env.set("MOTHX_DIR", previousDir);
+  if (previousDir === undefined) Deno.env.delete("OPENSAC_DIR");
+  else Deno.env.set("OPENSAC_DIR", previousDir);
 });
 
 Deno.test("runACP reads EOF immediately with a configured-but-unused provider path", () => {
-  // The config path is validated under MOTHX_DIR; an empty stream with an
+  // The config path is validated under OPENSAC_DIR; an empty stream with an
   // unconfigured provider would fail preflight, so this test only asserts the
   // RunOptions surface type compiles and helper paths exist.
   const configDir = Deno.makeTempDirSync();

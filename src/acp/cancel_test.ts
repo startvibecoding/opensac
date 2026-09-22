@@ -112,7 +112,7 @@ Deno.test("session/cancel aborts the session's cancel handle", () => {
 });
 
 Deno.test("acquirePromptAdmission fences concurrent local runs", async () => {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-admission-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-admission-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
   createSession({ workDir: root, sessionDir, id: "session-1" });

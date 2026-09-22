@@ -15,7 +15,7 @@ Deno.test("MuxServesExpvarsWithSQLiteStats", async () => {
   const resp = newHandler()(req);
   assertEquals(resp.status, 200);
   const vars = await resp.json();
-  assertEquals(typeof vars["mothx_sqlite"], "object");
+  assertEquals(typeof vars["opensac_sqlite"], "object");
 });
 
 Deno.test("ListenAddrDefaultsToLocalhost", () => {

@@ -11,7 +11,7 @@ import { openExistingSessionDBReadOnly } from "./root_db.ts";
 /**
  * One session lease still recorded as active in a session database. It names
  * the process that holds it, so destructive maintenance can refuse while
- * another mothx process may still be executing a run there.
+ * another opensac process may still be executing a run there.
  */
 export interface ActiveRuntimeLease {
   sessionId: string;

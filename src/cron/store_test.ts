@@ -11,7 +11,7 @@ import { newSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
 
 function newStore(): SQLiteCronStore {
   return newSQLiteCronStore(
-    Deno.makeTempDirSync({ prefix: "mothx-cron-store-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-cron-store-" }),
   );
 }
 
@@ -139,7 +139,7 @@ Deno.test("SQLiteCronStoreClaimDueReclaimsStaleRunning", () => {
 });
 
 Deno.test("SQLiteCronStorePersistence", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-cron-persist-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-cron-persist-" });
   const store1 = newSQLiteCronStore(dir);
   store1.create({ id: "j1", name: "persistent", prompt: "test" });
 

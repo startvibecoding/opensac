@@ -62,7 +62,7 @@ function makeRun(overrides: Partial<DurableRun>): DurableRun {
 Deno.test(
   "acquireExecutionAdmissionRecoversOrphanBeforeReturningGuard",
   async () => {
-    const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-admission-" });
+    const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
     try {
       initRecoveryTestSession(sessionDir, "admission-recovery");
       new RunStore(sessionDir).create(
@@ -97,7 +97,7 @@ Deno.test(
 );
 
 Deno.test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-admission-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
   try {
     initRecoveryTestSession(sessionDir, "admission-owned");
     const owner = sessionAcquireExecutionAdmission(
@@ -144,7 +144,7 @@ Deno.test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
 });
 
 Deno.test("acquireExecutionAdmissionRetainsVerifiedRemoteRun", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-admission-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
   try {
     initRecoveryTestSession(sessionDir, "admission-remote");
     const now = new Date();

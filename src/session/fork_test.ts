@@ -114,7 +114,7 @@ function startTurn(
 }
 
 Deno.test("fork session and message boundary", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fork-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "source");
     startTurn(sessionDir, "source", "turn-1");
@@ -164,7 +164,7 @@ Deno.test("fork session and message boundary", () => {
 });
 
 Deno.test("fork rejects an open turn and independent sessions stay concurrent", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fork-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "a");
     makeSession(sessionDir, "b");
@@ -194,7 +194,7 @@ Deno.test("fork rejects an open turn and independent sessions stay concurrent", 
 });
 
 Deno.test("fork rejects an orphaned pending decision", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fork-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "pending-decision");
     saveSessionRunEvent(sessionDir, {
@@ -226,7 +226,7 @@ Deno.test("fork rejects an orphaned pending decision", () => {
 });
 
 Deno.test("fork allows an orphaned cancelled decision", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fork-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "cancelled-decision");
     saveSessionRunEvent(sessionDir, {
@@ -277,7 +277,7 @@ Deno.test("fork allows an orphaned cancelled decision", () => {
 });
 
 Deno.test("fork uses a legacy completed run boundary", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fork-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "legacy-fork");
     const started = new Date(Date.now() - 1000);
@@ -344,7 +344,7 @@ Deno.test("fork uses a legacy completed run boundary", () => {
 });
 
 Deno.test("execution admission atomically starts a conversation turn", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fork-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "atomic-turn");
     const [release, ok] = tryLockRuntime(sessionDir, "atomic-turn");

@@ -18,13 +18,13 @@ import {
 
 function withConfigDir(fn: (tmp: string) => void): void {
   const tmp = Deno.makeTempDirSync({ prefix: "env-" });
-  const prevDir = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", path.join(tmp, "config"));
+  const prevDir = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", path.join(tmp, "config"));
   try {
     fn(tmp);
   } finally {
-    if (prevDir === undefined) Deno.env.delete("MOTHX_DIR");
-    else Deno.env.set("MOTHX_DIR", prevDir);
+    if (prevDir === undefined) Deno.env.delete("OPENSAC_DIR");
+    else Deno.env.set("OPENSAC_DIR", prevDir);
   }
 }
 

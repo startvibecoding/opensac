@@ -15,7 +15,7 @@ import { Level } from "./sandbox.ts";
 /** Default tmpfs size used when no policy value is supplied. */
 const DEFAULT_TMP_SIZE = "100000000";
 
-/** Describes the flags and runtime features required by MothX. */
+/** Describes the flags and runtime features required by OpenSAC. */
 export interface BwrapCapabilities {
   unshareUser: boolean;
   unsharePid: boolean;
@@ -32,7 +32,7 @@ export interface BwrapCapabilities {
   hostname: boolean;
 }
 
-/** Reports whether every capability MothX relies on is present. */
+/** Reports whether every capability OpenSAC relies on is present. */
 export function bwrapCapabilitiesComplete(caps: BwrapCapabilities): boolean {
   return caps.unshareUser && caps.unsharePid && caps.unshareIpc &&
     caps.unshareUts && caps.newSession && caps.dieWithParent &&

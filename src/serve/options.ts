@@ -6,7 +6,7 @@
 import * as path from "@std/path";
 import { normalizeServeConfig, type ServeConfig } from "./config.ts";
 
-/** CLI/process options for `mothx serve` (ports serve.RunOptions). */
+/** CLI/process options for `opensac serve` (ports serve.RunOptions). */
 export interface RunOptions {
   configPath: string;
   port: string;

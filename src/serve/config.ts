@@ -949,7 +949,7 @@ export function memoryEnabled(): boolean {
 
 // --- placeholder auth token (ports config.go's template-token helpers) --------
 
-/** The API token written by `mothx serve init-config` (Go PlaceholderAuthToken). */
+/** The API token written by `opensac serve init-config` (Go PlaceholderAuthToken). */
 export const PLACEHOLDER_AUTH_TOKEN =
   "sk-change-me-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 

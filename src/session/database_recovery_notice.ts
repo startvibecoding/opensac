@@ -2,7 +2,7 @@
 //
 // A database that src/db had to back up and rebuild after a schema migration
 // failure is announced over the same advisory UDP bus as runtime lease changes,
-// so every other mothx process on this host that shares the session directory
+// so every other opensac process on this host that shares the session directory
 // learns that the file it may still hold open was replaced. The notice carries
 // no content: receivers only retire their cached connection, warn the user, and
 // reopen the rebuilt file on the next access.
@@ -91,7 +91,7 @@ export function handlePeerDatabaseRebuilt(
     closeDatabase(dbPath);
   } catch (err) {
     console.error(
-      `[db] another MothX process rebuilt ${dbPath}; closing the cached connection: ${err}`,
+      `[db] another OpenSAC process rebuilt ${dbPath}; closing the cached connection: ${err}`,
     );
   }
   peerDatabaseRebuilds.push(recovery);

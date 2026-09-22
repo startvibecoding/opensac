@@ -6,7 +6,7 @@
 
 import { displayWidth, truncateDisplay } from "./formatters.ts";
 
-export const mothxLogo = `██   ██  ███  ████ █  █ █  █
+export const opensacLogo = `██   ██  ███  ████ █  █ █  █
 ███ ███ █   █  ██  █  █  ██
 █ ███ █ █   █  ██  ████  ██
 █  █  █ █   █  ██  █  █ █  █
@@ -20,7 +20,7 @@ const reset = "\u001B[0m";
 
 /** Width in display cells of the widest logo line. */
 export function logoWidth(): number {
-  return Math.max(...mothxLogo.split("\n").map(displayWidth));
+  return Math.max(...opensacLogo.split("\n").map(displayWidth));
 }
 
 /** Wraps each line in a rounded border sized to the widest line. */
@@ -52,7 +52,7 @@ export function renderHeader(
 ): string {
   const logoW = logoWidth();
 
-  const line1 = `${bold}MothX (${version})${reset}`;
+  const line1 = `${bold}OpenSAC (${version})${reset}`;
   const line2 = `${providerName} | ${modelName}`;
   const line3 = cwd;
   const infoContent = [line1, line2, line3, renameNotice].join("\n");
@@ -83,7 +83,7 @@ export function renderHeader(
 
   const panelLines = infoPanel.split("\n");
   const panelH = panelLines.length;
-  const logoLines = mothxLogo.split("\n");
+  const logoLines = opensacLogo.split("\n");
   const logoPad = Math.max(0, Math.floor((panelH - logoLines.length) / 2));
   const logoBlock: string[] = [];
   for (let i = 0; i < panelH; i++) {

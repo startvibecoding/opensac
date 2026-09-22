@@ -255,7 +255,7 @@ export function resolveWebUIDir(dir: string): string {
     for (
       const candidate of [
         join(exeDir, dir),
-        join(exeDir, "..", "share", "mothx", dir),
+        join(exeDir, "..", "share", "opensac", dir),
       ]
     ) {
       if (hasUIIndex(candidate)) return candidate;

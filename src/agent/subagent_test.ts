@@ -17,8 +17,8 @@ import {
 } from "./subagent.ts";
 
 Deno.env.set(
-  "MOTHX_DIR",
-  Deno.makeTempDirSync({ prefix: "mothx-agent-subagent-" }),
+  "OPENSAC_DIR",
+  Deno.makeTempDirSync({ prefix: "opensac-agent-subagent-" }),
 );
 
 function parse(text: string): Record<string, unknown> {
@@ -57,7 +57,7 @@ Deno.test("SubAgentToolsDescriptions", () => {
 Deno.test("SubAgentToolNamesMatchRegisteredTools", () => {
   const [, mgr] = newTestFactoryAndManager();
   const registry = newRegistry(
-    Deno.makeTempDirSync({ prefix: "mothx-agent-registry-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-agent-registry-" }),
     newNoneSandbox(),
   );
   registerSubAgentTools(registry, mgr);

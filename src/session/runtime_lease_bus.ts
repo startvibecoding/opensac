@@ -1,6 +1,6 @@
 // Ported from internal/session/runtime_lease_bus.go
 //
-// A best-effort, host-only UDP wake-up bus so every mothx process on this host
+// A best-effort, host-only UDP wake-up bus so every opensac process on this host
 // that shares a session directory learns when a Session lease is acquired,
 // released, or lost, or when a database was rebuilt. SQLite leases and durable
 // Run rows remain the sole authority: receivers always re-read the database
@@ -184,7 +184,7 @@ export function runtimeLeaseBusAddresses(): {
   listenPort: number;
   broadcast: string;
 } {
-  const envPort = (Deno.env.get("MOTHX_RUNTIME_BUS_PORT") ?? "").trim();
+  const envPort = (Deno.env.get("OPENSAC_RUNTIME_BUS_PORT") ?? "").trim();
   const portText = envPort === "" ? runtimeLeaseBusDefaultPort : envPort;
   const port = Number.parseInt(portText, 10);
   // A wildcard bind is required to receive the directed broadcast. Every

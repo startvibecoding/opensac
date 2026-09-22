@@ -37,7 +37,7 @@ import { saveSessionCapabilityEvent } from "../../session/session_events.ts";
 import { getSessionMetadata } from "../../session/projects.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-read-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-read-" });
 }
 
 function settingsFor(dir: string): Settings {

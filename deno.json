@@ -1,11 +1,11 @@
 {
-  "name": "mothx",
+  "name": "opensac",
   "version": "0.1.0",
   "exports": "./src/main.ts",
   "tasks": {
     "run": "deno task build && ./bin/opensac",
     "start": "deno run -A src/main.ts",
-    "build": "deno compile -A --include src/platform/busybox_assets --include src/context/tokenizerdata --include src/stats/dashboard.html --include src/stats/mothx.png --include src/stats/mothx-small.ico --include src/skills/builtin -o bin/opensac src/main.ts",
+    "build": "deno compile -A --include src/platform/busybox_assets --include src/context/tokenizerdata --include src/stats/dashboard.html --include src/stats/opensac.png --include src/stats/opensac-small.ico --include src/skills/builtin -o bin/opensac src/main.ts",
     "serve": "deno task ui-build && deno task build && ./bin/opensac serve",
     "install": "deno install -g -A -n opensac src/main.ts",
     "test": "deno test -A",

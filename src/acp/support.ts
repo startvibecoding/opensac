@@ -128,7 +128,7 @@ export function isStartupError(error: unknown): boolean {
 
 /**
  * Writes the machine-readable startup line to the given sink (stderr by
- * default), mirroring `MOTHX_ACP_ERROR {json}`.
+ * default), mirroring `OPENSAC_ACP_ERROR {json}`.
  */
 export function writeACPStartupError(
   error: unknown,
@@ -142,7 +142,7 @@ export function writeACPStartupError(
     message: startup.message,
   };
   if (startup.fix !== "") payload.fix = startup.fix;
-  const line = `MOTHX_ACP_ERROR ${JSON.stringify(payload)}\n`;
+  const line = `OPENSAC_ACP_ERROR ${JSON.stringify(payload)}\n`;
   if (write !== undefined) {
     write(line);
     return;

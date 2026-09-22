@@ -1,5 +1,5 @@
 // Translated from internal/acp/manage_skillhub_test.go and the SkillHub catalog
-// case of acp_manage_test.go. These exercise the `mothx/manage/skillhub/*`
+// case of acp_manage_test.go. These exercise the `opensac/manage/skillhub/*`
 // family ported into src/acp/manage_skillhub.ts against an in-memory ACP server
 // fixture, mirroring the Go `newManageFixtureServer`.
 
@@ -116,7 +116,7 @@ function findSkillHubMarket(
 
 Deno.test("manage skillhub get is token-free", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = defaultSettings();
     settings.skillHub!.markets = [
       {
@@ -140,7 +140,7 @@ Deno.test("manage skillhub get is token-free", () => {
     const srv = newManageFixtureServer(output, configDir);
 
     const result = manageResult(
-      callManage(srv, output, 1, "mothx/manage/skillhub/get", {}),
+      callManage(srv, output, 1, "opensac/manage/skillhub/get", {}),
     );
     assertEquals(result["defaultMarket"], "skillhub.cn");
     assertEquals(result["defaultInstallScope"], "project");
@@ -163,7 +163,7 @@ Deno.test("manage skillhub get is token-free", () => {
 
 Deno.test("manage skillhub patch round trip", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = defaultSettings();
     settings.skillHub!.markets = [{
       id: "skillhub.cn",
@@ -200,7 +200,7 @@ Deno.test("manage skillhub patch round trip", () => {
       ],
     };
     const result = manageResult(
-      callManage(srv, output, 1, "mothx/manage/skillhub/patch", { patch }),
+      callManage(srv, output, 1, "opensac/manage/skillhub/patch", { patch }),
     );
     assertEquals(result["defaultMarket"], "clawhub.ai");
     assertEquals(result["defaultInstallScope"], "global");
@@ -219,7 +219,7 @@ Deno.test("manage skillhub patch round trip", () => {
 
 Deno.test("manage skillhub patch clears token", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = defaultSettings();
     settings.skillHub!.markets = [{
       id: "skillhub.cn",
@@ -240,7 +240,7 @@ Deno.test("manage skillhub patch clears token", () => {
       }],
     };
     manageResult(
-      callManage(srv, output, 1, "mothx/manage/skillhub/patch", { patch }),
+      callManage(srv, output, 1, "opensac/manage/skillhub/patch", { patch }),
     );
     const raw = readManageRawFile();
     const skillHub = raw["skillHub"] as Record<string, unknown>;
@@ -298,7 +298,7 @@ Deno.test("manage skillhub patch validation", () => {
   ];
   for (const tc of cases) {
     const configDir = Deno.makeTempDirSync();
-    withEnv("MOTHX_DIR", configDir, () => {
+    withEnv("OPENSAC_DIR", configDir, () => {
       saveGlobalSettings(defaultSettings());
       const output = new SyncBuffer();
       const srv = newManageFixtureServer(output, configDir);
@@ -306,7 +306,7 @@ Deno.test("manage skillhub patch validation", () => {
         srv,
         output,
         1,
-        "mothx/manage/skillhub/patch",
+        "opensac/manage/skillhub/patch",
         {
           patch: tc.patch,
         },
@@ -336,7 +336,7 @@ Deno.test("manage skillhub redaction masks market tokens", () => {
 
 Deno.test("manage skillhub preserves unknown fields", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settingsPath = globalSettingsPath();
     Deno.writeTextFileSync(
       settingsPath,
@@ -364,7 +364,7 @@ Deno.test("manage skillhub preserves unknown fields", () => {
       }],
     };
     manageResult(
-      callManage(srv, output, 1, "mothx/manage/skillhub/patch", { patch }),
+      callManage(srv, output, 1, "opensac/manage/skillhub/patch", { patch }),
     );
 
     const raw = readManageRawFile();
@@ -392,7 +392,7 @@ Deno.test("manage skillhub default market falls back to product default", () => 
 Deno.test("manage skillhub catalog projects runtime-owned targets", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = defaultSettings();
     settings.skillHub!.defaultMarket = "skillhub.cn";
     settings.skillHub!.defaultInstallScope = "project";
@@ -405,7 +405,7 @@ Deno.test("manage skillhub catalog projects runtime-owned targets", () => {
     srv.sessions.set(rt.id, rt);
 
     const targets = manageResult(
-      callManage(srv, output, 1, "mothx/manage/skillhub/targets", {
+      callManage(srv, output, 1, "opensac/manage/skillhub/targets", {
         sessionId: rt.id,
       }),
     );
@@ -416,7 +416,7 @@ Deno.test("manage skillhub catalog projects runtime-owned targets", () => {
     assert(firstPath.startsWith(workDir + path.SEPARATOR));
 
     const markets = manageResult(
-      callManage(srv, output, 2, "mothx/manage/skillhub/markets", {
+      callManage(srv, output, 2, "opensac/manage/skillhub/markets", {
         sessionId: rt.id,
       }),
     );
@@ -428,7 +428,7 @@ Deno.test("manage skillhub catalog projects runtime-owned targets", () => {
       srv,
       output,
       3,
-      "mothx/manage/skillhub/targets",
+      "opensac/manage/skillhub/targets",
       {},
     );
     assertEquals(manageError(message).code, "skillhub_invalid_request");
@@ -437,7 +437,7 @@ Deno.test("manage skillhub catalog projects runtime-owned targets", () => {
       srv,
       output,
       4,
-      "mothx/manage/skillhub/install",
+      "opensac/manage/skillhub/install",
       {
         sessionId: rt.id,
         market: "skillhub.cn",

@@ -6,6 +6,12 @@
 //   view (inline mode, never the alternate screen).
 // - The header, tab bar, and streaming rows are plain strings produced by the
 //   migrated formatters; this component lays them out.
+//
+// Enhanced with TurnCard-style display inspired by moark:
+// - Activity timeline showing tool executions and thinking
+// - Collapsible tool results
+// - Response text with improved formatting
+// - Status indicators and timing
 
 import React from "react";
 import type { ReactElement } from "react";
@@ -14,6 +20,8 @@ import { AppController } from "./app_controller.ts";
 import { renderHeader } from "./header.ts";
 import { displayWidth } from "./formatters.ts";
 import type { TranscriptStore } from "./transcript_store.ts";
+import { CompactThinkingRow } from "./thinking_display.tsx";
+import { CompactToolRow } from "./tool_execution_display.tsx";
 
 export interface AppProps {
   /** The event-dispatch controller owning the transcript. */
@@ -53,7 +61,7 @@ function plain(s: string): string {
   return s.replace(/\u001B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\-_])/g, "");
 }
 
-/** The full-screen layout. */
+/** The full-screen layout with enhanced TurnCard display. */
 export function App({
   controller,
   header,
@@ -66,7 +74,7 @@ export function App({
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>
-          {label ?? "MothX"}
+          {label ?? "OpenSAC"}
         </Text>
         {visibleRows.map((row) => <Text key={row.id}>{row.text}</Text>)}
       </Box>
@@ -101,6 +109,11 @@ export function App({
     else streaming.push(row);
   }
 
+  // Live per-turn activity timeline (tools + thinking) tracked by the
+  // controller from the agent event stream. Running items carry live elapsed
+  // timing; completed items keep their status/result until the next turn.
+  const activities = controller.activityManager.buildTimeline();
+
   // Ink supports a single <Static>; header lines and committed transcript rows
   // share it, header first.
   const headerLines = header
@@ -126,6 +139,40 @@ export function App({
       <Static items={committedAll}>
         {(row) => renderRow(row, false)}
       </Static>
+
+      {/* Live activity timeline (running/completed tools + thinking). */}
+      {activities.length > 0 && (
+        <Box flexDirection="column" marginLeft={1} marginBottom={1}>
+          {activities.map((activity) => (
+            activity.type === "tool"
+              ? (
+                <CompactToolRow
+                  key={activity.id}
+                  toolName={activity.toolName ?? activity.type}
+                  status={activity.status as
+                    | "running"
+                    | "completed"
+                    | "error"
+                    | "interrupted"}
+                  intent={activity.intent}
+                  elapsedMs={activity.elapsedMs}
+                  width={width - 4}
+                />
+              )
+              : (
+                <CompactThinkingRow
+                  key={activity.id}
+                  content={activity.content ?? ""}
+                  isStreaming={activity.status === "running"}
+                  elapsedMs={activity.elapsedMs}
+                  translator={controller.translator}
+                  width={width - 4}
+                />
+              )
+          ))}
+        </Box>
+      )}
+
       {streaming.map((row) => renderRow(row, true))}
       {controller.shownApproval && (
         <Box flexDirection="column" borderStyle="round">

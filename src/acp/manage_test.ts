@@ -1,6 +1,6 @@
 // Translated from internal/acp/manage_env_test.go, manage_experts_test.go, and
 // the application-settings cases of acp_manage_test.go. These exercise the
-// `mothx/manage/*` families ported into src/acp/manage.ts against an
+// `opensac/manage/*` families ported into src/acp/manage.ts against an
 // in-memory ACP server fixture, mirroring the Go `newManageFixtureServer`.
 
 import {
@@ -126,7 +126,7 @@ function writeEnvFile(configDir: string, contents: string): void {
 Deno.test("manage env get never returns values", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     writeEnvFile(
@@ -135,7 +135,7 @@ Deno.test("manage env get never returns values", () => {
     );
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/env/get", {}),
+      callManage(server, output, 1, "opensac/manage/env/get", {}),
     );
     const vars = result["variables"] as Record<string, unknown>[];
     assertEquals(vars.length, 2);
@@ -150,7 +150,7 @@ Deno.test("manage env get never returns values", () => {
 Deno.test("manage env patch set/replace/unset", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     writeEnvFile(
@@ -159,7 +159,7 @@ Deno.test("manage env patch set/replace/unset", () => {
     );
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/env/patch", {
+      callManage(server, output, 1, "opensac/manage/env/patch", {
         set: [
           { name: "KEEP", value: "new" },
           { name: "ADD", value: "fresh" },
@@ -184,12 +184,12 @@ Deno.test("manage env patch set/replace/unset", () => {
 Deno.test("manage env patch preserves an empty value", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/env/patch", {
+      callManage(server, output, 1, "opensac/manage/env/patch", {
         set: [{ name: "EMPTY", value: "" }],
       }),
     );
@@ -207,14 +207,14 @@ Deno.test("manage env patch preserves an empty value", () => {
 Deno.test("manage env patch rejects invalid names", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     for (
       const name of ["", "BAD=NAME", "BAD\u0000NAME", "BAD\rNAME", "BAD\nNAME"]
     ) {
       const { code } = manageError(
-        callManage(server, output, 1, "mothx/manage/env/patch", {
+        callManage(server, output, 1, "opensac/manage/env/patch", {
           set: [{ name, value: "x" }],
         }),
       );
@@ -226,13 +226,13 @@ Deno.test("manage env patch rejects invalid names", () => {
 Deno.test("manage env patch rejects duplicates and conflicts", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
 
     assertEquals(
       manageError(
-        callManage(server, output, 1, "mothx/manage/env/patch", {
+        callManage(server, output, 1, "opensac/manage/env/patch", {
           set: [
             { name: "A", value: "1" },
             { name: "A", value: "2" },
@@ -243,7 +243,7 @@ Deno.test("manage env patch rejects duplicates and conflicts", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 2, "mothx/manage/env/patch", {
+        callManage(server, output, 2, "opensac/manage/env/patch", {
           set: [{ name: "A", value: "1" }],
           unset: ["A"],
         }),
@@ -256,12 +256,12 @@ Deno.test("manage env patch rejects duplicates and conflicts", () => {
 Deno.test("manage env patch rejects unknown fields", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     assertEquals(
       manageError(
-        callManage(server, output, 1, "mothx/manage/env/patch", {
+        callManage(server, output, 1, "opensac/manage/env/patch", {
           set: [{ name: "A", value: "1" }],
           evil: true,
         }),
@@ -274,7 +274,7 @@ Deno.test("manage env patch rejects unknown fields", () => {
 Deno.test("manage env patch rejects malformed input without writing", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     writeEnvFile(configDir, JSON.stringify({ vars: { KEEP: "old" } }));
@@ -301,7 +301,7 @@ Deno.test("manage env patch rejects malformed input without writing", () => {
     ];
     cases.forEach((tc, i) => {
       const { code } = manageError(
-        callManage(server, output, i + 1, "mothx/manage/env/patch", tc.patch),
+        callManage(server, output, i + 1, "opensac/manage/env/patch", tc.patch),
       );
       assertEquals(code, tc.want);
       assertStrictEquals(Deno.readTextFileSync(envPath), before);
@@ -312,7 +312,7 @@ Deno.test("manage env patch rejects malformed input without writing", () => {
 Deno.test("manage env get does not leak secret value or length", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     writeEnvFile(
@@ -320,7 +320,7 @@ Deno.test("manage env get does not leak secret value or length", () => {
       JSON.stringify({ vars: { SECRET: "longsecretvaluehere" } }),
     );
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/env/get", {}),
+      callManage(server, output, 1, "opensac/manage/env/get", {}),
     );
     const data = JSON.stringify(result);
     assertEquals(data.includes("longsecretvaluehere"), false);
@@ -331,11 +331,11 @@ Deno.test("manage env get does not leak secret value or length", () => {
 Deno.test("manage env patch never echoes the submitted value", () => {
   const cwd = Deno.makeTempDirSync();
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, cwd);
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/env/patch", {
+      callManage(server, output, 1, "opensac/manage/env/patch", {
         set: [{ name: "KEY", value: "supersecret" }],
       }),
     );
@@ -367,13 +367,13 @@ function manageExpertDraft(name: string): Record<string, unknown> {
 
 Deno.test("manage experts global default and project scope", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const workDir = Deno.makeTempDirSync();
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, workDir);
 
     const created = manageResult(
-      callManage(server, output, 1, "mothx/manage/experts/create", {
+      callManage(server, output, 1, "opensac/manage/experts/create", {
         bundle: manageExpertDraft("desktop-global"),
       }),
     );
@@ -382,7 +382,7 @@ Deno.test("manage experts global default and project scope", () => {
     assertEquals(globalBundle["scope"], "global");
 
     const project = manageResult(
-      callManage(server, output, 2, "mothx/manage/experts/create", {
+      callManage(server, output, 2, "opensac/manage/experts/create", {
         scope: "project",
         cwd: workDir,
         bundle: manageExpertDraft("desktop-project"),
@@ -392,7 +392,7 @@ Deno.test("manage experts global default and project scope", () => {
     assertEquals(project["cwd"], path.normalize(workDir));
 
     const listed = manageResult(
-      callManage(server, output, 3, "mothx/manage/experts/list", {
+      callManage(server, output, 3, "opensac/manage/experts/list", {
         scope: "project",
         cwd: workDir,
       }),
@@ -409,7 +409,7 @@ Deno.test("manage experts global default and project scope", () => {
       en: "Updated",
     };
     const updated = manageResult(
-      callManage(server, output, 4, "mothx/manage/experts/update", {
+      callManage(server, output, 4, "opensac/manage/experts/update", {
         bundle: updatedDraft,
       }),
     );
@@ -419,7 +419,7 @@ Deno.test("manage experts global default and project scope", () => {
     assertEquals(display["zh"], "已更新");
 
     const removed = manageResult(
-      callManage(server, output, 5, "mothx/manage/experts/delete", {
+      callManage(server, output, 5, "opensac/manage/experts/delete", {
         name: "desktop-global",
       }),
     );
@@ -430,11 +430,11 @@ Deno.test("manage experts global default and project scope", () => {
 
 Deno.test("manage experts rejects a builtin scope", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, Deno.makeTempDirSync());
     const { code } = manageError(
-      callManage(server, output, 1, "mothx/manage/experts/delete", {
+      callManage(server, output, 1, "opensac/manage/experts/delete", {
         scope: "builtin",
         name: "software-company",
       }),
@@ -447,11 +447,11 @@ Deno.test("manage experts rejects a builtin scope", () => {
 
 Deno.test("manage application get returns the runtime-owned settings view", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, Deno.makeTempDirSync());
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/application/get", {}),
+      callManage(server, output, 1, "opensac/manage/application/get", {}),
     );
     const defaults = result["defaults"] as Record<string, unknown>;
     assertStrictEquals(typeof defaults["defaultMode"], "string");
@@ -466,13 +466,13 @@ Deno.test("manage application get returns the runtime-owned settings view", () =
 
 Deno.test("manage application patch updates defaults and rejects unknown fields", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, Deno.makeTempDirSync());
 
     assertEquals(
       manageError(
-        callManage(server, output, 1, "mothx/manage/application/patch", {
+        callManage(server, output, 1, "opensac/manage/application/patch", {
           patch: { defaults: { defaultMode: "not-a-mode" } },
         }),
       ).code,
@@ -480,7 +480,7 @@ Deno.test("manage application patch updates defaults and rejects unknown fields"
     );
     assertEquals(
       manageError(
-        callManage(server, output, 2, "mothx/manage/application/patch", {
+        callManage(server, output, 2, "opensac/manage/application/patch", {
           patch: { nope: {} },
         }),
       ).code,
@@ -488,7 +488,7 @@ Deno.test("manage application patch updates defaults and rejects unknown fields"
     );
 
     const updated = manageResult(
-      callManage(server, output, 3, "mothx/manage/application/patch", {
+      callManage(server, output, 3, "opensac/manage/application/patch", {
         patch: { defaults: { defaultMode: "plan" } },
       }),
     );
@@ -498,7 +498,7 @@ Deno.test("manage application patch updates defaults and rejects unknown fields"
     // The nested section merge preserves siblings and writes through the
     // shared settings patch boundary.
     const compaction = manageResult(
-      callManage(server, output, 4, "mothx/manage/application/patch", {
+      callManage(server, output, 4, "opensac/manage/application/patch", {
         patch: { compaction: { reserveTokens: 4096 } },
       }),
     );
@@ -509,13 +509,13 @@ Deno.test("manage application patch updates defaults and rejects unknown fields"
 
 Deno.test("manage router rejects unknown methods", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, Deno.makeTempDirSync());
 
     assertEquals(
       manageError(
-        callManage(server, output, 2, "mothx/manage/bogus", {}),
+        callManage(server, output, 2, "opensac/manage/bogus", {}),
       ).code,
       "manage_method_not_found",
     );
@@ -534,8 +534,8 @@ Deno.test("initialize advertises the manage env/experts/application features", (
   >;
   const result = message["result"] as Record<string, unknown>;
   const meta = result["_meta"] as Record<string, unknown>;
-  const mothx = meta["mothx.dev"] as Record<string, unknown>;
-  const features = mothx["features"] as string[];
+  const opensac = meta["opensac.dev"] as Record<string, unknown>;
+  const features = opensac["features"] as string[];
   assertNotStrictEquals(features.indexOf("manageEnv"), -1);
   assertNotStrictEquals(features.indexOf("manageExperts"), -1);
   assertNotStrictEquals(features.indexOf("manageApplicationSettings"), -1);
@@ -610,14 +610,14 @@ async function callManageAsync(
 
 Deno.test("manage settings get masks provider keys", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     // Guarantee the built-in env fallbacks resolve to "no key".
     withEnv("ANTHROPIC_API_KEY", "", () => {
       writeManageSettings(configDir);
       const output = new SyncBuffer();
       const server = newManageFixtureServer(output, configDir);
       const result = manageResult(
-        callManage(server, output, 1, "mothx/manage/settings/get", {}),
+        callManage(server, output, 1, "opensac/manage/settings/get", {}),
       );
       assertEquals(result["defaultProvider"], "manage-alpha");
       assertEquals(result["defaultModel"], "alpha-model");
@@ -658,7 +658,7 @@ Deno.test("manage settings get masks provider keys", () => {
 
 Deno.test("manage settings patch whitelist round trip", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir, (settings) => {
       if (settings.sandbox) settings.sandbox.level = "strict";
     });
@@ -666,7 +666,7 @@ Deno.test("manage settings patch whitelist round trip", () => {
     const server = newManageFixtureServer(output, configDir);
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/settings/patch", {
+      callManage(server, output, 1, "opensac/manage/settings/patch", {
         patch: {
           defaultModel: "alpha-mini",
           defaultMode: "agent",
@@ -698,7 +698,7 @@ Deno.test("manage settings patch whitelist round trip", () => {
 
     // providerKey / providerBaseUrl merge into the existing provider entry.
     const rotated = manageResult(
-      callManage(server, output, 2, "mothx/manage/settings/patch", {
+      callManage(server, output, 2, "opensac/manage/settings/patch", {
         patch: {
           providerKey: {
             name: "manage-alpha",
@@ -733,7 +733,7 @@ Deno.test("manage settings patch whitelist round trip", () => {
 
 Deno.test("manage settings patch rejects disallowed and invalid", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
@@ -785,7 +785,7 @@ Deno.test("manage settings patch rejects disallowed and invalid", () => {
     let index = 1;
     for (const testCase of cases) {
       const { code, data } = manageError(
-        callManage(server, output, index++, "mothx/manage/settings/patch", {
+        callManage(server, output, index++, "opensac/manage/settings/patch", {
           patch: testCase.patch,
         }),
       );
@@ -795,7 +795,7 @@ Deno.test("manage settings patch rejects disallowed and invalid", () => {
 
     assertEquals(
       manageError(
-        callManage(server, output, 90, "mothx/manage/settings/patch", {
+        callManage(server, output, 90, "opensac/manage/settings/patch", {
           patch: {},
         }),
       ).code,
@@ -811,13 +811,13 @@ Deno.test("manage settings patch rejects disallowed and invalid", () => {
 
 Deno.test("manage providers list projects catalog", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/providers/list", {}),
+      callManage(server, output, 1, "opensac/manage/providers/list", {}),
     );
     assertEquals(result["defaultProvider"], "manage-alpha");
     assertEquals(result["defaultModel"], "alpha-model");
@@ -848,13 +848,13 @@ Deno.test("manage providers list projects catalog", () => {
 
 Deno.test("manage providers config save delete and discover", async () => {
   const configDir = Deno.makeTempDirSync();
-  await withEnvAsync("MOTHX_DIR", configDir, async () => {
+  await withEnvAsync("OPENSAC_DIR", configDir, async () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
 
     const initial = manageResult(
-      callManage(server, output, 1, "mothx/manage/providers/list", {}),
+      callManage(server, output, 1, "opensac/manage/providers/list", {}),
     );
     const configs = initial["providerConfigs"] as unknown[];
     assertNotStrictEquals(configs.length, 0);
@@ -863,7 +863,7 @@ Deno.test("manage providers config save delete and discover", async () => {
     assertStrictEquals(encodedInitial.includes("ALSOSECRET"), false);
 
     const created = manageResult(
-      callManage(server, output, 2, "mothx/manage/providers/save", {
+      callManage(server, output, 2, "opensac/manage/providers/save", {
         id: "desktop-custom",
         apiKey: "sk-desktop-NEWSECRET-444",
         provider: {
@@ -907,7 +907,7 @@ Deno.test("manage providers config save delete and discover", async () => {
 
     // A model or endpoint edit must preserve the existing secret header.
     manageResult(
-      callManage(server, output, 3, "mothx/manage/providers/save", {
+      callManage(server, output, 3, "opensac/manage/providers/save", {
         id: "desktop-custom",
         provider: { baseUrl: "https://desktop-2.example.com/v1" },
       }),
@@ -923,7 +923,7 @@ Deno.test("manage providers config save delete and discover", async () => {
 
     assertEquals(
       manageError(
-        callManage(server, output, 4, "mothx/manage/providers/save", {
+        callManage(server, output, 4, "opensac/manage/providers/save", {
           id: "desktop-custom",
           provider: {
             api: "openai-chat",
@@ -936,7 +936,7 @@ Deno.test("manage providers config save delete and discover", async () => {
     );
 
     const deleted = manageResult(
-      callManage(server, output, 5, "mothx/manage/providers/delete", {
+      callManage(server, output, 5, "opensac/manage/providers/delete", {
         id: "desktop-custom",
       }),
     );
@@ -973,7 +973,7 @@ Deno.test("manage providers config save delete and discover", async () => {
           server,
           output,
           6,
-          "mothx/manage/providers/discover",
+          "opensac/manage/providers/discover",
           {
             api: "openai-chat",
             baseUrl: `http://127.0.0.1:${modelServer.addr.port}/v1`,
@@ -996,20 +996,20 @@ Deno.test("manage providers config save delete and discover", async () => {
 
 Deno.test("manage providers test structured paths", async () => {
   const configDir = Deno.makeTempDirSync();
-  await withEnvAsync("MOTHX_DIR", configDir, async () => {
+  await withEnvAsync("OPENSAC_DIR", configDir, async () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
 
     assertEquals(
       manageError(
-        callManage(server, output, 1, "mothx/manage/providers/test", {}),
+        callManage(server, output, 1, "opensac/manage/providers/test", {}),
       ).code,
       "invalid_params",
     );
     assertEquals(
       manageError(
-        callManage(server, output, 2, "mothx/manage/providers/test", {
+        callManage(server, output, 2, "opensac/manage/providers/test", {
           provider: "ghost",
         }),
       ).code,
@@ -1017,9 +1017,15 @@ Deno.test("manage providers test structured paths", async () => {
     );
 
     const result = manageResult(
-      await callManageAsync(server, output, 3, "mothx/manage/providers/test", {
-        provider: "manage-broken",
-      }),
+      await callManageAsync(
+        server,
+        output,
+        3,
+        "opensac/manage/providers/test",
+        {
+          provider: "manage-broken",
+        },
+      ),
     );
     assertEquals(result["ok"], false);
     const message = result["error"] as string;
@@ -1064,7 +1070,7 @@ function writeManageSkill(
 Deno.test("manage skills list/set round trip", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = writeManageSettings(configDir);
     writeManageSkill(
       path.join(configDir, "skills"),
@@ -1085,7 +1091,7 @@ Deno.test("manage skills list/set round trip", () => {
     server.skillsMgr.load();
 
     const listed = manageResult(
-      callManage(server, output, 1, "mothx/manage/skills/list", {
+      callManage(server, output, 1, "opensac/manage/skills/list", {
         cwd: workDir,
       }),
     );
@@ -1103,7 +1109,7 @@ Deno.test("manage skills list/set round trip", () => {
     assertStrictEquals(byName["global-gen"]["description"], "global-gen");
 
     const set = manageResult(
-      callManage(server, output, 2, "mothx/manage/skills/set", {
+      callManage(server, output, 2, "opensac/manage/skills/set", {
         name: "global-gen",
         enabled: false,
         cwd: workDir,
@@ -1122,7 +1128,7 @@ Deno.test("manage skills list/set round trip", () => {
     assertEquals(server.skillsMgr!.list().length, 3);
 
     const relisted = manageResult(
-      callManage(server, output, 3, "mothx/manage/skills/list", {
+      callManage(server, output, 3, "opensac/manage/skills/list", {
         cwd: workDir,
       }),
     );
@@ -1133,13 +1139,13 @@ Deno.test("manage skills list/set round trip", () => {
     }
 
     const settingsView = manageResult(
-      callManage(server, output, 4, "mothx/manage/settings/get", {}),
+      callManage(server, output, 4, "opensac/manage/settings/get", {}),
     );
     assertEquals(settingsView["skillsDisabled"], ["global-gen"]);
 
     // Re-enable removes the entry and keeps the sparse file sparse.
     const reenabled = manageResult(
-      callManage(server, output, 5, "mothx/manage/skills/set", {
+      callManage(server, output, 5, "opensac/manage/skills/set", {
         name: "global-gen",
         enabled: true,
         cwd: workDir,
@@ -1153,7 +1159,7 @@ Deno.test("manage skills list/set round trip", () => {
 
     assertEquals(
       manageError(
-        callManage(server, output, 6, "mothx/manage/skills/set", {
+        callManage(server, output, 6, "opensac/manage/skills/set", {
           name: "missing-skill",
           enabled: false,
           cwd: workDir,
@@ -1163,7 +1169,7 @@ Deno.test("manage skills list/set round trip", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 7, "mothx/manage/skills/set", {
+        callManage(server, output, 7, "opensac/manage/skills/set", {
           name: "global-gen",
           cwd: workDir,
         }),
@@ -1172,7 +1178,7 @@ Deno.test("manage skills list/set round trip", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 8, "mothx/manage/skills/list", {
+        callManage(server, output, 8, "opensac/manage/skills/list", {
           cwd: "relative/dir",
         }),
       ).code,
@@ -1199,14 +1205,14 @@ function writeManageMCPFile(): void {
 
 Deno.test("manage mcp list returns complete local config", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     writeManageMCPFile();
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/mcp/list", {}),
+      callManage(server, output, 1, "opensac/manage/mcp/list", {}),
     );
     const servers = result["servers"] as Record<string, unknown>[];
     assertEquals(servers.length, 2);
@@ -1227,14 +1233,14 @@ Deno.test("manage mcp list returns complete local config", () => {
 
 Deno.test("manage mcp set replaces and merges", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     writeManageMCPFile();
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/mcp/set", {
+      callManage(server, output, 1, "opensac/manage/mcp/set", {
         servers: [
           {
             name: "keeper",
@@ -1275,7 +1281,7 @@ Deno.test("manage mcp set replaces and merges", () => {
     // Schema validation.
     assertEquals(
       manageError(
-        callManage(server, output, 2, "mothx/manage/mcp/set", {
+        callManage(server, output, 2, "opensac/manage/mcp/set", {
           servers: [{
             name: "x",
             command: "/bin/x",
@@ -1287,7 +1293,7 @@ Deno.test("manage mcp set replaces and merges", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 3, "mothx/manage/mcp/set", {
+        callManage(server, output, 3, "opensac/manage/mcp/set", {
           servers: [{ name: "no-command" }],
         }),
       ).code,
@@ -1295,7 +1301,7 @@ Deno.test("manage mcp set replaces and merges", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 4, "mothx/manage/mcp/set", {
+        callManage(server, output, 4, "opensac/manage/mcp/set", {
           servers: [
             { name: "dup", command: "/bin/a" },
             { name: "dup", command: "/bin/b" },
@@ -1306,7 +1312,7 @@ Deno.test("manage mcp set replaces and merges", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 5, "mothx/manage/mcp/set", {
+        callManage(server, output, 5, "opensac/manage/mcp/set", {
           servers: [{
             name: "bad",
             type: "carrier-pigeon",
@@ -1318,14 +1324,14 @@ Deno.test("manage mcp set replaces and merges", () => {
     );
     assertEquals(
       manageError(
-        callManage(server, output, 6, "mothx/manage/mcp/set", {}),
+        callManage(server, output, 6, "opensac/manage/mcp/set", {}),
       ).code,
       "invalid_params",
     );
     assertEquals(loadMCPConfig(globalMCPPath()).mcpServers!.length, 2);
 
     const cleared = manageResult(
-      callManage(server, output, 7, "mothx/manage/mcp/set", { servers: [] }),
+      callManage(server, output, 7, "opensac/manage/mcp/set", { servers: [] }),
     );
     assertEquals((cleared["servers"] as unknown[]).length, 0);
   });
@@ -1334,7 +1340,7 @@ Deno.test("manage mcp set replaces and merges", () => {
 Deno.test("manage mcp project scope uses active session work dir", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, workDir);
@@ -1344,7 +1350,7 @@ Deno.test("manage mcp project scope uses active session work dir", () => {
     server.sessions.set("project-session", rt);
 
     const result = manageResult(
-      callManage(server, output, 1, "mothx/manage/mcp/set", {
+      callManage(server, output, 1, "opensac/manage/mcp/set", {
         scope: "project",
         sessionId: "project-session",
         servers: [{
@@ -1371,7 +1377,7 @@ Deno.test("manage mcp project scope uses active session work dir", () => {
     assertStrictEquals(globalMissing, true);
 
     const listed = manageResult(
-      callManage(server, output, 2, "mothx/manage/mcp/list", {
+      callManage(server, output, 2, "opensac/manage/mcp/list", {
         scope: "project",
         sessionId: "project-session",
       }),
@@ -1380,7 +1386,7 @@ Deno.test("manage mcp project scope uses active session work dir", () => {
 
     assertEquals(
       manageError(
-        callManage(server, output, 3, "mothx/manage/mcp/list", {
+        callManage(server, output, 3, "opensac/manage/mcp/list", {
           scope: "project",
           sessionId: "missing-session",
         }),
@@ -1437,13 +1443,13 @@ Deno.test("manage stats query mapping", () => {
 
 Deno.test("manage memory round trip and limit", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
     const server = newManageFixtureServer(output, configDir);
 
     const empty = manageResult(
-      callManage(server, output, 1, "mothx/manage/memory/get", {}),
+      callManage(server, output, 1, "opensac/manage/memory/get", {}),
     );
     assertEquals(empty["content"], "");
     assertEquals(empty["size"], 0);
@@ -1453,20 +1459,20 @@ Deno.test("manage memory round trip and limit", () => {
 
     const content = "# Memory\n\nhello world";
     const put = manageResult(
-      callManage(server, output, 2, "mothx/manage/memory/put", { content }),
+      callManage(server, output, 2, "opensac/manage/memory/put", { content }),
     );
     assertEquals(put["size"], content.length);
     assertNotStrictEquals(put["updatedAt"], "");
     assertEquals(Deno.readTextFileSync(wantPath), content);
 
     const roundTrip = manageResult(
-      callManage(server, output, 3, "mothx/manage/memory/get", {}),
+      callManage(server, output, 3, "opensac/manage/memory/get", {}),
     );
     assertEquals(roundTrip["content"], content);
 
     const maxBytes = 1 << 20;
     const oversize = manageError(
-      callManage(server, output, 4, "mothx/manage/memory/put", {
+      callManage(server, output, 4, "opensac/manage/memory/put", {
         content: "a".repeat(maxBytes + 1),
       }),
     );
@@ -1476,7 +1482,7 @@ Deno.test("manage memory round trip and limit", () => {
 
     assertEquals(
       manageError(
-        callManage(server, output, 5, "mothx/manage/memory/put", {}),
+        callManage(server, output, 5, "opensac/manage/memory/put", {}),
       ).code,
       "invalid_params",
     );
@@ -1488,7 +1494,7 @@ Deno.test("manage memory round trip and limit", () => {
 Deno.test("manage memory follows serve config path", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const custom = path.join(configDir, "custom", "agent-memory.md");
     Deno.writeTextFileSync(
@@ -1499,7 +1505,7 @@ Deno.test("manage memory follows serve config path", () => {
     const server = newManageFixtureServer(output, workDir);
 
     const put = manageResult(
-      callManage(server, output, 1, "mothx/manage/memory/put", {
+      callManage(server, output, 1, "opensac/manage/memory/put", {
         content: "serve path memory",
       }),
     );
@@ -1511,7 +1517,7 @@ Deno.test("manage memory follows serve config path", () => {
       JSON.stringify({ memory: { enabled: false } }),
     );
     const view = manageResult(
-      callManage(server, output, 2, "mothx/manage/settings/get", {}),
+      callManage(server, output, 2, "opensac/manage/settings/get", {}),
     );
     assertStrictEquals(view["memoryEnabled"], false);
   });
@@ -1654,7 +1660,7 @@ Deno.test("manage deliveries list projects failures", () => {
     "failed",
   );
   const result = manageResult(
-    callManage(server, output, 1, "mothx/manage/deliveries/list", {
+    callManage(server, output, 1, "opensac/manage/deliveries/list", {
       sessionId: sessionID,
     }),
   );
@@ -1676,14 +1682,14 @@ Deno.test("manage deliveries retry reopens and clears the failure", () => {
     "failed",
   );
   const retry = manageResult(
-    callManage(server, output, 2, "mothx/manage/deliveries/retry", {
+    callManage(server, output, 2, "opensac/manage/deliveries/retry", {
       operationId: "acp-delivery-op",
     }),
   );
   assertStrictEquals(retry["retried"], true);
 
   const after = manageResult(
-    callManage(server, output, 3, "mothx/manage/deliveries/list", {
+    callManage(server, output, 3, "opensac/manage/deliveries/list", {
       sessionId: sessionID,
     }),
   );
@@ -1691,7 +1697,7 @@ Deno.test("manage deliveries retry reopens and clears the failure", () => {
 
   assertEquals(
     manageError(
-      callManage(server, output, 4, "mothx/manage/deliveries/retry", {}),
+      callManage(server, output, 4, "opensac/manage/deliveries/retry", {}),
     ).code,
     "invalid_params",
   );
@@ -1708,7 +1714,7 @@ Deno.test("manage deliveries retry refuses non-retryable operations", () => {
         nonRetryable.server,
         nonRetryable.output,
         1,
-        "mothx/manage/deliveries/retry",
+        "opensac/manage/deliveries/retry",
         {
           operationId: nonRetryable.operationID,
         },
@@ -1730,7 +1736,7 @@ Deno.test("manage deliveries retry refuses non-retryable operations", () => {
         pending.server,
         pending.output,
         2,
-        "mothx/manage/deliveries/retry",
+        "opensac/manage/deliveries/retry",
         {
           operationId: pending.operationID,
         },
@@ -1749,7 +1755,7 @@ Deno.test("manage deliveries retry refuses non-retryable operations", () => {
         nonRetryable.server,
         nonRetryable.output,
         3,
-        "mothx/manage/deliveries/retry",
+        "opensac/manage/deliveries/retry",
         {
           operationId: "missing-operation",
         },

@@ -1,7 +1,7 @@
 // Ported from internal/acp/acp.go (the ACP request-metadata vocabulary).
 //
 // ACP clients exchange workspace/parent/editor metadata in `_meta` under both
-// the `mothx` and the namespaced `mothx.dev` keys. Unknown metadata is ignored
+// the `opensac` and the namespaced `opensac.dev` keys. Unknown metadata is ignored
 // by design so clients can roll out optional fields independently.
 
 import {
@@ -38,7 +38,7 @@ export interface EditorContext {
 }
 
 /**
- * The protocol-neutral workspace window exchanged in `_meta.mothx`. It is
+ * The protocol-neutral workspace window exchanged in `_meta.opensac`. It is
  * deliberately kept separate from session additional directories: `cwd` is the
  * session's primary root, while the latter are extra roots granted to that
  * session.
@@ -48,8 +48,8 @@ export interface WorkspaceSpec {
   additionalDirectories?: string[];
 }
 
-/** The `mothx` / `mothx.dev` request metadata envelope. */
-export interface MothxRequestMeta {
+/** The `opensac` / `opensac.dev` request metadata envelope. */
+export interface OpensacRequestMeta {
   workspace?: WorkspaceSpec;
   parentSessionId?: string;
   surface?: string;
@@ -58,18 +58,18 @@ export interface MothxRequestMeta {
 
 /** The ACP `_meta` object accepting both metadata namespaces. */
 export interface RequestMeta {
-  mothx?: MothxRequestMeta;
-  "mothx.dev"?: MothxRequestMeta;
+  opensac?: OpensacRequestMeta;
+  "opensac.dev"?: OpensacRequestMeta;
 }
 
-/** Returns the negotiated workspace spec (`mothx` wins over `mothx.dev`). */
+/** Returns the negotiated workspace spec (`opensac` wins over `opensac.dev`). */
 export function requestWorkspace(
   meta: RequestMeta | undefined | null,
 ): WorkspaceSpec | undefined {
   if (meta === undefined || meta === null) return undefined;
-  if (meta.mothx?.workspace !== undefined) return meta.mothx.workspace;
-  if (meta["mothx.dev"]?.workspace !== undefined) {
-    return meta["mothx.dev"].workspace;
+  if (meta.opensac?.workspace !== undefined) return meta.opensac.workspace;
+  if (meta["opensac.dev"]?.workspace !== undefined) {
+    return meta["opensac.dev"].workspace;
   }
   return undefined;
 }
@@ -80,13 +80,13 @@ export function requestParentSessionID(
 ): string {
   if (meta === undefined || meta === null) return "";
   if (
-    meta.mothx !== undefined &&
-    (meta.mothx.parentSessionId ?? "").trim() !== ""
+    meta.opensac !== undefined &&
+    (meta.opensac.parentSessionId ?? "").trim() !== ""
   ) {
-    return meta.mothx.parentSessionId ?? "";
+    return meta.opensac.parentSessionId ?? "";
   }
-  if (meta["mothx.dev"] !== undefined) {
-    return meta["mothx.dev"].parentSessionId ?? "";
+  if (meta["opensac.dev"] !== undefined) {
+    return meta["opensac.dev"].parentSessionId ?? "";
   }
   return "";
 }
@@ -96,11 +96,11 @@ export function requestEditorContext(
   meta: RequestMeta | undefined | null,
 ): EditorContext | undefined {
   if (meta === undefined || meta === null) return undefined;
-  if (meta.mothx?.editorContext !== undefined) {
-    return meta.mothx.editorContext;
+  if (meta.opensac?.editorContext !== undefined) {
+    return meta.opensac.editorContext;
   }
-  if (meta["mothx.dev"] !== undefined) {
-    return meta["mothx.dev"].editorContext;
+  if (meta["opensac.dev"] !== undefined) {
+    return meta["opensac.dev"].editorContext;
   }
   return undefined;
 }
@@ -111,12 +111,12 @@ export function requestSurface(
 ): string {
   if (meta === undefined || meta === null) return "";
   if (
-    meta.mothx !== undefined && (meta.mothx.surface ?? "").trim() !== ""
+    meta.opensac !== undefined && (meta.opensac.surface ?? "").trim() !== ""
   ) {
-    return (meta.mothx.surface ?? "").trim();
+    return (meta.opensac.surface ?? "").trim();
   }
-  if (meta["mothx.dev"] !== undefined) {
-    return (meta["mothx.dev"].surface ?? "").trim();
+  if (meta["opensac.dev"] !== undefined) {
+    return (meta["opensac.dev"].surface ?? "").trim();
   }
   return "";
 }

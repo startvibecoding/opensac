@@ -222,7 +222,7 @@ export function planDelivery(
       fallback.push(
         `Generated ${kind} ${
           JSON.stringify(name)
-        } is available in the MothX WebUI session; this channel cannot send media attachments.`,
+        } is available in the OpenSAC WebUI session; this channel cannot send media attachments.`,
       );
       return;
     }

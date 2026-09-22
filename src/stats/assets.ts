@@ -19,19 +19,19 @@ export function dashboardHTML(): string {
 }
 
 /** The embedded small favicon (ICO). */
-export function mothxSmallICO(): Uint8Array {
+export function opensacSmallICO(): Uint8Array {
   if (cachedICO === null) {
     cachedICO = Deno.readFileSync(
-      new URL("./mothx-small.ico", import.meta.url),
+      new URL("./opensac-small.ico", import.meta.url),
     );
   }
   return cachedICO;
 }
 
 /** The embedded dashboard logo (PNG). */
-export function mothxPNG(): Uint8Array {
+export function opensacPNG(): Uint8Array {
   if (cachedPNG === null) {
-    cachedPNG = Deno.readFileSync(new URL("./mothx.png", import.meta.url));
+    cachedPNG = Deno.readFileSync(new URL("./opensac.png", import.meta.url));
   }
   return cachedPNG;
 }

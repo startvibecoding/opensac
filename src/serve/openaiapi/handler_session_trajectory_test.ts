@@ -19,7 +19,7 @@ import { openRootDB } from "../../session/root_db.ts";
 import { saveSessionCapabilityEvent } from "../../session/session_events.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-trajectory-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-trajectory-" });
 }
 
 function settingsFor(dir: string): Settings {
@@ -229,9 +229,11 @@ Deno.test("handleSessionExport streams the NDJSON log", async () => {
       "application/x-ndjson; charset=utf-8",
     );
     assert(
-      resp.headers.get("content-disposition")!.includes("mothx-session-s1.log"),
+      resp.headers.get("content-disposition")!.includes(
+        "opensac-session-s1.log",
+      ),
     );
-    assertEquals(resp.headers.get("x-mothx-session-count"), "1");
+    assertEquals(resp.headers.get("x-opensac-session-count"), "1");
     const text = await resp.text();
     const lines = text.trim().split("\n").map((l) => JSON.parse(l));
     assertEquals(lines[0].type, "manifest");

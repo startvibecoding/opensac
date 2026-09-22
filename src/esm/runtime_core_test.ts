@@ -47,7 +47,7 @@ Deno.test("RoleContext bounds the recovery observer", () => {
 });
 
 Deno.test("Supervisor worker continue stops at active", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter({ [roleWorker]: continueResponse });
@@ -62,7 +62,7 @@ Deno.test("Supervisor worker continue stops at active", async () => {
 });
 
 Deno.test("Supervisor completion uses critic then audit", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter({
@@ -84,7 +84,7 @@ Deno.test("Supervisor completion uses critic then audit", async () => {
 });
 
 Deno.test("Supervisor publishes lifecycle events", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter({ [roleWorker]: continueResponse });
@@ -104,7 +104,7 @@ Deno.test("Supervisor publishes lifecycle events", async () => {
 });
 
 Deno.test("Supervisor repeated recovery stays active and uses observer", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     for (let i = 0; i < 5; i++) {
@@ -126,7 +126,7 @@ Deno.test("Supervisor repeated recovery stays active and uses observer", async (
 });
 
 Deno.test("Supervisor incomplete role recovers and keeps objective active", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter();
@@ -143,7 +143,7 @@ Deno.test("Supervisor incomplete role recovers and keeps objective active", asyn
 });
 
 Deno.test("Supervisor roles use unbounded long-task iterations", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter({
@@ -169,7 +169,7 @@ Deno.test("Supervisor roles use unbounded long-task iterations", async () => {
 });
 
 Deno.test("Supervisor non-retryable failure pauses until explicit resume", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const wantErr = new Error("provider rejected the request");
@@ -187,7 +187,7 @@ Deno.test("Supervisor non-retryable failure pauses until explicit resume", async
 });
 
 Deno.test("Supervisor shared store persists across runtime instances", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const first = new RuntimeTestAdapter({ [roleWorker]: continueResponse });
@@ -214,7 +214,7 @@ Deno.test("Supervisor shared store persists across runtime instances", async () 
 });
 
 Deno.test("Supervisor rejected completions continue across continuations", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter({
@@ -237,7 +237,7 @@ Deno.test("Supervisor rejected completions continue across continuations", async
 });
 
 Deno.test("Supervisor blocked audit accumulates across continuations", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-rt-");
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
     const blocked = new RuntimeTestAdapter({

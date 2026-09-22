@@ -8,7 +8,7 @@ import { ChannelSession, type Dispatcher } from "./dispatcher.ts";
 import { reconcileCompletedBackgroundRun } from "./background_recovery.ts";
 
 Deno.test("reconcile completed background run after restart", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-bgr-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-bgr-" });
   const workDir = Deno.makeTempDirSync();
   const mgr = newManager(workDir, sessionDir);
   mgr.init();

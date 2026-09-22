@@ -277,6 +277,7 @@ export class TUISession implements CommandHost {
   }
 
   clearConversation(): void {
+    this.#commands.clearActiveSkills();
     this.controller.store.resetTranscriptState();
     this.controller.activities.clear();
     this.input.paste.reset();
@@ -306,6 +307,10 @@ export class TUISession implements CommandHost {
     return this.#commands.listExperts();
   }
 
+  showExpert(id: string): string {
+    return this.#commands.showExpert(id);
+  }
+
   async bindExpert(id: string): Promise<CommandResult> {
     return await this.#commands.bindExpert(id);
   }
@@ -330,12 +335,20 @@ export class TUISession implements CommandHost {
     return await this.#commands.deleteSession(id);
   }
 
+  async forkSession(): Promise<CommandResult> {
+    return await this.#commands.forkSession();
+  }
+
   async listWorkflows(): Promise<CommandResult> {
     return await this.#commands.listWorkflows();
   }
 
   async showWorkflow(id: string): Promise<CommandResult> {
     return await this.#commands.showWorkflow(id);
+  }
+
+  async cancelWorkflow(id: string): Promise<CommandResult> {
+    return await this.#commands.cancelWorkflow(id);
   }
 
   async handleESM(cmd: string): Promise<CommandResult> {
@@ -395,7 +408,15 @@ export class TUISession implements CommandHost {
   }
 
   listAgents(): string {
-    return this.translator.text("agent.none");
+    return this.#commands.listAgents();
+  }
+
+  async switchAgent(id: string): Promise<CommandResult> {
+    return await this.#commands.switchAgent(id);
+  }
+
+  async destroyAgent(id: string): Promise<CommandResult> {
+    return await this.#commands.destroyAgent(id);
   }
 
   multiAgentEnabled(): boolean {
@@ -481,6 +502,11 @@ export class TUISession implements CommandHost {
         );
       }
       this.#dialog = undefined;
+      // Hand off to another panel (Go closeAuthDialog + openXDialog).
+      if (outcome.handoff === "auth") this.openAuthDialog();
+      else if (outcome.handoff === "defaultModel") {
+        this.openDefaultModelDialog("global");
+      } else if (outcome.handoff === "tuilang") this.openTuiLangDialog();
     }
     return true;
   }
@@ -509,12 +535,19 @@ export class TUISession implements CommandHost {
     return {};
   }
 
-  openAuthDialog(): CommandResult {
-    this.#openDialog(new Dialog((d) => new AuthDialog(this.dialogHost, d)));
+  openAuthDialog(initialProvider?: string): CommandResult {
+    this.#openDialog(
+      new Dialog((d) => new AuthDialog(this.dialogHost, d, initialProvider)),
+    );
     return {};
   }
 
-  openSettingsDialog(): CommandResult {
+  openSettingsDialog(providerID?: string): CommandResult {
+    // `/settings <provider>` deep-links into that provider's auth detail (Go
+    // openSettingsDialog(args)).
+    if (providerID !== undefined && providerID.trim() !== "") {
+      return this.openAuthDialog(providerID.trim());
+    }
     this.#openDialog(new Dialog((d) => new SettingsDialog(this.dialogHost, d)));
     return {};
   }

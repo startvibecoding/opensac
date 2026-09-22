@@ -28,7 +28,7 @@ import { SessionRunEventSink } from "../../agentruntime/run_event.ts";
 import { openRootDB } from "../../session/root_db.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-stream-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-stream-" });
 }
 
 function settingsFor(dir: string): Settings {

@@ -21,7 +21,7 @@ import type { Provider } from "../../provider/provider.ts";
 import type { Attachment } from "../../provider/types.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-attach-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-attach-" });
 }
 
 function settingsFor(dir: string): Settings {

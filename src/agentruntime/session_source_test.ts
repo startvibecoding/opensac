@@ -13,7 +13,7 @@ import {
 import { SourceConflictError, SourceTUI, SourceWeChat } from "./source.ts";
 
 Deno.test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-source-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = newManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
@@ -32,7 +32,7 @@ Deno.test("resolveManagerSourceFallsBackToRequestWithoutManager", () => {
 });
 
 Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-source-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = newManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
@@ -46,7 +46,7 @@ Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
 });
 
 Deno.test("resolveManagerPolicyAppliesForcedChannelMode", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-source-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = newManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");

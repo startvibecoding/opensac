@@ -68,7 +68,7 @@ export function run(cwd: string, version: string): Response {
   checks.push({
     id: "cli",
     status: StatusOK,
-    title: "mothx CLI",
+    title: "opensac CLI",
     detail: version,
   });
   checks.push(...checkEnvironment(cwd));
@@ -181,7 +181,7 @@ function checkCWD(cwd: string): Check {
       status: StatusError,
       title: "Working directory",
       detail,
-      fix: "Start mothx from an existing directory",
+      fix: "Start opensac from an existing directory",
     };
   }
   return {

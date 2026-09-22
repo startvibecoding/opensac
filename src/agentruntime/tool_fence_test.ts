@@ -70,10 +70,10 @@ function hookInput(runId: string): BeforeToolExecuteContext {
 }
 
 Deno.test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fence-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fence-" });
   try {
     const manager = newManager(
-      Deno.makeTempDirSync({ prefix: "mothx-fence-work-" }),
+      Deno.makeTempDirSync({ prefix: "opensac-fence-work-" }),
       sessionDir,
     );
     manager.initWithID("fence-session");
@@ -169,7 +169,7 @@ Deno.test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
 });
 
 Deno.test("beforeToolExecuteFenceAllowsNonSideEffectingAndUnboundRuns", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-fence-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fence-" });
   try {
     const manager = newManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithID("fence-idle");

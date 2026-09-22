@@ -1,7 +1,7 @@
 // Ported from internal/provider/hosted_tools.go
 
 /**
- * The MothX-configured search capability. It is controlled by the local
+ * The OpenSAC-configured search capability. It is controlled by the local
  * web-search settings/session switch.
  */
 export const hostedToolWebSearch = "web_search";

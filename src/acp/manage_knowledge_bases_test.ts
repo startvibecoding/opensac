@@ -250,7 +250,7 @@ Deno.test("knowledge base schedule syncs create, update and delete on cron store
 
 Deno.test("knowledge-bases mcp apply quick-adds canonical server", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = writeSettings(configDir);
     const sessionDir = getSessionDir(settings);
     const rootDir = Deno.makeTempDirSync();
@@ -272,7 +272,7 @@ Deno.test("knowledge-bases mcp apply quick-adds canonical server", () => {
         server,
         output,
         1,
-        "mothx/manage/knowledge-bases/mcp/apply",
+        "opensac/manage/knowledge-bases/mcp/apply",
         { id: base.id },
       ),
     );
@@ -303,7 +303,7 @@ Deno.test("knowledge-bases mcp apply quick-adds canonical server", () => {
         server,
         output,
         2,
-        "mothx/manage/knowledge-bases/mcp/apply",
+        "opensac/manage/knowledge-bases/mcp/apply",
         { id: base.id, enabled: false },
       ),
     );
@@ -320,7 +320,7 @@ Deno.test("knowledge-bases mcp apply quick-adds canonical server", () => {
         server,
         output,
         3,
-        "mothx/manage/knowledge-bases/mcp/apply",
+        "opensac/manage/knowledge-bases/mcp/apply",
         { id: "missing" },
       ),
     );
@@ -332,7 +332,7 @@ Deno.test("knowledge-bases mcp apply quick-adds canonical server", () => {
         server,
         output,
         4,
-        "mothx/manage/knowledge-bases/mcp/apply",
+        "opensac/manage/knowledge-bases/mcp/apply",
         {},
       ),
     );
@@ -344,14 +344,14 @@ Deno.test("knowledge-bases mcp apply quick-adds canonical server", () => {
 
 Deno.test("knowledge-bases create list get update delete project runtime state", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = writeSettings(configDir);
     const rootDir = Deno.makeTempDirSync();
     const output = new SyncBuffer();
     const server = fixtureServer(output, configDir, settings);
 
     const created = result(
-      callManage(server, output, 1, "mothx/manage/knowledge-bases/create", {
+      callManage(server, output, 1, "opensac/manage/knowledge-bases/create", {
         knowledgeBase: {
           name: "Docs",
           rootDir,
@@ -367,13 +367,13 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
     assert(baseID.length > 0);
 
     const listed = result(
-      callManage(server, output, 2, "mothx/manage/knowledge-bases/list", {}),
+      callManage(server, output, 2, "opensac/manage/knowledge-bases/list", {}),
     );
     const items = listed["knowledgeBases"] as unknown[];
     assertEquals(items.length, 1);
 
     const got = result(
-      callManage(server, output, 3, "mothx/manage/knowledge-bases/get", {
+      callManage(server, output, 3, "opensac/manage/knowledge-bases/get", {
         id: baseID,
       }),
     );
@@ -384,7 +384,7 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
 
     // Update keeps identity; schedule=manual stays off cron.
     const updated = result(
-      callManage(server, output, 4, "mothx/manage/knowledge-bases/update", {
+      callManage(server, output, 4, "opensac/manage/knowledge-bases/update", {
         id: baseID,
         knowledgeBase: {
           name: "Docs 2",
@@ -403,7 +403,7 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
     // Query before any snapshot projects knowledge_base_unindexed.
     assertEquals(
       errorCode(
-        callManage(server, output, 5, "mothx/manage/knowledge-bases/query", {
+        callManage(server, output, 5, "opensac/manage/knowledge-bases/query", {
           id: baseID,
           query: "anything",
         }),
@@ -413,7 +413,7 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
 
     // Scan admits a background job and returns the indexing view.
     const scanned = result(
-      callManage(server, output, 6, "mothx/manage/knowledge-bases/scan", {
+      callManage(server, output, 6, "opensac/manage/knowledge-bases/scan", {
         id: baseID,
       }),
     );
@@ -425,7 +425,7 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
 
     // A second concurrent scan is shared.
     const rescanned = result(
-      callManage(server, output, 7, "mothx/manage/knowledge-bases/scan", {
+      callManage(server, output, 7, "opensac/manage/knowledge-bases/scan", {
         id: baseID,
       }),
     );
@@ -436,7 +436,7 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
     // Validation: unknown provider, and provider/model must come together.
     assertEquals(
       errorCode(
-        callManage(server, output, 8, "mothx/manage/knowledge-bases/create", {
+        callManage(server, output, 8, "opensac/manage/knowledge-bases/create", {
           knowledgeBase: {
             name: "bad",
             rootDir,
@@ -452,7 +452,7 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
     );
     assertEquals(
       errorCode(
-        callManage(server, output, 9, "mothx/manage/knowledge-bases/create", {
+        callManage(server, output, 9, "opensac/manage/knowledge-bases/create", {
           knowledgeBase: {
             name: "bad",
             rootDir,
@@ -468,29 +468,35 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
     );
     assertEquals(
       errorCode(
-        callManage(server, output, 10, "mothx/manage/knowledge-bases/create", {
-          knowledgeBase: {
-            name: "bad",
-            rootDir,
-            preprocessProfile: "documents",
-            mode: "yolo",
-            schedule: "not a schedule",
+        callManage(
+          server,
+          output,
+          10,
+          "opensac/manage/knowledge-bases/create",
+          {
+            knowledgeBase: {
+              name: "bad",
+              rootDir,
+              preprocessProfile: "documents",
+              mode: "yolo",
+              schedule: "not a schedule",
+            },
           },
-        }),
+        ),
       ),
       "knowledge_base_schedule_invalid",
     );
 
     // Delete.
     const deleted = result(
-      callManage(server, output, 11, "mothx/manage/knowledge-bases/delete", {
+      callManage(server, output, 11, "opensac/manage/knowledge-bases/delete", {
         id: baseID,
       }),
     );
     assertEquals(deleted["deleted"], true);
     assertEquals(
       errorCode(
-        callManage(server, output, 12, "mothx/manage/knowledge-bases/get", {
+        callManage(server, output, 12, "opensac/manage/knowledge-bases/get", {
           id: baseID,
         }),
       ),
@@ -501,13 +507,13 @@ Deno.test("knowledge-bases create list get update delete project runtime state",
 
 Deno.test("knowledge-bases query clamps limit and requires id+query", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = writeSettings(configDir);
     const output = new SyncBuffer();
     const server = fixtureServer(output, configDir, settings);
     assertEquals(
       errorCode(
-        callManage(server, output, 1, "mothx/manage/knowledge-bases/query", {
+        callManage(server, output, 1, "opensac/manage/knowledge-bases/query", {
           id: "x",
         }),
       ),
@@ -515,7 +521,7 @@ Deno.test("knowledge-bases query clamps limit and requires id+query", () => {
     );
     assertEquals(
       errorCode(
-        callManage(server, output, 2, "mothx/manage/knowledge-bases/query", {
+        callManage(server, output, 2, "opensac/manage/knowledge-bases/query", {
           query: "x",
         }),
       ),
@@ -523,7 +529,7 @@ Deno.test("knowledge-bases query clamps limit and requires id+query", () => {
     );
     assertEquals(
       errorCode(
-        callManage(server, output, 3, "mothx/manage/knowledge-bases/query", {
+        callManage(server, output, 3, "opensac/manage/knowledge-bases/query", {
           id: "missing",
           query: "x",
           limit: 99,
@@ -538,31 +544,31 @@ Deno.test("knowledge-bases query clamps limit and requires id+query", () => {
 
 Deno.test("cron handlers project structured errors without prerequisites", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = writeSettings(configDir);
     const output = new SyncBuffer();
     const server = fixtureServer(output, configDir, settings);
     // ensureManageCron needs runtime/p/m; list projects cron_unavailable.
     assertEquals(
-      errorCode(callManage(server, output, 1, "mothx/manage/cron/list", {})),
+      errorCode(callManage(server, output, 1, "opensac/manage/cron/list", {})),
       "cron_unavailable",
     );
     assertEquals(
       errorCode(
-        callManage(server, output, 2, "mothx/manage/cron/run", {}),
+        callManage(server, output, 2, "opensac/manage/cron/run", {}),
       ),
       "invalid_params",
     );
     assertEquals(
       errorCode(
-        callManage(server, output, 3, "mothx/manage/cron/remove", {}),
+        callManage(server, output, 3, "opensac/manage/cron/remove", {}),
       ),
       "invalid_params",
     );
     // Whitelist rejects unknown fields before touching the runtime.
     assertEquals(
       errorCode(
-        callManage(server, output, 4, "mothx/manage/cron/create", {
+        callManage(server, output, 4, "opensac/manage/cron/create", {
           name: "n",
           workDir: "/",
         }),

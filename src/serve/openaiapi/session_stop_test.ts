@@ -175,8 +175,8 @@ function beginDurableTestRun(
 }
 
 Deno.test("cancelSessionRun aborts a pending approval", async () => {
-  const workDir = tempDir("mothx-stop-workdir-");
-  const sessionDir = tempDir("mothx-stop-sessions-");
+  const workDir = tempDir("opensac-stop-workdir-");
+  const sessionDir = tempDir("opensac-stop-sessions-");
   const fx = beginDurableTestRun(
     workDir,
     sessionDir,
@@ -220,8 +220,8 @@ Deno.test("cancelSessionRun aborts a pending approval", async () => {
 });
 
 Deno.test("cancelSessionRun before registration denies the late approval", async () => {
-  const workDir = tempDir("mothx-stop-workdir-");
-  const sessionDir = tempDir("mothx-stop-sessions-");
+  const workDir = tempDir("opensac-stop-workdir-");
+  const sessionDir = tempDir("opensac-stop-sessions-");
   const fx = beginDurableTestRun(
     workDir,
     sessionDir,
@@ -267,8 +267,8 @@ Deno.test("cancelSessionRun before registration denies the late approval", async
 });
 
 Deno.test("cancelSessionRun does not affect another session's approval", async () => {
-  const workDir = tempDir("mothx-stop-workdir-");
-  const sessionDir = tempDir("mothx-stop-sessions-");
+  const workDir = tempDir("opensac-stop-workdir-");
+  const sessionDir = tempDir("opensac-stop-sessions-");
   const fxA = beginDurableTestRun(
     workDir,
     sessionDir,
@@ -313,7 +313,7 @@ Deno.test("cancelSessionRun does not affect another session's approval", async (
 });
 
 Deno.test("cancelSessionRun without an active run is rejected", async () => {
-  const sessionDir = tempDir("mothx-stop-sessions-");
+  const sessionDir = tempDir("opensac-stop-sessions-");
   try {
     const server = new Server({ settings: { sessionDir } as never });
     // A session that does not resolve at all surfaces the same rejection the

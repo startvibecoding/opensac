@@ -238,7 +238,7 @@ Deno.test("skillhub targets handler lists project and global dirs", async () => 
       {
         path: join(workDir, ".opensac", "skills"),
         scope: "project",
-        label: "MothX project skills",
+        label: "OpenSAC project skills",
       },
       {
         path: join(workDir, ".skills"),

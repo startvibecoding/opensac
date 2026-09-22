@@ -30,7 +30,7 @@ import {
 const sessionID = "session-response-store";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-session-" });
 }
 
 function decode(value: Uint8Array | null): string {

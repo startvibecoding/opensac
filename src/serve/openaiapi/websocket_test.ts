@@ -15,7 +15,7 @@ import { newExternalSubAgentServer } from "./external_subagents.ts";
 import { runWebSocketHandler } from "./websocket.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-ws-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-ws-" });
 }
 
 function settingsFor(dir: string): Settings {

@@ -45,8 +45,8 @@ Deno.test("isTemplateServer", () => {
 Deno.test("loadConfiguredServers skips disabled entries", () => {
   const configDir = Deno.makeTempDirSync();
   const projectDir = Deno.makeTempDirSync();
-  const prev = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", configDir);
+  const prev = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", configDir);
   try {
     saveMCPConfig(path.join(configDir, "mcp.json"), {
       mcpServers: [
@@ -76,7 +76,7 @@ Deno.test("loadConfiguredServers skips disabled entries", () => {
     assertEquals(servers[1].name, "legacy");
     assert(true);
   } finally {
-    if (prev === undefined) Deno.env.delete("MOTHX_DIR");
-    else Deno.env.set("MOTHX_DIR", prev);
+    if (prev === undefined) Deno.env.delete("OPENSAC_DIR");
+    else Deno.env.set("OPENSAC_DIR", prev);
   }
 });

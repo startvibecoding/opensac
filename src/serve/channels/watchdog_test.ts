@@ -56,7 +56,7 @@ function baseSessionRun(overrides: Partial<SessionRun>): SessionRun {
 
 function newWatchdogTestDispatcher(cfg = defaultConfig()): Dispatcher {
   const d = new Dispatcher({ cfg });
-  d.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-watchdog-" });
+  d.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-watchdog-" });
   return d;
 }
 

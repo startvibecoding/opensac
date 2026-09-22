@@ -20,8 +20,8 @@ import { knowledgeStoreSchema } from "./migrations.ts";
 const knowledgeStoreSchemaVersion = 2;
 
 Deno.test("knowledge store migrates legacy fts to bigram index", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "mothx-root-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const baseID = "kb-legacy-fts";
     const dbPath = knowledgeBaseDatabasePath(sessionDir, baseID);

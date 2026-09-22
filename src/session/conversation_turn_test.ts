@@ -15,7 +15,7 @@ import {
 } from "./mod.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-session-" });
 }
 
 Deno.test("startConversationTurn opens a durable boundary row", () => {

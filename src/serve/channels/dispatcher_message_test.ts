@@ -132,9 +132,9 @@ function newFixture(
     model?: Model;
   } = {},
 ): DispatcherFixture {
-  const workDir = Deno.makeTempDirSync({ prefix: "mothx-ch-work-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "opensac-ch-work-" });
   const settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-ch-sess-" });
+  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-ch-sess-" });
   const cfg = defaultConfig();
   cfg.workDir = workDir;
   if (overrides.multiAgent !== undefined) cfg.multiAgent = overrides.multiAgent;
@@ -1387,9 +1387,9 @@ function newProviderFixture(
   provider: Provider,
   overrides: { multiAgent?: boolean; identityLocks?: boolean } = {},
 ): DispatcherFixture {
-  const workDir = Deno.makeTempDirSync({ prefix: "mothx-ch-work-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "opensac-ch-work-" });
   const settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-ch-sess-" });
+  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-ch-sess-" });
   const cfg = defaultConfig();
   cfg.workDir = workDir;
   // Go's provider fixtures use a 32768-token context window; a smaller window
@@ -1688,7 +1688,7 @@ Deno.test("handle delivery materializes channel image through runtime", async ()
     }`,
   );
   // The port renames the config directory, so the materialized inputs live
-  // under .opensac/tmp/inputs (Go's fixture used .mothx).
+  // under .opensac/tmp/inputs (Go's fixture used .opensac).
   const inputsDir = join(workDir, ".opensac", "tmp", "inputs");
   const paths: string[] = [];
   for (const dirEntry of Deno.readDirSync(inputsDir)) {

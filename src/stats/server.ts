@@ -3,7 +3,7 @@
 // `net/http.ServeMux` maps to a small path router over the standard web
 // Request/Response API; `http.Server` maps to `Deno.serve`.
 
-import { dashboardHTML, mothxPNG, mothxSmallICO } from "./assets.ts";
+import { dashboardHTML, opensacPNG, opensacSmallICO } from "./assets.ts";
 import { DB, type Query } from "./stats.ts";
 
 /** Builds a Query from URL query parameters. */
@@ -73,21 +73,21 @@ export class Server {
     if (p === "/") {
       return htmlResponse(dashboardHTML());
     }
-    if (p === "/mothx-small.ico") {
+    if (p === "/opensac-small.ico") {
       const h = new Headers({
         "Content-Type": "image/x-icon",
         "Cache-Control": "public, max-age=86400",
       });
-      return new Response(mothxSmallICO() as unknown as BodyInit, {
+      return new Response(opensacSmallICO() as unknown as BodyInit, {
         headers: h,
       });
     }
-    if (p === "/mothx.png") {
+    if (p === "/opensac.png") {
       const h = new Headers({
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=86400",
       });
-      return new Response(mothxPNG() as unknown as BodyInit, { headers: h });
+      return new Response(opensacPNG() as unknown as BodyInit, { headers: h });
     }
     if (p === "/api/summary") {
       return this.#json(() =>

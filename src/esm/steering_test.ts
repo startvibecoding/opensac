@@ -5,7 +5,7 @@ import { SteeringSource } from "./steering.ts";
 import { cleanup, makeStore } from "./test_helpers.ts";
 
 Deno.test("SteeringSource injects each active objective version once", () => {
-  const { store, sessionID } = makeStore("mothx-esm-steering-");
+  const { store, sessionID } = makeStore("opensac-esm-steering-");
   try {
     const source = new SteeringSource(store, sessionID);
     assertEquals(source.next().length, 0);
@@ -28,7 +28,7 @@ Deno.test("SteeringSource injects each active objective version once", () => {
 });
 
 Deno.test("SteeringSource skips paused objective until resumed", () => {
-  const { store, sessionID } = makeStore("mothx-esm-steering-");
+  const { store, sessionID } = makeStore("opensac-esm-steering-");
   try {
     store.create(sessionID, "finish the objective");
     const source = new SteeringSource(store, sessionID);

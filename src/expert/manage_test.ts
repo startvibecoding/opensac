@@ -111,8 +111,8 @@ Deno.test("manager project scope and invalid draft", () => {
 
 Deno.test("manager rejects builtin and preserves precedence", () => {
   withTempDir((globalRoot) => {
-    const prev = Deno.env.get("MOTHX_DIR");
-    Deno.env.set("MOTHX_DIR", globalRoot);
+    const prev = Deno.env.get("OPENSAC_DIR");
+    Deno.env.set("OPENSAC_DIR", globalRoot);
     try {
       withTempDir((project) => {
         const manager = new Manager(project);
@@ -142,8 +142,8 @@ Deno.test("manager rejects builtin and preserves precedence", () => {
         assert(false, "frontend-developer missing from effective list");
       });
     } finally {
-      if (prev === undefined) Deno.env.delete("MOTHX_DIR");
-      else Deno.env.set("MOTHX_DIR", prev);
+      if (prev === undefined) Deno.env.delete("OPENSAC_DIR");
+      else Deno.env.set("OPENSAC_DIR", prev);
     }
   });
 });

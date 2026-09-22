@@ -1,7 +1,7 @@
 # opensac
 
-MothX ported to Deno + TypeScript. This repository is the Deno/TS target of a
-1:1 migration from the Go implementation at `/home/free/src/mothx`.
+opensac is MothX ported to Deno + TypeScript. This repository is the Deno/TS
+target of a 1:1 migration from the Go implementation at `/home/free/src/mothx`.
 
 ## Status
 
@@ -24,7 +24,7 @@ Ported so far (all type-checked, linted, and tested):
 | `internal/config` | `src/config` | settings.json/env.json/mcp.json/allow.json schemas, provider presets, sparse load/patch |
 | `internal/imageproc` | `src/imageproc` | prepare/resize/crop, provider family inference; imagescript + @jsquash/webp codecs |
 | `internal/skills` | `src/skills` | skill discovery (builtin/global/project), references, enable/disable toggles |
-| `internal/contextfiles` | `src/contextfiles` | well-known context-file discovery (global/parent/project), `.mothx/rule.md` load/ensure, system-prompt assembly |
+| `internal/contextfiles` | `src/contextfiles` | well-known context-file discovery (global/parent/project), `.opensac/rule.md` load/ensure, system-prompt assembly |
 | `internal/expert` | `src/expert` | expert bundle format (manifest + persona frontmatter), layered builtin/global/project ExpertCenter, writable CRUD manager, embedded seed bundles |
 | `internal/tools` | `src/tools` | tool Registry + standard tools (read/ls/write/edit/insert/plan/find/grep/bash/jobs/kill/question/skill_ref/a2a_dispatch/image_generation), file diff/atomic write, file locks, background jobs |
 | top-level `agent` (public SDK) | `sdk/agent` | public `Agent`/`Provider`/`Builder`/`ExternalTool` interfaces + types (must not import `src/`) |
@@ -61,7 +61,7 @@ deno task test    # deno test -A
 deno task lint    # deno lint
 deno task fmt     # deno fmt
 deno task start   # run src/main.ts
-deno task build   # deno compile -> bin/mothx
+deno task build   # deno compile -> bin/opensac
 ```
 
 Configuration lives in `deno.json` — tasks, formatter, linter, compiler options,

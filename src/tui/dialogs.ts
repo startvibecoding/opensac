@@ -7,16 +7,12 @@
 // and session APIs, and applies the change to the live session. None of them is
 // a status display.
 
-import {
-  type AllowConfig,
-  loadAllow,
-  saveProject,
-  setProjectAutoEdit,
-} from "../config/allow.ts";
+import { type AllowConfig } from "../config/allow.ts";
 import { clearEnv, envList, loadEnv, setEnv, unsetEnv } from "../config/env.ts";
 import {
   defaultProviderConfigsAll,
   getProviderConfig,
+  isProjectDir,
   loadGlobalSettingsSparse,
   loadProjectSettingsSparse,
   resolveKey,
@@ -515,9 +511,17 @@ export class AuthDialog implements DialogController {
   #error = "";
   #pendingCustomID = "";
 
-  constructor(host: DialogHost, dialog: Dialog) {
+  constructor(host: DialogHost, dialog: Dialog, initialProvider = "") {
     this.#host = host;
     this.#dialog = dialog;
+    // `/settings <provider>` deep-links into that provider's detail (Go
+    // openSettingsDialog with a provider arg).
+    const provider = initialProvider.trim();
+    if (provider !== "") {
+      this.#providerID = provider;
+      this.#view = "provider";
+      this.#dialog.resetCursor();
+    }
   }
 
   page(): DialogPage {
@@ -746,158 +750,1310 @@ export class AuthDialog implements DialogController {
 
 // --- /settings --------------------------------------------------------------
 
-/** The `/settings` browser: inspect settings and toggle key switches. */
+/** The second-level settings category views (Go authViewSettings*). */
+type SettingsView =
+  | "root"
+  | "defaults"
+  | "behavior"
+  | "webSearch"
+  | "contextFiles"
+  | "statusLine"
+  | "compaction"
+  | "sandbox"
+  | "paths"
+  | "retry"
+  | "approval";
+
+/** Cycle lists for enum-like fields (Go cycleString lists). */
+const SETTINGS_CYCLES: Record<string, { values: string[]; def: string }> = {
+  defaultThinkingLevel: {
+    values: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+    def: "medium",
+  },
+  defaultMode: { values: ["plan", "agent", "yolo", "os"], def: "yolo" },
+  "sandbox.level": {
+    values: ["none", "standard", "strict"],
+    def: "none",
+  },
+};
+
+/** Fields edited through the single-line input box (Go authSettingsInputPrompt). */
+
+/**
+ * The `/settings` browser: a full category tree with second- and third-level
+ * fields, mirroring the Go auth settings dialog (auth_settings_top.go). Each
+ * row shows the current effective value; Enter cycles enums, flips switches,
+ * opens the text input for free-form fields, or hands off to another dialog
+ * (providers → /auth, defaults → the model picker). All changes persist to the
+ * global settings through the shared config API and reload the live session.
+ */
 export class SettingsDialog implements DialogController {
   #host: DialogHost;
   #dialog: Dialog;
-  #view: "root" | "defaults" | "behavior" = "root";
+  #view: SettingsView = "root";
+  #field = "";
+  #tuiScope: "global" | "project" = "global";
   #error = "";
-  #message = "";
 
   constructor(host: DialogHost, dialog: Dialog) {
     this.#host = host;
     this.#dialog = dialog;
   }
 
+  // --- Page rendering -------------------------------------------------------
+
   page(): DialogPage {
+    return this.#withInput(this.#rawPage());
+  }
+
+  #rawPage(): DialogPage {
     const tr = this.#host.translator;
+    const s = this.#host.settings;
     switch (this.#view) {
       case "root":
-        return {
-          title: tr.text("dialog.settings.title"),
-          items: [
-            {
-              label: tr.text("dialog.settings.defaults"),
-              description: `${this.#host.settings.defaultProvider ?? ""}/${
-                this.#host.settings.defaultModel ?? ""
-              }`,
-              value: "defaults",
-            },
-            {
-              label: tr.text("dialog.settings.behavior"),
-              description: tr.text("dialog.settings.behavior_desc"),
-              value: "behavior",
-            },
-          ],
-          hint: tr.text("dialog.settings.hint"),
-          error: this.#error !== "" ? this.#error : this.#message,
-        };
+        return this.#rootPage();
       case "defaults":
         return {
-          title: tr.text("dialog.settings.defaults"),
+          title: tr.text("settings.category.defaults"),
           items: [
             {
-              label: tr.text("dialog.settings.default_provider"),
-              description: this.#host.settings.defaultProvider ?? "",
-              value: "edit-default",
+              label: tr.text("settings.field.default_model"),
+              description: `${this.#value(s.defaultProvider)} / ${
+                this.#value(s.defaultModel)
+              }`,
+              value: "defaults.modelPicker",
             },
-            {
-              label: tr.text("dialog.settings.default_model"),
-              description: this.#host.settings.defaultModel ?? "",
-              value: "edit-default",
-            },
+            this.#item(
+              "defaultThinkingLevel",
+              tr.text("settings.field.default_thinking"),
+              this.#value(s.defaultThinkingLevel ?? "medium"),
+            ),
+            this.#item(
+              "defaultMode",
+              tr.text("settings.field.default_mode"),
+              this.#value(s.defaultMode ?? "yolo"),
+            ),
+            this.#doneItem(),
           ],
-          hint: tr.text("dialog.settings.defaults_hint"),
-          error: this.#error !== "" ? this.#error : this.#message,
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
         };
-      case "behavior": {
-        const allow = this.#host.allow;
+      case "behavior":
         return {
-          title: tr.text("dialog.settings.behavior"),
+          title: tr.text("settings.category.behavior"),
           items: [
-            {
-              label: tr.text("dialog.settings.auto_edit"),
-              description: allow.autoEdit === true ? "ON" : "OFF",
-              value: "toggle-auto-edit",
-              current: allow.autoEdit === true,
-            },
-            {
-              label: tr.text("dialog.settings.plan_tool"),
-              description: this.#host.settings.enablePlanTool === false
-                ? "OFF"
-                : "ON",
-              value: "toggle-plan-tool",
-              current: this.#host.settings.enablePlanTool !== false,
-            },
+            this.#inputItem(
+              "theme",
+              tr.text("settings.field.theme"),
+              this.#value(s.theme ?? "dark"),
+            ),
+            this.#item(
+              "enablePlanTool",
+              tr.text("settings.field.enable_plan_tool"),
+              this.#boolPtrSummary(s.enablePlanTool, true),
+            ),
+            this.#item(
+              "enableArtifact",
+              tr.text("settings.field.enable_artifact"),
+              this.#boolPtrSummary(s.enableArtifact, false),
+            ),
+            this.#item(
+              "authored",
+              tr.text("settings.field.authored"),
+              this.#yesNo(s.authored === true),
+            ),
+            this.#inputItem(
+              "maxContextTokens",
+              tr.text("settings.field.max_context_tokens"),
+              s.maxContextTokens
+                ? `${s.maxContextTokens}`
+                : tr.text("settings.value.unset"),
+            ),
+            this.#item(
+              "updateCheck",
+              tr.text("settings.field.update_check"),
+              this.#boolPtrSummary(s.updateCheck, true),
+            ),
+            this.#item(
+              "toolExecution.mode",
+              tr.text("settings.field.tool_execution_mode"),
+              this.#toolExecutionMode(),
+            ),
+            this.#inputItem(
+              "toolExecution.maxConcurrency",
+              tr.text("settings.field.tool_max_concurrency"),
+              `${this.#toolExecutionMaxConcurrency()}`,
+            ),
+            this.#doneItem(),
           ],
-          hint: tr.text("dialog.settings.behavior_hint"),
-          error: this.#error !== "" ? this.#error : this.#message,
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
         };
-      }
+      case "webSearch":
+        return {
+          title: tr.text("settings.category.web_search"),
+          items: [
+            this.#item(
+              "webSearch.enabled",
+              tr.text("settings.label.enabled"),
+              this.#boolPtrSummary(s.webSearch?.enabled, false),
+            ),
+            this.#inputItem(
+              "webSearch.provider",
+              tr.text("settings.field.provider"),
+              this.#value(s.webSearch?.provider ?? "openai"),
+            ),
+            this.#inputItem(
+              "webSearch.providerType",
+              tr.text("settings.field.provider_type"),
+              this.#value(s.webSearch?.providerType ?? "responses"),
+            ),
+            this.#inputItem(
+              "webSearch.model",
+              tr.text("settings.field.model"),
+              this.#value(s.webSearch?.model ?? ""),
+            ),
+            this.#item(
+              "imageGeneration.enabled",
+              tr.text("settings.field.image_generation_enabled"),
+              this.#boolPtrSummary(s.imageGeneration?.enabled, false),
+            ),
+            this.#inputItem(
+              "imageGeneration.provider",
+              tr.text("settings.field.image_generation_provider"),
+              this.#value(s.imageGeneration?.provider ?? "openai"),
+            ),
+            this.#inputItem(
+              "imageGeneration.apiType",
+              tr.text("settings.field.image_generation_api_type"),
+              this.#value(s.imageGeneration?.apiType ?? "openai-images"),
+            ),
+            this.#inputItem(
+              "imageGeneration.baseUrl",
+              tr.text("settings.field.image_generation_base_url"),
+              this.#value(s.imageGeneration?.baseUrl ?? ""),
+            ),
+            this.#inputItem(
+              "imageGeneration.token",
+              tr.text("settings.field.image_generation_token"),
+              tr.text("settings.value.hidden"),
+            ),
+            this.#inputItem(
+              "imageGeneration.model",
+              tr.text("settings.field.image_generation_model"),
+              this.#value(s.imageGeneration?.model ?? "gpt-image-1"),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "contextFiles":
+        return {
+          title: tr.text("settings.category.context_files"),
+          items: [
+            this.#item(
+              "contextFiles.enabled",
+              tr.text("settings.label.enabled"),
+              this.#yesNo(s.contextFiles?.enabled === true),
+            ),
+            this.#inputItem(
+              "contextFiles.extraFiles",
+              tr.text("settings.field.extra_files"),
+              this.#listSummary(s.contextFiles?.extraFiles),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "statusLine":
+        return {
+          title: tr.text("settings.category.status_line"),
+          items: [
+            this.#item(
+              "statusLine.enabled",
+              tr.text("settings.label.enabled"),
+              this.#yesNo(s.statusLine?.enabled === true),
+            ),
+            this.#inputItem(
+              "statusLine.type",
+              tr.text("settings.label.type"),
+              this.#value(s.statusLine?.type ?? "command"),
+            ),
+            this.#inputItem(
+              "statusLine.command",
+              tr.text("settings.label.command"),
+              this.#value(s.statusLine?.command ?? "ccstatusline"),
+            ),
+            this.#inputItem(
+              "statusLine.padding",
+              tr.text("settings.label.padding"),
+              `${s.statusLine?.padding ?? 0}`,
+            ),
+            this.#inputItem(
+              "statusLine.refreshInterval",
+              tr.text("settings.label.refresh_interval"),
+              `${s.statusLine?.refreshInterval ?? 0}s`,
+            ),
+            this.#inputItem(
+              "statusLine.timeoutMs",
+              tr.text("settings.label.timeout"),
+              `${s.statusLine?.timeoutMs ?? 800}ms`,
+            ),
+            this.#inputItem(
+              "statusLine.fallback",
+              tr.text("settings.label.fallback"),
+              this.#value(s.statusLine?.fallback ?? "builtin"),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "compaction":
+        return {
+          title: tr.text("settings.category.compaction"),
+          items: [
+            this.#item(
+              "compaction.enabled",
+              tr.text("settings.label.enabled"),
+              this.#yesNo(s.compaction?.enabled === true),
+            ),
+            this.#inputItem(
+              "compaction.reserveTokens",
+              tr.text("settings.field.reserve_tokens"),
+              `${s.compaction?.reserveTokens ?? 0}`,
+            ),
+            this.#inputItem(
+              "compaction.keepRecentTokens",
+              tr.text("settings.field.keep_recent_tokens"),
+              `${s.compaction?.keepRecentTokens ?? 0}`,
+            ),
+            this.#inputItem(
+              "compaction.tokenizer",
+              tr.text("settings.field.tokenizer"),
+              this.#value(s.compaction?.tokenizer ?? "") ||
+                tr.text("settings.value.auto"),
+            ),
+            this.#inputItem(
+              "compaction.tokenizerModel",
+              tr.text("settings.field.tokenizer_model"),
+              this.#value(s.compaction?.tokenizerModel ?? "") ||
+                tr.text("settings.value.auto"),
+            ),
+            this.#inputItem(
+              "compaction.template",
+              tr.text("settings.field.template"),
+              this.#value(s.compaction?.template ?? ""),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "sandbox":
+        return {
+          title: tr.text("settings.category.sandbox"),
+          items: [
+            this.#item(
+              "sandbox.enabled",
+              tr.text("settings.label.enabled"),
+              this.#yesNo(s.sandbox?.enabled === true),
+            ),
+            this.#item(
+              "sandbox.level",
+              tr.text("settings.field.level"),
+              this.#value(s.sandbox?.level ?? "none"),
+            ),
+            this.#inputItem(
+              "sandbox.bwrapPath",
+              tr.text("settings.field.bwrap_path"),
+              this.#value(s.sandbox?.bwrapPath ?? "") ||
+                tr.text("settings.value.auto"),
+            ),
+            this.#inputItem(
+              "sandbox.allowedRead",
+              tr.text("settings.field.allowed_read"),
+              this.#listSummary(s.sandbox?.allowedRead),
+            ),
+            this.#inputItem(
+              "sandbox.allowedWrite",
+              tr.text("settings.field.allowed_write"),
+              this.#listSummary(s.sandbox?.allowedWrite),
+            ),
+            this.#inputItem(
+              "sandbox.deniedPaths",
+              tr.text("settings.field.denied_paths"),
+              this.#listSummary(s.sandbox?.deniedPaths),
+            ),
+            this.#inputItem(
+              "sandbox.passEnv",
+              tr.text("settings.field.pass_env"),
+              this.#listSummary(s.sandbox?.passEnv),
+            ),
+            this.#inputItem(
+              "sandbox.tmpSize",
+              tr.text("settings.field.tmp_size"),
+              this.#value(s.sandbox?.tmpSize ?? "100m"),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "paths":
+        return {
+          title: tr.text("settings.category.paths"),
+          items: [
+            this.#inputItem(
+              "sessionDir",
+              tr.text("settings.field.session_dir"),
+              this.#value(s.sessionDir ?? ""),
+            ),
+            this.#inputItem(
+              "skillsDir",
+              tr.text("settings.field.skills_dir"),
+              this.#value(s.skillsDir ?? ""),
+            ),
+            this.#inputItem(
+              "shellPath",
+              tr.text("settings.field.shell_path"),
+              this.#value(s.shellPath ?? "") ||
+                tr.text("settings.value.default_shell"),
+            ),
+            this.#inputItem(
+              "shellCommandPrefix",
+              tr.text("settings.field.shell_command_prefix"),
+              this.#value(s.shellCommandPrefix ?? "") ||
+                tr.text("settings.value.none"),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "retry":
+        return {
+          title: tr.text("settings.category.retry"),
+          items: [
+            this.#item(
+              "retry.enabled",
+              tr.text("settings.label.enabled"),
+              this.#yesNo(s.retry?.enabled === true),
+            ),
+            this.#inputItem(
+              "retry.maxRetries",
+              tr.text("settings.field.max_retries"),
+              `${s.retry?.maxRetries ?? 0}`,
+            ),
+            this.#inputItem(
+              "retry.baseDelayMs",
+              tr.text("settings.field.base_delay"),
+              `${s.retry?.baseDelayMs ?? 0}ms`,
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
+      case "approval":
+        return {
+          title: tr.text("settings.category.approval"),
+          items: [
+            this.#item(
+              "approval.confirmBeforeWrite",
+              tr.text("settings.field.confirm_before_write"),
+              this.#boolPtrSummary(s.approval?.confirmBeforeWrite, true),
+            ),
+            this.#inputItem(
+              "approval.bashWhitelist",
+              tr.text("settings.field.bash_whitelist"),
+              this.#listSummary(s.approval?.bashWhitelist),
+            ),
+            this.#inputItem(
+              "approval.bashBlacklist",
+              tr.text("settings.field.bash_blacklist"),
+              this.#listSummary(s.approval?.bashBlacklist),
+            ),
+            this.#doneItem(),
+          ],
+          hint: tr.text("dialog.settings.hint"),
+          error: this.#error,
+        };
     }
   }
 
+  #rootPage(): DialogPage {
+    const tr = this.#host.translator;
+    const s = this.#host.settings;
+    const providers = Object.keys(s.providers ?? {});
+    return {
+      title: tr.text("dialog.settings.title"),
+      items: [
+        {
+          label: tr.text("settings.category.providers"),
+          description: tr.text(
+            "settings.summary.providers",
+            providers.length,
+            this.#value(s.defaultProvider),
+            this.#value(s.defaultModel),
+          ),
+          value: "providers",
+        },
+        {
+          label: tr.text("settings.category.defaults"),
+          description: tr.text(
+            "settings.summary.defaults",
+            this.#value(s.defaultMode ?? "yolo"),
+            this.#value(s.defaultThinkingLevel ?? "medium"),
+          ),
+          value: "defaults",
+        },
+        {
+          label: tr.text("settings.category.behavior"),
+          description: tr.text(
+            "settings.summary.behavior",
+            this.#value(s.theme ?? "dark"),
+            this.#boolPtrSummary(s.enablePlanTool, true),
+          ),
+          value: "behavior",
+        },
+        {
+          label: tr.text("settings.category.web_search"),
+          description: tr.text(
+            "settings.summary.web_search",
+            this.#boolPtrSummary(s.webSearch?.enabled, false),
+            this.#value(s.webSearch?.provider ?? "openai"),
+          ),
+          value: "webSearch",
+        },
+        {
+          label: tr.text("settings.category.context_files"),
+          description: tr.text(
+            "settings.summary.context_files",
+            this.#yesNo(s.contextFiles?.enabled === true),
+            (s.contextFiles?.extraFiles ?? []).length,
+          ),
+          value: "contextFiles",
+        },
+        {
+          label: tr.text("settings.category.status_line"),
+          description: tr.text(
+            "settings.summary.status_line",
+            this.#yesNo(s.statusLine?.enabled === true),
+            this.#value(s.statusLine?.type ?? "command"),
+          ),
+          value: "statusLine",
+        },
+        {
+          label: tr.text("settings.category.compaction"),
+          description: tr.text(
+            "settings.summary.compaction",
+            this.#yesNo(s.compaction?.enabled === true),
+            `${s.compaction?.reserveTokens ?? 0}`,
+            `${s.compaction?.keepRecentTokens ?? 0}`,
+          ),
+          value: "compaction",
+        },
+        {
+          label: tr.text("settings.category.sandbox"),
+          description: tr.text(
+            "settings.summary.sandbox",
+            this.#yesNo(s.sandbox?.enabled === true),
+            this.#value(s.sandbox?.level ?? "none"),
+          ),
+          value: "sandbox",
+        },
+        {
+          label: tr.text("settings.category.paths"),
+          description: tr.text(
+            "settings.summary.paths",
+            this.#value(s.sessionDir ?? ""),
+          ),
+          value: "paths",
+        },
+        {
+          label: tr.text("settings.category.retry"),
+          description: tr.text(
+            "settings.summary.retry",
+            this.#yesNo(s.retry?.enabled === true),
+            s.retry?.maxRetries ?? 0,
+            s.retry?.baseDelayMs ?? 0,
+          ),
+          value: "retry",
+        },
+        {
+          label: tr.text("settings.category.approval"),
+          description: tr.text(
+            "settings.summary.approval",
+            this.#boolPtrSummary(s.approval?.confirmBeforeWrite, true),
+            (s.approval?.bashWhitelist ?? []).length,
+            (s.approval?.bashBlacklist ?? []).length,
+          ),
+          value: "approval",
+        },
+        {
+          label: tr.text("settings.language"),
+          description: tr.text(
+            "settings.language.description",
+            this.#value(s.tuilang ?? "auto"),
+            tr.language,
+            this.#value(s.tuilang ?? "auto"),
+            this.#tuiScope,
+          ),
+          value: "tuilang",
+        },
+        {
+          label: tr.text("settings.language.scope"),
+          description: tr.text(
+            "settings.language.scope.description",
+            this.#tuiScope,
+          ),
+          value: "tuilang.scope",
+        },
+        {
+          label: tr.text("settings.language.save"),
+          description: tr.text("settings.language.save.description"),
+          value: "tuilang.save",
+        },
+      ],
+      hint: tr.text("dialog.settings.hint"),
+      error: this.#error,
+    };
+  }
+
+  // --- Row helpers -----------------------------------------------------------
+
+  /** Adds the input box to a page while a field is being edited. */
+  #withInput(page: DialogPage): DialogPage {
+    if (this.#field === "") return page;
+    const tr = this.#host.translator;
+    const prompt = this.#inputPrompt(this.#field);
+    return {
+      ...page,
+      input: {
+        prompt: tr.text(prompt),
+        value: this.#dialog.inputActive
+          ? this.#dialog.inputValue
+          : this.#inputValue(this.#field),
+        placeholder: "",
+        masked: this.#field === "imageGeneration.token",
+      },
+    };
+  }
+
+  /** The input prompt message id for a field (Go authSettingsInputPrompt). */
+  #inputPrompt(field: string): string {
+    switch (field) {
+      case "theme":
+        return "settings.prompt.theme";
+      case "maxContextTokens":
+        return "settings.prompt.max_context_tokens";
+      case "webSearch.provider":
+        return "settings.prompt.web_provider";
+      case "webSearch.providerType":
+        return "settings.prompt.web_provider_type";
+      case "webSearch.model":
+        return "settings.prompt.web_model";
+      case "toolExecution.maxConcurrency":
+        return "settings.prompt.tool_max_concurrency";
+      case "imageGeneration.provider":
+        return "settings.prompt.image_provider";
+      case "imageGeneration.apiType":
+        return "settings.prompt.image_api_type";
+      case "imageGeneration.baseUrl":
+        return "settings.prompt.image_base_url";
+      case "imageGeneration.token":
+        return "settings.prompt.image_token";
+      case "imageGeneration.model":
+        return "settings.prompt.image_model";
+      case "contextFiles.extraFiles":
+        return "settings.prompt.extra_files";
+      case "statusLine.type":
+        return "settings.prompt.status_line_type";
+      case "statusLine.command":
+        return "settings.prompt.status_line_command";
+      case "statusLine.padding":
+        return "settings.prompt.status_line_padding";
+      case "statusLine.refreshInterval":
+        return "settings.prompt.refresh_interval";
+      case "statusLine.timeoutMs":
+        return "settings.prompt.timeout_ms";
+      case "statusLine.fallback":
+        return "settings.prompt.status_line_fallback";
+      case "compaction.reserveTokens":
+        return "settings.prompt.reserve_tokens";
+      case "compaction.keepRecentTokens":
+        return "settings.prompt.keep_recent_tokens";
+      case "compaction.tokenizer":
+        return "settings.prompt.tokenizer";
+      case "compaction.tokenizerModel":
+        return "settings.prompt.tokenizer_model";
+      case "compaction.template":
+        return "settings.prompt.template";
+      case "sandbox.bwrapPath":
+        return "settings.prompt.bwrap_path";
+      case "sandbox.allowedRead":
+      case "sandbox.allowedWrite":
+      case "sandbox.deniedPaths":
+      case "sandbox.passEnv":
+        return "settings.prompt.list_values";
+      case "sandbox.tmpSize":
+        return "settings.prompt.tmp_size";
+      case "sessionDir":
+        return "settings.prompt.session_dir";
+      case "skillsDir":
+        return "settings.prompt.skills_dir";
+      case "shellPath":
+        return "settings.prompt.shell_path";
+      case "shellCommandPrefix":
+        return "settings.prompt.shell_prefix";
+      case "retry.maxRetries":
+        return "settings.prompt.max_retries";
+      case "retry.baseDelayMs":
+        return "settings.prompt.base_delay";
+      case "approval.bashWhitelist":
+      case "approval.bashBlacklist":
+        return "settings.prompt.approval_prefixes";
+      default:
+        return "settings.prompt.list_values";
+    }
+  }
+
+  #item(field: string, label: string, description: string): DialogItem {
+    return { label, description, value: field };
+  }
+
+  #inputItem(
+    field: string,
+    label: string,
+    description: string,
+  ): DialogItem {
+    return { label, description, value: `input:${field}` };
+  }
+
+  #doneItem(): DialogItem {
+    return {
+      label: this.#host.translator.text("settings.done"),
+      description: this.#host.translator.text("settings.return"),
+      value: "done",
+    };
+  }
+
+  #value(v: string | undefined): string {
+    const tr = this.#host.translator;
+    const t = (v ?? "").trim();
+    if (t === "") return tr.text("settings.value.unset");
+    return t;
+  }
+
+  #yesNo(v: boolean): string {
+    return this.#host.translator.text(
+      v ? "settings.value.yes" : "settings.value.no",
+    );
+  }
+
+  #boolPtrSummary(v: boolean | undefined, def: boolean): string {
+    const tr = this.#host.translator;
+    if (v === undefined) {
+      return tr.text(
+        def ? "settings.value.auto_enabled" : "settings.value.auto_disabled",
+      );
+    }
+    return tr.text(v ? "settings.value.enabled" : "settings.value.disabled");
+  }
+
+  #listSummary(values: string[] | undefined): string {
+    const tr = this.#host.translator;
+    const list = (values ?? []).filter((v) => v.trim() !== "");
+    if (list.length === 0) return tr.text("settings.value.empty");
+    if (list.length === 1) return this.#value(list[0]);
+    return `${list.length} entries`;
+  }
+
+  #toolExecutionMode(): string {
+    const te = this.#host.settings.toolExecution;
+    return this.#value(te?.mode ?? "parallel");
+  }
+
+  #toolExecutionMaxConcurrency(): number {
+    return this.#host.settings.toolExecution?.maxConcurrency ?? 10;
+  }
+
+  // --- Selection -------------------------------------------------------------
+
   select(value: string): void {
+    this.#error = "";
+    if (value === "done") {
+      this.back();
+      return;
+    }
+    if (value === "providers") {
+      this.#dialog.close(undefined, false, "auth");
+      return;
+    }
+    if (value === "defaults.modelPicker") {
+      this.#dialog.close(undefined, false, "defaultModel");
+      return;
+    }
+    if (value === "tuilang.scope") {
+      this.#cycleTuiScope();
+      return;
+    }
+    if (value === "tuilang.save") {
+      this.#saveTuiLang();
+      return;
+    }
+    if (value.startsWith("input:")) {
+      const field = value.slice("input:".length);
+      this.#field = field;
+      this.#dialog.openInput(this.#inputValue(field));
+      return;
+    }
+    // Category entry.
+    if (this.#isView(value)) {
+      this.#view = value;
+      this.#dialog.resetCursor();
+      return;
+    }
+    if (value === "tuilang") {
+      this.#cycleTuiLang();
+      return;
+    }
+    if (SETTINGS_CYCLES[value] !== undefined) {
+      this.#cycleField(value);
+      return;
+    }
+    if (value === "enablePlanTool") {
+      this.#cycleBoolPtr("enablePlanTool", true);
+      return;
+    }
+    if (value === "enableArtifact") {
+      this.#cycleBoolPtr("enableArtifact", false);
+      return;
+    }
+    if (value === "updateCheck") {
+      this.#cycleBoolPtr("updateCheck", true);
+      return;
+    }
+    if (value === "webSearch.enabled") {
+      this.#cycleBoolPtr("webSearch.enabled", false);
+      return;
+    }
+    if (value === "imageGeneration.enabled") {
+      this.#cycleBoolPtr("imageGeneration.enabled", false);
+      return;
+    }
+    if (value === "approval.confirmBeforeWrite") {
+      this.#cycleBoolPtr("approval.confirmBeforeWrite", true);
+      return;
+    }
+    // Plain booleans: flip and save.
     switch (value) {
-      case "defaults":
-        this.#view = "defaults";
-        this.#dialog.resetCursor();
+      case "authored":
+        this.#save({ authored: this.#host.settings.authored !== true });
         return;
-      case "behavior":
-        this.#view = "behavior";
-        this.#dialog.resetCursor();
+      case "contextFiles.enabled":
+        this.#save({
+          contextFiles: {
+            ...(this.#host.settings.contextFiles ?? { enabled: false }),
+            enabled: this.#host.settings.contextFiles?.enabled !== true,
+          },
+        });
         return;
-      case "edit-default":
-        // Hand off to the default-model picker.
-        this.#dialog.close(undefined);
+      case "statusLine.enabled": {
+        const next = {
+          ...(this.#host.settings.statusLine ?? {}),
+          enabled: this.#host.settings.statusLine?.enabled !== true,
+        };
+        if (next.enabled) this.#normalizeStatusLine(next);
+        this.#save({ statusLine: next });
         return;
-      case "toggle-auto-edit":
-        this.#toggleAutoEdit();
+      }
+      case "compaction.enabled":
+        this.#save({
+          compaction: {
+            ...(this.#host.settings.compaction ??
+              { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
+            enabled: this.#host.settings.compaction?.enabled !== true,
+          },
+        });
         return;
-      case "toggle-plan-tool":
-        this.#togglePlanTool();
+      case "sandbox.enabled":
+        this.#save({
+          sandbox: {
+            ...(this.#host.settings.sandbox ??
+              { enabled: false, level: "none", allowNetwork: false }),
+            enabled: this.#host.settings.sandbox?.enabled !== true,
+          },
+        });
+        return;
+      case "retry.enabled":
+        this.#save({
+          retry: {
+            ...(this.#host.settings.retry ??
+              { enabled: false, maxRetries: 0, baseDelayMs: 0 }),
+            enabled: this.#host.settings.retry?.enabled !== true,
+          },
+        });
         return;
       default:
         return;
     }
   }
 
-  #toggleAutoEdit(): void {
-    const tr = this.#host.translator;
-    const next = !(this.#host.allow.autoEdit === true);
-    try {
-      const allow = loadAllow();
-      setProjectAutoEdit(allow, next);
-      saveProject(allow);
-      this.#host.reloadSettings();
-      this.#message = tr.text(
-        "allowautoedit.saved",
-        next ? "ON" : "OFF",
-        "project",
+  #isView(value: string): value is SettingsView {
+    return [
+      "defaults",
+      "behavior",
+      "webSearch",
+      "contextFiles",
+      "statusLine",
+      "compaction",
+      "sandbox",
+      "paths",
+      "retry",
+      "approval",
+    ].includes(value);
+  }
+
+  // --- Cycle / toggle helpers ------------------------------------------------
+
+  #cycleField(field: string): void {
+    const spec = SETTINGS_CYCLES[field];
+    if (spec === undefined) return;
+    const current = this.#readField(field) ?? spec.def;
+    const idx = spec.values.indexOf(current);
+    const next = spec.values[(idx + 1) % spec.values.length];
+    this.#save({ [field]: next });
+  }
+
+  #cycleBoolPtr(field: string, def: boolean): void {
+    const current = this.#readBoolPtr(field);
+    let next: boolean | undefined;
+    if (current === undefined) next = !def;
+    else if (current !== def) next = def;
+    else next = undefined;
+    if (field === "webSearch.enabled") {
+      this.#save({
+        webSearch: {
+          ...(this.#host.settings.webSearch ?? {}),
+          enabled: next,
+        },
+      });
+    } else if (field === "imageGeneration.enabled") {
+      this.#save({
+        imageGeneration: {
+          ...(this.#host.settings.imageGeneration ?? {}),
+          enabled: next,
+        },
+      });
+    } else if (field === "approval.confirmBeforeWrite") {
+      this.#save({
+        approval: {
+          ...(this.#host.settings.approval ?? {}),
+          confirmBeforeWrite: next,
+        },
+      });
+    } else {
+      this.#save({ [field]: next });
+    }
+  }
+
+  #readField(field: string): string | undefined {
+    const s = this.#host.settings;
+    switch (field) {
+      case "defaultThinkingLevel":
+        return s.defaultThinkingLevel;
+      case "defaultMode":
+        return s.defaultMode;
+      case "sandbox.level":
+        return s.sandbox?.level;
+      default:
+        return undefined;
+    }
+  }
+
+  #readBoolPtr(field: string): boolean | undefined {
+    const s = this.#host.settings;
+    switch (field) {
+      case "enablePlanTool":
+        return s.enablePlanTool;
+      case "enableArtifact":
+        return s.enableArtifact;
+      case "updateCheck":
+        return s.updateCheck;
+      case "webSearch.enabled":
+        return s.webSearch?.enabled;
+      case "imageGeneration.enabled":
+        return s.imageGeneration?.enabled;
+      case "approval.confirmBeforeWrite":
+        return s.approval?.confirmBeforeWrite;
+      default:
+        return undefined;
+    }
+  }
+
+  #cycleTuiLang(): void {
+    const order = ["auto", "zh", "en"];
+    const current = this.#host.settings.tuilang ?? "auto";
+    const idx = order.indexOf(current);
+    const next = order[(idx + 1) % order.length];
+    this.#saveTuiLangValue(next);
+  }
+
+  #cycleTuiScope(): void {
+    if (this.#tuiScope === "project") {
+      this.#tuiScope = "global";
+      return;
+    }
+    if (!isProjectDir(this.#host.workDir)) {
+      this.#error = this.#host.translator.text(
+        "settings.language.project_unavailable",
       );
-      this.#error = "";
+      return;
+    }
+    this.#tuiScope = "project";
+  }
+
+  #saveTuiLang(): void {
+    this.#saveTuiLangValue(this.#host.settings.tuilang ?? "auto");
+  }
+
+  #saveTuiLangValue(value: string): void {
+    try {
+      if (this.#tuiScope === "project") {
+        if (!isProjectDir(this.#host.workDir)) {
+          this.#error = this.#host.translator.text(
+            "settings.language.project_unavailable",
+          );
+          return;
+        }
+        saveProjectSettingsPatch({ tuilang: value });
+      } else {
+        saveGlobalSettingsPatch({ tuilang: value });
+      }
+      this.#host.settings.tuilang = value;
+      this.#host.reloadSettings();
     } catch (err) {
-      this.#error = tr.text(
-        "alloweditpath.save_failed",
+      this.#error = this.#host.translator.text(
+        "settings.language.save_failed",
         (err as Error).message,
       );
     }
   }
 
-  #togglePlanTool(): void {
-    const tr = this.#host.translator;
-    const next = this.#host.settings.enablePlanTool === false;
-    try {
-      const sparse = loadGlobalSettingsSparse();
-      sparse.enablePlanTool = next;
-      saveGlobalSettings(sparse);
-      this.#host.reloadSettings();
-      this.#message = tr.text(
-        "dialog.settings.plan_tool_saved",
-        next ? "ON" : "OFF",
-      );
-      this.#error = "";
-    } catch (err) {
-      this.#error = tr.text("settings.save_failed", (err as Error).message);
+  #normalizeStatusLine(next: Record<string, unknown>): void {
+    if (next.type === undefined || next.type === "") next.type = "command";
+    if (next.command === undefined || (next.command as string).trim() === "") {
+      next.command = "ccstatusline";
+    }
+    if (next.timeoutMs === undefined || next.timeoutMs === 0) {
+      next.timeoutMs = 800;
+    }
+    if (next.fallback === undefined || next.fallback === "") {
+      next.fallback = "builtin";
     }
   }
 
-  submit(): void {}
+  // --- Input submit ----------------------------------------------------------
+
+  /** The current value prefilled when the input box opens. */
+  #inputValue(field: string): string {
+    const s = this.#host.settings;
+    switch (field) {
+      case "theme":
+        return s.theme ?? "";
+      case "maxContextTokens":
+        return s.maxContextTokens ? `${s.maxContextTokens}` : "";
+      case "webSearch.provider":
+        return s.webSearch?.provider ?? "";
+      case "webSearch.providerType":
+        return s.webSearch?.providerType ?? "";
+      case "webSearch.model":
+        return s.webSearch?.model ?? "";
+      case "toolExecution.maxConcurrency":
+        return `${this.#toolExecutionMaxConcurrency()}`;
+      case "imageGeneration.provider":
+        return s.imageGeneration?.provider ?? "";
+      case "imageGeneration.apiType":
+        return s.imageGeneration?.apiType ?? "";
+      case "imageGeneration.baseUrl":
+        return s.imageGeneration?.baseUrl ?? "";
+      case "imageGeneration.token":
+        return s.imageGeneration?.token ?? "";
+      case "imageGeneration.model":
+        return s.imageGeneration?.model ?? "";
+      case "contextFiles.extraFiles":
+        return (s.contextFiles?.extraFiles ?? []).join(", ");
+      case "statusLine.type":
+        return s.statusLine?.type ?? "";
+      case "statusLine.command":
+        return s.statusLine?.command ?? "";
+      case "statusLine.padding":
+        return `${s.statusLine?.padding ?? 0}`;
+      case "statusLine.refreshInterval":
+        return `${s.statusLine?.refreshInterval ?? 0}`;
+      case "statusLine.timeoutMs":
+        return `${s.statusLine?.timeoutMs ?? 0}`;
+      case "statusLine.fallback":
+        return s.statusLine?.fallback ?? "";
+      case "compaction.reserveTokens":
+        return `${s.compaction?.reserveTokens ?? 0}`;
+      case "compaction.keepRecentTokens":
+        return `${s.compaction?.keepRecentTokens ?? 0}`;
+      case "compaction.tokenizer":
+        return s.compaction?.tokenizer ?? "";
+      case "compaction.tokenizerModel":
+        return s.compaction?.tokenizerModel ?? "";
+      case "compaction.template":
+        return s.compaction?.template ?? "";
+      case "sandbox.bwrapPath":
+        return s.sandbox?.bwrapPath ?? "";
+      case "sandbox.allowedRead":
+        return (s.sandbox?.allowedRead ?? []).join(", ");
+      case "sandbox.allowedWrite":
+        return (s.sandbox?.allowedWrite ?? []).join(", ");
+      case "sandbox.deniedPaths":
+        return (s.sandbox?.deniedPaths ?? []).join(", ");
+      case "sandbox.passEnv":
+        return (s.sandbox?.passEnv ?? []).join(", ");
+      case "sandbox.tmpSize":
+        return s.sandbox?.tmpSize ?? "";
+      case "sessionDir":
+        return s.sessionDir ?? "";
+      case "skillsDir":
+        return s.skillsDir ?? "";
+      case "shellPath":
+        return s.shellPath ?? "";
+      case "shellCommandPrefix":
+        return s.shellCommandPrefix ?? "";
+      case "retry.maxRetries":
+        return `${s.retry?.maxRetries ?? 0}`;
+      case "retry.baseDelayMs":
+        return `${s.retry?.baseDelayMs ?? 0}`;
+      case "approval.bashWhitelist":
+        return (s.approval?.bashWhitelist ?? []).join(", ");
+      case "approval.bashBlacklist":
+        return (s.approval?.bashBlacklist ?? []).join(", ");
+      default:
+        return "";
+    }
+  }
+
+  submit(value: string): void {
+    this.#error = "";
+    const field = this.#field;
+    const input = value.trim();
+    try {
+      const patch = this.#buildPatch(field, input);
+      if (patch !== null) this.#save(patch);
+    } catch (err) {
+      this.#error = (err as Error).message;
+    }
+    this.#dialog.closeInput();
+  }
+
+  /** Builds a global-settings patch for one input field. */
+  #buildPatch(field: string, input: string): Record<string, unknown> | null {
+    const s = this.#host.settings;
+    const tr = this.#host.translator;
+    switch (field) {
+      case "theme":
+        return { theme: input };
+      case "maxContextTokens":
+        return { maxContextTokens: this.#int(input, tr) };
+      case "webSearch.provider":
+        return { webSearch: { ...(s.webSearch ?? {}), provider: input } };
+      case "webSearch.providerType":
+        return { webSearch: { ...(s.webSearch ?? {}), providerType: input } };
+      case "webSearch.model":
+        return { webSearch: { ...(s.webSearch ?? {}), model: input } };
+      case "toolExecution.maxConcurrency":
+        return {
+          toolExecution: {
+            ...(s.toolExecution ?? {}),
+            maxConcurrency: this.#int(input, tr),
+          },
+        };
+      case "imageGeneration.provider":
+        return {
+          imageGeneration: { ...(s.imageGeneration ?? {}), provider: input },
+        };
+      case "imageGeneration.apiType":
+        return {
+          imageGeneration: { ...(s.imageGeneration ?? {}), apiType: input },
+        };
+      case "imageGeneration.baseUrl":
+        return {
+          imageGeneration: { ...(s.imageGeneration ?? {}), baseUrl: input },
+        };
+      case "imageGeneration.token":
+        return {
+          imageGeneration: { ...(s.imageGeneration ?? {}), token: input },
+        };
+      case "imageGeneration.model":
+        return {
+          imageGeneration: { ...(s.imageGeneration ?? {}), model: input },
+        };
+      case "contextFiles.extraFiles":
+        return {
+          contextFiles: {
+            ...(s.contextFiles ?? { enabled: false }),
+            extraFiles: this.#list(input),
+          },
+        };
+      case "statusLine.type":
+        return { statusLine: { ...(s.statusLine ?? {}), type: input } };
+      case "statusLine.command":
+        return { statusLine: { ...(s.statusLine ?? {}), command: input } };
+      case "statusLine.padding":
+        return {
+          statusLine: {
+            ...(s.statusLine ?? {}),
+            padding: this.#int(input, tr),
+          },
+        };
+      case "statusLine.refreshInterval":
+        return {
+          statusLine: {
+            ...(s.statusLine ?? {}),
+            refreshInterval: this.#int(input, tr),
+          },
+        };
+      case "statusLine.timeoutMs":
+        return {
+          statusLine: {
+            ...(s.statusLine ?? {}),
+            timeoutMs: this.#int(input, tr),
+          },
+        };
+      case "statusLine.fallback":
+        return { statusLine: { ...(s.statusLine ?? {}), fallback: input } };
+      case "compaction.reserveTokens":
+        return {
+          compaction: {
+            ...(s.compaction ??
+              { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
+            reserveTokens: this.#int(input, tr),
+          },
+        };
+      case "compaction.keepRecentTokens":
+        return {
+          compaction: {
+            ...(s.compaction ??
+              { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
+            keepRecentTokens: this.#int(input, tr),
+          },
+        };
+      case "compaction.tokenizer":
+        return {
+          compaction: { ...(s.compaction ?? {}), tokenizer: input },
+        };
+      case "compaction.tokenizerModel":
+        return {
+          compaction: { ...(s.compaction ?? {}), tokenizerModel: input },
+        };
+      case "compaction.template":
+        return {
+          compaction: { ...(s.compaction ?? {}), template: input },
+        };
+      case "sandbox.bwrapPath":
+        return { sandbox: { ...(s.sandbox ?? {}), bwrapPath: input } };
+      case "sandbox.allowedRead":
+        return {
+          sandbox: { ...(s.sandbox ?? {}), allowedRead: this.#list(input) },
+        };
+      case "sandbox.allowedWrite":
+        return {
+          sandbox: { ...(s.sandbox ?? {}), allowedWrite: this.#list(input) },
+        };
+      case "sandbox.deniedPaths":
+        return {
+          sandbox: { ...(s.sandbox ?? {}), deniedPaths: this.#list(input) },
+        };
+      case "sandbox.passEnv":
+        return {
+          sandbox: { ...(s.sandbox ?? {}), passEnv: this.#list(input) },
+        };
+      case "sandbox.tmpSize":
+        return { sandbox: { ...(s.sandbox ?? {}), tmpSize: input } };
+      case "sessionDir":
+        return { sessionDir: input };
+      case "skillsDir":
+        return { skillsDir: input };
+      case "shellPath":
+        return { shellPath: input };
+      case "shellCommandPrefix":
+        return { shellCommandPrefix: input };
+      case "retry.maxRetries":
+        return {
+          retry: {
+            ...(s.retry ?? { enabled: false, maxRetries: 0, baseDelayMs: 0 }),
+            maxRetries: this.#int(input, tr),
+          },
+        };
+      case "retry.baseDelayMs":
+        return {
+          retry: {
+            ...(s.retry ?? { enabled: false, maxRetries: 0, baseDelayMs: 0 }),
+            baseDelayMs: this.#int(input, tr),
+          },
+        };
+      case "approval.bashWhitelist":
+        return {
+          approval: {
+            ...(s.approval ?? {}),
+            bashWhitelist: this.#list(input, true),
+          },
+        };
+      case "approval.bashBlacklist":
+        return {
+          approval: {
+            ...(s.approval ?? {}),
+            bashBlacklist: this.#list(input, true),
+          },
+        };
+      default:
+        return null;
+    }
+  }
+
+  #int(input: string, tr: Translator): number {
+    if (!/^\d+$/.test(input.trim())) {
+      throw new Error(tr.text("settings.error.non_negative_integer"));
+    }
+    return Number.parseInt(input, 10);
+  }
+
+  /** Splits comma/newline separated values; `keepTrailing` preserves trailing spaces. */
+  #list(input: string, keepTrailing = false): string[] {
+    return input
+      .split(/[,\n]/)
+      .map((v) => (keepTrailing ? v.replace(/^\s+/u, "") : v.trim()))
+      .filter((v) => v !== "");
+  }
+
+  /** Persists a patch to global settings and refreshes the live session. */
+  #save(patch: Record<string, unknown>): void {
+    try {
+      saveGlobalSettingsPatch(patch);
+      this.#host.reloadSettings();
+    } catch (err) {
+      this.#error = this.#host.translator.text(
+        "settings.save_failed",
+        (err as Error).message,
+      );
+    }
+  }
+
   key(): void {}
 
   back(): void {
     if (this.#view !== "root") {
       this.#view = "root";
+      this.#error = "";
       this.#dialog.resetCursor();
       return;
     }

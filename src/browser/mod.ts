@@ -1,7 +1,7 @@
 // Public surface of src/browser (ported from internal/browser + the vibe-browser
 // SDK packages it depends on).
 //
-// The mothx `browser` tool controls a Chromium-family browser through the
+// The opensac `browser` tool controls a Chromium-family browser through the
 // ported vibe-browser client, which supports direct CDP mode (`Client.open`)
 // and daemon mode (`Client.connect`).
 

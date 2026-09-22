@@ -22,7 +22,7 @@ export interface MigrationRecovery {
 /** Returns the one-line operator-facing summary of a recovery. */
 export function describeMigrationRecovery(r: MigrationRecovery): string {
   if (r.peer) {
-    return `another MothX process rebuilt the database at ${r.path} after a failed migration`;
+    return `another OpenSAC process rebuilt the database at ${r.path} after a failed migration`;
   }
   if (r.backupPath === "") {
     return `database migration failed for ${r.path} (${

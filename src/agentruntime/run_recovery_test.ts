@@ -70,7 +70,7 @@ function delay(ms: number): Promise<void> {
 }
 
 Deno.test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     const now = new Date();
@@ -108,7 +108,7 @@ Deno.test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
 });
 
 Deno.test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     for (let i = 0; i < 10; i++) {
@@ -149,7 +149,7 @@ Deno.test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
 });
 
 Deno.test("RecoverOrphanedRunsSlowAttemptDoesNotBlockOtherSessions", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     initRecoveryTestSession(sessionDir, "slow-session");
@@ -223,7 +223,7 @@ async function recoverOrphanedRunsWithSlowPolicy(
 }
 
 Deno.test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     initRecoveryTestSession(sessionDir, "session-local");
@@ -264,7 +264,7 @@ Deno.test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => 
 });
 
 Deno.test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-owned");
     const guard = acquireExecutionAdmission(sessionDir, "session-owned");
@@ -300,7 +300,7 @@ Deno.test("DefaultRunRecoveryPolicyDoesNotTrustSourceAlone", () => {
 });
 
 Deno.test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-remote-record");
     const now = new Date();
@@ -337,7 +337,7 @@ Deno.test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
 });
 
 Deno.test("RecoveryFailureIsDurableAndRetryable", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-retry");
     new RunStore(sessionDir).create(durableRun({

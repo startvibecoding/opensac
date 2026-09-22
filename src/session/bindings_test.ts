@@ -19,7 +19,7 @@ import {
 import { openRootDB } from "./root_db.ts";
 
 Deno.test("channel tools persist for a session", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-channel-tools";
     const db = openRootDB(sessionDir);
@@ -65,7 +65,7 @@ Deno.test("channel binding validation", () => {
 });
 
 Deno.test("find binding returns null for missing identity", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     // Ensure the schema exists before querying.
     openRootDB(sessionDir);

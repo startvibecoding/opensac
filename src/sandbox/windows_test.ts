@@ -25,16 +25,16 @@ Deno.test("win sandbox wrapCommand shell selection", () => {
 
 Deno.test("win sandbox buildEnv filters and overlays", () => {
   const sb = newWinSandbox(Deno.cwd(), Level.Standard);
-  Deno.env.set("MOTHX_SANDBOX_LEAK", "1");
+  Deno.env.set("OPENSAC_SANDBOX_LEAK", "1");
   try {
     const env = sb.buildEnv({});
     // Non-allow-listed parent variables are dropped.
-    assert(!env.includes("MOTHX_SANDBOX_LEAK=1"));
+    assert(!env.includes("OPENSAC_SANDBOX_LEAK=1"));
     assert(env.some((e) => e.startsWith("PATH=")) || env.length === 0);
 
     const withOpts = sb.buildEnv({ envVars: { FOO: "bar" } });
     assert(withOpts.includes("FOO=bar"));
   } finally {
-    Deno.env.delete("MOTHX_SANDBOX_LEAK");
+    Deno.env.delete("OPENSAC_SANDBOX_LEAK");
   }
 });

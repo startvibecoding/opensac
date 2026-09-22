@@ -1,6 +1,6 @@
 // Focused tests for the ACP session-establishing slice of src/acp/server.ts
 // (translated from the session/new, session/load, session/resume, session/fork,
-// session/set_config_option, session/set_mode, mothx/session/draft-config-
+// session/set_config_option, session/set_mode, opensac/session/draft-config-
 // options, available-commands and MCP-notification paths of
 // internal/acp/acp.go). Fixtures create real persisted sessions in a temp
 // session directory and call the handlers directly; because the fixture never
@@ -83,7 +83,7 @@ interface Fixture {
 }
 
 function newFixture(): Fixture {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-open-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-open-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
   const workDir = path.join(root, "work");
@@ -357,19 +357,19 @@ Deno.test("session/set_config_option accepts a boolean capability value", async 
   );
 });
 
-Deno.test("mothx/session/draft-config-options returns empty without a provider", () => {
+Deno.test("opensac/session/draft-config-options returns empty without a provider", () => {
   const { server, sink, workDir } = newFixture();
   server.handleDraftConfigOptions(
-    rpc(1, "mothx/session/draft-config-options", { cwd: workDir }),
+    rpc(1, "opensac/session/draft-config-options", { cwd: workDir }),
   );
   const result = responseOf(sink.toString()).result as Record<string, unknown>;
   assertEquals(result.configOptions, []);
 });
 
-Deno.test("mothx/session/draft-config-options requires a cwd", () => {
+Deno.test("opensac/session/draft-config-options requires a cwd", () => {
   const { server, sink } = newFixture();
   server.handleDraftConfigOptions(
-    rpc(1, "mothx/session/draft-config-options", {}),
+    rpc(1, "opensac/session/draft-config-options", {}),
   );
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });

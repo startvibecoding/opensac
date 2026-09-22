@@ -26,8 +26,8 @@ function inputTestSession(): {
   workDir: string;
   sessionId: string;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-inputmat-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "mothx-work-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-inputmat-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "opensac-work-" });
   const manager = newManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };

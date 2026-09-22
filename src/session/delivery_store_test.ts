@@ -56,7 +56,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 function deliveryFixture(): { sessionDir: string; sessionId: string } {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-delivery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-delivery-" });
   const sessionId = "delivery-session";
   const started = new Date();
   createSessionRun(

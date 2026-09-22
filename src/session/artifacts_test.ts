@@ -27,7 +27,7 @@ function record(overrides: Partial<AttachmentRecord>): AttachmentRecord {
 }
 
 Deno.test("list generated artifacts filters status and session in creation order", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-artifacts";
     const otherSessionId = "session-artifacts-other";

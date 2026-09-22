@@ -33,7 +33,7 @@ export interface MaintenancePolicy {
 }
 
 /** Namespaces Runtime-owned maintenance jobs inside the shared cron store. */
-export const MaintenanceCronJobPrefix = "mothx-maintenance:";
+export const MaintenanceCronJobPrefix = "opensac-maintenance:";
 
 /**
  * Reclaims unreferenced attachment storage once a day. Reclamation is already

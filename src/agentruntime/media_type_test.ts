@@ -45,7 +45,7 @@ Deno.test("DetectContentTypeSniffsCommonMedia", () => {
 });
 
 Deno.test("DetectAttachmentMediaTypeReadsFileBytes", async () => {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-media-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-media-" });
   const file = `${dir}/pixel.png`;
   await Deno.writeFile(file, onePixelPng);
   assertEquals(await detectAttachmentMediaType(file), "image/png");

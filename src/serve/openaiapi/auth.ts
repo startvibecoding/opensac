@@ -21,7 +21,7 @@ export type { CORSConfig };
 /** The Go `http.Handler` projection used by every middleware in this module. */
 export type HTTPHandler = (request: Request) => Response | Promise<Response>;
 
-export const webUISessionCookieName = "mothx_webui_auth";
+export const webUISessionCookieName = "opensac_webui_auth";
 
 /**
  * AuthMiddleware validates Bearer tokens or a Web UI session cookie. If auth
@@ -250,7 +250,7 @@ export function isPublicWebUIAssetRequest(request: Request): boolean {
   switch (path) {
     case "/":
     case "/index.html":
-    case "/mothx-small.ico":
+    case "/opensac-small.ico":
       return true;
     default:
       return path.startsWith("/assets/");

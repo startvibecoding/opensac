@@ -64,7 +64,7 @@ async function waitFor(
 }
 
 Deno.test("RecoveryCoordinatorStartupScanConvergesThenWakeReconverges", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-coordinator-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-coordinator-" });
   const store = new RunStore(sessionDir);
   const coordinator = new RecoveryCoordinator(sessionDir, {
     scanIntervalMs: 60_000,

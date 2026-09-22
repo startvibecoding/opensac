@@ -20,7 +20,7 @@ import { closeAll } from "../../db/mod.ts";
 import type { SessionCapabilities } from "./types.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-caps-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-caps-" });
 }
 
 function settingsFor(dir: string): Settings {

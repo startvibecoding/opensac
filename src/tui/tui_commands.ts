@@ -11,6 +11,7 @@ import {
   getAutoEdit,
   loadAllow,
   removeEditPath,
+  saveGlobalAutoEditValue,
   saveProject,
   setGlobalAutoEdit,
   setProjectAutoEdit,
@@ -28,8 +29,6 @@ import {
   fullMCPConfigTemplate,
   globalMCPPath,
   loadMCPConfig,
-  type MCPServer,
-  mcpServerEnabled,
   normalizeMCPConfig,
   projectMCPPath,
   saveMCPConfig,
@@ -45,7 +44,7 @@ import { ensureRuleFile, ruleFilePath } from "../contextfiles/contextfiles.ts";
 import { registerDelegateSubAgentTool } from "../agent/subagent.ts";
 import { ConfigOptionBrowser } from "../agentruntime/session_options.ts";
 import { ExpertSwitchRequiresForkError } from "../agentruntime/expert.ts";
-import { forkWithExpert } from "../agentruntime/fork.ts";
+import { fork, forkWithExpert } from "../agentruntime/fork.ts";
 import {
   createSession,
   deleteSession as deleteSessionRuntime,
@@ -58,11 +57,19 @@ import type { Agent } from "../agent/agent.ts";
 import type { Event } from "../agent/events.ts";
 import { Service as SkillHubService } from "../skillhub/service.ts";
 import { projectSkillDirs } from "../skills/skills.ts";
+import { newLocalIndex } from "../skillhub/local.ts";
 import type { Market } from "../skillhub/types.ts";
 import { clientsForSettings } from "../skillhub/factory.ts";
 import { defaultStore as workflowStore } from "../workflow/tools.ts";
 import { defaultActiveRegistry } from "../workflow/active.ts";
-import { ErrNotFound, ESMStore, type Objective } from "../esm/mod.ts";
+import {
+  ErrInvalidObjective,
+  ErrInvalidTransition,
+  ErrNotFound,
+  ErrObjectiveExists,
+  ESMStore,
+  type Objective,
+} from "../esm/mod.ts";
 import { DB as StatsDB } from "../stats/stats.ts";
 import { Server as StatsServer } from "../stats/server.ts";
 import { formatDuration } from "./formatters.ts";
@@ -88,6 +95,8 @@ interface TUIHost {
 export class TuiCommands {
   #host: TUIHost;
   #activeSkills = new Set<string>();
+  /** The accumulated extra-context bytes appended by activateSkill. */
+  #appendedSkillContext = "";
   #delegateMode = false;
   #agent: Agent | undefined;
   #reloadRequested = false;
@@ -135,43 +144,69 @@ export class TuiCommands {
     if (this.#activeSkills.has(name)) {
       return tr.text("skill.already_active", name);
     }
-    this.#activeSkills.add(name);
     const ctx = mgr.buildSkillContext(name);
     this.#host.runtime.extraContext = this.#host.runtime.extraContext + ctx;
+    this.#appendedSkillContext += ctx;
+    this.#activeSkills.add(name);
     return tr.text("skill.activated", name, skill.source, skill.description);
+  }
+
+  /**
+   * Clears skill activations and restores the pre-skill extra context (Go
+   * /clear rebuilds activeSkills + extraContext).
+   */
+  clearActiveSkills(): void {
+    if (this.#appendedSkillContext !== "") {
+      const current = this.#host.runtime.extraContext ?? "";
+      this.#host.runtime.extraContext = current.endsWith(
+          this.#appendedSkillContext,
+        )
+        ? current.slice(0, -this.#appendedSkillContext.length)
+        : current;
+    }
+    this.#appendedSkillContext = "";
+    this.#activeSkills.clear();
   }
 
   // --- MCP ------------------------------------------------------------------
 
   listMCPServers(): string {
-    const tr = this.#tr();
-    const servers = this.#loadMCPServers();
-    if (servers.length === 0) return tr.text("mcps.empty");
-    const lines = [tr.text("mcps.title", servers.length)];
-    for (const srv of servers) {
-      const enabled = mcpServerEnabled(srv)
-        ? tr.text("mcps.enabled")
-        : tr.text("mcps.disabled");
-      lines.push(
-        tr.text("mcps.entry", srv.name, srv.type ?? "stdio", enabled),
-      );
-    }
-    return lines.join("\n");
-  }
-
-  #loadMCPServers(): MCPServer[] {
-    const paths = [globalMCPPath(), projectMCPPath()];
-    const servers: MCPServer[] = [];
-    for (const p of paths) {
+    const sources: Array<{ label: string; path: string }> = [
+      { label: "Global", path: globalMCPPath() },
+      { label: "Project", path: projectMCPPath() },
+    ];
+    const lines = ["MCP servers:"];
+    let foundAny = false;
+    for (const src of sources) {
+      lines.push("", `${src.label} (${src.path}):`);
+      let cfg;
       try {
-        const cfg = loadMCPConfig(p);
+        cfg = loadMCPConfig(src.path);
         normalizeMCPConfig(cfg);
-        servers.push(...(cfg.mcpServers ?? []));
-      } catch {
-        // Missing config file: skip.
+      } catch (err) {
+        if (
+          (err as Error & { code?: string }).code === "ENOENT" ||
+          (err as Error).message.includes("No such file")
+        ) {
+          lines.push("  (not configured)");
+        } else {
+          lines.push(`  (invalid: ${(err as Error).message})`);
+        }
+        continue;
+      }
+      const servers = cfg.mcpServers ?? [];
+      if (servers.length === 0) {
+        lines.push("  (empty)");
+        continue;
+      }
+      for (const srv of servers) {
+        foundAny = true;
+        const target = srv.command ?? srv.url ?? "-";
+        lines.push(`  - ${srv.name} [${srv.type ?? "stdio"}] ${target}`);
       }
     }
-    return servers;
+    if (!foundAny) lines.push("", "Use /init_mcp to create project mcp.json.");
+    return lines.join("\n");
   }
 
   initMCPConfig(scope: string, full: boolean, force: boolean): CommandResult {
@@ -203,10 +238,82 @@ export class TuiCommands {
     const tr = this.#tr();
     const experts = this.#host.runtime.listExperts();
     if (experts.length === 0) return tr.text("expert.empty");
-    const lines = [tr.text("expert.list_title", experts.length)];
+    const boundID = this.#host.runtime.expertState().binding?.id ?? "";
+    const lines = ["Experts:", ""];
     for (const e of experts) {
+      const marker = e.name === boundID ? "*" : " ";
       const name = tr.language === "zh" ? e.displayName.zh : e.displayName.en;
-      lines.push(tr.text("expert.entry", e.name, e.source, name));
+      let line =
+        `  [${marker}] ${e.name}  ${name} (${e.expertType}, ${e.source})`;
+      if (e.invalid) line += `: invalid — ${e.invalidReason ?? ""}`;
+      lines.push(line);
+    }
+    lines.push(
+      "",
+      "Use /expert show <id> to inspect, or /expert bind <id> to bind this session.",
+    );
+    return lines.join("\n");
+  }
+
+  /** Shows one expert bundle's full details (Go formatExpertBundle). */
+  showExpert(id: string): string {
+    try {
+      const bundle = this.#host.runtime.inspectExpert(id);
+      return this.#formatExpertBundle(bundle);
+    } catch (err) {
+      return this.#tr().text(
+        "expert.show_failed",
+        (err as Error).message,
+      );
+    }
+  }
+
+  #formatExpertBundle(bundle: {
+    name: string;
+    manifest: {
+      expertType: string;
+      displayName: { zh: string; en: string };
+      members?: Array<{
+        id: string;
+        name?: { zh: string; en: string };
+        profession?: { zh: string; en: string };
+        role?: string;
+      }>;
+    };
+    invalid: boolean;
+    invalidReason: string;
+  }): string {
+    const tr = this.#tr();
+    const lines = [`Expert: ${bundle.name}`];
+    const displayName = tr.language === "zh"
+      ? bundle.manifest.displayName.zh
+      : bundle.manifest.displayName.en;
+    lines.push(`Name: ${displayName}`);
+    lines.push(`Type: ${bundle.manifest.expertType}`);
+    if (bundle.invalid) {
+      lines.push(`Status: invalid — ${bundle.invalidReason}`);
+      return lines.join("\n");
+    }
+    lines.push("Status: available");
+    if (bundle.manifest.expertType === "team") {
+      lines.push("Members:");
+      for (const member of bundle.manifest.members ?? []) {
+        let line = `  - ${member.id}`;
+        const name = tr.language === "zh" ? member.name?.zh : member.name?.en;
+        if (name !== undefined && name !== "" && name !== member.id) {
+          line += ` (${name})`;
+        }
+        const profession = tr.language === "zh"
+          ? member.profession?.zh
+          : member.profession?.en;
+        if (profession !== undefined && profession !== "") {
+          line += `: ${profession}`;
+        }
+        if (member.role !== undefined && member.role !== "") {
+          line += ` [${member.role}]`;
+        }
+        lines.push(line);
+      }
     }
     return lines.join("\n");
   }
@@ -272,6 +379,41 @@ export class TuiCommands {
       (n) => tr.text("sessions.list_title", n),
       tr.text("sessions.no_sessions"),
     );
+  }
+
+  /** Forks the current session into a child branch (Go forkCurrentSession). */
+  async forkSession(): Promise<CommandResult> {
+    const tr = this.#tr();
+    const sessionID = this.#host.currentSessionID();
+    if (sessionID === "") {
+      return { message: tr.text("sessions.no_match", ""), error: true };
+    }
+    try {
+      const result = fork(this.#host.manager.getSessionDir(), {
+        sourceSessionId: sessionID,
+        requestId: `tui-fork-${crypto.randomUUID()}`,
+        titleMode: "",
+      });
+      const child = openSession(
+        this.#host.manager.getSessionDir(),
+        result.sessionId,
+      );
+      await this.#host.bindManager(child);
+      this.#host.controller.store.resetTranscriptState();
+      const detail = listForDirDetailed(
+        this.#host.workDir,
+        this.#host.manager.getSessionDir(),
+      ).find((d) => d.id === result.sessionId);
+      return {
+        message: tr.text(
+          "sessions.switched",
+          result.sessionId,
+          detail?.messageCount ?? 0,
+        ),
+      };
+    } catch (err) {
+      return { message: (err as Error).message, error: true };
+    }
   }
 
   #resolveSession(query: string): SessionDetail | undefined {
@@ -411,6 +553,21 @@ export class TuiCommands {
     }
   }
 
+  /** Cancels an active workflow run (Go handleWorkflowsCommand cancel). */
+  cancelWorkflow(id: string): Promise<CommandResult> {
+    const tr = this.#tr();
+    const target = id.trim();
+    if (!defaultActiveRegistry().cancel(target)) {
+      return Promise.resolve({
+        message: tr.text("workflows.not_active", target),
+        error: true,
+      });
+    }
+    return Promise.resolve({
+      message: tr.text("workflows.cancel_requested", target),
+    });
+  }
+
   // --- ESM ------------------------------------------------------------------
 
   async handleESM(cmd: string): Promise<CommandResult> {
@@ -422,6 +579,19 @@ export class TuiCommands {
     const raw = cmd.trim().replace(/^\/esm/, "").trim();
     const [sub, ...restArr] = raw === "" ? ["status"] : raw.split(/\s+/);
     const rest = restArr.join(" ");
+    // Go: pause/resume/clear cannot mutate an active run; only objective
+    // creation, edit, and guide may update while the agent is thinking.
+    if (
+      this.#host.controller.isThinking &&
+      (sub === "pause" || sub === "resume" || sub === "clear")
+    ) {
+      return {
+        message:
+          "Only /esm <objective>, /esm edit, and /esm guide may update an active run. " +
+          "Pause, resume, and clear require the current run to finish or be aborted.",
+        error: true,
+      };
+    }
     try {
       switch (sub) {
         case "status":
@@ -436,9 +606,21 @@ export class TuiCommands {
           store.edit(sessionID, rest);
           return { message: this.#formatESM(store.get(sessionID)) };
         case "pause":
+          if (rest !== "") {
+            return {
+              message: tr.text("commands.usage", "/esm pause"),
+              error: true,
+            };
+          }
           store.pause(sessionID);
           return { message: this.#formatESM(store.get(sessionID)) };
         case "resume":
+          if (rest !== "") {
+            return {
+              message: tr.text("commands.usage", "/esm resume"),
+              error: true,
+            };
+          }
           store.resume(sessionID);
           return { message: this.#formatESM(store.get(sessionID)) };
         case "guide":
@@ -451,6 +633,12 @@ export class TuiCommands {
           store.addGuidance(sessionID, rest);
           return { message: "Guidance queued for the next ESM role run." };
         case "clear":
+          if (rest !== "") {
+            return {
+              message: tr.text("commands.usage", "/esm clear"),
+              error: true,
+            };
+          }
           store.clear(sessionID);
           return { message: "Enable Supervisor Mode cleared." };
         default:
@@ -458,11 +646,25 @@ export class TuiCommands {
           return { message: this.#formatESM(store.get(sessionID)) };
       }
     } catch (err) {
-      if (err === ErrNotFound) {
-        return { message: tr.text("esm.panel.no_objective") };
-      }
-      return { message: (err as Error).message, error: true };
+      return { message: this.#formatESMError(err), error: true };
     }
+  }
+
+  /** Maps ESM store errors to the Go command messages. */
+  #formatESMError(err: unknown): string {
+    if (err === ErrNotFound) {
+      return "No ESM objective. Create one with /esm <objective>.";
+    }
+    if (err === ErrObjectiveExists) {
+      return "An unfinished ESM objective already exists. Use /esm edit <objective> or /esm clear.";
+    }
+    if (err === ErrInvalidObjective) {
+      return "ESM objective cannot be empty.";
+    }
+    if (err === ErrInvalidTransition) {
+      return "ESM status cannot be changed that way.";
+    }
+    return (err as Error).message;
   }
 
   #formatESM(obj: Objective | null): string {
@@ -633,39 +835,50 @@ export class TuiCommands {
     const allow = loadAllow();
     if (parts.length < 2) {
       return {
-        message: tr.text(
-          "allowautoedit.status",
-          getAutoEdit(allow) ? "ON" : "OFF",
-        ),
+        message: [
+          tr.text(
+            "allowautoedit.status",
+            getAutoEdit(allow) ? "ON" : "OFF",
+          ),
+          tr.text("commands.usage", "/allowautoedit [on|off] [global]"),
+        ].join("\n"),
       };
     }
     const globalScope = parts.slice(2).includes("global");
     let enable: boolean;
     if (parts[1] === "on") enable = true;
     else if (parts[1] === "off") enable = false;
-    else {return {
+    else {
+      return {
         message: tr.text("commands.usage", "/allowautoedit [on|off] [global]"),
         error: true,
-      };}
+      };
+    }
     try {
-      if (globalScope) setGlobalAutoEdit(allow, enable);
-      else {
+      let effective = enable;
+      const scope = globalScope ? "global" : "project";
+      if (globalScope) {
+        effective = setGlobalAutoEdit(allow, enable);
+        saveGlobalAutoEditValue(enable);
+      } else {
         setProjectAutoEdit(allow, enable);
         saveProject(allow);
       }
+      let msg = `✅ Auto-edit (agent mode): ${
+        enable ? "ON" : "OFF"
+      } [${scope}]`;
+      if (globalScope && effective !== enable) {
+        msg += ` (effective here: ${
+          effective ? "ON" : "OFF"
+        } due to project override)`;
+      }
+      return { message: msg };
     } catch (err) {
       return {
         message: tr.text("alloweditpath.save_failed", (err as Error).message),
         error: true,
       };
     }
-    return {
-      message: tr.text(
-        "allowautoedit.saved",
-        enable ? "ON" : "OFF",
-        globalScope ? "global" : "project",
-      ),
-    };
   }
 
   // --- Modes ----------------------------------------------------------------
@@ -681,10 +894,13 @@ export class TuiCommands {
       return { message: tr.text("delegate.running"), error: true };
     }
     switch (arg) {
-      case "on": {
-        this.#delegateMode = true;
-        return { message: tr.text("delegate.changed", "ON") };
-      }
+      case "on":
+        // The TUI has no runtime AgentManager wired yet (Go agentMgr == nil),
+        // so delegate mode cannot register its tool here.
+        return {
+          message: tr.text("agent.manager_unavailable"),
+          error: true,
+        };
       case "off":
         this.#delegateMode = false;
         return { message: tr.text("delegate.changed", "OFF") };
@@ -723,30 +939,50 @@ export class TuiCommands {
 
   statusLine(parts: string[]): CommandResult {
     const tr = this.#tr();
-    const current = this.#host.settings.statusLine ?? {};
     const sub = (parts[1] ?? "status").toLowerCase();
-    if (sub === "status") {
-      return {
-        message: tr.text(
-          "statusline.status",
-          current.enabled === true ? "ON" : "OFF",
-          current.refreshInterval
-            ? `${current.refreshInterval}s`
-            : "event-driven",
-          (current.command ?? "").trim() || "(none)",
-        ),
-      };
+    switch (sub) {
+      case "status":
+        return this.#statusLineStatus();
+      case "on":
+      case "off":
+        return this.#statusLineToggle(sub === "on", parts[2] ?? "project");
+      case "command":
+        return this.#statusLineCommand(parts);
+      case "refresh":
+        return this.#statusLineRefresh(parts);
+      default:
+        return {
+          message: tr.text(
+            "commands.usage",
+            "/statusline [status|on|off|command|refresh] ...",
+          ),
+          error: true,
+        };
     }
-    if (sub !== "on" && sub !== "off") {
-      return {
-        message: tr.text(
-          "commands.usage",
-          "/statusline [status|on|off|command|refresh] ...",
-        ),
-        error: true,
-      };
+  }
+
+  /** Renders the status-line configuration (Go showStatusLineStatus). */
+  #statusLineStatus(): CommandResult {
+    const cfg = this.#host.settings.statusLine ?? {};
+    if (cfg.enabled !== true) {
+      return { message: "Status line: OFF\nFooter: builtin" };
     }
-    const scope = (parts[2] ?? "project").toLowerCase();
+    const lines = [
+      "Status line: ON",
+      `  Type: ${cfg.type ?? "command"}`,
+      `  Command: ${(cfg.command ?? "").trim() || "ccstatusline"}`,
+      `  Timeout: ${cfg.timeoutMs ?? 800}ms`,
+      cfg.refreshInterval !== undefined && cfg.refreshInterval > 0
+        ? `  Refresh: ${cfg.refreshInterval}s`
+        : "  Refresh: event-driven",
+    ];
+    return { message: lines.join("\n") };
+  }
+
+  /** Toggles the status line on/off in a project/global scope. */
+  #statusLineToggle(enabled: boolean, scopeRaw: string): CommandResult {
+    const tr = this.#tr();
+    const scope = scopeRaw.toLowerCase();
     if (scope !== "project" && scope !== "global") {
       return {
         message: tr.text(
@@ -756,7 +992,7 @@ export class TuiCommands {
         error: true,
       };
     }
-    const enabled = sub === "on";
+    const current = this.#host.settings.statusLine ?? {};
     const next = {
       ...current,
       enabled,
@@ -770,11 +1006,8 @@ export class TuiCommands {
         : {}),
     };
     try {
-      if (scope === "global") {
-        saveGlobalSettingsPatch({ statusLine: next });
-      } else {
-        saveProjectSettingsPatch({ statusLine: next });
-      }
+      if (scope === "global") saveGlobalSettingsPatch({ statusLine: next });
+      else saveProjectSettingsPatch({ statusLine: next });
       this.#host.settings.statusLine = next;
     } catch (err) {
       return {
@@ -786,6 +1019,104 @@ export class TuiCommands {
       message: enabled
         ? tr.text("statusline.on", scope)
         : tr.text("statusline.off"),
+    };
+  }
+
+  /** Sets the status-line command (Go setStatusLineCommand). */
+  #statusLineCommand(parts: string[]): CommandResult {
+    const tr = this.#tr();
+    if (parts.length < 3) {
+      return {
+        message: tr.text(
+          "commands.usage",
+          "/statusline command <cmd> [project|global]",
+        ),
+        error: true,
+      };
+    }
+    let scope = "project";
+    let end = parts.length;
+    const last = parts[parts.length - 1].toLowerCase();
+    if (last === "project" || last === "global") {
+      scope = last;
+      end--;
+    }
+    const cmd = parts.slice(2, end).join(" ").trim();
+    if (cmd === "") {
+      return {
+        message: tr.text(
+          "commands.usage",
+          "/statusline command <cmd> [project|global]",
+        ),
+        error: true,
+      };
+    }
+    const current = this.#host.settings.statusLine ?? {};
+    const next = {
+      ...current,
+      type: "command",
+      command: cmd,
+      timeoutMs: current.timeoutMs ?? 800,
+      fallback: current.fallback ?? "builtin",
+    };
+    try {
+      if (scope === "global") saveGlobalSettingsPatch({ statusLine: next });
+      else saveProjectSettingsPatch({ statusLine: next });
+      this.#host.settings.statusLine = next;
+    } catch (err) {
+      return {
+        message: tr.text("statusline.failed", (err as Error).message),
+        error: true,
+      };
+    }
+    return {
+      message: `Status line command updated (${scope} settings): ${cmd}`,
+    };
+  }
+
+  /** Sets the status-line refresh interval in seconds (Go setStatusLineRefresh). */
+  #statusLineRefresh(parts: string[]): CommandResult {
+    const tr = this.#tr();
+    if (parts.length < 3) {
+      return {
+        message: tr.text(
+          "commands.usage",
+          "/statusline refresh <sec> [project|global]",
+        ),
+        error: true,
+      };
+    }
+    let scope = "project";
+    if (parts.length > 3) {
+      const last = parts[parts.length - 1].toLowerCase();
+      if (last === "project" || last === "global") scope = last;
+    }
+    const refresh = Number.parseInt(parts[2], 10);
+    if (Number.isNaN(refresh) || refresh < 0 || refresh > 60) {
+      return {
+        message: tr.text(
+          "commands.usage",
+          "/statusline refresh <0-60> [project|global]",
+        ),
+        error: true,
+      };
+    }
+    const current = this.#host.settings.statusLine ?? {};
+    const next = { ...current, refreshInterval: refresh };
+    try {
+      if (scope === "global") saveGlobalSettingsPatch({ statusLine: next });
+      else saveProjectSettingsPatch({ statusLine: next });
+      this.#host.settings.statusLine = next;
+    } catch (err) {
+      return {
+        message: tr.text("statusline.failed", (err as Error).message),
+        error: true,
+      };
+    }
+    return {
+      message: refresh === 0
+        ? `Status line refresh updated (${scope} settings): event-driven`
+        : `Status line refresh updated (${scope} settings): ${refresh}s`,
     };
   }
 
@@ -947,6 +1278,74 @@ export class TuiCommands {
           service.uninstall(market as Market, id, this.#skillHubScope());
           return { message: `✅ Uninstalled ${id}` };
         }
+        case "skillset": {
+          if (parts.length < 3) {
+            return {
+              message: tr.text(
+                "commands.usage",
+                "/skillhub skillset <market>/<id>... [--global|--project|--activate]",
+              ),
+              error: true,
+            };
+          }
+          let scope = this.#skillHubScope();
+          let activate = false;
+          const requests: Array<{
+            market: Market;
+            id: string;
+            scope: string;
+            targetDir: string;
+          }> = [];
+          for (const value of parts.slice(2)) {
+            if (value === "--global") {
+              scope = "global";
+              continue;
+            }
+            if (value === "--project") {
+              scope = "project";
+              continue;
+            }
+            if (value === "--activate") {
+              activate = true;
+              continue;
+            }
+            const { market, id } = TuiCommands.#parseSkillHubID(value);
+            requests.push({
+              market: market as Market,
+              id,
+              scope,
+              targetDir: this.#skillHubTargetDir(),
+            });
+          }
+          const results = await service.installSkillSet(undefined, requests);
+          if (activate) {
+            for (const result of results) {
+              this.activateSkill(result.name);
+            }
+          }
+          return {
+            message: `Installed ${results.length} skills${
+              activate ? " and activated them in the current session" : ""
+            }.`,
+          };
+        }
+        case "installed": {
+          const index = newLocalIndex(
+            this.#skillHubTargetDir(),
+            projectSkillDirs(this.#host.workDir),
+          );
+          const states = index.list();
+          if (states.length === 0) {
+            return { message: "No marketplace skills installed." };
+          }
+          const lines = ["Installed marketplace skills:"];
+          for (const state of states) {
+            lines.push(
+              `  ${state.dir} (${state.scope}, ${state.version})`,
+            );
+          }
+          return { message: lines.join("\n") };
+        }
         default: {
           // Default view: list installed skills (no network).
           const query = parts.slice(1).join(" ");
@@ -1002,8 +1401,37 @@ export class TuiCommands {
       const byProvider = db.byProvider({});
       if (byProvider.length > 0) {
         lines.push("", tr.text("stats.by_provider"));
-        for (const row of byProvider) {
-          lines.push(`  ${row.label}: ${row.totalTokens}`);
+        for (const row of byProvider.slice(0, 5)) {
+          const label = row.vendor === "" ? "-" : row.vendor;
+          lines.push(
+            `  ${label}  req:${row.requests}  in:${row.inputTokens}  out:${row.outputTokens}  total:${row.totalTokens}`,
+          );
+        }
+      }
+      const byModel = db.byModel({});
+      if (byModel.length > 0) {
+        lines.push("", tr.text("stats.by_model"));
+        for (const row of byModel.slice(0, 5)) {
+          const label = row.model !== "" ? row.model : (row.label || "-");
+          lines.push(
+            `  ${label}  req:${row.requests}  in:${row.inputTokens}  out:${row.outputTokens}  total:${row.totalTokens}`,
+          );
+        }
+      }
+      const recent = db.recent(1, 10);
+      if (recent.items.length > 0) {
+        lines.push("", tr.text("stats.recent"));
+        for (const item of recent.items) {
+          const t =
+            item.timestamp?.toISOString().slice(0, 16).replace("T", " ") ??
+              "-";
+          lines.push(
+            `  ${t}  ${item.vendor || "-"}  ${
+              item.model || "-"
+            }  in:${item.inputTokens} out:${item.outputTokens}  ${
+              formatStatsDuration(item.durationMs)
+            }`,
+          );
         }
       }
       return { message: lines.join("\n") };
@@ -1057,6 +1485,37 @@ export class TuiCommands {
     }
   }
 
+  // --- Agents ---------------------------------------------------------------
+
+  /**
+   * Lists agents (Go listAgents). The TUI has no Runtime AgentManager wired
+   * yet, so this mirrors Go's nil-manager path exactly.
+   */
+  listAgents(): string {
+    const tr = this.#tr();
+    const lines = [tr.text("agent.multi_status", "main")];
+    lines.push(`  ${tr.text("agent.manager_unavailable")}`);
+    return lines.join("\n");
+  }
+
+  /** Switches the focused agent (Go switchAgent; nil-manager path). */
+  async switchAgent(_id: string): Promise<CommandResult> {
+    await Promise.resolve();
+    return {
+      message: this.#tr().text("agent.manager_unavailable"),
+      error: true,
+    };
+  }
+
+  /** Destroys a sub-agent (Go destroyAgent; nil-manager path). */
+  async destroyAgent(_id: string): Promise<CommandResult> {
+    await Promise.resolve();
+    return {
+      message: this.#tr().text("agent.manager_unavailable"),
+      error: true,
+    };
+  }
+
   // --- Compaction -----------------------------------------------------------
 
   async compact(): Promise<CommandResult> {
@@ -1090,6 +1549,13 @@ export class TuiCommands {
     this.#reloadRequested = true;
     return { message: this.#tr().text("reload.requested"), quit: true };
   }
+}
+
+/** Formats a duration like the Go stats overlay (e.g. "350ms", "1.5s"). */
+function formatStatsDuration(ms: number): string {
+  if (ms <= 0) return "-";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 export { defaultActiveRegistry, registerDelegateSubAgentTool, saveEnv };

@@ -163,7 +163,7 @@ Deno.test("NewDecisionRecord shape by status", () => {
 });
 
 Deno.test("Load decision records by session and run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   const sink = new SessionRunEventSink(sessionDir);
   const transitions = [
     {

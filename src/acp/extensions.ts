@@ -1,7 +1,7 @@
 // Ported from internal/acp/extensions.go (the pure, server-independent
 // extension projections).
 //
-// These helpers build the additive `mothx/*` extension payloads that the ACP
+// These helpers build the additive `opensac/*` extension payloads that the ACP
 // server emits: the per-project result projection and the
 // `listedSession._meta.lastRun` durable-run projection. They carry no server
 // state, so they are ported ahead of the ACP server, which lands in a later

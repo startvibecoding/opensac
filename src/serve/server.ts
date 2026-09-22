@@ -144,7 +144,7 @@ export async function runServe(
 ): Promise<void> {
   const opts = { ...defaultRunOptions(), ...partial };
   const cfg = loadServeRuntimeConfig(opts);
-  console.error(`MothX Serve starting`);
+  console.error(`OpenSAC Serve starting`);
   const handle = startServeHttp({
     config: cfg,
     onListen: ({ hostname, port }) => {

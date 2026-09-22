@@ -59,7 +59,7 @@ export async function run(opts: RunOptions, version: string): Promise<void> {
     };
   }
 
-  console.error(`MothX Serve ${version} starting`);
+  console.error(`OpenSAC Serve ${version} starting`);
   const displayAddr = displayListenAddr(cfg.api.listen);
   if (cfg.features.openAIAPI) {
     console.error(

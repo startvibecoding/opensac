@@ -14,6 +14,7 @@ import {
   defaultProviderConfig,
   defaultProviderConfigsAll,
   getProviderConfig,
+  loadProjectSettingsSparse,
   resolveKey,
   saveGlobalSettingsPatch,
   saveProjectSettingsPatch,
@@ -27,6 +28,7 @@ import { newRegistry } from "../tools/tool.ts";
 import { Agent } from "../agent/agent.ts";
 import { prompt as systemInitPrompt } from "../systeminit/systeminit.ts";
 import { openFile } from "../platform/platform.ts";
+import { localTimeZone, utcOffset } from "./i18n.ts";
 import type { CommandResult } from "./commands.ts";
 import type { TUISession } from "./tui_session.ts";
 
@@ -167,13 +169,23 @@ export class TuiSessionCommands {
     const tr = this.#session.translator;
     const configured = this.#session.settings.tuilang ?? "auto";
     if (parts.length === 1) {
+      // Go MsgTUILangStatus: configured, effective language, UTC offset, and
+      // whether the value comes from project or global settings.
+      const offset = utcOffset(new Date(), localTimeZone());
+      let source = "global";
+      try {
+        const project = loadProjectSettingsSparse();
+        if ((project.tuilang ?? "").trim() !== "") source = "project";
+      } catch {
+        // No project settings: global source.
+      }
       return {
         message: tr.text(
           "tuilang.status",
           configured,
           tr.language,
-          "",
-        ).trim(),
+          `${offset}  source=${source}`,
+        ),
       };
     }
     let scope = "global";

@@ -49,9 +49,9 @@ Deno.test("Normalize", () => {
 
 Deno.test("CheckInBackgroundRespectsDisableFlag", () => {
   const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("MOTHX_DIR");
+  const oldDir = Deno.env.get("OPENSAC_DIR");
   const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
-  Deno.env.set("MOTHX_DIR", dir);
+  Deno.env.set("OPENSAC_DIR", dir);
   Deno.env.set("VIBECODING_NO_UPDATE_CHECK", "1");
   try {
     let called = false;
@@ -62,16 +62,16 @@ Deno.test("CheckInBackgroundRespectsDisableFlag", () => {
     checkInBackground("v1.2.3", null);
     assertEquals(called, false, "expected disabled check not to fetch");
   } finally {
-    restoreEnv("MOTHX_DIR", oldDir);
+    restoreEnv("OPENSAC_DIR", oldDir);
     restoreEnv("VIBECODING_NO_UPDATE_CHECK", oldDisable);
   }
 });
 
 Deno.test("CheckInBackgroundRecordsFailureCooldown", async () => {
   const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("MOTHX_DIR");
+  const oldDir = Deno.env.get("OPENSAC_DIR");
   const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
-  Deno.env.set("MOTHX_DIR", dir);
+  Deno.env.set("OPENSAC_DIR", dir);
   Deno.env.set("VIBECODING_NO_UPDATE_CHECK", "");
   try {
     const nowValue = new Date(1000 * 1000);
@@ -88,16 +88,16 @@ Deno.test("CheckInBackgroundRecordsFailureCooldown", async () => {
     );
     assertEquals(new Date(c.checked_at).getTime(), nowValue.getTime());
   } finally {
-    restoreEnv("MOTHX_DIR", oldDir);
+    restoreEnv("OPENSAC_DIR", oldDir);
     restoreEnv("VIBECODING_NO_UPDATE_CHECK", oldDisable);
   }
 });
 
 Deno.test("RefreshCacheNotifiesForNewerSemver", async () => {
   const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("MOTHX_DIR");
+  const oldDir = Deno.env.get("OPENSAC_DIR");
   const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
-  Deno.env.set("MOTHX_DIR", dir);
+  Deno.env.set("OPENSAC_DIR", dir);
   Deno.env.set("VIBECODING_NO_UPDATE_CHECK", "");
   try {
     const nowValue = new Date(2000 * 1000);
@@ -116,15 +116,15 @@ Deno.test("RefreshCacheNotifiesForNewerSemver", async () => {
     const c = readCache();
     assertEquals(new Date(c.checked_at).getTime(), nowValue.getTime());
   } finally {
-    restoreEnv("MOTHX_DIR", oldDir);
+    restoreEnv("OPENSAC_DIR", oldDir);
     restoreEnv("VIBECODING_NO_UPDATE_CHECK", oldDisable);
   }
 });
 
 Deno.test("RefreshCacheSkipsNotifyForCurrentOrOlderVersion", async () => {
   const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", dir);
+  const oldDir = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", dir);
   try {
     setFetchLatestVersion(() => Promise.resolve("v1.2.3"));
     let called = false;
@@ -139,7 +139,7 @@ Deno.test("RefreshCacheSkipsNotifyForCurrentOrOlderVersion", async () => {
     // sanity: cache path lives under the temp dir
     assertEquals(cachePath().startsWith(dir), true);
   } finally {
-    restoreEnv("MOTHX_DIR", oldDir);
+    restoreEnv("OPENSAC_DIR", oldDir);
   }
 });
 

@@ -119,7 +119,7 @@ async function serveRequest(
       return serverResult(request.id, {
         protocolVersion: mcpProtocolVersion,
         capabilities: { tools: {} },
-        serverInfo: { name: "mothx-knowledge", version: "dev" },
+        serverInfo: { name: "opensac-knowledge", version: "dev" },
       });
     case "tools/list": {
       let tools: ServerTool[];

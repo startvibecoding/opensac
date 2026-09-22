@@ -40,7 +40,7 @@ import { Server } from "./server.ts";
 import { APISession, SessionPool } from "./session_mgr.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-approval-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-approval-" });
 }
 
 function settingsFor(dir: string): Settings {

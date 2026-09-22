@@ -3,7 +3,7 @@
 // Go's `net/http/pprof` and `expvar` have no direct Deno equivalents. This port
 // keeps the same local-only debug server contract:
 //   - `/debug/vars` renders the process expvar map (the SQLite contention
-//     metrics from `src/db` under `mothx_sqlite`).
+//     metrics from `src/db` under `opensac_sqlite`).
 //   - `/debug/pprof/` serves an index listing the (non-Go) runtime endpoints.
 //
 // The Go CPU/heap `pprof` profiles and execution traces are Go-runtime specific

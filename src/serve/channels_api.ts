@@ -279,7 +279,7 @@ export async function fetchWechatQRURL(
             "image/avif,image/webp,image/apng,image/svg+xml,image/*,text/html,*/*;q=0.8",
           referer: currentReferer,
           "user-agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) MothX-Serve Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) OpenSAC-Serve Safari/537.36",
           cookie: jar.cookiesFor(url),
         }),
       ),

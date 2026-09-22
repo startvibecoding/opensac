@@ -23,14 +23,14 @@ import {
   ServeConfigState,
 } from "./config_state.ts";
 
-function withMothxDir<T>(dir: string, fn: () => T): T {
-  const previous = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", dir);
+function withOpensacDir<T>(dir: string, fn: () => T): T {
+  const previous = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", dir);
   try {
     return fn();
   } finally {
-    if (previous === undefined) Deno.env.delete("MOTHX_DIR");
-    else Deno.env.set("MOTHX_DIR", previous);
+    if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
+    else Deno.env.set("OPENSAC_DIR", previous);
   }
 }
 
@@ -128,7 +128,7 @@ Deno.test("config state uses explicit path layer and loads overrides", () => {
   const opts = defaultRunOptions();
   opts.configPath = explicit;
   opts.port = "7100";
-  const state = withMothxDir(
+  const state = withOpensacDir(
     Deno.makeTempDirSync(),
     () => ServeConfigState.load(opts),
   );
@@ -148,7 +148,7 @@ Deno.test("updateChannel validates whitelist and persists writable layer", async
   Deno.writeTextFileSync(explicit, JSON.stringify({}));
   const opts = defaultRunOptions();
   opts.configPath = explicit;
-  const state = withMothxDir(dir, () => ServeConfigState.load(opts));
+  const state = withOpensacDir(dir, () => ServeConfigState.load(opts));
 
   assertThrows(
     () => parseChannelConfigPatch("wechat", JSON.stringify({ bad: 1 })),
@@ -188,7 +188,7 @@ Deno.test("feishu patch masks appSecret in the effective view", async () => {
   const explicit = path.join(dir, "serve.json");
   const opts = defaultRunOptions();
   opts.configPath = explicit;
-  const state = withMothxDir(dir, () => ServeConfigState.load(opts));
+  const state = withOpensacDir(dir, () => ServeConfigState.load(opts));
   await state.updateChannel(
     "feishu",
     JSON.stringify({ appId: "cli-x", appSecret: "s3cr3t" }),
@@ -209,7 +209,7 @@ Deno.test("updateChannel rolls the file back when apply fails", async () => {
   Deno.writeTextFileSync(explicit, original);
   const opts = defaultRunOptions();
   opts.configPath = explicit;
-  const state = withMothxDir(dir, () => ServeConfigState.load(opts));
+  const state = withOpensacDir(dir, () => ServeConfigState.load(opts));
   await assertRejects(
     () =>
       state.updateChannel(
@@ -235,7 +235,7 @@ Deno.test("updateFull persists and strips ephemeral CLI overrides", async () => 
   const opts = defaultRunOptions();
   opts.configPath = explicit;
   opts.port = "9999";
-  const state = withMothxDir(dir, () => ServeConfigState.load(opts));
+  const state = withOpensacDir(dir, () => ServeConfigState.load(opts));
   const returned = await state.updateFull(
     JSON.stringify({ listen: ":9999", provider: "p", model: "m" }),
   );
@@ -255,7 +255,7 @@ Deno.test("updateFull rolls back when apply fails", async () => {
   Deno.writeTextFileSync(explicit, JSON.stringify({ provider: "old" }));
   const opts = defaultRunOptions();
   opts.configPath = explicit;
-  const state = withMothxDir(dir, () => ServeConfigState.load(opts));
+  const state = withOpensacDir(dir, () => ServeConfigState.load(opts));
   await assertRejects(
     () =>
       state.updateFull(JSON.stringify({ provider: "new" }), () => {
@@ -302,7 +302,7 @@ Deno.test("reload reapplies overrides after external file change", () => {
   const opts = defaultRunOptions();
   opts.configPath = explicit;
   opts.provider = "flag-provider";
-  const state = withMothxDir(dir, () => ServeConfigState.load(opts));
+  const state = withOpensacDir(dir, () => ServeConfigState.load(opts));
   Deno.writeTextFileSync(explicit, JSON.stringify({ provider: "new" }));
   state.reload();
   assertEquals(state.effective.api.provider, "flag-provider");

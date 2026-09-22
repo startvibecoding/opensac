@@ -56,6 +56,11 @@ export interface DialogPage {
 export interface DialogOutcome {
   message?: string;
   error?: boolean;
+  /**
+   * Requests the session open another dialog after this one closes (Go
+   * closeAuthDialog + openDefaultModelDialog handoffs).
+   */
+  handoff?: "auth" | "defaultModel" | "tuilang";
 }
 
 /** The behavior a concrete dialog implements. */
@@ -103,11 +108,16 @@ export class Dialog {
   }
 
   /** Closes the dialog, optionally reporting a status message. */
-  close(message?: string, error = false): void {
+  close(
+    message?: string,
+    error = false,
+    handoff?: DialogOutcome["handoff"],
+  ): void {
     this.#closed = true;
     if (message !== undefined && message !== "") {
       this.#outcome = { message, error };
     }
+    if (handoff !== undefined) this.#outcome.handoff = handoff;
   }
 
   /** Opens the single-line input box (pre-filled with `value`). */

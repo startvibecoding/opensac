@@ -1,0 +1,101 @@
+// Focused tests for the ActivityManager: the live per-turn activity timeline
+// fed by the AppController (tools, thinking, nesting, interruption) plus its
+// module-level singleton helpers.
+
+import { assert, assertEquals } from "@std/assert";
+import {
+  ActivityManager,
+  formatElapsed,
+  getActivityManager,
+  getToolDisplayName,
+  isParentTool,
+  resetActivityManager,
+} from "./activity_manager.ts";
+
+Deno.test("ActivityManager tracks tool executions with timing", () => {
+  const am = new ActivityManager();
+  const before = Date.now();
+  am.startToolExecution("t1", "bash", { command: "ls" });
+  am.completeToolExecution("t1", "ok");
+  const items = am.buildTimeline();
+  assertEquals(items.length, 1);
+  assertEquals(items[0].type, "tool");
+  assertEquals(items[0].status, "completed");
+  assertEquals(items[0].toolName, "bash");
+  assertEquals(items[0].content, "ok");
+  assertEquals(items[0].timestamp >= before, true);
+  assertEquals(typeof items[0].elapsedMs, "number");
+});
+
+Deno.test("ActivityManager marks errored and interrupted tools", () => {
+  const am = new ActivityManager();
+  am.startToolExecution("t1", "bash");
+  am.completeToolExecution("t1", undefined, "boom");
+  am.startToolExecution("t2", "grep");
+  am.interruptToolExecution("t2");
+  const items = am.buildTimeline();
+  assertEquals(items.find((i) => i.id === "t1")?.status, "error");
+  assertEquals(items.find((i) => i.id === "t1")?.error, "boom");
+  assertEquals(items.find((i) => i.id === "t2")?.status, "interrupted");
+  // getActiveTools reports only running tools.
+  am.startToolExecution("t3", "ls");
+  assertEquals(am.getActiveTools().map((t) => t.id), ["t3"]);
+  assertEquals(am.hasRunningActivities(), true);
+});
+
+Deno.test("ActivityManager tracks thinking blocks and clears per turn", () => {
+  const am = new ActivityManager();
+  am.startThinking("turn");
+  am.appendThinking("turn", "why?");
+  am.completeThinking("turn");
+  am.startToolExecution("t1", "bash");
+  const items = am.buildTimeline();
+  const think = items.find((i) => i.type === "thinking");
+  assertEquals(think?.content, "why?");
+  assertEquals(think?.status, "completed");
+  assertEquals(items.length, 2);
+  // Stable sort by timestamp keeps the earlier thinking block first.
+  assertEquals(items[0].type, "thinking");
+  am.clear();
+  assertEquals(am.buildTimeline().length, 0);
+  assertEquals(am.hasRunningActivities(), false);
+});
+
+Deno.test("ActivityManager nesting tracks parent depth", () => {
+  const am = new ActivityManager();
+  am.startToolExecution("parent", "task");
+  am.startToolExecution("child", "bash", undefined, undefined, "parent");
+  const items = am.buildTimeline();
+  assertEquals(items.find((i) => i.id === "child")?.depth, 1);
+  assertEquals(items.find((i) => i.id === "child")?.parentId, "parent");
+});
+
+Deno.test("singleton accessor returns a stable instance; reset replaces it", () => {
+  const first = getActivityManager();
+  assertEquals(getActivityManager(), first);
+  resetActivityManager();
+  assert(getActivityManager() !== first);
+});
+
+Deno.test("format helpers render compact labels", () => {
+  assertEquals(formatElapsed(500), "<1s");
+  assertEquals(formatElapsed(5000), "5s");
+  assertEquals(formatElapsed(125000), "2m5s");
+  assertEquals(isParentTool("task"), true);
+  assertEquals(isParentTool("spawn_agent"), true);
+  assertEquals(isParentTool("bash"), false);
+  assertEquals(getToolDisplayName("bash", { command: "ls -la" }), "ls -la");
+  assertEquals(
+    getToolDisplayName("read", { file_path: "/tmp/a.txt" }),
+    "Read a.txt",
+  );
+  assertEquals(
+    getToolDisplayName("write", { file_path: "/tmp/b.txt" }),
+    "Write b.txt",
+  );
+  assertEquals(
+    getToolDisplayName("edit", { file_path: "/tmp/c.txt" }),
+    "Edit c.txt",
+  );
+  assertEquals(getToolDisplayName("grep"), "grep");
+});

@@ -116,13 +116,13 @@ export interface SessionUpdate {
   _meta?: Record<string, unknown>;
 }
 
-/** One selectable option in the `mothx/requestQuestion` payload. */
+/** One selectable option in the `opensac/requestQuestion` payload. */
 export interface RequestQuestionOption {
   id: string;
   label: string;
 }
 
-/** The `mothx/requestQuestion` payload. */
+/** The `opensac/requestQuestion` payload. */
 export interface RequestQuestionPayload {
   prompt: string;
   options?: RequestQuestionOption[];

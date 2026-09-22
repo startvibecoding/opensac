@@ -90,7 +90,7 @@ function readServeConfig(): Record<string, unknown> {
 
 Deno.test("manage serve config get is secret free", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeServeConfig(
       configDir,
       JSON.stringify({
@@ -118,7 +118,7 @@ Deno.test("manage serve config get is secret free", () => {
     const server = new AcpServer();
     server.sink = output;
     const view = result(
-      callManage(server, output, 1, "mothx/manage/serve/get", {}),
+      callManage(server, output, 1, "opensac/manage/serve/get", {}),
     );
     const api = view["api"] as Record<string, unknown>;
     assertEquals(api["listen"], "0.0.0.0:7872");
@@ -148,7 +148,7 @@ Deno.test("manage serve config get is secret free", () => {
 
 Deno.test("manage serve config patch round trip keeps secrets", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeServeConfig(
       configDir,
       JSON.stringify({
@@ -168,7 +168,7 @@ Deno.test("manage serve config patch round trip keeps secrets", () => {
     const server = new AcpServer();
     server.sink = output;
     const view = result(
-      callManage(server, output, 1, "mothx/manage/serve/patch", {
+      callManage(server, output, 1, "opensac/manage/serve/patch", {
         patch: {
           api: {
             listen: "127.0.0.1:7873",
@@ -235,7 +235,7 @@ Deno.test("manage serve config patch round trip keeps secrets", () => {
 
     output.reset();
     const again = result(
-      callManage(server, output, 2, "mothx/manage/serve/get", {}),
+      callManage(server, output, 2, "opensac/manage/serve/get", {}),
     );
     assertEquals(
       (again["api"] as Record<string, unknown>)["listen"],
@@ -246,7 +246,7 @@ Deno.test("manage serve config patch round trip keeps secrets", () => {
 
 Deno.test("manage serve config patch rejects unsafe and invalid fields", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeServeConfig(configDir, `{"api":{"listen":"127.0.0.1:7872"}}`);
     const cases: Array<{ name: string; patch: unknown; want: string }> = [
       {
@@ -330,7 +330,7 @@ Deno.test("manage serve config patch rejects unsafe and invalid fields", () => {
       const server = new AcpServer();
       server.sink = output;
       const code = errorCode(
-        callManage(server, output, 1, "mothx/manage/serve/patch", {
+        callManage(server, output, 1, "opensac/manage/serve/patch", {
           patch: tc.patch,
         }),
       );
@@ -343,7 +343,7 @@ Deno.test("manage serve config patch rejects unsafe and invalid fields", () => {
 
 Deno.test("manage serve api.session projection and validation", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeServeConfig(
       configDir,
       JSON.stringify({
@@ -357,7 +357,7 @@ Deno.test("manage serve api.session projection and validation", () => {
     const server = new AcpServer();
     server.sink = output;
     const view = result(
-      callManage(server, output, 1, "mothx/manage/serve/get", {}),
+      callManage(server, output, 1, "opensac/manage/serve/get", {}),
     );
     const session =
       (view["api"] as Record<string, unknown>)["session"] as Record<
@@ -368,7 +368,7 @@ Deno.test("manage serve api.session projection and validation", () => {
     assertEquals(session["maxSessions"], 5);
 
     const patched = result(
-      callManage(server, output, 2, "mothx/manage/serve/patch", {
+      callManage(server, output, 2, "opensac/manage/serve/patch", {
         patch: {
           api: {
             session: { idleTimeoutSeconds: 1200, maxSessions: 0 },
@@ -455,7 +455,7 @@ Deno.test("manage serve api.session projection and validation", () => {
     for (let i = 0; i < invalidCases.length; i++) {
       const tc = invalidCases[i];
       const code = errorCode(
-        callManage(server, output, i + 3, "mothx/manage/serve/patch", {
+        callManage(server, output, i + 3, "opensac/manage/serve/patch", {
           patch: tc.patch,
         }),
       );
@@ -472,7 +472,7 @@ Deno.test("manage serve api.session projection and validation", () => {
 
 Deno.test("manage channels get is credential safe and patch projects", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     writeServeConfig(
       configDir,
       JSON.stringify({
@@ -492,7 +492,7 @@ Deno.test("manage channels get is credential safe and patch projects", () => {
     const server = new AcpServer();
     server.sink = output;
     const view = result(
-      callManage(server, output, 1, "mothx/manage/channels/get", {}),
+      callManage(server, output, 1, "opensac/manage/channels/get", {}),
     );
     const wechat = view["wechat"] as Record<string, unknown>;
     assertEquals(wechat["enabled"], true);
@@ -505,7 +505,7 @@ Deno.test("manage channels get is credential safe and patch projects", () => {
     assert(!JSON.stringify(view).includes("shh"));
 
     const patched = result(
-      callManage(server, output, 2, "mothx/manage/channels/patch", {
+      callManage(server, output, 2, "opensac/manage/channels/patch", {
         patch: {
           artifact: true,
           wechat: { enabled: false, clearCredPath: true, autoTyping: false },
@@ -529,7 +529,7 @@ Deno.test("manage channels get is credential safe and patch projects", () => {
     // Rejected patch: both credPath and clearCredPath.
     assertEquals(
       errorCode(
-        callManage(server, output, 3, "mothx/manage/channels/patch", {
+        callManage(server, output, 3, "opensac/manage/channels/patch", {
           patch: {
             wechat: { credPath: "/x", clearCredPath: true },
           },
@@ -540,7 +540,7 @@ Deno.test("manage channels get is credential safe and patch projects", () => {
     // Top-level section whitelist.
     assertEquals(
       errorCode(
-        callManage(server, output, 4, "mothx/manage/channels/patch", {
+        callManage(server, output, 4, "opensac/manage/channels/patch", {
           patch: { hooks: {} },
         }),
       ),

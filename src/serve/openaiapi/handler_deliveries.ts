@@ -75,7 +75,7 @@ export function handleDeliveryFailuresAPI(
 }
 
 /**
- * deliveryFailureJSON mirrors the ACP mothx/manage/deliveries/list projection
+ * deliveryFailureJSON mirrors the ACP opensac/manage/deliveries/list projection
  * so WebUI and Desktop render the same facts, including the retryable verdict
  * that the shared Runtime predicate owns.
  */

@@ -120,7 +120,7 @@ export function handleSessionExport(
     }.log"`,
     "cache-control": "no-store",
     "x-content-type-options": "nosniff",
-    "x-mothx-session-count": String(sessions.length),
+    "x-opensac-session-count": String(sessions.length),
   };
   if (req.method === "HEAD") {
     return new Response(null, { status: 200, headers });
@@ -802,7 +802,7 @@ function safeSessionFilename(id: string): string {
     }
   }
   if (name === "") name = "session";
-  return `mothx-session-${name}`;
+  return `opensac-session-${name}`;
 }
 
 function writeTrajectoryError(err: unknown): Response {

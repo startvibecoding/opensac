@@ -43,14 +43,14 @@ Deno.test("webUI login uses configured token as password", async () => {
   const setCookie = loginResponse.headers.get("set-cookie") ?? "";
   const cookies = setCookie === "" ? [] : [setCookie];
   assertEquals(cookies.length, 1);
-  assertStringIncludes(cookies[0], "mothx_webui_auth=");
+  assertStringIncludes(cookies[0], "opensac_webui_auth=");
   assertStringIncludes(cookies[0], "HttpOnly");
   assertStringIncludes(cookies[0], "SameSite=Strict");
   assertStringIncludes(cookies[0], "Max-Age=");
   const maxAge = Number(/Max-Age=(\d+)/.exec(cookies[0])?.[1] ?? "0");
   assert(maxAge > 0);
 
-  const cookiePair = /mothx_webui_auth=[^;]+/.exec(cookies[0])?.[0] ?? "";
+  const cookiePair = /opensac_webui_auth=[^;]+/.exec(cookies[0])?.[0] ?? "";
   const protectedResponse = await invoke(
     authMiddleware(cfg, noContent),
     getRequest("/api/status", { cookie: cookiePair }),
@@ -78,7 +78,7 @@ Deno.test("auth middleware allows only WebUI bootstrap assets without credential
   );
 
   for (
-    const path of ["/", "/index.html", "/assets/app.js", "/mothx-small.ico"]
+    const path of ["/", "/index.html", "/assets/app.js", "/opensac-small.ico"]
   ) {
     const response = await invoke(handler, getRequest(path));
     assertEquals(response.status, 204, path);

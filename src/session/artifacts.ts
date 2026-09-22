@@ -46,7 +46,7 @@ export function listGeneratedArtifacts(
  * Returns metadata-only projections of the persisted attachment rows of one
  * session, optionally filtered by lifecycle status (an empty status returns
  * every row), in durable creation order. Adapters use it for listing surfaces
- * (for example ACP mothx/attachment/list).
+ * (for example ACP opensac/attachment/list).
  */
 export function listSessionAttachments(
   sessionDir: string,

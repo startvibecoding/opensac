@@ -23,7 +23,7 @@ import { closeAll } from "../../db/mod.ts";
 import { listSessionRunEvents } from "../../session/session_events.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-decision-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-decision-" });
 }
 
 function settingsFor(dir: string): Settings {

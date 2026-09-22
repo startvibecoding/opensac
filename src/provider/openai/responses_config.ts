@@ -701,9 +701,9 @@ export function responsesConfigHostedTools(
   appendConfig(cfg.fileSearch, "file_search");
   const codeInterpreter = cloneResponsesToolExtra(cfg.codeInterpreter ?? {}) ??
     {};
-  delete codeInterpreter["mothx"];
+  delete codeInterpreter["opensac"];
   appendConfig(codeInterpreter, "code_interpreter");
-  // image_generation is intentionally not appended here. MothX executes it only
+  // image_generation is intentionally not appended here. OpenSAC executes it only
   // through the standalone local image_generation tool so the configured
   // endpoint/token/API type remain independent from the chat provider.
   for (const values of cfg.remoteMCP ?? []) {
@@ -723,7 +723,7 @@ export function responsesConfigHostedTools(
 }
 
 /**
- * Reads MothX-local policy knobs from the existing hosted-tools map. They are
+ * Reads OpenSAC-local policy knobs from the existing hosted-tools map. They are
  * deliberately removed from the upstream tool descriptor, so gateways and other
  * providers never see private fields.
  */
@@ -737,7 +737,7 @@ export function responsesHostedPoliciesWithError(
   cfg: ResponsesHostedToolsConfig,
 ): Record<string, ResponsesHostedPolicy> {
   const result: Record<string, ResponsesHostedPolicy> = {};
-  const rawValue = cfg.codeInterpreter?.["mothx"];
+  const rawValue = cfg.codeInterpreter?.["opensac"];
   if (
     rawValue === null || typeof rawValue !== "object" ||
     Array.isArray(rawValue) || Object.keys(rawValue).length === 0
@@ -755,7 +755,7 @@ export function responsesHostedPoliciesWithError(
     const calls = hostedPolicyInt(raw["maxCalls"]);
     if (calls === undefined || calls < 0 || calls > 10000) {
       throw new Error(
-        "responses.hostedTools.codeInterpreter.mothx.maxCalls must be an integer from 0 to 10000",
+        "responses.hostedTools.codeInterpreter.opensac.maxCalls must be an integer from 0 to 10000",
       );
     }
     policy.maxCalls = calls;
@@ -765,7 +765,7 @@ export function responsesHostedPoliciesWithError(
     const seconds = hostedPolicyInt(raw["timeoutSecs"]);
     if (seconds === undefined || seconds < 0 || seconds > 24 * 60 * 60) {
       throw new Error(
-        "responses.hostedTools.codeInterpreter.mothx.timeoutSecs must be an integer from 0 to 86400",
+        "responses.hostedTools.codeInterpreter.opensac.timeoutSecs must be an integer from 0 to 86400",
       );
     }
     policy.timeoutMs = seconds * 1000;

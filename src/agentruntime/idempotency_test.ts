@@ -54,7 +54,7 @@ Deno.test("IdempotencyKeyFingerprint", () => {
 });
 
 Deno.test("FindIdempotentRun uses canonical started event", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     const sessionId = "session-idempotent";
     createSessionRun(
@@ -120,7 +120,7 @@ Deno.test("FindIdempotentRun uses canonical started event", () => {
 });
 
 Deno.test("FindIdempotentRun resolves a durable submission reservation", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     const sessionId = "session-submission";
     const keyHash = idempotencyKeyFingerprint("durable-submission");

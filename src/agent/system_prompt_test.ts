@@ -17,7 +17,7 @@ Deno.test("system prompt includes identity, mode, tools and guidelines", () => {
     false,
   );
 
-  assert(prompt.includes("You are MothX"));
+  assert(prompt.includes("You are OpenSAC"));
   assert(prompt.includes("## Mode: YOLO"));
   assert(prompt.includes("- Working directory: /work"));
   assert(prompt.includes("- read: read a file"));

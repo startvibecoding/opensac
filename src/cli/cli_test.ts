@@ -31,20 +31,20 @@ Deno.test("parseGoDurationMs rejects invalid and non-positive values", () => {
 
 Deno.test("resolveACPTimeout flag wins over environment", () => {
   const env: Record<string, string | undefined> = {
-    MOTHX_ACP_PERMISSION_TIMEOUT: "10m",
-    MOTHX_ACP_QUESTION_TIMEOUT: "2m",
+    OPENSAC_ACP_PERMISSION_TIMEOUT: "10m",
+    OPENSAC_ACP_QUESTION_TIMEOUT: "2m",
   };
   assertEquals(
-    resolveACPTimeout("", "MOTHX_ACP_PERMISSION_TIMEOUT", env),
+    resolveACPTimeout("", "OPENSAC_ACP_PERMISSION_TIMEOUT", env),
     600_000,
   );
   assertEquals(
-    resolveACPTimeout("30s", "MOTHX_ACP_PERMISSION_TIMEOUT", env),
+    resolveACPTimeout("30s", "OPENSAC_ACP_PERMISSION_TIMEOUT", env),
     30_000,
   );
   // Invalid flag falls through to env.
   assertEquals(
-    resolveACPTimeout("bogus", "MOTHX_ACP_QUESTION_TIMEOUT", env),
+    resolveACPTimeout("bogus", "OPENSAC_ACP_QUESTION_TIMEOUT", env),
     120_000,
   );
   // Both empty -> 0 (documented defaults).
@@ -74,23 +74,23 @@ Deno.test("acpRunOptions maps CLI flags and resolved timeouts", () => {
   assertEquals(opts.version, "9.9.9");
   assertEquals(opts.permissionTimeoutMs, 420_000);
   // Question timeout reads env when the flag is empty.
-  const previous = Deno.env.get("MOTHX_ACP_QUESTION_TIMEOUT");
-  Deno.env.set("MOTHX_ACP_QUESTION_TIMEOUT", "3m");
+  const previous = Deno.env.get("OPENSAC_ACP_QUESTION_TIMEOUT");
+  Deno.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", "3m");
   try {
     assertEquals(
       acpRunOptions(defaultCLIOptions(), "").questionTimeoutMs,
       180_000,
     );
   } finally {
-    if (previous === undefined) Deno.env.delete("MOTHX_ACP_QUESTION_TIMEOUT");
-    else Deno.env.set("MOTHX_ACP_QUESTION_TIMEOUT", previous);
+    if (previous === undefined) Deno.env.delete("OPENSAC_ACP_QUESTION_TIMEOUT");
+    else Deno.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", previous);
   }
 });
 
 Deno.test("doctor command projects JSON and human output", () => {
   const configDir = Deno.makeTempDirSync();
-  const previous = Deno.env.get("MOTHX_DIR");
-  Deno.env.set("MOTHX_DIR", configDir);
+  const previous = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", configDir);
   try {
     const lines: string[] = [];
     const result = executeDoctorCommand({
@@ -109,11 +109,11 @@ Deno.test("doctor command projects JSON and human output", () => {
       version: "test",
       write: (line: string) => void human.push(line),
     });
-    assert(human.includes("  MothX Doctor"));
+    assert(human.includes("  OpenSAC Doctor"));
     assert(human.some((line: string) => line.includes("Result:")));
   } finally {
-    if (previous === undefined) Deno.env.delete("MOTHX_DIR");
-    else Deno.env.set("MOTHX_DIR", previous);
+    if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
+    else Deno.env.set("OPENSAC_DIR", previous);
   }
 });
 
@@ -142,7 +142,7 @@ Deno.test("every Go subcommand is wired (no pending placeholders)", async () => 
   ) {
     assert(help.includes(name), `help must list ${name}`);
   }
-  // Go has no `mothx cron` subcommand (cron is the root --cron flag), so the
+  // Go has no `opensac cron` subcommand (cron is the root --cron flag), so the
   // Commands section must not list one.
   const commandsSection = help.slice(help.indexOf("Commands:"));
   assertEquals(commandsSection.includes("cron"), false);

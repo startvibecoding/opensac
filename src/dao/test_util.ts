@@ -5,13 +5,13 @@ import { ensureCurrentSchema } from "../session/schema.ts";
 
 /** Opens a fresh managed session database with the canonical schema. */
 export function openTestDb(name = "sessions"): DB {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-dao-test-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-dao-test-" });
   return open(`${dir}/${name}.db`, ensureCurrentSchema);
 }
 
 /** Opens a fresh managed database without schema migration. */
 export function openBareDb(name = "bare"): DB {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-dao-bare-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-dao-bare-" });
   return open(`${dir}/${name}.db`);
 }
 

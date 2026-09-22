@@ -1,4 +1,4 @@
-// Focused tests for the ported `mothx speedtest` command: thinking-level
+// Focused tests for the ported `opensac speedtest` command: thinking-level
 // parsing, target collection, token estimation, averaging/sorting, the table
 // projection, and the command path with an injected fake provider (no network).
 

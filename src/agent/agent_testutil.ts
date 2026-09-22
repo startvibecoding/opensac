@@ -63,12 +63,12 @@ export function newTestFactoryAndManager(): [AgentFactory, AgentManager] {
     doneStream(),
   );
   const sandboxMgr: SandboxManager = newManager(
-    Deno.makeTempDirSync({ prefix: "mothx-agent-sandbox-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-agent-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
   settings.sessionDir = Deno.makeTempDirSync({
-    prefix: "mothx-agent-sessions-",
+    prefix: "opensac-agent-sessions-",
   });
 
   const factory = newAgentFactory(

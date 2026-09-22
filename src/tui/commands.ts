@@ -51,14 +51,20 @@ export interface CommandHost {
   listMCPServers(): string;
   initMCPConfig(scope: string, full: boolean, force: boolean): CommandResult;
   listExperts(): string;
+  /** Shows one expert bundle's full details (/expert show <id>). */
+  showExpert(id: string): string;
   bindExpert(id: string): Promise<CommandResult>;
   forkSwitchExpert(id: string): Promise<CommandResult>;
   listSessions(): string;
+  /** Forks the current session, preserving its history (/sessions fork). */
+  forkSession(): Promise<CommandResult>;
   switchSession(id: string): Promise<CommandResult>;
   clearSession(): Promise<CommandResult>;
   deleteSession(id: string): Promise<CommandResult>;
   listWorkflows(): Promise<CommandResult>;
   showWorkflow(id: string): Promise<CommandResult>;
+  /** Cancels an active workflow run by ID (/workflows cancel <id>). */
+  cancelWorkflow(id: string): Promise<CommandResult>;
   handleESM(cmd: string): Promise<CommandResult>;
   handleBTW(cmd: string): Promise<CommandResult>;
   listEnv(): string;
@@ -74,6 +80,10 @@ export interface CommandHost {
   handleSkillHub(parts: string[]): Promise<CommandResult>;
   listStats(parts: string[]): Promise<CommandResult>;
   listAgents(): string;
+  /** Switches the focused agent (/agent switch <id>). */
+  switchAgent(id: string): Promise<CommandResult>;
+  /** Destroys a sub-agent (/agent destroy <id>). */
+  destroyAgent(id: string): Promise<CommandResult>;
   multiAgentEnabled(): boolean;
   handleReload(): Promise<CommandResult>;
   /** Lists configured providers and their credential state (/auth, /settings). */
@@ -92,8 +102,8 @@ export interface CommandHost {
   openModelDialog(): CommandResult;
   /** Opens the interactive provider/auth editor. */
   openAuthDialog(): CommandResult;
-  /** Opens the interactive settings browser. */
-  openSettingsDialog(): CommandResult;
+  /** Opens the interactive settings browser (/settings [provider]). */
+  openSettingsDialog(providerID?: string): CommandResult;
   /** Opens the interactive environment-variable editor. */
   openEnvDialog(): CommandResult;
   /** Opens the interactive session browser. */
@@ -155,6 +165,12 @@ export async function dispatchCommand(
       return cmdMode(host, parts);
     case "/model":
       if (parts.length > 1) return await cmdModel(host, parts);
+      if (host.running) {
+        return {
+          message: tr.text("commands.running_cannot_open", "/model"),
+          error: true,
+        };
+      }
       return host.openModelDialog();
     case "/clear":
       host.clearConversation();
@@ -207,14 +223,32 @@ export async function dispatchCommand(
     case "/stats":
       return await host.listStats(parts);
     case "/agent":
-      return cmdAgent(host, parts);
+      return await cmdAgent(host, parts);
     case "/reload":
       return await host.handleReload();
     case "/auth":
+      if (host.running) {
+        return {
+          message: tr.text("commands.running_cannot_open", "/auth"),
+          error: true,
+        };
+      }
       return host.openAuthDialog();
     case "/settings":
-      return host.openSettingsDialog();
+      if (host.running) {
+        return {
+          message: tr.text("settings.running"),
+          error: true,
+        };
+      }
+      return host.openSettingsDialog(parts[1]);
     case "/defaultModel":
+      if (host.running) {
+        return {
+          message: tr.text("commands.running_cannot_open", "/defaultModel"),
+          error: true,
+        };
+      }
       return await host.setDefaultModel(parts);
     case "/tuilang":
       if (parts.length === 1) return host.openTuiLangDialog();
@@ -301,7 +335,7 @@ async function cmdExpert(
           error: true,
         };
       }
-      return { message: host.listExperts() };
+      return { message: host.showExpert(parts[2]) };
     case "bind":
       if (parts.length < 3) {
         return {
@@ -358,6 +392,9 @@ async function cmdSessions(
         };
       }
       return await host.deleteSession(parts[2]);
+    case "fork":
+    case "branch":
+      return await host.forkSession();
     default:
       return {
         message: tr.text("sessions.unknown_subcommand", parts[1]),
@@ -380,6 +417,18 @@ async function cmdWorkflows(
       };
     }
     return await host.showWorkflow(parts[2]);
+  }
+  if (sub === "cancel") {
+    if (parts.length < 3) {
+      return {
+        message: host.translator.text(
+          "commands.usage",
+          "/workflows cancel <id>",
+        ),
+        error: true,
+      };
+    }
+    return await host.cancelWorkflow(parts[2]);
   }
   return {
     message: host.translator.text(
@@ -413,25 +462,46 @@ function cmdEnv(host: CommandHost, parts: string[]): CommandResult {
   }
 }
 
-function cmdAgent(host: CommandHost, parts: string[]): CommandResult {
+function cmdAgent(
+  host: CommandHost,
+  parts: string[],
+): Promise<CommandResult> {
   const tr = host.translator;
-  if (!host.multiAgentEnabled()) return { message: tr.text("agent.disabled") };
+  if (!host.multiAgentEnabled()) {
+    return Promise.resolve({ message: tr.text("agent.disabled") });
+  }
   if (parts.length < 2) {
-    return {
+    return Promise.resolve({
       message: tr.text("commands.usage", "/agent list|switch|destroy"),
       error: true,
-    };
+    });
   }
   switch (parts[1]) {
     case "list":
-      return { message: host.listAgents() };
+      return Promise.resolve({ message: host.listAgents() });
+    case "switch":
+      if (parts.length < 3) {
+        return Promise.resolve({
+          message: tr.text("commands.usage", "/agent switch <id>"),
+          error: true,
+        });
+      }
+      return host.switchAgent(parts[2]);
+    case "destroy":
+      if (parts.length < 3) {
+        return Promise.resolve({
+          message: tr.text("commands.usage", "/agent destroy <id>"),
+          error: true,
+        });
+      }
+      return host.destroyAgent(parts[2]);
     default:
-      return {
+      return Promise.resolve({
         message: tr.text(
           "commands.usage",
           "/agent list|switch <id>|destroy <id>",
         ),
         error: true,
-      };
+      });
   }
 }

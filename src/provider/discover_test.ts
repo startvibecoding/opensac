@@ -60,11 +60,11 @@ Deno.test("ParseDiscoveredModelsBareArray", () => {
 });
 
 Deno.test("ResolveSecretRef", () => {
-  Deno.env.set("MOTHX_DISCOVER_TEST_KEY", "from-env");
+  Deno.env.set("OPENSAC_DISCOVER_TEST_KEY", "from-env");
   try {
-    assertEquals(resolveSecretRef("${MOTHX_DISCOVER_TEST_KEY}"), "from-env");
+    assertEquals(resolveSecretRef("${OPENSAC_DISCOVER_TEST_KEY}"), "from-env");
     assertEquals(resolveSecretRef(" literal "), "literal");
   } finally {
-    Deno.env.delete("MOTHX_DISCOVER_TEST_KEY");
+    Deno.env.delete("OPENSAC_DISCOVER_TEST_KEY");
   }
 });

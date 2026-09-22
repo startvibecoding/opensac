@@ -35,7 +35,7 @@ Deno.test("Windows directory picker script forces UTF-8 output", () => {
   }
   assertStringIncludes(
     script,
-    "$env:MOTHX_DIRECTORY_PICKER_PATH",
+    "$env:OPENSAC_DIRECTORY_PICKER_PATH",
     "default path must arrive through the UTF-16 environment block",
   );
 });

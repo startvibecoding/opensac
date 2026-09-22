@@ -83,7 +83,7 @@ function makeRun(
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 Deno.test("released lease leaves a fencing tombstone", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-tombstone");
     const [releaseOld, okOld] = tryLockRuntime(sessionDir, "lease-tombstone");
@@ -105,7 +105,7 @@ Deno.test("released lease leaves a fencing tombstone", () => {
 });
 
 Deno.test("admission requires an existing idle session", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "admission-idle");
     const guard = acquireExecutionAdmission(sessionDir, "admission-idle");
@@ -126,7 +126,7 @@ Deno.test("admission requires an existing idle session", () => {
 });
 
 Deno.test("admission requires recovery for an active run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "admission-active");
     makeRun(sessionDir, "admission-active", "run-active", "running");
@@ -149,7 +149,7 @@ Deno.test("admission requires recovery for an active run", () => {
 });
 
 Deno.test("recovery binds the expected active run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "recovery-bind");
     makeRun(sessionDir, "recovery-bind", "run-recovery", "running");
@@ -173,7 +173,7 @@ Deno.test("recovery binds the expected active run", () => {
 });
 
 Deno.test("recovery requires an active run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "recovery-idle");
     assertThrows(
@@ -186,7 +186,7 @@ Deno.test("recovery requires an active run", () => {
 });
 
 Deno.test("multi-mutation releases earlier sessions on conflict", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "mutation-a");
     makeSession(sessionDir, "mutation-b");
@@ -206,7 +206,7 @@ Deno.test("multi-mutation releases earlier sessions on conflict", () => {
 });
 
 Deno.test("an unexpired lease blocks a competing process", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-busy");
     const db = openRootDB(sessionDir);
@@ -234,7 +234,7 @@ Deno.test("an unexpired lease blocks a competing process", () => {
 });
 
 Deno.test("an expired lease is reclaimed with a fencing epoch bump", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-expired");
     const db = openRootDB(sessionDir);
@@ -272,7 +272,7 @@ Deno.test("an expired lease is reclaimed with a fencing epoch bump", () => {
 });
 
 Deno.test("heartbeat batch renews survivors and marks displaced leases lost", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "hb-batch-1");
     makeSession(sessionDir, "hb-batch-2");
@@ -310,7 +310,7 @@ Deno.test("heartbeat batch renews survivors and marks displaced leases lost", as
 });
 
 Deno.test("retire keeps a live lease and stops only for an empty directory", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "retire-race");
     const dirKey = leaseDirKey(sessionDir);
@@ -339,7 +339,7 @@ Deno.test("retire keeps a live lease and stops only for an empty directory", () 
 });
 
 Deno.test("a transient renewal error never marks the lease lost", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   const originalBudget = runtimeHeartbeatTiming.retryBudgetMs;
   try {
     makeSession(sessionDir, "renew-stall");
@@ -375,7 +375,7 @@ Deno.test("a transient renewal error never marks the lease lost", async () => {
 });
 
 Deno.test("renewal recovers after repeated timeout ticks", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-lease-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   const originalBudget = runtimeHeartbeatTiming.retryBudgetMs;
   try {
     makeSession(sessionDir, "renew-recover");

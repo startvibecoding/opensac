@@ -34,6 +34,7 @@ import {
   DecisionQuestion,
 } from "../agentruntime/decision.ts";
 import { AgentActivityStore } from "./activity.ts";
+import { ActivityManager } from "./activity_manager.ts";
 import { TranscriptStore } from "./transcript_store.ts";
 import { Translator } from "./i18n.ts";
 
@@ -84,6 +85,11 @@ export interface AppControllerCallbacks {
 export class AppController {
   readonly store: TranscriptStore;
   readonly activities = new AgentActivityStore();
+  /** Live per-turn activity timeline (tools, thinking) for the lead agent. */
+  readonly activityManager = new ActivityManager();
+
+  /** Whether the current turn has an open thinking block in the manager. */
+  #thinkBlockOpen = false;
 
   waitingForApproval = false;
   waitingForQuestion = false;
@@ -114,6 +120,11 @@ export class AppController {
 
   setLeadAgentId(id: string | undefined): void {
     this.#leadAgentId = id;
+  }
+
+  /** The translator used for localized labels (Go App.translator). */
+  get translator(): Translator {
+    return this.#translator;
   }
 
   attachRun(run: RunHandle | undefined): void {
@@ -152,10 +163,17 @@ export class AppController {
         this.#cb.scheduleRender();
         return;
 
-      case EventThinkDelta:
-        this.store.appendThinkDelta(event.thinkDelta ?? "");
+      case EventThinkDelta: {
+        const delta = event.thinkDelta ?? "";
+        this.store.appendThinkDelta(delta);
+        if (!this.#thinkBlockOpen) {
+          this.activityManager.startThinking("turn");
+          this.#thinkBlockOpen = true;
+        }
+        this.activityManager.appendThinking("turn", delta);
         this.#cb.scheduleRender();
         return;
+      }
 
       case EventHostedItem:
         if (event.hostedItem) {
@@ -168,6 +186,9 @@ export class AppController {
         return;
 
       case EventTurnStart:
+        // A new turn owns a fresh activity timeline (Go turn lifecycle).
+        this.activityManager.clear();
+        this.#thinkBlockOpen = false;
         this.store.beginAssistantSlot();
         return;
 
@@ -178,11 +199,21 @@ export class AppController {
             event.toolCall.name,
             event.toolArgs,
           );
+          this.activityManager.startToolExecution(
+            event.toolCall.id,
+            event.toolCall.name,
+            event.toolArgs,
+          );
         }
         return;
 
       case EventToolExecutionStart:
         this.store.appendToolExecutionStart(
+          event.toolCallId ?? "",
+          event.toolName ?? "",
+          event.toolArgs,
+        );
+        this.activityManager.startToolExecution(
           event.toolCallId ?? "",
           event.toolName ?? "",
           event.toolArgs,
@@ -200,11 +231,20 @@ export class AppController {
           toolError: event.toolError,
           toolExecutionState: event.toolExecutionState,
         });
+        this.activityManager.completeToolExecution(
+          event.toolCallId ?? "",
+          event.toolResult ?? "",
+          event.toolError?.message,
+        );
         this.#cb.scheduleRender();
         return;
 
       case EventTurnEnd:
         this.store.commitActiveStream();
+        if (this.#thinkBlockOpen) {
+          this.activityManager.completeThinking("turn");
+          this.#thinkBlockOpen = false;
+        }
         this.#cb.scheduleRender();
         return;
 
@@ -353,6 +393,15 @@ export class AppController {
 
   #handleRunFinished(event: Event): void {
     this.runTerminalHandled = true;
+    // Terminal run: close any open thinking block and interrupt tools that
+    // never delivered a result, mirroring finalizeInterruptedTools.
+    if (this.#thinkBlockOpen) {
+      this.activityManager.completeThinking("turn");
+      this.#thinkBlockOpen = false;
+    }
+    for (const tool of this.activityManager.getActiveTools()) {
+      this.activityManager.interruptToolExecution(tool.id);
+    }
     if (this.#run) {
       let state: RunState = "completed";
       switch (event.status) {

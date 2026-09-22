@@ -53,7 +53,7 @@ function textBlock(text: string): ContentBlock {
 }
 
 function withTempDir(fn: (dir: string, sessionDir: string) => void): void {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-session-test-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-session-test-" });
   const sessionDir = path.join(dir, "sessions");
   try {
     fn(dir, sessionDir);

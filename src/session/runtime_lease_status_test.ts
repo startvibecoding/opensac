@@ -13,7 +13,7 @@ import {
 } from "./runtime_lease_status.ts";
 
 Deno.test("active runtime leases reports held holders", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     // No database yet: nothing is held, and a read-only preflight must not
     // initialize the file it is only inspecting.
@@ -68,7 +68,7 @@ Deno.test("active runtime leases reports held holders", () => {
 });
 
 Deno.test("active runtime leases never migrates the preflight database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const pathValue = rootDBPath(sessionDir);
     const standalone = openStandalone(pathValue, (db) => {

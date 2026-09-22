@@ -454,7 +454,7 @@ function archiveBackgroundResponseWithPolicy(
   }
   if (normalizer.hostedPolicyError() !== undefined) {
     status = "incomplete";
-    incompleteReason = "mothx_code_interpreter_quota";
+    incompleteReason = "opensac_code_interpreter_quota";
   }
   const summary = {
     responseId: response.id ?? "",

@@ -6,7 +6,7 @@ import { roleWorker, Supervisor } from "./runtime_core.ts";
 import { cleanup, makeStore, RuntimeTestAdapter } from "./test_helpers.ts";
 
 Deno.test("Store addGuidance stamps objective version", () => {
-  const { store, sessionID } = makeStore("mothx-esm-guidance-");
+  const { store, sessionID } = makeStore("opensac-esm-guidance-");
   try {
     const obj = store.create(sessionID, "finish the objective");
     store.addGuidance(sessionID, "focus on failing tests");
@@ -37,7 +37,7 @@ Deno.test("Store addGuidance stamps objective version", () => {
 });
 
 Deno.test("Supervisor injects and consumes guidance for worker", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-guidance-");
+  const { store, sessionID } = makeStore("opensac-esm-guidance-");
   try {
     store.create(sessionID, "finish the objective");
     store.addGuidance(sessionID, "prioritize the failing tests");
@@ -66,7 +66,7 @@ Deno.test("Supervisor injects and consumes guidance for worker", async () => {
 });
 
 Deno.test("Supervisor keeps guidance when role fails", async () => {
-  const { store, sessionID } = makeStore("mothx-esm-guidance-");
+  const { store, sessionID } = makeStore("opensac-esm-guidance-");
   try {
     store.create(sessionID, "finish the objective");
     store.addGuidance(sessionID, "prioritize the failing tests");

@@ -11,7 +11,7 @@
 // sub-agent lifecycle events, and attachment listing), the session lifecycle
 // handlers, the agent-event projection, and the prompt run
 // (`handlePrompt`/`requestQuestion`/`requestPermission`). The stdio dispatch
-// loop (`Run`) and the `mothx/manage/*` plane land in later slices.
+// loop (`Run`) and the `opensac/manage/*` plane land in later slices.
 //
 // Deviations (see docs/proposal/go-to-deno-migration.md):
 //   - Go's `sync.Mutex`/`sync.Once` are dropped; Deno's single-threaded event
@@ -259,7 +259,7 @@ import {
   artifactSessionUpdate,
   decodeSessionCursor,
   encodeSessionCursor,
-  mothxExtensionNamespace,
+  opensacExtensionNamespace,
   questionProjectionFor,
   textToolContent,
   toolCallLocations,
@@ -449,12 +449,12 @@ export interface ACPInitializeResult {
   _meta?: Record<string, unknown>;
 }
 
-/** The `mothx/doctor` request. */
+/** The `opensac/doctor` request. */
 export interface ACPDoctorRequest {
   cwd?: string;
 }
 
-/** The `mothx/session/setMeta` request. */
+/** The `opensac/session/setMeta` request. */
 export interface ACPSessionSetMetaRequest {
   sessionId?: string;
   pinned?: boolean;
@@ -462,31 +462,31 @@ export interface ACPSessionSetMetaRequest {
   _meta?: RequestMeta;
 }
 
-/** The `mothx/session/setMeta` result. */
+/** The `opensac/session/setMeta` result. */
 export interface ACPSessionSetMetaResult {
   pinned: boolean;
   projectId: string | null;
   updatedAt: string;
 }
 
-/** The `mothx/projects/*` request. */
+/** The `opensac/projects/*` request. */
 export interface ACPProjectRequest {
   id?: string;
   name?: string;
 }
 
-/** The `mothx/workspace/extend` request. */
+/** The `opensac/workspace/extend` request. */
 export interface ACPWorkspaceExtendRequest {
   additionalDirectories?: string[];
 }
 
-/** The `mothx/attachment/list` request. */
+/** The `opensac/attachment/list` request. */
 export interface ACPAttachmentListRequest {
   sessionId?: string;
   status?: string;
 }
 
-/** One `mothx/attachment/list` entry. */
+/** One `opensac/attachment/list` entry. */
 export interface ACPAttachmentListEntry {
   attachmentId: string;
   filename: string;
@@ -498,19 +498,19 @@ export interface ACPAttachmentListEntry {
   createdAt: string;
 }
 
-/** The `mothx/session/history` request. */
+/** The `opensac/session/history` request. */
 export interface ACPTranscriptPageRequest {
   sessionId?: string;
   cursor?: string;
   limit?: number;
 }
 
-/** The `session/list` and `mothx/session/listAll` request. */
+/** The `session/list` and `opensac/session/listAll` request. */
 export interface ACPListSessionsRequest {
   cwd?: string;
   additionalDirectories?: string[];
   cursor?: string;
-  /** Only honored by `mothx/session/listAll` (`all`/`project`/`ungrouped`). */
+  /** Only honored by `opensac/session/listAll` (`all`/`project`/`ungrouped`). */
   scope?: string;
   projectId?: string;
   query?: string;
@@ -532,7 +532,7 @@ export interface ACPListedSession {
   _meta?: Record<string, unknown>;
 }
 
-/** The `session/list` and `mothx/session/listAll` result. */
+/** The `session/list` and `opensac/session/listAll` result. */
 export interface ACPListSessionsResult {
   sessions: ACPListedSession[];
   nextCursor?: string;
@@ -544,27 +544,27 @@ export interface ACPCloseSessionRequest {
   _meta?: RequestMeta;
 }
 
-/** The `mothx/session/delete` / `session/delete` request. */
+/** The `opensac/session/delete` / `session/delete` request. */
 export interface ACPDeleteSessionRequest {
   sessionId?: string;
   _meta?: RequestMeta;
 }
 
-/** The `mothx/session/setTitle` request. */
+/** The `opensac/session/setTitle` request. */
 export interface ACPSetTitleRequest {
   sessionId?: string;
   title?: string;
   _meta?: RequestMeta;
 }
 
-/** The `mothx/session/setWorkDir` request. */
+/** The `opensac/session/setWorkDir` request. */
 export interface ACPSetWorkDirRequest {
   sessionId?: string;
   cwd?: string;
   _meta?: RequestMeta;
 }
 
-/** The `mothx/session/setWorkDir` result. */
+/** The `opensac/session/setWorkDir` result. */
 export interface ACPSetWorkDirResult {
   cwd: string;
 }
@@ -627,7 +627,7 @@ export class ACPActiveSessionRunError extends Error {
 
 /**
  * Session-cumulative prompt-cache totals projected on `usage_update` under
- * `_meta["mothx.dev"]` (feature key `usageCacheProjection`). One accumulator
+ * `_meta["opensac.dev"]` (feature key `usageCacheProjection`). One accumulator
  * serves both the persisted-history seed and live usage events.
  */
 export class ACPCacheUsage {
@@ -648,7 +648,7 @@ export class ACPCacheUsage {
   meta(): Record<string, unknown> | undefined {
     if (this.inputTotal <= 0) return undefined;
     return {
-      [mothxExtensionNamespace]: {
+      [opensacExtensionNamespace]: {
         cacheRead: this.cacheRead,
         cacheWrite: this.cacheWrite,
         totalInputTokens: this.inputTotal,
@@ -1148,7 +1148,7 @@ export class AcpServer {
     }
 
     const meta: Record<string, unknown> = {
-      [mothxExtensionNamespace]: {
+      [opensacExtensionNamespace]: {
         minClientProtocol: 1,
         doctor: true,
         requestQuestion: true,
@@ -1179,7 +1179,7 @@ export class AcpServer {
           "subagentEvents",
           "toolResultImages",
           // usage_update carries the cumulative prompt-cache totals under
-          // _meta["mothx.dev"] only while this key is advertised.
+          // _meta["opensac.dev"] only while this key is advertised.
           "usageCacheProjection",
           "attachmentList",
           "manageSettings",
@@ -1228,8 +1228,8 @@ export class AcpServer {
         _meta: meta,
       },
       agentInfo: {
-        name: "mothx",
-        title: "MothX",
+        name: "opensac",
+        title: "OpenSAC",
         version: this.productVersion(),
       },
       authMethods: [],
@@ -1238,7 +1238,7 @@ export class AcpServer {
     this.writeResponse(req.idRaw, result, null);
   }
 
-  /** Handles `mothx/doctor`. */
+  /** Handles `opensac/doctor`. */
   handleDoctor(req: ACPRPCRequest): void {
     let inRequest: ACPDoctorRequest = {};
     const params = req.params;
@@ -1276,7 +1276,7 @@ export class AcpServer {
    * prompt response.
    */
   notifyRunStatus(sessionId: string, runId: string, status: string): void {
-    this.notifyExtension("_mothx/session_event", {
+    this.notifyExtension("_opensac/session_event", {
       sessionId,
       event: "run_status",
       runId,
@@ -1328,7 +1328,7 @@ export class AcpServer {
   // ─── §4.2 session metadata (pinned/project) and projects ──────────────────
 
   /**
-   * Serves `mothx/session/setMeta`: a thin projection of
+   * Serves `opensac/session/setMeta`: a thin projection of
    * `session.setSessionMetadata`. Absent fields keep their persisted values,
    * an explicit null `projectId` clears the assignment, and the change is
    * broadcast as a `session_info_update`.
@@ -1526,7 +1526,7 @@ export class AcpServer {
     }
   }
 
-  /** Serves `mothx/projects/list`. */
+  /** Serves `opensac/projects/list`. */
   handleProjectsList(req: ACPRPCRequest): void {
     if (this.settings === null) {
       this.writeResponse(
@@ -1569,7 +1569,7 @@ export class AcpServer {
     this.writeResponse(req.idRaw, { projects: items }, null);
   }
 
-  /** Serves `mothx/projects/create`. */
+  /** Serves `opensac/projects/create`. */
   handleProjectsCreate(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPProjectRequest;
     const name = typeof inRequest.name === "string"
@@ -1613,7 +1613,7 @@ export class AcpServer {
     }
   }
 
-  /** Serves `mothx/projects/rename`. */
+  /** Serves `opensac/projects/rename`. */
   handleProjectsRename(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPProjectRequest;
     const id = typeof inRequest.id === "string" ? inRequest.id.trim() : "";
@@ -1662,7 +1662,7 @@ export class AcpServer {
     }
   }
 
-  /** Serves `mothx/projects/delete`. */
+  /** Serves `opensac/projects/delete`. */
   handleProjectsDelete(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPProjectRequest;
     const id = typeof inRequest.id === "string" ? inRequest.id.trim() : "";
@@ -1707,7 +1707,7 @@ export class AcpServer {
   // ─── §4.3 dynamic workspace extension ─────────────────────────────────────
 
   /**
-   * Serves `mothx/workspace/extend`: grow-only expansion of the workspace
+   * Serves `opensac/workspace/extend`: grow-only expansion of the workspace
    * window negotiated at `initialize`. The cwd is immutable and the window
    * never shrinks.
    */
@@ -1837,7 +1837,7 @@ export class AcpServer {
         );
       }
     }
-    this.notifyExtension("_mothx/session_event", {
+    this.notifyExtension("_opensac/session_event", {
       event: "workspace",
       cwd,
       additionalDirectories: merged,
@@ -1901,7 +1901,7 @@ export class AcpServer {
   ): void {
     let remaining = deadline.getTime() - Date.now();
     if (remaining < 0) remaining = 0;
-    this.notifyExtension("_mothx/session_event", {
+    this.notifyExtension("_opensac/session_event", {
       sessionId,
       event: "decision_deadline",
       requestId,
@@ -2019,7 +2019,7 @@ export class AcpServer {
     }
     if (meta.memberEmoji !== "") params.memberEmoji = meta.memberEmoji;
     if (meta.memberRole !== "") params.memberRole = meta.memberRole;
-    this.notifyExtension("_mothx/session_event", params);
+    this.notifyExtension("_opensac/session_event", params);
   }
 
   /**
@@ -2036,9 +2036,9 @@ export class AcpServer {
   // ─── §4.8 attachment metadata listing ─────────────────────────────────────
 
   /**
-   * Serves the `mothx/attachment/list` extension: a metadata-only listing of
+   * Serves the `opensac/attachment/list` extension: a metadata-only listing of
    * the Runtime-owned attachment rows of one session, optionally filtered by
-   * protocol status. Content bytes stay behind `mothx/attachment/fetch`.
+   * protocol status. Content bytes stay behind `opensac/attachment/fetch`.
    */
   handleAttachmentList(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPAttachmentListRequest;
@@ -2239,7 +2239,7 @@ export class AcpServer {
     this.writeResponse(req.idRaw, page, null);
   }
 
-  // ─── session catalog: session/list and mothx/session/listAll ──────────────
+  // ─── session catalog: session/list and opensac/session/listAll ──────────────
 
   /** Serves `session/list` scoped to the negotiated workspace roots. */
   handleListSessions(req: ACPRPCRequest): void {
@@ -2355,7 +2355,7 @@ export class AcpServer {
   }
 
   /**
-   * Narrows `mothx/session/listAll` before cursor pagination. It only combines
+   * Narrows `opensac/session/listAll` before cursor pagination. It only combines
    * persisted session details, canonical session metadata, and canonical project
    * names for a read-only adapter query.
    */
@@ -2699,7 +2699,7 @@ export class AcpServer {
     return result;
   }
 
-  /** Serves `mothx/session/delete` and `session/delete`. */
+  /** Serves `opensac/session/delete` and `session/delete`. */
   handleDeleteSession(req: ACPRPCRequest): void {
     const inRequest = decodeDeleteSessionRequest(req.params);
     if (inRequest === null || (inRequest.sessionId ?? "").trim() === "") {
@@ -2822,7 +2822,7 @@ export class AcpServer {
     this.writeResponse(req.idRaw, {}, null);
   }
 
-  /** Serves `mothx/session/setTitle`. */
+  /** Serves `opensac/session/setTitle`. */
   handleSetSessionTitle(req: ACPRPCRequest): void {
     const inRequest = decodeSetTitleRequest(req.params);
     const sessionId = (inRequest?.sessionId ?? "").trim();
@@ -2892,7 +2892,7 @@ export class AcpServer {
   }
 
   /**
-   * Serves `mothx/session/setWorkDir`: moves an idle session to an
+   * Serves `opensac/session/setWorkDir`: moves an idle session to an
    * already-authorized directory. Runtime resources are bound to a workdir, so
    * an open idle runtime is shut down and rebuilt on the next `session/load`.
    */
@@ -4068,7 +4068,7 @@ export class AcpServer {
     this.notifyAvailableCommands(id);
   }
 
-  /** Handles `mothx/session/draft-config-options` before a session exists. */
+  /** Handles `opensac/session/draft-config-options` before a session exists. */
   handleDraftConfigOptions(req: ACPRPCRequest): void {
     const inRequest = decodeDraftConfigOptionsRequest(req.params);
     if (inRequest === null) {
@@ -5167,7 +5167,7 @@ export class AcpServer {
       // Project generated artifacts as canonical session/update notifications.
       // The observer only renders Runtime-owned attachment records after
       // durable persistence; content retrieval stays with the
-      // mothx/attachment/fetch extension method.
+      // opensac/attachment/fetch extension method.
       artifacts?.setObserver((record) => {
         try {
           this.notify(
@@ -5601,7 +5601,7 @@ export class AcpServer {
     const commands: AvailableCommand[] = [{
       name: systeminitCommand,
       description: "Initialize project guidance",
-      _meta: { [mothxExtensionNamespace]: { kind: "command" } },
+      _meta: { [opensacExtensionNamespace]: { kind: "command" } },
     }];
     for (const skill of manager.list()) {
       if (skill === null || skill === undefined || skill.name.trim() === "") {
@@ -5610,7 +5610,7 @@ export class AcpServer {
       commands.push({
         name: "/" + skill.name,
         description: skill.description,
-        _meta: { [mothxExtensionNamespace]: { kind: "skill" } },
+        _meta: { [opensacExtensionNamespace]: { kind: "skill" } },
       });
     }
     return commands;
@@ -5924,18 +5924,18 @@ export class AcpServer {
           params.errorInfo = info;
           params.error = displayErrorMessage(info);
         }
-        this.notifyExtension("_mothx/session_event", params);
+        this.notifyExtension("_opensac/session_event", params);
         break;
       }
       case EventRetry:
         this.notifyExtension(
-          "_mothx/session_event",
+          "_opensac/session_event",
           acpRetryEvent(sessionId, ev),
         );
         break;
       case EventStatus:
         if (ev.retryStatus === true) return;
-        this.notifyExtension("_mothx/session_event", {
+        this.notifyExtension("_opensac/session_event", {
           sessionId,
           event: "status",
           message: ev.statusMessage ?? "",
@@ -5946,7 +5946,7 @@ export class AcpServer {
         // new ID here keeps its streamed text/thought separate from earlier
         // turns and leaves the tool cards at their canonical transcript point.
         this.advanceStreamSegment(sessionId);
-        this.notifyExtension("_mothx/session_event", {
+        this.notifyExtension("_opensac/session_event", {
           sessionId,
           event: acpEventName(ev.type),
           message: ev.statusMessage ?? "",
@@ -5955,7 +5955,7 @@ export class AcpServer {
       case EventCompactionStart:
       case EventCompactionEnd:
       case EventTurnEnd:
-        this.notifyExtension("_mothx/session_event", {
+        this.notifyExtension("_opensac/session_event", {
           sessionId,
           event: acpEventName(ev.type),
           message: ev.statusMessage ?? "",
@@ -6203,7 +6203,7 @@ export interface ACPNewSessionRequest {
   _meta?: RequestMeta;
 }
 
-/** ACP `mothx/session/draft-config-options` request params. */
+/** ACP `opensac/session/draft-config-options` request params. */
 export interface ACPDraftConfigOptionsRequest {
   cwd?: string;
   _meta?: RequestMeta;
@@ -6237,7 +6237,7 @@ export interface ACPForkSessionRequest {
   atSeq?: number;
   requestId?: string;
   titleMode?: string;
-  /** The additive MothX fork expert override; track presence separately. */
+  /** The additive OpenSAC fork expert override; track presence separately. */
   expertId?: string;
   expertIdSet?: boolean;
   _meta?: RequestMeta;
@@ -6482,7 +6482,7 @@ function decodeNewSessionRequest(params: unknown): ACPNewSessionRequest | null {
   return decodeSessionLifecycleRequest(params) as ACPNewSessionRequest | null;
 }
 
-/** Decodes a `mothx/session/draft-config-options` request. */
+/** Decodes a `opensac/session/draft-config-options` request. */
 function decodeDraftConfigOptionsRequest(
   params: unknown,
 ): ACPDraftConfigOptionsRequest | null {
@@ -6733,7 +6733,7 @@ export function acpFailureRPCError(
   });
 }
 
-/** Decodes the `mothx/session/history` request; null marks malformed params. */
+/** Decodes the `opensac/session/history` request; null marks malformed params. */
 function decodeTranscriptPageRequest(
   params: unknown,
 ): ACPTranscriptPageRequest | null {
@@ -6808,12 +6808,12 @@ function decodeDeleteSessionRequest(
   return decodeSessionRequest(params) as ACPDeleteSessionRequest | null;
 }
 
-/** Decodes a `mothx/session/setTitle` request; null marks malformed params. */
+/** Decodes a `opensac/session/setTitle` request; null marks malformed params. */
 function decodeSetTitleRequest(params: unknown): ACPSetTitleRequest | null {
   return decodeSessionRequest(params) as ACPSetTitleRequest | null;
 }
 
-/** Decodes a `mothx/session/setWorkDir` request; null marks malformed params. */
+/** Decodes a `opensac/session/setWorkDir` request; null marks malformed params. */
 function decodeSetWorkDirRequest(params: unknown): ACPSetWorkDirRequest | null {
   return decodeSessionRequest(params) as ACPSetWorkDirRequest | null;
 }

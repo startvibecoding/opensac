@@ -83,11 +83,11 @@ export function acpRunOptions(
     artifact: flags.artifact,
     permissionTimeoutMs: resolveACPTimeout(
       flags.acpPermissionTimeout,
-      "MOTHX_ACP_PERMISSION_TIMEOUT",
+      "OPENSAC_ACP_PERMISSION_TIMEOUT",
     ),
     questionTimeoutMs: resolveACPTimeout(
       flags.acpQuestionTimeout,
-      "MOTHX_ACP_QUESTION_TIMEOUT",
+      "OPENSAC_ACP_QUESTION_TIMEOUT",
     ),
   };
 }
@@ -436,7 +436,7 @@ function newA2ACommand(): any {
     .noExit()
     .action(() => {
       throw new ValidationError(
-        "`mothx a2a stop` is not ported yet (the TS server does not write a PID file)",
+        "`opensac a2a stop` is not ported yet (the TS server does not write a PID file)",
       );
     });
   return new Command()
@@ -492,7 +492,7 @@ function newA2ACommand(): any {
       // No subcommand: print help via ValidationError-free path is awkward in
       // Cliffy; surface the same short description as Go.
       throw new ValidationError(
-        "use `mothx a2a start`, `mothx a2a status`, or `--init-a2a-config`",
+        "use `opensac a2a start`, `opensac a2a status`, or `--init-a2a-config`",
       );
     })
     .command("start", start)
@@ -593,7 +593,7 @@ function parseSpeedtestDurationMs(value: string): number {
 export function newRootCommand(version = currentVersion()): Command {
   const flags = defaultCLIOptions();
   const root = new Command()
-    .name("mothx")
+    .name("opensac")
     .version(version)
     .description("AI coding assistant")
     .noExit();

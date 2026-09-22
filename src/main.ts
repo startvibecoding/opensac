@@ -1,4 +1,4 @@
-// MothX entry point (migrated from cmd/mothx). Thin process wrapper over the
+// OpenSAC entry point (migrated from cmd/mothx). Thin process wrapper over the
 // Cliffy command tree in ./command.ts; the interactive TUI and remaining
 // subcommands arrive with backlog slices #36/#37.
 

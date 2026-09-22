@@ -540,7 +540,7 @@ export async function handleMessage(
     let text = response.text;
     if (text !== "") text += "\n\n";
     text +=
-      "Generated attachments are available in the MothX WebUI session. This text-only caller cannot send media attachments.";
+      "Generated attachments are available in the OpenSAC WebUI session. This text-only caller cannot send media attachments.";
     response.text = text;
     for (const attachment of response.attachments) {
       attachment.complete?.(signal, "unsupported", "", "text_only_adapter");
@@ -1580,7 +1580,7 @@ function channelStopReply(result: SessionStopResult): string {
     return "🛑 Stale execution recovery requested.";
   }
   if (result.code === SessionStopOwnedElsewhere) {
-    return "⏳ This session is running in another MothX process and cannot be stopped here.";
+    return "⏳ This session is running in another OpenSAC process and cannot be stopped here.";
   }
   if (result.code === SessionStopRemoteUnsupported) {
     return "⏳ The detached provider run cannot be stopped from this channel.";

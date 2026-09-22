@@ -32,7 +32,7 @@ import {
 } from "./session_runtime_snapshot.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-snapshot-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-snapshot-" });
 }
 
 function settingsFor(dir: string): Settings {

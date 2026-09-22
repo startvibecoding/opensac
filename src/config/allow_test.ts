@@ -27,15 +27,15 @@ import {
 function withTempAllowPaths(fn: () => void): void {
   const tmp = Deno.makeTempDirSync({ prefix: "allow-" });
   const prevWd = Deno.cwd();
-  const prevDir = Deno.env.get("MOTHX_DIR");
+  const prevDir = Deno.env.get("OPENSAC_DIR");
   Deno.chdir(tmp);
-  Deno.env.set("MOTHX_DIR", path.join(tmp, "global"));
+  Deno.env.set("OPENSAC_DIR", path.join(tmp, "global"));
   try {
     fn();
   } finally {
     Deno.chdir(prevWd);
-    if (prevDir === undefined) Deno.env.delete("MOTHX_DIR");
-    else Deno.env.set("MOTHX_DIR", prevDir);
+    if (prevDir === undefined) Deno.env.delete("OPENSAC_DIR");
+    else Deno.env.set("OPENSAC_DIR", prevDir);
   }
 }
 

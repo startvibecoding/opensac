@@ -50,7 +50,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-responses-runtime-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-responses-runtime-" });
 }
 
 Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {

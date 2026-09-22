@@ -64,7 +64,7 @@ function baseIntent(overrides: Partial<ExecutionIntent>): ExecutionIntent {
 }
 
 Deno.test("execution intent round trips through durable storage", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-intent-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     saveExecutionIntent(
       sessionDir,
@@ -96,7 +96,7 @@ Deno.test("execution intent round trips through durable storage", () => {
 });
 
 Deno.test("execution intent admission rejects mismatched identity", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-intent-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     assertThrows(
       () =>
@@ -131,7 +131,7 @@ Deno.test("execution intent admission rejects mismatched identity", () => {
 });
 
 Deno.test("execution intent atomically admits run, event, and turn", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-intent-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     const now = new Date();
     const eventId = createExecutionIntentAndSessionRunEventWithTurn(

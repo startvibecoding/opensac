@@ -20,7 +20,7 @@ import { Store as ESMStore } from "./store.ts";
 import { workerTaskPrompt } from "./prompt.ts";
 
 function newTestStore(): { store: Store; sessionID: string } {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-esm-store-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-esm-store-" });
   return { store: new ESMStore(sessionDir), sessionID: "esm-session" };
 }
 

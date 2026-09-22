@@ -56,7 +56,7 @@ export interface SystemPromptOptions {
 
 const authoredSystemPrompt =
   `When creating a git commit, include this trailer exactly:
-Co-Authored-By: MothX <harness@mothx.net>`;
+Co-Authored-By: OpenSAC <harness@opensac.net>`;
 
 /** Constructs the system prompt and includes the resolved tool execution policy. */
 export function buildSystemPromptWithOptions(
@@ -90,7 +90,7 @@ export function buildSystemPromptWithOptions(
 
   // Core identity and environment
   out +=
-    `You are MothX, an AI coding assistant operating in a terminal environment.
+    `You are OpenSAC, an AI coding assistant operating in a terminal environment.
 
 ## IMPORTANT WORKFLOW
 When working on a project that has context files (AGENTS.md, CLAUDE.md, .cursorrules, etc.),

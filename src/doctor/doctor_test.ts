@@ -40,7 +40,7 @@ function checkByID(result: Response, id: string): Check {
 Deno.test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const settings = defaultSettings();
     settings.defaultProvider = "doctor-test";
     settings.defaultModel = "model";
@@ -68,7 +68,7 @@ Deno.test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
 Deno.test("RunUsesProjectSettingsForRequestedCWD", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const projectDir = path.join(workDir, ProjectDirName);
     Deno.mkdirSync(projectDir, { recursive: true });
     Deno.writeTextFileSync(
@@ -122,7 +122,7 @@ Deno.test("ValidateProviderReportsMissingModelWhenNoModelCanBeSelected", () => {
 Deno.test("RunNeverSerializesAPIKey", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const apiKey = "doctor-test-secret-value";
     const settings = defaultSettings();
     settings.defaultProvider = "doctor-secret";

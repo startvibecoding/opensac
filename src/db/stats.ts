@@ -3,7 +3,7 @@
 import { beginWaitStats, busyRetryStats } from "./busy.ts";
 
 /** The expvar name under which the process-wide SQLite contention metrics are published. */
-export const SQLITE_EXPVAR_KEY = "mothx_sqlite";
+export const SQLITE_EXPVAR_KEY = "opensac_sqlite";
 
 /**
  * Renders the cumulative contention counters as JSON: transient busy begin

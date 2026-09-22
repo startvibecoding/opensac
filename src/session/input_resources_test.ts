@@ -8,7 +8,7 @@ import {
 } from "./input_resources.ts";
 
 Deno.test("input resource events round-trip in durable order", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     saveInputResourceEvent(sessionDir, {
       id: "evt-1",
@@ -48,7 +48,7 @@ Deno.test("input resource events round-trip in durable order", () => {
 });
 
 Deno.test("input resource event identity is validated", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     assertThrows(() =>
       saveInputResourceEvent(sessionDir, {

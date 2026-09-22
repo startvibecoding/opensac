@@ -1,5 +1,5 @@
 // Ported from internal/acp/manage_serve.go (the serve + channels families of
-// the `mothx/manage/*` Phase 3 management plane).
+// the `opensac/manage/*` Phase 3 management plane).
 //
 // Serve config management is a thin, secret-safe projection of internal/serve.
 // It only reads and writes the global serve.json (not any project/workdir

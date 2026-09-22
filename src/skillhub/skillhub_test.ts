@@ -33,9 +33,9 @@ Deno.test("SkillHubSearchAndUserSkills", async () => {
       case "/api/v1/search":
         assertEquals(u.searchParams.get("q"), "go");
         return jsonResponse(
-          `{"results":[{"slug":"go-expert","name":"Go Expert","owner_name":"mothx","updatedAt":1783990604537}]}`,
+          `{"results":[{"slug":"go-expert","name":"Go Expert","owner_name":"opensac","updatedAt":1783990604537}]}`,
         );
-      case "/api/v1/users/mothx/skills":
+      case "/api/v1/users/opensac/skills":
         assertEquals(u.searchParams.get("page"), "2");
         return jsonResponse(
           `{"count":2,"skills":[{"slug":"go-expert","name":"Go Expert","description":"Go testing"},{"slug":"rust","name":"Rust"}]}`,
@@ -48,9 +48,9 @@ Deno.test("SkillHubSearchAndUserSkills", async () => {
   const page = await market.search(undefined, { query: "go", limit: 10 });
   assertEquals(page.items.length, 1);
   assertEquals(page.items[0].market, "skillhub.cn");
-  assertEquals(page.items[0].author, "mothx");
+  assertEquals(page.items[0].author, "opensac");
 
-  const page2 = await market.userSkills(undefined, "mothx", {
+  const page2 = await market.userSkills(undefined, "opensac", {
     query: "testing",
     limit: 20,
     page: 2,

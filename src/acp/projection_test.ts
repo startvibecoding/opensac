@@ -38,7 +38,7 @@ import {
   extractSamplingInput,
   extractSamplingPrompt,
   formatACPPlan,
-  mothxExtensionNamespace,
+  opensacExtensionNamespace,
   parseJSONRawToMap,
   planStatusMarker,
   questionProjectionFor,
@@ -200,7 +200,7 @@ Deno.test("acpPlanEntriesMapsStepStatuses", () => {
   assertEquals(acpPlanMeta({ title: "", note: "", steps: [] }), undefined);
   assertEquals(
     acpPlanMeta({ title: "T", note: "N", steps: [] }),
-    { [mothxExtensionNamespace]: { title: "T", note: "N" } },
+    { [opensacExtensionNamespace]: { title: "T", note: "N" } },
   );
 });
 
@@ -325,7 +325,7 @@ Deno.test("requestQuestionPayloadForTrimsOptions", () => {
     prompt: "Choose",
     options: [{ id: "a", label: "a" }, { id: "b", label: "b" }],
     multi: false,
-    title: "MothX",
+    title: "OpenSAC",
     placeholder: "why",
   });
 });
@@ -333,10 +333,10 @@ Deno.test("requestQuestionPayloadForTrimsOptions", () => {
 Deno.test("questionProjectionForKeepsLegacyAndV1Methods", () => {
   const request = { question: "Q", options: ["a"], explanation: "" };
   const legacy = questionProjectionFor(false, request);
-  assertEquals(legacy.method, "_mothx/request_question");
+  assertEquals(legacy.method, "_opensac/request_question");
   assertEquals((legacy.params as Record<string, unknown>).question, "Q");
   const v1 = questionProjectionFor(true, request);
-  assertEquals(v1.method, "mothx/requestQuestion");
+  assertEquals(v1.method, "opensac/requestQuestion");
   assertEquals((v1.params as Record<string, unknown>).prompt, "Q");
 });
 

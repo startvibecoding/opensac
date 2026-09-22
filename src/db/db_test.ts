@@ -13,7 +13,7 @@ import {
 } from "./mod.ts";
 
 function tempDbPath(name: string): string {
-  const dir = Deno.makeTempDirSync({ prefix: "mothx-db-test-" });
+  const dir = Deno.makeTempDirSync({ prefix: "opensac-db-test-" });
   return `${dir}/${name}`;
 }
 

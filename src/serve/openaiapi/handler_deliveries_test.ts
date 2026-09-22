@@ -22,7 +22,7 @@ import { RunStore } from "../../agentruntime/run_store.ts";
 import { createSession } from "../../agentruntime/session_lifecycle.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-delivery-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-delivery-" });
 }
 
 function settingsFor(dir: string): Settings {

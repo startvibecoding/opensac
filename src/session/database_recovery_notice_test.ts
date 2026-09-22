@@ -42,28 +42,29 @@ Deno.test("database rebuild notice validation", () => {
 });
 
 Deno.test("broadcast stays on loopback regardless of scope", () => {
-  const previousPort = Deno.env.get("MOTHX_RUNTIME_BUS_PORT");
-  const previousScope = Deno.env.get("MOTHX_RUNTIME_BUS_SCOPE");
-  Deno.env.set("MOTHX_RUNTIME_BUS_PORT", "49371");
+  const previousPort = Deno.env.get("OPENSAC_RUNTIME_BUS_PORT");
+  const previousScope = Deno.env.get("OPENSAC_RUNTIME_BUS_SCOPE");
+  Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", "49371");
   try {
     for (const scope of ["", "host", "lan", "255.255.255.255"]) {
-      Deno.env.set("MOTHX_RUNTIME_BUS_SCOPE", scope);
+      Deno.env.set("OPENSAC_RUNTIME_BUS_SCOPE", scope);
       const { listenHost, listenPort, broadcast } = runtimeLeaseBusAddresses();
       assertEquals(broadcast, "127.255.255.255");
       assertEquals(listenHost, "0.0.0.0");
       assertEquals(listenPort, 49371);
     }
   } finally {
-    if (previousPort === undefined) Deno.env.delete("MOTHX_RUNTIME_BUS_PORT");
-    else Deno.env.set("MOTHX_RUNTIME_BUS_PORT", previousPort);
-    if (previousScope === undefined) Deno.env.delete("MOTHX_RUNTIME_BUS_SCOPE");
-    else Deno.env.set("MOTHX_RUNTIME_BUS_SCOPE", previousScope);
+    if (previousPort === undefined) Deno.env.delete("OPENSAC_RUNTIME_BUS_PORT");
+    else Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", previousPort);
+    if (previousScope === undefined) {
+      Deno.env.delete("OPENSAC_RUNTIME_BUS_SCOPE");
+    } else Deno.env.set("OPENSAC_RUNTIME_BUS_SCOPE", previousScope);
   }
 });
 
 Deno.test("peer database rebuild retires the cached connection", () => {
   takeDatabaseRecoveries();
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-peer-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-peer-" });
   const dbPath = rootDBPath(sessionDir);
   try {
     const cached = openRootDB(sessionDir);

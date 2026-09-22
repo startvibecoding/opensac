@@ -1,11 +1,11 @@
 // Ported from internal/acp/manage.go / manage_env.go / manage_experts.go /
-// manage_application.go (the Phase 3 `mothx/manage/*` management plane).
+// manage_application.go (the Phase 3 `opensac/manage/*` management plane).
 //
 // This slice ports the secret-safe management surface that does not depend on
 // the unported `internal/serve` runtime: the shared manage helpers, the
-// `mothx/manage/env/*` projection of internal/config/env.go, the
-// `mothx/manage/experts/*` projection of internal/expert.Manager, and the
-// `mothx/manage/application/*` projection of the Runtime-owned settings subset.
+// `opensac/manage/env/*` projection of internal/config/env.go, the
+// `opensac/manage/experts/*` projection of internal/expert.Manager, and the
+// `opensac/manage/application/*` projection of the Runtime-owned settings subset.
 //
 // This slice also ports the settings/providers, skills, mcp, stats, memory, and
 // deliveries families of manage.go; the skillhub, knowledge-base/cron, and
@@ -324,180 +324,180 @@ export const manageAllowedModes: Record<string, boolean> = {
   [ModeOS]: true,
 };
 
-// ─── mothx/manage router ──────────────────────────────────────────────────────
+// ─── opensac/manage router ──────────────────────────────────────────────────────
 
 /**
- * Routes the `mothx/manage/*` extension family. Unknown methods keep the
+ * Routes the `opensac/manage/*` extension family. Unknown methods keep the
  * canonical manage_method_not_found error.
  */
 export function handleManageRequest(s: AcpServer, req: ACPRPCRequest): void {
   switch (req.method) {
-    case "mothx/manage/env/get":
+    case "opensac/manage/env/get":
       handleManageEnvGet(s, req);
       return;
-    case "mothx/manage/env/patch":
+    case "opensac/manage/env/patch":
       handleManageEnvPatch(s, req);
       return;
-    case "mothx/manage/experts/list":
+    case "opensac/manage/experts/list":
       handleManageExpertsList(s, req);
       return;
-    case "mothx/manage/experts/get":
+    case "opensac/manage/experts/get":
       handleManageExpertsGet(s, req);
       return;
-    case "mothx/manage/experts/create":
+    case "opensac/manage/experts/create":
       handleManageExpertsCreate(s, req);
       return;
-    case "mothx/manage/experts/update":
+    case "opensac/manage/experts/update":
       handleManageExpertsUpdate(s, req);
       return;
-    case "mothx/manage/experts/delete":
+    case "opensac/manage/experts/delete":
       handleManageExpertsDelete(s, req);
       return;
-    case "mothx/manage/application/get":
+    case "opensac/manage/application/get":
       handleManageApplicationGet(s, req);
       return;
-    case "mothx/manage/application/patch":
+    case "opensac/manage/application/patch":
       handleManageApplicationPatch(s, req);
       return;
-    case "mothx/manage/settings/get":
+    case "opensac/manage/settings/get":
       handleManageSettingsGet(s, req);
       return;
-    case "mothx/manage/settings/patch":
+    case "opensac/manage/settings/patch":
       handleManageSettingsPatch(s, req);
       return;
-    case "mothx/manage/providers/list":
+    case "opensac/manage/providers/list":
       handleManageProvidersList(s, req);
       return;
-    case "mothx/manage/providers/save":
+    case "opensac/manage/providers/save":
       handleManageProvidersSave(s, req);
       return;
-    case "mothx/manage/providers/delete":
+    case "opensac/manage/providers/delete":
       handleManageProvidersDelete(s, req);
       return;
-    case "mothx/manage/providers/discover":
+    case "opensac/manage/providers/discover":
       void handleManageProvidersDiscover(s, req);
       return;
-    case "mothx/manage/providers/test":
+    case "opensac/manage/providers/test":
       void handleManageProvidersTest(s, req);
       return;
-    case "mothx/manage/skills/list":
+    case "opensac/manage/skills/list":
       handleManageSkillsList(s, req);
       return;
-    case "mothx/manage/skills/set":
+    case "opensac/manage/skills/set":
       handleManageSkillsSet(s, req);
       return;
-    case "mothx/manage/mcp/list":
+    case "opensac/manage/mcp/list":
       handleManageMCPList(s, req);
       return;
-    case "mothx/manage/mcp/set":
+    case "opensac/manage/mcp/set":
       handleManageMCPSet(s, req);
       return;
-    case "mothx/manage/stats/summary":
+    case "opensac/manage/stats/summary":
       handleManageStatsSummary(s, req);
       return;
-    case "mothx/manage/stats/timeseries":
+    case "opensac/manage/stats/timeseries":
       handleManageStatsTimeseries(s, req);
       return;
-    case "mothx/manage/memory/get":
+    case "opensac/manage/memory/get":
       handleManageMemoryGet(s, req);
       return;
-    case "mothx/manage/memory/put":
+    case "opensac/manage/memory/put":
       handleManageMemoryPut(s, req);
       return;
-    case "mothx/manage/deliveries/list":
+    case "opensac/manage/deliveries/list":
       handleManageDeliveriesList(s, req);
       return;
-    case "mothx/manage/deliveries/retry":
+    case "opensac/manage/deliveries/retry":
       handleManageDeliveriesRetry(s, req);
       return;
-    case "mothx/manage/skillhub/get":
+    case "opensac/manage/skillhub/get":
       handleManageSkillHubGet(s, req);
       return;
-    case "mothx/manage/skillhub/patch":
+    case "opensac/manage/skillhub/patch":
       handleManageSkillHubPatch(s, req);
       return;
-    case "mothx/manage/skillhub/markets":
+    case "opensac/manage/skillhub/markets":
       handleManageSkillHubMarkets(s, req);
       return;
-    case "mothx/manage/skillhub/categories":
+    case "opensac/manage/skillhub/categories":
       void handleManageSkillHubCategories(s, req);
       return;
-    case "mothx/manage/skillhub/official":
+    case "opensac/manage/skillhub/official":
       void handleManageSkillHubOfficial(s, req);
       return;
-    case "mothx/manage/skillhub/search":
+    case "opensac/manage/skillhub/search":
       void handleManageSkillHubSearch(s, req);
       return;
-    case "mothx/manage/skillhub/detail":
+    case "opensac/manage/skillhub/detail":
       void handleManageSkillHubDetail(s, req);
       return;
-    case "mothx/manage/skillhub/targets":
+    case "opensac/manage/skillhub/targets":
       handleManageSkillHubTargets(s, req);
       return;
-    case "mothx/manage/skillhub/installed":
+    case "opensac/manage/skillhub/installed":
       handleManageSkillHubInstalled(s, req);
       return;
-    case "mothx/manage/skillhub/install":
+    case "opensac/manage/skillhub/install":
       void handleManageSkillHubInstall(s, req);
       return;
-    case "mothx/manage/skillhub/activate":
+    case "opensac/manage/skillhub/activate":
       void handleManageSkillHubActivate(s, req);
       return;
-    case "mothx/manage/skillhub/uninstall":
+    case "opensac/manage/skillhub/uninstall":
       handleManageSkillHubUninstall(s, req);
       return;
-    case "mothx/manage/cron/list":
+    case "opensac/manage/cron/list":
       handleManageCronList(s, req);
       return;
-    case "mothx/manage/cron/create":
+    case "opensac/manage/cron/create":
       handleManageCronCreate(s, req);
       return;
-    case "mothx/manage/cron/update":
+    case "opensac/manage/cron/update":
       handleManageCronUpdate(s, req);
       return;
-    case "mothx/manage/cron/remove":
+    case "opensac/manage/cron/remove":
       handleManageCronRemove(s, req);
       return;
-    case "mothx/manage/cron/run":
+    case "opensac/manage/cron/run":
       handleManageCronRun(s, req);
       return;
-    case "mothx/manage/knowledge-bases/list":
+    case "opensac/manage/knowledge-bases/list":
       handleManageKnowledgeBasesList(s, req);
       return;
-    case "mothx/manage/knowledge-bases/get":
+    case "opensac/manage/knowledge-bases/get":
       handleManageKnowledgeBasesGet(s, req);
       return;
-    case "mothx/manage/knowledge-bases/create":
+    case "opensac/manage/knowledge-bases/create":
       handleManageKnowledgeBasesCreate(s, req);
       return;
-    case "mothx/manage/knowledge-bases/update":
+    case "opensac/manage/knowledge-bases/update":
       handleManageKnowledgeBasesUpdate(s, req);
       return;
-    case "mothx/manage/knowledge-bases/delete":
+    case "opensac/manage/knowledge-bases/delete":
       handleManageKnowledgeBasesDelete(s, req);
       return;
-    case "mothx/manage/knowledge-bases/scan":
+    case "opensac/manage/knowledge-bases/scan":
       handleManageKnowledgeBasesScan(s, req);
       return;
-    case "mothx/manage/knowledge-bases/status":
+    case "opensac/manage/knowledge-bases/status":
       handleManageKnowledgeBasesStatus(s, req);
       return;
-    case "mothx/manage/knowledge-bases/query":
+    case "opensac/manage/knowledge-bases/query":
       handleManageKnowledgeBasesQuery(s, req);
       return;
-    case "mothx/manage/knowledge-bases/mcp/apply":
+    case "opensac/manage/knowledge-bases/mcp/apply":
       handleManageKnowledgeBaseMCPApply(s, req);
       return;
-    case "mothx/manage/serve/get":
+    case "opensac/manage/serve/get":
       handleManageServeConfigGet(s, req);
       return;
-    case "mothx/manage/serve/patch":
+    case "opensac/manage/serve/patch":
       handleManageServeConfigPatch(s, req);
       return;
-    case "mothx/manage/channels/get":
+    case "opensac/manage/channels/get":
       handleManageChannelsGet(s, req);
       return;
-    case "mothx/manage/channels/patch":
+    case "opensac/manage/channels/patch":
       handleManageChannelsPatch(s, req);
       return;
     default:
@@ -514,7 +514,7 @@ export function handleManageRequest(s: AcpServer, req: ACPRPCRequest): void {
   }
 }
 
-// ─── mothx/manage/env/* (manage_env.go) ───────────────────────────────────────
+// ─── opensac/manage/env/* (manage_env.go) ───────────────────────────────────────
 
 interface ManageEnvVariableView {
   name: string;
@@ -755,7 +755,7 @@ function manageEnvFieldInvalid(
   return acpStructuredRPCError(-32602, "env_field_invalid", message, data);
 }
 
-// ─── mothx/manage/experts/* (manage_experts.go) ───────────────────────────────
+// ─── opensac/manage/experts/* (manage_experts.go) ───────────────────────────────
 
 interface ManageExpertsRequest {
   cwd: string;
@@ -961,7 +961,7 @@ function normalizeExpertDraft(
 /** Re-exported for tests that need the expert summary shape. */
 export type { ExpertSummary };
 
-// ─── mothx/manage/application/* (manage_application.go) ───────────────────────
+// ─── opensac/manage/application/* (manage_application.go) ───────────────────────
 
 const manageApplicationSections: Record<string, Record<string, boolean>> = {
   defaults: {
@@ -1663,7 +1663,7 @@ function handleManageSettingsPatch(s: AcpServer, req: ACPRPCRequest): void {
           "settings_field_not_allowed",
           `settings field ${
             JSON.stringify(field)
-          } is not writable through mothx/manage/settings/patch`,
+          } is not writable through opensac/manage/settings/patch`,
           { field, allowed: allowedList },
         );
       }
@@ -2978,7 +2978,7 @@ function handleManageMCPSet(s: AcpServer, req: ACPRPCRequest): void {
           "mcp_field_not_allowed",
           `MCP server field ${
             JSON.stringify(rejected)
-          } is not writable through mothx/manage/mcp/set`,
+          } is not writable through opensac/manage/mcp/set`,
           { field: rejected },
         );
       }

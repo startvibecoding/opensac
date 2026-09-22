@@ -27,7 +27,7 @@ export function executeDoctorCommand(
     return { exitCode: 0 };
   }
   write("");
-  write("  MothX Doctor");
+  write("  OpenSAC Doctor");
   write("  ------------");
   for (const check of result.checks) {
     let line = `    ${doctorIcon(check.status)} ${check.title}`;

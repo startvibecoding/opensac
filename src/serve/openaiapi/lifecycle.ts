@@ -584,7 +584,7 @@ export async function run(opts: RunOptions, version: string): Promise<void> {
 /** printServeBanner ports Go's startup log block. */
 function printServeBanner(srv: Server, cfg: Config, version: string): void {
   const listen = getListenAddr(cfg);
-  console.error(`MothX Serve API ${version} starting on ${listen}`);
+  console.error(`OpenSAC Serve API ${version} starting on ${listen}`);
   console.error(
     `  Provider: ${srv.providerName} | Model: ${
       srv.model?.id ?? ""

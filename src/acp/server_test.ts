@@ -89,7 +89,7 @@ function sessionEventParams(
 ): Record<string, unknown>[] {
   const matches: Record<string, unknown>[] = [];
   for (const message of messages) {
-    if (message.method !== "_mothx/session_event") continue;
+    if (message.method !== "_opensac/session_event") continue;
     const params = message.params as Record<string, unknown> | undefined;
     if (params?.event === event) matches.push(params);
   }
@@ -161,12 +161,12 @@ Deno.test("notifyRunStatus projects a run_status session event", () => {
 Deno.test("setSessionMeta validates params before storage", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
-  server.handleSetSessionMeta(rpc(1, "mothx/session/setMeta", {}));
+  server.handleSetSessionMeta(rpc(1, "opensac/session/setMeta", {}));
   server.handleSetSessionMeta(
-    rpc(2, "mothx/session/setMeta", { sessionId: "s" }),
+    rpc(2, "opensac/session/setMeta", { sessionId: "s" }),
   );
   server.handleSetSessionMeta(
-    rpc(3, "mothx/session/setMeta", { sessionId: "s", projectId: 42 }),
+    rpc(3, "opensac/session/setMeta", { sessionId: "s", projectId: 42 }),
   );
   const messages = parseMessages(output.toString());
   assertEquals(messages.length, 3);
@@ -176,11 +176,11 @@ Deno.test("setSessionMeta validates params before storage", () => {
 Deno.test("project handlers return structured errors without settings", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
-  server.handleProjectsList(rpc(1, "mothx/projects/list"));
-  server.handleProjectsCreate(rpc(2, "mothx/projects/create", { name: "x" }));
-  server.handleProjectsCreate(rpc(3, "mothx/projects/create", {}));
-  server.handleProjectsRename(rpc(4, "mothx/projects/rename", { id: "p" }));
-  server.handleProjectsDelete(rpc(5, "mothx/projects/delete"));
+  server.handleProjectsList(rpc(1, "opensac/projects/list"));
+  server.handleProjectsCreate(rpc(2, "opensac/projects/create", { name: "x" }));
+  server.handleProjectsCreate(rpc(3, "opensac/projects/create", {}));
+  server.handleProjectsRename(rpc(4, "opensac/projects/rename", { id: "p" }));
+  server.handleProjectsDelete(rpc(5, "opensac/projects/delete"));
   const messages = parseMessages(output.toString());
   assertEquals(messages.length, 5);
   assertRPCErrorCode(messages[0], "projects_unavailable");
@@ -197,7 +197,7 @@ Deno.test("project create/list/rename/delete round trip", () => {
   server.settings = { sessionDir };
 
   server.handleProjectsCreate(
-    rpc(1, "mothx/projects/create", { name: "Alpha" }),
+    rpc(1, "opensac/projects/create", { name: "Alpha" }),
   );
   const created = parseMessages(output.toString())[0].result as Record<
     string,
@@ -207,7 +207,7 @@ Deno.test("project create/list/rename/delete round trip", () => {
   assertEquals(created.name, "Alpha");
 
   output.reset();
-  server.handleProjectsList(rpc(1, "mothx/projects/list"));
+  server.handleProjectsList(rpc(1, "opensac/projects/list"));
   const listed = parseMessages(output.toString())[0].result as {
     projects: { id: string }[];
   };
@@ -216,7 +216,7 @@ Deno.test("project create/list/rename/delete round trip", () => {
 
   output.reset();
   server.handleProjectsRename(
-    rpc(1, "mothx/projects/rename", { id, name: "Beta" }),
+    rpc(1, "opensac/projects/rename", { id, name: "Beta" }),
   );
   const renamed = parseMessages(output.toString())[0].result as Record<
     string,
@@ -225,7 +225,7 @@ Deno.test("project create/list/rename/delete round trip", () => {
   assertEquals(renamed.name, "Beta");
 
   output.reset();
-  server.handleProjectsDelete(rpc(1, "mothx/projects/delete", { id }));
+  server.handleProjectsDelete(rpc(1, "opensac/projects/delete", { id }));
   assertEquals(parseMessages(output.toString())[0].result, {});
 });
 
@@ -239,17 +239,17 @@ Deno.test("workspace extend validates, merges, dedupes, and caps", () => {
   const added = Deno.makeTempDirSync();
 
   server.handleWorkspaceExtend(
-    rpc(1, "mothx/workspace/extend", {
+    rpc(1, "opensac/workspace/extend", {
       additionalDirectories: ["relative/dir"],
     }),
   );
   server.handleWorkspaceExtend(
-    rpc(2, "mothx/workspace/extend", {
+    rpc(2, "opensac/workspace/extend", {
       additionalDirectories: [path.join(added, "missing")],
     }),
   );
   server.handleWorkspaceExtend(
-    rpc(3, "mothx/workspace/extend", { additionalDirectories: [] }),
+    rpc(3, "opensac/workspace/extend", { additionalDirectories: [] }),
   );
   let messages = parseMessages(output.toString());
   assertEquals(messages.length, 3);
@@ -262,7 +262,7 @@ Deno.test("workspace extend validates, merges, dedupes, and caps", () => {
   server.workspaceAdditionalDirectories = [existing];
   output.reset();
   server.handleWorkspaceExtend(
-    rpc(4, "mothx/workspace/extend", {
+    rpc(4, "opensac/workspace/extend", {
       additionalDirectories: [added, added],
     }),
   );
@@ -288,7 +288,7 @@ Deno.test("workspace extend validates, merges, dedupes, and caps", () => {
   }
   output.reset();
   server.handleWorkspaceExtend(
-    rpc(5, "mothx/workspace/extend", { additionalDirectories: many }),
+    rpc(5, "opensac/workspace/extend", { additionalDirectories: many }),
   );
   const limited = parseMessages(output.toString());
   assertEquals(limited.length, 1);
@@ -309,7 +309,7 @@ Deno.test("workspace extend normalizes symlinks", () => {
   const server = newFixtureServer(output);
   server.cwd = Deno.makeTempDirSync();
   server.handleWorkspaceExtend(
-    rpc(1, "mothx/workspace/extend", { additionalDirectories: [link] }),
+    rpc(1, "opensac/workspace/extend", { additionalDirectories: [link] }),
   );
   assertEquals(server.workspaceAdditionalDirectories.length, 1);
   assertEquals(server.workspaceAdditionalDirectories[0], resolvedTarget);
@@ -521,9 +521,9 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
 Deno.test("attachment list validates params before storage", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
-  server.handleAttachmentList(rpc(1, "mothx/attachment/list"));
+  server.handleAttachmentList(rpc(1, "opensac/attachment/list"));
   server.handleAttachmentList(
-    rpc(2, "mothx/attachment/list", { sessionId: "s", status: "expired" }),
+    rpc(2, "opensac/attachment/list", { sessionId: "s", status: "expired" }),
   );
   const messages = parseMessages(output.toString());
   assertEquals(messages.length, 2);
@@ -540,7 +540,7 @@ Deno.test("initialize declares the Phase 1 feature keys", () => {
   const response = parseMessages(output.toString())[0] as {
     result: { _meta: Record<string, unknown> };
   };
-  const namespace = response.result._meta["mothx.dev"] as {
+  const namespace = response.result._meta["opensac.dev"] as {
     features: string[];
   };
   const features = new Set(namespace.features);
@@ -584,17 +584,17 @@ Deno.test("initialize advertises standard session lifecycle capabilities", () =>
   const mcpCaps = agentCaps.mcpCapabilities as Record<string, unknown>;
   assert(!("stdio" in mcpCaps));
   const meta = agentCaps._meta as Record<string, unknown>;
-  const extension = meta["mothx.dev"] as Record<string, unknown>;
+  const extension = meta["opensac.dev"] as Record<string, unknown>;
   assertEquals(extension.doctor, true);
   assert((extension.features as string[]).includes("sessionConfigProvider"));
   assert((extension.features as string[]).includes("usageCacheProjection"));
   const agentInfo = result.agentInfo as Record<string, unknown>;
-  assertEquals(agentInfo.name, "mothx");
-  assertEquals(agentInfo.title, "MothX");
+  assertEquals(agentInfo.name, "opensac");
+  assertEquals(agentInfo.title, "OpenSAC");
   assert((agentInfo.version as string).length > 0);
   const rootMeta = result._meta as Record<string, unknown>;
   assertEquals(
-    (rootMeta["mothx.dev"] as Record<string, unknown>).doctor,
+    (rootMeta["opensac.dev"] as Record<string, unknown>).doctor,
     true,
   );
 });
@@ -646,10 +646,10 @@ Deno.test("initialize rejects a duplicate call", () => {
 
 Deno.test("handleDoctor does not require a session", () => {
   const configDir = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newFixtureServer(output);
-    server.handleDoctor(rpc(1, "mothx/doctor", {}));
+    server.handleDoctor(rpc(1, "opensac/doctor", {}));
     const result = parseMessages(output.toString())[0].result as {
       version: string;
       checks: { id: string }[];
@@ -662,12 +662,12 @@ Deno.test("handleDoctor does not require a session", () => {
 Deno.test("handleDoctor uses the server cwd when the request omits it", () => {
   const configDir = Deno.makeTempDirSync();
   const cwd = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newFixtureServer(output);
     server.cwd = cwd;
     server.version = "test-version";
-    server.handleDoctor(rpc(1, "mothx/doctor", {}));
+    server.handleDoctor(rpc(1, "opensac/doctor", {}));
     const result = parseMessages(output.toString())[0].result as {
       checks: { id: string; detail?: string }[];
     };
@@ -681,7 +681,7 @@ Deno.test("initialize and doctor use the configured run version", () => {
   const server = newFixtureServer(output);
   server.version = "0.3.1";
   server.handleInitialize(rpc(1, "initialize"));
-  server.handleDoctor(rpc(2, "mothx/doctor", {}));
+  server.handleDoctor(rpc(2, "opensac/doctor", {}));
   const messages = parseMessages(output.toString());
   const initialize = messages[0].result as Record<string, unknown>;
   assertEquals(
@@ -695,12 +695,12 @@ Deno.test("initialize and doctor use the configured run version", () => {
 Deno.test("doctor matches the shared doctor response", () => {
   const configDir = Deno.makeTempDirSync();
   const cwd = Deno.makeTempDirSync();
-  withEnv("MOTHX_DIR", configDir, () => {
+  withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = newFixtureServer(output);
     server.cwd = cwd;
     server.version = "0.3.1";
-    server.handleDoctor(rpc(1, "mothx/doctor", {}));
+    server.handleDoctor(rpc(1, "opensac/doctor", {}));
     const wire = parseMessages(output.toString())[0].result as {
       ok: boolean;
       version: string;
@@ -722,7 +722,7 @@ Deno.test("doctor matches the shared doctor response", () => {
 Deno.test("handleDoctor rejects a relative cwd", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
-  server.handleDoctor(rpc(1, "mothx/doctor", { cwd: "relative" }));
+  server.handleDoctor(rpc(1, "opensac/doctor", { cwd: "relative" }));
   const message = parseMessages(output.toString())[0];
   assertEquals((message.error as Record<string, unknown>).code, -32602);
 });

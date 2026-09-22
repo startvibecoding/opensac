@@ -35,8 +35,8 @@ import {
   type ToolCallLocation,
 } from "./protocol.ts";
 
-/** The MothX ACP extension namespace. */
-export const mothxExtensionNamespace = "mothx.dev";
+/** The OpenSAC ACP extension namespace. */
+export const opensacExtensionNamespace = "opensac.dev";
 
 /** The maximum bytes projected for one tool-result image (2 MiB). */
 export const acpToolImageMaxBytes = 2 << 20;
@@ -164,13 +164,13 @@ export function acpPlanEntries(plan: TaskPlan): PlanEntry[] {
   return entries;
 }
 
-/** Projects a task plan's title/note onto the MothX extension metadata. */
+/** Projects a task plan's title/note onto the OpenSAC extension metadata. */
 export function acpPlanMeta(
   plan: TaskPlan,
 ): Record<string, unknown> | undefined {
   if (plan.title === "" && plan.note === "") return undefined;
   return {
-    [mothxExtensionNamespace]: { title: plan.title, note: plan.note },
+    [opensacExtensionNamespace]: { title: plan.title, note: plan.note },
   };
 }
 
@@ -376,7 +376,7 @@ export function extractSamplingInput(params: unknown): {
   return { prompt: parts.join("\n"), systemPrompt, maxTokens };
 }
 
-/** Builds the `mothx/requestQuestion` payload for one question request. */
+/** Builds the `opensac/requestQuestion` payload for one question request. */
 export function requestQuestionPayloadFor(request: {
   question: string;
   options: string[];
@@ -391,7 +391,7 @@ export function requestQuestionPayloadFor(request: {
     prompt: request.question,
     options,
     multi: false,
-    title: "MothX",
+    title: "OpenSAC",
     placeholder: request.explanation,
   };
 }
@@ -411,7 +411,7 @@ export function questionProjectionFor(
 ): { method: string; params: unknown } {
   if (!initialized) {
     return {
-      method: "_mothx/request_question",
+      method: "_opensac/request_question",
       params: {
         question: request.question,
         options: request.options,
@@ -420,7 +420,7 @@ export function questionProjectionFor(
     };
   }
   return {
-    method: "mothx/requestQuestion",
+    method: "opensac/requestQuestion",
     params: requestQuestionPayloadFor(request),
   };
 }

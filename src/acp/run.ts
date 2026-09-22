@@ -13,7 +13,7 @@
 // maps to the existing `ACPLineReader` over `Deno.stdin.readable`; and Go's
 // synchronous handlers are already `async` on the server, so the switch simply
 // awaits the prompt/session ones. Startup failures before `initialize` print
-// the machine-readable `MOTHX_ACP_ERROR` line exactly like Go.
+// the machine-readable `OPENSAC_ACP_ERROR` line exactly like Go.
 
 import { AcpServer, type AcpServerSink } from "./server.ts";
 import { ACPLineReader, EmptyMessageError, validRPCID } from "./wire.ts";
@@ -175,7 +175,7 @@ export function resolveACPProviderSelection(
 
 /**
  * Runs the ACP stdio server. Returns at clean EOF. Startup failures before
- * `initialize` are classified and printed as `MOTHX_ACP_ERROR`.
+ * `initialize` are classified and printed as `OPENSAC_ACP_ERROR`.
  */
 export async function runACP(
   opts: RunOptions = {},
@@ -210,7 +210,7 @@ async function runACPInner(
     throw new ACPStartupError({
       code: "cwd_invalid",
       message: "working directory is unavailable",
-      fix: "Start mothx from an existing directory",
+      fix: "Start opensac from an existing directory",
       cause: error,
     });
   }
@@ -218,7 +218,7 @@ async function runACPInner(
     throw new ACPStartupError({
       code: "cwd_invalid",
       message: "working directory is unavailable",
-      fix: "Start mothx from an existing directory",
+      fix: "Start opensac from an existing directory",
       cause: new Error(
         `working directory ${JSON.stringify(cwd)} is not a directory`,
       ),
@@ -537,7 +537,7 @@ export async function dispatchMethod(
     case "initialize":
       srv.handleInitialize(req);
       return;
-    case "mothx/doctor":
+    case "opensac/doctor":
       srv.handleDoctor(req);
       return;
     case "session/new":
@@ -546,10 +546,10 @@ export async function dispatchMethod(
     case "session/load":
       await srv.handleLoadSession(req);
       return;
-    case "mothx/session/history":
+    case "opensac/session/history":
       srv.handleSessionHistory(req);
       return;
-    case "mothx/session/draft-config-options":
+    case "opensac/session/draft-config-options":
       srv.handleDraftConfigOptions(req);
       return;
     case "session/resume":
@@ -570,44 +570,44 @@ export async function dispatchMethod(
     case "session/close":
       await srv.handleCloseSession(req);
       return;
-    case "mothx/session/delete":
+    case "opensac/session/delete":
     case "session/delete":
       srv.handleDeleteSession(req);
       return;
-    case "mothx/session/setTitle":
+    case "opensac/session/setTitle":
       srv.handleSetSessionTitle(req);
       return;
-    case "mothx/session/setWorkDir":
+    case "opensac/session/setWorkDir":
       await srv.handleSetSessionWorkDir(req);
       return;
-    case "mothx/session/setMeta":
+    case "opensac/session/setMeta":
       srv.handleSetSessionMeta(req);
       return;
-    case "mothx/projects/list":
+    case "opensac/projects/list":
       srv.handleProjectsList(req);
       return;
-    case "mothx/projects/create":
+    case "opensac/projects/create":
       srv.handleProjectsCreate(req);
       return;
-    case "mothx/projects/rename":
+    case "opensac/projects/rename":
       srv.handleProjectsRename(req);
       return;
-    case "mothx/projects/delete":
+    case "opensac/projects/delete":
       srv.handleProjectsDelete(req);
       return;
-    case "mothx/workspace/extend":
+    case "opensac/workspace/extend":
       srv.handleWorkspaceExtend(req);
       return;
-    case "mothx/attachment/fetch":
+    case "opensac/attachment/fetch":
       handleAttachmentFetch(srv, req);
       return;
-    case "mothx/attachment/list":
+    case "opensac/attachment/list":
       srv.handleAttachmentList(req);
       return;
     case "session/list":
       srv.handleListSessions(req);
       return;
-    case "mothx/session/listAll":
+    case "opensac/session/listAll":
       srv.handleListAllSessions(req);
       return;
     case "session/set_config_option":
@@ -617,7 +617,7 @@ export async function dispatchMethod(
       await srv.handleSetMode(req);
       return;
     default:
-      if (req.method.startsWith("mothx/manage/")) {
+      if (req.method.startsWith("opensac/manage/")) {
         handleManageRequest(srv, req);
       } else if ((req.idRaw ?? "") !== "") {
         srv.writeResponse(
@@ -638,7 +638,7 @@ interface AttachmentFetchRequest {
 
 const maxRequestBytes = 10 << 20;
 
-/** Serves `mothx/attachment/fetch`. Exported for focused tests. */
+/** Serves `opensac/attachment/fetch`. Exported for focused tests. */
 export function handleAttachmentFetch(
   srv: AcpServer,
   req: ACPRPCRequest,

@@ -1,4 +1,4 @@
-// Focused tests for the ported `mothx stats` command: terminal table
+// Focused tests for the ported `opensac stats` command: terminal table
 // projection (tabwriter alignment), formatter helpers, and the web-server
 // path with an injected serve function (no real browser or listener).
 

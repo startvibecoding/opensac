@@ -44,7 +44,7 @@ import {
 } from "./mod.ts";
 
 const SAVED_ENV = [
-  "MOTHX_DIR",
+  "OPENSAC_DIR",
   "VIBECODING_PROVIDER",
   "VIBECODING_MODEL",
   "VIBECODING_MODE",
@@ -55,7 +55,7 @@ function withConfigDir(fn: (tmp: string) => void): void {
   const tmp = Deno.makeTempDirSync({ prefix: "cfg-" });
   const prevWd = Deno.cwd();
   const saved = SAVED_ENV.map((k) => [k, Deno.env.get(k)] as const);
-  Deno.env.set("MOTHX_DIR", path.join(tmp, "config"));
+  Deno.env.set("OPENSAC_DIR", path.join(tmp, "config"));
   for (
     const k of [
       "VIBECODING_PROVIDER",
@@ -262,12 +262,12 @@ Deno.test("authored setting round trip", () => {
 
 Deno.test("resolveKey and resolveKeyValue", () => {
   const s = defaultSettings();
-  Deno.env.set("MOTHX_TEST_KEY", "secret-value");
+  Deno.env.set("OPENSAC_TEST_KEY", "secret-value");
   try {
     const derived = {
       ...s,
       providers: {
-        test: { api: "openai-chat", models: [], apiKey: "${MOTHX_TEST_KEY}" },
+        test: { api: "openai-chat", models: [], apiKey: "${OPENSAC_TEST_KEY}" },
       },
     };
     assertEquals(resolveKey(derived, "test"), "secret-value");
@@ -281,7 +281,7 @@ Deno.test("resolveKey and resolveKeyValue", () => {
     assertEquals(resolveKeyValue("plain"), "plain");
     assertEquals(resolveKeyValue("!echo hi"), "!echo hi"); // shell opt-in disabled
   } finally {
-    Deno.env.delete("MOTHX_TEST_KEY");
+    Deno.env.delete("OPENSAC_TEST_KEY");
   }
 });
 
@@ -514,7 +514,7 @@ Deno.test("loadSettings project supports false and zero overrides", () => {
     const project = path.join(tmp, "project");
     Deno.mkdirSync(project, { recursive: true });
     Deno.chdir(project);
-    Deno.env.set("MOTHX_DIR", path.join(tmp, "config2"));
+    Deno.env.set("OPENSAC_DIR", path.join(tmp, "config2"));
     Deno.mkdirSync(path.dirname(projectSettingsPath()), { recursive: true });
     Deno.writeTextFileSync(
       projectSettingsPath(),

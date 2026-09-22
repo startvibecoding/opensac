@@ -79,7 +79,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 Deno.test("session run recovery requires a fenced recovery lease", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     makeSession(sessionDir, "recovery-record");
     const now = new Date();
@@ -166,7 +166,7 @@ Deno.test("session run recovery requires a fenced recovery lease", () => {
 });
 
 Deno.test("converge session run recovery atomically closes run, turn, decisions, and recovery", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-recovery-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     makeSession(sessionDir, "recovery-converge");
     const guard = acquireExecutionAdmission(sessionDir, "recovery-converge");

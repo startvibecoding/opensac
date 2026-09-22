@@ -17,8 +17,8 @@ import { newAgentManager, runtimeConfigOfManagedAgent } from "./manager.ts";
 import { emptyCompaction, testModel } from "./agent_testutil.ts";
 
 Deno.env.set(
-  "MOTHX_DIR",
-  Deno.makeTempDirSync({ prefix: "mothx-agent-factory-" }),
+  "OPENSAC_DIR",
+  Deno.makeTempDirSync({ prefix: "opensac-agent-factory-" }),
 );
 
 // Compile-time assertion: AgentAdapter satisfies the public Agent interface.
@@ -38,7 +38,7 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
     [],
   );
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-sessions-" });
+  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
   const factory = newAgentFactoryWithOptions(
     mockProvider,
     mockProvider.models()[0],
@@ -58,7 +58,7 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
   const manager = newAgentManager(factory);
 
   const parentRegistry = newRegistry(
-    Deno.makeTempDirSync({ prefix: "mothx-parent-reg-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
     newNoneSandbox(),
   );
   const parent = newAgentWithLoopConfig({
@@ -72,7 +72,7 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
   const child = manager.create({
     parentId: parent.id(),
     mode: "plan",
-    workDir: Deno.makeTempDirSync({ prefix: "mothx-child-" }),
+    workDir: Deno.makeTempDirSync({ prefix: "opensac-child-" }),
   }) as AgentAdapter;
   const childConfig = runtimeConfigOfManagedAgent(child);
   assert(childConfig !== undefined);
@@ -96,7 +96,7 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
     [],
   );
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-sessions-" });
+  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
   const factory = newAgentFactoryWithOptions(
     mockProvider,
     mockProvider.models()[0],
@@ -116,7 +116,7 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
   const manager = newAgentManager(factory);
 
   const parentRegistry = newRegistry(
-    Deno.makeTempDirSync({ prefix: "mothx-parent-reg-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
     newNoneSandbox(),
   );
   const parent = newAgentWithLoopConfig({
@@ -130,7 +130,7 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
   const child = manager.create({
     parentId: parent.id(),
     mode: "plan",
-    workDir: Deno.makeTempDirSync({ prefix: "mothx-child-" }),
+    workDir: Deno.makeTempDirSync({ prefix: "opensac-child-" }),
   }) as AgentAdapter;
   const childConfig = runtimeConfigOfManagedAgent(child);
   assert(childConfig !== undefined);
@@ -155,11 +155,11 @@ Deno.test("AgentFactoryWorkflowPromptNotInheritedByChild", () => {
     [],
   );
   const sandboxMgr: SandboxManager = newManager(
-    Deno.makeTempDirSync({ prefix: "mothx-sandbox-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-sessions-" });
+  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
   const factory = newAgentFactoryWithOptions(
     mockProvider,
     mockProvider.models()[0],
@@ -192,11 +192,11 @@ Deno.test("AgentFactoryPropagatesProviderNameToChildren", () => {
     [],
   );
   const sandboxMgr: SandboxManager = newManager(
-    Deno.makeTempDirSync({ prefix: "mothx-sandbox-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "mothx-sessions-" });
+  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
   const factory = newAgentFactoryWithOptions(
     mockProvider,
     mockProvider.models()[0],

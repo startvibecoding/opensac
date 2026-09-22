@@ -59,7 +59,7 @@ export function takeDatabaseIndexRepairs(): DatabaseIndexRepair[] {
  * Returns the database recoveries recorded since the last call and clears them,
  * so a front-end can tell the user exactly once what was backed up and why.
  *
- * Rebuilds other mothx processes announced over the advisory runtime lease bus
+ * Rebuilds other opensac processes announced over the advisory runtime lease bus
  * are appended so a front-end drains local and peer notices through one API.
  */
 export function takeDatabaseRecoveries(): DatabaseRecovery[] {

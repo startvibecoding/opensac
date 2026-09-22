@@ -23,7 +23,7 @@ import {
 } from "../../session/session_events.ts";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "mothx-openaiapi-events-" });
+  return Deno.makeTempDirSync({ prefix: "opensac-openaiapi-events-" });
 }
 
 function settingsFor(dir: string): Settings {

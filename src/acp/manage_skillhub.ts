@@ -1,6 +1,6 @@
 // Ported from internal/acp/manage_skillhub.go and
 // internal/acp/manage_skillhub_catalog.go (the SkillHub half of the
-// `mothx/manage/*` Phase 3 management plane).
+// `opensac/manage/*` Phase 3 management plane).
 //
 // `manage_skillhub.go` projects the token-free SkillHub settings view and
 // applies the strict write-only market patch. `manage_skillhub_catalog.go` is
@@ -590,7 +590,7 @@ export function manageMergeSkillHubMarkets(
 
 // ─── SkillHub catalog (manage_skillhub_catalog.go) ───────────────────────────
 
-/** The common request envelope for every `mothx/manage/skillhub/*` call. */
+/** The common request envelope for every `opensac/manage/skillhub/*` call. */
 export interface ManageSkillHubCatalogRequest {
   sessionId: string;
   market: string;
@@ -897,7 +897,7 @@ export function handleManageSkillHubTargets(
       return;
     }
     const labels = [
-      "MothX project skills",
+      "OpenSAC project skills",
       "Project skills",
       "Agents skills",
       "Generic project skills",

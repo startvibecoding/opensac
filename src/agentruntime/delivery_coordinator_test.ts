@@ -81,7 +81,7 @@ function operation(overrides: Partial<DeliveryOperation>): DeliveryOperation {
 }
 
 function fixture(): { sessionDir: string; sessionId: string } {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-coordinator-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-coordinator-" });
   const sessionId = "coord-session";
   const now = new Date();
   createSessionRun(

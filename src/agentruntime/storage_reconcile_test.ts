@@ -24,8 +24,8 @@ function inputTestSession(): {
   workDir: string;
   sessionId: string;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-reconcile-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "mothx-reconcile-work-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-reconcile-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "opensac-reconcile-work-" });
   const manager = newManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
@@ -132,7 +132,7 @@ Deno.test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () 
   const policy = defaultAttachmentPolicy();
   const now = new Date();
 
-  const missingDB = Deno.makeTempDirSync({ prefix: "mothx-nodb-" });
+  const missingDB = Deno.makeTempDirSync({ prefix: "opensac-nodb-" });
   const orphan = writeArtifactDirectory(
     missingDB,
     "0123456789abcdef",
@@ -148,7 +148,7 @@ Deno.test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () 
   assertEquals(threw, true);
   assert(exists(orphan));
 
-  const corruptDB = Deno.makeTempDirSync({ prefix: "mothx-corruptdb-" });
+  const corruptDB = Deno.makeTempDirSync({ prefix: "opensac-corruptdb-" });
   const orphan2 = writeArtifactDirectory(
     corruptDB,
     "0123456789abcdef",
@@ -172,7 +172,7 @@ Deno.test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
   void sessionId;
   try {
     const policy = defaultAttachmentPolicy();
-    const victimDir = Deno.makeTempDirSync({ prefix: "mothx-victim-" });
+    const victimDir = Deno.makeTempDirSync({ prefix: "opensac-victim-" });
     const victimFile = path.join(victimDir, "precious");
     Deno.writeTextFileSync(victimFile, "do not delete");
     Deno.mkdirSync(path.join(root, ArtifactStorageDirectoryName()), {

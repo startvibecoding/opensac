@@ -7,7 +7,7 @@ import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import { StatsDAO, type StatsRecord } from "../dao/mod.ts";
 import { closeDatabases, openBunDatabase } from "../session/mod.ts";
-import { dashboardHTML, mothxSmallICO } from "./assets.ts";
+import { dashboardHTML, opensacSmallICO } from "./assets.ts";
 import { DB, type Query } from "./stats.ts";
 
 function insert(db: DB, record: Partial<StatsRecord>): void {
@@ -37,9 +37,9 @@ function createTestDB(): DB {
   return DB.open(dbPath);
 }
 
-Deno.test("DashboardUsesMothXSmallFavicon", () => {
-  assert(dashboardHTML().includes('href="/mothx-small.ico"'));
-  assert(mothxSmallICO().length > 0);
+Deno.test("DashboardUsesOpenSACSmallFavicon", () => {
+  assert(dashboardHTML().includes('href="/opensac-small.ico"'));
+  assert(opensacSmallICO().length > 0);
 });
 
 Deno.test("DashboardShareActivityUsesSevenDayFlameHeatmap", () => {

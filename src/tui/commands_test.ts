@@ -54,6 +54,10 @@ function host(overrides: Partial<CommandHost> = {}): {
     listExperts() {
       return "experts";
     },
+    showExpert(id) {
+      calls.push(`showExpert:${id}`);
+      return `expert ${id}`;
+    },
     bindExpert(id): Promise<CommandResult> {
       calls.push(`bindExpert:${id}`);
       return Promise.resolve({ message: `bound ${id}` });
@@ -64,6 +68,10 @@ function host(overrides: Partial<CommandHost> = {}): {
     },
     listSessions() {
       return "sessions";
+    },
+    forkSession(): Promise<CommandResult> {
+      calls.push("forkSession");
+      return Promise.resolve({ message: "forked" });
     },
     switchSession(id): Promise<CommandResult> {
       calls.push(`switchSession:${id}`);
@@ -82,6 +90,10 @@ function host(overrides: Partial<CommandHost> = {}): {
     },
     showWorkflow(id): Promise<CommandResult> {
       return Promise.resolve({ message: `wf ${id}` });
+    },
+    cancelWorkflow(id): Promise<CommandResult> {
+      calls.push(`cancelWorkflow:${id}`);
+      return Promise.resolve({ message: `cancelled ${id}` });
     },
     handleESM(cmd): Promise<CommandResult> {
       calls.push(`esm:${cmd}`);
@@ -141,6 +153,14 @@ function host(overrides: Partial<CommandHost> = {}): {
     listAgents() {
       return "agents";
     },
+    switchAgent(id): Promise<CommandResult> {
+      calls.push(`switchAgent:${id}`);
+      return Promise.resolve({ message: `switched ${id}` });
+    },
+    destroyAgent(id): Promise<CommandResult> {
+      calls.push(`destroyAgent:${id}`);
+      return Promise.resolve({ message: `destroyed ${id}` });
+    },
     multiAgentEnabled() {
       return true;
     },
@@ -180,8 +200,8 @@ function host(overrides: Partial<CommandHost> = {}): {
       calls.push("openAuthDialog");
       return {};
     },
-    openSettingsDialog(): CommandResult {
-      calls.push("openSettingsDialog");
+    openSettingsDialog(providerID?: string): CommandResult {
+      calls.push(`openSettingsDialog:${providerID ?? ""}`);
       return {};
     },
     openEnvDialog(): CommandResult {
@@ -217,7 +237,7 @@ Deno.test("dialog commands open interactive panels", async () => {
   await dispatchCommand("/tuilang", h);
   assertEquals(calls, [
     "openAuthDialog",
-    "openSettingsDialog",
+    "openSettingsDialog:",
     "openModelDialog",
     "openEnvDialog",
     "openSessionsDialog",
@@ -279,16 +299,35 @@ Deno.test("expert and session subcommands route correctly", async () => {
   await dispatchCommand("/expert bind exp1", h);
   await dispatchCommand("/expert switch exp2", h);
   await dispatchCommand("/expert unbind", h);
+  await dispatchCommand("/expert show exp3", h);
   await dispatchCommand("/sessions ls", h);
   await dispatchCommand("/sessions del s1", h);
   await dispatchCommand("/sessions new", h);
+  await dispatchCommand("/sessions fork", h);
+  await dispatchCommand("/sessions branch", h);
   assertEquals(calls, [
     "bindExpert:exp1",
     "forkExpert:exp2",
     "bindExpert:",
+    "showExpert:exp3",
     "deleteSession:s1",
     "clearSession",
+    "forkSession",
+    "forkSession",
   ]);
+});
+
+Deno.test("workflows cancel routes to the host", async () => {
+  const { host: h, calls } = host();
+  const result = await dispatchCommand("/workflows cancel wf1", h);
+  assertEquals(calls, ["cancelWorkflow:wf1"]);
+  assertEquals(result.message, "cancelled wf1");
+});
+
+Deno.test("/settings with a provider deep-links into auth", async () => {
+  const { host: h, calls } = host();
+  await dispatchCommand("/settings anthropic", h);
+  assertEquals(calls, ["openSettingsDialog:anthropic"]);
 });
 
 Deno.test("/esm and /btw pass the raw command line through", async () => {
@@ -305,6 +344,31 @@ Deno.test("/agent respects multi-agent gating", async () => {
   const disabled = host({ multiAgentEnabled: () => false });
   const result = await dispatchCommand("/agent list", disabled.host);
   assertStringIncludes(result.message ?? "", "disabled");
+});
+
+Deno.test("/agent switch and destroy route to the host", async () => {
+  const { host: h, calls } = host();
+  await dispatchCommand("/agent switch sub1", h);
+  await dispatchCommand("/agent destroy sub2", h);
+  assertEquals(calls, ["switchAgent:sub1", "destroyAgent:sub2"]);
+  const bare = await dispatchCommand("/agent switch", h);
+  assertEquals(bare.error, true);
+});
+
+Deno.test("dialog commands refuse to open while running", async () => {
+  const busy = host({ running: true });
+  const model = await dispatchCommand("/model", busy.host);
+  assertEquals(model.error, true);
+  const auth = await dispatchCommand("/auth", busy.host);
+  assertEquals(auth.error, true);
+  const settings = await dispatchCommand("/settings", busy.host);
+  assertEquals(settings.error, true);
+  const def = await dispatchCommand("/defaultModel", busy.host);
+  assertEquals(def.error, true);
+  // Argument forms still work while running.
+  const argForm = host({ running: true });
+  await dispatchCommand("/model gpt", argForm.host);
+  assertEquals(argForm.calls, ["setModel:gpt"]);
 });
 
 Deno.test("help text lists commands and shortcuts", () => {

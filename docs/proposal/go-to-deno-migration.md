@@ -4741,6 +4741,78 @@ keyboard E2E that intrinsically requires a real terminal.
   the resize width application/no-op table).
 
 
+### Ledger entry — product rename `mothx` → `opensac` and cron test-hygiene repair
+
+Two work items landed in one run.
+
+(1) **Product identity rename (`mothx` → `opensac`, `MothX` → `OpenSAC`).** The
+config-directory rename (`.mothx` → `.opensac`, `MOTHX_DIR` → `OPENSAC_DIR`)
+was already in place; this closes the remaining product-identity leftovers from
+the Go port. Renamed across `src/`, `sdk/`, `examples/`, `bootstrap.ts`,
+`deno.json`, `README.md`, and `AGENTS.md`: user-facing strings (system prompt,
+doctor/serve/CLI banners, User-Agent, temp-dir prefixes, log/notice text), code
+identifiers (`mothxLogo`/`mothxPNG`/`mothxSmallICO` → `opensac*`,
+`mothxExtensionNamespace`, `MothxRequestMeta` → `OpensacRequestMeta`,
+`withMothxDir`), the ACP extension surface (`mothx.dev` → `opensac.dev`, the
+`mothx/manage/*`, `mothx/session/*`, `mothx/projects/*`, `mothx/attachment/*`,
+`mothx/workspace/*`, `mothx/requestQuestion`, `mothx/doctor`, `_mothx/*`
+methods/keys), the `opensac_webui_auth` cookie, the `x-opensac-session-count`
+header, the `opensac_sqlite` expvar key, the `responses.*.codeInterpreter`
+internal knob, and every `MOTHX_*` env var (`OPENSAC_ACP_*`,
+`OPENSAC_RUNTIME_BUS_*`, `OPENSAC_BUILD_VERSION`/`OPENSAC_VCS_*`,
+`OPENSAC_SQLITE_SYNCHRONOUS`, and the test keys). The `MOTHX_DIR` override is
+retained as the one documented legacy fallback. The stats assets are renamed
+(`src/stats/opensac.png`, `src/stats/opensac-small.ico`) with their routes,
+`deno.json --include` entries, and dashboard references updated. Provenance
+references to the Go source tree (`cmd/mothx`, `github.com/startvibecoding/mothx`,
+`/home/free/src/mothx`) are deliberately preserved in comments and the README,
+and the historical ledger above is left as-is.
+
+(2) **Cron test-hygiene repair.** The `SchedulerLocalJobWaitsForSessionRuntimeLock`
+cron integration test held the legacy `session.lockRuntime` to prove a job waits
+for a busy session, which the architecture test-hygiene guard rejects for adapter
+tests. It now acquires the canonical `agentruntime.acquireExecutionAdmission`
+guard instead, so no `legacyTestAllowlist` entry is needed.
+
+- Validation: full suite 2373 passed / 0 failed; architecture 8/8 (23 steps);
+  lint clean (846 files); fmt/check clean.
+
+### Ledger entry — TUI activity timeline completed (moark-style turn cards)
+
+Continues the Ink-shell split with a live per-turn activity timeline for the
+lead agent, using the four modules created alongside that split.
+
+(1) **`ActivityManager` wired into the event stream.** `AppController` now
+feeds a per-turn `ActivityManager` from `handleAgentEvent`: `EventTurnStart`
+resets the timeline, `EventThinkDelta` opens/appends the turn's thinking block,
+`EventToolCall`/`EventToolExecutionStart` open tool rows, and
+`EventToolExecutionEnd`/`EventToolResult` complete them (error status when a
+`toolError` is present). `EventTurnEnd` finalizes the open thinking block, and a
+terminal `EventRunFinished` interrupts any tool that never delivered a result
+(mirroring the store's `finalizeInterruptedTools`). The manager carries live
+elapsed timing (`startTime`/`endTime`), so running rows show a ticking duration
+in the managed view, and parent/depth tracking is ready for sub-agent nesting.
+
+(2) **`app.tsx` renders from the manager through the display components.** The
+inline `ActivityRowDisplay`/`getActivityIcon`/`getStatusColor` duplicates and
+the separate streaming-thinking block are gone; the timeline is rendered with
+`CompactToolRow` (tools) and `CompactThinkingRow` (thinking) from the new
+`tool_execution_display.tsx`/`thinking_display.tsx` modules. Thinking stays
+visible in the transcript's committed/streaming think rows, so nothing is lost.
+
+(3) **Cleanup.** `thinking_display.tsx` no longer ships a placeholder module-
+level `translator` (a temporary hack); `CompactThinkingRow` takes it as a prop.
+The `turn_card.tsx` builder remains for tests/tooling but `app.tsx` no longer
+accumulates every session tool into one unbounded timeline.
+
+(4) **Tests.** New `activity_manager_test.ts` covers tracking, error/interrupt
+status, thinking blocks, nesting, clearing, the singleton accessors, and the
+format helpers; `app_controller_test.ts` gains per-turn timeline, run-finish
+interruption, and turn-reset coverage.
+
+- Validation: `src/tui` 189 passed / 0 failed; full suite 2390 passed /
+  0 failed; architecture 8/8 (23 steps); lint clean (851 files); fmt/check clean.
+
 ## Validation
 
 ```sh

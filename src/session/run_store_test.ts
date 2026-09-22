@@ -69,7 +69,7 @@ function statusOf(sessionDir: string, sql: string, params: string[]): string {
 }
 
 Deno.test("create session run rejects duplicate and status rollback", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
     const run = baseRun({
@@ -104,7 +104,7 @@ Deno.test("create session run rejects duplicate and status rollback", () => {
 });
 
 Deno.test("update session run status allows waiting resume and cancellation", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     createSessionRun(
       sessionDir,
@@ -139,7 +139,7 @@ Deno.test("update session run status allows waiting resume and cancellation", ()
 });
 
 Deno.test("next session run attempt uses highest existing attempt", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
     for (
@@ -179,7 +179,7 @@ Deno.test("next session run attempt uses highest existing attempt", () => {
 });
 
 Deno.test("finish session run and conversation turn commits assistant idempotently", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
     createSessionRunAndEventWithTurn(
@@ -339,7 +339,7 @@ Deno.test("finish session run and conversation turn commits assistant idempotent
 });
 
 Deno.test("finish session run commits when turn already closed", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
     createSessionRunAndEventWithTurn(
@@ -441,7 +441,7 @@ Deno.test("finish session run commits when turn already closed", () => {
 });
 
 Deno.test("finish session run rolls back invalid delivery plan", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
     createSessionRunAndEventWithTurn(
@@ -595,7 +595,7 @@ Deno.test("finish session run rolls back invalid delivery plan", () => {
 });
 
 Deno.test("list session runs does not deadlock pool", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-list-runs-pool";
     createSessionRun(
@@ -624,7 +624,7 @@ Deno.test("list session runs does not deadlock pool", () => {
 });
 
 Deno.test("annotate session run error only fills empty error", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const now = new Date();
     createSessionRun(

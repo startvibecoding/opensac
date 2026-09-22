@@ -13,7 +13,7 @@ import {
   utcOffset,
 } from "./i18n.ts";
 import { displayWidth, truncateDisplay } from "./formatters.ts";
-import { logoWidth, mothxLogo, renderHeader } from "./header.ts";
+import { logoWidth, opensacLogo, renderHeader } from "./header.ts";
 import { type AgentTab, renderAgentTabBar } from "./agent_tabbar.ts";
 
 // ─── i18n ───────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ Deno.test("Translator falls back zh → en → id and formats args", () => {
 // ─── header ─────────────────────────────────────────────────────────────────
 
 Deno.test("logoWidth measures the widest logo line in cells", () => {
-  const lines = mothxLogo.split("\n");
+  const lines = opensacLogo.split("\n");
   assertEquals(lines.length, 5);
   assertEquals(logoWidth(), Math.max(...lines.map(displayWidth)));
   assertEquals(logoWidth(), 28); // block runes are 1 cell each
@@ -95,7 +95,7 @@ Deno.test("renderHeader shows logo and info panel at full width", () => {
   assertEquals(lines.length, 6);
   // deno-lint-ignore no-control-regex
   const text = header.replace(/\u001B\[[0-9;]*m/g, "");
-  assert(text.includes("MothX (1.2.3)"), text);
+  assert(text.includes("OpenSAC (1.2.3)"), text);
   assert(text.includes("deepseek | v4"), text);
   assert(text.includes("/home/u/proj"), text);
   assert(text.includes("Make OSCHINA Tokens Harness eXecution"));

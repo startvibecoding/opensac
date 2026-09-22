@@ -19,8 +19,8 @@ import { newManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
 
 function makeSessionRoot(): string {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-maint-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "mothx-maint-work-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-maint-" });
+  const workDir = Deno.makeTempDirSync({ prefix: "opensac-maint-work-" });
   const manager = newManager(workDir, root);
   manager.init();
   return root;

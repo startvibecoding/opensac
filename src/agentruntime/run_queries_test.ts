@@ -49,7 +49,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 Deno.test("AnnotateDurableRunError only terminalizes empty errors", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     createSessionRun(
       sessionDir,
@@ -105,7 +105,7 @@ Deno.test("AnnotateDurableRunError only terminalizes empty errors", () => {
 });
 
 Deno.test("ListLatestDurableRunsBySessions projects newest run per session", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     const now = Date.now();
     createSessionRun(

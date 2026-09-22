@@ -1,7 +1,7 @@
 // Focused tests for the ACP session catalog and lifecycle-mutation slice of
-// src/acp/server.ts (translated from the session/close, mothx/session/delete,
-// mothx/session/setTitle, mothx/session/setWorkDir, mothx/session/history,
-// session/list, mothx/session/listAll, and decision-ledger paths of
+// src/acp/server.ts (translated from the session/close, opensac/session/delete,
+// opensac/session/setTitle, opensac/session/setWorkDir, opensac/session/history,
+// session/list, opensac/session/listAll, and decision-ledger paths of
 // internal/acp/acp.go). Fixtures create real persisted sessions in a temp
 // session directory and call the handlers directly.
 
@@ -78,7 +78,7 @@ interface Fixture {
 }
 
 function newFixture(): Fixture {
-  const root = Deno.makeTempDirSync({ prefix: "mothx-acp-life-" });
+  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-life-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
   const server = new AcpServer();
@@ -161,7 +161,7 @@ Deno.test("session/list rejects an invalid cursor and pages by offset", () => {
   assertEquals(result.sessions.length, 0);
 });
 
-Deno.test("mothx/session/listAll validates scope and filters by query", () => {
+Deno.test("opensac/session/listAll validates scope and filters by query", () => {
   const { server, sink, sessionDir, root } = newFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
@@ -170,7 +170,7 @@ Deno.test("mothx/session/listAll validates scope and filters by query", () => {
 
   sink.reset();
   server.handleListAllSessions(
-    rpc(1, "mothx/session/listAll", { scope: "project" }),
+    rpc(1, "opensac/session/listAll", { scope: "project" }),
   );
   assert(
     (errorOf(responseOf(sink.toString())).message as string).includes(
@@ -180,7 +180,7 @@ Deno.test("mothx/session/listAll validates scope and filters by query", () => {
 
   sink.reset();
   server.handleListAllSessions(
-    rpc(2, "mothx/session/listAll", { scope: "bogus" }),
+    rpc(2, "opensac/session/listAll", { scope: "bogus" }),
   );
   assert(
     (errorOf(responseOf(sink.toString())).message as string).includes(
@@ -190,7 +190,7 @@ Deno.test("mothx/session/listAll validates scope and filters by query", () => {
 
   sink.reset();
   server.handleListAllSessions(
-    rpc(3, "mothx/session/listAll", { query: "sess-a" }),
+    rpc(3, "opensac/session/listAll", { query: "sess-a" }),
   );
   const result = responseOf(sink.toString()).result as {
     sessions: Record<string, unknown>[];
@@ -199,14 +199,14 @@ Deno.test("mothx/session/listAll validates scope and filters by query", () => {
   assertEquals(result.sessions[0].sessionId, "sess-a");
 });
 
-Deno.test("mothx/session/setTitle persists and notifies", () => {
+Deno.test("opensac/session/setTitle persists and notifies", () => {
   const { server, sink, sessionDir, root } = newFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-title");
 
   sink.reset();
   server.handleSetSessionTitle(
-    rpc(1, "mothx/session/setTitle", { sessionId: id, title: "Renamed" }),
+    rpc(1, "opensac/session/setTitle", { sessionId: id, title: "Renamed" }),
   );
   const messages = parseMessages(sink.toString());
   const response = messages[messages.length - 1];
@@ -219,12 +219,12 @@ Deno.test("mothx/session/setTitle persists and notifies", () => {
 
   sink.reset();
   server.handleSetSessionTitle(
-    rpc(2, "mothx/session/setTitle", { sessionId: id }),
+    rpc(2, "opensac/session/setTitle", { sessionId: id }),
   );
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });
 
-Deno.test("mothx/session/setWorkDir guards and moves the session", async () => {
+Deno.test("opensac/session/setWorkDir guards and moves the session", async () => {
   const { server, sink, sessionDir, root } = newFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
@@ -235,7 +235,7 @@ Deno.test("mothx/session/setWorkDir guards and moves the session", async () => {
   // Same cwd short-circuits without a mutation.
   sink.reset();
   await server.handleSetSessionWorkDir(
-    rpc(1, "mothx/session/setWorkDir", { sessionId: id, cwd: workA }),
+    rpc(1, "opensac/session/setWorkDir", { sessionId: id, cwd: workA }),
   );
   assertEquals(
     (responseOf(sink.toString()).result as Record<string, unknown>).cwd,
@@ -246,7 +246,7 @@ Deno.test("mothx/session/setWorkDir guards and moves the session", async () => {
   server.sessions.set(id, activeRuntime(id));
   sink.reset();
   await server.handleSetSessionWorkDir(
-    rpc(2, "mothx/session/setWorkDir", { sessionId: id, cwd: workD }),
+    rpc(2, "opensac/session/setWorkDir", { sessionId: id, cwd: workD }),
   );
   assert(
     (errorOf(responseOf(sink.toString())).message as string).includes(
@@ -258,7 +258,7 @@ Deno.test("mothx/session/setWorkDir guards and moves the session", async () => {
   server.sessions.delete(id);
   sink.reset();
   await server.handleSetSessionWorkDir(
-    rpc(3, "mothx/session/setWorkDir", { sessionId: id, cwd: workD }),
+    rpc(3, "opensac/session/setWorkDir", { sessionId: id, cwd: workD }),
   );
   assertEquals(
     (responseOf(sink.toString()).result as Record<string, unknown>).cwd,
@@ -273,7 +273,7 @@ Deno.test("mothx/session/setWorkDir guards and moves the session", async () => {
   server.workspaceCwd = root;
   sink.reset();
   await server.handleSetSessionWorkDir(
-    rpc(4, "mothx/session/setWorkDir", { sessionId: id, cwd: workB }),
+    rpc(4, "opensac/session/setWorkDir", { sessionId: id, cwd: workB }),
   );
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });
@@ -302,14 +302,16 @@ Deno.test("session/close shuts down an open runtime and is workspace-guarded", a
   assertEquals(errorOf(responseOf(sink.toString())).code, -32000);
 });
 
-Deno.test("mothx/session/delete removes an idle session and rejects an active one", () => {
+Deno.test("opensac/session/delete removes an idle session and rejects an active one", () => {
   const { server, sink, sessionDir, root } = newFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-del");
 
   server.sessions.set(id, new ACPSessionRuntime());
   sink.reset();
-  server.handleDeleteSession(rpc(1, "mothx/session/delete", { sessionId: id }));
+  server.handleDeleteSession(
+    rpc(1, "opensac/session/delete", { sessionId: id }),
+  );
   assert(
     (errorOf(responseOf(sink.toString())).message as string).includes(
       "cannot delete an active session",
@@ -318,7 +320,9 @@ Deno.test("mothx/session/delete removes an idle session and rejects an active on
 
   server.sessions.delete(id);
   sink.reset();
-  server.handleDeleteSession(rpc(2, "mothx/session/delete", { sessionId: id }));
+  server.handleDeleteSession(
+    rpc(2, "opensac/session/delete", { sessionId: id }),
+  );
   assertEquals(responseOf(sink.toString()).result, {});
   assertEquals(
     listAllDetailed(sessionDir).some((detail) => detail.id === id),
@@ -328,11 +332,13 @@ Deno.test("mothx/session/delete removes an idle session and rejects an active on
   // Re-deleting a session whose row is gone reports the structured failure
   // (Go's `OpenByIDExact` returns "not registered in DB" for a missing row).
   sink.reset();
-  server.handleDeleteSession(rpc(3, "mothx/session/delete", { sessionId: id }));
+  server.handleDeleteSession(
+    rpc(3, "opensac/session/delete", { sessionId: id }),
+  );
   assertEquals(errorOf(responseOf(sink.toString())).code, -32000);
 });
 
-Deno.test("mothx/session/history pages the canonical transcript", () => {
+Deno.test("opensac/session/history pages the canonical transcript", () => {
   const { server, sink, sessionDir, root } = newFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-hist");
@@ -345,7 +351,7 @@ Deno.test("mothx/session/history pages the canonical transcript", () => {
 
   sink.reset();
   server.handleSessionHistory(
-    rpc(1, "mothx/session/history", { sessionId: id }),
+    rpc(1, "opensac/session/history", { sessionId: id }),
   );
   const result = responseOf(sink.toString()).result as {
     sessionId: string;
@@ -357,12 +363,12 @@ Deno.test("mothx/session/history pages the canonical transcript", () => {
 
   sink.reset();
   server.handleSessionHistory(
-    rpc(2, "mothx/session/history", { sessionId: "nope" }),
+    rpc(2, "opensac/session/history", { sessionId: "nope" }),
   );
   assertEquals(errorOf(responseOf(sink.toString())).code, -32000);
 
   sink.reset();
-  server.handleSessionHistory(rpc(3, "mothx/session/history", 42));
+  server.handleSessionHistory(rpc(3, "opensac/session/history", 42));
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });
 
@@ -399,7 +405,7 @@ Deno.test("decision ledger persists, replays, and terminalizes on close", () => 
   sink.reset();
   server.replayPendingDecisionRequests(id);
   const request = parseMessages(sink.toString()).find(
-    (m) => m.method === "_mothx/request_question",
+    (m) => m.method === "_opensac/request_question",
   );
   assert(request !== undefined);
 

@@ -11,15 +11,15 @@ import {
   utf8Prefix,
 } from "./metadata.ts";
 
-Deno.test("request metadata accessors prefer the mothx namespace", () => {
+Deno.test("request metadata accessors prefer the opensac namespace", () => {
   const meta = {
-    mothx: {
+    opensac: {
       workspace: { cwd: "/work", additionalDirectories: ["/extra"] },
       parentSessionId: "parent-1",
       surface: "desktop",
       editorContext: { path: "/work/a.ts", language: "typescript" },
     },
-    "mothx.dev": {
+    "opensac.dev": {
       workspace: { cwd: "/other" },
       parentSessionId: "parent-2",
       surface: "web",
@@ -30,7 +30,7 @@ Deno.test("request metadata accessors prefer the mothx namespace", () => {
   assertEquals(requestSurface(meta), "desktop");
   assertEquals(requestEditorContext(meta)?.language, "typescript");
 
-  const devOnly = { "mothx.dev": { workspace: { cwd: "/dev" } } };
+  const devOnly = { "opensac.dev": { workspace: { cwd: "/dev" } } };
   assertEquals(requestWorkspace(devOnly)?.cwd, "/dev");
   assertEquals(requestParentSessionID(devOnly), "");
   assertEquals(requestSurface(undefined), "");

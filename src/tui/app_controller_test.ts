@@ -334,6 +334,80 @@ Deno.test({
     );
     assert(out.includes("streaming answer"), out);
     assert(out.includes("Approval required"), out);
-    assert(out.includes("MothX (test)"), out);
+    assert(out.includes("OpenSAC (test)"), out);
   },
+});
+
+Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
+  const { c } = controller("lead");
+  c.attachRun(runHandle().handle);
+  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({ type: EventThinkDelta, thinkDelta: "hmm" }));
+  c.handleAgentEvent(ev({
+    type: EventToolCall,
+    toolCall: { id: "t1", name: "bash" },
+    toolArgs: { command: "ls" },
+  }));
+
+  // Tool still running: timeline shows thinking + running tool with live
+  // elapsed timing.
+  let items = c.activityManager.buildTimeline();
+  assertEquals(items.length, 2);
+  const tool = items.find((i) => i.type === "tool");
+  assertEquals(tool?.status, "running");
+  assertEquals(tool?.toolName, "bash");
+  assertEquals(typeof tool?.elapsedMs, "number");
+  const think = items.find((i) => i.type === "thinking");
+  assertEquals(think?.status, "running");
+  assertEquals(think?.content, "hmm");
+
+  c.handleAgentEvent(ev({
+    type: EventToolResult,
+    toolCallId: "t1",
+    toolResult: "ok",
+  }));
+  items = c.activityManager.buildTimeline();
+  assertEquals(items.find((i) => i.type === "tool")?.status, "completed");
+  assertEquals(items.find((i) => i.type === "tool")?.content, "ok");
+
+  // Turn end finalizes the open thinking block.
+  c.handleAgentEvent(ev({ type: EventTurnEnd }));
+  assertEquals(
+    c.activityManager.buildTimeline().find((i) => i.type === "thinking")
+      ?.status,
+    "completed",
+  );
+});
+
+Deno.test("run finish interrupts tools that never returned", () => {
+  const { c } = controller("lead");
+  const { handle } = runHandle();
+  c.attachRun(handle);
+  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({
+    type: EventToolExecutionStart,
+    toolCallId: "t9",
+    toolName: "bash",
+  }));
+  c.handleAgentEvent(ev({ type: EventRunFinished, status: TaskCanceled }));
+  const tool = c.activityManager.buildTimeline().find((i) => i.type === "tool");
+  assertEquals(tool?.status, "interrupted");
+  // No thinking block was opened, so none is finalized.
+  assertEquals(
+    c.activityManager.buildTimeline().filter((i) => i.type === "thinking")
+      .length,
+    0,
+  );
+});
+
+Deno.test("new turn resets the activity timeline", () => {
+  const { c } = controller("lead");
+  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({
+    type: EventToolCall,
+    toolCall: { id: "a", name: "grep" },
+  }));
+  assertEquals(c.activityManager.buildTimeline().length, 1);
+  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  assertEquals(c.activityManager.buildTimeline().length, 0);
 });

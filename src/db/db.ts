@@ -43,7 +43,7 @@ export const BUSY_TIMEOUT_MS = 10_000;
 
 /** SQLite `synchronous` mode for new connections. */
 function synchronousMode(): string {
-  const env = (Deno.env.get("MOTHX_SQLITE_SYNCHRONOUS") ?? "").trim();
+  const env = (Deno.env.get("OPENSAC_SQLITE_SYNCHRONOUS") ?? "").trim();
   return env.toUpperCase() === "FULL" ? "FULL" : "NORMAL";
 }
 

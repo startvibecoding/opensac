@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 // Subprocess integration test (migrated shape of the Go
 // TestACPStdioProcessHelper family): spawns `deno run src/main.ts acp` in a
-// temp MOTHX_DIR and verifies the initialize handshake over real stdio, the
+// temp OPENSAC_DIR and verifies the initialize handshake over real stdio, the
 // startup error line for an unconfigured provider, and clean EOF shutdown.
 
 import { assert, assertEquals } from "@std/assert";
@@ -65,7 +65,7 @@ Deno.test("acp subprocess completes initialize handshake", async () => {
   const homeDir = Deno.makeTempDirSync();
   // Build a minimal settings blob around a provider whose presence is only
   // validated structurally; use the same defaults path as the CLI. If no
-  // provider key exists, startup emits MOTHX_ACP_ERROR instead, which the
+  // provider key exists, startup emits OPENSAC_ACP_ERROR instead, which the
   // next test covers. Here we only assert the process speaks NDJSON when a
   // settings file exists: initialize either succeeds or yields a typed RPC
   // error (never a crash).
@@ -87,7 +87,7 @@ Deno.test("acp subprocess completes initialize handshake", async () => {
     method: "initialize",
   }) + "\n";
   const result = await runAcp([initialize], {
-    MOTHX_DIR: configDir,
+    OPENSAC_DIR: configDir,
     HOME: homeDir,
   });
   const lines: string[] = result.output.trim().split("\n").filter(Boolean);
@@ -127,7 +127,7 @@ Deno.test("acp subprocess rejects methods before initialize", async () => {
     method: "session/list",
   }) + "\n";
   const result = await runAcp([line], {
-    MOTHX_DIR: configDir,
+    OPENSAC_DIR: configDir,
     HOME: homeDir,
   });
   const message: Record<string, any> = JSON.parse(
@@ -162,11 +162,11 @@ Deno.test("acp subprocess exits cleanly at EOF after initialize", async () => {
     JSON.stringify({
       jsonrpc: "2.0",
       id: 2,
-      method: "mothx/doctor",
+      method: "opensac/doctor",
     }) + "\n",
   ];
   const result = await runAcp(lines, {
-    MOTHX_DIR: configDir,
+    OPENSAC_DIR: configDir,
     HOME: homeDir,
   });
   const messages: Record<string, any>[] = result.output.trim().split("\n")

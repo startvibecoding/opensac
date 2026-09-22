@@ -17,11 +17,11 @@ export function current(): string {
   const value = version.trim();
   if (value !== "") return value;
 
-  const buildVersion = Deno.env.get("MOTHX_BUILD_VERSION")?.trim() ?? "";
+  const buildVersion = Deno.env.get("OPENSAC_BUILD_VERSION")?.trim() ?? "";
   if (buildVersion !== "" && buildVersion !== "(devel)") return buildVersion;
 
-  const revision = Deno.env.get("MOTHX_VCS_REVISION")?.trim() ?? "";
-  const modified = Deno.env.get("MOTHX_VCS_MODIFIED")?.trim() ?? "";
+  const revision = Deno.env.get("OPENSAC_VCS_REVISION")?.trim() ?? "";
+  const modified = Deno.env.get("OPENSAC_VCS_MODIFIED")?.trim() ?? "";
   if (revision !== "") {
     return modified === "true" ? `${revision}-dirty` : revision;
   }

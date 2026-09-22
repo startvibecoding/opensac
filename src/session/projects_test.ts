@@ -15,7 +15,7 @@ import {
 } from "./projects.ts";
 
 Deno.test("list session metadata batch and project counts", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const project = createProject(sessionDir, "Phase1");
     assert(project.id !== "");
@@ -54,7 +54,7 @@ Deno.test("list session metadata batch and project counts", () => {
 });
 
 Deno.test("delete project clears session assignments but keeps the pin", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const project = createProject(sessionDir, "Temporary");
     setSessionMetadata(sessionDir, "session-project-delete", {
@@ -75,7 +75,7 @@ Deno.test("delete project clears session assignments but keeps the pin", () => {
 });
 
 Deno.test("list projects degrades on a missing database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-session-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     assertEquals(listProjects(sessionDir), []);
   } finally {

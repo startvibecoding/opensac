@@ -20,7 +20,7 @@ class RecordingRunEventSink implements RunEventSink {
 
 Deno.test("SessionRunEventSink RecordJSON", () => {
   const sink = new SessionRunEventSink(
-    Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" }),
+    Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" }),
   );
   sink.recordJSON(
     "session-1",
@@ -52,7 +52,7 @@ Deno.test("RunEvent carries protocol-neutral data", () => {
 });
 
 Deno.test("SessionRunEventSink preserves insertion order", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "mothx-agentruntime-" });
+  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   const sink = new SessionRunEventSink(sessionDir);
   for (
     const event of [

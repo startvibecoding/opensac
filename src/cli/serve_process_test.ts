@@ -1,4 +1,4 @@
-// Subprocess test for `mothx serve` HTTP bootstrap: spawns `deno run
+// Subprocess test for `opensac serve` HTTP bootstrap: spawns `deno run
 // src/main.ts serve --port 0 --config <file>`, reads the chosen port from the
 // startup banner, and verifies /api/status responds over real HTTP.
 
@@ -40,7 +40,7 @@ Deno.test("serve subprocess answers /api/status on the bound port", async () => 
     stdin: "null",
     stdout: "piped",
     stderr: "piped",
-    env: { ...Deno.env.toObject(), MOTHX_DIR: dir },
+    env: { ...Deno.env.toObject(), OPENSAC_DIR: dir },
   });
   const child = command.spawn();
   let boundPort = 0;

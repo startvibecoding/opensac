@@ -97,8 +97,8 @@ function spawnHelper(
   );
   const env: Record<string, string> = {
     ...Deno.env.toObject(),
-    MOTHX_RUNTIME_BUS_PORT: String(port),
-    ...(mode !== undefined ? { MOTHX_RUNTIME_BUS_HELPER_MODE: mode } : {}),
+    OPENSAC_RUNTIME_BUS_PORT: String(port),
+    ...(mode !== undefined ? { OPENSAC_RUNTIME_BUS_HELPER_MODE: mode } : {}),
     ...(extraEnv ?? {}),
   };
   const command = new Deno.Command(Deno.execPath(), {
@@ -184,8 +184,8 @@ Deno.test("runtime lease bus logs use dedicated subscribers", async () => {
 
 Deno.test("runtime lease bus stops when last handler unsubscribes", async () => {
   const port = await freeUdpPort();
-  const previous = Deno.env.get("MOTHX_RUNTIME_BUS_PORT");
-  Deno.env.set("MOTHX_RUNTIME_BUS_PORT", String(port));
+  const previous = Deno.env.get("OPENSAC_RUNTIME_BUS_PORT");
+  Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", String(port));
   try {
     const stop = subscribeRuntimeLeaseNotifications(() => {});
     assert(
@@ -199,15 +199,15 @@ Deno.test("runtime lease bus stops when last handler unsubscribes", async () => 
     );
     assertFalse(runtimeLeaseBusListening());
   } finally {
-    if (previous === undefined) Deno.env.delete("MOTHX_RUNTIME_BUS_PORT");
-    else Deno.env.set("MOTHX_RUNTIME_BUS_PORT", previous);
+    if (previous === undefined) Deno.env.delete("OPENSAC_RUNTIME_BUS_PORT");
+    else Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", previous);
   }
 });
 
 Deno.test("runtime lease bus broadcast reaches another process", async () => {
   const port = await freeUdpPort();
-  const previous = Deno.env.get("MOTHX_RUNTIME_BUS_PORT");
-  Deno.env.set("MOTHX_RUNTIME_BUS_PORT", String(port));
+  const previous = Deno.env.get("OPENSAC_RUNTIME_BUS_PORT");
+  Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", String(port));
   const received: RuntimeLeaseNotification[] = [];
   const stop = subscribeRuntimeLeaseNotifications((n) => received.push(n));
   const helpers: Helper[] = [];
@@ -238,15 +238,15 @@ Deno.test("runtime lease bus broadcast reaches another process", async () => {
     for (const helper of helpers) helper.stop();
     stop();
     await waitForRuntimeLeaseBusStopped(5000);
-    if (previous === undefined) Deno.env.delete("MOTHX_RUNTIME_BUS_PORT");
-    else Deno.env.set("MOTHX_RUNTIME_BUS_PORT", previous);
+    if (previous === undefined) Deno.env.delete("OPENSAC_RUNTIME_BUS_PORT");
+    else Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", previous);
   }
 });
 
 Deno.test("runtime lease bus database rebuilt reaches another process", async () => {
   const port = await freeUdpPort();
-  const previous = Deno.env.get("MOTHX_RUNTIME_BUS_PORT");
-  Deno.env.set("MOTHX_RUNTIME_BUS_PORT", String(port));
+  const previous = Deno.env.get("OPENSAC_RUNTIME_BUS_PORT");
+  Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", String(port));
   const notifications: RuntimeLeaseNotification[] = [];
   const stop = subscribeRuntimeLeaseNotifications((n) => notifications.push(n));
   const dbPath = path.join(Deno.makeTempDirSync(), "sessions.db");
@@ -257,7 +257,7 @@ Deno.test("runtime lease bus database rebuilt reaches another process", async ()
       "parent listener did not start",
     );
     helper = spawnHelper(port, "publish_database_rebuilt", {
-      MOTHX_RUNTIME_BUS_HELPER_PATH: dbPath,
+      OPENSAC_RUNTIME_BUS_HELPER_PATH: dbPath,
     });
     const deadline = Date.now() + 5000;
     while (notifications.length === 0 && Date.now() < deadline) {
@@ -271,7 +271,7 @@ Deno.test("runtime lease bus database rebuilt reaches another process", async ()
     helper?.stop();
     stop();
     await waitForRuntimeLeaseBusStopped(5000);
-    if (previous === undefined) Deno.env.delete("MOTHX_RUNTIME_BUS_PORT");
-    else Deno.env.set("MOTHX_RUNTIME_BUS_PORT", previous);
+    if (previous === undefined) Deno.env.delete("OPENSAC_RUNTIME_BUS_PORT");
+    else Deno.env.set("OPENSAC_RUNTIME_BUS_PORT", previous);
   }
 });

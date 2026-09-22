@@ -10,7 +10,7 @@ import { userAgent } from "../ua/ua.ts";
 import * as semver from "./semver.ts";
 
 /** The npm package used for update detection. */
-export const PACKAGE_NAME = "mothx";
+export const PACKAGE_NAME = "opensac";
 
 /** The minimum time between background network checks. */
 export const checkIntervalMs = 24 * 60 * 60 * 1000;

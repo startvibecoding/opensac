@@ -1,4 +1,4 @@
-// Focused tests for the ported `mothx a2a` command surface that does not
+// Focused tests for the ported `opensac a2a` command surface that does not
 // require the Runtime agent factory: config resolution/override, init-config,
 // and the status health probe (with an injected fetch).
 
@@ -29,7 +29,7 @@ async function withEnv<T>(
 
 Deno.test("resolveA2AConfig falls back to defaults without a file", async () => {
   const dir = Deno.makeTempDirSync();
-  await withEnv("MOTHX_DIR", dir, () => {
+  await withEnv("OPENSAC_DIR", dir, () => {
     const { config, path } = resolveA2AConfig(defaultA2AStartOptions());
     assertEquals(path, configPath());
     assertEquals(config.enabled, false);
@@ -40,7 +40,7 @@ Deno.test("resolveA2AConfig falls back to defaults without a file", async () => 
 
 Deno.test("resolveA2AConfig applies CLI overrides", async () => {
   const dir = Deno.makeTempDirSync();
-  await withEnv("MOTHX_DIR", dir, () => {
+  await withEnv("OPENSAC_DIR", dir, () => {
     const opts = defaultA2AStartOptions();
     opts.port = 9999;
     opts.workDir = "/srv/work";
@@ -64,7 +64,7 @@ Deno.test("resolveA2AConfig reads a written global config", async () => {
       auth_token: "secret",
     }),
   );
-  await withEnv("MOTHX_DIR", dir, () => {
+  await withEnv("OPENSAC_DIR", dir, () => {
     const { config } = resolveA2AConfig(defaultA2AStartOptions());
     assertEquals(config.enabled, false);
     assertEquals(config.port, 8123);
@@ -75,7 +75,7 @@ Deno.test("resolveA2AConfig reads a written global config", async () => {
 
 Deno.test("executeA2AInit writes the template and refuses overwrite", async () => {
   const dir = Deno.makeTempDirSync();
-  await withEnv("MOTHX_DIR", dir, async () => {
+  await withEnv("OPENSAC_DIR", dir, async () => {
     const written = await executeA2AInit(false, () => {});
     assert(written.endsWith("a2a.json"));
     const text = Deno.readTextFileSync(written);

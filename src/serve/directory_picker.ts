@@ -146,7 +146,7 @@ export const windowsDirectoryPickerScript =
   `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
 $dialog.Description = 'Select working directory'
-$dialog.SelectedPath = $env:MOTHX_DIRECTORY_PICKER_PATH
+$dialog.SelectedPath = $env:OPENSAC_DIRECTORY_PICKER_PATH
 if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Write($dialog.SelectedPath) }`;
 
 async function openWindowsDirectoryPicker(
@@ -162,7 +162,7 @@ async function openWindowsDirectoryPicker(
       "-Command",
       "Add-Type -AssemblyName System.Windows.Forms; " +
       windowsDirectoryPickerScript,
-    ], { MOTHX_DIRECTORY_PICKER_PATH: defaultPath });
+    ], { OPENSAC_DIRECTORY_PICKER_PATH: defaultPath });
   }
   throw errNativeDirectoryPickerUnavailable;
 }
