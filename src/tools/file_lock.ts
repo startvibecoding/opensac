@@ -37,17 +37,15 @@ export class FileLockManager {
       const current = this.#held.get(p);
       if (current === undefined) {
         this.#held.set(p, { owner, acquiredAt: Date.now() });
-        let released = false;
-        return () => {
-          if (released) return;
-          released = true;
-          this.#release(p);
-        };
+        return this.#makeRelease(p);
       }
 
       const currentOwner = current.owner;
       const acquiredAt = current.acquiredAt;
-      await this.#wait(p, signal).catch((err) => {
+      let granted = false;
+      try {
+        granted = await this.#wait(p, signal);
+      } catch (err) {
         if (err instanceof AbortError) {
           throw new Error(
             `wait for file lock ${p} held by ${currentOwner} since ${
@@ -56,8 +54,29 @@ export class FileLockManager {
           );
         }
         throw err;
-      });
+      }
+      if (granted) {
+        // The releasing holder handed the lock directly to this waiter (the
+        // placeholder entry written by #release is ours). Claim it instead of
+        // re-checking the held map, which would wait for a release that can
+        // never come and deadlock every queued caller.
+        this.#held.set(p, { owner, acquiredAt: Date.now() });
+        if (signal?.aborted) {
+          this.#release(p);
+          throw abortError(signal);
+        }
+        return this.#makeRelease(p);
+      }
     }
+  }
+
+  #makeRelease(p: string): () => void {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#release(p);
+    };
   }
 
   #release(p: string): void {
@@ -73,15 +92,20 @@ export class FileLockManager {
     this.#held.delete(p);
   }
 
-  #wait(p: string, signal: AbortSignal | undefined): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+  /**
+   * Waits until the lock is handed to this waiter. Resolves `true` when the
+   * releasing holder granted ownership to us; the waiter must then claim the
+   * placeholder entry instead of re-checking the held map.
+   */
+  #wait(p: string, signal: AbortSignal | undefined): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
       let settled = false;
       const queue = this.#waiters.get(p) ?? [];
       const onWake = () => {
         if (settled) return;
         settled = true;
         signal?.removeEventListener("abort", onAbort);
-        resolve();
+        resolve(true);
       };
       const onAbort = () => {
         if (settled) return;

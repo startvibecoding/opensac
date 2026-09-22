@@ -34,6 +34,39 @@ interface DeepSeekTokenizer {
 
 let deepSeekTok: DeepSeekTokenizer | null | undefined;
 
+/**
+ * Bounded LRU memo for `deepSeekTokenCount` results.
+ *
+ * Context accounting walks the full message history several times per turn
+ * (usage events, turn/run terminal events, auto-compaction checks, large-tool-
+ * result guards, the compaction cut search). Tokenizing the whole history from
+ * scratch on every pass costs O(history) CPU each time and freezes the
+ * single-threaded runtime for longer and longer as a session accumulates large
+ * tool results. The function is pure in `text`, so memoizing it makes repeated
+ * passes cost map lookups and only new content gets tokenized.
+ *
+ * Hot keys are usually the very string instances the messages already retain,
+ * so retention is bounded by the caps below rather than by history size.
+ */
+const tokenCountCache = new Map<string, number>();
+const tokenCountCacheMaxEntries = 65536;
+const tokenCountCacheMaxChars = 32_000_000;
+let tokenCountCacheChars = 0;
+
+function rememberTokenCount(text: string, total: number): void {
+  tokenCountCache.set(text, total);
+  tokenCountCacheChars += text.length;
+  while (
+    tokenCountCache.size > tokenCountCacheMaxEntries ||
+    tokenCountCacheChars > tokenCountCacheMaxChars
+  ) {
+    const oldest = tokenCountCache.keys().next();
+    if (oldest.done === true) break;
+    tokenCountCache.delete(oldest.value);
+    tokenCountCacheChars -= oldest.value.length;
+  }
+}
+
 function tokenizerDataURL(): URL {
   return new URL("./tokenizerdata/deepseek_v3_tokenizer.json", import.meta.url);
 }
@@ -82,6 +115,22 @@ export function deepSeekTokenCount(text: string): number {
   if (tok === null || text === "") {
     return 0;
   }
+  const cached = tokenCountCache.get(text);
+  if (cached !== undefined) {
+    // Refresh recency so multi-pass history walks do not thrash the LRU.
+    tokenCountCache.delete(text);
+    tokenCountCache.set(text, cached);
+    return cached;
+  }
+  const total = deepSeekUncachedTokenCount(tok, text);
+  rememberTokenCount(text, total);
+  return total;
+}
+
+function deepSeekUncachedTokenCount(
+  tok: DeepSeekTokenizer,
+  text: string,
+): number {
   let total = 0;
   let remaining = text;
   while (remaining !== "") {

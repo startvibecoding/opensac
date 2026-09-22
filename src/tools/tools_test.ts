@@ -407,6 +407,21 @@ Deno.test("GrepTool limits total results and falls back to literal", async () =>
   assertStringIncludes(literal.text, "(no matches found)");
 });
 
+Deno.test("GrepTool skips oversized files instead of buffering them", async () => {
+  const dir = tempDir();
+  writeText(
+    path.join(dir, "huge.txt"),
+    "needle here\n" + "x".repeat(17 * 1024 * 1024),
+  );
+  writeText(path.join(dir, "small.txt"), "needle here\n");
+  const tool = new GrepTool(newRegistry(dir, undefined));
+
+  const result = await tool.execute(ctx, { pattern: "needle", path: "." });
+  assertStringIncludes(result.text, "small.txt");
+  assert(!result.text.includes("huge.txt"), "oversized file must not be read");
+  assertStringIncludes(result.text, "skipped 1 files");
+});
+
 Deno.test("LsTool lists directory entries", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "a.txt"), "hi");
@@ -576,6 +591,94 @@ Deno.test("file lock manager waits and cancels", async () => {
 
   const releaseAgain = await mgr.acquire(undefined, file, "third");
   releaseAgain();
+});
+
+/** Resolves `p` within `ms`, failing instead of hanging the suite. */
+async function withDeadline<T>(p: Promise<T>, ms = 2000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`timed out after ${ms}ms (deadlock?)`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+Deno.test("file lock manager hands the lock to the next waiter", async () => {
+  const mgr = new FileLockManager();
+  const file = path.join(tempDir(), "locked.txt");
+  const order: string[] = [];
+
+  const first = await mgr.acquire(undefined, file, "first");
+  const second = mgr.acquire(undefined, file, "second").then((release) => {
+    order.push("second");
+    return release;
+  });
+  const third = mgr.acquire(undefined, file, "third").then((release) => {
+    order.push("third");
+    return release;
+  });
+
+  first();
+  const releaseSecond = await withDeadline(second);
+  assertEquals(order, ["second"]);
+
+  releaseSecond();
+  const releaseThird = await withDeadline(third);
+  assertEquals(order, ["second", "third"]);
+  releaseThird();
+
+  // The queue drained cleanly: a fresh acquire is immediate.
+  const releaseFourth = await withDeadline(
+    mgr.acquire(undefined, file, "fourth"),
+  );
+  releaseFourth();
+});
+
+Deno.test("file lock manager survives an aborted waiter in the queue", async () => {
+  const mgr = new FileLockManager();
+  const file = path.join(tempDir(), "locked.txt");
+  const first = await mgr.acquire(undefined, file, "first");
+
+  const controller = new AbortController();
+  const aborted = mgr.acquire(controller.signal, file, "aborted");
+  const next = mgr.acquire(undefined, file, "next").then((release) => release);
+  controller.abort();
+  await expectRejects(() => aborted);
+
+  first();
+  // The aborted waiter must not swallow the handoff and poison the lock.
+  const releaseNext = await withDeadline(next);
+  releaseNext();
+});
+
+Deno.test("EditTool serializes concurrent edits to the same file", async () => {
+  const dir = tempDir();
+  const file = path.join(dir, "e.txt");
+  writeText(file, "alpha beta gamma");
+  const r = newRegistry(dir, undefined);
+  const tool = new EditTool(r);
+
+  await withDeadline(
+    Promise.all([
+      tool.execute(ctx, {
+        path: "e.txt",
+        edits: [{ oldText: "alpha", newText: "ALPHA" }],
+      }),
+      tool.execute(ctx, {
+        path: "e.txt",
+        edits: [{ oldText: "gamma", newText: "GAMMA" }],
+      }),
+    ]),
+  );
+  assertEquals(readText(file), "ALPHA beta GAMMA");
 });
 
 Deno.test("default registries share a file lock manager", () => {

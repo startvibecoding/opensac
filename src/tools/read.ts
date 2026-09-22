@@ -164,7 +164,7 @@ export class ReadTool implements Tool {
 
     let data: Uint8Array;
     try {
-      data = Deno.readFileSync(p);
+      data = await Deno.readFile(p);
     } catch (err) {
       throw new Error(`cannot read file: ${messageOf(err)}`);
     }
@@ -191,13 +191,17 @@ export class ReadTool implements Tool {
     if (end > lines.length) end = lines.length;
 
     const selected = lines.slice(offset, end);
+    const maxBytes = 50000;
     let sb = "";
     for (let i = 0; i < selected.length; i++) {
       const lineNum = offset + i + 1;
       sb += `${lineNum}\t${selected[i]}\n`;
+      // Stop formatting early once the output is over the byte cap. The
+      // truncation below only depends on the first maxBytes of the formatted
+      // text, so huge windows do not build multi-megabyte strings first.
+      if (sb.length > maxBytes) break;
     }
 
-    const maxBytes = 50000;
     if (new TextEncoder().encode(sb).length > maxBytes) {
       sb = truncateString(sb, maxBytes) +
         `\n... (truncated, total ${lines.length} lines)`;

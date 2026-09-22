@@ -3,9 +3,11 @@
 // The Go tool delegates to the `go-ripgrep` SDK. This port reuses the ported
 // `globset.ts`/`ignore.ts` for the `include` filter and ignore handling and
 // runs a native per-line regex search (falling back to a literal substring
-// search when the regex is invalid). Go's concurrent worker pool maps to
-// sequential traversal in the single-threaded runtime. This is registered as a
-// deliberate deviation from the external SDK dependency.
+// search when the regex is invalid). Go's concurrent worker pool maps to a
+// sequential async traversal that awaits directory scans and file reads so a
+// long search cannot freeze the single-threaded runtime. Oversized files are
+// skipped instead of being buffered whole into memory. This is registered as
+// a deliberate deviation from the external SDK dependency.
 
 import * as path from "@std/path";
 import { GlobSet } from "./globset.ts";
@@ -19,6 +21,8 @@ import {
 } from "./tool.ts";
 
 const maxGrepOutputBytes = 200000;
+/** Files larger than this are skipped: the scan buffers whole files. */
+const maxGrepFileBytes = 16 * 1024 * 1024;
 
 /** Searches file contents using regex patterns. */
 export class GrepTool implements Tool {
@@ -33,7 +37,7 @@ export class GrepTool implements Tool {
   }
 
   description(): string {
-    return "Search file contents using regex patterns. Returns matching lines with file paths and line numbers. If the pattern is an invalid regex, it automatically falls back to a literal search. Use for finding code patterns, function definitions, etc.";
+    return "Search file contents using regex patterns. Returns matching lines with file paths and line numbers. If the pattern is an invalid regex, it automatically falls back to a literal search. Use for finding code patterns, function definitions, etc. Files over 16MB are skipped.";
   }
 
   promptSnippet(): string {
@@ -71,10 +75,10 @@ export class GrepTool implements Tool {
     };
   }
 
-  execute(
+  async execute(
     _ctx: ToolContext,
     params: Record<string, unknown>,
-  ): ToolResult {
+  ): Promise<ToolResult> {
     const pattern = typeof params["pattern"] === "string"
       ? params["pattern"] as string
       : "";
@@ -128,7 +132,7 @@ export class GrepTool implements Tool {
 
     let files: GrepFile[];
     try {
-      files = collectGrepFiles(searchPath, includeGlob);
+      files = await collectGrepFiles(searchPath, includeGlob);
     } catch (err) {
       throw new Error(`grep search failed: ${messageOf(err)}`);
     }
@@ -137,10 +141,21 @@ export class GrepTool implements Tool {
     let bytesUsed = 0;
     let count = 0;
     let truncated = false;
+    let skipped = 0;
     for (const file of files) {
+      let size: number;
+      try {
+        size = (await Deno.stat(file.path)).size;
+      } catch {
+        continue;
+      }
+      if (size > maxGrepFileBytes) {
+        skipped++;
+        continue;
+      }
       let data: Uint8Array;
       try {
-        data = Deno.readFileSync(file.path);
+        data = await Deno.readFile(file.path);
       } catch {
         continue;
       }
@@ -166,13 +181,19 @@ export class GrepTool implements Tool {
       if (truncated) break;
     }
 
+    const skippedNote = skipped > 0
+      ? `\n... (skipped ${skipped} files over ${
+        Math.floor(maxGrepFileBytes / (1024 * 1024))
+      }MB)`
+      : "";
     if (lines.length === 0) {
       if (literalFallback) {
         return newTextToolResult(
-          "(invalid regex; fell back to literal search)\n(no matches found)",
+          "(invalid regex; fell back to literal search)\n(no matches found)" +
+            skippedNote,
         );
       }
-      return newTextToolResult("(no matches found)");
+      return newTextToolResult("(no matches found)" + skippedNote);
     }
 
     let output = lines.join("\n");
@@ -186,6 +207,7 @@ export class GrepTool implements Tool {
         output += `\n... (truncated at ${maxGrepOutputBytes} bytes)`;
       }
     }
+    output += skippedNote;
 
     return newTextToolResult(output);
   }
@@ -199,39 +221,44 @@ interface GrepFile {
 function collectGrepFiles(
   root: string,
   includeGlob: GlobSet | null,
-): GrepFile[] {
-  const info = Deno.lstatSync(root);
-  if (!info.isDirectory) {
-    if (shouldIncludeGrepPath(root, path.basename(root), includeGlob)) {
-      return [{ path: root, rel: path.basename(root) }];
+): Promise<GrepFile[]> {
+  return (async () => {
+    const info = Deno.lstatSync(root);
+    if (!info.isDirectory) {
+      if (shouldIncludeGrepPath(root, path.basename(root), includeGlob)) {
+        return [{ path: root, rel: path.basename(root) }];
+      }
+      return [];
     }
-    return [];
-  }
 
-  const files: GrepFile[] = [];
-  const stack = new IgnoreStack(false, false, 0);
-  stack.loadBaseRules(root);
-  walkGrepDir(root, root, stack, includeGlob, files);
-  return files;
+    const files: GrepFile[] = [];
+    const stack = new IgnoreStack(false, false, 0);
+    stack.loadBaseRules(root);
+    await walkGrepDir(root, root, stack, includeGlob, files);
+    return files;
+  })();
 }
 
-function walkGrepDir(
+async function walkGrepDir(
   root: string,
   dir: string,
   stack: IgnoreStack,
   includeGlob: GlobSet | null,
   files: GrepFile[],
-): void {
+): Promise<void> {
   stack.push(dir);
   try {
-    const entries = [...Deno.readDirSync(dir)];
+    const entries: Deno.DirEntry[] = [];
+    for await (const entry of Deno.readDir(dir)) {
+      entries.push(entry);
+    }
     entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       const isDir = entry.isDirectory;
       if (stack.isIgnored(full, isDir)) continue;
       if (isDir) {
-        walkGrepDir(root, full, stack.clone(), includeGlob, files);
+        await walkGrepDir(root, full, stack.clone(), includeGlob, files);
         continue;
       }
       let rel: string;
