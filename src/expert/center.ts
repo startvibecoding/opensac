@@ -6,9 +6,9 @@ import { configDir } from "../platform/platform.ts";
 import { builtinFS } from "./builtin.ts";
 import {
   type Bundle,
-  SourceBuiltin,
-  SourceGlobal,
-  SourceProject,
+  sourceBuiltin,
+  sourceGlobal,
+  sourceProject,
 } from "./expert.ts";
 import type { LocalizedText, Summary } from "./expert.ts";
 import {
@@ -55,16 +55,16 @@ export class Center {
       const name = entry.name;
       const data = builtinFS.readFile(name + "/" + manifestFileName);
       if (data === undefined) continue;
-      summaries.set(name, summaryFromManifest(name, SourceBuiltin, data));
+      summaries.set(name, summaryFromManifest(name, sourceBuiltin, data));
     }
     // global
-    for (const summary of listOSLayer(globalExpertsDir(), SourceGlobal)) {
+    for (const summary of listOSLayer(globalExpertsDir(), sourceGlobal)) {
       summaries.set(summary.name, summary);
     }
     // project (highest priority)
     const projectDir = this.projectExpertsDir();
     if (projectDir !== "") {
-      for (const summary of listOSLayer(projectDir, SourceProject)) {
+      for (const summary of listOSLayer(projectDir, sourceProject)) {
         summaries.set(summary.name, summary);
       }
     }

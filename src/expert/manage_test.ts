@@ -3,31 +3,31 @@
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
+  expertSchemaVersion,
   type ManagedBundle,
   Manager,
   manifestFileName,
-  RoleLead,
-  SchemaVersion,
+  roleLead,
   ScopeGlobal,
   ScopeProject,
-  SourceBuiltin,
-  SourceProject,
-  TypeAgent,
+  sourceBuiltin,
+  sourceProject,
+  typeAgent,
 } from "./mod.ts";
 
 function managedAgentDraft(name: string): ManagedBundle {
   return {
     scope: "",
     manifest: {
-      schemaVersion: SchemaVersion,
+      schemaVersion: expertSchemaVersion,
       name,
-      expertType: TypeAgent,
+      expertType: typeAgent,
       agentName: "lead",
       displayName: { zh: "测试主角", en: "Test Lead" },
       members: [{
         id: "lead",
         name: { zh: "主角", en: "Lead" },
-        role: RoleLead,
+        role: roleLead,
       }],
     },
     agents: { lead: "---\nname: lead\n---\nYou are the lead.\n" },
@@ -118,7 +118,7 @@ Deno.test("manager rejects builtin and preserves precedence", () => {
         const manager = new Manager(project);
         let threw = false;
         try {
-          manager.delete(SourceBuiltin, "software-company");
+          manager.delete(sourceBuiltin, "software-company");
         } catch {
           threw = true;
         }
@@ -134,7 +134,7 @@ Deno.test("manager rejects builtin and preserves precedence", () => {
 
         for (const item of manager.list()) {
           if (item.name === "frontend-developer") {
-            assertEquals(item.source, SourceProject);
+            assertEquals(item.source, sourceProject);
             assertEquals(item.displayName.zh, "项目覆盖");
             return;
           }

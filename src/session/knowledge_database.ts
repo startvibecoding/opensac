@@ -13,10 +13,13 @@ import { ensureKnowledgeBaseSchema } from "./migrations.ts";
 
 const knowledgeBaseDatabaseDirectoryName = "knowledge-bases";
 
-/** Raised when a knowledge base (or its database) does not exist. */
-export const ErrKnowledgeBaseNotFound: Error = new Error(
-  "knowledge base not found",
-);
+/** Thrown when a knowledge base (or its database) does not exist. */
+export class KnowledgeBaseNotFoundError extends Error {
+  override name = "KnowledgeBaseNotFoundError";
+  constructor() {
+    super("knowledge base not found");
+  }
+}
 
 /**
  * Derives the private SQLite file for exactly one knowledge base. The file
@@ -35,12 +38,9 @@ export function knowledgeBaseDatabasePath(
   );
 }
 
-/** Alias matching the exported Go name. */
-export const KnowledgeBaseDatabasePath = knowledgeBaseDatabasePath;
-
 function normalizeKnowledgeBaseDatabaseID(value: string): string {
   const trimmed = value.trim();
-  if (trimmed === "") throw ErrKnowledgeBaseNotFound;
+  if (trimmed === "") throw new KnowledgeBaseNotFoundError();
   for (const ch of trimmed) {
     if (
       !(ch >= "a" && ch <= "z" || ch >= "A" && ch <= "Z" ||
@@ -69,7 +69,7 @@ function openKnowledgeBaseDatabase(
       info = Deno.lstatSync(dbPath);
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) {
-        throw ErrKnowledgeBaseNotFound;
+        throw new KnowledgeBaseNotFoundError();
       }
       throw new Error(`stat knowledge base database: ${err}`);
     }
@@ -81,7 +81,7 @@ function openKnowledgeBaseDatabase(
     foreignKeys: true,
   });
   const handle = wrapDatabase(connection);
-  if (handle === null) throw new Error("knowledge database handle is nil");
+  if (handle === null) throw new Error("knowledge database is not open");
   return { db: handle, path: dbPath };
 }
 

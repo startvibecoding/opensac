@@ -6,7 +6,7 @@
 
 import type { SQLInputValue } from "node:sqlite";
 import { type DB, runInTx } from "../db/mod.ts";
-import { KnowledgeFTSIndexText } from "../dao/knowledge_bases.ts";
+import { knowledgeFTSIndexText } from "../dao/knowledge_bases.ts";
 import { nonTerminalSessionRunStatusSQL } from "./run_status.ts";
 
 export const CURRENT_SCHEMA_VERSION = 43;
@@ -1017,7 +1017,7 @@ function reindexKnowledgeChunkFTS(tx: DB): void {
   const pending = rows.map((row) => ({
     id: row.id,
     snapshotID: row.snapshot_id,
-    text: KnowledgeFTSIndexText(row.text),
+    text: knowledgeFTSIndexText(row.text),
   }));
   tx.exec(`DELETE FROM knowledge_chunk_fts`);
   for (const row of pending) {

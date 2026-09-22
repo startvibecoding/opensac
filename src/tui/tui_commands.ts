@@ -64,10 +64,10 @@ import { clientsForSettings } from "../skillhub/factory.ts";
 import { defaultStore as workflowStore } from "../workflow/tools.ts";
 import { defaultActiveRegistry } from "../workflow/active.ts";
 import {
-  ErrInvalidObjective,
-  ErrInvalidTransition,
-  ErrNotFound,
-  ErrObjectiveExists,
+  EsmInvalidObjectiveError,
+  EsmInvalidTransitionError,
+  EsmObjectiveExistsError,
+  EsmObjectiveNotFoundError,
   ESMStore,
   type Objective,
 } from "../esm/mod.ts";
@@ -665,16 +665,16 @@ export class TuiCommands {
 
   /** Maps ESM store errors to the Go command messages. */
   #formatESMError(err: unknown): string {
-    if (err === ErrNotFound) {
+    if (err instanceof EsmObjectiveNotFoundError) {
       return "No ESM objective. Create one with /esm <objective>.";
     }
-    if (err === ErrObjectiveExists) {
+    if (err instanceof EsmObjectiveExistsError) {
       return "An unfinished ESM objective already exists. Use /esm edit <objective> or /esm clear.";
     }
-    if (err === ErrInvalidObjective) {
+    if (err instanceof EsmInvalidObjectiveError) {
       return "ESM objective cannot be empty.";
     }
-    if (err === ErrInvalidTransition) {
+    if (err instanceof EsmInvalidTransitionError) {
       return "ESM status cannot be changed that way.";
     }
     return (err as Error).message;

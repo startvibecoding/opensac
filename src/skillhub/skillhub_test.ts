@@ -9,7 +9,7 @@ import {
 import * as path from "@std/path";
 import { newClawHubClient } from "./clawhub.ts";
 import {
-  Install as installSkill,
+  installSkill,
   InvalidArchiveError,
   LocalSkillExistsError,
   writeMetadata,

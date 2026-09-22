@@ -5,7 +5,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import * as path from "@std/path";
 import { BashTool, InsertTool, newRegistry } from "./mod.ts";
 import { newJobManager } from "./jobmanager.ts";
-import { NewBashToolWithJM } from "./bash.ts";
+import { newBashToolWithJobManager } from "./bash.ts";
 
 const insertInMemoryLimit = 32 * 1024 * 1024;
 
@@ -43,7 +43,7 @@ Deno.test("BashTool applies a sync timeout", async () => {
 
 Deno.test("BashTool executes an & command asynchronously", async () => {
   const jm = newJobManager();
-  const bash = NewBashToolWithJM(newRegistry("/tmp", undefined), jm);
+  const bash = newBashToolWithJobManager(newRegistry("/tmp", undefined), jm);
   const result = await bash.execute({}, { command: "sleep 5 &" });
   assertStringIncludes(result.text, "Use 'jobs' tool to check status");
   assertEquals(jm.listJobs().length, 1);

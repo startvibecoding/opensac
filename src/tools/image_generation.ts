@@ -172,7 +172,7 @@ export class ImageGenerationTool implements Tool {
       "Content-Type": "application/json",
     };
     const op = operationIDFromContext(ctx);
-    if (op.ok) headers["Idempotency-Key"] = op.value;
+    if (op !== undefined) headers["Idempotency-Key"] = op;
     const token = this.#settings
       ? resolveImageGenerationToken(this.#settings)
       : "";

@@ -12,7 +12,7 @@ import {
   type MCPServer,
   mcpServerEnabled,
   normalizeMCPConfig,
-  ProjectDirName,
+  projectDirName,
   projectMCPPath,
   saveMCPConfig,
 } from "./mod.ts";
@@ -23,7 +23,7 @@ Deno.test("MCP path helpers", () => {
   Deno.chdir(tmp);
   try {
     assertEquals(path.basename(globalMCPPath()), "mcp.json");
-    assertEquals(projectMCPPath(), path.join(ProjectDirName, "mcp.json"));
+    assertEquals(projectMCPPath(), path.join(projectDirName, "mcp.json"));
   } finally {
     Deno.chdir(prevWd);
   }

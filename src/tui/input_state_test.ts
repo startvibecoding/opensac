@@ -9,6 +9,11 @@ function state(): InputState {
   return new InputState({ width: 80, translator: new Translator("en") });
 }
 
+Deno.test("ctrl+t requests the plan modal", () => {
+  const s = state();
+  assertEquals(s.handleKey("ctrl+t").kind, "plan-details");
+});
+
 Deno.test("backspace removes the character before the cursor", () => {
   const s = state();
   s.insertText("abc");

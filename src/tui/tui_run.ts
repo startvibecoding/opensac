@@ -18,7 +18,7 @@ import { recordDecisionEvent } from "../agentruntime/decision_events.ts";
 import type { RunState } from "../agentruntime/run_state.ts";
 import type { RunHandle } from "./app_controller.ts";
 
-export const DecisionSourceTUI = "tui";
+export const decisionSourceTUI = "tui";
 
 /** Maps a terminal RunState to the decision status recorded for decisions
  * still pending when the run ended (Go decisionTerminalStatus): only an
@@ -103,7 +103,7 @@ export class TuiRun implements RunHandle {
       status,
       value,
       payload,
-      source: DecisionSourceTUI,
+      source: decisionSourceTUI,
       mode: this.mode,
     });
   }

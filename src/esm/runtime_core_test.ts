@@ -2,7 +2,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import {
-  ErrDeadlineExceeded,
+  EsmDeadlineExceededError,
   longTaskMaxIterations,
   newRoleIncompleteError,
   recoveryObserverTimeout,
@@ -113,7 +113,7 @@ Deno.test("Supervisor repeated recovery stays active and uses observer", async (
       ]);
     }
     const adapter = new RuntimeTestAdapter();
-    adapter.roleErr = ErrDeadlineExceeded;
+    adapter.roleErr = new EsmDeadlineExceededError();
     const { objective: obj, error } = await new Supervisor({ store, adapter })
       .run(sessionID, "run-limit", Deno.makeTempDirSync(), "agent");
     assertEquals(error, null);
@@ -200,7 +200,7 @@ Deno.test("Supervisor shared store persists across runtime instances", async () 
     );
     await new Supervisor({ store, adapter: second }).run(
       sessionID,
-      "webui-run",
+      "acp-run",
       Deno.makeTempDirSync(),
       "agent",
     );

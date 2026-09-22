@@ -905,7 +905,7 @@ function forkResultByIdTx(tx: Tx, childId: string): ForkResult {
 }
 
 function forkResultByDB(db: { db: DB | null }, childId: string): ForkResult {
-  if (db.db === null) throw new Error("fork database is nil");
+  if (db.db === null) throw new Error("fork database is not open");
   return forkResultFromRecord(new ForkDAO(db.db).result(db.db, childId));
 }
 

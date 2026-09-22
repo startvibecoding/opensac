@@ -25,6 +25,29 @@ function input(partial: Partial<ToolRowInput>): ToolRowInput {
   };
 }
 
+Deno.test("plan rows render the checklist and compact progress", () => {
+  const planData = {
+    title: "My plan",
+    note: "",
+    steps: [
+      { title: "one", status: "done" },
+      { title: "two", status: "running" },
+    ],
+  };
+  const row = formatToolRow(
+    tr,
+    input({ toolName: "plan", plan: planData }),
+    false,
+  );
+  assertEquals(row, "[plan] My plan\n  ✓ one\n  ▸ two");
+  const compact = formatToolRow(
+    tr,
+    input({ toolName: "plan", plan: planData }),
+    true,
+  );
+  assertEquals(compact, "[plan] My plan (1/2)");
+});
+
 Deno.test("header includes the path argument", () => {
   assertEquals(
     toolHeader(input({ toolName: "read", toolArgs: { path: "src/a.ts" } })),
@@ -169,4 +192,25 @@ Deno.test("toolSectionValue reads the line after a marker", () => {
 Deno.test("empty summary falls back to ellipsis", () => {
   const row = formatToolRow(tr, input({ toolName: "ls" }), false);
   assertEquals(row, "[ls] ...");
+});
+
+Deno.test("running rows prefix the spinner before the running label", () => {
+  const bash = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      status: "running",
+      toolArgs: { command: "npm run build" },
+      spinner: "⠋",
+    }),
+    false,
+  );
+  assert(bash.includes("[bash] npm run build (⠋ running)"), bash);
+
+  const read = formatToolRow(
+    tr,
+    input({ toolName: "read", status: "running", spinner: "⠋" }),
+    false,
+  );
+  assert(read.includes("[read] ⠋ running"), read);
 });

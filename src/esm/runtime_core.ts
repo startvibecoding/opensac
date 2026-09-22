@@ -1,7 +1,7 @@
 // Ported from internal/esm/runtime_core.go
 //
 // The front-end-neutral ESM supervisor extracted from the TUI implementation.
-// TUI/WebUI/ACP hosts implement RuntimeAdapter to run one isolated role and
+// TUI/ACP hosts implement RuntimeAdapter to run one isolated role and
 // project host events; all ESM policy and durable state transitions remain in
 // this module and the Store.
 //
@@ -57,13 +57,28 @@ export const roleRecovery: Role = "recovery";
  */
 export const longTaskMaxIterations = -1;
 
-/** Sentinel: a role stopped before completing its assigned work. */
-export const ErrRoleIncomplete = new Error("ESM role incomplete");
+/** Thrown when a role stopped before completing its assigned work. */
+export class EsmRoleIncompleteError extends Error {
+  override name = "EsmRoleIncompleteError";
+  constructor() {
+    super("ESM role incomplete");
+  }
+}
 
-/** Sentinel mirroring `context.Canceled`. */
-export const ErrCanceled = new Error("context canceled");
-/** Sentinel mirroring `context.DeadlineExceeded`. */
-export const ErrDeadlineExceeded = new Error("context deadline exceeded");
+/** Thrown in place of `context.Canceled`. */
+export class EsmCanceledError extends Error {
+  override name = "EsmCanceledError";
+  constructor() {
+    super("context canceled");
+  }
+}
+/** Thrown in place of `context.DeadlineExceeded`. */
+export class EsmDeadlineExceededError extends Error {
+  override name = "EsmDeadlineExceededError";
+  constructor() {
+    super("context deadline exceeded");
+  }
+}
 
 /** Identifies an ESM role that stopped before completing its work. */
 export class RoleIncompleteError extends Error {
@@ -155,7 +170,7 @@ export interface RoleRequest {
 }
 
 /**
- * Implemented by TUI/WebUI/ACP agent hosts. ESM policy remains in the
+ * Implemented by TUI/ACP agent hosts. ESM policy remains in the
  * Supervisor; adapters only execute roles and project host events.
  */
 export interface RuntimeAdapter {
@@ -240,13 +255,13 @@ export class Supervisor {
     if (this.store === null) {
       return {
         objective: null,
-        error: new Error("esm supervisor store is nil"),
+        error: new Error("esm supervisor store is required"),
       };
     }
     if (this.adapter === null) {
       return {
         objective: null,
-        error: new Error("esm supervisor adapter is nil"),
+        error: new Error("esm supervisor adapter is required"),
       };
     }
     let obj: Objective;
@@ -645,13 +660,13 @@ function rolePrompt(obj: Objective, role: Role): string {
 
 /** Reports whether an error represents an explicit cancellation. */
 export function isCanceled(err: unknown): boolean {
-  if (err === ErrCanceled) return true;
+  if (err instanceof EsmCanceledError) return true;
   return err instanceof DOMException && err.name === "AbortError";
 }
 
 /** Reports whether an error represents a deadline/timeout. */
 export function isDeadlineExceeded(err: unknown): boolean {
-  if (err === ErrDeadlineExceeded) return true;
+  if (err instanceof EsmDeadlineExceededError) return true;
   return err instanceof DOMException && err.name === "TimeoutError";
 }
 

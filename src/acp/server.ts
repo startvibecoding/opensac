@@ -23,6 +23,7 @@
 //   - `time.Time` maps to `Date` and `time.Duration` to milliseconds.
 
 import { createHash } from "node:crypto";
+import { isAbortError, isTimeoutError } from "../util/errors.ts";
 import { isAbsolute, normalize } from "@std/path";
 import {
   calculateCost,
@@ -112,8 +113,8 @@ import { generateID } from "../session/entry.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
 import type { ExecutionIntent } from "../session/execution_intent.ts";
 import {
-  ErrKnowledgeBaseNotFound,
-  ErrKnowledgeBaseUnindexed,
+  KnowledgeBaseNotFoundError,
+  KnowledgeBaseUnindexedError,
 } from "../session/knowledge_bases.ts";
 import { current as appversionCurrent } from "../version/version.ts";
 import {
@@ -1184,8 +1185,6 @@ export class AcpServer {
           "attachmentList",
           "manageSettings",
           "manageApplicationSettings",
-          "manageServeConfig",
-          "manageChannels",
           "manageProviders",
           "manageProviderConfig",
           "manageSkills",
@@ -2469,9 +2468,9 @@ export class AcpServer {
       if (sessionDir !== "") {
         try {
           const binding = latestModelChangeByID(sessionDir, detail.id);
-          if (binding.ok && binding.entry !== null) {
-            modelProvider = binding.entry.provider;
-            modelID = binding.entry.modelId;
+          if (binding !== null) {
+            modelProvider = binding.provider;
+            modelID = binding.modelId;
           }
         } catch { /* an unreadable binding keeps the list default */ }
         try {
@@ -5846,7 +5845,7 @@ export class AcpServer {
         break;
       }
       case EventToolExecutionUpdate: {
-        const content = textToolContent(goSprint(ev.partialResult));
+        const content = textToolContent(renderScalar(ev.partialResult));
         this.notify(sessionId, {
           sessionUpdate: "tool_call_update",
           toolCallId: ev.toolCallId ?? "",
@@ -6317,12 +6316,12 @@ function usageContext(
 }
 
 /**
- * Approximates Go's `fmt.Sprint` for the tool-update partial result: a nil
- * value renders as `"<nil>"`, scalars use their native text, and everything
- * else falls back to JSON.
+ * Renders a scalar-ish tool-update partial result as text: a nullish value
+ * renders as `"null"`, scalars use their native text, and everything else
+ * falls back to JSON.
  */
-function goSprint(value: unknown): string {
-  if (value === undefined || value === null) return "<nil>";
+function renderScalar(value: unknown): string {
+  if (value === undefined || value === null) return "null";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
@@ -6330,7 +6329,7 @@ function goSprint(value: unknown): string {
   if (typeof value === "bigint") return value.toString();
   try {
     const encoded = JSON.stringify(value);
-    return encoded === undefined ? "<nil>" : encoded;
+    return encoded === undefined ? "null" : encoded;
   } catch {
     return String(value);
   }
@@ -6996,19 +6995,6 @@ function jsonRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
-/** Reports whether an error is a cancellation (Go's `context.Canceled`). */
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
-}
-
-/** Reports whether an error is a deadline (Go's `context.DeadlineExceeded`). */
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof Error &&
-    (error.name === "TimeoutError" ||
-      error.name === "DeadlineExceededError");
-}
-
-/** Returns the lowercase SHA-256 hex digest of one string. */
 function sha256Hex(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
@@ -7020,7 +7006,7 @@ function sha256Hex(text: string): string {
  */
 export function manageKnowledgeBaseRPCError(error: unknown): RPCError {
   const err = error instanceof Error ? error : new Error(String(error));
-  if (err === ErrKnowledgeBaseNotFound) {
+  if (err instanceof KnowledgeBaseNotFoundError) {
     return acpStructuredRPCError(
       -32602,
       "knowledge_base_not_found",
@@ -7028,7 +7014,7 @@ export function manageKnowledgeBaseRPCError(error: unknown): RPCError {
       undefined,
     );
   }
-  if (err === ErrKnowledgeBaseUnindexed) {
+  if (err instanceof KnowledgeBaseUnindexedError) {
     return acpStructuredRPCError(
       -32602,
       "knowledge_base_unindexed",

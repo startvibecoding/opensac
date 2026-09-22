@@ -6,8 +6,8 @@
 
 import { createHash } from "node:crypto";
 import {
-  ErrRuntimeSubmissionConflict,
   getRuntimeSubmission,
+  RuntimeSubmissionConflictError,
 } from "../session/runtime_submission.ts";
 import { listSessionRunEvents } from "../session/session_events.ts";
 import type { SessionRun } from "../session/run_store.ts";
@@ -17,15 +17,21 @@ import { getDurableRun } from "./run_queries.ts";
  * Means a submission key was reused for a different request or admission
  * scope. Callers must not silently start another Run.
  */
-export const ErrIdempotencyKeyConflict: Error = ErrRuntimeSubmissionConflict;
+export class IdempotencyKeyConflictError
+  extends RuntimeSubmissionConflictError {
+  override name = "IdempotencyKeyConflictError";
+}
 
 /**
  * Means a durable started event matched a submission key but its canonical Run
  * row is unavailable for reconciliation.
  */
-export const ErrIdempotencyRunMissing: Error = new Error(
-  "idempotency started event has no durable run",
-);
+export class IdempotencyRunMissingError extends Error {
+  override name = "IdempotencyRunMissingError";
+  constructor() {
+    super("idempotency started event has no durable run");
+  }
+}
 
 /**
  * Keeps a client/platform key out of durable event data while retaining a
@@ -66,10 +72,10 @@ export function findIdempotentRun(
       submission.requestFingerprint !== "" && fingerprint !== "" &&
       submission.requestFingerprint !== fingerprint
     ) {
-      throw ErrIdempotencyKeyConflict;
+      throw new IdempotencyKeyConflictError();
     }
     const run = getDurableRun(sessionDir, submission.runId);
-    if (run === null) throw ErrIdempotencyRunMissing;
+    if (run === null) throw new IdempotencyRunMissingError();
     return run;
   }
   // Named legacy bridge for Runs admitted before runtime_submissions. Remove
@@ -90,19 +96,19 @@ export function findIdempotentRun(
       continue;
     }
     if (idempotencyScope !== "" && idempotencyScope !== scope) {
-      throw ErrIdempotencyKeyConflict;
+      throw new IdempotencyKeyConflictError();
     }
     if (idempotencyScope === "" && scope !== "submit") {
-      throw ErrIdempotencyKeyConflict;
+      throw new IdempotencyKeyConflictError();
     }
     if (
       requestFingerprint !== "" && fingerprint !== "" &&
       requestFingerprint !== fingerprint
     ) {
-      throw ErrIdempotencyKeyConflict;
+      throw new IdempotencyKeyConflictError();
     }
     const run = getDurableRun(sessionDir, event.runId);
-    if (run === null) throw ErrIdempotencyRunMissing;
+    if (run === null) throw new IdempotencyRunMissingError();
     return run;
   }
   return null;

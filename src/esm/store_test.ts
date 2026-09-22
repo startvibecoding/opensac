@@ -3,8 +3,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
 import {
-  ErrInvalidTransition,
-  ErrObjectiveExists,
+  EsmInvalidTransitionError,
+  EsmObjectiveExistsError,
   type Store,
 } from "./store.ts";
 import {
@@ -24,7 +24,7 @@ function newTestStore(): { store: Store; sessionID: string } {
   return { store: new ESMStore(sessionDir), sessionID: "esm-session" };
 }
 
-function assertSentinel(fn: () => unknown, sentinel: Error): void {
+function assertSentinel(fn: () => unknown, expected: new () => Error): void {
   let err: unknown = null;
   try {
     fn();
@@ -32,8 +32,8 @@ function assertSentinel(fn: () => unknown, sentinel: Error): void {
     err = e;
   }
   assert(
-    err === sentinel,
-    `expected sentinel ${sentinel.message}; got ${String(err)}`,
+    err instanceof expected,
+    `expected ${expected.name}; got ${String(err)}`,
   );
 }
 
@@ -46,7 +46,7 @@ Deno.test("Store create and usage accounting", () => {
 
     assertSentinel(
       () => store.create(sessionID, "replace"),
-      ErrObjectiveExists,
+      EsmObjectiveExistsError,
     );
 
     obj = store.accountUsage(sessionID, 60, 1000);
@@ -363,7 +363,7 @@ Deno.test("Store invalid transition sentinel", () => {
     // Audit completion on an active (not candidate) objective is invalid.
     assertSentinel(
       () => store.markCompleteFromAudit(sessionID, "review"),
-      ErrInvalidTransition,
+      EsmInvalidTransitionError,
     );
   } finally {
     closeAll();

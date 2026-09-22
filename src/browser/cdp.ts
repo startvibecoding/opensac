@@ -254,6 +254,10 @@ export class CdpClient {
     });
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   /** Closes the WebSocket connection. */
   close(): void {
     if (this.#closed) return;

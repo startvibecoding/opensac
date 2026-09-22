@@ -325,6 +325,7 @@ export function formatActivityTool(
     const key of [
       "path",
       "cmd",
+      "command",
       "query",
       "pattern",
       "handle",

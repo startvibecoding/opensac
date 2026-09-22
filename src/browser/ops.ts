@@ -169,6 +169,10 @@ export class Browser {
     this.#processKiller = killer;
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   /** Closes the CDP connection and kills the browser process. */
   close(): void {
     this.#pageCdp?.close();

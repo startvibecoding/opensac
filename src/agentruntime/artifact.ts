@@ -81,6 +81,10 @@ export class ArtifactCollector {
     return [...this.items];
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   /**
    * Removes this run's dynamic tool. Identity comparison still prevents an old
    * collector from removing a newer run's tool if a caller closes late.
@@ -92,9 +96,9 @@ export class ArtifactCollector {
     if (registry === null) return;
     const current = registry.get("publish_artifact");
     if (
-      current.ok &&
-      current.tool instanceof PublishArtifactTool &&
-      current.tool.collector === this
+      current !== undefined &&
+      current instanceof PublishArtifactTool &&
+      current.collector === this
     ) {
       registry.remove("publish_artifact");
     }
@@ -261,11 +265,11 @@ export class PublishArtifactTool implements Tool {
   }
 
   description(): string {
-    return "Publish a regular file that you created in the current working directory as a generated attachment. Use this only after the file is complete. The file is copied to Runtime-managed storage and may be delivered by the active channel.";
+    return "Publish a regular file that you created in the current working directory as a generated attachment. Use this only after the file is complete. The file is copied to Runtime-managed storage and may be delivered by the active front end.";
   }
 
   promptSnippet(): string {
-    return "Publish a completed work-directory file as a channel artifact";
+    return "Publish a completed work-directory file as a generated artifact";
   }
 
   promptGuidelines(): string[] {

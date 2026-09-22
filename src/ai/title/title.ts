@@ -25,10 +25,10 @@ export const titleSystem =
   "You create short conversation titles. Return only one plain-text title.";
 
 /** Thrown when the title model returns an empty title. */
-export class ErrEmptyTitle extends Error {
+export class EmptyTitleError extends Error {
   constructor() {
     super("title model returned an empty title");
-    this.name = "ErrEmptyTitle";
+    this.name = "EmptyTitleError";
   }
 }
 
@@ -49,15 +49,15 @@ export class Generator {
   /** Creates a normalized title from the supplied conversation. */
   async generate(messages: Message[]): Promise<string> {
     if (this.provider === undefined) {
-      throw new Error("title provider is nil");
+      throw new Error("title provider is required");
     }
     if (this.model === undefined) {
-      throw new Error("title model is nil");
+      throw new Error("title model is required");
     }
     if (messages.length === 0) {
-      throw new ErrEmptyTitle();
+      throw new EmptyTitleError();
     }
-    const fallback = Fallback(messages);
+    const fallback = fallbackTitle(messages);
 
     const input: Message[] = [...messages];
     input.push(newUserMessage(titlePrompt));
@@ -85,12 +85,12 @@ export class Generator {
       }
     }
 
-    const name = Normalize(raw);
+    const name = normalizeTitle(raw);
     if (name === "") {
       if (fallback !== "") {
         return fallback;
       }
-      throw new ErrEmptyTitle();
+      throw new EmptyTitleError();
     }
     return name;
   }
@@ -100,12 +100,12 @@ export class Generator {
  * Creates a useful local title from the first user message when the title model
  * is unavailable or returns no text.
  */
-export function Fallback(messages: Message[]): string {
+export function fallbackTitle(messages: Message[]): string {
   for (const message of messages) {
     if (message.role !== "user") {
       continue;
     }
-    const name = Normalize(messageText(message));
+    const name = normalizeTitle(messageText(message));
     if (name !== "") {
       return name;
     }
@@ -135,7 +135,7 @@ const trimCutset = /^[ \\t"'`#]+|[ \\t"'`#]+$/g;
  * Removes common model formatting and limits a title by Unicode code points so
  * multibyte languages are not cut by byte length.
  */
-export function Normalize(raw: string): string {
+export function normalizeTitle(raw: string): string {
   let name = raw.replace(/\n/g, " ").replace(/\r/g, " ").trim();
   name = name.replace(trimCutset, "");
   const runes = [...name];

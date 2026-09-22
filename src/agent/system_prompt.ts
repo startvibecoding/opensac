@@ -1,6 +1,6 @@
 // Ported from internal/agent/system_prompt.go.
 
-import { DefaultToolExecutionMaxConcurrency } from "../config/settings.ts";
+import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import {
   arch,
   defaultShell,
@@ -78,7 +78,7 @@ export function buildSystemPromptWithOptions(
   if (toolExecutionMode !== "sequential") toolExecutionMode = "parallel";
   let maxToolConcurrency = options.maxToolConcurrency ?? 0;
   if (maxToolConcurrency <= 0) {
-    maxToolConcurrency = DefaultToolExecutionMaxConcurrency;
+    maxToolConcurrency = defaultToolExecutionMaxConcurrency;
   }
 
   // Get platform-specific shell
@@ -309,8 +309,8 @@ The task description is the sub-agent's only context. Make it specific:
 - Mention the working directory if different from default.
 
 Good example:
-  "Find all Go files in internal/serve/openaiapi/ that import 'net/http' but do not call
-   http.Error for error handling. Return file paths with line numbers."
+  "Find all TypeScript files in src/tui/ that build provider content directly
+   instead of using the Runtime input contract. Return file paths with line numbers."
 
 Bad example:
   "Look at the API server code" (too vague, no expected output, no stop condition)

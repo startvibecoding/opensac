@@ -362,31 +362,6 @@ export const legacyTestAllowlist: Record<string, string> = {
   // exists that adapter tests can use without the legacy session API.
   "src/acp/manage_test.ts":
     "seeds a completed Run so the Runtime delivery-plan ownership check passes",
-  // The 1:1 translation of `watchdog_test.go`: the fixture seeds one running
-  // Run through `session.saveSessionRun`, reads it back with
-  // `session.getSessionRun`, and holds `session.lockRuntime` exactly as the Go
-  // test does. Remove once a test-only RunStore fixture exists.
-  "src/serve/channels/watchdog_test.ts":
-    "seeds and reads one running Run and holds the legacy runtime lock like the Go watchdog fixtures",
-  // The 1:1 translation of `delivery_recovery_test.go`: the fixture seeds one
-  // completed Run through `session.createSessionRun` exactly as the Go test
-  // does, so the recovery coordinator's durable projection is exercised against
-  // real session rows. Remove once a test-only RunStore fixture exists.
-  "src/serve/delivery_recovery_test.ts":
-    "seeds a completed Run so the recovery coordinator replays its durable delivery",
-  // The 1:1 translation of `session_lifecycle_test.go`: the fixture holds
-  // `session.lockRuntime` exactly as the Go test does to prove the lifecycle
-  // service refuses a busy session and rotates past it with force. Remove once
-  // a test-only admission fixture exists.
-  "src/serve/session_lifecycle_test.ts":
-    "holds the legacy runtime lock to reproduce the Go busy-session rotate fixtures",
-  // The 1:1 translation of the deferred `dispatcher_test.go` halves: the
-  // stale-run recovery fixture seeds one running Run through
-  // `session.saveSessionRun` and reads the stale/recovered rows with
-  // `session.getSessionRun` exactly as the Go test does. Remove once a
-  // test-only RunStore fixture exists.
-  "src/serve/channels/dispatcher_message_test.ts":
-    "seeds and reads one stale running Run like the Go dispatcher fixtures",
 };
 
 function isLegacyTestExempt(rel: string): boolean {

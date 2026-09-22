@@ -4,14 +4,19 @@
 // `SessionRuntime` resource assembly is ported: the verified co-mention edge
 // projection and the dedicated durable Librarian session.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertInstanceOf,
+  assertThrows,
+} from "@std/assert";
 import * as path from "@std/path";
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
-  ErrKnowledgeBaseNotFound,
   getKnowledgeBase,
   getSessionRun,
+  KnowledgeBaseNotFoundError,
   type KnowledgeGraphSnapshot,
   listSessionRunEvents,
   listSessionRuns,
@@ -34,7 +39,7 @@ import {
   appendVerifiedCoMentionEdges,
   type KnowledgeIndexerBinding,
 } from "./knowledge_indexer.ts";
-import { knowledgeLibrarianSessionID } from "./knowledge_librarian.ts";
+import { knowledgeLibrarianSessionIDForBase } from "./knowledge_librarian.ts";
 import { maxKnowledgeCapsuleChars } from "./knowledge_context.ts";
 import { attachSessionResources } from "./attach.ts";
 import { RunStateCompleted } from "./run_state.ts";
@@ -117,7 +122,7 @@ Deno.test("knowledge base indexer stores queryable graph snapshot", async () => 
   } catch (err) {
     missingErr = err;
   }
-  assertEquals(missingErr, ErrKnowledgeBaseNotFound);
+  assertInstanceOf(missingErr, KnowledgeBaseNotFoundError);
   assert(Deno.statSync(path.join(source, "docs", "auth.md")).isFile);
 });
 
@@ -531,7 +536,7 @@ Deno.test(
 
       const events = listSessionRunEvents(
         sessionDir,
-        knowledgeLibrarianSessionID(base),
+        knowledgeLibrarianSessionIDForBase(base),
       );
       let reusedEvent = false;
       for (const event of events) {
@@ -625,7 +630,7 @@ Deno.test(
       assert(capsule.citations.length > 0, "capsule has no citations");
       assertEquals(mock.getCallCount(), 1);
 
-      const librarianSessionID = knowledgeLibrarianSessionID(base);
+      const librarianSessionID = knowledgeLibrarianSessionIDForBase(base);
       const runs = listSessionRuns(sessionDir, librarianSessionID, 10);
       let librarianRunFound = false;
       for (const run of runs) {

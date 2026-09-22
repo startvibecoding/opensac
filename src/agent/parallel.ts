@@ -6,9 +6,12 @@
 // item so callers can preserve one result per provider tool call.
 //
 // Deviation: Go's goroutine fan-out maps to async workers; fn returns a
-// Promise and the helper is awaited.
+// Promise and the helper is awaited. This helper is deliberately kept as the
+// one concurrency primitive instead of `@std/async`'s `pooledMap`: tool
+// dispatch requires both input-order results and full drain of every item
+// (one result per provider tool call), which `pooledMap` does not guarantee.
 
-import { DefaultToolExecutionMaxConcurrency } from "../config/settings.ts";
+import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 
 export async function boundedParallel<T, R>(
   max: number,
@@ -20,7 +23,7 @@ export async function boundedParallel<T, R>(
   if (items.length === 1) {
     return [await fn(items[0])];
   }
-  if (max <= 0) max = DefaultToolExecutionMaxConcurrency;
+  if (max <= 0) max = defaultToolExecutionMaxConcurrency;
   if (max > items.length) max = items.length;
 
   const results = new Array<R>(items.length);

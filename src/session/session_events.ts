@@ -41,7 +41,6 @@ export interface SessionCapabilities {
   workflows: boolean;
   webSearch: boolean;
   browser: boolean;
-  a2aMaster: boolean;
   updatedAt: Date;
 }
 
@@ -112,38 +111,34 @@ function resolveSessionDir(sessionDir: string): string {
 function openExisting(
   sessionDir: string,
 ): Database | null {
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  return ok ? db : null;
+  const db = openExistingSessionDB(sessionDir);
+  return db;
 }
 
-/** Loads persisted capabilities for a session, or `[null, false]`. */
+/** Loads persisted capabilities for a session, or null when unavailable. */
 export function loadSessionCapabilities(
   sessionDir: string,
   sessionId: string,
-): { caps: SessionCapabilities | null; ok: boolean } {
-  if (sessionId === "") return { caps: null, ok: false };
+): SessionCapabilities | null {
+  if (sessionId === "") return null;
   const db = openExisting(sessionDir);
-  if (db === null) return { caps: null, ok: false };
+  if (db === null) return null;
   let record;
   try {
     record = new SessionDAO(db.db).capability(sessionId);
   } catch {
-    return { caps: null, ok: false };
+    return null;
   }
   return {
-    caps: {
-      sessionId: record.sessionId,
-      mode: record.mode,
-      displayMode: record.displayMode,
-      delegateMode: record.delegateMode !== 0,
-      multiAgent: record.multiAgent !== 0,
-      workflows: record.workflows !== 0,
-      webSearch: record.webSearch !== 0,
-      browser: record.browser !== 0,
-      a2aMaster: record.a2aMaster !== 0,
-      updatedAt: parseSessionTimestamp(record.updatedAt),
-    },
-    ok: true,
+    sessionId: record.sessionId,
+    mode: record.mode,
+    displayMode: record.displayMode,
+    delegateMode: record.delegateMode !== 0,
+    multiAgent: record.multiAgent !== 0,
+    workflows: record.workflows !== 0,
+    webSearch: record.webSearch !== 0,
+    browser: record.browser !== 0,
+    updatedAt: parseSessionTimestamp(record.updatedAt),
   };
 }
 
@@ -171,7 +166,9 @@ export function saveSessionCapabilities(
       workflows: boolToInt(caps.workflows),
       webSearch: boolToInt(caps.webSearch),
       browser: boolToInt(caps.browser),
-      a2aMaster: boolToInt(caps.a2aMaster),
+      // The `a2a_master` column stays in the schema for compatibility, but the
+      // A2A mode is gone, so a capability row can never request it again.
+      a2aMaster: 0,
       updatedAt: updatedAt.toISOString(),
     });
   });

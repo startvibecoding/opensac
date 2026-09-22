@@ -351,7 +351,7 @@ function responseSessionStateFromRecord(
 }
 
 function requireConn(db: Database): NonNullable<Database["db"]> {
-  if (db.db === null) throw new Error("response database is nil");
+  if (db.db === null) throw new Error("response database is not open");
   return db.db;
 }
 

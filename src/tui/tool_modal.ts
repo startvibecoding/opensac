@@ -138,7 +138,7 @@ export class ToolModalState {
   render(
     lines: string[],
     tr: Translator,
-    options: { availableHeight?: number } = {},
+    options: { availableHeight?: number; title?: string } = {},
   ): string {
     const width = this.#width;
     const contentWidth = ToolModalState.contentWidthFor(width);
@@ -160,9 +160,11 @@ export class ToolModalState {
     if (lines.length === 0) {
       position = tr.text("tool.modal.position_empty");
     }
-    let title = `${tr.text("tool.modal.title")}  ${position}  ${
-      tr.text("tool.modal.switch_target_hint")
-    }  ${tr.text("tool.modal.page_hint")}  ${
+    let title = `${options.title ?? tr.text("tool.modal.title")}  ${position}`;
+    if (this.#targets.length > 1) {
+      title += `  ${tr.text("tool.modal.switch_target_hint")}`;
+    }
+    title += `  ${tr.text("tool.modal.page_hint")}  ${
       tr.text("tool.modal.scroll_hint")
     }  ${tr.text("tool.modal.close_hint")}`;
     title = truncateDisplay(title, contentWidth);

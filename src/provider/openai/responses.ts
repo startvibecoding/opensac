@@ -49,7 +49,6 @@ import { nextToolCallFallbackId } from "../toolcall_id.ts";
 import { providerUserAgent } from "../../ua/ua.ts";
 import type { ResponsesHostedPolicy } from "./hosted_registry.ts";
 import {
-  cloneBoolPtr,
   cloneStringMap,
   cloneStringSlice,
   limitImageHistory,
@@ -681,7 +680,7 @@ export function applyResponsesConfig(
   req.safety_identifier = config.safetyIdentifier;
   req.text = responsesTextOptionFromFormat(config.structuredOutput);
   req.tool_choice = config.toolChoice;
-  req.parallel_tool_calls = cloneBoolPtr(config.parallelToolCalls);
+  req.parallel_tool_calls = config.parallelToolCalls;
   req.max_tool_calls = config.maxToolCalls;
   if (
     config.stateMode === "conversation" && (config.conversation ?? "") !== "" &&
@@ -752,7 +751,7 @@ export function responsesTextOptionFromFormat(
       type: format.type,
       name: format.name,
       description: format.description,
-      strict: cloneBoolPtr(format.strict),
+      strict: format.strict,
       schema: format.schema,
     },
   };

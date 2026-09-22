@@ -10,9 +10,8 @@
 // previousCompactionSummary, canCompact, shouldAutoCompact, shouldCompact).
 //
 // Deviations from Go:
-//   - `context.Context` maps to the `RunContext` value bag (`run_context.ts`)
-//     carrying an `AbortSignal`; the typed context keys below are created with
-//     the shared `contextKey` helper.
+//   - `context.Context` maps to the `RunContext` context (`run_context.ts`)
+//     carrying an `AbortSignal` plus explicit typed run fields.
 //   - `chan<- Event` maps to an `EventSink` (`(ev: Event) => boolean`).
 //     `sendEvent`/`emit` and the Agent-bound approval/question coordination
 //     (`needsApproval`/`requestToolApproval`/`requestQuestion` and their
@@ -41,7 +40,7 @@ import {
 } from "../provider/types.ts";
 import type { Provider } from "../provider/provider.ts";
 import {
-  DefaultToolExecutionMaxConcurrency,
+  defaultToolExecutionMaxConcurrency,
   getProviderConfig,
   type Settings,
   toolExecutionEffectiveMaxConcurrency,
@@ -104,11 +103,8 @@ import {
 } from "./events.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
-  agentIDKey,
-  contextKey,
-  contextValue,
   contextWithSignal,
-  contextWithValue,
+  type EventSink,
   newRunContext,
   type RunContext,
 } from "./run_context.ts";
@@ -190,8 +186,6 @@ import {
   contextWithQuestionAsker,
   newRegistry,
   type Tool,
-  toolContextValue,
-  toolContextWithValue,
 } from "../tools/tool.ts";
 import type { FileDiff, QuestionAsker, TaskPlan } from "../tools/mod.ts";
 import { newNoneSandbox } from "../sandbox/none.ts";
@@ -232,7 +226,6 @@ import {
   IterationBudgetToolName,
   newIterationBudget,
   normalizeIterationBudgetPolicy,
-  toolContextWithIterationBudget,
 } from "./iteration_budget.ts";
 import { boundedParallel } from "./parallel.ts";
 import { newToolLaunchOrder, type ToolLaunchHandle } from "./tool_launch.ts";
@@ -240,36 +233,21 @@ import { EventChannel } from "./event_channel.ts";
 
 // --- Run-scoped context helpers -------------------------------------------
 
-/** The per-run event-channel context key. */
-export const agentEventChanKey = contextKey<EventSink>("agentEventChan");
-
-/**
- * A run event sink: pushes an event and reports whether it was accepted. This
- * is the TS projection of Go's `chan<- Event`; the loop and tool-execution
- * paths push through it, and a sealed/finished sink returns false instead of
- * blocking.
- */
-export type EventSink = (ev: Event) => boolean;
-
-/** Carries the parent agent run context through tool timeouts. */
-export const parentRunContextKey = contextKey<RunContext>("parentRunContext");
-
-/** Carries the parent agent's execution mode for sub-agent inheritance. */
-export const parentModeKey = contextKey<string>("parentMode");
+export type { EventSink };
 
 /** Returns a copy of ctx carrying the agent ID. */
 export function contextWithAgentID(
   ctx: RunContext | undefined,
   id: AgentID,
 ): RunContext {
-  return contextWithValue(ctx, agentIDKey, id);
+  return { ...(ctx ?? {}), agentID: id };
 }
 
 /** Extracts the agent ID, or `[undefined, false]`. */
 export function agentIDFromContext(
   ctx: RunContext | undefined,
 ): [AgentID | undefined, boolean] {
-  const id = contextValue(ctx, agentIDKey);
+  const id = ctx?.agentID;
   return [id, id !== undefined];
 }
 
@@ -278,14 +256,14 @@ export function contextWithEventChan(
   ctx: RunContext | undefined,
   ch: (ev: Event) => boolean,
 ): RunContext {
-  return contextWithValue(ctx, agentEventChanKey, ch);
+  return { ...(ctx ?? {}), eventSink: ch };
 }
 
 /** Extracts the event-channel push function, or `[undefined, false]`. */
 export function eventChanFromContext(
   ctx: RunContext | undefined,
 ): [((ev: Event) => boolean) | undefined, boolean] {
-  const ch = contextValue(ctx, agentEventChanKey);
+  const ch = ctx?.eventSink;
   return [ch, ch !== undefined];
 }
 
@@ -294,14 +272,14 @@ export function contextWithParentRunContext(
   ctx: RunContext | undefined,
   parent: RunContext,
 ): RunContext {
-  return contextWithValue(ctx, parentRunContextKey, parent);
+  return { ...(ctx ?? {}), parentRunContext: parent };
 }
 
 /** Extracts the parent agent run context, or `[undefined, false]`. */
 export function parentRunContextFromContext(
   ctx: RunContext | undefined,
 ): [RunContext | undefined, boolean] {
-  const parent = contextValue(ctx, parentRunContextKey);
+  const parent = ctx?.parentRunContext;
   return [parent, parent !== undefined];
 }
 
@@ -310,14 +288,14 @@ export function contextWithParentMode(
   ctx: RunContext | undefined,
   mode: string,
 ): RunContext {
-  return contextWithValue(ctx, parentModeKey, mode);
+  return { ...(ctx ?? {}), parentMode: mode };
 }
 
 /** Extracts the parent agent's execution mode, or `[undefined, false]`. */
 export function parentModeFromContext(
   ctx: RunContext | undefined,
 ): [string | undefined, boolean] {
-  const mode = contextValue(ctx, parentModeKey);
+  const mode = ctx?.parentMode;
   return [mode, mode !== undefined];
 }
 
@@ -356,48 +334,35 @@ interface ResponsesStateSnapshot {
 }
 
 /**
- * Tool-context keys carrying the parent agent run identity into a tool body.
- * They mirror Go's `ContextWithAgentID`/`ContextWithEventChan`/
- * `ContextWithParentRunContext`/`ContextWithParentMode` attachments, projected
- * onto the TS `ToolContext` value bag.
+ * Tool-context accessors carrying the parent agent run identity into a tool
+ * body. Each extracts one explicit `ToolContext` field the loop fills in before
+ * executing a tool, or `[undefined, false]` when absent.
  */
-export const toolContextAgentIDKey = Symbol("toolAgentID");
-export const toolContextEventSinkKey = Symbol("toolEventSink");
-export const toolContextParentRunContextKey = Symbol("toolParentRunContext");
-export const toolContextParentModeKey = Symbol("toolParentMode");
-
-/** Extracts the owning agent ID from a tool context, or `[undefined, false]`. */
 export function agentIDFromToolContext(
   ctx: ToolContext | undefined,
 ): [AgentID | undefined, boolean] {
-  const id = toolContextValue<AgentID>(ctx, toolContextAgentIDKey);
+  const id = ctx?.agentID;
   return [id, id !== undefined];
 }
 
-/** Extracts the parent event sink from a tool context, or `[undefined, false]`. */
 export function eventSinkFromToolContext(
   ctx: ToolContext | undefined,
 ): [EventSink | undefined, boolean] {
-  const sink = toolContextValue<EventSink>(ctx, toolContextEventSinkKey);
+  const sink = ctx?.eventSink;
   return [sink, sink !== undefined];
 }
 
-/** Extracts the parent run context from a tool context, or `[undefined, false]`. */
 export function parentRunContextFromToolContext(
   ctx: ToolContext | undefined,
 ): [RunContext | undefined, boolean] {
-  const parent = toolContextValue<RunContext>(
-    ctx,
-    toolContextParentRunContextKey,
-  );
+  const parent = ctx?.parentRunContext;
   return [parent, parent !== undefined];
 }
 
-/** Extracts the parent execution mode from a tool context, or `[undefined, false]`. */
 export function parentModeFromToolContext(
   ctx: ToolContext | undefined,
 ): [string | undefined, boolean] {
-  const mode = toolContextValue<string>(ctx, toolContextParentModeKey);
+  const mode = ctx?.parentMode;
   return [mode, mode !== undefined];
 }
 
@@ -814,7 +779,7 @@ export class Agent {
   /** The normalized per-batch local tool limit. */
   maxToolConcurrency(): number {
     const configured = this.config.maxToolConcurrency ?? 0;
-    if (configured <= 0) return DefaultToolExecutionMaxConcurrency;
+    if (configured <= 0) return defaultToolExecutionMaxConcurrency;
     return configured;
   }
 
@@ -1257,7 +1222,7 @@ export class Agent {
    * context cancels.
    *
    * The approval ID embeds the agent ID so decision registries keyed by ID
-   * (TUI/WebUI/ACP durable decision records) stay unique when several agents of
+   * (TUI/CLI/ACP durable decision records) stay unique when several agents of
    * one run raise their own first approval.
    */
   async requestToolApproval(
@@ -2992,7 +2957,7 @@ export class Agent {
         return toolResult(errMsg, undefined, true);
       }
       const found = this.#registry?.get(tc.name);
-      if (found === undefined || !found.ok) {
+      if (found === undefined) {
         const errMsg = `unknown tool: ${tc.name}`;
         this.sendEvent(ch, {
           type: EventToolExecutionEnd,
@@ -3003,7 +2968,7 @@ export class Agent {
         });
         return toolResult(errMsg, undefined, true);
       }
-      const tool: Tool = found.tool;
+      const tool: Tool = found;
       if (this.config.beforeToolCall !== undefined) {
         const blockResult = this.config.beforeToolCall({
           assistantMessage: emptyMessage(),
@@ -3086,32 +3051,19 @@ export class Agent {
         params,
       );
       try {
-        let toolCtx = execCtx;
-        toolCtx = toolContextWithValue(
-          toolCtx,
-          toolContextAgentIDKey,
-          this.#id,
-        );
-        toolCtx = toolContextWithValue(toolCtx, toolContextEventSinkKey, ch);
-        toolCtx = toolContextWithValue(
-          toolCtx,
-          toolContextParentRunContextKey,
-          ctx,
-        );
-        toolCtx = toolContextWithValue(
-          toolCtx,
-          toolContextParentModeKey,
-          this.config.mode ?? "",
-        );
-        const budget = iterationBudgetFromContext(ctx);
-        if (budget !== undefined) {
-          toolCtx = toolContextWithIterationBudget(toolCtx, budget);
-        }
+        let toolCtx: ToolContext = {
+          ...execCtx,
+          agentID: this.#id,
+          eventSink: ch,
+          parentRunContext: ctx,
+          parentMode: this.config.mode ?? "",
+          iterationBudget: iterationBudgetFromContext(ctx),
+        };
         const asker: QuestionAsker = {
           askQuestion: (askCtx, question, options, context) => {
             const rc: RunContext = {
               signal: askCtx.signal,
-              values: new Map([[agentEventChanKey, ch]]),
+              eventSink: ch,
             };
             return this.requestQuestion(rc, ch, question, options, context);
           },
@@ -4572,7 +4524,7 @@ export function newAgent(
   const normalized: Config = { ...cfg, compactionSettings };
   configureRegistryImageHint(normalized, registry);
   let toolExecutionMode = "parallel";
-  let maxToolConcurrency = DefaultToolExecutionMaxConcurrency;
+  let maxToolConcurrency = defaultToolExecutionMaxConcurrency;
   if (normalized.settings !== undefined) {
     const te = normalized.settings.toolExecution ?? {};
     toolExecutionMode = toolExecutionEffectiveMode(te);
@@ -4619,7 +4571,7 @@ export function newAgentWithLoopConfig(
       );
     }
     if ((normalized.maxToolConcurrency ?? 0) <= 0) {
-      normalized.maxToolConcurrency = DefaultToolExecutionMaxConcurrency;
+      normalized.maxToolConcurrency = defaultToolExecutionMaxConcurrency;
     }
   }
   return finishConstruction(normalized, registry);

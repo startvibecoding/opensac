@@ -24,16 +24,6 @@ export function cloneStringSlice(
   return [...src];
 }
 
-/** Clones a bool pointer (undefined stays undefined). */
-export function cloneBoolPtr(src: boolean | undefined): boolean | undefined {
-  return src === undefined ? undefined : src;
-}
-
-/** Clones a raw JSON document carried as a string. */
-export function cloneRawMessage(src: string | undefined): string | undefined {
-  return src === undefined ? undefined : src;
-}
-
 /** Clones custom HTTP headers (undefined stays undefined). */
 export function cloneHeaders(
   headers: Record<string, string> | undefined,

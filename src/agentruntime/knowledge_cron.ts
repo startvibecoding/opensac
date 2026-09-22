@@ -1,8 +1,8 @@
 // Ported from internal/agentruntime/knowledge_cron.go.
 //
 // Namespaced scheduled reindex jobs inside the shared cron store. The store is
-// keyed only by sessionDir, so every scheduler process (ACP, serve) can claim a
-// namespaced job; each must route it through `RunKnowledgeBaseCronJob` instead
+// keyed only by sessionDir, so every scheduler process (ACP, CLI) can claim a
+// namespaced job; each must route it through `runKnowledgeBaseCronJob` instead
 // of executing the job prompt as an ordinary agent run inside the knowledge
 // source directory.
 //
@@ -11,7 +11,7 @@
 // value object plus a thrown `Error`.
 
 import {
-  errKnowledgeBaseServiceNil,
+  KnowledgeBaseServiceMissingError,
   KnowledgeIndexJob,
 } from "./knowledge_index_job.ts";
 import type { KnowledgeBaseService } from "./knowledgebase.ts";
@@ -26,12 +26,12 @@ export interface KnowledgeBaseCronOutcome {
 }
 
 /** Derives the shared cron identity of one knowledge base's reindex schedule. */
-export function KnowledgeBaseCronJobID(knowledgeBaseID: string): string {
+export function knowledgeBaseCronJobID(knowledgeBaseID: string): string {
   return KnowledgeBaseCronJobPrefix + knowledgeBaseID.trim();
 }
 
 /** Extracts the knowledge base identity from a namespaced cron job ID. */
-export function KnowledgeBaseIDFromCronJobID(
+export function knowledgeBaseIDFromCronJobID(
   jobID: string,
 ): { id: string; ok: boolean } {
   const ok = jobID.startsWith(KnowledgeBaseCronJobPrefix);
@@ -47,15 +47,15 @@ export function KnowledgeBaseIDFromCronJobID(
  * execution path. Passing the process-wide cached service keeps scheduled scans
  * deduplicated against manual scans and visible to progress polling.
  */
-export async function RunKnowledgeBaseCronJob(
+export async function runKnowledgeBaseCronJob(
   ctx: AbortSignal | undefined,
   service: KnowledgeBaseService | null,
   jobID: string,
 ): Promise<KnowledgeBaseCronOutcome> {
-  const { id, ok } = KnowledgeBaseIDFromCronJobID(jobID);
+  const { id, ok } = knowledgeBaseIDFromCronJobID(jobID);
   if (!ok) return { handled: false, response: "" };
   if (service === null) {
-    throw errKnowledgeBaseServiceNil;
+    throw new KnowledgeBaseServiceMissingError();
   }
   const job: KnowledgeIndexJob = service.startIndex(ctx, id, SourceCron);
   const snapshot = await job.wait(ctx);

@@ -6,7 +6,7 @@
 // status, next run); this module owns what the job does.
 //
 // Deviations from Go: `context.Context` maps to an optional `AbortSignal`;
-// `RunMaintenanceCronJob` is async because the ported `ReconcileArtifactStorage`
+// `runMaintenanceCronJob` is async because the ported `reconcileArtifactStorage`
 // is async; a `(handled, response, error)` triple whose error is not a normal
 // control-flow signal maps to a `MaintenanceCronJobOutcome` value object plus a
 // thrown `Error`.
@@ -17,7 +17,7 @@ import {
   type Settings,
 } from "../config/settings.ts";
 import { defaultAttachmentPolicy } from "./attachment.ts";
-import { ReconcileArtifactStorage } from "./storage_reconcile.ts";
+import { reconcileArtifactStorage } from "./storage_reconcile.ts";
 
 /**
  * MaintenancePolicy is the resolved intent for Runtime-owned maintenance work.
@@ -45,8 +45,8 @@ export const MaintenanceStorageReconcileSchedule = "@daily";
 export const MaintenanceStorageReconcileJobName =
   "Reclaim unreferenced attachment storage";
 
-/** DefaultMaintenancePolicy is what applies when configuration says nothing. */
-export function DefaultMaintenancePolicy(): MaintenancePolicy {
+/** defaultMaintenancePolicy is what applies when configuration says nothing. */
+export function defaultMaintenancePolicy(): MaintenancePolicy {
   return {
     reclaimAttachmentStorage: true,
     storageReconcileSchedule: MaintenanceStorageReconcileSchedule,
@@ -54,13 +54,13 @@ export function DefaultMaintenancePolicy(): MaintenancePolicy {
 }
 
 /**
- * Resolves maintenance configuration into one policy. A nil settings object is
+ * Resolves maintenance configuration into one policy. A missing settings object is
  * not an error: it means every default.
  */
-export function MaintenancePolicyFromSettings(
+export function maintenancePolicyFromSettings(
   settings: Settings | undefined,
 ): MaintenancePolicy {
-  const policy = DefaultMaintenancePolicy();
+  const policy = defaultMaintenancePolicy();
   if (!settings) return policy;
   policy.reclaimAttachmentStorage = isAttachmentStorageReclaimEnabled(settings);
   const schedule = attachmentStorageReclaimSchedule(settings);
@@ -71,7 +71,7 @@ export function MaintenancePolicyFromSettings(
 }
 
 /** The stable identity of the attachment storage reconciliation job. */
-export function MaintenanceStorageReconcileJobID(): string {
+export function maintenanceStorageReconcileJobID(): string {
   return MaintenanceCronJobPrefix + "artifact-storage";
 }
 
@@ -79,7 +79,7 @@ export function MaintenanceStorageReconcileJobID(): string {
  * Reports whether a persisted job belongs to the maintenance namespace and
  * therefore must be executed by `runMaintenanceCronJob`.
  */
-export function IsMaintenanceCronJobID(jobID: string): boolean {
+export function isMaintenanceCronJobID(jobID: string): boolean {
   return jobID.trim().startsWith(MaintenanceCronJobPrefix);
 }
 
@@ -101,14 +101,14 @@ export interface MaintenanceCronJobOutcome {
  * be run as a model turn. `handled` is false only for job IDs outside the
  * namespace.
  */
-export async function RunMaintenanceCronJob(
+export async function runMaintenanceCronJob(
   sessionDir: string,
   jobID: string,
   policy: MaintenancePolicy,
   signal?: AbortSignal,
 ): Promise<MaintenanceCronJobOutcome> {
   const trimmed = jobID.trim();
-  if (!IsMaintenanceCronJobID(trimmed)) {
+  if (!isMaintenanceCronJobID(trimmed)) {
     return { handled: false, response: "" };
   }
   if (sessionDir.trim() === "") {
@@ -116,7 +116,7 @@ export async function RunMaintenanceCronJob(
       `maintenance job ${trimmed} requires a session directory`,
     );
   }
-  if (trimmed !== MaintenanceStorageReconcileJobID()) {
+  if (trimmed !== maintenanceStorageReconcileJobID()) {
     throw new Error(`unknown maintenance job "${trimmed}"`);
   }
   if (!policy.reclaimAttachmentStorage) {
@@ -128,7 +128,7 @@ export async function RunMaintenanceCronJob(
     };
   }
 
-  const reconciliation = await ReconcileArtifactStorage(
+  const reconciliation = await reconcileArtifactStorage(
     sessionDir,
     defaultAttachmentPolicy(),
     new Date(),

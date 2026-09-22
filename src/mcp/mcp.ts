@@ -327,6 +327,10 @@ export class Client {
     }
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -1426,7 +1430,7 @@ class MCPTool implements Tool {
     const op = operationIDFromContext(ctx);
     const result = await this.client.callTool(
       ctx.signal,
-      op.ok ? op.value : "",
+      op ?? "",
       this.info.name,
       params,
     );

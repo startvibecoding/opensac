@@ -16,6 +16,7 @@ import type { TUISession } from "./tui_session.ts";
 import type { InputState } from "./input_state.ts";
 import { coalesceSplitPaste, type KeyEvent, splitInputChunk } from "./keys.ts";
 import { formatCachePercent, formatTokens } from "./formatters.ts";
+import { SPINNER_INTERVAL_MS, spinnerFrame } from "./spinner.ts";
 
 export interface TuiShellProps {
   session: TUISession;
@@ -42,12 +43,22 @@ export function TuiShell({
   const { setRawMode, internal_eventEmitter } = useStdin();
   const input: InputState = session.input;
   const [, forceRender] = useState(0);
+  // Rotating-dots spinner tick; only advances while a run is active.
+  const [spin, setSpin] = useState(0);
 
   const queueRef = useRef<KeyEvent[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlersRef = useRef({ session, controller, exit, onExit, onSubmit });
 
   handlersRef.current = { session, controller, exit, onExit, onSubmit };
+
+  // Advance the spinner one frame per interval while a run is active so the
+  // busy footer and running tool rows animate.
+  useEffect(() => {
+    if (!session.busy) return;
+    const id = setInterval(() => setSpin((n) => n + 1), SPINNER_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [session.busy]);
 
   useEffect(() => {
     const onSignal = () => {
@@ -139,10 +150,16 @@ export function TuiShell({
         header: session.header,
         width,
         compactMode: session.compactMode,
+        overlayOpen: session.toolModalOpen || session.planModalOpen,
       }) as ReactElement}
       {session.toolModalOpen && (
         <Box flexDirection="column">
-          <Text>{session.toolModalView()}</Text>
+          <Text>{session.toolModalView(spinnerFrame(spin))}</Text>
+        </Box>
+      )}
+      {session.planModalOpen && (
+        <Box flexDirection="column">
+          <Text>{session.planModalView()}</Text>
         </Box>
       )}
       {session.esmPanelOpen && (
@@ -165,7 +182,7 @@ export function TuiShell({
       )}
       <Text dimColor>
         {session.busy
-          ? session.translator.text("shell.busy")
+          ? `${spinnerFrame(spin)} ${session.translator.text("shell.busy")}`
           : session.translator.text("shell.hint")}
       </Text>
       <Text dimColor>
@@ -253,6 +270,7 @@ function processEvent(
   }
   // Modal overlays consume their navigation keys first.
   if (session.toolModalOpen && handleToolModalKey(ev, session)) return;
+  if (session.planModalOpen && handlePlanModalKey(ev, session)) return;
   if (session.esmPanelOpen && handleESMPanelKey(ev, session)) return;
 
   if (ev.type === "text") {
@@ -284,6 +302,9 @@ function processEvent(
       return;
     case "tool-details":
       session.openToolModal();
+      return;
+    case "plan-details":
+      session.openPlanModal();
       return;
     case "esm-panel":
       session.openESMPanel();
@@ -332,6 +353,37 @@ function handleToolModalKey(ev: KeyEvent, session: TUISession): boolean {
       return true;
     case "pagedown":
       session.scrollToolModal(session.toolModalPageSize());
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Keys consumed by the Ctrl+T plan modal. */
+function handlePlanModalKey(ev: KeyEvent, session: TUISession): boolean {
+  if (ev.type === "text") {
+    if (ev.text.trim() === "q") {
+      session.closePlanModal();
+      return true;
+    }
+    return false;
+  }
+  switch (ev.name) {
+    case "escape":
+    case "ctrl+t":
+      session.closePlanModal();
+      return true;
+    case "up":
+      session.scrollPlanModal(-1);
+      return true;
+    case "down":
+      session.scrollPlanModal(1);
+      return true;
+    case "pageup":
+      session.scrollPlanModal(-session.planModalPageSize());
+      return true;
+    case "pagedown":
+      session.scrollPlanModal(session.planModalPageSize());
       return true;
     default:
       return false;

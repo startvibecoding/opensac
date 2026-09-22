@@ -1,7 +1,7 @@
 // Translated from internal/tools/*_test.go.
 //
 // Covers the Registry, the standard tools (read/ls/write/edit/insert/plan/
-// find/grep/bash/jobs/kill/question/skill_ref/a2a_dispatch/image_generation),
+// find/grep/bash/jobs/kill/question/skill_ref/image_generation),
 // the file-diff and atomic-write helpers, the file-lock manager, the globset/
 // ignore helpers, and the job manager.
 
@@ -9,7 +9,6 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import * as path from "@std/path";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
-  A2ADispatchTool,
   BashTool,
   buildFileDiff,
   FileLockManager,
@@ -37,7 +36,7 @@ import {
 import { newJobManager } from "./jobmanager.ts";
 import { formatGoDuration } from "./jobmanager.ts";
 import { EditTool } from "./edit.ts";
-import { NewBashToolWithJM } from "./bash.ts";
+import { newBashToolWithJobManager } from "./bash.ts";
 
 function tempDir(): string {
   return Deno.makeTempDirSync();
@@ -73,11 +72,11 @@ Deno.test("NewRegistry and register/get/remove", () => {
   const r = newRegistry("/tmp", undefined);
   const plan = new PlanTool(r);
   r.register(plan);
-  const { tool, ok } = r.get("plan");
-  assert(ok);
+  const tool = r.get("plan");
+  assert(tool !== undefined);
   assertEquals(tool.name(), "plan");
   r.remove("plan");
-  assertEquals(r.get("plan").ok, false);
+  assertEquals(r.get("plan"), undefined);
 });
 
 Deno.test("RegisterDefaults registers the standard tool set", () => {
@@ -97,14 +96,14 @@ Deno.test("RegisterDefaults registers the standard tool set", () => {
     "plan",
   ];
   for (const name of expected) {
-    assert(r.get(name).ok, `expected tool ${name}`);
+    assert(r.get(name) !== undefined, `expected tool ${name}`);
   }
 });
 
 Deno.test("RegisterDefaultsWithPlanTool(false) omits plan", () => {
   const r = newRegistry("/tmp", undefined);
   r.registerDefaultsWithPlanTool(false);
-  assertEquals(r.get("plan").ok, false);
+  assertEquals(r.get("plan"), undefined);
 });
 
 Deno.test("ModeTools filters by mode", () => {
@@ -464,7 +463,7 @@ Deno.test("BashTool uses non-interactive auth env", async () => {
 Deno.test("BashTool async creates a job that jobs/kill can manage", async () => {
   const jm = newJobManager();
   const r = newRegistry("/tmp", undefined);
-  const bash = NewBashToolWithJM(r, jm);
+  const bash = newBashToolWithJobManager(r, jm);
   const jobs = new JobsTool(r, bash);
   const kill = new KillTool(r, bash);
 
@@ -533,25 +532,6 @@ Deno.test("SkillRefTool loads a reference from a fake manager", async () => {
   await expectRejects(async () =>
     await tool.execute(ctx, { skill: "missing", ref: "a" })
   );
-});
-
-Deno.test("A2ADispatchTool lists agents and dispatches", async () => {
-  const tool = new A2ADispatchTool({
-    list: () => [{ name: "worker", url: "http://example.com" }],
-    dispatch: (_ctx, name, message) => `${name}:${message}`,
-  });
-  const params = tool.parameters() as {
-    properties: { agent_name: { enum: string[] } };
-  };
-  assertEquals(params.properties.agent_name.enum, ["worker"]);
-
-  const result = await tool.execute(ctx, {
-    agent_name: "worker",
-    message: "do it",
-  });
-  assertEquals(result.text, "worker:do it");
-
-  await expectRejects(() => tool.execute(ctx, { agent_name: "worker" }));
 });
 
 Deno.test("ImageGenerationTool rejects when disabled", async () => {
@@ -709,9 +689,9 @@ Deno.test("RegistryConfig registers filtered tools", () => {
     toolFilter: ["read", "write"],
   });
   assertEquals(filtered.all().length, 2);
-  assert(filtered.get("read").ok);
-  assert(filtered.get("write").ok);
-  assert(!filtered.get("bash").ok);
+  assert(filtered.get("read") !== undefined);
+  assert(filtered.get("write") !== undefined);
+  assert(filtered.get("bash") === undefined);
 });
 
 Deno.test("Registry job managers are per-instance", () => {

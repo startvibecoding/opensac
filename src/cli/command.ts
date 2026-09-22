@@ -2,15 +2,15 @@
 // `registerRootFlags`, `registerACPFlags`, and the root action dispatch).
 //
 // The Cliffy command tree is thin: it maps flags into `CLIOptions` and calls
-// the shared runtime/doctor/MCP/serve entry points. The interactive TUI, a2a,
-// stats, and cron actions remain placeholders until their backlog slices
-// (#36/#37) land; their flags keep the CLI surface stable.
+// the shared runtime/doctor/MCP entry points. The entry modes are ACP
+// (`opensac acp`), the interactive TUI (the root action), and CLI print mode
+// (`-P`); serve, channel, and A2A modes are not part of this product.
 //
 // Cliffy 1.3 invokes an option `action` with a single parsed-options argument
 // (`{ camelCaseFlag: value }`), so every action below reads from that object
 // rather than treating the value as a positional parameter.
 
-import { Command, ValidationError } from "@cliffy/command";
+import { Command } from "@cliffy/command";
 import {
   type CLIOptions,
   defaultCLIOptions,
@@ -20,17 +20,11 @@ import { runACP, type RunOptions } from "../acp/run.ts";
 import { isStartupError } from "../acp/support.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 import { executeKnowledgeMCPCommand } from "./knowledge_mcp.ts";
-import { runServe } from "../serve/server.ts";
 import {
   defaultStatsOptions,
   executeStatsCommand,
   type StatsCommandOptions,
 } from "./stats.ts";
-import {
-  defaultA2AStartOptions,
-  executeA2AInit,
-  executeA2AStatus,
-} from "./a2a.ts";
 import { executeSpeedtestCommand } from "./speedtest.ts";
 import { current as currentVersion } from "../version/version.ts";
 
@@ -267,81 +261,6 @@ function newKnowledgeMCPCommand(): any {
     .command("serve", serve);
 }
 
-/** Builds the `serve` subcommand (HTTP bootstrap slice of #36). */
-// deno-lint-ignore no-explicit-any
-function newServeCommand(): any {
-  const opts: Record<string, unknown> = {
-    configPath: "",
-    port: "",
-    webUIDir: "",
-    provider: "",
-    model: "",
-    workDir: "",
-    unsafe: false,
-    sandbox: false,
-    multiAgent: false,
-    delegate: false,
-    workflows: false,
-    webSearch: false,
-    browser: false,
-    artifact: false,
-    a2aMaster: false,
-    lobster: false,
-    verbose: false,
-    debug: false,
-  };
-  const value = (key: string, flag = key): OptionAction =>
-    stringSetter(opts, key, flag);
-  const enabled = (key: string, flag = key): OptionAction =>
-    boolSetter(opts, key, flag);
-  return new Command()
-    .description("Run the OpenAI-compatible API server and Web UI")
-    .noExit()
-    .option("-c, --config <path>", "Path to serve.json", {
-      action: value("configPath", "config"),
-    })
-    .option("-p, --port <port>", "Listen port or address override", {
-      action: value("port"),
-    })
-    .option("--webui-dir <path>", "Serve a built Web UI directory", {
-      action: value("webUIDir", "webuiDir"),
-    })
-    .option("--provider <name>", "Ephemeral provider override", {
-      action: value("provider"),
-    })
-    .option("--model <id>", "Ephemeral model override", {
-      action: value("model"),
-    })
-    .option("--work-dir <path>", "Default working directory", {
-      action: value("workDir", "workDir"),
-    })
-    .option("--unsafe", "Disable auth and bind all interfaces", {
-      action: enabled("unsafe"),
-    })
-    .option("--sandbox", "Enable sandboxing", { action: enabled("sandbox") })
-    .option("--multi-agent", "Enable multi-agent", {
-      action: enabled("multiAgent", "multiAgent"),
-    })
-    .option("--delegate", "Enable delegation", { action: enabled("delegate") })
-    .option("--workflows", "Enable workflows", { action: enabled("workflows") })
-    .option("--web-search", "Enable web search", {
-      action: enabled("webSearch", "webSearch"),
-    })
-    .option("--browser", "Enable browser tools", { action: enabled("browser") })
-    .option("--artifact", "Enable artifacts", { action: enabled("artifact") })
-    .option("--a2a-master", "Enable A2A master mode", {
-      action: enabled("a2aMaster", "a2aMaster"),
-    })
-    .option("--lobster", "Lobster mode (yolo, no sandbox, sub-agents)", {
-      action: enabled("lobster"),
-    })
-    .option("-v, --verbose", "Verbose logging", { action: enabled("verbose") })
-    .option("--debug", "Debug logging", { action: enabled("debug") })
-    .action(async () => {
-      await runServe(opts as never);
-    });
-}
-
 /** Builds the `stats` subcommand. */
 // deno-lint-ignore no-explicit-any
 function newStatsCommand(): any {
@@ -376,128 +295,6 @@ function newStatsCommand(): any {
     .action(async () => {
       await executeStatsCommand(opts);
     });
-}
-
-/** Builds the `a2a` command group (init-config/status; start pending runtime factory). */
-// deno-lint-ignore no-explicit-any
-function newA2ACommand(): any {
-  const flags = {
-    port: 0,
-    workDir: "",
-    provider: "",
-    model: "",
-    sandbox: false,
-    authToken: "",
-    initA2AConfig: false,
-    force: false,
-  };
-  const status = new Command()
-    .description("Check whether the local A2A server is running")
-    .noExit()
-    .action(async () => {
-      const view = await executeA2AStatus();
-      if (view.running) {
-        console.log(`A2A server is running on ${view.listen}`);
-      } else {
-        console.error(
-          `A2A server is not running on ${view.listen}: ${view.detail}`,
-        );
-        Deno.exit(1);
-      }
-    });
-  const start = new Command()
-    .description("Start the standalone A2A JSON-RPC server")
-    .noExit()
-    .option("--port <port:integer>", "Listen port")
-    .option("--work-dir <path>", "Default working directory")
-    .option("--provider <name>", "Provider")
-    .option("--model <id>", "Model")
-    .option("--sandbox", "Enable sandboxing")
-    .option("--auth-token <token>", "Bearer token")
-    .action(async () => {
-      const { executeA2AStartWithSettings } = await import("./a2a.ts");
-      const { loadSettings } = await import("../config/mod.ts");
-      const opts = defaultA2AStartOptions();
-      opts.port = flags.port;
-      opts.workDir = flags.workDir;
-      opts.provider = flags.provider;
-      opts.model = flags.model;
-      opts.sandbox = flags.sandbox;
-      opts.authToken = flags.authToken;
-      try {
-        await executeA2AStartWithSettings(opts, loadSettings());
-      } catch (error) {
-        console.error(`error: ${(error as Error).message}`);
-        Deno.exit(1);
-      }
-    });
-  const stop = new Command()
-    .description("Stop the local A2A server (PID file)")
-    .noExit()
-    .action(() => {
-      throw new ValidationError(
-        "`opensac a2a stop` is not ported yet (the TS server does not write a PID file)",
-      );
-    });
-  return new Command()
-    .description("Run the A2A (Agent-to-Agent) server")
-    .noExit()
-    .option("--port <port:integer>", "Listen port", {
-      action: (f: ParsedFlags) => {
-        if (typeof f["port"] === "number") flags.port = f["port"];
-      },
-    })
-    .option("--work-dir <path>", "Default working directory", {
-      action: (f: ParsedFlags) => {
-        if (typeof f["workDir"] === "string") flags.workDir = f["workDir"];
-      },
-    })
-    .option("--provider <name>", "Provider", {
-      action: (f: ParsedFlags) => {
-        if (typeof f["provider"] === "string") flags.provider = f["provider"];
-      },
-    })
-    .option("--model <id>", "Model", {
-      action: (f: ParsedFlags) => {
-        if (typeof f["model"] === "string") flags.model = f["model"];
-      },
-    })
-    .option("--sandbox", "Enable sandboxing", {
-      action: (f: ParsedFlags) => {
-        if (f["sandbox"] === true) flags.sandbox = true;
-      },
-    })
-    .option("--auth-token <token>", "Bearer token", {
-      action: (f: ParsedFlags) => {
-        if (typeof f["authToken"] === "string") {
-          flags.authToken = f["authToken"];
-        }
-      },
-    })
-    .option("--init-a2a-config", "Create a2a.json config template", {
-      action: (f: ParsedFlags) => {
-        if (f["initA2aConfig"] === true) flags.initA2AConfig = true;
-      },
-    })
-    .option("--force", "Force overwrite existing config", {
-      action: (f: ParsedFlags) => {
-        if (f["force"] === true) flags.force = true;
-      },
-    })
-    .action(async () => {
-      if (flags.initA2AConfig) {
-        await executeA2AInit(flags.force);
-        return;
-      }
-      // No subcommand: print help via ValidationError-free path is awkward in
-      // Cliffy; surface the same short description as Go.
-      throw new ValidationError(
-        "use `opensac a2a start`, `opensac a2a status`, or `--init-a2a-config`",
-      );
-    })
-    .command("start", start)
-    .command("stop", stop)
-    .command("status", status);
 }
 
 /** Builds the `speedtest` subcommand. */
@@ -619,25 +416,9 @@ export function newRootCommand(version = currentVersion()): Command {
     .option("--json", "Stream print-mode output as NDJSON (requires -P)", {
       action: boolSetter(target, "json"),
     })
-    .option("--init-serve", "Create serve.json config template", {
-      action: boolSetter(target, "initServe", "initServe"),
-    })
-    .option("--force", "Force overwrite existing files (used with --init-*)", {
-      action: boolSetter(target, "force"),
-    })
     .option("--cron", "Enable scheduled task management (cron tool)", {
       action: boolSetter(target, "cron"),
-    })
-    .option("--enable-a2a-master", "Enable A2A master mode", {
-      action: boolSetter(target, "enableA2AMaster", "enableA2aMaster"),
-    })
-    .option(
-      "--init-a2a-master-config",
-      "Create a2a-list.json config template",
-      {
-        action: boolSetter(target, "initA2AMaster", "initA2aMasterConfig"),
-      },
-    );
+    });
   sharedProviderFlags(root, flags);
   sharedExecutionFlags(
     root,
@@ -696,8 +477,6 @@ export function newRootCommand(version = currentVersion()): Command {
     .command("acp", newACPCommand(version))
     .command("doctor", newDoctorCommand(version))
     .command("knowledge-mcp", newKnowledgeMCPCommand())
-    .command("serve", newServeCommand())
-    .command("a2a", newA2ACommand())
     .command("stats", newStatsCommand())
     .command("speedtest", newSpeedtestCommand());
 

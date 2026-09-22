@@ -10,6 +10,7 @@
 // a deliberate deviation from the external SDK dependency.
 
 import * as path from "@std/path";
+import { compileUserRegExp } from "../util/regex.ts";
 import { GlobSet } from "./globset.ts";
 import { IgnoreStack } from "./ignore.ts";
 import {
@@ -37,7 +38,7 @@ export class GrepTool implements Tool {
   }
 
   description(): string {
-    return "Search file contents using regex patterns. Returns matching lines with file paths and line numbers. If the pattern is an invalid regex, it automatically falls back to a literal search. Use for finding code patterns, function definitions, etc. Files over 16MB are skipped.";
+    return "Search file contents using regex patterns. Returns matching lines with file paths and line numbers. If the pattern is an invalid or unsafe regex, it automatically falls back to a literal search. Use for finding code patterns, function definitions, etc. Files over 16MB are skipped.";
   }
 
   promptSnippet(): string {
@@ -55,7 +56,7 @@ export class GrepTool implements Tool {
         pattern: {
           type: "string",
           description:
-            "Regex pattern to search for. Invalid regex patterns automatically fall back to literal search.",
+            "Regex pattern to search for. Invalid or unsafe regex patterns automatically fall back to literal search.",
         },
         path: {
           type: "string",
@@ -111,7 +112,7 @@ export class GrepTool implements Tool {
     let matcher: RegExp;
     let literalFallback = false;
     try {
-      matcher = new RegExp(pattern);
+      matcher = compileUserRegExp(pattern);
     } catch {
       try {
         matcher = new RegExp(escapeRegExp(pattern));

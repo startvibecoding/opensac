@@ -49,6 +49,7 @@ import { TuiRun } from "./tui_run.ts";
 import { localTimeZone, Translator } from "./i18n.ts";
 import { InputState } from "./input_state.ts";
 import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
+import { renderTaskPlanLines } from "./plan_view.ts";
 import { renderAgentActivity } from "./activity.ts";
 import { expandedToolRow } from "./tool_row_format.ts";
 import { wrapANSI } from "./renderutil.ts";
@@ -128,6 +129,7 @@ export class TUISession implements CommandHost {
   #sessionCommands: TuiSessionCommands;
   #dialog: Dialog | undefined;
   #toolModal: ToolModalState | undefined;
+  #planModal: ToolModalState | undefined;
   #esmObjective: Objective | null = null;
   /**
    * The ESM role agent currently executing (Go esmActiveAgentID). Set by the
@@ -1069,6 +1071,7 @@ export class TUISession implements CommandHost {
       );
       return;
     }
+    this.closePlanModal();
     // Tabs mirror the Go toolModalTargets: main (the expanded transcript) plus
     // one tab per background or managed sub-agent — never one tab per tool
     // call. The lead agent is the "main" tab and must not repeat.
@@ -1109,13 +1112,97 @@ export class TUISession implements CommandHost {
     this.#toolModal = modal;
   }
 
-  /** Rows available to a modal/panel above the shell chrome. */
+  /**
+   * Rows available to a modal/panel above the shell chrome. The editor frame
+   * and rows plus the two footer lines are reserved so the managed region
+   * never has to scroll (Ink repaints the whole region and flickers once the
+   * frame is taller than the terminal).
+   */
   #panelAvailableHeight(): number {
-    return Math.max(this.#termHeight - 8, 6);
+    const editorRows = Math.max(
+      this.input.editor.view().split("\n").length,
+      1,
+    );
+    return Math.max(this.#termHeight - 6 - editorRows, 6);
   }
 
   closeToolModal(): void {
     this.#toolModal = undefined;
+  }
+
+  // --- Plan modal (Ctrl+T) ----------------------------------------------------
+
+  get planModalOpen(): boolean {
+    return this.#planModal !== undefined;
+  }
+
+  /** Opens the current task plan in a framed modal like the tool modal. */
+  openPlanModal(): void {
+    const plan = this.controller.currentPlan;
+    if (plan === undefined) {
+      this.controller.addMessage(
+        this.translator.text("plan.modal.no_plan"),
+        "plain",
+      );
+      return;
+    }
+    this.closeToolModal();
+    const modal = new ToolModalState(this.#termWidth, this.#termHeight);
+    modal.setTargets([
+      {
+        id: "plan",
+        label: this.translator.text("plan.modal.title"),
+        kind: "plan",
+      },
+    ]);
+    this.#planModal = modal;
+  }
+
+  closePlanModal(): void {
+    this.#planModal = undefined;
+  }
+
+  planModalPageSize(): number {
+    return this.#planModal?.pageSizeFor(false, this.#panelAvailableHeight()) ??
+      1;
+  }
+
+  scrollPlanModal(delta: number): void {
+    const modal = this.#planModal;
+    if (!modal) return;
+    modal.scroll(
+      delta,
+      this.#planModalLines().length,
+      this.planModalPageSize(),
+    );
+  }
+
+  planModalView(): string {
+    const modal = this.#planModal;
+    if (!modal) return "";
+    return modal.render(this.#planModalLines(), this.translator, {
+      availableHeight: this.#panelAvailableHeight(),
+      title: this.translator.text("plan.modal.title"),
+    });
+  }
+
+  /** Test access to the active plan modal state. */
+  planModalForTest(): ToolModalState {
+    if (this.#planModal === undefined) {
+      throw new Error("plan modal not open");
+    }
+    return this.#planModal;
+  }
+
+  #planModalLines(): string[] {
+    const modal = this.#planModal;
+    if (!modal) return [];
+    const plan = this.controller.currentPlan;
+    const width = ToolModalState.contentWidthFor(this.#termWidth);
+    const lines = plan === undefined
+      ? [this.translator.text("plan.modal.no_plan")]
+      : renderTaskPlanLines(plan, this.translator);
+    return this.#wrapModalLines(lines, width);
   }
 
   toolModalPageSize(): number {
@@ -1136,10 +1223,14 @@ export class TUISession implements CommandHost {
     this.#toolModal?.switchTarget(delta);
   }
 
-  toolModalView(): string {
+  /**
+   * Renders the open tool modal. `spinner` is the current rotating-dots frame,
+   * prefixed to running-state labels while a run is active.
+   */
+  toolModalView(spinner = ""): string {
     const modal = this.#toolModal;
     if (!modal) return "";
-    const lines = this.#toolModalLines();
+    const lines = this.#toolModalLines(spinner);
     return modal.render(lines, this.translator, {
       availableHeight: this.#panelAvailableHeight(),
     });
@@ -1151,7 +1242,7 @@ export class TUISession implements CommandHost {
     return this.#toolModal;
   }
 
-  #toolModalLines(): string[] {
+  #toolModalLines(spinner = ""): string[] {
     const modal = this.#toolModal;
     if (!modal) return [];
     const target = modal.targets[modal.active];
@@ -1173,7 +1264,7 @@ export class TUISession implements CommandHost {
     // Main tab: the expanded transcript (Go buildToolModalLines with
     // active == 0 — assistant, thinking, plain rows, and every tool call
     // expanded with args, full output, and diff).
-    return this.#wrapModalLines(this.#expandedTranscriptLines(), width);
+    return this.#wrapModalLines(this.#expandedTranscriptLines(spinner), width);
   }
 
   /** Wraps one block to the modal's content width (Go WrapANSI). */
@@ -1182,11 +1273,11 @@ export class TUISession implements CommandHost {
   }
 
   /** The expanded conversation for the main tab (Go buildToolModalLines). */
-  #expandedTranscriptLines(): string[] {
+  #expandedTranscriptLines(spinner = ""): string[] {
     const store = this.controller.store;
     const parts: string[] = [];
     for (let i = 0; i < store.messages.length; i++) {
-      const msg = this.#expandedMessageAt(i);
+      const msg = this.#expandedMessageAt(i, spinner);
       if (msg.trim() !== "") parts.push(msg);
     }
     if (parts.length === 0) {
@@ -1201,7 +1292,7 @@ export class TUISession implements CommandHost {
   }
 
   /** One transcript row expanded (Go renderExpandedMessageAt). */
-  #expandedMessageAt(idx: number): string {
+  #expandedMessageAt(idx: number, spinner = ""): string {
     const store = this.controller.store;
     const tool = store.toolResults.find((r) => r.msgIndex === idx);
     if (tool !== undefined) {
@@ -1212,6 +1303,8 @@ export class TUISession implements CommandHost {
         summary: tool.summary,
         fullContent: tool.fullContent,
         diff: tool.diff,
+        plan: tool.plan,
+        spinner,
         toolError: tool.toolError,
         executionState: tool.executionState,
       });

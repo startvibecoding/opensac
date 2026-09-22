@@ -7,15 +7,25 @@ import { isNoRows, RuntimeSubmissionDAO, type Tx } from "../dao/mod.ts";
 import { generateID } from "./entry.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 
-/** Returned when a submission key is already admitted. */
-export const ErrRuntimeSubmissionExists: Error = new Error(
-  "runtime submission already exists",
-);
+const runtimeSubmissionExistsMessage = "runtime submission already exists";
+const runtimeSubmissionConflictMessage =
+  "runtime submission key conflicts with another request";
 
-/** Returned when a submission key conflicts with another request. */
-export const ErrRuntimeSubmissionConflict: Error = new Error(
-  "runtime submission key conflicts with another request",
-);
+/** Thrown when a submission key is already admitted. */
+export class RuntimeSubmissionExistsError extends Error {
+  override name = "RuntimeSubmissionExistsError";
+  constructor() {
+    super(runtimeSubmissionExistsMessage);
+  }
+}
+
+/** Thrown when a submission key conflicts with another request. */
+export class RuntimeSubmissionConflictError extends Error {
+  override name = "RuntimeSubmissionConflictError";
+  constructor() {
+    super(runtimeSubmissionConflictMessage);
+  }
+}
 
 /** The durable admission identity for one original or retry submission. */
 export interface RuntimeSubmission {
@@ -40,19 +50,17 @@ export class RuntimeSubmissionError extends Error {
   constructor(existing: RuntimeSubmission, conflict: boolean) {
     super(
       conflict
-        ? `${ErrRuntimeSubmissionConflict.message}: existing Run ${existing.runId}`
-        : `${ErrRuntimeSubmissionExists.message}: Run ${existing.runId}`,
+        ? `${runtimeSubmissionConflictMessage}: existing Run ${existing.runId}`
+        : `${runtimeSubmissionExistsMessage}: Run ${existing.runId}`,
+      {
+        cause: conflict
+          ? new RuntimeSubmissionConflictError()
+          : new RuntimeSubmissionExistsError(),
+      },
     );
     this.name = "RuntimeSubmissionError";
     this.existing = existing;
     this.conflict = conflict;
-  }
-
-  /** Mirrors Go's `Unwrap`. */
-  unwrap(): Error {
-    return this.conflict
-      ? ErrRuntimeSubmissionConflict
-      : ErrRuntimeSubmissionExists;
   }
 }
 

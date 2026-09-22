@@ -118,7 +118,7 @@ function fmtQ(v: string): string {
 }
 
 function fmtV(v: unknown): string {
-  if (v === undefined || v === null) return "<nil>";
+  if (v === undefined || v === null) return "null";
   if (v instanceof Error) return v.message;
   if (typeof v === "object") {
     try {
@@ -167,7 +167,7 @@ export function goSprintf(format: string, args: unknown[]): string {
       case "s":
       case "v":
         out += value === undefined || value === null
-          ? "<nil>"
+          ? "null"
           : typeof value === "string"
           ? value
           : fmtV(value);

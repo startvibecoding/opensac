@@ -29,7 +29,7 @@ export const ReconcileGraceMs = 24 * 60 * 60 * 1000;
  * here and matched against the durable storage keys, so the reconciliation and
  * the intake can never disagree about where attachment content lives.
  */
-const artifactStorageDirectoryName = "artifacts";
+const artifactDirectoryName = "artifacts";
 
 /**
  * Throttles the opportunistic sweep to at most one pass per interval per
@@ -84,15 +84,15 @@ function emptyReconciliation(): ArtifactReconciliation {
 }
 
 /** Returns the session-directory subtree that holds private attachment content. */
-export function ArtifactStorageDirectoryName(): string {
-  return artifactStorageDirectoryName;
+export function artifactStorageDirectoryName(): string {
+  return artifactDirectoryName;
 }
 
 /**
  * Returns the modification time an unreferenced artifact directory must predate
- * before `ReconcileArtifactStorage` may reclaim it.
+ * before `reconcileArtifactStorage` may reclaim it.
  */
-export function ArtifactReclaimFloor(
+export function artifactReclaimFloor(
   policy: AttachmentPolicy,
   now: Date,
 ): Date {
@@ -109,7 +109,7 @@ export function ArtifactReclaimFloor(
  * deletes nothing. Only plain directories named like a generated attachment ID,
  * containing only regular files, are ever considered.
  */
-export async function ReconcileArtifactStorage(
+export async function reconcileArtifactStorage(
   sessionDir: string,
   policy: AttachmentPolicy,
   now: Date,
@@ -123,9 +123,9 @@ export async function ReconcileArtifactStorage(
     throw new Error("attachment retention must be positive");
   }
   if (now.getTime() === 0) now = new Date();
-  report.ageFloor = ArtifactReclaimFloor(policy, now);
+  report.ageFloor = artifactReclaimFloor(policy, now);
 
-  const root = path.join(sessionDir, artifactStorageDirectoryName);
+  const root = path.join(sessionDir, artifactDirectoryName);
   let rootInfo: Deno.FileInfo | null;
   try {
     rootInfo = await Deno.lstat(root);
@@ -212,7 +212,7 @@ async function referencedArtifactDirectories(
       if (id !== "") referenced.add(id);
       const key = record.storageKey.trim().split(path.SEPARATOR).join("/");
       const parts = key.split("/");
-      if (parts.length >= 2 && parts[0] === artifactStorageDirectoryName) {
+      if (parts.length >= 2 && parts[0] === artifactDirectoryName) {
         referenced.add(parts[1]);
       }
     }
@@ -286,7 +286,7 @@ export function reconcileAttachmentStorage(
   now?: Date,
   signal?: AbortSignal,
 ): Promise<ArtifactReconciliation> {
-  return ReconcileArtifactStorage(
+  return reconcileArtifactStorage(
     service.sessionDir,
     service.policy,
     now ?? new Date(),
@@ -312,7 +312,7 @@ export function reconcileArtifactStorageOpportunistic(
   ) {
     return;
   }
-  void ReconcileArtifactStorage(sessionDir, policy, new Date()).catch(() => {
+  void reconcileArtifactStorage(sessionDir, policy, new Date()).catch(() => {
     // best-effort
   });
 }

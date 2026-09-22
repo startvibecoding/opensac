@@ -110,8 +110,10 @@ function cronJobRecord(job: CronJob): CronJobRecord {
     oneShot: job.oneShot ?? false,
     mode: job.mode ?? "",
     workDir: job.workDir ?? "",
-    a2aTarget: job.a2aTarget ?? "",
-    a2aToken: job.a2aToken ?? "",
+    // The A2A target columns stay in the schema for compatibility; the A2A
+    // mode was removed, so jobs can no longer dispatch to a remote server.
+    a2aTarget: "",
+    a2aToken: "",
     enabled: job.enabled ?? false,
     createdAt: formatCronTime(job.createdAt ?? null),
     lastRun: formatCronTime(job.lastRun ?? null),
@@ -132,8 +134,6 @@ function cronJobFromRecord(record: CronJobRecord): CronJob {
     oneShot: record.oneShot,
     mode: record.mode,
     workDir: record.workDir,
-    a2aTarget: record.a2aTarget,
-    a2aToken: record.a2aToken,
     enabled: record.enabled,
     createdAt: parseCronTime(record.createdAt),
     lastRun: parseCronTime(record.lastRun),

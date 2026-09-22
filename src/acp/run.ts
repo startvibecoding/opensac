@@ -54,7 +54,7 @@ import { watchDatabaseRebuilds } from "../session/database_recovery_notice.ts";
 import { getSessionDir } from "../config/mod.ts";
 import { current as appversionCurrent } from "../version/version.ts";
 import { debugLogf } from "../provider/debug.ts";
-import { startForDebug } from "../debugpprof/pprof.ts";
+import { startDebugServer } from "../debugendpoints/debugendpoints.ts";
 import { isNoRowsAttachment } from "../dao/mod.ts";
 import { encodeBase64 } from "@std/encoding/base64";
 import { acpStructuredRPCError } from "./projection.ts";
@@ -197,7 +197,7 @@ async function runACPInner(
   setVerbose(opts.verbose === true || opts.debug === true);
   if (opts.debug === true) {
     Deno.env.set("VIBECODING_DEBUG", "1");
-    startForDebug((msg) =>
+    startDebugServer((msg) =>
       Deno.stderr.writeSync(new TextEncoder().encode(msg))
     );
   }
@@ -280,7 +280,7 @@ async function runACPInner(
     });
   }
 
-  // Long-running Runtime host: same lease-first recovery coordinator as serve.
+  // Long-running Runtime host: lease-first recovery coordinator.
   const recoveryAbort = new AbortController();
   const recoveryCoordinator = new RecoveryCoordinator(
     getSessionDir(settings),

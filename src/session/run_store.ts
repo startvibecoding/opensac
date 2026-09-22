@@ -106,7 +106,7 @@ export interface SessionRun {
 
 function requireConn(db: Database): NonNullable<Database["db"]> {
   const conn = db.db;
-  if (conn === null) throw new Error("run database is nil");
+  if (conn === null) throw new Error("run database is not open");
   return conn;
 }
 
@@ -616,8 +616,8 @@ export function listLatestSessionRuns(
 ): Map<string, SessionRun> {
   const result = new Map<string, SessionRun>();
   if (sessionIds.length === 0) return result;
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  if (!ok || db === null) return result;
+  const db = openExistingSessionDB(sessionDir);
+  if (db === null) return result;
   const records = new RunDAO(requireConn(db)).latestRunBySessions(sessionIds);
   for (const [sessionId, record] of records) {
     result.set(sessionId, sessionRunFromRecord(record));

@@ -189,7 +189,7 @@ export class Manager {
 
   /** Discovers skills below `dir` in an embedded filesystem. */
   loadFS(fsys: SkillFS | undefined, dir: string, source: string): void {
-    if (!fsys) throw new Error("skills filesystem is nil");
+    if (!fsys) throw new Error("skills filesystem is required");
     dir = posix.normalize(dir);
     if (dir === "." || dir.startsWith("../") || posix.isAbsolute(dir)) {
       throw new Error(

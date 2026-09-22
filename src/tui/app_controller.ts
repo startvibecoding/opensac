@@ -5,11 +5,13 @@
 // callbacks for messages/spinner. The Ink layer subscribes and renders.
 
 import type { Event } from "../agent/events.ts";
+import type { TaskPlan } from "../tools/tool.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
   EventDone,
   EventError,
   EventHostedItem,
+  EventPlanUpdate,
   EventQuestionRequest,
   EventRunFinished,
   EventStatus,
@@ -108,6 +110,10 @@ export class AppController {
 
   #run: RunHandle | undefined;
   #leadAgentId: string | undefined;
+  /** Latest published task plan (Ctrl+T). */
+  #currentPlan: TaskPlan | undefined;
+  /** Per-call plans pending their tool-result row (cleared every turn). */
+  readonly #planByToolCall = new Map<string, TaskPlan>();
   readonly #cb: AppControllerCallbacks;
   readonly #translator: Translator;
 
@@ -153,6 +159,11 @@ export class AppController {
 
   get runAttached(): boolean {
     return this.#run !== undefined;
+  }
+
+  /** The most recently published task plan, if the plan tool has run. */
+  get currentPlan(): TaskPlan | undefined {
+    return this.#currentPlan;
   }
 
   /** Adds a message row (Go addMessage): a plain transcript row plus the
@@ -203,6 +214,7 @@ export class AppController {
         // A new turn owns a fresh activity timeline (Go turn lifecycle).
         this.activityManager.clear();
         this.#thinkBlockOpen = false;
+        this.#planByToolCall.clear();
         this.store.beginAssistantSlot();
         return;
 
@@ -242,6 +254,7 @@ export class AppController {
           toolArgs: event.toolArgs,
           toolResult: event.toolResult,
           toolDiff: event.toolDiff,
+          plan: this.#planByToolCall.get(event.toolCallId ?? ""),
           toolError: event.toolError,
           toolExecutionState: event.toolExecutionState,
         });
@@ -261,6 +274,14 @@ export class AppController {
         if (this.#thinkBlockOpen) {
           this.activityManager.completeThinking("turn");
           this.#thinkBlockOpen = false;
+        }
+        this.#cb.scheduleRender();
+        return;
+
+      case EventPlanUpdate:
+        if (event.plan !== undefined) {
+          this.#currentPlan = event.plan;
+          this.#planByToolCall.set(event.toolCallId ?? "", event.plan);
         }
         this.#cb.scheduleRender();
         return;

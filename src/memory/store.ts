@@ -1,7 +1,7 @@
 // Ported from internal/memory/store.go
 //
-// Package memory implements persistent memory storage for serve channels.
-// Memory is stored as a human-readable Markdown file (memory.md).
+// Package memory implements persistent memory storage: a human-readable
+// Markdown file (memory.md) managed through the ACP management plane.
 
 import * as path from "@std/path";
 import { configDir, projectPath, projectPathFor } from "../config/mod.ts";

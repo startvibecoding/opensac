@@ -7,9 +7,9 @@ import {
   newKnowledgeBaseService,
 } from "./knowledgebase.ts";
 import {
-  KnowledgeBaseCronJobID,
-  KnowledgeBaseIDFromCronJobID,
-  RunKnowledgeBaseCronJob,
+  knowledgeBaseCronJobID,
+  knowledgeBaseIDFromCronJobID,
+  runKnowledgeBaseCronJob,
 } from "./knowledge_cron.ts";
 
 Deno.test("run knowledge base cron job routes namespaced jobs only", async () => {
@@ -19,7 +19,7 @@ Deno.test("run knowledge base cron job routes namespaced jobs only", async () =>
     defaultKnowledgeBaseIndexPolicy(),
   );
 
-  const foreign = await RunKnowledgeBaseCronJob(
+  const foreign = await runKnowledgeBaseCronJob(
     undefined,
     service,
     "plain-cron-job",
@@ -29,10 +29,10 @@ Deno.test("run knowledge base cron job routes namespaced jobs only", async () =>
 
   let missingThrew = false;
   try {
-    await RunKnowledgeBaseCronJob(
+    await runKnowledgeBaseCronJob(
       undefined,
       service,
-      KnowledgeBaseCronJobID("missing"),
+      knowledgeBaseCronJobID("missing"),
     );
   } catch {
     missingThrew = true;
@@ -41,10 +41,10 @@ Deno.test("run knowledge base cron job routes namespaced jobs only", async () =>
 
   let nilThrew = false;
   try {
-    await RunKnowledgeBaseCronJob(
+    await runKnowledgeBaseCronJob(
       undefined,
       null,
-      KnowledgeBaseCronJobID("any"),
+      knowledgeBaseCronJobID("any"),
     );
   } catch {
     nilThrew = true;
@@ -74,12 +74,12 @@ Deno.test("run knowledge base cron job indexes through canonical background path
     defaultKnowledgeBaseIndexPolicy(),
   );
 
-  const jobID = KnowledgeBaseCronJobID(base.id);
-  const parsed = KnowledgeBaseIDFromCronJobID(jobID);
+  const jobID = knowledgeBaseCronJobID(base.id);
+  const parsed = knowledgeBaseIDFromCronJobID(jobID);
   assert(parsed.ok === true);
   assertEquals(parsed.id, base.id);
 
-  const outcome = await RunKnowledgeBaseCronJob(undefined, service, jobID);
+  const outcome = await runKnowledgeBaseCronJob(undefined, service, jobID);
   assert(outcome.handled === true);
   assert(outcome.response.includes(`indexed knowledge base ${base.id}`));
   assert(outcome.response.includes("1 files"));
@@ -113,10 +113,10 @@ Deno.test("run knowledge base cron job honors context cancellation", async () =>
   controller.abort();
   let threw = false;
   try {
-    await RunKnowledgeBaseCronJob(
+    await runKnowledgeBaseCronJob(
       controller.signal,
       service,
-      KnowledgeBaseCronJobID(base.id),
+      knowledgeBaseCronJobID(base.id),
     );
   } catch {
     threw = true;

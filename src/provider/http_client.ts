@@ -16,6 +16,8 @@ export interface HttpClient {
   fetch(input: string | URL, init?: RequestInit): Promise<Response>;
   /** Releases the underlying connection pool. */
   close(): void;
+  /** `using`-compatible alias of `close()`. */
+  [Symbol.dispose]?(): void;
   /** The normalized proxy URL, when one was configured. */
   readonly proxyUrl?: string;
   /** Whether HTTP/2 was disabled. */
@@ -70,6 +72,9 @@ function build(opts: HTTPClientOptions, timeoutMs: number): HttpClient {
       return fetch(url, merged);
     },
     close(): void {
+      client.close();
+    },
+    [Symbol.dispose](): void {
       client.close();
     },
   };

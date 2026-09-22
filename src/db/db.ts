@@ -17,6 +17,7 @@ import {
   recordMigrationRecovery,
   recoverFromMigrationFailure,
 } from "./recovery.ts";
+import { isAbortError } from "../util/errors.ts";
 
 /**
  * Initializes or validates a database. It is intentionally kept compatible with
@@ -94,6 +95,10 @@ export class DB {
     ...params: SQLInputValue[]
   ): { changes: number | bigint; lastInsertRowid: number | bigint } {
     return this.#raw.prepare(sql).run(...params);
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
   }
 
   /** Closes the underlying connection. Callers should normally use CloseAll. */
@@ -354,10 +359,6 @@ function unrebuildableReason(err: unknown): string {
   if (isSQLiteBusy(err)) return "another process holds the SQLite writer lock";
   if (isSQLiteReadOnly(err)) return "the database file is read-only";
   return "";
-}
-
-function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "AbortError";
 }
 
 /** Marks a migration failure that must be snapshotted through its connection. */

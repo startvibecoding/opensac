@@ -42,8 +42,8 @@ export function sleepSync(ms: number): void {
 // Contention counters (ported from the atomic counters in busy.go)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const busyRetryCounters = { hits: 0, waitNanos: 0 };
-const beginWaitCounters = { count: 0, totalNs: 0, maxNs: 0 };
+const busyRetryCounters = { hits: 0, waitMs: 0 };
+const beginWaitCounters = { count: 0, totalMs: 0, maxMs: 0 };
 
 /**
  * Returns the cumulative begin-retry hit count and the total backoff time slept
@@ -52,7 +52,7 @@ const beginWaitCounters = { count: 0, totalNs: 0, maxNs: 0 };
 export function busyRetryStats(): { hits: number; totalWaitMs: number } {
   return {
     hits: busyRetryCounters.hits,
-    totalWaitMs: busyRetryCounters.waitNanos / 1_000_000,
+    totalWaitMs: busyRetryCounters.waitMs,
   };
 }
 
@@ -67,15 +67,15 @@ export function beginWaitStats(): {
 } {
   return {
     count: beginWaitCounters.count,
-    totalMs: beginWaitCounters.totalNs / 1_000_000,
-    maxMs: beginWaitCounters.maxNs / 1_000_000,
+    totalMs: beginWaitCounters.totalMs,
+    maxMs: beginWaitCounters.maxMs,
   };
 }
 
 export function recordBeginWait(elapsedMs: number): void {
   beginWaitCounters.count += 1;
-  beginWaitCounters.totalNs += elapsedMs * 1_000_000;
-  if (elapsedMs * 1_000_000 > beginWaitCounters.maxNs) {
-    beginWaitCounters.maxNs = elapsedMs * 1_000_000;
+  beginWaitCounters.totalMs += elapsedMs;
+  if (elapsedMs > beginWaitCounters.maxMs) {
+    beginWaitCounters.maxMs = elapsedMs;
   }
 }

@@ -10,7 +10,7 @@
 /**
  * ToolLaunchOrder prepares the start-order chain for one batch of calls. The
  * first call is always free to start. A non-positive call count returns null,
- * which yields nil-safe handles.
+ * which yields null-safe handles.
  */
 export class ToolLaunchOrder {
   private started: PromiseWithResolvers<void>[] = [];
@@ -42,7 +42,7 @@ export class ToolLaunchOrder {
   }
 }
 
-/** Creates a nil-safe ToolLaunchOrder; a non-positive count yields null. */
+/** Creates a null-safe ToolLaunchOrder; a non-positive count yields null. */
 export function newToolLaunchOrder(calls: number): ToolLaunchOrder | null {
   if (calls <= 0) return null;
   return new ToolLaunchOrder(calls);

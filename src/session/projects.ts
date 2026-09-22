@@ -55,8 +55,8 @@ export function boolToInt(v: boolean): number {
 
 /** Lists every project in updated-descending order. */
 export function listProjects(sessionDir: string): Project[] {
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  if (!ok || db === null) return [];
+  const db = openExistingSessionDB(sessionDir);
+  if (db === null) return [];
   const records = new ProjectDAO(db.db).list();
   return records.map((record) => ({
     id: record.id,
@@ -147,8 +147,8 @@ export function latestSessionTitle(
   sessionDir: string,
   sessionId: string,
 ): { name: string; source: string } {
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  if (!ok || db === null) return { name: "", source: "" };
+  const db = openExistingSessionDB(sessionDir);
+  if (db === null) return { name: "", source: "" };
   let data: string;
   try {
     data = new ProjectDAO(db.db).latestSessionInfoData(sessionId);
@@ -166,8 +166,8 @@ export function getSessionMetadata(
   sessionDir: string,
   sessionId: string,
 ): SessionMetadata {
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  if (!ok || db === null) return { pinned: false };
+  const db = openExistingSessionDB(sessionDir);
+  if (db === null) return { pinned: false };
   const record = new ProjectDAO(db.db).metadata(sessionId);
   if (record === null) return { pinned: false };
   const metadata: SessionMetadata = {
@@ -189,8 +189,8 @@ export function listSessionMetadata(
 ): Map<string, SessionMetadata> {
   const result = new Map<string, SessionMetadata>();
   if (sessionIds.length === 0) return result;
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  if (!ok || db === null) return result;
+  const db = openExistingSessionDB(sessionDir);
+  if (db === null) return result;
   const records = new ProjectDAO(db.db).metadataForSessions(sessionIds);
   for (const record of records) {
     const metadata: SessionMetadata = {
@@ -208,7 +208,7 @@ export function listSessionMetadata(
  * read-only projection for project listings.
  */
 export function projectSessionCounts(sessionDir: string): Map<string, number> {
-  const { db, ok } = openExistingSessionDB(sessionDir);
-  if (!ok || db === null) return new Map();
+  const db = openExistingSessionDB(sessionDir);
+  if (db === null) return new Map();
   return new ProjectDAO(db.db).sessionCountsByProject();
 }

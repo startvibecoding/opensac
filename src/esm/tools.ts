@@ -14,7 +14,7 @@ import {
   statusCompleteCandidate,
 } from "./state.ts";
 import { type Store } from "./store.ts";
-import { ErrNotFound } from "./store.ts";
+import { EsmObjectiveNotFoundError } from "./store.ts";
 
 export type SessionIDFunc = () => string;
 export type RunIDFunc = () => string;
@@ -74,7 +74,7 @@ class GetTool implements Tool {
     try {
       obj = this.store.get(this.sessionID());
     } catch (err) {
-      if (err === ErrNotFound) {
+      if (err instanceof EsmObjectiveNotFoundError) {
         return newTextToolResult(
           "No ESM objective is available for this session.",
         );

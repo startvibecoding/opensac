@@ -26,7 +26,7 @@ Ported so far (all type-checked, linted, and tested):
 | `internal/skills` | `src/skills` | skill discovery (builtin/global/project), references, enable/disable toggles |
 | `internal/contextfiles` | `src/contextfiles` | well-known context-file discovery (global/parent/project), `.opensac/rule.md` load/ensure, system-prompt assembly |
 | `internal/expert` | `src/expert` | expert bundle format (manifest + persona frontmatter), layered builtin/global/project ExpertCenter, writable CRUD manager, embedded seed bundles |
-| `internal/tools` | `src/tools` | tool Registry + standard tools (read/ls/write/edit/insert/plan/find/grep/bash/jobs/kill/question/skill_ref/a2a_dispatch/image_generation), file diff/atomic write, file locks, background jobs |
+| `internal/tools` | `src/tools` | tool Registry + standard tools (read/ls/write/edit/insert/plan/find/grep/bash/jobs/kill/question/skill_ref/image_generation), file diff/atomic write, file locks, background jobs |
 | top-level `agent` (public SDK) | `sdk/agent` | public `Agent`/`Provider`/`Builder`/`ExternalTool` interfaces + types (must not import `src/`) |
 | `bootstrap` | `src/bootstrap` | provider bridge wiring `Builder.withProviderByName` to `src/provider` (builder hook deferred to `src/agent`) |
 

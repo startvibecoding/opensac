@@ -15,10 +15,10 @@ import {
 } from "@std/assert";
 import * as path from "@std/path";
 import {
-  DefaultMaintenancePolicy,
-  IsMaintenanceCronJobID,
+  defaultMaintenancePolicy,
+  isMaintenanceCronJobID,
   MaintenanceCronJobPrefix,
-  MaintenanceStorageReconcileJobID,
+  maintenanceStorageReconcileJobID,
   MaintenanceStorageReconcileJobName,
   MaintenanceStorageReconcileSchedule,
 } from "../agentruntime/maintenance_cron.ts";
@@ -35,7 +35,7 @@ import { streamDone, streamTextDelta } from "../provider/mod.ts";
 import type { CronJob } from "./cron.ts";
 import { normalizeJobSchedule } from "./schedule.ts";
 import {
-  ErrJobAlreadyRunning,
+  JobAlreadyRunningError,
   newScheduler,
   newSchedulerWithSessionDir,
   Scheduler,
@@ -412,7 +412,7 @@ Deno.test("SchedulerRunNowErrors", () => {
     lastRun: new Date(),
   });
   const err = assertThrows(() => scheduler.runNow(job.id!));
-  assertInstanceOf(err, ErrJobAlreadyRunning);
+  assertInstanceOf(err, JobAlreadyRunningError);
 });
 
 // --- Maintenance projection tests ---
@@ -436,10 +436,10 @@ Deno.test("SchedulerStartProjectsMaintenanceJobOnce", async () => {
   try {
     const maintenance = newSQLiteCronStore(sessionDir)
       .list()
-      .filter((job) => IsMaintenanceCronJobID(job.id ?? ""));
+      .filter((job) => isMaintenanceCronJobID(job.id ?? ""));
     assertEquals(maintenance.length, 1);
     const job = maintenance[0];
-    assertEquals(job.id, MaintenanceStorageReconcileJobID());
+    assertEquals(job.id, maintenanceStorageReconcileJobID());
     assertEquals(job.schedule, MaintenanceStorageReconcileSchedule);
     assert(job.enabled === true);
     assert(job.oneShot !== true);
@@ -470,13 +470,13 @@ Deno.test("DisabledMaintenancePolicyRemovesTheProjection", async () => {
     storageReconcileSchedule: "",
   });
   off.start();
-  assertThrows(() => store.get(MaintenanceStorageReconcileJobID()));
+  assertThrows(() => store.get(maintenanceStorageReconcileJobID()));
   await off.stop();
 
   const on = newSchedulerWithSessionDir(store, null, 3_600_000, sessionDir);
-  on.setMaintenancePolicy(DefaultMaintenancePolicy());
+  on.setMaintenancePolicy(defaultMaintenancePolicy());
   on.start();
-  store.get(MaintenanceStorageReconcileJobID());
+  store.get(maintenanceStorageReconcileJobID());
   await on.stop();
 
   const restarted = newSchedulerWithSessionDir(
@@ -490,7 +490,7 @@ Deno.test("DisabledMaintenancePolicyRemovesTheProjection", async () => {
     storageReconcileSchedule: "",
   });
   restarted.start();
-  assertThrows(() => store.get(MaintenanceStorageReconcileJobID()));
+  assertThrows(() => store.get(maintenanceStorageReconcileJobID()));
   store.get("cron-keep");
   await restarted.stop();
   closeDatabases();
@@ -501,7 +501,7 @@ Deno.test("MaintenanceScheduleOverrideKeepsRunHistory", async () => {
   const store = newSQLiteCronStore(sessionDir);
   const runAt = new Date(Date.now() - 2 * 3_600_000);
   const stored = normalizeJobSchedule({
-    id: MaintenanceStorageReconcileJobID(),
+    id: maintenanceStorageReconcileJobID(),
     name: MaintenanceStorageReconcileJobName,
     prompt: "Runtime-owned maintenance; never executed as an agent prompt.",
     schedule: "@daily",
@@ -526,7 +526,7 @@ Deno.test("MaintenanceScheduleOverrideKeepsRunHistory", async () => {
   });
   scheduler.start();
   try {
-    const job = store.get(MaintenanceStorageReconcileJobID());
+    const job = store.get(maintenanceStorageReconcileJobID());
     assertEquals(job.schedule, "@every 6h");
     assert(job.nextRun !== null);
     assertEquals(job.runCount, 3);
@@ -554,7 +554,7 @@ Deno.test("InvalidMaintenanceScheduleFallsBackToDefault", async () => {
   });
   scheduler.start();
   try {
-    const job = store.get(MaintenanceStorageReconcileJobID());
+    const job = store.get(maintenanceStorageReconcileJobID());
     assertEquals(job.schedule, MaintenanceStorageReconcileSchedule);
   } finally {
     await scheduler.stop();
@@ -583,10 +583,10 @@ Deno.test("MaintenanceJobCompletesThroughTheRuntimeNotAnAgent", async () => {
   );
   scheduler.start();
   try {
-    scheduler.runNow(MaintenanceStorageReconcileJobID());
+    scheduler.runNow(maintenanceStorageReconcileJobID());
     const completed = await waitForStatus(
       store,
-      MaintenanceStorageReconcileJobID(),
+      maintenanceStorageReconcileJobID(),
       "success",
     );
     assertEquals(completed.lastError, "");

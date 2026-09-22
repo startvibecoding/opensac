@@ -33,7 +33,7 @@ export const maxKnowledgeLibrarianChars = 4_800;
  * index/librarian Run provenance and same-base admission mutual exclusion
  * depend on.
  */
-export function KnowledgeLibrarianSessionID(
+export function knowledgeLibrarianSessionID(
   baseID: string,
   rootDir: string,
 ): string {
@@ -42,8 +42,11 @@ export function KnowledgeLibrarianSessionID(
     sum.subarray(0, 12).toString("hex");
 }
 
-export function knowledgeLibrarianSessionID(base: KnowledgeBase): string {
-  return KnowledgeLibrarianSessionID(base.id, base.rootDir);
+/** Derives the dedicated-session identity from a knowledge-base handle. */
+export function knowledgeLibrarianSessionIDForBase(
+  base: KnowledgeBase,
+): string {
+  return knowledgeLibrarianSessionID(base.id, base.rootDir);
 }
 
 /**
@@ -55,7 +58,7 @@ export function openKnowledgeLibrarianSession(
   sessionDir: string,
   base: KnowledgeBase,
 ): import("../session/mod.ts").Manager {
-  const id = knowledgeLibrarianSessionID(base);
+  const id = knowledgeLibrarianSessionIDForBase(base);
   try {
     return openByIDExact(sessionDir, id);
   } catch {

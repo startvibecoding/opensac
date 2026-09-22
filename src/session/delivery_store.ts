@@ -14,20 +14,29 @@ import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 import { writeRootDatabase } from "./database.ts";
 import { normalizedRunJSON } from "./run_json.ts";
 
-/** Raised when a delivery operation lease was lost to another owner/epoch. */
-export const ErrDeliveryLeaseLost: Error = new Error(
-  "delivery operation lease was lost",
-);
+/** Thrown when a delivery operation lease was lost to another owner/epoch. */
+export class DeliveryLeaseLostError extends Error {
+  override name = "DeliveryLeaseLostError";
+  constructor() {
+    super("delivery operation lease was lost");
+  }
+}
 
-/** Raised when a delivery operation is leased or not yet ready. */
-export const ErrDeliveryOperationBusy: Error = new Error(
-  "delivery operation is leased or not ready",
-);
+/** Thrown when a delivery operation is leased or not yet ready. */
+export class DeliveryOperationBusyError extends Error {
+  override name = "DeliveryOperationBusyError";
+  constructor() {
+    super("delivery operation is leased or not ready");
+  }
+}
 
-/** Raised when a delivery operation row is absent. */
-export const ErrDeliveryOperationAbsent: Error = new Error(
-  "delivery operation was not found",
-);
+/** Thrown when a delivery operation row is absent. */
+export class DeliveryOperationAbsentError extends Error {
+  override name = "DeliveryOperationAbsentError";
+  constructor() {
+    super("delivery operation was not found");
+  }
+}
 
 /** Default lease window for an unclaimed operation. */
 export const defaultDeliveryLeaseMs = 30_000;
@@ -102,7 +111,7 @@ function stringValue(value: string | null): string {
 
 function requireConn(db: Database): NonNullable<Database["db"]> {
   if (db.db === null) {
-    throw new Error("delivery database is nil");
+    throw new Error("delivery database is not open");
   }
   return db.db;
 }
@@ -376,23 +385,23 @@ export function claimDeliveryOperation(
     try {
       ({ intentStatus } = dao.dependencyStatus(tx, operationId));
     } catch (err) {
-      if (isNoRows(err)) throw ErrDeliveryOperationAbsent;
+      if (isNoRows(err)) throw new DeliveryOperationAbsentError();
       throw err;
     }
     if (
       intentStatus === "delivered" || intentStatus === "failed" ||
       intentStatus === "cancelled"
     ) {
-      throw ErrDeliveryOperationBusy;
+      throw new DeliveryOperationBusyError();
     }
     const nowMillis = now.getTime();
     const leaseMillis = claimedUntil.getTime();
     const result = dao.claim(tx, operationId, owner, nowMillis, leaseMillis);
-    if (result !== 1) throw ErrDeliveryOperationBusy;
+    if (result !== 1) throw new DeliveryOperationBusyError();
     const loadedRecord = dao.findOperation(tx, operationId);
     operation = deliveryOperationFromRecord(loadedRecord);
   });
-  if (operation === null) throw ErrDeliveryOperationAbsent;
+  if (operation === null) throw new DeliveryOperationAbsentError();
   return operation;
 }
 
@@ -452,7 +461,7 @@ export function updateDeliveryOperation(
     try {
       currentRecord = dao.currentResult(tx, operationId);
     } catch (err) {
-      if (isNoRows(err)) throw ErrDeliveryOperationAbsent;
+      if (isNoRows(err)) throw new DeliveryOperationAbsentError();
       throw err;
     }
     if (
@@ -467,7 +476,7 @@ export function updateDeliveryOperation(
     ) {
       return;
     }
-    throw ErrDeliveryLeaseLost;
+    throw new DeliveryLeaseLostError();
   });
 }
 
@@ -513,7 +522,7 @@ export function updateDeliveryOperationProgress(
       failureCode.trim(),
       now.toISOString(),
     );
-    if (result !== 1) throw ErrDeliveryLeaseLost;
+    if (result !== 1) throw new DeliveryLeaseLostError();
     refreshDeliveryIntentStatusTx(tx, operationId, now);
   });
 }
@@ -675,7 +684,7 @@ export function getDeliveryOperation(
   try {
     record = new DeliveryDAO(null).findOperation(conn, operationId);
   } catch (err) {
-    if (isNoRows(err)) throw ErrDeliveryOperationAbsent;
+    if (isNoRows(err)) throw new DeliveryOperationAbsentError();
     throw err;
   }
   return deliveryOperationFromRecord(record);

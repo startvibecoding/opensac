@@ -743,7 +743,7 @@ export class AuthDialog {
           title: tr.text(fieldTitleKey(this.#view)),
           hint,
           error: this.#error,
-          items: this.fieldItems(allSpecs),
+          items: [...this.fieldItems(allSpecs), this.#backItem()],
           input: this.#paramField !== ""
             ? {
               prompt: tr.text(this.activeFieldLabel()),
@@ -966,6 +966,19 @@ export class AuthDialog {
     });
   }
 
+  /**
+   * Explicit "confirm and return" item for field pages, mirroring the settings
+   * dialog's done item. Selecting it steps back one level exactly like Escape.
+   */
+  #backItem(): DialogItem {
+    const tr = this.#host.translator;
+    return {
+      label: tr.text("auth.field.done"),
+      description: tr.text("settings.return"),
+      value: "back",
+    };
+  }
+
   // ── selection ─────────────────────────────────────────────────────────────
 
   select(value: string): void {
@@ -1061,6 +1074,10 @@ export class AuthDialog {
       "model-cost",
       "model-compat",
     ];
+    if (value === "back") {
+      this.#pop();
+      return;
+    }
     if (directViews.includes(value as AuthView) || value === "done") {
       if (value === "done") {
         this.confirm();
@@ -1301,7 +1318,10 @@ export class AuthDialog {
         headers[k] = v;
       }
 
-      const resp = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+      const resp = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      });
       if (!resp.ok) {
         this.#fetchError = this.#host.translator.text(
           "dialog.auth.fetch_models_failed",
@@ -1319,8 +1339,7 @@ export class AuthDialog {
         for (const m of body.data) {
           if (m?.id) models.push({ id: m.id, name: m.name ?? m.id });
         }
-      }
-      // Google Gemini format: { models: [{ name, displayName }] }
+      } // Google Gemini format: { models: [{ name, displayName }] }
       else if (Array.isArray(body?.models)) {
         for (const m of body.models) {
           // Google returns "models/xxx", strip the prefix

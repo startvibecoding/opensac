@@ -13,9 +13,9 @@
 import { isTransientDeliveryFailure } from "../dao/mod.ts";
 import {
   claimDeliveryOperation,
+  DeliveryLeaseLostError,
   type DeliveryOperation,
-  ErrDeliveryLeaseLost,
-  ErrDeliveryOperationBusy,
+  DeliveryOperationBusyError,
   listDueDeliveryOperations,
   updateDeliveryOperation,
   updateDeliveryOperationProgress,
@@ -184,7 +184,7 @@ export class DeliveryCoordinator {
       try {
         operation = this.claim(candidate.id, now);
       } catch (claimErr) {
-        if (claimErr === ErrDeliveryOperationBusy) continue;
+        if (claimErr instanceof DeliveryOperationBusyError) continue;
         throw claimErr;
       }
       const outcome = await execute(operation);
@@ -226,7 +226,7 @@ export class DeliveryCoordinator {
       try {
         this.complete(operation, result);
       } catch (completeErr) {
-        if (completeErr === ErrDeliveryLeaseLost) continue;
+        if (completeErr instanceof DeliveryLeaseLostError) continue;
         throw completeErr;
       }
       processed++;

@@ -30,12 +30,8 @@ export interface CLIOptions {
   model: string;
   mode: string;
   thinking: string;
-  // root file init
-  initServe: boolean;
-  force: boolean;
+  // scheduled task management
   cron: boolean;
-  enableA2AMaster: boolean;
-  initA2AMaster: boolean;
   // ACP decision deadlines (raw Go duration strings)
   acpPermissionTimeout: string;
   acpQuestionTimeout: string;
@@ -62,11 +58,7 @@ export function defaultCLIOptions(): CLIOptions {
     model: "",
     mode: "",
     thinking: "",
-    initServe: false,
-    force: false,
     cron: false,
-    enableA2AMaster: false,
-    initA2AMaster: false,
     acpPermissionTimeout: "",
     acpQuestionTimeout: "",
   };

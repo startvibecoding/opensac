@@ -55,7 +55,7 @@ export class CronDAO {
   }
 
   create(record: CronJobRecord | null): void {
-    if (record === null) throw new Error("cron job record is nil");
+    if (record === null) throw new Error("cron job record is missing");
     execChanges(
       this.requireDb(),
       `INSERT INTO cron_jobs
@@ -68,7 +68,7 @@ export class CronDAO {
   }
 
   update(record: CronJobRecord | null): void {
-    if (record === null) throw new Error("cron job record is nil");
+    if (record === null) throw new Error("cron job record is missing");
     const changed = execChanges(
       this.requireDb(),
       `UPDATE cron_jobs SET
@@ -110,7 +110,7 @@ export class CronDAO {
   }
 
   private requireDb(): DB {
-    if (this.db === null) throw new Error("cron database is nil");
+    if (this.db === null) throw new Error("cron database is not open");
     return this.db;
   }
 }

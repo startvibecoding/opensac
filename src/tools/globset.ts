@@ -4,6 +4,8 @@
 // the tools package uses for ignore handling and the `include` filter. Go's
 // `regexp` maps to `RegExp`; the generated patterns are anchored the same way.
 
+import { compileGeneratedRegExp } from "../util/regex.ts";
+
 /** A single compiled glob pattern. */
 export interface Glob {
   original: string;
@@ -24,7 +26,7 @@ export function newGlob(patternIn: string): Glob {
   pattern = pattern.replaceAll("\\", "/");
 
   const regexStr = globToRegex(pattern);
-  const regexp = new RegExp(regexStr);
+  const regexp = compileGeneratedRegExp(regexStr);
 
   return { original: pattern, regexp, isNegated };
 }

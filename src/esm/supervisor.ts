@@ -1,7 +1,7 @@
 // Ported from internal/esm/supervisor.go
 //
 // The canonical TUI ESM role-result application semantics. Both the TUI and
-// WebUI adapters apply results through these functions so completion,
+// ACP adapters apply results through these functions so completion,
 // rejection, and blocker classification cannot diverge.
 
 import {
@@ -64,7 +64,7 @@ export function applyWorkerResult(
   runID: string,
   result: RoleResult,
 ): ApplyResult {
-  if (store === null) throw new Error("esm store is nil");
+  if (store === null) throw new Error("esm store is required");
   let report: WorkerReport;
   try {
     report = parseWorkerReport(result.response);
@@ -186,7 +186,7 @@ export function applyReviewResult(
   role: string,
   result: RoleResult,
 ): ApplyResult {
-  if (store === null) throw new Error("esm store is nil");
+  if (store === null) throw new Error("esm store is required");
   let report: AuditReport;
   try {
     report = parseAuditReport(result.response);

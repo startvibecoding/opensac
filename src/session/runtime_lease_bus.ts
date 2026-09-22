@@ -81,8 +81,8 @@ const runtimeLeaseBusLogs: {
 
 /**
  * Receives UDP diagnostics without writing them to the process-wide logger.
- * Serve uses this to expose the messages in WebUI; TUI, CLI, and channel
- * transports must not receive protocol diagnostics.
+ * Tools and diagnostics surfaces use this to expose the messages; TUI, CLI, and
+ * protocol transports must not receive protocol diagnostics.
  */
 export function subscribeRuntimeLeaseLogs(
   sink: (message: string) => void,
@@ -285,7 +285,7 @@ function onRuntimeLeaseDatagram(
   if (!validRuntimeLeaseNotification(notification)) return;
   if (notification.originInstanceId === runtimeOwnerID()) {
     // This process has already published the corresponding canonical event
-    // directly. Ignoring its loopback copy avoids duplicate WebUI projections
+    // directly. Ignoring its loopback copy avoids duplicate projections
     // while other processes still receive the broadcast.
     return;
   }

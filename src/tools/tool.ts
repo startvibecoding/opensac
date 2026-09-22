@@ -10,6 +10,9 @@
 // `async` so filesystem/child-process tools share one signature.
 
 import * as path from "@std/path";
+import type { AgentID } from "../../sdk/agent/types.ts";
+import type { IterationBudget } from "../agent/iteration_budget.ts";
+import type { EventSink, RunContext } from "../agent/run_context.ts";
 import { envList, loadEnv } from "../config/env.ts";
 import type { Settings } from "../config/settings.ts";
 import {
@@ -26,7 +29,7 @@ import type {
 } from "../provider/types.ts";
 import { type Sandbox } from "../sandbox/mod.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
-import { NewBashToolWithJM } from "./bash.ts";
+import { newBashToolWithJobManager } from "./bash.ts";
 import { EditTool } from "./edit.ts";
 import { FindTool } from "./find.ts";
 import { defaultFileLockManager, FileLockManager } from "./file_lock.ts";
@@ -51,32 +54,16 @@ export interface ToolContext {
   operationId?: string;
   /** Interactive question handler for the `question` tool. */
   questionAsker?: QuestionAsker;
-  /**
-   * Run-scoped typed values attached by the Runtime for tools that need data
-   * the package cannot import (for example the per-run iteration budget owned
-   * by `src/agent`). This is the TS analog of the value bag Go threads through
-   * `context.Context`, minus the direct import cycle.
-   */
-  values?: Map<symbol, unknown>;
-}
-
-/** Attaches a typed value to a tool context (copy-on-write). */
-export function toolContextWithValue<T>(
-  ctx: ToolContext,
-  key: symbol,
-  value: T,
-): ToolContext {
-  const values = new Map(ctx.values);
-  values.set(key, value);
-  return { ...ctx, values };
-}
-
-/** Extracts a typed value from a tool context, or undefined. */
-export function toolContextValue<T>(
-  ctx: ToolContext | undefined,
-  key: symbol,
-): T | undefined {
-  return ctx?.values?.get(key) as T | undefined;
+  /** Identity of the owning agent, for agent-owned sub-tools. */
+  agentID?: AgentID;
+  /** The owning run's canonical event sink. */
+  eventSink?: EventSink;
+  /** The owning run's context, carried through tool timeouts. */
+  parentRunContext?: RunContext;
+  /** The owning agent's execution mode for sub-agent inheritance. */
+  parentMode?: string;
+  /** The per-run iteration budget handle owned by the agent loop. */
+  iterationBudget?: IterationBudget;
 }
 
 /**
@@ -94,10 +81,10 @@ export function contextWithOperationID(
 /** Extracts the stable operation ID, when the Runtime claimed a record. */
 export function operationIDFromContext(
   ctx: ToolContext | undefined,
-): { value: string; ok: boolean } {
-  if (!ctx) return { value: "", ok: false };
+): string | undefined {
+  if (!ctx) return undefined;
   const value = ctx.operationId ?? "";
-  return { value, ok: value !== "" };
+  return value === "" ? undefined : value;
 }
 
 /** Attaches a `QuestionAsker` to the context. */
@@ -340,10 +327,9 @@ export class Registry {
     this.#tools.set(name, t);
   }
 
-  /** Returns a tool by name. */
-  get(name: string): { tool: Tool; ok: boolean } {
-    const t = this.#tools.get(name);
-    return { tool: t as Tool, ok: t !== undefined };
+  /** Returns a tool by name, or undefined when not registered. */
+  get(name: string): Tool | undefined {
+    return this.#tools.get(name);
   }
 
   /** Removes a tool by name. No-op if not found. */
@@ -444,7 +430,7 @@ export class Registry {
     this.register(new WriteTool(this));
     this.register(new EditTool(this));
     this.register(new InsertTool(this));
-    const bashTool = NewBashToolWithJM(this, this.#jobManager);
+    const bashTool = newBashToolWithJobManager(this, this.#jobManager);
     this.register(bashTool);
     this.register(new JobsTool(this, bashTool));
     this.register(new KillTool(this, bashTool));
@@ -455,7 +441,7 @@ export class Registry {
 
   /** Registers only the specified tools by name. */
   registerFiltered(toolNames: string[]): void {
-    const bashTool = NewBashToolWithJM(this, this.#jobManager);
+    const bashTool = newBashToolWithJobManager(this, this.#jobManager);
     const factories: Record<string, () => Tool> = {
       "read": () => new ReadTool(this),
       "ls": () => new LsTool(this),

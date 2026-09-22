@@ -100,7 +100,7 @@ Deno.test("buildAgent without hydrateHistory leaves history empty", async () => 
     "off",
   );
 
-  // Default (no hydrateHistory) matches serve/ACP behavior: they replay
+  // Default (no hydrateHistory) matches ACP behavior: they replay
   // history themselves after the build.
   const agent = runtime.buildAgent({
     provider: created.provider,

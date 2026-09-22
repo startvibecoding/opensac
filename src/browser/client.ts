@@ -589,6 +589,10 @@ export class Client {
     return await this.#browser!.closeTab(targetId, signal);
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   /** Closes the client connection. */
   close(): void {
     if (this.#daemon) return;

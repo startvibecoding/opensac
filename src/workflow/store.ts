@@ -25,7 +25,7 @@ export class FileStore {
   async save(state: RunState, signal?: AbortSignal): Promise<void> {
     throwIfAborted(signal);
     if (state === null || state === undefined) {
-      throw new Error("workflow state is nil");
+      throw new Error("workflow state is required");
     }
     if (state.id === "") {
       throw new Error("workflow state id is required");

@@ -113,7 +113,7 @@ export {
   type RunHandle,
 } from "./app_controller.ts";
 export {
-  DecisionSourceTUI,
+  decisionSourceTUI,
   decisionTerminalStatus,
   TuiRun,
 } from "./tui_run.ts";

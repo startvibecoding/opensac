@@ -5,6 +5,8 @@
 
 import React from "react";
 import { render } from "ink";
+import process from "node:process";
+import { atomicStdout } from "../tui/sync_output.ts";
 import { TuiShell } from "../tui/tui_shell.tsx";
 import { TUISession } from "../tui/tui_session.ts";
 import type { Settings } from "../config/mod.ts";
@@ -139,7 +141,13 @@ export async function runInteractiveAction(
         sessionEnded.resolve();
       },
     }),
-    { exitOnCtrlC: false, patchConsole: false },
+    {
+      exitOnCtrlC: false,
+      patchConsole: false,
+      // Every Ink write (erase + repaint of the managed region) becomes one
+      // atomic frame, so a live modal cannot flicker mid-repaint.
+      stdout: atomicStdout(process.stdout),
+    },
   );
 
   await sessionEnded.promise;

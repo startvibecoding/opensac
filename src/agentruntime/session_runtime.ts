@@ -127,10 +127,10 @@ import type { DecisionService } from "./decision.ts";
 import type { ExecutionRuntime } from "./execution.ts";
 import {
   composeSteering,
-  ErrExpertSwitchRequiresFork,
   type ExpertBinding,
   expertConfigOption,
   ExpertSwitchRequiresForkError,
+  expertSwitchRequiresForkMessage,
   inspectExpert as inspectExpertImpl,
   listExperts as listExpertsImpl,
   newExpertBinding,
@@ -325,6 +325,10 @@ export class SessionRuntime {
       this.close();
     }
     throw shutdownErr;
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
   }
 
   /**
@@ -592,9 +596,9 @@ export class SessionRuntime {
     const manager = this.manager;
     if (manager !== undefined) {
       const loaded = loadSessionCapabilities(manager.getSessionDir(), this.id);
-      if (loaded.ok && loaded.caps !== null) {
-        browserEnabled = loaded.caps.browser;
-        webSearchEnabled = loaded.caps.webSearch;
+      if (loaded !== null) {
+        browserEnabled = loaded.browser;
+        webSearchEnabled = loaded.webSearch;
       }
     }
     this.sandboxEnabled = sandboxEnabled;
@@ -635,9 +639,10 @@ export class SessionRuntime {
     this.synchronizeCoreToolsLocked(browserEnabled);
     this.lastUsed = new Date();
     if (manager !== undefined) {
-      const loaded = loadSessionCapabilities(manager.getSessionDir(), this.id);
-      const persisted = loaded.caps ??
-        emptyCapabilities(this.id);
+      const persisted = loadSessionCapabilities(
+        manager.getSessionDir(),
+        this.id,
+      ) ?? emptyCapabilities(this.id);
       persisted.sessionId = this.id;
       persisted.browser = browserEnabled;
       persisted.webSearch = webSearchEnabled;
@@ -986,7 +991,7 @@ export class SessionRuntime {
     const currentID = manager.getExpertId().trim();
     if (currentID !== "" && nextID !== "" && currentID !== nextID) {
       throw new ExpertSwitchRequiresForkError(
-        `${ErrExpertSwitchRequiresFork}: ${JSON.stringify(currentID)} -> ${
+        `${expertSwitchRequiresForkMessage}: ${JSON.stringify(currentID)} -> ${
           JSON.stringify(nextID)
         }`,
       );
@@ -1731,7 +1736,7 @@ export class SessionRuntime {
     };
     const agent = newAgentWithLoopConfig(cfg, registry);
     // Opt-in history hydration: adapters that replay history themselves
-    // (serve/ACP/channels call loadHistoryState after the build) must keep the
+    // (ACP and other callers of loadHistoryState after the build) must keep the
     // default off, or the replayed turns would be loaded twice.
     if (opts.hydrateHistory === true && manager !== undefined) {
       const replay = manager.getReplayState();
@@ -2156,7 +2161,6 @@ function emptyCapabilities(sessionId: string): SessionCapabilities {
     workflows: false,
     webSearch: false,
     browser: false,
-    a2aMaster: false,
     updatedAt: new Date(0),
   };
 }

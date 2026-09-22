@@ -506,7 +506,7 @@ export function newCancelTool(active?: ActiveRegistry): CancelTool {
  * `workflow_cancel` are always registered; `workflow_run` is registered only
  * when a manager is supplied, matching the Go `RegisterTools` requirement that
  * the run tool has an AgentManager. (The Go helper returns early when the
- * manager is nil; here the read-only tools stay available without one.)
+ * manager is missing; here the read-only tools stay available without one.)
  */
 export function registerWorkflowTools(
   registry: Registry | undefined,

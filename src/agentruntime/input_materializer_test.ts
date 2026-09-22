@@ -261,7 +261,7 @@ Deno.test("InputResourceLifecycleEventsAndDraftCleanup", async () => {
       sessionId,
       "",
       bytesIngress({
-        origin: "webui",
+        origin: "acp",
         eventId: "old-draft",
         content: encoder.encode("old"),
         filenameHint: "old.txt",

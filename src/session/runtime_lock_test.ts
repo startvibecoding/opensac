@@ -86,11 +86,11 @@ Deno.test("released lease leaves a fencing tombstone", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-tombstone");
-    const [releaseOld, okOld] = tryLockRuntime(sessionDir, "lease-tombstone");
-    assert(okOld, "first lease must acquire");
+    const releaseOld = tryLockRuntime(sessionDir, "lease-tombstone");
+    assert(releaseOld !== null, "first lease must acquire");
     releaseOld();
-    const [releaseNew, okNew] = tryLockRuntime(sessionDir, "lease-tombstone");
-    assert(okNew, "second lease must acquire after release");
+    const releaseNew = tryLockRuntime(sessionDir, "lease-tombstone");
+    assert(releaseNew !== null, "second lease must acquire after release");
     releaseNew();
 
     const db = openRootDB(sessionDir);
@@ -226,8 +226,8 @@ Deno.test("an unexpired lease blocks a competing process", () => {
       expiresAt: now + 3600,
       updatedAt: now,
     });
-    const [, ok] = tryLockRuntime(sessionDir, "lease-busy");
-    assertEquals(ok, false);
+    const busyRelease = tryLockRuntime(sessionDir, "lease-busy");
+    assertEquals(busyRelease, null);
   } finally {
     closeAll();
   }
@@ -255,8 +255,8 @@ Deno.test("an expired lease is reclaimed with a fencing epoch bump", () => {
       updatedAt: now - 100,
     });
 
-    const [release, ok] = tryLockRuntime(sessionDir, "lease-expired");
-    assert(ok, "expired lease must be reclaimable");
+    const release = tryLockRuntime(sessionDir, "lease-expired");
+    assert(release !== null, "expired lease must be reclaimable");
     const binding = currentRuntimeLeaseBinding(sessionDir, "lease-expired");
     assert(
       binding !== null && binding.epoch >= 2,

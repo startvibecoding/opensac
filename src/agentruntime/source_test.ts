@@ -26,9 +26,9 @@ import {
   SourceConflictError,
   SourceFeishu,
   sourceFromSessionHeader,
+  SourceTUI,
   SourceUnknown,
   sourceWaitsForMembers,
-  SourceWebUI,
   SourceWeChat,
 } from "./source.ts";
 
@@ -40,7 +40,7 @@ Deno.test("ResolveSource prefers persisted binding and reports conflicts", () =>
       channelId: "c",
     } as Binding,
     sessionHeader: { channelType: "feishu" } as Header,
-    current: SourceWebUI,
+    current: SourceCLI,
     requested: SourceACP,
   });
   assertEquals(resolved.source, SourceWeChat);
@@ -61,7 +61,7 @@ Deno.test("ResolveSource binding wins over request and runtime", () => {
       channelType: "wechat",
       channelId: "c",
     } as Binding,
-    current: SourceWebUI,
+    current: SourceCLI,
     requested: SourceACP,
   });
   assertEquals(resolved.source, SourceWeChat);
@@ -71,7 +71,7 @@ Deno.test("ResolvePolicy uses resolved channel source", () => {
   const { resolution, mode, error } = resolvePolicy(
     {
       sessionHeader: { channelType: "feishu" } as Header,
-      requested: SourceWebUI,
+      requested: SourceCLI,
     },
     ModeAgent,
     ModePlan,
@@ -90,7 +90,7 @@ Deno.test("ResolvePolicy bound channel cannot downgrade mode", () => {
         channelType: "feishu",
         channelId: "c",
       } as Binding,
-      requested: SourceWebUI,
+      requested: SourceCLI,
     },
     ModeAgent,
     ModePlan,
@@ -109,7 +109,7 @@ Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
         channelType: "feishu",
         channelId: "c",
       } as Binding,
-      current: SourceWebUI,
+      current: SourceCLI,
       requested: SourceACP,
     },
     ModeAgent,
@@ -119,11 +119,11 @@ Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
   assert(error instanceof SourceConflictError);
 });
 
-Deno.test("ResolvePolicy unbound WebUI uses requested mode", () => {
+Deno.test("ResolvePolicy unbound CLI uses requested mode", () => {
   const { mode, error } = resolvePolicy(
     {
-      current: SourceWebUI,
-      requested: SourceWebUI,
+      current: SourceCLI,
+      requested: SourceCLI,
     },
     ModeAgent,
     ModeYolo,
@@ -184,7 +184,7 @@ Deno.test("Policy ResolveMode table", () => {
     {
       name: "regular request overrides session",
       policy: new ExecutionPolicy({
-        source: SourceWebUI,
+        source: SourceCLI,
         defaultMode: ModeAgent,
       }),
       session: ModePlan,
@@ -194,20 +194,20 @@ Deno.test("Policy ResolveMode table", () => {
     {
       name: "regular empty session uses default",
       policy: new ExecutionPolicy({
-        source: SourceWebUI,
+        source: SourceCLI,
         defaultMode: ModeAgent,
       }),
       want: ModeAgent,
     },
     {
       name: "empty policy default falls back to yolo",
-      policy: new ExecutionPolicy({ source: SourceWebUI }),
+      policy: new ExecutionPolicy({ source: SourceCLI }),
       want: ModeYolo,
     },
     {
       name: "regular request uses os",
       policy: new ExecutionPolicy({
-        source: SourceWebUI,
+        source: SourceCLI,
         defaultMode: ModeAgent,
       }),
       requested: ModeOS,
@@ -259,7 +259,7 @@ Deno.test("ResolveUnattendedMode", () => {
 Deno.test("IsValidMode and member waiting", () => {
   assert(isValidMode("yolo"));
   assertFalse(isValidMode("bogus"));
-  assert(sourceWaitsForMembers(SourceWebUI));
+  assert(sourceWaitsForMembers(SourceTUI));
   assert(sourceWaitsForMembers(SourceACP));
   assertFalse(sourceWaitsForMembers(SourceCLI));
 });

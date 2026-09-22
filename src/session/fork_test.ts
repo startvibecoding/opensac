@@ -179,14 +179,13 @@ Deno.test("fork rejects an open turn and independent sessions stay concurrent", 
       ForkSessionActiveError,
     );
 
-    const [releaseA, okA] = tryLockRuntime(sessionDir, "a");
-    assert(okA, "session a should acquire the runtime lease");
-    const [releaseA2, okA2] = tryLockRuntime(sessionDir, "a");
-    assert(!okA2, "active lease must block runtime acquisition");
-    const [releaseB, okB] = tryLockRuntime(sessionDir, "b");
-    assert(okB, "session b should acquire independently");
+    const releaseA = tryLockRuntime(sessionDir, "a");
+    assert(releaseA !== null, "session a should acquire the runtime lease");
+    const releaseA2 = tryLockRuntime(sessionDir, "a");
+    assert(releaseA2 === null, "active lease must block runtime acquisition");
+    const releaseB = tryLockRuntime(sessionDir, "b");
+    assert(releaseB !== null, "session b should acquire independently");
     releaseB();
-    releaseA2();
     releaseA();
   } finally {
     closeAll();
@@ -347,8 +346,8 @@ Deno.test("execution admission atomically starts a conversation turn", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "atomic-turn");
-    const [release, ok] = tryLockRuntime(sessionDir, "atomic-turn");
-    assert(ok, "acquire runtime lease");
+    const release = tryLockRuntime(sessionDir, "atomic-turn");
+    assert(release !== null, "acquire runtime lease");
     try {
       const started = new Date();
       createExecutionIntentAndSessionRunEventWithTurn(

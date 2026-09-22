@@ -44,10 +44,10 @@ export {
 } from "./report.ts";
 
 export {
-  ErrInvalidObjective,
-  ErrInvalidTransition,
-  ErrNotFound,
-  ErrObjectiveExists,
+  EsmInvalidObjectiveError,
+  EsmInvalidTransitionError,
+  EsmObjectiveExistsError,
+  EsmObjectiveNotFoundError,
   formatTime,
   isUsageLimitError,
   type Store,
@@ -96,9 +96,9 @@ export {
 } from "./supervisor.ts";
 export {
   compactESMError,
-  ErrCanceled,
-  ErrDeadlineExceeded,
-  ErrRoleIncomplete,
+  EsmCanceledError,
+  EsmDeadlineExceededError,
+  EsmRoleIncompleteError,
   isCanceled,
   isDeadlineExceeded,
   isRoleIncomplete,

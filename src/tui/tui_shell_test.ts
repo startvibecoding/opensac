@@ -82,10 +82,11 @@ interface Harness {
   input: InputState;
   submitted: string[];
   actions: string[];
+  output: () => string;
   unmount: () => void;
 }
 
-function mount(): Harness {
+function mount(busy = false): Harness {
   const translator = new Translator("en");
   const controller = new AppController(translator, {
     onMessage: () => {},
@@ -99,7 +100,7 @@ function mount(): Harness {
     input,
     translator,
     header: { version: "t", providerName: "p", modelName: "m", cwd: "/w" },
-    busy: false,
+    busy,
     mode: "yolo",
     toolModalOpen: false,
     esmPanelOpen: false,
@@ -138,6 +139,7 @@ function mount(): Harness {
     input,
     submitted,
     actions,
+    output: () => stdout.output,
     unmount: () => instance.unmount(),
   };
 }
@@ -198,6 +200,18 @@ Deno.test({
     h.stdin.push("\r");
     await sleep(60);
     assertEquals(h.submitted, [payload]);
+    h.unmount();
+  },
+});
+
+Deno.test({
+  name: "busy footer animates the rotating dots spinner",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const h = mount(true);
+    await sleep(60);
+    assert(/[⠋⠙⠹⠸⠴⠦⠧⠇⠏] working/.test(h.output()), h.output());
     h.unmount();
   },
 });

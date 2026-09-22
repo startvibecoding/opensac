@@ -120,13 +120,13 @@ Deno.test("doctor command projects JSON and human output", () => {
 Deno.test("root command registers acp doctor and knowledge-mcp", async () => {
   const root = newRootCommand("test-version");
   const help = await root.getHelp();
-  const names: string[] = ["acp", "doctor", "knowledge-mcp", "serve", "stats"];
+  const names: string[] = ["acp", "doctor", "knowledge-mcp", "stats"];
   for (const name of names) {
     assert(help.includes(name), `help must list ${name}`);
   }
 });
 
-Deno.test("every Go subcommand is wired (no pending placeholders)", async () => {
+Deno.test("every supported subcommand is wired (no pending placeholders)", async () => {
   const root = newRootCommand("test-version");
   const help = await root.getHelp();
   for (
@@ -134,18 +134,24 @@ Deno.test("every Go subcommand is wired (no pending placeholders)", async () => 
       "acp",
       "doctor",
       "knowledge-mcp",
-      "serve",
-      "a2a",
       "stats",
       "speedtest",
     ]
   ) {
     assert(help.includes(name), `help must list ${name}`);
   }
-  // Go has no `opensac cron` subcommand (cron is the root --cron flag), so the
-  // Commands section must not list one.
-  const commandsSection = help.slice(help.indexOf("Commands:"));
-  assertEquals(commandsSection.includes("cron"), false);
+  // The removed serve/A2A modes must not come back as subcommands. Read the
+  // command tree instead of parsing colored help text (the `acp` description
+  // contains the substring "server").
+  // deno-lint-ignore no-explicit-any
+  const listed = (root as any).getCommands().map((cmd: any) => cmd.getName());
+  for (const removed of ["serve", "a2a", "cron"]) {
+    assertEquals(
+      listed.includes(removed),
+      false,
+      `help must not list ${removed}`,
+    );
+  }
 });
 
 Deno.test("knowledge-mcp serve requires at least one knowledge base", async () => {

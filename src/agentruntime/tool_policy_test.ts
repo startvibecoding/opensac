@@ -6,7 +6,7 @@ import type { BeforeToolCallContext } from "../agent/agent.ts";
 import {
   type ExecutionPolicy,
   policyForSource,
-  SourceWebUI,
+  SourceCLI,
   SourceWeChat,
 } from "./source.ts";
 import {
@@ -52,7 +52,7 @@ Deno.test("EvaluateToolCallBlocksForcedModeHighRiskBash", () => {
 });
 
 Deno.test("NonChannelPolicyDoesNotInstallHardCommandGuard", () => {
-  const policy = policyForSource(SourceWebUI, "agent");
+  const policy = policyForSource(SourceCLI, "agent");
   const decision = evaluateToolCall(policy, "bash", { command: "rm -rf /" });
   assertFalse(decision.block);
   assertEquals(beforeToolCallForPolicy(policy, null), null);

@@ -21,12 +21,12 @@ import type { AcpServer } from "./server.ts";
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
-  ErrKnowledgeBaseNotFound,
-  ErrKnowledgeBaseUnindexed,
   getKnowledgeBase,
   getKnowledgeSnapshot,
   type KnowledgeBase,
+  KnowledgeBaseNotFoundError,
   type KnowledgeBaseSpec,
+  KnowledgeBaseUnindexedError,
   type KnowledgeSnapshot,
   listKnowledgeBases,
   updateKnowledgeBase,
@@ -38,22 +38,22 @@ import {
 } from "../agentruntime/knowledgebase.ts";
 import type { KnowledgeIndexProgress } from "../agentruntime/knowledge_index_job.ts";
 import {
-  KnowledgeBaseCronJobID,
-  KnowledgeBaseIDFromCronJobID,
-  RunKnowledgeBaseCronJob,
+  knowledgeBaseCronJobID,
+  knowledgeBaseIDFromCronJobID,
+  runKnowledgeBaseCronJob,
 } from "../agentruntime/knowledge_cron.ts";
 import { SourceACP as SourceACPValue } from "../agentruntime/source.ts";
 import { normalizeJobSchedule, parseSchedule } from "../cron/schedule.ts";
 import type { CronJob, CronStore } from "../cron/cron.ts";
 import { newSQLiteCronStore } from "../cron/sqlite_store.ts";
 import {
-  ErrJobAlreadyRunning,
+  JobAlreadyRunningError,
   newSchedulerWithSessionDir,
   Scheduler,
 } from "../cron/scheduler.ts";
 import { userVisibleJobs } from "../cron/maintenance.ts";
 import { newAgentManager } from "../agentruntime/agent_manager.ts";
-import { MaintenancePolicyFromSettings } from "../agentruntime/maintenance_cron.ts";
+import { maintenancePolicyFromSettings } from "../agentruntime/maintenance_cron.ts";
 import { getSessionDir } from "../config/mod.ts";
 import {
   defaultProviderConfig,
@@ -201,14 +201,10 @@ function knowledgeBaseMCPCommand(): string {
 
 // ─── schedule projection ─────────────────────────────────────────────────────
 
-export function knowledgeBaseCronJobID(id: string): string {
-  return KnowledgeBaseCronJobID(id);
-}
-
 export function knowledgeBaseIDFromCronJob(
   job: CronJob,
 ): { id: string; ok: boolean } {
-  return KnowledgeBaseIDFromCronJobID(job.id ?? "");
+  return knowledgeBaseIDFromCronJobID(job.id ?? "");
 }
 
 /**
@@ -348,12 +344,12 @@ export function removeKnowledgeBaseSchedule(s: AcpServer, id: string): void {
  * share one background-job registry with manual scans; Cron then records the
  * scheduling outcome and moves the next-run cursor.
  */
-async function runKnowledgeBaseCronJob(
+async function handleKnowledgeBaseCronJob(
   s: AcpServer,
   job: CronJob,
   _signal?: AbortSignal,
 ): Promise<{ handled: boolean; response: string; error: Error | null }> {
-  const { ok } = KnowledgeBaseIDFromCronJobID(job.id ?? "");
+  const { ok } = knowledgeBaseIDFromCronJobID(job.id ?? "");
   if (!ok) return { handled: false, response: "", error: null };
   let service: KnowledgeBaseService;
   try {
@@ -362,7 +358,7 @@ async function runKnowledgeBaseCronJob(
     return { handled: true, response: "", error: toError(err) };
   }
   try {
-    const outcome = await RunKnowledgeBaseCronJob(
+    const outcome = await runKnowledgeBaseCronJob(
       _signal,
       service,
       job.id ?? "",
@@ -475,9 +471,9 @@ export function ensureManageCron(s: AcpServer): {
     manager,
     manageCronInterval(),
     sessionDir,
-    (job, signal) => runKnowledgeBaseCronJob(s, job, signal),
+    (job, signal) => handleKnowledgeBaseCronJob(s, job, signal),
   );
-  scheduler.setMaintenancePolicy(MaintenancePolicyFromSettings(settings));
+  scheduler.setMaintenancePolicy(maintenancePolicyFromSettings(settings));
   // Reconcile schedules persisted by older Desktop processes before the
   // first tick.
   syncAllKnowledgeBaseSchedulesWithStore(s, store);
@@ -526,7 +522,6 @@ interface ManageCronJobView {
   lastStatus: string;
   sessionId?: string;
   workDir?: string;
-  a2aTarget?: string;
   createdAt?: string;
   lastRun?: string;
   nextRun?: string;
@@ -547,7 +542,6 @@ function manageCronJobView(job: CronJob): ManageCronJobView {
   };
   if (job.sessionId) view.sessionId = job.sessionId;
   if (job.workDir) view.workDir = job.workDir;
-  if (job.a2aTarget) view.a2aTarget = job.a2aTarget;
   if (job.createdAt) view.createdAt = job.createdAt.toISOString();
   if (job.lastRun) view.lastRun = job.lastRun.toISOString();
   if (job.nextRun) view.nextRun = job.nextRun.toISOString();
@@ -901,7 +895,7 @@ export function handleManageCronRun(s: AcpServer, req: ACPRPCRequest): void {
     scheduler.runNow(id);
   } catch (err) {
     let code = "cron_run_failed";
-    if (err instanceof ErrJobAlreadyRunning) code = "cron_job_running";
+    if (err instanceof JobAlreadyRunningError) code = "cron_job_running";
     else if (errorMessage(err).includes("not found")) {
       code = "cron_job_not_found";
     }
@@ -1022,7 +1016,7 @@ function validateKnowledgeBaseSchedule(
 
 export function manageKnowledgeBaseRPCError(err: unknown): RPCError {
   const error = toError(err);
-  if (error === ErrKnowledgeBaseNotFound) {
+  if (error instanceof KnowledgeBaseNotFoundError) {
     return acpStructuredRPCError(
       -32602,
       "knowledge_base_not_found",
@@ -1030,7 +1024,7 @@ export function manageKnowledgeBaseRPCError(err: unknown): RPCError {
       null,
     );
   }
-  if (error === ErrKnowledgeBaseUnindexed) {
+  if (error instanceof KnowledgeBaseUnindexedError) {
     return acpStructuredRPCError(
       -32602,
       "knowledge_base_unindexed",
@@ -1468,7 +1462,7 @@ export function handleManageKnowledgeBaseMCPApply(
   try {
     getKnowledgeBase(getSessionDir(s.settings), id);
   } catch (err) {
-    const code = toError(err) === ErrKnowledgeBaseNotFound
+    const code = toError(err) instanceof KnowledgeBaseNotFoundError
       ? "knowledge_base_not_found"
       : "knowledge_base_unavailable";
     s.writeResponse(

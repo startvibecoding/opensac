@@ -1,7 +1,7 @@
 // Ported from internal/contextfiles/contextfiles.go
 
 import * as path from "@std/path";
-import { ProjectDirName, projectPathFor } from "../config/mod.ts";
+import { projectDirName, projectPathFor } from "../config/mod.ts";
 
 /** Well-known context file names used by various AI coding tools. */
 export const wellKnownFiles: string[] = [
@@ -177,7 +177,7 @@ export function safeContextFilePath(
 /**
  * The path to the project-level rule file relative to the working directory.
  */
-export const ruleFile = ProjectDirName + "/rule.md";
+export const ruleFile = projectDirName + "/rule.md";
 
 /** The default restrictive project rule template written by /rule. */
 export const defaultRuleContent = `# Project Rules

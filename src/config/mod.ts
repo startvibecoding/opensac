@@ -1,12 +1,9 @@
 // Public surface of src/config (ported from internal/config).
 
-export { ProjectDirName, projectPath, projectPathFor } from "./paths.ts";
+export { projectDirName, projectPath, projectPathFor } from "./paths.ts";
 export {
   type ApprovalSettings,
   attachmentStorageReclaimSchedule,
-  BoolPtr,
-  cloneBoolPtr,
-  cloneFloat64Ptr,
   cloneStringMap,
   cloneStringSlice,
   type CompactionSettings,
@@ -16,8 +13,8 @@ export {
   defaultProviderConfig,
   defaultProviderConfigsAll,
   defaultSettings,
-  DefaultSkillHubOfficialHandle,
-  DefaultToolExecutionMaxConcurrency,
+  defaultSkillHubOfficialHandle,
+  defaultToolExecutionMaxConcurrency,
   effectiveImageGeneration,
   getGlobalSkillsDir,
   getModelConfig,

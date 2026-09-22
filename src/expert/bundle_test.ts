@@ -7,9 +7,9 @@ import {
   createMemoryFS,
   loadBundle,
   loadBundleFS,
-  RoleLead,
-  RoleMember,
-  TypeAgent,
+  roleLead,
+  roleMember,
+  typeAgent,
 } from "./mod.ts";
 
 const validTeamManifest = `{
@@ -99,18 +99,18 @@ Deno.test("loadBundle valid team", () => {
     // 3 referenced + 1 unreferenced md all load into defs.
     assertEquals(b.defs.size, 4, defIDs(b).join(","));
     const lead = b.defs.get("lead-x")!;
-    assertEquals(lead.role, RoleLead);
+    assertEquals(lead.role, roleLead);
     assertEquals(lead.displayName, "领队");
     assertEquals(lead.prompt, "领队正文");
     assertEquals(lead.emoji, "🎯");
     assertEquals(lead.description, "领队人设");
     for (const id of ["worker-a", "worker-b"]) {
-      assertEquals(b.defs.get(id)!.role, RoleMember, id);
+      assertEquals(b.defs.get(id)!.role, roleMember, id);
     }
     assertEquals(b.defs.get("worker-a")!.displayName, "Worker A");
     assertEquals(b.defs.get("worker-b")!.displayName, "工人乙");
     assertEquals(b.defs.get("extra")!.displayName, "extra");
-    assertEquals(b.defs.get("extra")!.role, RoleMember);
+    assertEquals(b.defs.get("extra")!.role, roleMember);
     assertEquals(b.defs.get("extra")!.meta.name, "extra");
     assertEquals(b.skillsDir, path.join(dir, "skills"));
     assertEquals(b.skillsFS, null);
@@ -122,10 +122,10 @@ Deno.test("loadBundle valid agent", () => {
     const dir = writeBundle(tmp, "agent-x", agentFiles());
     const b = loadBundle(dir);
     assert(!b.invalid, `bundle invalid: ${b.invalidReason}`);
-    assertEquals(b.manifest.expertType, TypeAgent);
+    assertEquals(b.manifest.expertType, typeAgent);
     const solo = b.defs.get("solo");
     assert(solo !== undefined, `Defs missing solo: ${defIDs(b)}`);
-    assertEquals(solo.role, RoleLead);
+    assertEquals(solo.role, roleLead);
     assertEquals(solo.displayName, "独立");
     assertEquals(b.skillsDir, "");
   });
@@ -351,7 +351,7 @@ Deno.test("loadBundleFS", () => {
   const b = loadBundleFS(mapfs, "pkg-a");
   assert(!b.invalid, `pkg-a invalid: ${b.invalidReason}`);
   assertEquals(b.name, "pkg-a");
-  assertEquals(b.defs.get("lead-x")!.role, RoleLead);
+  assertEquals(b.defs.get("lead-x")!.role, roleLead);
   assertEquals(b.skillsDir, "pkg-a/skills");
   assert(b.skillsFS !== null, "skillsFS should be set for ExpertFS loads");
   assert(

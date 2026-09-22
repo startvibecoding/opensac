@@ -11,10 +11,10 @@ import {
   claimDeliveryOperation,
   createDeliveryPlan,
   type DeliveryIntent,
+  DeliveryLeaseLostError,
   type DeliveryOperation,
+  DeliveryOperationBusyError,
   type DeliveryPlan,
-  ErrDeliveryLeaseLost,
-  ErrDeliveryOperationBusy,
   getDeliveryOperation,
   getDeliveryPlan,
   listFailedTransientDeliveryOperations,
@@ -151,14 +151,14 @@ function createDeliveryFixturePlan(
   return plan;
 }
 
-function expectThrows(fn: () => void, expected: Error): void {
+function expectThrows(fn: () => void, expected: new () => Error): void {
   try {
     fn();
   } catch (err) {
-    assertEquals(err, expected);
-    return;
+    if (err instanceof expected) return;
+    throw new Error(`expected ${expected.name}; got ${String(err)}`);
   }
-  throw new Error(`expected throw: ${expected.message}`);
+  throw new Error(`expected throw: ${expected.name}`);
 }
 
 function intentStatus(sessionDir: string, intentId: string): string {
@@ -183,7 +183,7 @@ Deno.test("delivery claim fences expired worker and honors dependency", () => {
           now,
           60_000,
         ),
-      ErrDeliveryOperationBusy,
+      DeliveryOperationBusyError,
     );
     const claimed = claimDeliveryOperation(
       sessionDir,
@@ -204,7 +204,7 @@ Deno.test("delivery claim fences expired worker and honors dependency", () => {
           now,
           60_000,
         ),
-      ErrDeliveryOperationBusy,
+      DeliveryOperationBusyError,
     );
     expectThrows(
       () =>
@@ -220,7 +220,7 @@ Deno.test("delivery claim fences expired worker and honors dependency", () => {
           "",
           null,
         ),
-      ErrDeliveryLeaseLost,
+      DeliveryLeaseLostError,
     );
     updateDeliveryOperation(
       sessionDir,
@@ -294,7 +294,7 @@ Deno.test("delivery claim can recover expired lease", () => {
           "",
           null,
         ),
-      ErrDeliveryLeaseLost,
+      DeliveryLeaseLostError,
     );
   } finally {
     closeAll();

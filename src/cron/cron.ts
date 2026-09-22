@@ -19,8 +19,6 @@ export interface CronJob {
   oneShot?: boolean; // If true, auto-disable after first run
   mode?: string; // "agent" or "yolo"
   workDir?: string;
-  a2aTarget?: string; // A2A server URL (if set, send task via A2A protocol)
-  a2aToken?: string; // Bearer token for A2A server
   enabled?: boolean;
   createdAt?: Date | null;
   lastRun?: Date | null;

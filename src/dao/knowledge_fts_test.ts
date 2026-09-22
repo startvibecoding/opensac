@@ -3,7 +3,6 @@
 import { assert, assertEquals } from "@std/assert";
 import {
   knowledgeFTSHasTokenRune,
-  KnowledgeFTSIndexText,
   knowledgeFTSIndexText,
   knowledgeFTSQuery,
   knowledgeIsFTSCJK,
@@ -99,7 +98,6 @@ Deno.test("knowledge FTS CJK round trip", () => {
     assertEquals(match("不存在的词组").length, 0);
     assert(knowledgeFTSQuery("知识库").includes(" "));
     assert(knowledgeFTSHasTokenRune("go语言"));
-    assert(KnowledgeFTSIndexText === knowledgeFTSIndexText);
     assert(knowledgeIsFTSCJK(0x4e00) && !knowledgeIsFTSCJK(0x20));
   } finally {
     closeTestDbs();

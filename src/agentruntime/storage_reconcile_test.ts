@@ -8,10 +8,10 @@ import {
 } from "./attachment.ts";
 import { AttachmentService } from "./input.ts";
 import {
-  ArtifactReclaimFloor,
+  artifactReclaimFloor,
   artifactReconcileThrottle,
-  ArtifactStorageDirectoryName,
-  ReconcileArtifactStorage,
+  artifactStorageDirectoryName,
+  reconcileArtifactStorage,
   reconcileArtifactStorageOpportunistic,
 } from "./storage_reconcile.ts";
 import { newManager } from "../session/manager.ts";
@@ -59,7 +59,7 @@ function writeArtifactDirectory(
   ageMs: number,
   content: string,
 ): string {
-  const dir = path.join(sessionDir, ArtifactStorageDirectoryName(), id);
+  const dir = path.join(sessionDir, artifactStorageDirectoryName(), id);
   Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, "content");
   Deno.writeTextFileSync(file, content);
@@ -108,19 +108,19 @@ Deno.test("ReconcileArtifactStorageReclaimsOnlyAgedUnreferenced", async () => {
     );
     const nested = path.join(
       root,
-      ArtifactStorageDirectoryName(),
+      artifactStorageDirectoryName(),
       "2123456789abcdef",
     );
     Deno.mkdirSync(path.join(nested, "subdir"), { recursive: true });
 
-    const report = await ReconcileArtifactStorage(root, policy, now);
+    const report = await reconcileArtifactStorage(root, policy, now);
     assertEquals(report.removed, 1);
     assertEquals(report.freed, "gone".length);
     assertEquals(report.skippedReferenced, 1);
     assertEquals(report.skippedYoung, 1);
     // `someone-elses` (bad name) and the nested layout are both unrecognized.
     assertEquals(report.skippedUnrecognized, 2);
-    assert(exists(path.join(root, ArtifactStorageDirectoryName(), live.id)));
+    assert(exists(path.join(root, artifactStorageDirectoryName(), live.id)));
     assertEquals(exists(stale), false);
     for (const kept of [young, foreign, nested]) assert(exists(kept));
   } finally {
@@ -141,7 +141,7 @@ Deno.test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () 
   );
   let threw = false;
   try {
-    await ReconcileArtifactStorage(missingDB, policy, now);
+    await reconcileArtifactStorage(missingDB, policy, now);
   } catch {
     threw = true;
   }
@@ -158,7 +158,7 @@ Deno.test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () 
   Deno.writeTextFileSync(rootDBPath(corruptDB), "not a sqlite database");
   threw = false;
   try {
-    await ReconcileArtifactStorage(corruptDB, policy, now);
+    await reconcileArtifactStorage(corruptDB, policy, now);
   } catch {
     threw = true;
   }
@@ -175,12 +175,12 @@ Deno.test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
     const victimDir = Deno.makeTempDirSync({ prefix: "opensac-victim-" });
     const victimFile = path.join(victimDir, "precious");
     Deno.writeTextFileSync(victimFile, "do not delete");
-    Deno.mkdirSync(path.join(root, ArtifactStorageDirectoryName()), {
+    Deno.mkdirSync(path.join(root, artifactStorageDirectoryName()), {
       recursive: true,
     });
     const link = path.join(
       root,
-      ArtifactStorageDirectoryName(),
+      artifactStorageDirectoryName(),
       "3123456789abcdef",
     );
     try {
@@ -191,7 +191,7 @@ Deno.test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
     const stamp = new Date(Date.now() - 48 * 60 * 60 * 1000);
     Deno.utimeSync(victimFile, stamp, stamp);
 
-    const report = await ReconcileArtifactStorage(root, policy, new Date());
+    const report = await reconcileArtifactStorage(root, policy, new Date());
     assertEquals(report.removed, 0);
     assert(exists(victimFile));
   } finally {
@@ -230,7 +230,7 @@ Deno.test("ReconcileArtifactStorageOpportunisticRunsOncePerInterval", async () =
 
 Deno.test("ArtifactReclaimFloorIsRetentionPlusGrace", () => {
   const now = new Date(Date.UTC(2026, 0, 2, 3, 4, 5));
-  const floor = ArtifactReclaimFloor(defaultAttachmentPolicy(), now);
+  const floor = artifactReclaimFloor(defaultAttachmentPolicy(), now);
   const want = now.getTime() -
     (7 * 24 * 60 * 60 * 1000 + artifactReconcileGraceMs);
   assertEquals(floor.getTime(), want);

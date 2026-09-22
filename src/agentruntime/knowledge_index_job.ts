@@ -12,9 +12,13 @@
 
 import type { KnowledgeSnapshot } from "../session/mod.ts";
 
-export const errKnowledgeBaseServiceNil: Error = new Error(
-  "knowledge base service is nil",
-);
+/** Thrown when the knowledge-base service is unavailable. */
+export class KnowledgeBaseServiceMissingError extends Error {
+  override name = "KnowledgeBaseServiceMissingError";
+  constructor() {
+    super("knowledge base service is required");
+  }
+}
 
 export function knowledgeBaseDisabledError(id: string): Error {
   return new Error(`knowledge base ${id} is disabled`);

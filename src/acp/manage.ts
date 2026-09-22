@@ -1,15 +1,17 @@
 // Ported from internal/acp/manage.go / manage_env.go / manage_experts.go /
 // manage_application.go (the Phase 3 `opensac/manage/*` management plane).
 //
-// This slice ports the secret-safe management surface that does not depend on
-// the unported `internal/serve` runtime: the shared manage helpers, the
-// `opensac/manage/env/*` projection of internal/config/env.go, the
+// This slice owns the secret-safe management surface: the shared manage
+// helpers, the `opensac/manage/env/*` projection of internal/config/env.go, the
 // `opensac/manage/experts/*` projection of internal/expert.Manager, and the
-// `opensac/manage/application/*` projection of the Runtime-owned settings subset.
+// `opensac/manage/application/*` projection of the Runtime-owned settings
+// subset.
 //
 // This slice also ports the settings/providers, skills, mcp, stats, memory, and
-// deliveries families of manage.go; the skillhub, knowledge-base/cron, and
-// serve/channels families live in their sibling modules.
+// deliveries families of manage.go; the skillhub and knowledge-base/cron
+// families live in their sibling modules. Serve and channel management do not
+// exist: those entry modes were removed, so there is no serve.json or channel
+// configuration surface to project.
 //
 // Deviations from Go: `json.RawMessage` params/values map to already-decoded
 // JSON values, so the whitelist/validators inspect typed values rather than raw
@@ -79,11 +81,7 @@ import {
   thinkingXHigh,
 } from "../provider/types.ts";
 import {
-  loadConfig as loadServeConfig,
-  memoryEnabled as serveMemoryEnabled,
-} from "../serve/config.ts";
-import {
-  ErrDeliveryOperationAbsent,
+  DeliveryOperationAbsentError,
   getDeliveryOperation,
   listAllDetailed,
   listDeliveryFailures,
@@ -146,12 +144,6 @@ import {
   handleManageKnowledgeBasesStatus,
   handleManageKnowledgeBasesUpdate,
 } from "./manage_knowledge_bases.ts";
-import {
-  handleManageChannelsGet,
-  handleManageChannelsPatch,
-  handleManageServeConfigGet,
-  handleManageServeConfigPatch,
-} from "./manage_serve.ts";
 
 // ─── shared manage helpers (manage.go) ────────────────────────────────────────
 
@@ -487,18 +479,6 @@ export function handleManageRequest(s: AcpServer, req: ACPRPCRequest): void {
       return;
     case "opensac/manage/knowledge-bases/mcp/apply":
       handleManageKnowledgeBaseMCPApply(s, req);
-      return;
-    case "opensac/manage/serve/get":
-      handleManageServeConfigGet(s, req);
-      return;
-    case "opensac/manage/serve/patch":
-      handleManageServeConfigPatch(s, req);
-      return;
-    case "opensac/manage/channels/get":
-      handleManageChannelsGet(s, req);
-      return;
-    case "opensac/manage/channels/patch":
-      handleManageChannelsPatch(s, req);
       return;
     default:
       s.writeResponse(
@@ -1395,9 +1375,8 @@ function handleManageApplicationPatch(s: AcpServer, req: ACPRPCRequest): void {
 
 /**
  * The strict whitelist of `settings/patch`. Every entry maps onto the existing
- * internal/config schema; fields owned by other configuration surfaces
- * (serve.json features such as memoryEnabled) are deliberately rejected with
- * settings_field_not_allowed.
+ * internal/config schema; fields owned by other configuration surfaces are
+ * deliberately rejected with settings_field_not_allowed.
  */
 export const manageSettingsPatchFields: Record<string, boolean> = {
   defaultProvider: true,
@@ -1577,7 +1556,8 @@ export function manageSettingsView(
     sandboxLevel: settings.sandbox?.level ?? "",
     webSearchEnabled: isWebSearchEnabled(settings),
     skillsDisabled: [...disabled],
-    memoryEnabled: serveMemoryEnabled(),
+    // There is no serve.json anymore, so the memory.md surface is always on.
+    memoryEnabled: true,
   };
 }
 
@@ -3338,21 +3318,12 @@ function handleManageStatsTimeseries(s: AcpServer, req: ACPRPCRequest): void {
 const manageMemoryMaxBytes = 1 << 20;
 
 /**
- * Resolves memory.md through the same source as serve /api/memory: the serve
- * config's explicit memory path when configured, otherwise the global
- * ~/.opensac/memory.md.
+ * Resolves memory.md for the management plane: the global
+ * ~/.opensac/memory.md, with workDir only as the fallback for creating a new
+ * file.
  */
 function manageMemoryStore(s: AcpServer): MemoryStore {
-  let explicitPath = "";
-  try {
-    explicitPath = (loadServeConfig().memory.path ?? "").trim();
-  } catch {
-    explicitPath = "";
-  }
-  if (explicitPath === "") {
-    explicitPath = path.join(configDir(), "memory.md");
-  }
-  return new MemoryStore(explicitPath, manageWorkDir(s));
+  return new MemoryStore(path.join(configDir(), "memory.md"), manageWorkDir(s));
 }
 
 function manageMemoryUpdatedAt(p: string): string {
@@ -3565,7 +3536,7 @@ function handleManageDeliveriesRetry(s: AcpServer, req: ACPRPCRequest): void {
   try {
     operation = getDeliveryOperation(sessionDir, id);
   } catch (err) {
-    if (err === ErrDeliveryOperationAbsent) {
+    if (err instanceof DeliveryOperationAbsentError) {
       s.writeResponse(
         req.idRaw,
         null,

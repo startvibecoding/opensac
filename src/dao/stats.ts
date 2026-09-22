@@ -163,7 +163,7 @@ export class StatsDAO {
   }
 
   private requireDb(): DB {
-    if (this.db === null) throw new Error("stats database is nil");
+    if (this.db === null) throw new Error("stats database is not open");
     return this.db;
   }
 }

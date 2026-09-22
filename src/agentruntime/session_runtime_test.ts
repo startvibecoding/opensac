@@ -120,7 +120,7 @@ Deno.test("beginArtifactCollectionDisabledByDefault", () => {
   const runtime = new SessionRuntime({ registry });
   const collector = runtime.beginArtifactCollection("run-disabled");
   assertEquals(collector, null);
-  assert(!registry.get("publish_artifact").ok);
+  assert(registry.get("publish_artifact") === undefined);
 });
 
 Deno.test("setArtifactEnabledRejectsClosedRuntime", () => {
@@ -155,8 +155,8 @@ Deno.test("artifactCollectorObserverReceivesPersistedRecord", async () => {
       collector.setObserver((record) => observed.push(record));
       Deno.writeTextFileSync(`${workDir}/report.txt`, "observer content");
       const tool = runtime.registry!.get("publish_artifact");
-      assert(tool.ok, "publish_artifact was not registered");
-      await tool.tool.execute({}, { path: "report.txt" });
+      assert(tool !== undefined, "publish_artifact was not registered");
+      await tool.execute({}, { path: "report.txt" });
       const items = collector.artifacts();
       assertEquals(items.length, 1);
       assertEquals(observed.length, 1);
@@ -289,8 +289,8 @@ Deno.test("buildRegistryAppliesAdapterPolicy", () => {
     enablePlanTool: false,
     browser: false,
   });
-  assert(!registry.get("plan").ok, "plan tool must be disabled");
-  assert(registry.get("read").ok, "default tools must register");
+  assert(registry.get("plan") === undefined, "plan tool must be disabled");
+  assert(registry.get("read") !== undefined, "default tools must register");
   let mutated = false;
   buildRegistry(workDir, undefined, undefined, {
     registerDefaults: false,

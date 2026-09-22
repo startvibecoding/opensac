@@ -170,6 +170,10 @@ Deno.test("formatActivityTool picks known keys and truncates values", () => {
     'bash(cmd="ls -la")',
   );
   assertEquals(
+    formatActivityTool("bash", { command: "cd x\n& ls" }),
+    'bash(command="cd x & ls")',
+  );
+  assertEquals(
     formatActivityTool("read", { path: "/a", other: 1 }),
     'read(path="/a")',
   );

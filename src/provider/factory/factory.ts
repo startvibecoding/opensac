@@ -208,7 +208,7 @@ export function resolvedModels(
 
 /**
  * Ranks well-known providers before custom ones so the TUI dialogs and the
- * WebUI provider list share one ordering.
+ * Every adapter's provider list shares one ordering.
  */
 export function providerSortPriority(id: string): number {
   const name = id.toLowerCase();

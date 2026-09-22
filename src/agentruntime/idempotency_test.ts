@@ -9,8 +9,8 @@ import { closeAll } from "../db/mod.ts";
 import { createSessionRun, type SessionRun } from "../session/run_store.ts";
 import { saveSessionRunEvent } from "../session/session_events.ts";
 import {
-  ErrIdempotencyKeyConflict,
   findIdempotentRun,
+  IdempotencyKeyConflictError,
   idempotencyKeyFingerprint,
 } from "./idempotency.ts";
 
@@ -113,7 +113,7 @@ Deno.test("FindIdempotentRun uses canonical started event", () => {
         ),
       Error,
     );
-    assert(ErrIdempotencyKeyConflict instanceof Error);
+    assert(new IdempotencyKeyConflictError() instanceof Error);
   } finally {
     closeAll();
   }

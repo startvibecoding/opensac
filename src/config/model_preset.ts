@@ -67,7 +67,10 @@ function lookupInProvider(
   return match ? { ...match } : undefined;
 }
 
-function completeModelPreset(model: ModelConfig, requestedID: string): ModelConfig {
+function completeModelPreset(
+  model: ModelConfig,
+  requestedID: string,
+): ModelConfig {
   return {
     ...model,
     id: requestedID,

@@ -5,7 +5,7 @@ import * as path from "@std/path";
 import {
   defaultSettings,
   type ModelConfig,
-  ProjectDirName,
+  projectDirName,
   type ProviderConfig,
   saveGlobalSettings,
   type Settings,
@@ -69,7 +69,7 @@ Deno.test("RunUsesProjectSettingsForRequestedCWD", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
-    const projectDir = path.join(workDir, ProjectDirName);
+    const projectDir = path.join(workDir, projectDirName);
     Deno.mkdirSync(projectDir, { recursive: true });
     Deno.writeTextFileSync(
       path.join(projectDir, "settings.json"),

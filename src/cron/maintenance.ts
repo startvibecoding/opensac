@@ -5,12 +5,12 @@
 // (`SetMaintenancePolicy`/`ensureMaintenanceJob`/`normalizeMaintenanceSchedule`)
 // lands with the Scheduler and the durable Runtime lifecycle (backlog #26).
 
-import { IsMaintenanceCronJobID } from "../agentruntime/maintenance_cron.ts";
+import { isMaintenanceCronJobID } from "../agentruntime/maintenance_cron.ts";
 import type { CronJob } from "./cron.ts";
 
 /**
  * Removes Runtime-owned maintenance jobs from a job list headed for a
- * user-facing surface (the cron tool, the serve API, and ACP management). Those
+ * user-facing surface (the cron tool and ACP management). Those
  * jobs are host storage housekeeping: they are scheduled, claimed, and completed
  * through the same lifecycle as any other job, but they are not automation tasks
  * the user authored, their prompt is not a prompt, and a front-end that rendered
@@ -19,7 +19,7 @@ import type { CronJob } from "./cron.ts";
  * authoritative store untouched.
  */
 export function userVisibleJobs(jobs: CronJob[]): CronJob[] {
-  return jobs.filter((job) => !IsMaintenanceCronJobID(job.id ?? ""));
+  return jobs.filter((job) => !isMaintenanceCronJobID(job.id ?? ""));
 }
 
 /**

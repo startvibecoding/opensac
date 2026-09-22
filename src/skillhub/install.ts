@@ -59,7 +59,7 @@ export interface InstallResult {
 }
 
 /** Installs a skill from a marketplace client into the target directory. */
-export async function Install(
+export async function installSkill(
   signal: AbortSignal | undefined,
   client: MarketClient,
   request: InstallRequest,

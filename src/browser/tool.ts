@@ -50,7 +50,7 @@ export function removeTool(registry: Registry | undefined): void {
 /** Reports whether the browser tool is registered. */
 export function isToolRegistered(registry: Registry | undefined): boolean {
   if (!registry) return false;
-  return registry.get(ToolName).ok;
+  return registry.get(ToolName) !== undefined;
 }
 
 /** The browser tool. */

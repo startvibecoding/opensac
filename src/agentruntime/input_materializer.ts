@@ -730,7 +730,7 @@ export class InputMaterializer {
 
 function requireConn(db: Database): DB {
   const conn = db.db;
-  if (conn === null) throw new Error("input resource database is nil");
+  if (conn === null) throw new Error("input resource database is not open");
   return conn;
 }
 

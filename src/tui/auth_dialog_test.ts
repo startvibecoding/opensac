@@ -308,6 +308,30 @@ Deno.test("empty float resets the field to auto", () => {
   assertEquals(row?.description, "auto");
 });
 
+Deno.test("field pages offer a confirm item that steps back one level", () => {
+  const [d, panel] = dialog({}, "openai");
+  d.select("network");
+  assert(
+    d.page().items.some((i) => i.value === "back"),
+    "field page must offer the confirm-return item",
+  );
+  d.select("back");
+  assertEquals(panel.closed, false);
+  assert(
+    d.page().items.some((i) => i.value === "network"),
+    "the confirm item must return to the group list",
+  );
+  // Model field pages share the same affordance.
+  d.select("model-list");
+  const first = d.page().items.find((i) => i.value.startsWith("model:"));
+  assert(first !== undefined);
+  d.select(first.value);
+  d.select("model-basics");
+  assert(d.page().items.some((i) => i.value === "back"));
+  d.select("back");
+  assert(d.page().items.some((i) => i.value === "model-basics"));
+});
+
 Deno.test("cleanup", () => {
   if (realHome !== undefined) Deno.env.set("OPENSAC_DIR", realHome);
   else Deno.env.delete("OPENSAC_DIR");

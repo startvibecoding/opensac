@@ -829,8 +829,7 @@ export function validateResponsesCapabilities(
 /**
  * Validates the fields that the current request will actually send.
  * Synchronous Provider.Chat requests do not send background=true, even when the
- * configured durable mode is enabled; the serve coordinator validates that mode
- * separately before using the run manager.
+ * configured durable mode is enabled.
  */
 export function validateResponsesCapabilitiesForRequest(
   p: ResponsesConfigHost,

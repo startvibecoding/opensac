@@ -2,8 +2,8 @@
 //
 // This is the single source-of-truth resolver: the runtime source vocabulary,
 // the per-run execution mode policy, and the source-precedence rules shared by
-// TUI, CLI, WebUI/API, ACP, cron, and the messaging channels. `Policy` is kept
-// as an alias for `ExecutionPolicy`, mirroring Go.
+// TUI, CLI, ACP, cron, and sessions persisted with a channel binding. `Policy`
+// is kept as an alias for `ExecutionPolicy`, mirroring Go.
 //
 // Deviations: `strings.TrimSpace` maps to String.prototype.trim; the Go
 // `(resolution, mode, error)` multiple return maps to an `ExecutionPolicyResult`
@@ -25,7 +25,6 @@ export type Source = RuntimeSource;
 
 export const SourceUnknown: RuntimeSource = "";
 export const SourceTUI: RuntimeSource = "tui";
-export const SourceWebUI: RuntimeSource = "webui";
 export const SourceWeChat: RuntimeSource = "wechat";
 export const SourceFeishu: RuntimeSource = "feishu";
 export const SourceACP: RuntimeSource = "acp";
@@ -165,7 +164,6 @@ export function sourceFromSessionHeader(
 export function sourceWaitsForMembers(source: RuntimeSource): boolean {
   switch (source) {
     case SourceTUI:
-    case SourceWebUI:
     case SourceACP:
       return true;
     default:
@@ -334,7 +332,6 @@ export function resolveSourceFromSession(
 function isKnownRequestedSource(source: RuntimeSource): boolean {
   switch (source) {
     case SourceTUI:
-    case SourceWebUI:
     case SourceWeChat:
     case SourceFeishu:
     case SourceACP:

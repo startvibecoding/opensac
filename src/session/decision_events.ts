@@ -3,8 +3,8 @@
 // The durable decision ledger records every approval/question transition as a
 // run event. A canonical name is decisionEventPrefix + the decision status
 // (pending, resolved, cancelled, timed_out); the legacy approval_*/question_*
-// names are still written by the serve compatibility bridge and stay
-// recognized so every reader agrees on one vocabulary.
+// names stay recognized so rows persisted before that rename and every reader
+// agree on one vocabulary.
 //
 // The vocabulary lives in session because session owns the run-event row schema
 // and the fork boundary keys on it. The decision envelope itself (and every
@@ -18,7 +18,7 @@ const decisionEventTypes: ReadonlySet<string> = new Set([
   decisionEventPrefix + "resolved",
   decisionEventPrefix + "cancelled",
   decisionEventPrefix + "timed_out",
-  // Legacy names written by the serve compatibility bridge.
+  // Legacy names still present in already-persisted run-event rows.
   "approval_requested",
   "question_requested",
   "approval_resolved",
@@ -32,7 +32,7 @@ export function decisionEventType(status: string): string {
 
 /**
  * Reports whether eventType belongs to the durable decision ledger, including
- * the legacy serve names.
+ * the legacy names.
  */
 export function isDecisionEventType(eventType: string): boolean {
   return decisionEventTypes.has(eventType);

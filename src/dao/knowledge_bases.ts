@@ -602,7 +602,7 @@ export class KnowledgeBaseDAO {
   }
 
   private requireDb(): DB {
-    if (this.db === null) throw new Error("knowledge database is nil");
+    if (this.db === null) throw new Error("knowledge database is not open");
     return this.db;
   }
 }
@@ -717,6 +717,3 @@ export function knowledgeFTSIndexText(text: string): string {
   }
   return builder;
 }
-
-/** Alias matching the exported Go name. */
-export const KnowledgeFTSIndexText = knowledgeFTSIndexText;

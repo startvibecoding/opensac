@@ -1491,38 +1491,6 @@ Deno.test("manage memory round trip and limit", () => {
   });
 });
 
-Deno.test("manage memory follows serve config path", () => {
-  const configDir = Deno.makeTempDirSync();
-  const workDir = Deno.makeTempDirSync();
-  withEnv("OPENSAC_DIR", configDir, () => {
-    writeManageSettings(configDir);
-    const custom = path.join(configDir, "custom", "agent-memory.md");
-    Deno.writeTextFileSync(
-      path.join(configDir, "serve.json"),
-      JSON.stringify({ memory: { enabled: true, path: custom } }),
-    );
-    const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, workDir);
-
-    const put = manageResult(
-      callManage(server, output, 1, "opensac/manage/memory/put", {
-        content: "serve path memory",
-      }),
-    );
-    assertEquals(put["path"], custom);
-    assertEquals(Deno.readTextFileSync(custom), "serve path memory");
-
-    Deno.writeTextFileSync(
-      path.join(configDir, "serve.json"),
-      JSON.stringify({ memory: { enabled: false } }),
-    );
-    const view = manageResult(
-      callManage(server, output, 2, "opensac/manage/settings/get", {}),
-    );
-    assertStrictEquals(view["memoryEnabled"], false);
-  });
-});
-
 function baseDeliveryRun(overrides: Partial<SessionRun>): SessionRun {
   return {
     id: "",

@@ -15,7 +15,7 @@ import {
 import type { Options as SandboxOptions } from "../sandbox/sandbox.ts";
 import { Level } from "../sandbox/sandbox.ts";
 import { defaultProviderConfigs } from "./provider_defaults.ts";
-import { ProjectDirName, projectPath, projectPathFor } from "./paths.ts";
+import { projectDirName, projectPath, projectPathFor } from "./paths.ts";
 
 /** Controls whether config loading prints diagnostic messages to stderr. */
 export let Verbose = false;
@@ -270,15 +270,10 @@ export interface Settings {
 }
 
 /** Default number of local tool calls that may run concurrently per turn. */
-export const DefaultToolExecutionMaxConcurrency = 10;
+export const defaultToolExecutionMaxConcurrency = 10;
 
 /** Default official SkillHub handle. */
-export const DefaultSkillHubOfficialHandle = "user_0064faa7";
-
-/** Returns a pointer-equivalent for a bool value. */
-export function BoolPtr(v: boolean): boolean {
-  return v;
-}
+export const defaultSkillHubOfficialHandle = "user_0064faa7";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Clone helpers
@@ -296,18 +291,6 @@ export function cloneStringSlice(
   src: string[] | undefined,
 ): string[] | undefined {
   return src === undefined ? undefined : [...src];
-}
-
-/** Returns a copy of a bool pointer, or undefined if src is undefined. */
-export function cloneBoolPtr(src: boolean | undefined): boolean | undefined {
-  return src === undefined ? undefined : src;
-}
-
-/** Returns a copy of a float pointer, or undefined if src is undefined. */
-export function cloneFloat64Ptr(
-  src: number | undefined,
-): number | undefined {
-  return src === undefined ? undefined : src;
 }
 
 /**
@@ -384,8 +367,6 @@ function cloneAnyMapSlice(
 function cloneModelConfig(src: ModelConfig): ModelConfig {
   return {
     ...src,
-    temperature: cloneFloat64Ptr(src.temperature),
-    top_p: cloneFloat64Ptr(src.top_p),
     cost: src.cost ? { ...src.cost } : undefined,
     input: cloneStringSlice(src.input),
     compat: cloneModelCompat(src.compat),
@@ -438,7 +419,7 @@ export function defaultSettings(): Settings {
     tuilang: "auto",
     toolExecution: {
       mode: "parallel",
-      maxConcurrency: DefaultToolExecutionMaxConcurrency,
+      maxConcurrency: defaultToolExecutionMaxConcurrency,
     },
     statusLine: {
       enabled: false,
@@ -467,7 +448,7 @@ export function defaultSettings(): Settings {
     skillHub: {
       defaultMarket: "skillhub.cn",
       defaultInstallScope: "project",
-      officialHandles: [DefaultSkillHubOfficialHandle],
+      officialHandles: [defaultSkillHubOfficialHandle],
     },
     compaction: {
       enabled: true,
@@ -1322,7 +1303,7 @@ export function loadProjectSettingsSparse(): Settings {
 
 /** Writes settings.json atomically with private permissions. */
 export function saveGlobalSettings(s: Settings): void {
-  if (!s) throw new Error("settings is nil");
+  if (!s) throw new Error("settings is required");
   const data = marshalSettings(s);
   writeGlobalSettingsData(data);
 }
@@ -1415,7 +1396,7 @@ export function saveProjectSettingsPatch(
 
 /** Writes .opensac/settings.json atomically with private permissions. */
 export function saveProjectSettings(s: Settings): void {
-  if (!s) throw new Error("settings is nil");
+  if (!s) throw new Error("settings is required");
   const settingsPath = projectSettingsPath();
   const projectDir = path.dirname(settingsPath);
   Deno.mkdirSync(projectDir, { recursive: true, mode: 0o700 });
@@ -1458,7 +1439,7 @@ export function isProjectDir(p: string): boolean {
   for (
     const marker of [
       ".git",
-      ProjectDirName,
+      projectDirName,
       "go.mod",
       "package.json",
       "pyproject.toml",
@@ -1826,7 +1807,7 @@ export function mergeProviderConfig(
     configFieldWasSet(fs, "cacheControl") ||
     (fs === undefined && overlay.cacheControl !== undefined)
   ) {
-    result.cacheControl = cloneBoolPtr(overlay.cacheControl);
+    result.cacheControl = overlay.cacheControl;
   }
   if (
     configFieldWasSet(fs, "maxImagesPerRequest") ||
@@ -1963,13 +1944,13 @@ export function mergeModelConfig(
     configFieldWasSet(fs, "temperature") ||
     (fs === undefined && overlay.temperature !== undefined)
   ) {
-    result.temperature = cloneFloat64Ptr(overlay.temperature);
+    result.temperature = overlay.temperature;
   }
   if (
     configFieldWasSet(fs, "top_p") ||
     (fs === undefined && overlay.top_p !== undefined)
   ) {
-    result.top_p = cloneFloat64Ptr(overlay.top_p);
+    result.top_p = overlay.top_p;
   }
   if (
     configFieldWasSet(fs, "cost") ||
@@ -2033,7 +2014,7 @@ export function toolExecutionEffectiveMaxConcurrency(
   s: ToolExecutionSettings,
 ): number {
   if ((s.maxConcurrency ?? 0) <= 0) {
-    return DefaultToolExecutionMaxConcurrency;
+    return defaultToolExecutionMaxConcurrency;
   }
   return s.maxConcurrency!;
 }

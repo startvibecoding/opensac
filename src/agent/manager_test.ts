@@ -288,7 +288,7 @@ Deno.test("ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering", () => {
     id: "esm-worker",
     multiAgent: true,
   }) as AgentAdapter;
-  assert(created.inner.registry()?.get("subagent_spawn").ok === true);
+  assert(created.inner.registry()?.get("subagent_spawn") !== undefined);
   assert(created.inner.config.getSteeringMessages !== undefined);
 
   mailbox.enqueue(
@@ -311,7 +311,7 @@ Deno.test("ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering", () => {
     multiAgent: false,
     tools: ["read"],
   }) as AgentAdapter;
-  assert(critic.inner.registry()?.get("subagent_spawn").ok === false);
+  assert(critic.inner.registry()?.get("subagent_spawn") === undefined);
 });
 
 // Keep the exported helpers referenced for lint parity.

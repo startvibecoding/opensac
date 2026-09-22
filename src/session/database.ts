@@ -23,7 +23,7 @@ import { openRootDB, rootDBPath } from "./root_db.ts";
 export function openBunDatabase(path: string): Database {
   const connection: DB = open(path, ensureCurrentSchema);
   const handle = wrapDatabase(connection);
-  if (handle === null) throw new Error("database handle is nil");
+  if (handle === null) throw new Error("database is not open");
   return handle;
 }
 

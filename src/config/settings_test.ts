@@ -322,7 +322,7 @@ Deno.test("toolExecution defaults and effective values", () => {
   assertEquals(toolExecutionEffectiveMaxConcurrency({ maxConcurrency: 4 }), 4);
 });
 
-Deno.test("skillsDisabled is nil-safe and copies", () => {
+Deno.test("skillsDisabled is null-safe and copies", () => {
   assertEquals(skillsDisabled(undefined), undefined);
   assertEquals(skillsDisabled({}), undefined);
   const s = { skills: { disabled: ["gen-skill"] } };

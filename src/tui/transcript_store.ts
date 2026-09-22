@@ -8,6 +8,7 @@
 import type { FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
+import type { TaskPlan } from "../tools/tool.ts";
 
 export type ToolResultStatus = "running" | "completed" | "interrupted";
 
@@ -21,6 +22,8 @@ export interface ToolResultEntry {
   /** Full content for the expanded view. */
   fullContent: string;
   diff?: FileDiff;
+  /** Structured task plan published with the result (plan tool). */
+  plan?: TaskPlan;
   /** Stable presentation error from the tool execution. */
   toolError: string;
   executionState: string;
@@ -35,6 +38,7 @@ export interface ToolResultEvent {
   toolArgs?: Record<string, unknown>;
   toolResult?: string;
   toolDiff?: FileDiff;
+  plan?: TaskPlan;
   toolError?: Error;
   toolExecutionState?: string;
 }
@@ -243,6 +247,7 @@ export class TranscriptStore {
       row.status = "completed";
       row.fullContent = event.toolResult ?? "";
       row.diff = event.toolDiff;
+      row.plan = event.plan;
       row.summary = this.#summarize(
         matchedName,
         event.toolResult ?? "",
@@ -266,6 +271,7 @@ export class TranscriptStore {
       msgIndex: msgIdx,
       fullContent: event.toolResult ?? "",
       diff: event.toolDiff,
+      plan: event.plan,
       summary: this.#summarize(
         matchedName,
         event.toolResult ?? "",

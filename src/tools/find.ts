@@ -8,6 +8,7 @@
 // external SDK dependency.
 
 import * as path from "@std/path";
+import { compileGeneratedRegExp } from "../util/regex.ts";
 import { globToRegex } from "./globset.ts";
 import { IgnoreStack } from "./ignore.ts";
 import {
@@ -106,7 +107,7 @@ export class FindTool implements Tool {
     const flags = caseSensitive ? "" : "i";
     let regex: RegExp;
     try {
-      regex = new RegExp(globToRegex(pattern), flags);
+      regex = compileGeneratedRegExp(globToRegex(pattern), flags);
     } catch (err) {
       throw new Error(`find search failed: ${messageOf(err)}`);
     }

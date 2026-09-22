@@ -4,15 +4,15 @@ import * as path from "@std/path";
 import {
   type AgentDef,
   type Bundle,
+  expertSchemaVersion,
   type Frontmatter,
   type LocalizedText,
   type Manifest,
   type MemberMeta,
-  RoleLead,
-  RoleMember,
-  SchemaVersion,
-  TypeAgent,
-  TypeTeam,
+  roleLead,
+  roleMember,
+  typeAgent,
+  typeTeam,
 } from "./expert.ts";
 import { cleanSlashPath, type ExpertFS } from "./fs.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
@@ -38,7 +38,7 @@ export function loadBundle(dir: string): Bundle {
  */
 export function loadBundleFS(fsys: ExpertFS, dir: string): Bundle {
   if (!fsys) {
-    throw new Error("expert: nil fs.FS");
+    throw new Error("expert: filesystem is required");
   }
   const cleaned = cleanSlashPath("/" + dir.trim());
   const base = path.basename(cleaned);
@@ -261,8 +261,8 @@ function loadBundleFrom(src: BundleSource, dirName: string): Bundle {
 
 /** Applies manifest-level checks that do not require the agents/ directory. */
 export function validateManifest(m: Manifest, dirName: string): string {
-  if (m.schemaVersion !== SchemaVersion) {
-    return `schemaVersion 必须为 ${SchemaVersion}，实际为 ${m.schemaVersion}`;
+  if (m.schemaVersion !== expertSchemaVersion) {
+    return `schemaVersion 必须为 ${expertSchemaVersion}，实际为 ${m.schemaVersion}`;
   }
   if (m.name.trim() === "") {
     return "manifest name 不能为空";
@@ -279,7 +279,7 @@ export function validateStructure(
   haveAgentFile: Set<string>,
 ): string {
   switch (m.expertType) {
-    case TypeTeam: {
+    case typeTeam: {
       if (m.teamInfo === undefined) {
         return "expertType team 必须提供 teamInfo";
       }
@@ -308,7 +308,7 @@ export function validateStructure(
       }
       return "";
     }
-    case TypeAgent: {
+    case typeAgent: {
       const name = (m.agentName ?? "").trim();
       if (name === "") {
         return "expertType agent 必须提供 agentName";
@@ -400,20 +400,20 @@ export function assignRoles(
   defs: Map<string, AgentDef>,
 ): void {
   switch (m.expertType) {
-    case TypeTeam: {
+    case typeTeam: {
       if (m.teamInfo !== undefined) {
         const lead = defs.get(m.teamInfo.leadAgent);
-        if (lead) lead.role = RoleLead;
+        if (lead) lead.role = roleLead;
         for (const id of m.teamInfo.memberAgents) {
           const def = defs.get(id);
-          if (def) def.role = RoleMember;
+          if (def) def.role = roleMember;
         }
       }
       break;
     }
-    case TypeAgent: {
+    case typeAgent: {
       const def = defs.get(m.agentName ?? "");
-      if (def) def.role = RoleLead;
+      if (def) def.role = roleLead;
       break;
     }
   }

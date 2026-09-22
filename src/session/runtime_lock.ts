@@ -26,7 +26,7 @@ import { nonTerminalSessionRunStatuses } from "./run_status.ts";
 import { runtimeOwnerID } from "./runtime_identity.ts";
 import { publishRuntimeLeaseNotification } from "./runtime_lease_bus.ts";
 
-const runtimeLeaseTTL = 15; // seconds
+const runtimeLeaseTTLSecs = 15;
 const runtimeHeartbeatEveryMs = 3_000;
 // Bounds how long one heartbeat tick keeps retrying a failed renewal before
 // yielding to the next tick. Exhausting it is NOT ownership loss: a database
@@ -266,7 +266,7 @@ function acquireRuntimeLeaseWithOptions(
       if (options.allowMissingSession) return null;
       throw new RuntimeSessionNotFoundError(sessionId);
     }
-    const expires = now + runtimeLeaseTTL;
+    const expires = now + runtimeLeaseTTLSecs;
     const ownerID = runtimeOwnerID();
     const tokenHash = newLeaseTokenHash();
     const purpose = options.purpose;
@@ -416,7 +416,9 @@ export class LeaseHeartbeatScheduler {
         return;
       }
       this.#renewing = true;
-      void this.renew(leases).finally(() => {
+      // A rejected batch must not become an unhandled rejection (the process
+      // would exit) nor leave the overlap guard latched; the next tick retries.
+      void this.renew(leases).catch(() => {}).finally(() => {
         this.#renewing = false;
       });
     }, runtimeHeartbeatTiming.everyMs);
@@ -528,7 +530,11 @@ function renewLeaseBatchOnce(
       expiresAt: 0,
       updatedAt: 0,
     }));
-    return new RuntimeLeaseDAO(null).renewBatch(tx, records, runtimeLeaseTTL);
+    return new RuntimeLeaseDAO(null).renewBatch(
+      tx,
+      records,
+      runtimeLeaseTTLSecs,
+    );
   });
 }
 
@@ -1047,7 +1053,7 @@ export function acquireRecovery(
 export function tryLockRuntime(
   sessionDir: string,
   sessionId: string,
-): [release: () => void, ok: boolean] {
+): (() => void) | null {
   return tryLockRuntimePurpose(
     sessionDir,
     sessionId,
@@ -1059,7 +1065,7 @@ function tryLockRuntimePurpose(
   sessionDir: string,
   sessionId: string,
   purpose: string,
-): [release: () => void, ok: boolean] {
+): (() => void) | null {
   let guard: RuntimeLeaseGuard;
   try {
     guard = acquireRuntimeLeaseGuard(sessionDir, sessionId, {
@@ -1068,9 +1074,9 @@ function tryLockRuntimePurpose(
       allowMissingSession: true,
     });
   } catch {
-    return [() => {}, false];
+    return null;
   }
-  return [() => guard.release(), true];
+  return () => guard.release();
 }
 
 /**
@@ -1082,8 +1088,8 @@ export async function lockRuntime(
   sessionId: string,
 ): Promise<() => void> {
   for (;;) {
-    const [release, ok] = tryLockRuntime(sessionDir, sessionId);
-    if (ok) return release;
+    const release = tryLockRuntime(sessionDir, sessionId);
+    if (release !== null) return release;
     await delay(50);
   }
 }
@@ -1111,7 +1117,7 @@ export async function lockSessionData(
 export function tryLockRuntimes(
   sessionDir: string,
   sessionIDs: string[],
-): [release: () => void, ok: boolean] {
+): (() => void) | null {
   const ids = [...sessionIDs].sort();
   const ordered: string[] = [];
   for (const id of ids) {
@@ -1124,17 +1130,14 @@ export function tryLockRuntimes(
   }
   const releases: Array<() => void> = [];
   for (const id of ordered) {
-    const [release, ok] = tryLockRuntime(sessionDir, id);
-    if (!ok) {
+    const release = tryLockRuntime(sessionDir, id);
+    if (release === null) {
       for (let i = releases.length - 1; i >= 0; i--) releases[i]();
-      return [() => {}, false];
+      return null;
     }
     releases.push(release);
   }
-  return [
-    () => {
-      for (let i = releases.length - 1; i >= 0; i--) releases[i]();
-    },
-    true,
-  ];
+  return () => {
+    for (let i = releases.length - 1; i >= 0; i--) releases[i]();
+  };
 }

@@ -3,16 +3,16 @@
 import { assert, assertRejects } from "@std/assert";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import {
-  DefaultMaintenancePolicy,
-  IsMaintenanceCronJobID,
+  defaultMaintenancePolicy,
+  isMaintenanceCronJobID,
   MaintenanceCronJobPrefix,
-  MaintenancePolicyFromSettings,
-  MaintenanceStorageReconcileJobID,
+  maintenancePolicyFromSettings,
+  maintenanceStorageReconcileJobID,
   MaintenanceStorageReconcileSchedule,
-  RunMaintenanceCronJob,
+  runMaintenanceCronJob,
 } from "./maintenance_cron.ts";
 import {
-  ArtifactStorageDirectoryName,
+  artifactStorageDirectoryName,
   ReconcileGraceMs,
 } from "./storage_reconcile.ts";
 import { newManager } from "../session/manager.ts";
@@ -33,7 +33,7 @@ function writeArtifactDirectory(
   ageMs: number,
   content: string,
 ): string {
-  const dir = `${sessionDir}/${ArtifactStorageDirectoryName()}/${id}`;
+  const dir = `${sessionDir}/${artifactStorageDirectoryName()}/${id}`;
   Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = `${dir}/content`;
   Deno.writeTextFileSync(path, content, { mode: 0o600 });
@@ -44,8 +44,8 @@ function writeArtifactDirectory(
 }
 
 Deno.test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
-  const policy = DefaultMaintenancePolicy();
-  const outside = await RunMaintenanceCronJob(
+  const policy = defaultMaintenancePolicy();
+  const outside = await runMaintenanceCronJob(
     makeSessionRoot(),
     "knowledge-base-index:abc",
     policy,
@@ -53,7 +53,7 @@ Deno.test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
   assert(!outside.handled, "the maintenance path claimed a foreign job");
 
   const unknown = (await assertRejects(() =>
-    RunMaintenanceCronJob(
+    runMaintenanceCronJob(
       makeSessionRoot(),
       MaintenanceCronJobPrefix + "unknown-task",
       policy,
@@ -65,9 +65,9 @@ Deno.test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
   );
 
   await assertRejects(() =>
-    RunMaintenanceCronJob(
+    runMaintenanceCronJob(
       "",
-      MaintenanceStorageReconcileJobID(),
+      maintenanceStorageReconcileJobID(),
       policy,
     )
   );
@@ -83,9 +83,9 @@ Deno.test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
     "stale",
   );
 
-  const outcome = await RunMaintenanceCronJob(
+  const outcome = await runMaintenanceCronJob(
     root,
-    MaintenanceStorageReconcileJobID(),
+    maintenanceStorageReconcileJobID(),
     { reclaimAttachmentStorage: false, storageReconcileSchedule: "" },
   );
   assert(outcome.handled);
@@ -96,22 +96,22 @@ Deno.test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
   assert(Deno.statSync(aged), "a disabled policy still reclaimed storage");
 });
 
-Deno.test("MaintenancePolicyFromSettings", () => {
-  const fromNil = MaintenancePolicyFromSettings(undefined);
+Deno.test("maintenancePolicyFromSettings", () => {
+  const fromNil = maintenancePolicyFromSettings(undefined);
   assert(
     fromNil.reclaimAttachmentStorage === true &&
       fromNil.storageReconcileSchedule === MaintenanceStorageReconcileSchedule,
     "nil settings policy should be the default",
   );
 
-  const empty = MaintenancePolicyFromSettings({});
+  const empty = maintenancePolicyFromSettings({});
   assert(
     empty.reclaimAttachmentStorage === true &&
       empty.storageReconcileSchedule === MaintenanceStorageReconcileSchedule,
     "empty settings policy should be enabled on the default cadence",
   );
 
-  const off = MaintenancePolicyFromSettings({
+  const off = maintenancePolicyFromSettings({
     maintenance: { reclaimAttachmentStorage: false },
   });
   assert(
@@ -119,7 +119,7 @@ Deno.test("MaintenancePolicyFromSettings", () => {
     "explicit false should disable reclamation",
   );
 
-  const override = MaintenancePolicyFromSettings({
+  const override = maintenancePolicyFromSettings({
     maintenance: { storageReconcileSchedule: "  @every 6h  " },
   });
   assert(
@@ -139,10 +139,10 @@ Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
     "stale",
   );
 
-  const outcome = await RunMaintenanceCronJob(
+  const outcome = await runMaintenanceCronJob(
     root,
-    MaintenanceStorageReconcileJobID(),
-    DefaultMaintenancePolicy(),
+    maintenanceStorageReconcileJobID(),
+    defaultMaintenancePolicy(),
   );
   assert(outcome.handled);
   assert(
@@ -159,7 +159,7 @@ Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
   }
   assert(!exists, "the scheduled pass did not remove the aged artifact");
 
-  const dir = `${root}/${ArtifactStorageDirectoryName()}/6123456789abcdef`;
+  const dir = `${root}/${artifactStorageDirectoryName()}/6123456789abcdef`;
   let dirExists = true;
   try {
     Deno.statSync(dir);
@@ -171,7 +171,7 @@ Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
 });
 
 Deno.test("IsMaintenanceCronJobIDMatchesPrefixOnly", () => {
-  assert(IsMaintenanceCronJobID(MaintenanceStorageReconcileJobID()));
-  assert(IsMaintenanceCronJobID(MaintenanceCronJobPrefix + "anything"));
-  assert(!IsMaintenanceCronJobID("cron-user"));
+  assert(isMaintenanceCronJobID(maintenanceStorageReconcileJobID()));
+  assert(isMaintenanceCronJobID(MaintenanceCronJobPrefix + "anything"));
+  assert(!isMaintenanceCronJobID("cron-user"));
 });

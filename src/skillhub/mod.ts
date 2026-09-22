@@ -47,9 +47,9 @@ export {
 } from "./http.ts";
 export {
   createZip,
-  Install as installSkill,
   type InstallRequest,
   type InstallResult,
+  installSkill,
   InvalidArchiveError,
   LocalSkillExistsError,
   maxDownloadBytes,

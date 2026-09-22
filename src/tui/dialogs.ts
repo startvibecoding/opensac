@@ -1312,27 +1312,27 @@ export class SettingsDialog implements DialogController {
       return;
     }
     if (value === "enablePlanTool") {
-      this.#cycleBoolPtr("enablePlanTool", true);
+      this.#cycleOptionalBool("enablePlanTool", true);
       return;
     }
     if (value === "enableArtifact") {
-      this.#cycleBoolPtr("enableArtifact", false);
+      this.#cycleOptionalBool("enableArtifact", false);
       return;
     }
     if (value === "updateCheck") {
-      this.#cycleBoolPtr("updateCheck", true);
+      this.#cycleOptionalBool("updateCheck", true);
       return;
     }
     if (value === "webSearch.enabled") {
-      this.#cycleBoolPtr("webSearch.enabled", false);
+      this.#cycleOptionalBool("webSearch.enabled", false);
       return;
     }
     if (value === "imageGeneration.enabled") {
-      this.#cycleBoolPtr("imageGeneration.enabled", false);
+      this.#cycleOptionalBool("imageGeneration.enabled", false);
       return;
     }
     if (value === "approval.confirmBeforeWrite") {
-      this.#cycleBoolPtr("approval.confirmBeforeWrite", true);
+      this.#cycleOptionalBool("approval.confirmBeforeWrite", true);
       return;
     }
     // Plain booleans: flip and save.
@@ -1415,8 +1415,8 @@ export class SettingsDialog implements DialogController {
     this.#save({ [field]: next });
   }
 
-  #cycleBoolPtr(field: string, def: boolean): void {
-    const current = this.#readBoolPtr(field);
+  #cycleOptionalBool(field: string, def: boolean): void {
+    const current = this.#readOptionalBool(field);
     let next: boolean | undefined;
     if (current === undefined) next = !def;
     else if (current !== def) next = def;
@@ -1461,7 +1461,7 @@ export class SettingsDialog implements DialogController {
     }
   }
 
-  #readBoolPtr(field: string): boolean | undefined {
+  #readOptionalBool(field: string): boolean | undefined {
     const s = this.#host.settings;
     switch (field) {
       case "enablePlanTool":

@@ -69,7 +69,7 @@ interface Case {
 const bypassCases: Case[] = [
   {
     name: "session create",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: [
       'import { createSessionRun } from "../session/run_store.ts";',
       'export function persist() { createSessionRun("", {} as never); }',
@@ -78,7 +78,7 @@ const bypassCases: Case[] = [
   },
   {
     name: "session run query",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: [
       'import { getSessionRun } from "../session/run_store.ts";',
       'export function inspect() { getSessionRun("", "run"); }',
@@ -87,19 +87,19 @@ const bypassCases: Case[] = [
   },
   {
     name: "run store update",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export function persist(runStore: any) { runStore.update("run"); }\n',
     want: "direct agentruntime.RunStore.update",
   },
   {
     name: "run store finish",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export function persist(runStore: any) { runStore.finish("run"); }\n',
     want: "direct agentruntime.RunStore.finish",
   },
   {
     name: "legacy runtime lease",
-    path: "src/serve/new_adapter.ts",
+    path: "src/acp/new_adapter.ts",
     src: [
       'import { tryLockRuntime } from "../session/runtime_lock.ts";',
       'export function reserve() { tryLockRuntime("", "session"); }',
@@ -108,56 +108,56 @@ const bypassCases: Case[] = [
   },
   {
     name: "legacy attachment delivery",
-    path: "src/serve/new_adapter.ts",
+    path: "src/acp/new_adapter.ts",
     src: "export function project(s: any) { s.beginDelivery(); }\n",
     want: "new use of legacy attachment delivery API beginDelivery",
   },
   {
     name: "direct SQL handle",
-    path: "src/serve/new_adapter.ts",
+    path: "src/acp/new_adapter.ts",
     src: 'export function persist(db: any) { db.exec("SELECT 1"); }\n',
     want: "direct database exec",
   },
   {
     name: "direct agent construction",
-    path: "src/serve/new_adapter.ts",
+    path: "src/acp/new_adapter.ts",
     src:
       'export function build(reg: any) { return new Agent("id", "", {}, reg); }\n',
     want: "direct new Agent",
   },
   {
     name: "foreign key enforcement DSN pragma",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export const open = "file:db?_pragma=foreign_keys(ON)";\n',
     want: "SQLite foreign key enforcement is owned by src/db",
   },
   {
     name: "foreign key enforcement equality pragma",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export const open = "PRAGMA foreign_keys = 1";\n',
     want: "SQLite foreign key enforcement is owned by src/db",
   },
   {
     name: "foreign key enforcement lowercase pragma",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export const open = "pragma foreign_keys = true";\n',
     want: "SQLite foreign key enforcement is owned by src/db",
   },
   {
     name: "foreign key disable pragma is allowed",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export const open = "PRAGMA foreign_keys = OFF";\n',
     want: "",
   },
   {
     name: "bare foreign_keys pragma without enable value is allowed",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src: 'export const open = "PRAGMA foreign_keys";\n',
     want: "",
   },
   {
     name: "runtime store wiring is allowed",
-    path: "src/serve/adapter.ts",
+    path: "src/acp/adapter.ts",
     src:
       "export function wire(execution: any, runStore: any) { execution.setRunStore(runStore); }\n",
     want: "",

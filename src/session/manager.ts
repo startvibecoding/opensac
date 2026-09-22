@@ -1350,10 +1350,9 @@ export function latestAdditionalDirectoriesByID(
 export function latestModelChangeByID(
   sessionDir: string,
   sessionID: string,
-): { entry: ModelChangeEntry | null; ok: boolean } {
+): ModelChangeEntry | null {
   const m = openByIDExact(sessionDir, sessionID);
-  const entry = m.getLatestModelChange();
-  return { entry, ok: entry !== null };
+  return m.getLatestModelChange();
 }
 
 function sessionDBExists(dbPath: string): boolean {
@@ -1450,8 +1449,8 @@ function buildListOptions(opts: ListOption[]): ListOptions {
 /** Lists session records for a given working directory. */
 export function listForDir(cwd: string, sessionDir = ""): SessionInfo[] {
   const dir = sessionDir === "" ? platformSessionDir() : sessionDir;
-  const { db, ok } = openExistingSessionDB(dir);
-  if (!ok || db === null) return [];
+  const db = openExistingSessionDB(dir);
+  if (db === null) return [];
   const records = new SessionDAO(db.db).listForDir(cwd);
   return records.map((record) => sessionInfoFromRecord(dir, record));
 }
@@ -1463,8 +1462,8 @@ export function listAll(
 ): SessionInfo[] {
   const dir = sessionDir === "" ? platformSessionDir() : sessionDir;
   const options = buildListOptions(opts);
-  const { db, ok } = openExistingSessionDB(dir);
-  if (!ok || db === null) return [];
+  const db = openExistingSessionDB(dir);
+  if (db === null) return [];
   const records = new SessionDAO(db.db).list({
     search: options.search,
     messagesOnly: options.messagesOnly,
@@ -1516,8 +1515,8 @@ export function countWithMessages(
   const dir = sessionDir === "" ? platformSessionDir() : sessionDir;
   const options = buildListOptions(opts);
   options.messagesOnly = true;
-  const { db, ok } = openExistingSessionDB(dir);
-  if (!ok || db === null) return 0;
+  const db = openExistingSessionDB(dir);
+  if (db === null) return 0;
   return new SessionDAO(db.db).count({
     search: options.search,
     messagesOnly: options.messagesOnly,
@@ -1527,8 +1526,8 @@ export function countWithMessages(
 /** Returns the total number of sessions. */
 export function countAll(sessionDir = ""): number {
   const dir = sessionDir === "" ? platformSessionDir() : sessionDir;
-  const { db, ok } = openExistingSessionDB(dir);
-  if (!ok || db === null) return 0;
+  const db = openExistingSessionDB(dir);
+  if (db === null) return 0;
   return new SessionDAO(db.db).count({});
 }
 

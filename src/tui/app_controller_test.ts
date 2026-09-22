@@ -8,6 +8,7 @@ import type { Event } from "../agent/events.ts";
 import {
   EventDone,
   EventError,
+  EventPlanUpdate,
   EventRunFinished,
   EventStatus,
   EventTextDelta,
@@ -52,6 +53,35 @@ function runHandle() {
 function ev(partial: Partial<Event>): Event {
   return { ...partial } as Event;
 }
+
+Deno.test("plan updates set the current plan and tag their tool row", () => {
+  const { c } = controller("lead");
+  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(
+    ev({ type: EventToolExecutionStart, toolCallId: "tc-p", toolName: "plan" }),
+  );
+  c.handleAgentEvent(
+    ev({
+      type: EventPlanUpdate,
+      toolCallId: "tc-p",
+      plan: {
+        title: "T",
+        note: "",
+        steps: [{ title: "s", status: "running" }],
+      },
+    }),
+  );
+  c.handleAgentEvent(
+    ev({
+      type: EventToolResult,
+      toolCallId: "tc-p",
+      toolName: "plan",
+      toolResult: "Plan: T",
+    }),
+  );
+  assertEquals(c.currentPlan?.title, "T");
+  assertEquals(c.store.toolResults[0]?.plan?.title, "T");
+});
 
 Deno.test("lead streaming events feed the transcript store", () => {
   const { c } = controller("lead");
@@ -417,4 +447,49 @@ Deno.test("new turn resets the activity timeline", () => {
   assertEquals(c.activityManager.buildTimeline().length, 1);
   c.handleAgentEvent(ev({ type: EventTurnStart }));
   assertEquals(c.activityManager.buildTimeline().length, 0);
+});
+
+Deno.test({
+  name: "live activity rows render each tool's single-line call",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const { c } = controller("lead");
+    c.handleAgentEvent(ev({ type: EventTurnStart }));
+    c.handleAgentEvent(ev({
+      type: EventToolExecutionStart,
+      toolCallId: "t-bash",
+      toolName: "bash",
+      toolArgs: { command: "cd /a/b & ls" },
+    }));
+    c.handleAgentEvent(ev({
+      type: EventToolExecutionStart,
+      toolCallId: "t-read",
+      toolName: "read",
+      toolArgs: { path: "src/main.ts" },
+    }));
+    const stdout = new FakeStdout();
+    const instance = render(
+      App({
+        controller: c,
+        header: {
+          version: "test",
+          providerName: "p",
+          modelName: "m",
+          cwd: "/w",
+        },
+        width: 90,
+      }),
+      {
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        exitOnCtrlC: false,
+        patchConsole: false,
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    instance.unmount();
+    const out = stdout.output;
+    assert(out.includes("bash: cd /a/b & ls"), out);
+    assert(out.includes("read: src/main.ts"), out);
+  },
 });

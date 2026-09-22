@@ -446,7 +446,7 @@ Deno.test("execution runtime observe agent event persists retry and safe termina
     id: "run-observe",
     sessionId: "session-observe",
     intentId: "intent-observe",
-    source: "webui",
+    source: "acp",
     model: "model",
     mode: "agent",
   });
@@ -526,7 +526,7 @@ Deno.test("execution runtime shutdown persists terminal event and is idempotent"
   const run = makeRun({
     id: "run-shutdown",
     sessionId: "session-shutdown",
-    source: "webui",
+    source: "acp",
     model: "model-shutdown",
     mode: "agent",
     status: "running",

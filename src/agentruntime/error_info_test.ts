@@ -65,7 +65,7 @@ Deno.test("ClassifyErrorCancellationAndTimeout", () => {
 Deno.test("SharedFailureContractAcrossAdapters", () => {
   // The adapters intentionally have different wire formats, but the runtime
   // classification is the contract they must all project.
-  const entries = ["tui", "acp", "channel", "webui"];
+  const entries = ["tui", "acp", "cli"];
   for (const name of entries) {
     const info = classifyError(
       new Error("HTTP 503 provider secret=should-not-leak"),

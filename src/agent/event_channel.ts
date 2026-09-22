@@ -32,6 +32,10 @@ export class EventChannel implements AsyncIterable<Event> {
     return true;
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   /** Seals the channel: no further pushes are accepted and readers finish. */
   close(): void {
     if (this.#closed) return;

@@ -52,7 +52,9 @@ export function appendInputResourceEventTx(
   tx: Tx,
   event: InputResourceEvent,
 ): void {
-  if (tx === null) throw new Error("input resource event transaction is nil");
+  if (tx === null) {
+    throw new Error("input resource event transaction is not available");
+  }
   if (
     event.id === "" || event.sessionId === "" || event.resourceId === "" ||
     event.eventType === ""

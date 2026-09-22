@@ -2,7 +2,7 @@
 // internal/cron/maintenance.go.
 //
 // The Scheduler checks for due cron jobs and executes them through the shared
-// Runtime: Runtime-owned maintenance is dispatched to `RunMaintenanceCronJob`,
+// Runtime: Runtime-owned maintenance is dispatched to `runMaintenanceCronJob`,
 // an optional adapter `JobHandler` may claim a job, and local jobs run a
 // canonical durable `ExecutionRuntime` run keyed to the target session before
 // spawning a sub-agent. Cron stays the sole owner of job lifecycle (claims,
@@ -20,13 +20,13 @@ import { type AgentManager } from "../agent/manager.ts";
 import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
 import { ExecutionRuntime } from "../agentruntime/execution.ts";
 import {
-  DefaultMaintenancePolicy,
-  IsMaintenanceCronJobID,
+  defaultMaintenancePolicy,
+  isMaintenanceCronJobID,
   type MaintenancePolicy,
-  MaintenanceStorageReconcileJobID,
+  maintenanceStorageReconcileJobID,
   MaintenanceStorageReconcileJobName,
   MaintenanceStorageReconcileSchedule,
-  RunMaintenanceCronJob,
+  runMaintenanceCronJob,
 } from "../agentruntime/maintenance_cron.ts";
 import { SessionRunEventSink } from "../agentruntime/run_event.ts";
 import {
@@ -55,7 +55,7 @@ import { normalizeJobSchedule, parseSchedule } from "./schedule.ts";
 
 /**
  * JobHandler may claim execution for a persisted job before the Scheduler falls
- * back to its ordinary local-agent/A2A behavior. It lets Runtime-owned
+ * back to its ordinary local-agent behavior. It lets Runtime-owned
  * maintenance work reuse cron's claim, recovery, status, and completion
  * lifecycle without creating an adapter-specific timer or scheduler.
  *
@@ -74,20 +74,16 @@ export type JobHandler = (
   signal?: AbortSignal,
 ) => JobHandlerOutcome | Promise<JobHandlerOutcome>;
 
-/** A persisted running claim may outlive the process that created it. */
-export const CronRunningLeaseTimeoutMs = runningLeaseTimeoutMs;
-
 const defaultIntervalMs = 30_000;
-const maxA2AResponseBytes = 1 << 20;
 
 /**
- * ErrJobAlreadyRunning is thrown by `runNow` when the stored job still holds a
+ * JobAlreadyRunningError is thrown by `runNow` when the stored job still holds a
  * fresh running claim.
  */
-export class ErrJobAlreadyRunning extends Error {
+export class JobAlreadyRunningError extends Error {
   constructor(id: string) {
     super(`cron job is already running: ${id}`);
-    this.name = "ErrJobAlreadyRunning";
+    this.name = "JobAlreadyRunningError";
   }
 }
 
@@ -164,7 +160,7 @@ export class Scheduler {
 
   /** Returns the installed policy or the Runtime default. */
   maintenancePolicy(): MaintenancePolicy {
-    return this.maintenance ?? DefaultMaintenancePolicy();
+    return this.maintenance ?? defaultMaintenancePolicy();
   }
 
   /** Begins the scheduler loop, projecting Runtime maintenance first. */
@@ -292,7 +288,7 @@ export class Scheduler {
       now.getTime() - job.lastRun!.getTime() >= runningLeaseTimeoutMs;
   }
 
-  /** Runs a cron job by spawning a sub-agent or sending to an A2A server. */
+  /** Runs a cron job by spawning a sub-agent. */
   executeJob(job: CronJob): Promise<void> {
     return this.executeJobContext(undefined, job);
   }
@@ -312,14 +308,14 @@ export class Scheduler {
     let releaseRuntime: (() => void) | null = null;
 
     try {
-      if (IsMaintenanceCronJobID(job.id ?? "")) {
+      if (isMaintenanceCronJobID(job.id ?? "")) {
         // Maintenance is Runtime-owned work that reuses this scheduler's claim,
         // status, and next-run lifecycle. It is dispatched here rather than
         // through an adapter JobHandler because a handler may legitimately
         // decline a job, and a declined maintenance job would otherwise fall
         // through and run its prompt as a model turn.
         try {
-          const outcome = await RunMaintenanceCronJob(
+          const outcome = await runMaintenanceCronJob(
             this.sessionDir,
             job.id ?? "",
             this.maintenancePolicy(),
@@ -354,19 +350,6 @@ export class Scheduler {
           });
           return;
         }
-      }
-
-      // A2A target mode: send task to remote A2A server
-      if ((job.a2aTarget ?? "") !== "") {
-        try {
-          await this.executeA2AJob(signal, job);
-        } catch (err) {
-          lastErr = asError(err);
-        }
-        this.updateJob(job.id ?? "", (current) => {
-          this.completeJob(current, lastErr);
-        });
-        return;
       }
 
       // Local agent mode
@@ -639,7 +622,7 @@ export class Scheduler {
     if (
       (job.lastStatus ?? "") === "running" && !this.isStaleRunning(job, now)
     ) {
-      throw new ErrJobAlreadyRunning(trimmed);
+      throw new JobAlreadyRunningError(trimmed);
     }
     // Manual run is an explicit override (same semantics as the cron tool run
     // action): re-enable the job and clear its schedule state so the claim path
@@ -666,59 +649,6 @@ export class Scheduler {
         release();
       }
     });
-  }
-
-  /** Sends a task to a remote A2A server. */
-  async executeA2AJob(
-    signal: AbortSignal | undefined,
-    job: CronJob,
-  ): Promise<void> {
-    const payload = {
-      jsonrpc: "2.0",
-      method: "message/send",
-      params: {
-        message: {
-          role: "user",
-          parts: [{ type: "text", text: job.prompt ?? "" }],
-        },
-      },
-      id: 1,
-    };
-    const combined = combineSignals(signal, AbortSignal.timeout(30_000));
-    let resp: Response;
-    try {
-      resp = await fetch(`${job.a2aTarget ?? ""}/a2a`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(job.a2aToken !== undefined && job.a2aToken !== ""
-            ? { Authorization: `Bearer ${job.a2aToken}` }
-            : {}),
-        },
-        body: JSON.stringify(payload),
-        signal: combined,
-      });
-    } catch (err) {
-      throw new Error(`a2a request: ${errorMessage(err)}`);
-    }
-    if (resp.status !== 200) {
-      try {
-        await resp.body?.cancel();
-      } catch {
-        // best effort
-      }
-      throw new Error(`a2a request: status ${resp.status}`);
-    }
-    const text = (await resp.text()).slice(0, maxA2AResponseBytes);
-    let result: { error?: { message?: string } };
-    try {
-      result = JSON.parse(text) as { error?: { message?: string } };
-    } catch (err) {
-      throw new Error(`decode response: ${errorMessage(err)}`);
-    }
-    if (result.error !== undefined) {
-      throw new Error(`a2a error: ${result.error.message ?? ""}`);
-    }
   }
 
   /** Fans out a session-scoped completion notification when bound. */
@@ -749,7 +679,7 @@ export class Scheduler {
   ensureMaintenanceJob(): void {
     if (this.store === null || this.store === undefined) return;
     const policy = this.maintenancePolicy();
-    const id = MaintenanceStorageReconcileJobID();
+    const id = maintenanceStorageReconcileJobID();
     let existing: CronJob | null = null;
     let existingErr: Error | null = null;
     try {
@@ -898,17 +828,6 @@ function cronDurableRun(
     conversationTurn: false,
   };
   return Object.assign(base, fields);
-}
-
-function combineSignals(
-  a: AbortSignal | undefined,
-  b: AbortSignal,
-): AbortSignal {
-  if (a === undefined) return b;
-  if (typeof AbortSignal.any === "function") {
-    return AbortSignal.any([a, b]);
-  }
-  return b;
 }
 
 function waitInterval(ms: number, quit: AbortSignal): Promise<boolean> {

@@ -43,6 +43,12 @@ export interface AppProps {
   visibleRows?: Array<{ id: string; text: string }>;
   /** Compact mode: single-line tool summaries (Go a.compactMode). */
   compactMode?: boolean;
+  /**
+   * A framed modal overlays the conversation: hide the live streaming tail
+   * (it is already rendered inside the modal) so the managed region fits the
+   * terminal and Ink's full-region repaint cannot scroll or flicker.
+   */
+  overlayOpen?: boolean;
 }
 
 /** One transcript row with its presentation kind. */
@@ -73,6 +79,7 @@ export function App({
   label,
   visibleRows = [],
   compactMode = false,
+  overlayOpen = false,
 }: AppProps): ReactElement {
   if (!controller) {
     // Legacy banner mode (toolchain smoke tests).
@@ -161,6 +168,7 @@ export function App({
                 <CompactToolRow
                   key={activity.id}
                   toolName={activity.toolName ?? activity.type}
+                  toolInput={activity.toolInput}
                   status={activity.status as
                     | "running"
                     | "completed"
@@ -185,7 +193,7 @@ export function App({
         </Box>
       )}
 
-      {streaming.map((row) => renderRow(row, true))}
+      {!overlayOpen && streaming.map((row) => renderRow(row, true))}
       {controller.shownApproval && (
         <Box flexDirection="column" borderStyle="round">
           <Text bold>Approval required</Text>
@@ -203,7 +211,9 @@ export function App({
           ))}
         </Box>
       )}
-      {controller.isThinking && <Text dimColor>~ working...</Text>}
+      {!overlayOpen && controller.isThinking && (
+        <Text dimColor>~ working...</Text>
+      )}
     </Box>
   );
 }
@@ -259,6 +269,7 @@ function rowTextAt(
         summary: tool.summary,
         fullContent: tool.fullContent,
         diff: tool.diff,
+        plan: tool.plan,
         toolError: tool.toolError,
         executionState: tool.executionState,
       },

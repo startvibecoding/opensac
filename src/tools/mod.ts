@@ -1,15 +1,10 @@
 // Public surface of src/tools (ported from internal/tools).
 
 export {
-  type A2ADispatcher,
-  A2ADispatchTool,
-  type AgentEntry,
-} from "./a2a_dispatch.ts";
-export {
   BashTool,
   isValidShell,
   newBashTool,
-  NewBashToolWithJM,
+  newBashToolWithJobManager,
 } from "./bash.ts";
 export { EditTool } from "./edit.ts";
 export {

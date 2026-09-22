@@ -59,6 +59,10 @@ export class Database {
     return this.#managed;
   }
 
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   /** Close only closes explicitly standalone connections. */
   close(): void {
     if (this.#db === null || this.#managed) return;
@@ -67,7 +71,7 @@ export class Database {
 
   /** Runs a callback in one transaction on the managed connection. */
   runInTx<T>(fn: (conn: Tx) => T): T {
-    if (this.#db === null) throw new Error("database handle is nil");
+    if (this.#db === null) throw new Error("database is not open");
     return runInTx(this.#db, fn);
   }
 }

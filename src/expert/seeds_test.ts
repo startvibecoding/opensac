@@ -3,11 +3,11 @@
 import { assert, assertEquals } from "@std/assert";
 import { builtinFS, type Bundle, loadBundleFS } from "./mod.ts";
 import {
-  RoleLead,
-  RoleMember,
-  SchemaVersion,
-  TypeAgent,
-  TypeTeam,
+  expertSchemaVersion,
+  roleLead,
+  roleMember,
+  typeAgent,
+  typeTeam,
 } from "./mod.ts";
 
 function loadSeed(name: string): Bundle {
@@ -29,8 +29,8 @@ Deno.test("builtin seeds load valid", () => {
 Deno.test("software company seed", () => {
   const b = loadSeed("software-company");
 
-  assertEquals(b.manifest.schemaVersion, SchemaVersion);
-  assertEquals(b.manifest.expertType, TypeTeam);
+  assertEquals(b.manifest.schemaVersion, expertSchemaVersion);
+  assertEquals(b.manifest.expertType, typeTeam);
   assert(b.manifest.teamInfo !== undefined, "teamInfo missing");
   assertEquals(b.manifest.agentName, "software-team-lead");
   assertEquals(b.manifest.teamInfo!.leadAgent, "software-team-lead");
@@ -58,7 +58,7 @@ Deno.test("software company seed", () => {
     assert(b.defs.has(id), `Defs missing ${id}`);
   }
   const lead = b.defs.get("software-team-lead")!;
-  assertEquals(lead.role, RoleLead);
+  assertEquals(lead.role, roleLead);
   assertEquals(lead.displayName, "齐活林");
   assert(
     lead.emoji !== "" && lead.meta.vibe !== "" && lead.meta.color !== "",
@@ -66,7 +66,7 @@ Deno.test("software company seed", () => {
   );
   for (const id of wantIDs.slice(1)) {
     const def = b.defs.get(id)!;
-    assertEquals(def.role, RoleMember, id);
+    assertEquals(def.role, roleMember, id);
     assert(
       def.displayName !== "" && def.emoji !== "" && def.description !== "",
       `${id} persona metadata incomplete`,
@@ -143,17 +143,17 @@ Deno.test("software company seed", () => {
 Deno.test("frontend developer seed", () => {
   const b = loadSeed("frontend-developer");
 
-  assertEquals(b.manifest.expertType, TypeAgent);
+  assertEquals(b.manifest.expertType, typeAgent);
   assertEquals(b.manifest.agentName, "frontend-developer");
   assertEquals(b.manifest.displayName.zh, "前端开发专家");
   assertEquals(b.manifest.displayName.en, "Frontend Developer");
   const members = b.manifest.members ?? [];
   assertEquals(members.length, 1);
-  assertEquals(members[0].role, RoleLead);
+  assertEquals(members[0].role, roleLead);
   assertEquals(b.defs.size, 1, [...b.defs.keys()].join(","));
   const def = b.defs.get("frontend-developer");
   assert(def !== undefined, "Defs missing frontend-developer");
-  assertEquals(def.role, RoleLead);
+  assertEquals(def.role, roleLead);
   assertEquals(def.displayName, "前小端");
   for (
     const field of [

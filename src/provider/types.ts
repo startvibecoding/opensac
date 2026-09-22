@@ -151,7 +151,7 @@ export function newToolResultMessage(
 
 /**
  * Creates a tool result message with rich content blocks.
- * If contents is nil or empty, it falls back to using the text parameter.
+ * If contents is undefined or empty, it falls back to using the text parameter.
  */
 export function newToolResultMessageWithContents(
   toolCallId: string,
@@ -312,7 +312,7 @@ export function isStubUsage(u: Usage | null | undefined): boolean {
 
 /** Renders a Usage for inclusion in error/status messages. */
 export function formatUsage(u: Usage | null | undefined): string {
-  if (u == null) return "nil";
+  if (u == null) return "none";
   return `{input:${u.input} output:${u.output} total:${u.totalTokens}}`;
 }
 
@@ -408,9 +408,9 @@ export interface Model {
   maxTokens: number;
   /** true when maxTokens came from user/runtime config (never serialized) */
   maxTokensSet?: boolean;
-  /** nil = use API default */
+  /** undefined = use API default */
   temperature?: number;
-  /** nil = use API default */
+  /** undefined = use API default */
   topP?: number;
   compat?: ModelCompat;
 }
@@ -713,9 +713,9 @@ export interface ChatParams {
   systemPrompt: string;
   thinkingLevel: ThinkingLevel;
   maxTokens: number;
-  /** nil = use API default */
+  /** undefined = use API default */
   temperature?: number;
-  /** nil = use API default */
+  /** undefined = use API default */
   topP?: number;
   /** which model to use */
   modelId: string;

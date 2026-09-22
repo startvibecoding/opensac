@@ -107,7 +107,7 @@ export class DB {
       throw new Error(`open database: ${(err as Error).message}`);
     }
     const raw = db.db;
-    if (raw === null) throw new Error("database handle is nil");
+    if (raw === null) throw new Error("database is not open");
     return new DB(db, new StatsDAO(raw));
   }
 
@@ -115,6 +115,10 @@ export class DB {
   static openDefault(): DB {
     const dbPath = path.join(sessionDir(), "sessions.db");
     return DB.open(dbPath);
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
   }
 
   /**

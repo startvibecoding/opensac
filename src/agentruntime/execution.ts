@@ -2175,6 +2175,10 @@ class Done {
       this.#resolve = res;
     });
   }
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
   close(): void {
     if (!this.closed) {
       this.closed = true;

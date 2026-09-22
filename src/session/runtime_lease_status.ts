@@ -56,14 +56,14 @@ function formatDurationSeconds(seconds: number): string {
  * to call before the first run or after a reset.
  *
  * The check is deliberately narrow: a lease exists only while a process is
- * admitted or executing a run, so an idle TUI, serve, or ACP process holding
+ * admitted or executing a run, so an idle TUI or ACP process holding
  * the same directory open is not reported here.
  */
 export function activeRuntimeLeases(
   sessionDir: string,
 ): ActiveRuntimeLease[] {
-  const { db, ok } = openExistingSessionDBReadOnly(sessionDir);
-  if (!ok || db === null) return [];
+  const db = openExistingSessionDBReadOnly(sessionDir);
+  if (db === null) return [];
   try {
     const executor = db.db;
     if (executor === null) return [];

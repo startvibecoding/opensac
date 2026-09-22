@@ -5,9 +5,9 @@ import { projectSkillDirs } from "../skills/skills.ts";
 import { MemoryCache, newMemoryCache } from "./cache.ts";
 import { newClawHubClient } from "./clawhub.ts";
 import {
-  Install as installSkill,
   type InstallRequest,
   type InstallResult,
+  installSkill,
   LocalSkillExistsError,
 } from "./install.ts";
 import { LocalIndex, readMetadata, versionsDiffer } from "./local.ts";

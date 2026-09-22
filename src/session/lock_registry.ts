@@ -1,7 +1,7 @@
 // Ported from internal/session/lock_registry.go
 //
 // Process-local map of per-key mutexes whose entries are evicted once no
-// caller references them anymore. Long-running serve processes otherwise
+// caller references them anymore. Long-running processes otherwise
 // accumulate one mutex per historical session or identity key forever.
 //
 // Deviation: Go's `sync.Mutex` is a blocking OS-level primitive; here

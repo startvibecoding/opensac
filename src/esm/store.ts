@@ -40,14 +40,34 @@ import {
 } from "./state.ts";
 import { trimStringSlice } from "./report.ts";
 
-/** Sentinel: no objective exists for the session. */
-export const ErrNotFound = new Error("esm objective not found");
-/** Sentinel: an unfinished objective already exists. */
-export const ErrObjectiveExists = new Error("esm objective already exists");
-/** Sentinel: the objective text was empty. */
-export const ErrInvalidObjective = new Error("esm objective cannot be empty");
-/** Sentinel: the requested lifecycle transition is not allowed. */
-export const ErrInvalidTransition = new Error("invalid esm status transition");
+/** Thrown when no objective exists for the session. */
+export class EsmObjectiveNotFoundError extends Error {
+  override name = "EsmObjectiveNotFoundError";
+  constructor() {
+    super("esm objective not found");
+  }
+}
+/** Thrown when an unfinished objective already exists. */
+export class EsmObjectiveExistsError extends Error {
+  override name = "EsmObjectiveExistsError";
+  constructor() {
+    super("esm objective already exists");
+  }
+}
+/** Thrown when the objective text was empty. */
+export class EsmInvalidObjectiveError extends Error {
+  override name = "EsmInvalidObjectiveError";
+  constructor() {
+    super("esm objective cannot be empty");
+  }
+}
+/** Thrown when the requested lifecycle transition is not allowed. */
+export class EsmInvalidTransitionError extends Error {
+  override name = "EsmInvalidTransitionError";
+  constructor() {
+    super("invalid esm status transition");
+  }
+}
 
 /**
  * Persists Enable Supervisor Mode state in the shared sessions database.
@@ -63,7 +83,7 @@ export class Store {
 
   /** Returns the current objective for a session. */
   get(sessionID: string): Objective {
-    if (sessionID === "") throw ErrNotFound;
+    if (sessionID === "") throw new EsmObjectiveNotFoundError();
     const db = openRootDB(this.sessionDir);
     return getObjective(db.db!, sessionID);
   }
@@ -74,8 +94,8 @@ export class Store {
    */
   create(sessionID: string, objective: string): Objective {
     objective = objective.trim();
-    if (sessionID === "") throw ErrNotFound;
-    if (objective === "") throw ErrInvalidObjective;
+    if (sessionID === "") throw new EsmObjectiveNotFoundError();
+    if (objective === "") throw new EsmInvalidObjectiveError();
     const db = openRootDB(this.sessionDir);
     const now = this.timestamp();
     const esmID = "esm-" + generateID();
@@ -84,10 +104,12 @@ export class Store {
       try {
         existing = getObjective(tx, sessionID);
       } catch (err) {
-        if (err !== ErrNotFound) throw err;
+        if (!(err instanceof EsmObjectiveNotFoundError)) throw err;
       }
       if (existing !== null) {
-        if (isUnfinishedStatus(existing.status)) throw ErrObjectiveExists;
+        if (isUnfinishedStatus(existing.status)) {
+          throw new EsmObjectiveExistsError();
+        }
         new ESMDAO(null).delete(tx, sessionID);
       }
       new ESMDAO(null).insert(tx, {
@@ -120,10 +142,12 @@ export class Store {
   /** Updates the objective text for an unfinished objective. */
   edit(sessionID: string, objective: string): Objective {
     objective = objective.trim();
-    if (objective === "") throw ErrInvalidObjective;
+    if (objective === "") throw new EsmInvalidObjectiveError();
     const db = openRootDB(this.sessionDir);
     const current = getObjective(db.db!, sessionID);
-    if (!isUnfinishedStatus(current.status)) throw ErrInvalidTransition;
+    if (!isUnfinishedStatus(current.status)) {
+      throw new EsmInvalidTransitionError();
+    }
     current.objective = objective;
     current.blockedCount = 0;
     current.blockedReason = "";
@@ -162,7 +186,9 @@ export class Store {
   private setUserStatus(sessionID: string, status: Status): Objective {
     const db = openRootDB(this.sessionDir);
     const current = getObjective(db.db!, sessionID);
-    if (!isUnfinishedStatus(current.status)) throw ErrInvalidTransition;
+    if (!isUnfinishedStatus(current.status)) {
+      throw new EsmInvalidTransitionError();
+    }
     current.status = status;
     current.updatedAt = this.now();
     saveObjective(db.db!, current);
@@ -191,7 +217,7 @@ export class Store {
       case statusUsageLimited:
         break;
       default:
-        throw ErrInvalidTransition;
+        throw new EsmInvalidTransitionError();
     }
     current.status = statusActive;
     current.blockedCount = 0;
@@ -235,7 +261,7 @@ export class Store {
         validTransition = current.status === statusComplete;
         break;
     }
-    if (!validTransition) throw ErrInvalidTransition;
+    if (!validTransition) throw new EsmInvalidTransitionError();
     current.phase = phase;
     current.updatedAt = this.now();
     saveObjective(db.db!, current);
@@ -254,7 +280,7 @@ export class Store {
     remainingWork = trimStringSlice(remainingWork);
     const db = openRootDB(this.sessionDir);
     const current = getObjective(db.db!, sessionID);
-    if (current.status !== statusActive) throw ErrInvalidTransition;
+    if (current.status !== statusActive) throw new EsmInvalidTransitionError();
     current.phase = phaseWorker;
     current.progressSummary = summary.trim();
     current.remainingWork = remainingWork;
@@ -289,7 +315,9 @@ export class Store {
     }
     db.runInTx((tx) => {
       const current = getObjective(tx, sessionID);
-      if (current.status !== statusActive) throw ErrInvalidTransition;
+      if (current.status !== statusActive) {
+        throw new EsmInvalidTransitionError();
+      }
       if (remainingWork === null) remainingWork = current.remainingWork;
       current.status = statusActive;
       current.recoveryCount = current.recoveryCount + 1;
@@ -379,7 +407,7 @@ export class Store {
         const current = getObjective(tx, sessionID);
         if (current.status !== statusActive) {
           transitionCurrent = current;
-          throw ErrInvalidTransition;
+          throw new EsmInvalidTransitionError();
         }
         switch (status) {
           case statusComplete:
@@ -423,7 +451,9 @@ export class Store {
         saveObjective(tx, current);
       });
     } catch (err) {
-      if (err === ErrInvalidTransition) throw ErrInvalidTransition;
+      if (err instanceof EsmInvalidTransitionError) {
+        throw new EsmInvalidTransitionError();
+      }
       throw err;
     }
     if (transitionCurrent !== null) return transitionCurrent;
@@ -441,7 +471,9 @@ export class Store {
     }
     const db = openRootDB(this.sessionDir);
     const current = getObjective(db.db!, sessionID);
-    if (current.status !== statusCompleteCandidate) throw ErrInvalidTransition;
+    if (current.status !== statusCompleteCandidate) {
+      throw new EsmInvalidTransitionError();
+    }
     current.status = statusComplete;
     current.blockedCount = 0;
     current.blockedReason = "";
@@ -532,7 +564,7 @@ export class Store {
             idempotent = true;
             return;
           }
-          throw ErrInvalidTransition;
+          throw new EsmInvalidTransitionError();
         }
         let nextCount = current.rejectionCount;
         if (runID === "" || current.rejectionRunId !== runID) {
@@ -547,7 +579,9 @@ export class Store {
         saveObjective(tx, current);
       });
     } catch (err) {
-      if (err === ErrInvalidTransition) throw ErrInvalidTransition;
+      if (err instanceof EsmInvalidTransitionError) {
+        throw new EsmInvalidTransitionError();
+      }
       throw err;
     }
     if (idempotent) return transitionCurrent as unknown as Objective;
@@ -565,7 +599,9 @@ export class Store {
     }
     const db = openRootDB(this.sessionDir);
     const current = getObjective(db.db!, sessionID);
-    if (!isUnfinishedStatus(current.status)) throw ErrInvalidTransition;
+    if (!isUnfinishedStatus(current.status)) {
+      throw new EsmInvalidTransitionError();
+    }
     current.completionReview = review;
     current.updatedAt = this.now();
     saveObjective(db.db!, current);
@@ -659,20 +695,20 @@ export class Store {
 }
 
 // Reads the objective for `sessionID` through the DAO, mapping the DAO
-// "no rows" sentinel to ErrNotFound.
+// "no rows" sentinel to EsmObjectiveNotFoundError.
 function getObjective(executor: DB, sessionID: string): Objective {
   let record: ESMObjectiveRecord;
   try {
     record = new ESMDAO(null).getFrom(executor, sessionID);
   } catch (err) {
-    if (isNoRows(err)) throw ErrNotFound;
+    if (isNoRows(err)) throw new EsmObjectiveNotFoundError();
     throw err;
   }
   return objectiveFromRecord(record);
 }
 
 function objectiveFromRecord(record: ESMObjectiveRecord | null): Objective {
-  if (record === null) throw ErrNotFound;
+  if (record === null) throw new EsmObjectiveNotFoundError();
   let remaining: string[];
   try {
     remaining = JSON.parse(record.remainingWork) as string[];

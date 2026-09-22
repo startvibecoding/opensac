@@ -2,6 +2,7 @@
 
 import { isContentRejectionError } from "./content_rejection.ts";
 import { errMessage } from "./context_overflow.ts";
+import { isAbortLike, isTimeoutLike } from "../util/errors.ts";
 
 /**
  * Cloudflare's non-standard HTTP status for an upstream origin that did not
@@ -14,27 +15,6 @@ export interface RetryConfig {
   enabled: boolean;
   maxRetries: number;
   baseDelayMs: number;
-}
-
-/** Returns true when the thrown value looks like an abort (user cancellation). */
-function isAbortError(err: unknown): boolean {
-  if (err instanceof DOMException && err.name === "AbortError") return true;
-  if (err instanceof Error && err.name === "AbortError") return true;
-  return errMessage(err).toLowerCase().includes("operation was aborted");
-}
-
-/** Returns true when the thrown value looks like a timeout. */
-function isTimeoutLike(err: unknown): boolean {
-  if (err instanceof DOMException && err.name === "TimeoutError") return true;
-  if (err instanceof Error && err.name === "TimeoutError") return true;
-  if (
-    err instanceof Error && err.cause != null && isTimeoutLike(err.cause)
-  ) {
-    return true;
-  }
-  const s = errMessage(err).toLowerCase();
-  return s.includes("deadline exceeded") || s.includes("timed out") ||
-    s.includes("timeout");
 }
 
 /** Extracts a Node-style error code from an error or its cause chain. */
@@ -72,7 +52,7 @@ export function isRetryable(err: unknown, statusCode: number): boolean {
   if (err == null) return false;
 
   // Context cancellation is never retryable (user abort), but a timeout is.
-  if (isAbortError(err)) return false;
+  if (isAbortLike(err)) return false;
   if (isTimeoutLike(err)) return true;
 
   // A truncated HTTP/SSE response is retryable.

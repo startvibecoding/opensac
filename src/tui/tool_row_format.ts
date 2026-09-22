@@ -13,6 +13,8 @@ import type { FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import type { Translator } from "./i18n.ts";
 import { formatDetailedActivityTool } from "./activity.ts";
+import { planProgress, planTitle, renderTaskPlanLines } from "./plan_view.ts";
+import type { TaskPlan } from "../tools/tool.ts";
 
 export type ToolRowStatus = "running" | "completed" | "interrupted";
 
@@ -23,6 +25,9 @@ export interface ToolRowInput {
   summary: string;
   fullContent: string;
   diff?: FileDiff;
+  plan?: TaskPlan;
+  /** Spinner frame prefixed to the running label on live rows. */
+  spinner?: string;
   toolError: string;
   executionState: string;
 }
@@ -74,13 +79,15 @@ export function toolHeader(input: ToolRowInput): string {
 
 // ── bash ────────────────────────────────────────────────────────────────────
 
-function normalizeCommand(command: string): string {
+export function normalizeCommand(command: string): string {
   return command.replace(/\r\n/g, "; ").replace(/\n/g, "; ").trim();
 }
 
 /** Status suffix for a bash row (Go bashCommandStatus). */
 function bashStatus(tr: Translator, input: ToolRowInput): string {
-  if (input.status === "running") return tr.text("tool.command.running");
+  if (input.status === "running") {
+    return `${spinnerMark(input)}${tr.text("tool.command.running")}`;
+  }
   if (input.status === "interrupted") {
     return tr.text("tool.modal.state.canceled");
   }
@@ -114,6 +121,13 @@ function bashCommandLine(tr: Translator, input: ToolRowInput): string {
 
 // ── running rows ────────────────────────────────────────────────────────────
 
+/** Spinner prefix for a live running label (empty without a supplied frame). */
+function spinnerMark(input: ToolRowInput): string {
+  return input.spinner !== undefined && input.spinner !== ""
+    ? `${input.spinner} `
+    : "";
+}
+
 /** Running line for any tool (Go formatToolExecutionStartWithTranslator). */
 function runningLine(tr: Translator, input: ToolRowInput): string {
   if (input.toolName === "bash") return bashCommandLine(tr, input);
@@ -123,17 +137,21 @@ function runningLine(tr: Translator, input: ToolRowInput): string {
     case "find": {
       const pattern = input.toolArgs?.["pattern"];
       if (typeof pattern === "string") {
-        return `${header} running ${truncateRaw(pattern, 120)}`;
+        return `${header} ${spinnerMark(input)}running ${
+          truncateRaw(pattern, 120)
+        }`;
       }
       break;
     }
     case "ls": {
       const p = toolPath(input.toolArgs);
-      if (p !== "") return `${header} running ${truncateRaw(p, 120)}`;
+      if (p !== "") {
+        return `${header} ${spinnerMark(input)}running ${truncateRaw(p, 120)}`;
+      }
       break;
     }
   }
-  return `${header} ${tr.text("tool.command.running")}`;
+  return `${header} ${spinnerMark(input)}${tr.text("tool.command.running")}`;
 }
 
 // ── edit / write diff display ───────────────────────────────────────────────
@@ -172,6 +190,7 @@ export function expandedToolRow(
   input: ToolRowInput,
 ): string {
   if (input.status === "running") return runningLine(tr, input);
+  if (input.toolName === "plan") return planRow(tr, input, false);
 
   let header: string;
   if (input.toolName === "bash") {
@@ -238,6 +257,26 @@ function unifiedDiffExcerpt(unified: string): string {
   return lines.join("\n");
 }
 
+// ── plan rows ───────────────────────────────────────────────────────────────
+
+/** Plan row: `[plan] title` plus the checklist (compact shows progress). */
+function planRow(
+  tr: Translator,
+  input: ToolRowInput,
+  compact: boolean,
+): string {
+  const plan = input.plan;
+  const header = toolHeader(input);
+  if (plan === undefined) return `${header} ...`;
+  if (compact) {
+    const { done, total } = planProgress(plan);
+    return `${header} ${planTitle(plan, tr)} (${done}/${total})`;
+  }
+  const lines = renderTaskPlanLines(plan, tr);
+  lines[0] = `${header} ${lines[0]}`;
+  return lines.join("\n");
+}
+
 // ── generic completed rows ─────────────────────────────────────────────────
 
 /** Completed non-specialized tool row: header + summary (compact mode aware). */
@@ -289,6 +328,8 @@ export function formatToolRow(
     // No result was produced; the header carries the terminal state.
     return `${toolHeader(input)} ${tr.text("tool.modal.state.canceled")}`;
   }
+
+  if (input.toolName === "plan") return planRow(tr, input, compact);
 
   if (compact) return completedLine(tr, input, true);
 

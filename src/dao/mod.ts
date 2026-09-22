@@ -87,7 +87,6 @@ export {
   type KnowledgeEvidenceRecord,
   type KnowledgeFileRecord,
   knowledgeFTSHasTokenRune,
-  KnowledgeFTSIndexText,
   knowledgeFTSIndexText,
   knowledgeFTSQuery,
   type KnowledgeGraphProjection,

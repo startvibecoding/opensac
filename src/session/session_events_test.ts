@@ -56,8 +56,8 @@ function appendMessageEntry(
 Deno.test("session capabilities round trip and default to not-found", () => {
   const sessionDir = tempDir();
   try {
-    assertEquals(loadSessionCapabilities(sessionDir, "s-1").ok, false);
-    assertEquals(loadSessionCapabilities(sessionDir, "").ok, false);
+    assertEquals(loadSessionCapabilities(sessionDir, "s-1"), null);
+    assertEquals(loadSessionCapabilities(sessionDir, ""), null);
 
     saveSessionCapabilities(sessionDir, {
       sessionId: "s-1",
@@ -68,7 +68,6 @@ Deno.test("session capabilities round trip and default to not-found", () => {
       workflows: true,
       webSearch: false,
       browser: true,
-      a2aMaster: false,
       updatedAt: new Date("2026-01-01T00:00:00Z"),
     });
     saveSessionCapabilities(sessionDir, {
@@ -80,12 +79,10 @@ Deno.test("session capabilities round trip and default to not-found", () => {
       workflows: false,
       webSearch: true,
       browser: false,
-      a2aMaster: true,
       updatedAt: new Date("2026-01-02T00:00:00Z"),
     });
 
-    const { caps, ok } = loadSessionCapabilities(sessionDir, "s-1");
-    assert(ok);
+    const caps = loadSessionCapabilities(sessionDir, "s-1");
     assert(caps !== null);
     assertEquals(caps.mode, "agent");
     assertEquals(caps.displayMode, "manual");
@@ -94,7 +91,6 @@ Deno.test("session capabilities round trip and default to not-found", () => {
     assertEquals(caps.workflows, false);
     assertEquals(caps.webSearch, true);
     assertEquals(caps.browser, false);
-    assertEquals(caps.a2aMaster, true);
   } finally {
     closeAll();
   }

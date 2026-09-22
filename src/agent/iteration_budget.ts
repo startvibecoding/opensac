@@ -1,15 +1,7 @@
 // Ported from internal/agent/iteration_budget.go.
 
-import {
-  contextKey,
-  contextWithValue,
-  type RunContext,
-} from "./run_context.ts";
-import {
-  type ToolContext,
-  toolContextValue,
-  toolContextWithValue,
-} from "../tools/tool.ts";
+import { type RunContext } from "./run_context.ts";
+import type { ToolContext } from "../tools/tool.ts";
 
 /**
  * IterationBudgetToolName is the model-facing renewal tool for the main loop's
@@ -209,27 +201,20 @@ export function newIterationBudget(
   return new IterationBudget(policy, soft);
 }
 
-const iterationBudgetContextKey = contextKey<IterationBudget>(
-  "iterationBudget",
-);
-
 /** Attaches the per-run budget handle to the run context. */
 export function contextWithIterationBudget(
   ctx: RunContext | undefined,
   b: IterationBudget,
 ): RunContext | undefined {
   if (ctx == null || b == null) return ctx;
-  return contextWithValue(ctx, iterationBudgetContextKey, b);
+  return { ...ctx, iterationBudget: b };
 }
 
 /** Extracts the per-run budget handle. */
 export function iterationBudgetFromContext(
   ctx: RunContext | undefined,
 ): IterationBudget | undefined {
-  if (ctx == null) return undefined;
-  return ctx.values.get(iterationBudgetContextKey) as
-    | IterationBudget
-    | undefined;
+  return ctx?.iterationBudget;
 }
 
 /**
@@ -241,12 +226,12 @@ export function toolContextWithIterationBudget(
   ctx: ToolContext,
   b: IterationBudget,
 ): ToolContext {
-  return toolContextWithValue(ctx, iterationBudgetContextKey, b);
+  return { ...ctx, iterationBudget: b };
 }
 
 /** Extracts the per-run budget handle from a tool context. */
 export function iterationBudgetFromToolContext(
   ctx: ToolContext | undefined,
 ): IterationBudget | undefined {
-  return toolContextValue<IterationBudget>(ctx, iterationBudgetContextKey);
+  return ctx?.iterationBudget;
 }

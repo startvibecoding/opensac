@@ -8,10 +8,10 @@ const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 // them before the Agent is built and must execute the resulting message with
 // the same Agent Core method.
 //
-// The adapter modules downstream of the shared runtime (TUI, CLI, ACP, Serve/
-// OpenAI-API, channels) are still being ported, so a listed file that does not
-// exist yet is reported as pending rather than failing the guard. Once a file
-// lands, it must contain every required Runtime input-contract call.
+// The adapter modules downstream of the shared runtime (TUI, CLI, and ACP)
+// are the only entry projections, so a listed file that does not exist is
+// reported as pending rather than failing the guard. Once a file lands, it
+// must contain every required Runtime input-contract call.
 interface ContractCheck {
   path: string;
   requires: string[];
@@ -44,47 +44,6 @@ const checks: ContractCheck[] = [
       "promptToRunInput(",
       ".buildUserMessage(",
       "runWithUserMessage(",
-    ],
-  },
-  {
-    path: "src/serve/openaiapi/handler_run_submit.ts",
-    requires: [
-      ".acceptInput(",
-      ".buildUserMessage(",
-      "beginArtifactCollection(",
-    ],
-  },
-  {
-    path: "src/serve/openaiapi/handler_chat.ts",
-    requires: [
-      "requestRunInput(",
-      ".acceptInput(",
-      ".buildUserMessage(",
-      "beginArtifactCollection(",
-    ],
-  },
-  {
-    path: "src/serve/openaiapi/background_external.ts",
-    requires: [
-      "req.input",
-      ".buildUserMessage(",
-      "beginArtifactCollection(",
-    ],
-  },
-  {
-    // The channel dispatcher core already owns the attachment-ingress mapping;
-    // HandleMessage/HandleDelivery land in delivery.ts, which must consume the
-    // Runtime input contract (same split as the Go file's delivery path).
-    path: "src/serve/channels/dispatcher.ts",
-    requires: ["channelAttachmentIngresses"],
-  },
-  {
-    path: "src/serve/channels/delivery.ts",
-    requires: [
-      "channelAttachmentIngresses",
-      ".acceptInput(",
-      ".buildUserMessage(",
-      "beginArtifactCollection(",
     ],
   },
 ];

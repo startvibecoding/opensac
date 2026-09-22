@@ -4,10 +4,10 @@ import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
   Center,
-  SourceBuiltin,
-  SourceGlobal,
-  SourceProject,
-  TypeTeam,
+  sourceBuiltin,
+  sourceGlobal,
+  sourceProject,
+  typeTeam,
 } from "./mod.ts";
 
 /** Builds a minimal valid agent-bundle manifest for shadow assertions. */
@@ -112,22 +112,22 @@ Deno.test("center list shadow and sort", () => {
         const wants = [
           {
             name: "aaa-project-only",
-            source: SourceProject,
+            source: sourceProject,
             displayName: "项目专属",
           },
           {
             name: "frontend-developer",
-            source: SourceProject,
+            source: sourceProject,
             displayName: "项目前端",
           },
           {
             name: "software-company",
-            source: SourceProject,
+            source: sourceProject,
             displayName: "项目软件公司",
           },
           {
             name: "zz-global-only",
-            source: SourceProject,
+            source: sourceProject,
             displayName: "项目覆盖全局",
           },
         ];
@@ -147,10 +147,10 @@ Deno.test("center list shadow and sort", () => {
           new Center().list().map((s) => [s.name, s]),
         );
         const fe = byName2.get("frontend-developer")!;
-        assertEquals(fe.source, SourceGlobal);
+        assertEquals(fe.source, sourceGlobal);
         assertEquals(fe.displayName.zh, "全局前端");
-        assertEquals(byName2.get("software-company")!.source, SourceBuiltin);
-        assertEquals(byName2.get("zz-global-only")!.source, SourceGlobal);
+        assertEquals(byName2.get("software-company")!.source, sourceBuiltin);
+        assertEquals(byName2.get("zz-global-only")!.source, sourceGlobal);
       });
     });
   });
@@ -164,7 +164,7 @@ Deno.test("center list missing layers tolerated", () => {
       assertEquals(list[0].name, "frontend-developer");
       assertEquals(list[1].name, "software-company");
       for (const s of list) {
-        assertEquals(s.source, SourceBuiltin, s.name);
+        assertEquals(s.source, sourceBuiltin, s.name);
         assert(!s.invalid, `${s.name} invalid: ${s.invalidReason}`);
         assert(s.expertType !== "", `${s.name} ExpertType empty`);
       }
@@ -209,7 +209,7 @@ Deno.test("center list invalid manifest flagged", () => {
         assert(broken.invalid && broken.invalidReason!.includes("expert.json"));
         const shadow = byName.get("frontend-developer");
         assert(shadow !== undefined, "frontend-developer missing from List");
-        assertEquals(shadow.source, SourceProject);
+        assertEquals(shadow.source, sourceProject);
         assert(
           shadow.invalid && shadow.invalidReason!.includes("不一致"),
           `frontend-developer = ${JSON.stringify(shadow)}`,
@@ -230,7 +230,7 @@ Deno.test("center get", () => {
         const c = new Center(projectRoot);
         const b = c.get("software-company");
         assert(!b.invalid, `builtin seed invalid: ${b.invalidReason}`);
-        assertEquals(b.manifest.expertType, TypeTeam);
+        assertEquals(b.manifest.expertType, typeTeam);
         assertEquals(b.defs.size, 5);
 
         // Project layer wins over builtin.

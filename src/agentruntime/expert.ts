@@ -16,8 +16,8 @@ import {
   type AgentDef,
   type Bundle,
   type Summary,
-  TypeAgent,
-  TypeTeam,
+  typeAgent,
+  typeTeam,
 } from "../expert/expert.ts";
 import type { Message } from "../provider/types.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
@@ -40,14 +40,14 @@ export class ExpertSwitchRequiresForkError extends Error {
  * with another must create a forked session. Binding a fresh session and
  * unbinding an existing one remain supported.
  */
-export const ErrExpertSwitchRequiresFork =
+export const expertSwitchRequiresForkMessage =
   "switching an expert requires a session fork";
 
 /** The resolved expert identity of one session (subject to Runtime ownership). */
 export interface ExpertBinding {
   /** expert bundle name (= session header expertId) */
   id: string;
-  /** expert.TypeAgent | expert.TypeTeam */
+  /** expert.typeAgent | expert.typeTeam */
   type: string;
   /**
    * True for team-type bindings; it forces multi-agent capability for the
@@ -106,7 +106,7 @@ export function newExpertBinding(bundle: Bundle): ExpertBinding {
   const binding: ExpertBinding = {
     id: bundle.name,
     type: bundle.manifest.expertType,
-    team: bundle.manifest.expertType === TypeTeam,
+    team: bundle.manifest.expertType === typeTeam,
     bundle,
     identityPrompt: "",
     rosterPrompt: "",
@@ -114,12 +114,12 @@ export function newExpertBinding(bundle: Bundle): ExpertBinding {
   };
   let leadID = "";
   switch (bundle.manifest.expertType) {
-    case TypeTeam:
+    case typeTeam:
       if (bundle.manifest.teamInfo !== undefined) {
         leadID = bundle.manifest.teamInfo.leadAgent;
       }
       break;
-    case TypeAgent:
+    case typeAgent:
       leadID = bundle.manifest.agentName ?? "";
       break;
   }
@@ -274,7 +274,7 @@ export function sessionHasTeamExpert(
   try {
     const bundle = new Center(workDir).get(expertID);
     if (bundle.invalid) return false;
-    return bundle.manifest.expertType === TypeTeam;
+    return bundle.manifest.expertType === typeTeam;
   } catch {
     return false;
   }
@@ -301,7 +301,7 @@ export function expertConfigOption(
     let name = summary.displayName.en.trim();
     if (name === "") name = summary.displayName.zh.trim();
     if (name === "") name = summary.name;
-    const kind = summary.expertType === TypeTeam
+    const kind = summary.expertType === typeTeam
       ? "Expert team"
       : "Single expert";
     choices.push({ value: summary.name, name, description: kind });

@@ -22,7 +22,7 @@ import { generateID } from "./entry.ts";
 import { boolToInt, parseProjectTime } from "./projects.ts";
 import {
   deleteKnowledgeBaseDatabase,
-  ErrKnowledgeBaseNotFound,
+  KnowledgeBaseNotFoundError,
   listKnowledgeBaseDatabaseIDs,
   queryKnowledgeBaseDatabase,
   readKnowledgeBaseDatabase,
@@ -32,12 +32,15 @@ import {
 /** The knowledge-store schema version of a completed graph snapshot. */
 export const KnowledgeGraphSchemaVersion = 1;
 
-/** Raised when a knowledge base has no completed active index. */
-export const ErrKnowledgeBaseUnindexed: Error = new Error(
-  "knowledge base has no completed index",
-);
+/** Thrown when a knowledge base has no completed active index. */
+export class KnowledgeBaseUnindexedError extends Error {
+  override name = "KnowledgeBaseUnindexedError";
+  constructor() {
+    super("knowledge base has no completed index");
+  }
+}
 
-export { ErrKnowledgeBaseNotFound };
+export { KnowledgeBaseNotFoundError };
 
 /**
  * The editable Desktop configuration. It deliberately stores provider/model/
@@ -186,7 +189,7 @@ export function listKnowledgeBases(sessionDir: string): KnowledgeBase[] {
         record = new KnowledgeBaseDAO(db.db).findBase(id);
       });
     } catch (err) {
-      if (isNoRows(err) || err === ErrKnowledgeBaseNotFound) continue;
+      if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) continue;
       throw err;
     }
     if (record === undefined) continue;
@@ -201,13 +204,13 @@ export function listKnowledgeBases(sessionDir: string): KnowledgeBase[] {
   return bases;
 }
 
-/** Loads one knowledge base, or throws `ErrKnowledgeBaseNotFound`. */
+/** Loads one knowledge base, or throws `KnowledgeBaseNotFoundError`. */
 export function getKnowledgeBase(
   sessionDir: string,
   id: string,
 ): KnowledgeBase {
   id = id.trim();
-  if (id === "") throw ErrKnowledgeBaseNotFound;
+  if (id === "") throw new KnowledgeBaseNotFoundError();
   migrateLegacyKnowledgeBaseStorage(sessionDir);
   let record: KnowledgeBaseRecord | undefined;
   try {
@@ -215,10 +218,10 @@ export function getKnowledgeBase(
       record = new KnowledgeBaseDAO(db.db).findBase(id);
     });
   } catch (err) {
-    if (isNoRows(err)) throw ErrKnowledgeBaseNotFound;
+    if (isNoRows(err)) throw new KnowledgeBaseNotFoundError();
     throw err;
   }
-  if (record === undefined) throw ErrKnowledgeBaseNotFound;
+  if (record === undefined) throw new KnowledgeBaseNotFoundError();
   return knowledgeBaseFromRecord(record);
 }
 
@@ -233,7 +236,7 @@ export function updateKnowledgeBase(
   spec: KnowledgeBaseSpec,
 ): KnowledgeBase {
   id = id.trim();
-  if (id === "") throw ErrKnowledgeBaseNotFound;
+  if (id === "") throw new KnowledgeBaseNotFoundError();
   validateKnowledgeBaseSpec(spec);
   const base = getKnowledgeBase(sessionDir, id);
   const updated: KnowledgeBase = {
@@ -245,7 +248,7 @@ export function updateKnowledgeBase(
   writeKnowledgeBaseDatabase(sessionDir, id, false, (tx) => {
     const store = new KnowledgeBaseDAO(null);
     const changed = store.updateBase(tx, knowledgeBaseRecord(updated));
-    if (changed !== 1) throw ErrKnowledgeBaseNotFound;
+    if (changed !== 1) throw new KnowledgeBaseNotFoundError();
     store.pruneSnapshotsExcept(tx, id, "");
   });
   return updated;
@@ -254,12 +257,12 @@ export function updateKnowledgeBase(
 /** Deletes a knowledge base and its private database file. */
 export function deleteKnowledgeBase(sessionDir: string, id: string): void {
   id = id.trim();
-  if (id === "") throw ErrKnowledgeBaseNotFound;
+  if (id === "") throw new KnowledgeBaseNotFoundError();
   migrateLegacyKnowledgeBaseStorage(sessionDir);
   getKnowledgeBase(sessionDir, id);
   writeKnowledgeBaseDatabase(sessionDir, id, false, (tx) => {
     const changed = new KnowledgeBaseDAO(null).deleteBase(tx, id);
-    if (changed !== 1) throw ErrKnowledgeBaseNotFound;
+    if (changed !== 1) throw new KnowledgeBaseNotFoundError();
   });
   deleteKnowledgeBaseDatabase(sessionDir, id);
 }
@@ -285,7 +288,7 @@ export function getKnowledgeSnapshot(
     if (record === undefined) continue;
     return knowledgeSnapshotFromRecord(record);
   }
-  throw ErrKnowledgeBaseUnindexed;
+  throw new KnowledgeBaseUnindexedError();
 }
 
 /** Atomically stores a completed graph and makes it the active snapshot. */
@@ -322,7 +325,7 @@ export function storeKnowledgeGraphSnapshot(
         graph.snapshot.id,
         now.toISOString(),
       );
-      if (changed !== 1) throw ErrKnowledgeBaseNotFound;
+      if (changed !== 1) throw new KnowledgeBaseNotFoundError();
       store.pruneSnapshotsExcept(
         tx,
         graph.snapshot.knowledgeBaseId,
@@ -373,7 +376,7 @@ export function reuseKnowledgeSnapshotIfFilesMatch(
       reusable = true;
     });
   } catch (err) {
-    if (isNoRows(err) || err === ErrKnowledgeBaseNotFound) {
+    if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) {
       return { snapshot: emptySnapshot(), reusable: false };
     }
     throw err;
@@ -483,7 +486,7 @@ export function prepareKnowledgeGraphReusePlan(
       );
     });
   } catch (err) {
-    if (isNoRows(err) || err === ErrKnowledgeBaseNotFound) {
+    if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) {
       return { sourceSnapshotId: "", files: new Map() };
     }
     throw err;
@@ -726,7 +729,7 @@ export function queryKnowledgeGraph(
     readKnowledgeBaseDatabase(sessionDir, baseID, (tx) => {
       const { projection, indexed } = new KnowledgeBaseDAO(tx)
         .activeGraphProjection(tx, baseID, query, limit);
-      if (!indexed) throw ErrKnowledgeBaseUnindexed;
+      if (!indexed) throw new KnowledgeBaseUnindexedError();
       result.knowledgeBase = knowledgeBaseFromRecord(projection.base);
       result.snapshot = knowledgeSnapshotFromRecord(projection.snapshot);
       result.chunks = knowledgeChunksFromRecords(projection.chunks);
@@ -734,8 +737,8 @@ export function queryKnowledgeGraph(
       result.edges = knowledgeEdgesFromRecords(projection.edges);
     });
   } catch (err) {
-    if (isNoRows(err) || err === ErrKnowledgeBaseNotFound) {
-      throw ErrKnowledgeBaseNotFound;
+    if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) {
+      throw new KnowledgeBaseNotFoundError();
     }
     throw err;
   }
@@ -775,7 +778,7 @@ export function migrateLegacyKnowledgeBaseStorage(sessionDir: string): void {
     writeLegacyKnowledgeBaseToDedicatedStore(sessionDir, legacy);
     writeRootDatabase(sessionDir, (tx) => {
       const changed = new KnowledgeBaseDAO(null).deleteBase(tx, base.id);
-      if (changed !== 1) throw ErrKnowledgeBaseNotFound;
+      if (changed !== 1) throw new KnowledgeBaseNotFoundError();
     });
   }
 }
@@ -1142,17 +1145,3 @@ function emptySnapshot(): KnowledgeSnapshot {
     errorSummary: "",
   };
 }
-
-/** Aliases matching the exported Go names. */
-export const CreateKnowledgeBase = createKnowledgeBase;
-export const ListKnowledgeBases = listKnowledgeBases;
-export const GetKnowledgeBase = getKnowledgeBase;
-export const UpdateKnowledgeBase = updateKnowledgeBase;
-export const DeleteKnowledgeBase = deleteKnowledgeBase;
-export const GetKnowledgeSnapshot = getKnowledgeSnapshot;
-export const StoreKnowledgeGraphSnapshot = storeKnowledgeGraphSnapshot;
-export const ReuseKnowledgeSnapshotIfFilesMatch =
-  reuseKnowledgeSnapshotIfFilesMatch;
-export const PrepareKnowledgeGraphReusePlan = prepareKnowledgeGraphReusePlan;
-export const AppendKnowledgeFileGraph = appendKnowledgeFileGraph;
-export const QueryKnowledgeGraph = queryKnowledgeGraph;

@@ -31,7 +31,6 @@ import * as mcp from "../mcp/mod.ts";
 import * as platform from "../platform/platform.ts";
 import * as providerfactory from "../provider/factory/mod.ts";
 import * as skills from "../skills/mod.ts";
-import { configPath } from "../serve/config.ts";
 import * as appversion from "../version/version.ts";
 
 export const StatusOK = "ok";
@@ -261,12 +260,6 @@ function checkConfigFiles(
       id: "config.project",
       title: "Project settings",
       path: projectPathFor(cwd, "settings.json"),
-    },
-    { id: "serve.global", title: "Serve config (global)", path: configPath() },
-    {
-      id: "serve.project",
-      title: "Serve config (project)",
-      path: projectPathFor(cwd, "serve.json"),
     },
     { id: "mcp.global", title: "MCP config (global)", path: globalMCPPath() },
     {

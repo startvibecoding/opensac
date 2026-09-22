@@ -7,7 +7,7 @@ import {
   assertStringIncludes,
 } from "@std/assert";
 import { newClawHubClient } from "./clawhub.ts";
-import { Install as installSkill } from "./install.ts";
+import { installSkill } from "./install.ts";
 import { jsonResponse, makeArchive, startServer } from "./test_helpers.ts";
 
 const ambiguousCustomMailPayload =

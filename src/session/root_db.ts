@@ -40,7 +40,7 @@ export function rootDBPath(sessionDir: string): string {
 export function openRootDB(sessionDir: string): Database {
   const connection: DB = open(rootDBPath(sessionDir), ensureCurrentSchema);
   const handle = wrapDatabase(connection);
-  if (handle === null) throw new Error("root database handle is nil");
+  if (handle === null) throw new Error("root database is not open");
   return handle;
 }
 
@@ -65,20 +65,20 @@ function sessionDBExists(dbPath: string): boolean {
 
 /**
  * Opens an existing sessions database through the DAO-owned handle. When the
- * file does not exist it returns `{ db: null, ok: false }` rather than creating
- * one, matching the read-only listing surfaces. Callers must not close the
- * returned managed handle.
+ * file does not exist it returns null rather than creating one, matching the
+ * read-only listing surfaces. Callers must not close the returned managed
+ * handle.
  */
 export function openExistingSessionDB(
   sessionDir: string,
-): { db: Database | null; ok: boolean } {
+): Database | null {
   if (sessionDir === "") {
     sessionDir = platformSessionDir();
   }
   const dbPath = path.join(sessionDir, "sessions.db");
-  if (!sessionDBExists(dbPath)) return { db: null, ok: false };
+  if (!sessionDBExists(dbPath)) return null;
   const connection: DB = open(dbPath, ensureCurrentSchema);
-  return { db: wrapDatabase(connection), ok: true };
+  return wrapDatabase(connection);
 }
 
 /**
@@ -88,14 +88,14 @@ export function openExistingSessionDB(
  */
 export function openExistingSessionDBReadOnly(
   sessionDir: string,
-): { db: Database | null; ok: boolean } {
+): Database | null {
   if (sessionDir === "") {
     sessionDir = platformSessionDir();
   }
   const dbPath = path.join(sessionDir, "sessions.db");
-  if (!sessionDBExists(dbPath)) return { db: null, ok: false };
+  if (!sessionDBExists(dbPath)) return null;
   const connection: DB = openReadOnlyStandalone(dbPath);
-  return { db: wrapStandaloneDatabase(connection), ok: true };
+  return wrapStandaloneDatabase(connection);
 }
 
 /**
@@ -105,7 +105,7 @@ export function openExistingSessionDBReadOnly(
 export function openStandaloneDB(pathValue: string): Database {
   const connection: DB = openStandalone(pathValue, ensureCurrentSchema);
   const handle = wrapStandaloneDatabase(connection);
-  if (handle === null) throw new Error("standalone database handle is nil");
+  if (handle === null) throw new Error("standalone database is not open");
   return handle;
 }
 

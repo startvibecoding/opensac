@@ -1,11 +1,11 @@
 // Public surface of src/ai (ported from internal/ai).
 
 export {
-  ErrEmptyTitle,
-  Fallback,
+  EmptyTitleError,
+  fallbackTitle,
   Generator,
   maxTitleRunes,
-  Normalize,
+  normalizeTitle,
   titlePrompt,
   titleSystem,
 } from "./title/title.ts";

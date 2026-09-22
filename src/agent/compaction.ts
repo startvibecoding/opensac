@@ -5,7 +5,7 @@ import type { CompactionSettings } from "../context/compaction.ts";
 
 /**
  * Converts the user-facing settings.json compaction block into the agent-loop
- * compaction settings. All runtimes (CLI, TUI, serve API, channels, ACP, A2A)
+ * compaction settings. All runtimes (CLI, TUI, ACP, cron)
  * must build agent compaction settings through this helper so no field is
  * dropped. Zero-valued limits are filled later by `normalizeCompactionSettings`
  * inside the Agent constructor.

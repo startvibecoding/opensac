@@ -5,8 +5,8 @@
 // lease as every other session mutation.
 //
 // Deviation: `AcquireSessionMutation` is async (the lease-first orphan
-// reconciliation path is async), so `deleteSession` returns a Promise; Go's
-// `defer guard.Release()` maps to `try/finally`.
+// reconciliation path is async), so `deleteSession` returns a Promise; guard
+// release uses `try/finally`.
 
 import type { RuntimeLeaseGuard } from "../session/mod.ts";
 import {

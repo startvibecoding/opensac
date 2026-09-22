@@ -1,7 +1,7 @@
 // Ported from internal/expert/manage.go
 
 import * as path from "@std/path";
-import { type Manifest, SourceGlobal, SourceProject } from "./expert.ts";
+import { type Manifest, sourceGlobal, sourceProject } from "./expert.ts";
 import { agentsDirName, loadBundle, manifestFileName } from "./bundle.ts";
 import {
   Center,
@@ -16,8 +16,8 @@ import type { Summary } from "./expert.ts";
  * have a scope: they are packaged with the binary and always read-only.
  */
 export type Scope = string;
-export const ScopeGlobal: Scope = SourceGlobal;
-export const ScopeProject: Scope = SourceProject;
+export const ScopeGlobal: Scope = sourceGlobal;
+export const ScopeProject: Scope = sourceProject;
 
 /**
  * The editable representation of an expert bundle. Agent values are complete

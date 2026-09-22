@@ -6,9 +6,10 @@
 // `setBuilderFunc`. Go's `init()` builder registration maps to a module-level
 // call at the bottom of this file, mirroring `bootstrap`'s blank import.
 //
-// Deviations: `os.Getwd` maps to `Deno.cwd`; `config.BoolPtr` maps to a plain
-// boolean; `context.CancelFunc`/`chan` are dropped (Deno is single-threaded);
-// `provider.ThinkingLevel(...)` maps to the `thinkingMedium` constant.
+// Deviations: `os.Getwd` maps to `Deno.cwd`; Go's `*bool` optional fields map
+// to plain optional booleans; `context.CancelFunc`/`chan` are dropped (Deno is
+// single-threaded); `provider.ThinkingLevel(...)` maps to the `thinkingMedium`
+// constant.
 
 import type { Agent as PublicAgent, AgentID } from "../../sdk/agent/types.ts";
 import {
@@ -17,7 +18,7 @@ import {
   setBuilderFunc,
 } from "../../sdk/agent/builder.ts";
 import {
-  DefaultToolExecutionMaxConcurrency,
+  defaultToolExecutionMaxConcurrency,
   getSessionDir,
   isPlanToolEnabled,
   type Settings,
@@ -372,7 +373,7 @@ export function createAgent(
         f.settings.toolExecution ?? {},
       );
     } else {
-      maxToolConcurrency = DefaultToolExecutionMaxConcurrency;
+      maxToolConcurrency = defaultToolExecutionMaxConcurrency;
     }
   }
 

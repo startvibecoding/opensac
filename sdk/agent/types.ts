@@ -332,7 +332,7 @@ export const eventRunFinished: EventType = 29;
 /**
  * TaskStatus is the canonical terminal outcome of an agent run/task. It is
  * carried by the eventRunFinished event and is the single source of truth that
- * TUI, WebUI/Serve, and channel consumers use to classify a finished task.
+ * TUI, CLI, and ACP consumers use to classify a finished task.
  */
 export type TaskStatus = string;
 

@@ -242,39 +242,12 @@ export class DecisionService {
   }
 
   /**
-   * Removes all decisions for a Run like `clearRunWithValue`, invoking bound
-   * resolver callbacks with an empty value so a pending approval/question wait
-   * is never left hanging. A decision whose callback fails stays pending so the
-   * clear can be retried.
+   * Removes all decisions for a Run like `clearRunWithValue` with an empty
+   * value, so a pending approval/question wait is never left hanging. A
+   * decision whose callback fails stays pending so the clear can be retried.
    */
   clearRun(runId: string): DecisionRequest[] {
-    if (runId === "") return [];
-    const cleared: DecisionRequest[] = [];
-    for (const [id, request] of this.#pending) {
-      if (request.runId !== runId) continue;
-      const resolver = this.#resolvers.get(id);
-      if (resolver !== undefined) {
-        this.#resolving.add(id);
-        try {
-          resolver("");
-        } catch {
-          this.#resolving.delete(id);
-          continue;
-        }
-        this.#resolving.delete(id);
-      }
-      cleared.push(request);
-      this.#pending.delete(id);
-      this.#resolvers.delete(id);
-      this.#resolving.delete(id);
-      this.#resolved.set(id, {
-        id,
-        kind: request.kind,
-        status: "cancelled",
-      });
-      this.#resolvedRequests.set(id, request);
-    }
-    return cleared;
+    return this.clearRunWithValue(runId, "");
   }
 
   pending(): DecisionRequest[] {

@@ -129,6 +129,7 @@ export function helpText(tr: Translator): string {
     shortcut("Tab", "keyboard.shortcut.cycle_mode"),
     shortcut("Esc", "keyboard.shortcut.abort"),
     shortcut("Ctrl+O", "keyboard.shortcut.tool_details"),
+    shortcut("Ctrl+T", "keyboard.shortcut.plan_details"),
     shortcut("Ctrl+E", "keyboard.shortcut.esm_progress"),
     shortcut("Ctrl+R", "keyboard.shortcut.preview_image"),
     shortcut("Ctrl+G", "keyboard.shortcut.compact_tools"),

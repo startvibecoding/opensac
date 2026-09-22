@@ -11,6 +11,7 @@
 // direct equivalent, so the network branch relies on the message heuristics the
 // Go branch already falls back to.
 
+import { isAbortError, isTimeoutError } from "../util/errors.ts";
 import {
   isContentRejectionError,
   isContextOverflowError,
@@ -395,18 +396,6 @@ export function displayErrorMessage(info: ErrorInfo): string {
   }
   if (message === "") return detail;
   return `${message}: ${detail}`;
-}
-
-function isAbortError(err: unknown): boolean {
-  if (err instanceof DOMException && err.name === "AbortError") return true;
-  if (err instanceof Error && err.name === "AbortError") return true;
-  return false;
-}
-
-function isTimeoutError(err: unknown): boolean {
-  if (err instanceof DOMException && err.name === "TimeoutError") return true;
-  if (err instanceof Error && err.name === "TimeoutError") return true;
-  return false;
 }
 
 function errorText(err: unknown): string {

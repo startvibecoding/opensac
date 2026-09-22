@@ -1250,7 +1250,7 @@ export class SubAgentDestroyTool implements Tool {
 
 /**
  * Enqueues at most one terminal MemberCompletion per spawned sub-agent run into
- * the session mailbox. A nil mailbox (no expert team bound) makes notify a
+ * the session mailbox. A null mailbox (no expert team bound) makes notify a
  * no-op.
  */
 export class memberNotifier {

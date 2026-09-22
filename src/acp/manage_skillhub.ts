@@ -23,7 +23,7 @@ import type { AcpServer, ACPSessionRuntime } from "./server.ts";
 import * as path from "@std/path";
 import {
   defaultSettings,
-  DefaultSkillHubOfficialHandle,
+  defaultSkillHubOfficialHandle,
   getGlobalSkillsDir,
   saveGlobalSettingsPatch,
   type Settings,
@@ -699,7 +699,7 @@ function manageSkillHubCatalog(
   }
   let officialHandles = settings.skillHub?.officialHandles ?? [];
   if (officialHandles.length === 0) {
-    officialHandles = [DefaultSkillHubOfficialHandle];
+    officialHandles = [defaultSkillHubOfficialHandle];
   }
   const service = SkillHubService.forWorkDir(
     getGlobalSkillsDir(settings),

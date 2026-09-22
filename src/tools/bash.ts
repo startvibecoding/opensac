@@ -452,10 +452,10 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
     const async = params["async"] === true;
     const v = timeoutSecondsParam(params);
     if (async) {
-      if (v.ok) return clampTimeout(v.seconds);
+      if (v !== undefined) return clampTimeout(v);
       return 0;
     }
-    if (v.ok) return clampTimeout(v.seconds);
+    if (v !== undefined) return clampTimeout(v);
     return 45000;
   }
 }
@@ -520,11 +520,9 @@ function decode(data: Uint8Array): string {
 
 function timeoutSecondsParam(
   params: Record<string, unknown>,
-): { seconds: number; ok: boolean } {
+): number | undefined {
   const v = params["timeout"];
-  if (v === undefined) return { seconds: 0, ok: false };
-  if (typeof v !== "number") return { seconds: 0, ok: false };
-  return { seconds: v, ok: true };
+  return typeof v === "number" ? v : undefined;
 }
 
 function clampTimeout(seconds: number): number {
@@ -590,6 +588,9 @@ export function newBashTool(r: Registry): BashTool {
 }
 
 /** Creates a new bash tool with an existing JobManager. */
-export function NewBashToolWithJM(r: Registry, jm: JobManager): BashTool {
+export function newBashToolWithJobManager(
+  r: Registry,
+  jm: JobManager,
+): BashTool {
   return new BashTool(r, jm);
 }

@@ -1,7 +1,7 @@
 // Ported from internal/ai/title/title_test.go
 
 import { assertEquals } from "@std/assert";
-import { Generator, maxTitleRunes, Normalize } from "./title.ts";
+import { Generator, maxTitleRunes, normalizeTitle } from "./title.ts";
 import {
   type ChatParams,
   type Model,
@@ -77,12 +77,12 @@ Deno.test("GeneratorFallsBackWhenProviderFails", async () => {
 });
 
 Deno.test("NormalizeLimitsUnicodeTitle", () => {
-  const got = Normalize("###" + "界" + "界".repeat(50));
+  const got = normalizeTitle("###" + "界" + "界".repeat(50));
   assertEquals([...got].length, maxTitleRunes);
 });
 
 Deno.test("NormalizeReproducesGoOverEscapedCutset", () => {
   // Go's cutset includes a literal backslash and the letter `t`.
-  assertEquals(Normalize(" test "), "es");
-  assertEquals(Normalize("#title#"), "itle");
+  assertEquals(normalizeTitle(" test "), "es");
+  assertEquals(normalizeTitle("#title#"), "itle");
 });

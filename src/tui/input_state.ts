@@ -24,6 +24,7 @@ export type InputAction =
   | { kind: "escape" }
   | { kind: "cancel-or-exit" }
   | { kind: "tool-details" }
+  | { kind: "plan-details" }
   | { kind: "esm-panel" }
   | { kind: "paste-image" }
   | { kind: "compact-toggle" }
@@ -269,6 +270,8 @@ export class InputState {
         return { kind: "cancel-or-exit" };
       case "ctrl+o":
         return { kind: "tool-details" };
+      case "ctrl+t":
+        return { kind: "plan-details" };
       case "ctrl+e":
         return { kind: "esm-panel" };
       case "ctrl+r":

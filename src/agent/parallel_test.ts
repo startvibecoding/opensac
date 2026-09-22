@@ -1,7 +1,7 @@
 // Translated from internal/agent/parallel_test.go.
 
 import { assertEquals } from "@std/assert";
-import { DefaultToolExecutionMaxConcurrency } from "../config/settings.ts";
+import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import { boundedParallel } from "./parallel.ts";
 
 function sleep(ms: number): Promise<void> {
@@ -47,7 +47,7 @@ Deno.test("boundedParallel preserves order and concurrency limit", async () => {
 
 Deno.test("boundedParallel default and serial limits", async () => {
   const items = Array.from(
-    { length: DefaultToolExecutionMaxConcurrency + 4 },
+    { length: defaultToolExecutionMaxConcurrency + 4 },
     (_v, i) => i,
   );
 
@@ -56,7 +56,7 @@ Deno.test("boundedParallel default and serial limits", async () => {
   });
   await boundedParallel(0, items, (item) => tracker.fn(item));
   assertEquals(
-    tracker.peak() <= DefaultToolExecutionMaxConcurrency,
+    tracker.peak() <= defaultToolExecutionMaxConcurrency,
     true,
   );
 

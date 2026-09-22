@@ -4,21 +4,21 @@ import type { ExpertFS } from "./fs.ts";
 
 // Supported expertType values in expert.json.
 /** A single-persona bundle (manifest agentName points at the only agents/*.md). */
-export const TypeAgent = "agent";
+export const typeAgent = "agent";
 /** A lead + members bundle (manifest teamInfo declares the roster). */
-export const TypeTeam = "team";
+export const typeTeam = "team";
 
 // Member roles within a bundle.
-export const RoleLead = "lead";
-export const RoleMember = "member";
+export const roleLead = "lead";
+export const roleMember = "member";
 
 // Source layer identifiers reported by Center.
-export const SourceBuiltin = "builtin";
-export const SourceGlobal = "global";
-export const SourceProject = "project";
+export const sourceBuiltin = "builtin";
+export const sourceGlobal = "global";
+export const sourceProject = "project";
 
 /** The only supported expert.json schema version. */
-export const SchemaVersion = 1;
+export const expertSchemaVersion = 1;
 
 /** A bilingual zh/en text pair used by manifest metadata. */
 export interface LocalizedText {

@@ -3,7 +3,7 @@
 import * as path from "@std/path";
 
 /** Project-level configuration directory name. */
-export const ProjectDirName = ".opensac";
+export const projectDirName = ".opensac";
 
 /** Returns a project-level path under .opensac in the current working directory. */
 export function projectPath(...elem: string[]): string {
@@ -13,5 +13,5 @@ export function projectPath(...elem: string[]): string {
 /** Returns a project-level path under `cwd`/.opensac. */
 export function projectPathFor(cwd: string, ...elem: string[]): string {
   if (cwd === "") cwd = ".";
-  return path.join(cwd, ProjectDirName, ...elem);
+  return path.join(cwd, projectDirName, ...elem);
 }
