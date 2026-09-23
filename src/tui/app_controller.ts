@@ -88,7 +88,7 @@ export interface AppControllerCallbacks {
 
 export class AppController {
   readonly store: TranscriptStore;
-  readonly activities = new AgentActivityStore();
+  readonly activities: AgentActivityStore;
   /** Live per-turn activity timeline (tools, thinking) for the lead agent. */
   readonly activityManager = new ActivityManager();
 
@@ -126,6 +126,7 @@ export class AppController {
     this.#cb = cb;
     this.#leadAgentId = options.leadAgentId;
     this.store = new TranscriptStore({ translator });
+    this.activities = new AgentActivityStore(translator);
   }
 
   setLeadAgentId(id: string | undefined): void {

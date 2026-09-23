@@ -34,6 +34,8 @@ export function CompactThinkingRow({
 }: CompactThinkingRowProps): ReactElement {
   const timeStr = elapsedMs ? ` (${formatDuration(elapsedMs)})` : "";
   // truncateDisplay measures display cells, so CJK previews fit the row.
+  // width-15 budgets the fixed "~ <label> — " prefix plus the trailing
+  // "(elapsed) |" suffix.
   const preview = truncateDisplay(content, width - 15);
 
   return (

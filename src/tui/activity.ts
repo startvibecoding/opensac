@@ -2,8 +2,9 @@
 // background/team agents into per-agent activity snapshots, and renders those
 // snapshots for the status line and the tool modal's agent tabs.
 //
-// The store owns state folding only (`record(event, now)`); rendering takes
-// snapshots, mirroring the Go split between App state and render helpers.
+// The store owns state folding (`record(event, now)`), resolving i18n-coupled
+// lines through its own Translator at record time; rendering takes snapshots,
+// mirroring the Go split between App state and render helpers.
 
 import type { Event } from "../agent/events.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
@@ -27,6 +28,7 @@ import {
   TASK_CANCELED,
   TASK_FAILED,
 } from "../agent/events.ts";
+import { truncateDisplay } from "./formatters.ts";
 import { sprintf } from "./i18n.ts";
 import {
   classifyError,
@@ -69,6 +71,16 @@ export interface AgentActivity {
 export class AgentActivityStore {
   #activities = new Map<string, AgentActivity>();
   #order: string[] = [];
+  /**
+   * Resolves i18n-coupled lines (done/canceled/tool started/retry/…) at
+   * record time, so snapshots carry display text for the session language
+   * instead of raw message IDs or record-time English.
+   */
+  readonly #tr: Translator;
+
+  constructor(tr: Translator = new Translator("en")) {
+    this.#tr = tr;
+  }
 
   /** Ordered agent IDs of every tracked activity. */
   get order(): string[] {
@@ -149,7 +161,7 @@ export class AgentActivityStore {
       }
       case EVENT_RETRY: {
         act.state = "running";
-        const line = retryStatusMessage(event);
+        const line = retryStatusMessage(event, this.#tr);
         act.lastResult = truncatePlain(line, 160);
         this.#appendLine(act, now, line);
         break;
@@ -175,7 +187,7 @@ export class AgentActivityStore {
       case EVENT_HOSTED_ITEM: {
         act.state = "running";
         if (event.hostedItem) {
-          let line = "activity.hosted_item";
+          let line = this.#tr.text("activity.hosted_item");
           if (event.hostedItem.type) line += ` [${event.hostedItem.type}]`;
           if (event.hostedItem.status) line += `: ${event.hostedItem.status}`;
           act.lastResult = truncatePlain(line, 160);
@@ -195,7 +207,7 @@ export class AgentActivityStore {
           this.#appendLine(
             act,
             now,
-            sprintfMessage(
+            this.#tr.text(
               "activity.tool_started",
               formatDetailedActivityTool(name, event.toolArgs),
             ),
@@ -221,7 +233,7 @@ export class AgentActivityStore {
           act.fullResult = result;
         }
         if (name || result) {
-          let line = "activity.tool_result";
+          let line = this.#tr.text("activity.tool_result");
           if (name) line += ` [${name}]`;
           if (result) line += ":\n" + result;
           this.#appendLine(act, now, line);
@@ -239,24 +251,24 @@ export class AgentActivityStore {
             this.#appendLine(
               act,
               now,
-              sprintfMessage("activity.error", message),
+              this.#tr.text("activity.error", message),
             );
             break;
           }
           case TASK_CANCELED:
             act.state = "canceled";
-            this.#appendLine(act, now, "activity.canceled");
+            this.#appendLine(act, now, this.#tr.text("activity.canceled"));
             break;
           default:
             act.state = "done";
-            this.#appendLine(act, now, "activity.done");
+            this.#appendLine(act, now, this.#tr.text("activity.done"));
         }
         break;
       }
       case EVENT_DONE: {
         if (isTerminalActivityState(act.state)) break;
         act.state = "done";
-        this.#appendLine(act, now, "activity.done");
+        this.#appendLine(act, now, this.#tr.text("activity.done"));
         break;
       }
       case EVENT_ERROR: {
@@ -265,7 +277,7 @@ export class AgentActivityStore {
         const message = activityFailureMessage(event.error);
         act.lastResult = truncatePlain(message, 320);
         act.fullResult = message;
-        this.#appendLine(act, now, sprintfMessage("activity.error", message));
+        this.#appendLine(act, now, this.#tr.text("activity.error", message));
         break;
       }
     }
@@ -281,23 +293,18 @@ export class AgentActivityStore {
   }
 }
 
-// The Go store renders through the Translator inline; the TS store records
-// message IDs for i18n-coupled lines and the renderer resolves them. Events
+// i18n-coupled lines are resolved through the store's Translator at record
+// time, so snapshots carry display text for the session language; events
 // that start as literal text (status messages) are stored as-is.
 
-function sprintfMessage(id: string, arg: string): string {
-  // activity.tool_started / activity.error take one %s argument; resolve the
-  // English text at record time so the timeline stays readable in snapshots.
-  return new Translator("en").text(id, arg);
-}
-
-function retryStatusMessage(event: Event): string {
+function retryStatusMessage(event: Event, tr: Translator): string {
   const attempt = event.retryAttempt ?? 0;
   const max = event.retryMaxAttempts ?? 0;
+  const label = max ? `${attempt}/${max}` : `${attempt}`;
   if (event.retryReason) {
-    return `retrying (${attempt}${max ? `/${max}` : ""}): ${event.retryReason}`;
+    return tr.text("activity.retry_reason", label, event.retryReason);
   }
-  return `retrying (${attempt}${max ? `/${max}` : ""})`;
+  return tr.text("activity.retry", label);
 }
 
 function activityFailureMessage(err?: Error): string {
@@ -392,7 +399,10 @@ export function renderAgentActivity(
   if (act.state) header += ` [${act.state}]`;
   if (act.updatedAt && act.updatedAt.getTime() > 0) {
     header += ` ${
-      tr.text("activity.updated", formatActivityAge(act.updatedAt, now))
+      tr.text(
+        "activity.updated",
+        formatActivityAge(act.updatedAt, now, tr),
+      )
     }`;
   }
   lines.push(header);
@@ -435,12 +445,25 @@ export function renderAgentActivity(
   return lines.join("\n");
 }
 
-/** Renders the relative age ("12s ago" / "3m ago"). */
-export function formatActivityAge(t: Date, now: Date = new Date()): string {
+/**
+ * Renders the relative age ("12s ago" / "3m ago"). Pass `tr` to resolve the
+ * localized activity.ago_* labels; omitted keeps the English literals for
+ * callers and tests without a translator.
+ */
+export function formatActivityAge(
+  t: Date,
+  now: Date = new Date(),
+  tr?: Translator,
+): string {
   let d = Math.round((now.getTime() - t.getTime()) / 1000);
   if (d < 0) d = 0;
-  if (d < 60) return sprintf("%ds ago", [d]);
-  return sprintf("%dm ago", [Math.floor(d / 60)]);
+  if (d < 60) {
+    return tr ? tr.text("activity.ago_seconds", d) : sprintf("%ds ago", [d]);
+  }
+  const minutes = Math.floor(d / 60);
+  return tr
+    ? tr.text("activity.ago_minutes", minutes)
+    : sprintf("%dm ago", [minutes]);
 }
 
 /** Renders the trailing status summary of active agents (Go
@@ -461,7 +484,7 @@ export function renderActivitySummary(
     const state = act.state || "running";
     let line = `${act.agentId} [${state}]`;
     if (detail) line += ` ${detail}`;
-    if (width > 0) line = truncatePlain(line, width - 2);
+    if (width > 0) line = truncateDisplay(line, width - 2);
     lines.push(line);
   }
   if (lines.length === 0) return "";

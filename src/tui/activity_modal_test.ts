@@ -210,6 +210,50 @@ Deno.test("formatActivityAge renders seconds and minutes", () => {
   );
 });
 
+Deno.test("activity store resolves i18n lines through its translator", () => {
+  const store = new AgentActivityStore(new Translator("zh"));
+  const now = new Date();
+  store.record({
+    type: EVENT_TOOL_CALL,
+    agentId: "a1",
+    toolName: "bash",
+    toolArgs: { command: "ls" },
+  }, now);
+  store.record({
+    type: EVENT_RUN_FINISHED,
+    agentId: "a1",
+    status: TASK_CANCELED,
+  }, now);
+  store.record({ type: EVENT_DONE, agentId: "a2" }, now);
+  assertEquals(
+    store.get("a1")!.events[0].text.startsWith("工具已开始："),
+    true,
+  );
+  assertEquals(store.get("a1")!.events[1].text, "已取消");
+  assertEquals(store.get("a2")!.events[0].text, "完成");
+  // Raw message IDs must never leak into the rendered panel.
+  const panel = renderAgentActivity(
+    store.get("a1"),
+    "a1",
+    new Translator("zh"),
+  );
+  assertEquals(panel.includes("activity."), false);
+  assertEquals(panel.includes("已取消"), true);
+});
+
+Deno.test("formatActivityAge resolves localized labels with a translator", () => {
+  const now = new Date("2026-09-20T12:01:00");
+  const zh = new Translator("zh");
+  assertEquals(
+    formatActivityAge(new Date("2026-09-20T12:00:45"), now, zh),
+    "15 秒前",
+  );
+  assertEquals(
+    formatActivityAge(new Date("2026-09-20T11:58:00"), now, zh),
+    "3 分钟前",
+  );
+});
+
 Deno.test("renderActivitySummary shows last 4 agents with state", () => {
   const store = new AgentActivityStore();
   for (let i = 0; i < 6; i++) {

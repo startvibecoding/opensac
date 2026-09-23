@@ -154,7 +154,11 @@ export function App({
         {(row) => renderRow(row, false)}
       </Static>
 
-      {/* Live activity timeline (running/completed tools + thinking). */}
+      {
+        /* Live activity timeline (running/completed tools + thinking).
+          Rows receive width-4: 1-col left indent (marginLeft) + 3 cols of
+          margin slack so a full-width row never touches the terminal edge. */
+      }
       {activities.length > 0 && (
         <Box flexDirection="column" marginLeft={1} marginBottom={1}>
           {activities.map((activity) => (
