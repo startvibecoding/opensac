@@ -59,7 +59,7 @@ Deno.test("think deltas convert an untouched assistant slot", () => {
   s.beginAssistantSlot(); // reserved but empty
   s.appendThinkDelta("thinking...");
   // The empty assistant slot became the think slot; a fresh assistant slot
-  // opened after it (Go EventThinkDelta handling).
+  // opened after it (Go EVENT_THINK_DELTA handling).
   assertEquals(s.currentThinkIdx, 0);
   assertEquals(s.thinkRaw(0), "thinking...");
   assertEquals(s.currentAssistantIdx, 1);

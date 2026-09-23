@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/delivery_coordinator.go.
 //
 // The Runtime-owned claim/fence/retry boundary for durable delivery outbox
 // operations. It composes the session delivery store, so transports never write
@@ -70,7 +69,7 @@ export interface DeliveryExecutorOutcome {
  * transports can be disconnected or rate-limited for minutes, and a small
  * attempt count would abandon the reply long before that.
  */
-export const DefaultDeliveryRetryWindowMs = 10 * 60 * 1000;
+export const DEFAULT_DELIVERY_RETRY_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * Reports whether a failed delivery operation may be reopened for another retry
@@ -102,7 +101,7 @@ export class DeliveryCoordinator {
       ? "delivery-worker-" + generateID()
       : owner;
     this.leaseMs = 30_000;
-    this.retryWindowMs = DefaultDeliveryRetryWindowMs;
+    this.retryWindowMs = DEFAULT_DELIVERY_RETRY_WINDOW_MS;
     this.maxRetries = 0;
   }
 
@@ -246,7 +245,7 @@ export class DeliveryCoordinator {
     }
     const window = this.retryWindowMs > 0
       ? this.retryWindowMs
-      : DefaultDeliveryRetryWindowMs;
+      : DEFAULT_DELIVERY_RETRY_WINDOW_MS;
     let start = operation.createdAt;
     if (operation.retryWindowStartedAt !== null) {
       // An explicit retry restarts the budget instead of counting from the

@@ -1,4 +1,4 @@
-// Ported from internal/tui/command_suggest.go: wires the slash-command spec
+// wires the slash-command spec
 // table into the suggestion dropdown. Command-name suggestions come from the
 // specs; per-command argument suggestions come from the static argument
 // tables below. The App-level overlays (auth dialog, tool modal, …) simply

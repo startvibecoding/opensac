@@ -1,4 +1,3 @@
-// Ported from internal/provider/google/provider.go
 //
 // Wire structs keep the Go JSON tag keys (camelCase) as TypeScript property
 // names. `Chat(ctx, params) <-chan StreamEvent` maps to

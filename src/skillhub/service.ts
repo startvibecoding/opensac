@@ -1,5 +1,3 @@
-// Ported from internal/skillhub/service.go
-
 import * as path from "@std/path";
 import { projectSkillDirs } from "../skills/skills.ts";
 import { MemoryCache, newMemoryCache } from "./cache.ts";

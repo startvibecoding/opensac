@@ -1,5 +1,3 @@
-// Ported from internal/session/knowledge_database_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
 import { KnowledgeBaseDAO } from "../dao/mod.ts";
@@ -8,8 +6,8 @@ import {
   createKnowledgeBase,
   deleteKnowledgeBase,
   getKnowledgeSnapshot,
+  KNOWLEDGE_GRAPH_SCHEMA_VERSION,
   type KnowledgeFile,
-  KnowledgeGraphSchemaVersion,
   type KnowledgeGraphSnapshot,
   listKnowledgeBases,
   prepareKnowledgeGraphReusePlan,
@@ -236,7 +234,7 @@ Deno.test("knowledge base migrates legacy session store into dedicated database"
         knowledgeBaseId: baseID,
         runId: "",
         status: "completed",
-        schemaVersion: KnowledgeGraphSchemaVersion,
+        schemaVersion: KNOWLEDGE_GRAPH_SCHEMA_VERSION,
         fileCount: 0,
         chunkCount: 0,
         nodeCount: 0,
@@ -251,7 +249,7 @@ Deno.test("knowledge base migrates legacy session store into dedicated database"
         knowledgeBaseId: baseID,
         runId: "",
         status: "completed",
-        schemaVersion: KnowledgeGraphSchemaVersion,
+        schemaVersion: KNOWLEDGE_GRAPH_SCHEMA_VERSION,
         fileCount: 1,
         chunkCount: 1,
         nodeCount: 1,

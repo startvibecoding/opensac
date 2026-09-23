@@ -1,5 +1,3 @@
-// Ported from internal/provider/provider.go
-
 import type { ChatParams, Model, StreamEvent } from "./types.ts";
 
 /** Provider is the interface that all LLM providers must implement. */

@@ -1,4 +1,4 @@
-// Ported from internal/acp/acp.go (the ACP stdio JSON-RPC transport).
+// (the ACP stdio JSON-RPC transport).
 //
 // Go reads newline-delimited JSON with a `bufio.Reader` and writes JSON lines
 // to a `io.Writer` it optionally flushes. The Deno projection keeps the same

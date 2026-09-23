@@ -1,4 +1,3 @@
-// Ported from internal/session/entry.go
 //
 // Session entry types and the shared ID generator. Timestamps map from Go
 // `time.Time` to `Date`.

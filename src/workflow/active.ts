@@ -1,4 +1,3 @@
-// Ported from internal/workflow/active.go.
 //
 // Tracks workflow runs that can be canceled in this process. `sync.RWMutex` is
 // dropped (Deno is single-threaded); `context.CancelFunc` maps to `() => void`.

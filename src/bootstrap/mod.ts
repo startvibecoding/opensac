@@ -1,4 +1,4 @@
-// Ported from the Go `bootstrap` package (bootstrap/bootstrap.go).
+// (bootstrap/bootstrap.go).
 //
 // Importing this module registers the provider resolution hook
 // (`agent.setResolveProviderFunc`) and the concrete provider factories

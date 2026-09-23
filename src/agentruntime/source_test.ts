@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/source_test.go, source_contract_test.go,
 // and policy_test.go.
 //
 // The Go `TestSessionRuntimeRejectsMutationAfterClose` case is deferred until
@@ -10,26 +9,26 @@ import type { Header } from "../session/entry.ts";
 import {
   ExecutionPolicy,
   isValidMode,
-  ModeAgent,
-  ModeOS,
-  ModePlan,
+  MODE_AGENT,
+  MODE_OS,
+  MODE_PLAN,
+  MODE_YOLO,
   ModeResolver,
-  ModeYolo,
   Policy,
   resolvePolicy,
   resolveSource,
   resolveSourceFromSession,
   resolveUnattendedMode,
   type RuntimeSource,
-  SourceACP,
-  SourceCLI,
+  SOURCE_ACP,
+  SOURCE_CLI,
+  SOURCE_FEISHU,
+  SOURCE_TUI,
+  SOURCE_UNKNOWN,
+  SOURCE_WE_CHAT,
   SourceConflictError,
-  SourceFeishu,
   sourceFromSessionHeader,
-  SourceTUI,
-  SourceUnknown,
   sourceWaitsForMembers,
-  SourceWeChat,
 } from "./source.ts";
 
 Deno.test("ResolveSource prefers persisted binding and reports conflicts", () => {
@@ -40,17 +39,17 @@ Deno.test("ResolveSource prefers persisted binding and reports conflicts", () =>
       channelId: "c",
     } as Binding,
     sessionHeader: { channelType: "feishu" } as Header,
-    current: SourceCLI,
-    requested: SourceACP,
+    current: SOURCE_CLI,
+    requested: SOURCE_ACP,
   });
-  assertEquals(resolved.source, SourceWeChat);
+  assertEquals(resolved.source, SOURCE_WE_CHAT);
   assert(resolved.conflicted);
   assertEquals(resolved.diagnostics.length, 3);
 });
 
 Deno.test("ResolveSource falls back for a new session", () => {
-  const resolved = resolveSource({ requested: SourceACP });
-  assertEquals(resolved.source, SourceACP);
+  const resolved = resolveSource({ requested: SOURCE_ACP });
+  assertEquals(resolved.source, SOURCE_ACP);
   assertFalse(resolved.conflicted);
 });
 
@@ -61,25 +60,25 @@ Deno.test("ResolveSource binding wins over request and runtime", () => {
       channelType: "wechat",
       channelId: "c",
     } as Binding,
-    current: SourceCLI,
-    requested: SourceACP,
+    current: SOURCE_CLI,
+    requested: SOURCE_ACP,
   });
-  assertEquals(resolved.source, SourceWeChat);
+  assertEquals(resolved.source, SOURCE_WE_CHAT);
 });
 
 Deno.test("ResolvePolicy uses resolved channel source", () => {
   const { resolution, mode, error } = resolvePolicy(
     {
       sessionHeader: { channelType: "feishu" } as Header,
-      requested: SourceCLI,
+      requested: SOURCE_CLI,
     },
-    ModeAgent,
-    ModePlan,
-    ModeAgent,
+    MODE_AGENT,
+    MODE_PLAN,
+    MODE_AGENT,
   );
   assertEquals(error, null);
-  assertEquals(resolution.source, SourceFeishu);
-  assertEquals(mode, ModeYolo);
+  assertEquals(resolution.source, SOURCE_FEISHU);
+  assertEquals(mode, MODE_YOLO);
 });
 
 Deno.test("ResolvePolicy bound channel cannot downgrade mode", () => {
@@ -90,15 +89,15 @@ Deno.test("ResolvePolicy bound channel cannot downgrade mode", () => {
         channelType: "feishu",
         channelId: "c",
       } as Binding,
-      requested: SourceCLI,
+      requested: SOURCE_CLI,
     },
-    ModeAgent,
-    ModePlan,
-    ModeAgent,
+    MODE_AGENT,
+    MODE_PLAN,
+    MODE_AGENT,
   );
   assertEquals(error, null);
-  assertEquals(resolution.source, SourceFeishu);
-  assertEquals(mode, ModeYolo);
+  assertEquals(resolution.source, SOURCE_FEISHU);
+  assertEquals(mode, MODE_YOLO);
 });
 
 Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
@@ -109,12 +108,12 @@ Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
         channelType: "feishu",
         channelId: "c",
       } as Binding,
-      current: SourceCLI,
-      requested: SourceACP,
+      current: SOURCE_CLI,
+      requested: SOURCE_ACP,
     },
-    ModeAgent,
-    ModePlan,
-    ModeAgent,
+    MODE_AGENT,
+    MODE_PLAN,
+    MODE_AGENT,
   );
   assert(error instanceof SourceConflictError);
 });
@@ -122,15 +121,15 @@ Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
 Deno.test("ResolvePolicy unbound CLI uses requested mode", () => {
   const { mode, error } = resolvePolicy(
     {
-      current: SourceCLI,
-      requested: SourceCLI,
+      current: SOURCE_CLI,
+      requested: SOURCE_CLI,
     },
-    ModeAgent,
-    ModeYolo,
-    ModeAgent,
+    MODE_AGENT,
+    MODE_YOLO,
+    MODE_AGENT,
   );
   assertEquals(error, null);
-  assertEquals(mode, ModeYolo);
+  assertEquals(mode, MODE_YOLO);
 });
 
 Deno.test("ResolvePolicy rejects unknown source candidates", () => {
@@ -140,7 +139,7 @@ Deno.test("ResolvePolicy rejects unknown source candidates", () => {
       { current: "stale-runtime" as RuntimeSource },
     ]
   ) {
-    const { error } = resolvePolicy(input, "", "", ModeAgent);
+    const { error } = resolvePolicy(input, "", "", MODE_AGENT);
     assert(error !== null, `expected error for ${JSON.stringify(input)}`);
   }
 });
@@ -156,62 +155,62 @@ Deno.test("Policy ResolveMode table", () => {
     {
       name: "wechat cannot be downgraded",
       policy: new ExecutionPolicy({
-        source: SourceWeChat,
-        defaultMode: ModeAgent,
+        source: SOURCE_WE_CHAT,
+        defaultMode: MODE_AGENT,
       }),
-      session: ModeAgent,
-      requested: ModePlan,
-      want: ModeYolo,
+      session: MODE_AGENT,
+      requested: MODE_PLAN,
+      want: MODE_YOLO,
     },
     {
       name: "wechat ignores malformed adapter hint",
       policy: new ExecutionPolicy({
-        source: SourceWeChat,
-        defaultMode: ModeAgent,
+        source: SOURCE_WE_CHAT,
+        defaultMode: MODE_AGENT,
       }),
       session: "not-a-mode",
       requested: "invalid",
-      want: ModeYolo,
+      want: MODE_YOLO,
     },
     {
       name: "feishu empty session uses yolo",
       policy: new ExecutionPolicy({
-        source: SourceFeishu,
-        defaultMode: ModeAgent,
+        source: SOURCE_FEISHU,
+        defaultMode: MODE_AGENT,
       }),
-      want: ModeYolo,
+      want: MODE_YOLO,
     },
     {
       name: "regular request overrides session",
       policy: new ExecutionPolicy({
-        source: SourceCLI,
-        defaultMode: ModeAgent,
+        source: SOURCE_CLI,
+        defaultMode: MODE_AGENT,
       }),
-      session: ModePlan,
-      requested: ModeYolo,
-      want: ModeYolo,
+      session: MODE_PLAN,
+      requested: MODE_YOLO,
+      want: MODE_YOLO,
     },
     {
       name: "regular empty session uses default",
       policy: new ExecutionPolicy({
-        source: SourceCLI,
-        defaultMode: ModeAgent,
+        source: SOURCE_CLI,
+        defaultMode: MODE_AGENT,
       }),
-      want: ModeAgent,
+      want: MODE_AGENT,
     },
     {
       name: "empty policy default falls back to yolo",
-      policy: new ExecutionPolicy({ source: SourceCLI }),
-      want: ModeYolo,
+      policy: new ExecutionPolicy({ source: SOURCE_CLI }),
+      want: MODE_YOLO,
     },
     {
       name: "regular request uses os",
       policy: new ExecutionPolicy({
-        source: SourceCLI,
-        defaultMode: ModeAgent,
+        source: SOURCE_CLI,
+        defaultMode: MODE_AGENT,
       }),
-      requested: ModeOS,
-      want: ModeOS,
+      requested: MODE_OS,
+      want: MODE_OS,
     },
   ];
   for (const tt of tests) {
@@ -225,31 +224,31 @@ Deno.test("Policy ResolveMode table", () => {
 
 Deno.test("ModeResolver", () => {
   const got = new ModeResolver(
-    new ExecutionPolicy({ source: SourceFeishu, defaultMode: ModeAgent }),
-  ).resolve(ModePlan, ModeAgent);
-  assertEquals(got, ModeYolo);
+    new ExecutionPolicy({ source: SOURCE_FEISHU, defaultMode: MODE_AGENT }),
+  ).resolve(MODE_PLAN, MODE_AGENT);
+  assertEquals(got, MODE_YOLO);
 });
 
 Deno.test("SourceFromSessionHeader", () => {
   assertEquals(
     sourceFromSessionHeader({ channelType: "feishu" } as Header),
-    SourceFeishu,
+    SOURCE_FEISHU,
   );
   assertEquals(
     sourceFromSessionHeader({ channelType: "local" } as Header),
-    SourceUnknown,
+    SOURCE_UNKNOWN,
   );
 });
 
 Deno.test("ResolveUnattendedMode", () => {
   const tests: Array<[string, string]> = [
-    ["", ModeYolo],
-    [ModePlan, ModeYolo],
-    [ModeAgent, ModeYolo],
-    [ModeYolo, ModeYolo],
-    [ModeOS, ModeOS],
-    [" os ", ModeOS],
-    ["not-a-mode", ModeYolo],
+    ["", MODE_YOLO],
+    [MODE_PLAN, MODE_YOLO],
+    [MODE_AGENT, MODE_YOLO],
+    [MODE_YOLO, MODE_YOLO],
+    [MODE_OS, MODE_OS],
+    [" os ", MODE_OS],
+    ["not-a-mode", MODE_YOLO],
   ];
   for (const [session, want] of tests) {
     assertEquals(resolveUnattendedMode(session), want);
@@ -259,14 +258,14 @@ Deno.test("ResolveUnattendedMode", () => {
 Deno.test("IsValidMode and member waiting", () => {
   assert(isValidMode("yolo"));
   assertFalse(isValidMode("bogus"));
-  assert(sourceWaitsForMembers(SourceTUI));
-  assert(sourceWaitsForMembers(SourceACP));
-  assertFalse(sourceWaitsForMembers(SourceCLI));
+  assert(sourceWaitsForMembers(SOURCE_TUI));
+  assert(sourceWaitsForMembers(SOURCE_ACP));
+  assertFalse(sourceWaitsForMembers(SOURCE_CLI));
 });
 
 Deno.test("ResolveSourceFromSession rejects an empty session ID", () => {
   assertThrows(
-    () => resolveSourceFromSession("/tmp", "", { requested: SourceACP }),
+    () => resolveSourceFromSession("/tmp", "", { requested: SOURCE_ACP }),
     Error,
   );
 });

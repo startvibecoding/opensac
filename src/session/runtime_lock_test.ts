@@ -1,4 +1,3 @@
-// Ported from internal/session/runtime_lock_test.go
 //
 // The Go tests drive admission through the session Manager; the not-yet-ported
 // Manager is replaced with direct DAO session/Run persistence so the portable

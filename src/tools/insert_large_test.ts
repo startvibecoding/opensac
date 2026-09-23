@@ -1,4 +1,4 @@
-// Translated from internal/tools/insert_test.go (the large-file streaming case)
+// (the large-file streaming case)
 // plus focused extras for the bash timeout and registry sandbox.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";

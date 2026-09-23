@@ -1,4 +1,3 @@
-// Ported from internal/agent/external_tool_adapter.go.
 //
 // Adapts a public agent.ExternalTool to the internal tools.Tool interface so
 // host-provided tools can run inside the agent loop.

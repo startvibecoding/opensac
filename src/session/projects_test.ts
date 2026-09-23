@@ -1,4 +1,4 @@
-// Ported from internal/session/phase1_projections_test.go (project and session
+// (project and session
 // metadata sections; Manager-based setup replaced with a bare schema).
 
 import { assert, assertEquals } from "@std/assert";

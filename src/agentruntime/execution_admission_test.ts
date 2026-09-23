@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/execution_admission_test.go.
 //
 // The Go tests drive a real session database and assert the lease-first
 // admission contract: a stale durable orphan Run is reconciled before the guard

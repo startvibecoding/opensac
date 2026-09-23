@@ -1,20 +1,18 @@
-// Ported from internal/agent/followup.go.
-
 import type { Message } from "../provider/types.ts";
 import type { MemberMailbox } from "./mailbox.ts";
 
 const minute = 60 * 1000;
 
 /**
- * MemberFollowUpWaitMax bounds how long a team lead waits for its still running
+ * MEMBER_FOLLOW_UP_WAIT_MAX bounds how long a team lead waits for its still running
  * members before the run may end (35 minutes).
  */
-export const MemberFollowUpWaitMax = 35 * minute;
+export const MEMBER_FOLLOW_UP_WAIT_MAX = 35 * minute;
 /**
- * MemberFollowUpPoll refreshes the "any member still running" check and the
+ * MEMBER_FOLLOW_UP_POLL refreshes the "any member still running" check and the
  * adapter steering probe while waiting (2 seconds).
  */
-export const MemberFollowUpPoll = 2 * 1000;
+export const MEMBER_FOLLOW_UP_POLL = 2 * 1000;
 
 /**
  * Builds a team lead's would-stop hook: it is called when a turn has no tool
@@ -43,10 +41,10 @@ export function composeFollowUps(
     if (messages.length > 0) return messages;
     if (!mailbox.runningChildrenRunning()) return null;
 
-    const deadline = Date.now() + MemberFollowUpWaitMax;
+    const deadline = Date.now() + MEMBER_FOLLOW_UP_WAIT_MAX;
     while (Date.now() < deadline) {
       try {
-        await mailbox.waitForActivity(signal, MemberFollowUpPoll);
+        await mailbox.waitForActivity(signal, MEMBER_FOLLOW_UP_POLL);
       } catch {
         // Cancelled run: let the loop reach its terminal state.
         return null;

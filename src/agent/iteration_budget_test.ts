@@ -1,9 +1,9 @@
-// Translated from internal/agent/iteration_budget_test.go (pure cases).
+// (pure cases).
 
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   contextWithIterationBudget,
-  DefaultIterationBudgetWallClock,
+  DEFAULT_ITERATION_BUDGET_WALL_CLOCK,
   iterationBudgetFromContext,
   type IterationBudgetPolicy,
   iterationBudgetPolicyEnabled,
@@ -35,7 +35,7 @@ Deno.test("iteration budget policy normalize", () => {
   assertEquals(p.renewFactor, defaultRenewFactor);
   assertEquals(p.maxRenewals, defaultMaxRenewals);
   assertEquals(p.minInterval, 9);
-  assertEquals(p.maxWallClock, DefaultIterationBudgetWallClock);
+  assertEquals(p.maxWallClock, DEFAULT_ITERATION_BUDGET_WALL_CLOCK);
   assert(iterationBudgetPolicyEnabled(p));
   assert(!iterationBudgetPolicyEnabled(policy({})));
 });

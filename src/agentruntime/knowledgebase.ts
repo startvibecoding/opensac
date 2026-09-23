@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/knowledgebase.go plus the
 // `KnowledgeBaseService` methods of knowledge_index_job.go /
 // knowledge_indexer.go / knowledge_librarian.go (TypeScript requires one class
 // body per module, so every service method is collected here while the free
@@ -31,12 +30,12 @@ import {
   appendKnowledgeFileGraph,
   generateID,
   getKnowledgeBase,
+  KNOWLEDGE_GRAPH_SCHEMA_VERSION,
   type KnowledgeBase,
   type KnowledgeChunk,
   type KnowledgeFile,
   type KnowledgeGraphQuery,
   type KnowledgeGraphReusePlan,
-  KnowledgeGraphSchemaVersion,
   type KnowledgeGraphSnapshot,
   type KnowledgeSnapshot,
   prepareKnowledgeGraphReusePlan,
@@ -54,12 +53,12 @@ import {
   truncateKnowledgeText,
 } from "./knowledge_context.ts";
 import {
+  KNOWLEDGE_INDEX_PHASE_COMMITTING,
+  KNOWLEDGE_INDEX_PHASE_ENRICHING,
+  KNOWLEDGE_INDEX_PHASE_INDEXING,
+  KNOWLEDGE_INDEX_PHASE_SCANNING,
   knowledgeBaseDisabledError,
   KnowledgeIndexJob,
-  KnowledgeIndexPhaseCommitting,
-  KnowledgeIndexPhaseEnriching,
-  KnowledgeIndexPhaseIndexing,
-  KnowledgeIndexPhaseScanning,
   type KnowledgeIndexProgress,
   newKnowledgeIndexJob,
 } from "./knowledge_index_job.ts";
@@ -78,11 +77,11 @@ import {
   openKnowledgeLibrarianSession,
 } from "./knowledge_librarian.ts";
 import {
-  ModeYolo,
+  MODE_YOLO,
   resolvePolicy,
   resolveUnattendedMode,
-  SourceACP,
-  SourceUnknown,
+  SOURCE_ACP,
+  SOURCE_UNKNOWN,
 } from "./source.ts";
 import { validateThinkingLevel } from "./session_options.ts";
 import { acquireExecutionAdmission } from "./execution_admission.ts";
@@ -90,9 +89,9 @@ import { type DurableRun, RunStore } from "./run_store.ts";
 import { type RunEvent, SessionRunEventSink } from "./run_event.ts";
 import { ExecutionRuntime } from "./execution.ts";
 import {
+  RUN_STATE_COMPLETED,
+  RUN_STATE_FAILED,
   type RunState,
-  RunStateCompleted,
-  RunStateFailed,
 } from "./run_state.ts";
 import { attachSessionResources } from "./attach.ts";
 import { displayErrorMessage } from "./error_info.ts";
@@ -103,9 +102,9 @@ import { runUserEntryID } from "../session/run_user_message.ts";
 import { newRegistryWithConfig } from "../tools/tool.ts";
 import { newUserMessage } from "../provider/types.ts";
 import {
-  EventError,
-  EventRunFinished,
-  EventTextDelta,
+  EVENT_ERROR,
+  EVENT_RUN_FINISHED,
+  EVENT_TEXT_DELTA,
   taskStatusIsSuccessful,
 } from "../agent/events.ts";
 
@@ -183,7 +182,7 @@ export class KnowledgeBaseService {
     ctx: AbortSignal | undefined,
     knowledgeBaseID: string,
   ): Promise<KnowledgeSnapshot> {
-    return this.indexDurable(ctx, knowledgeBaseID, SourceACP);
+    return this.indexDurable(ctx, knowledgeBaseID, SOURCE_ACP);
   }
 
   indexDurable(
@@ -211,12 +210,12 @@ export class KnowledgeBaseService {
   ): Promise<KnowledgeSnapshot> {
     const base = getKnowledgeBase(this.sessionDirValue, knowledgeBaseID);
     if (!base.enabled) throw knowledgeBaseDisabledError(base.id);
-    if (source === SourceUnknown) source = SourceACP;
+    if (source === SOURCE_UNKNOWN) source = SOURCE_ACP;
     const policyResult = resolvePolicy(
       { requested: source },
       "",
       base.mode,
-      ModeYolo,
+      MODE_YOLO,
     );
     if (policyResult.error !== null) {
       throw new Error(
@@ -296,8 +295,8 @@ export class KnowledgeBaseService {
         bodyErr = toError(err);
       }
       const state: RunState = bodyErr !== null
-        ? RunStateFailed
-        : RunStateCompleted;
+        ? RUN_STATE_FAILED
+        : RUN_STATE_COMPLETED;
       const message = bodyErr?.message ?? "";
       let finishErr: Error | null = null;
       try {
@@ -375,13 +374,13 @@ export class KnowledgeBaseService {
       files,
     );
     job?.update((p) => {
-      p.phase = KnowledgeIndexPhaseIndexing;
+      p.phase = KNOWLEDGE_INDEX_PHASE_INDEXING;
       p.filesTotal = files.length;
       p.filesDone = 0;
     });
     const graph = this.buildGraph(ctx, base.id, runID, reusePlan, job);
     job?.update((p) => {
-      p.phase = KnowledgeIndexPhaseEnriching;
+      p.phase = KNOWLEDGE_INDEX_PHASE_ENRICHING;
       p.chunks = graph.chunks.length;
     });
     const indexer = this.resolveKnowledgeIndexer(graph.knowledgeBase);
@@ -395,7 +394,7 @@ export class KnowledgeBaseService {
       indexer,
     );
     job?.update((p) => {
-      p.phase = KnowledgeIndexPhaseCommitting;
+      p.phase = KNOWLEDGE_INDEX_PHASE_COMMITTING;
     });
     return storeKnowledgeGraphSnapshot(this.sessionDirValue, graph);
   }
@@ -462,7 +461,7 @@ export class KnowledgeBaseService {
         status: "indexed",
       });
       job?.update((p) => {
-        p.phase = KnowledgeIndexPhaseScanning;
+        p.phase = KNOWLEDGE_INDEX_PHASE_SCANNING;
         p.filesDone++;
       });
     }
@@ -485,7 +484,7 @@ export class KnowledgeBaseService {
         knowledgeBaseId: base.id,
         runId: runID.trim(),
         status: "indexing",
-        schemaVersion: KnowledgeGraphSchemaVersion,
+        schemaVersion: KNOWLEDGE_GRAPH_SCHEMA_VERSION,
         fileCount: 0,
         chunkCount: 0,
         nodeCount: 0,
@@ -515,14 +514,14 @@ export class KnowledgeBaseService {
       if (reusable !== undefined) {
         appendKnowledgeFileGraph(graph, reusable);
         job?.update((p) => {
-          p.phase = KnowledgeIndexPhaseIndexing;
+          p.phase = KNOWLEDGE_INDEX_PHASE_INDEXING;
           p.filesDone++;
         });
         continue;
       }
       this.indexFile(ctx, root, full, graph);
       job?.update((p) => {
-        p.phase = KnowledgeIndexPhaseIndexing;
+        p.phase = KNOWLEDGE_INDEX_PHASE_INDEXING;
         p.filesDone++;
       });
     }
@@ -768,8 +767,8 @@ export class KnowledgeBaseService {
     });
     const runtime = await attachSessionResources({
       id: manager.getHeader()!.id,
-      source: SourceACP,
-      entrySource: SourceACP,
+      source: SOURCE_ACP,
+      entrySource: SOURCE_ACP,
       workDir: base.rootDir,
       manager,
       registry,
@@ -801,16 +800,16 @@ export class KnowledgeBaseService {
         // The Index Run has no conversation turn. Avoid staging the model's raw
         // JSON response as a transcript entry while still recording provider and
         // tool failures through the canonical ExecutionRuntime.
-        if (event.type !== EventRunFinished) {
+        if (event.type !== EVENT_RUN_FINISHED) {
           const observation = execution.observeAgentEvent(event);
           if (observation.error !== undefined && runErr === null) {
             runErr = new Error(displayErrorMessage(observation.error));
           }
           if (runErr !== null) break;
         }
-        if (event.type === EventTextDelta) {
+        if (event.type === EVENT_TEXT_DELTA) {
           response.push(event.textDelta ?? "");
-        } else if (event.type === EventRunFinished) {
+        } else if (event.type === EVENT_RUN_FINISHED) {
           terminal = true;
           if (!taskStatusIsSuccessful(event.status ?? "")) {
             runErr = event.error ??
@@ -818,7 +817,7 @@ export class KnowledgeBaseService {
                 `knowledge indexer finished with status ${event.status}`,
               );
           }
-        } else if (event.type === EventError) {
+        } else if (event.type === EVENT_ERROR) {
           if (event.error !== undefined) runErr = event.error;
         }
       }
@@ -865,7 +864,7 @@ export class KnowledgeBaseService {
       base.provider,
       base.model,
     );
-    const { mode } = caller.resolvePolicy("", base.mode, ModeYolo);
+    const { mode } = caller.resolvePolicy("", base.mode, MODE_YOLO);
     const thinking = validateThinkingLevel(base.thinkingLevel ?? "");
     const text = await this.runLibrarian(
       ctx,
@@ -905,8 +904,8 @@ export class KnowledgeBaseService {
     });
     const runtime = await attachSessionResources({
       id: sessionID,
-      source: SourceACP,
-      entrySource: SourceACP,
+      source: SOURCE_ACP,
+      entrySource: SOURCE_ACP,
       workDir: base.rootDir,
       manager,
       registry,
@@ -940,7 +939,7 @@ export class KnowledgeBaseService {
             id: runID,
             sessionId: sessionID,
             workDir: base.rootDir,
-            source: String(SourceACP),
+            source: String(SOURCE_ACP),
             model: model.id,
             mode,
             status: "running",
@@ -954,7 +953,7 @@ export class KnowledgeBaseService {
             sessionId: sessionID,
             runId: runID,
             eventType: "started",
-            source: String(SourceACP),
+            source: String(SOURCE_ACP),
             status: "running",
             model: model.id,
             mode,
@@ -962,7 +961,7 @@ export class KnowledgeBaseService {
             data,
           }),
         );
-        let state: RunState = RunStateCompleted;
+        let state: RunState = RUN_STATE_COMPLETED;
         let message = "";
         let bodyErr: Error | null = null;
         let text = "";
@@ -994,9 +993,9 @@ export class KnowledgeBaseService {
             if (observation.error !== undefined && bodyErr === null) {
               bodyErr = new Error(displayErrorMessage(observation.error));
             }
-            if (event.type === EventTextDelta) {
+            if (event.type === EVENT_TEXT_DELTA) {
               response.push(event.textDelta ?? "");
-            } else if (event.type === EventRunFinished) {
+            } else if (event.type === EVENT_RUN_FINISHED) {
               terminal = true;
               if (
                 !taskStatusIsSuccessful(event.status ?? "") && bodyErr === null
@@ -1006,7 +1005,7 @@ export class KnowledgeBaseService {
                     `librarian run finished with status ${event.status}`,
                   );
               }
-            } else if (event.type === EventError) {
+            } else if (event.type === EVENT_ERROR) {
               if (event.error !== undefined && bodyErr === null) {
                 bodyErr = event.error;
               }
@@ -1025,7 +1024,7 @@ export class KnowledgeBaseService {
           bodyErr = toError(err);
         }
         if (bodyErr !== null) {
-          state = RunStateFailed;
+          state = RUN_STATE_FAILED;
           message = bodyErr.message;
         }
         let finishErr: Error | null = null;
@@ -1039,7 +1038,7 @@ export class KnowledgeBaseService {
               sessionId: sessionID,
               runId: runID,
               eventType: "finished",
-              source: String(SourceACP),
+              source: String(SOURCE_ACP),
               status: state,
               model: model.id,
               mode,

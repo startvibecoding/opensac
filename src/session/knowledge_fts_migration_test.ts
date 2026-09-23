@@ -1,4 +1,3 @@
-// Ported from internal/session/knowledge_fts_migration_test.go
 //
 // Proves the v1 -> v2 knowledge-store migration: an existing store whose
 // knowledge_chunk_fts mirror holds raw (unicode61-uncut) CJK text must be
@@ -8,7 +7,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import {
-  KnowledgeGraphSchemaVersion,
+  KNOWLEDGE_GRAPH_SCHEMA_VERSION,
   queryKnowledgeGraph,
 } from "./knowledge_bases.ts";
 import {
@@ -46,7 +45,7 @@ Deno.test("knowledge store migrates legacy fts to bigram index", () => {
           (id, knowledge_base_id, run_id, status, schema_version, file_count, chunk_count, node_count, edge_count, started_at, finished_at, error_summary)
          VALUES ('snap1', ?, '', 'completed', ?, 1, 1, 0, 0, '2026-09-07T00:00:00Z', '2026-09-07T00:00:01Z', '')`,
         baseID,
-        KnowledgeGraphSchemaVersion,
+        KNOWLEDGE_GRAPH_SCHEMA_VERSION,
       );
       raw.run(
         `INSERT INTO knowledge_files

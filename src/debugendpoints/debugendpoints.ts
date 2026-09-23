@@ -149,9 +149,9 @@ export function startDebugServer(w?: (msg: string) => void): void {
 }
 
 /** Resets the once-per-process state. Exposed for tests only. */
-export function resetForTest(): void {
+export function resetDebugServer(): void {
   started = false;
   startedAddr = "";
 }
 
-export { listenAddr as listenAddrForTest };
+export { listenAddr as debugListenAddr };

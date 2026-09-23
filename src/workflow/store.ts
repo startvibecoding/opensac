@@ -1,4 +1,3 @@
-// Ported from internal/workflow/store.go.
 //
 // FileStore persists workflow state as JSON files. `os.CreateTemp` +
 // `os.Rename` map to `Deno.makeTempFile` + `Deno.rename`; `ctx.Err()` maps to

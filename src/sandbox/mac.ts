@@ -1,4 +1,3 @@
-// Ported from internal/sandbox/mac.go
 //
 // The Go original tracks temporary Seatbelt profiles in a map keyed by
 // *exec.Cmd and removes them from CleanupCommand. Deno has no such handle, so

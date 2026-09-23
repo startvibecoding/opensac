@@ -1,4 +1,4 @@
-// Ported from internal/agent/agent_approval.go (decision logic).
+// (decision logic).
 //
 // The Go file defines these as methods on *Agent, reading a.config.Mode,
 // a.config.Allow, and a.config.Settings. The Agent struct is not ported yet, so

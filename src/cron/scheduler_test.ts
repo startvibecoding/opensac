@@ -1,6 +1,4 @@
-// Translated from the Scheduler and maintenance cases of
 // internal/cron/cron_test.go, internal/cron/manage_runnow_test.go, and
-// internal/cron/maintenance_test.go.
 //
 // The Go concurrency cases (20 racing Start/Stop goroutines) reduce to
 // deterministic assertions because Deno is single-threaded: `start()` performs
@@ -17,10 +15,10 @@ import * as path from "@std/path";
 import {
   defaultMaintenancePolicy,
   isMaintenanceCronJobID,
-  MaintenanceCronJobPrefix,
+  MAINTENANCE_CRON_JOB_PREFIX,
+  MAINTENANCE_STORAGE_RECONCILE_JOB_NAME,
+  MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
   maintenanceStorageReconcileJobID,
-  MaintenanceStorageReconcileJobName,
-  MaintenanceStorageReconcileSchedule,
 } from "../agentruntime/maintenance_cron.ts";
 import { closeDatabases, listSessionRunEvents } from "../session/mod.ts";
 import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
@@ -440,7 +438,7 @@ Deno.test("SchedulerStartProjectsMaintenanceJobOnce", async () => {
     assertEquals(maintenance.length, 1);
     const job = maintenance[0];
     assertEquals(job.id, maintenanceStorageReconcileJobID());
-    assertEquals(job.schedule, MaintenanceStorageReconcileSchedule);
+    assertEquals(job.schedule, MAINTENANCE_STORAGE_RECONCILE_SCHEDULE);
     assert(job.enabled === true);
     assert(job.oneShot !== true);
     assertEquals(job.sessionId ?? "", "");
@@ -502,7 +500,7 @@ Deno.test("MaintenanceScheduleOverrideKeepsRunHistory", async () => {
   const runAt = new Date(Date.now() - 2 * 3_600_000);
   const stored = normalizeJobSchedule({
     id: maintenanceStorageReconcileJobID(),
-    name: MaintenanceStorageReconcileJobName,
+    name: MAINTENANCE_STORAGE_RECONCILE_JOB_NAME,
     prompt: "Runtime-owned maintenance; never executed as an agent prompt.",
     schedule: "@daily",
     mode: "yolo",
@@ -555,7 +553,7 @@ Deno.test("InvalidMaintenanceScheduleFallsBackToDefault", async () => {
   scheduler.start();
   try {
     const job = store.get(maintenanceStorageReconcileJobID());
-    assertEquals(job.schedule, MaintenanceStorageReconcileSchedule);
+    assertEquals(job.schedule, MAINTENANCE_STORAGE_RECONCILE_SCHEDULE);
   } finally {
     await scheduler.stop();
     closeDatabases();
@@ -602,7 +600,7 @@ Deno.test("MaintenanceJobCompletesThroughTheRuntimeNotAnAgent", async () => {
 Deno.test("UnknownMaintenanceJobCannotRunItsPrompt", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
   const store = newSQLiteCronStore(sessionDir);
-  const id = MaintenanceCronJobPrefix + "not-implemented";
+  const id = MAINTENANCE_CRON_JOB_PREFIX + "not-implemented";
   const job = normalizeJobSchedule({
     id,
     name: "not implemented",

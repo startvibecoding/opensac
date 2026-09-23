@@ -1,4 +1,3 @@
-// Ported from internal/provider/openai/responses_runtime.go
 //
 // `ResponsesRunManager` owns background Responses runs. It is intentionally
 // separate from `chatResponses`: background requests have a durable lifecycle

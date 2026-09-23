@@ -1,13 +1,11 @@
-// Translated from internal/agentruntime/knowledge_index_job_test.go.
-
 import { assert, assertEquals } from "@std/assert";
 import { createKnowledgeBase } from "../session/mod.ts";
 import {
   defaultKnowledgeBaseIndexPolicy,
   newKnowledgeBaseService,
 } from "./knowledgebase.ts";
-import { KnowledgeIndexPhaseCommitting } from "./knowledge_index_job.ts";
-import { SourceACP } from "./source.ts";
+import { KNOWLEDGE_INDEX_PHASE_COMMITTING } from "./knowledge_index_job.ts";
+import { SOURCE_ACP } from "./source.ts";
 
 Deno.test("knowledge base start index runs in background with progress", async () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
@@ -35,10 +33,10 @@ Deno.test("knowledge base start index runs in background with progress", async (
     defaultKnowledgeBaseIndexPolicy(),
   );
 
-  const job = service.startIndex(undefined, base.id, SourceACP);
+  const job = service.startIndex(undefined, base.id, SOURCE_ACP);
   assert(job.viewProgress().running === true);
 
-  const shared = service.startIndex(undefined, base.id, SourceACP);
+  const shared = service.startIndex(undefined, base.id, SOURCE_ACP);
   assert(shared === job);
 
   assert(service.indexProgress(base.id).running === true);
@@ -51,10 +49,10 @@ Deno.test("knowledge base start index runs in background with progress", async (
   assertEquals(progress.running, false);
   assertEquals(progress.filesTotal, 3);
   assertEquals(progress.filesDone, 3);
-  assertEquals(progress.phase, KnowledgeIndexPhaseCommitting);
+  assertEquals(progress.phase, KNOWLEDGE_INDEX_PHASE_COMMITTING);
   assertEquals(service.indexProgress(base.id).running, false);
 
-  const again = service.startIndex(undefined, base.id, SourceACP);
+  const again = service.startIndex(undefined, base.id, SOURCE_ACP);
   assert(again !== job);
   const reused = await again.wait(undefined);
   assertEquals(reused.id, snapshot.id);
@@ -79,7 +77,7 @@ Deno.test("knowledge base start index rejects disabled base synchronously", () =
   );
   let threw = false;
   try {
-    service.startIndex(undefined, base.id, SourceACP);
+    service.startIndex(undefined, base.id, SOURCE_ACP);
   } catch {
     threw = true;
   }

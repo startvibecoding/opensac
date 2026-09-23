@@ -1,4 +1,3 @@
-// Ported from internal/stats/stats.go
 //
 // Package stats provides usage-statistics queries over the request_stats table
 // and an HTTP dashboard that renders them.

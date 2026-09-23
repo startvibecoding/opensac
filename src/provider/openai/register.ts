@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/register.go
-
 import type {
   ModelCompat as ConfigModelCompat,
   ProviderConfig,

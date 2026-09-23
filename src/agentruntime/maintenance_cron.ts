@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/maintenance_cron.go.
 //
 // Runtime-owned maintenance work: the resolved intent policy, the namespaced
 // cron job identities, and the executor a shared cron scheduler dispatches to.
@@ -33,23 +32,23 @@ export interface MaintenancePolicy {
 }
 
 /** Namespaces Runtime-owned maintenance jobs inside the shared cron store. */
-export const MaintenanceCronJobPrefix = "opensac-maintenance:";
+export const MAINTENANCE_CRON_JOB_PREFIX = "opensac-maintenance:";
 
 /**
  * Reclaims unreferenced attachment storage once a day. Reclamation is already
  * age-bounded by the attachment retention window, so a daily pass is enough.
  */
-export const MaintenanceStorageReconcileSchedule = "@daily";
+export const MAINTENANCE_STORAGE_RECONCILE_SCHEDULE = "@daily";
 
 /** Labels the projected job for logs and direct store inspection. */
-export const MaintenanceStorageReconcileJobName =
+export const MAINTENANCE_STORAGE_RECONCILE_JOB_NAME =
   "Reclaim unreferenced attachment storage";
 
 /** defaultMaintenancePolicy is what applies when configuration says nothing. */
 export function defaultMaintenancePolicy(): MaintenancePolicy {
   return {
     reclaimAttachmentStorage: true,
-    storageReconcileSchedule: MaintenanceStorageReconcileSchedule,
+    storageReconcileSchedule: MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
   };
 }
 
@@ -72,7 +71,7 @@ export function maintenancePolicyFromSettings(
 
 /** The stable identity of the attachment storage reconciliation job. */
 export function maintenanceStorageReconcileJobID(): string {
-  return MaintenanceCronJobPrefix + "artifact-storage";
+  return MAINTENANCE_CRON_JOB_PREFIX + "artifact-storage";
 }
 
 /**
@@ -80,7 +79,7 @@ export function maintenanceStorageReconcileJobID(): string {
  * therefore must be executed by `runMaintenanceCronJob`.
  */
 export function isMaintenanceCronJobID(jobID: string): boolean {
-  return jobID.trim().startsWith(MaintenanceCronJobPrefix);
+  return jobID.trim().startsWith(MAINTENANCE_CRON_JOB_PREFIX);
 }
 
 /** The outcome of one maintenance dispatch. */

@@ -1,5 +1,3 @@
-// Ported from internal/provider/provider_test.go
-
 import { assert, assertEquals, assertExists } from "@std/assert";
 import {
   BaseProvider,

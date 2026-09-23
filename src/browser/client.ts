@@ -1,4 +1,4 @@
-// Ported from vibe-browser pkg/client/client.go (v0.1.5).
+// (v0.1.5).
 //
 // The high-level SDK entry point. It supports two modes:
 //   - Direct mode: connects directly to a browser via CDP (or launches one)

@@ -1,4 +1,4 @@
-// Ported from internal/workflow/js.go (the JavaScript workflow DSL evaluator).
+// (the JavaScript workflow DSL evaluator).
 //
 // The Go implementation evaluates the DSL inside a `goja` VM and interrupts a
 // runaway script. Deno has no interruptible in-process VM, so the DSL runs in

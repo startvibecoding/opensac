@@ -1,5 +1,3 @@
-// Ported from internal/provider/content_rejection_test.go
-
 import { assert } from "@std/assert";
 import { isContentRejectionError, isRetryable } from "./mod.ts";
 

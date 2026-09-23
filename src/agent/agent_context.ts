@@ -1,4 +1,4 @@
-// Ported from internal/agent/agent_context.go (stateless helpers).
+// (stateless helpers).
 //
 // The `Agent`-bound methods of agent_context.go (request assembly,
 // compaction, content-rejection/overflow recovery, history accessors) stay

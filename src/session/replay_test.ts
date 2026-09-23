@@ -1,4 +1,3 @@
-// Ported from internal/session/session_test.go and content_override_test.go
 // (replay core).
 //
 // The Go tests drive replay through the session Manager; the not-yet-ported

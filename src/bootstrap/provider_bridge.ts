@@ -1,4 +1,4 @@
-// Ported from the Go `bootstrap` package (bootstrap/provider_bridge.go).
+// (bootstrap/provider_bridge.go).
 //
 // `providerAdapter` exposes an internal provider through the public
 // `sdk/agent` Provider interface. It lives here (not in the public SDK) so the

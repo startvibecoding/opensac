@@ -1,4 +1,3 @@
-// Translated from internal/agent/subagent_test.go and subagent_tools_test.go
 // (the tool-surface, status/send/destroy, and parameter-validation cases).
 
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";

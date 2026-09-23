@@ -1,5 +1,3 @@
-// Ported from internal/provider/context_overflow_test.go
-
 import { assert } from "@std/assert";
 import { isContextOverflowError } from "./mod.ts";
 

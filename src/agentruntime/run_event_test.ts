@@ -1,6 +1,3 @@
-// Ported from internal/agentruntime/run_event_test.go and
-// run_event_replay_test.go.
-
 import { assertEquals } from "@std/assert";
 import {
   type RunEvent,

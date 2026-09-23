@@ -1,5 +1,3 @@
-// Ported from internal/provider/idle_timeout.go
-
 /**
  * The maximum time a streaming response body may go without delivering any data
  * before it is considered stalled and aborted. Unlike a fixed wall-clock

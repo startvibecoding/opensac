@@ -1,5 +1,3 @@
-// Ported from internal/provider/factory/factory.go
-
 import {
   defaultProviderConfig,
   type ModelCompat as ConfigModelCompat,

@@ -1,5 +1,3 @@
-// Ported from internal/expert/bundle_test.go
-
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import * as path from "@std/path";
 import {

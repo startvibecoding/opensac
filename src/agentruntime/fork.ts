@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/fork.go.
 //
 // The data layer owns the SQLite snapshot/copy transaction; this Runtime
 // boundary keeps adapters from implementing their own copy or Agent lifecycle.

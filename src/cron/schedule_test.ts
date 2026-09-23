@@ -1,4 +1,3 @@
-// Translated from internal/cron/schedule_test.go.
 //
 // The Go tests pin UTC instants; this port uses local-time `Date` construction
 // so the assertions are timezone-independent while still exercising the same

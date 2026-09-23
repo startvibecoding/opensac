@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/responses_codec_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   decodeResponsesOutputItem,

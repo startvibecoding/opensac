@@ -1,4 +1,3 @@
-// Ported from internal/session/run_recovery_test.go
 //
 // Deviation: the Go fixture creates a session through the (not yet ported)
 // Manager; these tests persist a session/run through the DAO and acquire the

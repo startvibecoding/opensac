@@ -1,4 +1,3 @@
-// Ported from internal/session/store.go
 //
 // The persistence-backend interface for session state plus the in-memory
 // implementation used by tests. The SQLite-backed `Manager` (session.go) is

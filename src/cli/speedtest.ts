@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main_speedtest.go: the `speedtest` benchmark. Runs
+// the `speedtest` benchmark. Runs
 // text-only streaming requests against configured provider/model pairs,
 // averages successful runs, and prints a sorted table by output tokens/s.
 // Pure helpers (target collection, averaging, formatting) are exported so the

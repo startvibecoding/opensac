@@ -1,5 +1,3 @@
-// Ported from internal/provider/retry_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   formatRetryMessage,

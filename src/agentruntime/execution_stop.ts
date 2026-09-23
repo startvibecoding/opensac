@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/execution_stop.go.
 //
 // The canonical stop matrix. Snapshot data is an expectation only: local
 // cancellation and recovery revalidate the exact Run/lease binding before
@@ -19,44 +18,45 @@ import {
   inspectSessionExecution,
   isRemoteResponseTerminal,
   registeredLocalExecution,
-  SessionExecutionDetached,
-  SessionExecutionExternal,
-  SessionExecutionIdle,
-  SessionExecutionInconsistent,
-  SessionExecutionLocal,
-  SessionExecutionOrphaned,
-  SessionExecutionRecoveryFailed,
-  SessionExecutionReserved,
+  SESSION_EXECUTION_DETACHED,
+  SESSION_EXECUTION_EXTERNAL,
+  SESSION_EXECUTION_IDLE,
+  SESSION_EXECUTION_INCONSISTENT,
+  SESSION_EXECUTION_LOCAL,
+  SESSION_EXECUTION_ORPHANED,
+  SESSION_EXECUTION_RECOVERY_FAILED,
+  SESSION_EXECUTION_RESERVED,
+  SESSION_EXECUTION_UNKNOWN,
   type SessionExecutionSnapshot,
-  SessionExecutionUnknown,
 } from "./execution.ts";
 import { wakeRecoveryCoordinators } from "./recovery_coordinator.ts";
 import {
   defaultRunRecoveryAction,
-  RecoveryKeepRemote,
+  RECOVERY_KEEP_REMOTE,
   stopOrphanedSessionRunWithSignal,
 } from "./run_recovery.ts";
-import { RunStateCancelling } from "./run_state.ts";
+import { RUN_STATE_CANCELLING } from "./run_state.ts";
 
 /** The adapter-neutral outcome of a stop request. */
 export type SessionStopCode = string;
 
-export const SessionStopAccepted: SessionStopCode = "stop_accepted";
-export const SessionStopRemoteAccepted: SessionStopCode =
+export const SESSION_STOP_ACCEPTED: SessionStopCode = "stop_accepted";
+export const SESSION_STOP_REMOTE_ACCEPTED: SessionStopCode =
   "remote_stop_accepted";
-export const SessionStopRecoveryStarted: SessionStopCode = "recovery_started";
-export const SessionStopOwnedElsewhere: SessionStopCode =
+export const SESSION_STOP_RECOVERY_STARTED: SessionStopCode =
+  "recovery_started";
+export const SESSION_STOP_OWNED_ELSEWHERE: SessionStopCode =
   "session_run_owned_elsewhere";
-export const SessionStopRemoteUnsupported: SessionStopCode =
+export const SESSION_STOP_REMOTE_UNSUPPORTED: SessionStopCode =
   "remote_stop_unsupported";
-export const SessionStopReserved: SessionStopCode = "session_reserved";
-export const SessionStopNoActiveRun: SessionStopCode = "no_active_run";
-export const SessionStopStateUnavailable: SessionStopCode =
+export const SESSION_STOP_RESERVED: SessionStopCode = "session_reserved";
+export const SESSION_STOP_NO_ACTIVE_RUN: SessionStopCode = "no_active_run";
+export const SESSION_STOP_STATE_UNAVAILABLE: SessionStopCode =
   "session_execution_state_unavailable";
-export const SessionStopRecoveryFailed: SessionStopCode =
+export const SESSION_STOP_RECOVERY_FAILED: SessionStopCode =
   "session_recovery_failed";
-export const SessionStopRemoteFailed: SessionStopCode = "remote_stop_failed";
-export const SessionStopTargetChanged: SessionStopCode =
+export const SESSION_STOP_REMOTE_FAILED: SessionStopCode = "remote_stop_failed";
+export const SESSION_STOP_TARGET_CHANGED: SessionStopCode =
   "session_run_target_changed";
 
 /** Distinguishes a missing cancel capability from an upstream failure. */
@@ -110,7 +110,7 @@ export async function requestSessionStop(
   } catch (err) {
     const unavailable = unknownSnapshot(sessionId);
     throw new StopStateUnavailableError(
-      { code: SessionStopStateUnavailable, execution: unavailable },
+      { code: SESSION_STOP_STATE_UNAVAILABLE, execution: unavailable },
       err,
     );
   }
@@ -119,10 +119,10 @@ export async function requestSessionStop(
     expected !== "" &&
     (snapshot.activeRun === undefined || snapshot.activeRun.id !== expected)
   ) {
-    return { code: SessionStopTargetChanged, execution: snapshot };
+    return { code: SESSION_STOP_TARGET_CHANGED, execution: snapshot };
   }
   switch (snapshot.state) {
-    case SessionExecutionIdle: {
+    case SESSION_EXECUTION_IDLE: {
       const legacy = requestLegacyLocalStop(
         sessionDir,
         sessionId,
@@ -130,9 +130,9 @@ export async function requestSessionStop(
         options.legacyLocalCancel,
       );
       if (legacy !== null) return legacy;
-      return { code: SessionStopNoActiveRun, execution: snapshot };
+      return { code: SESSION_STOP_NO_ACTIVE_RUN, execution: snapshot };
     }
-    case SessionExecutionReserved: {
+    case SESSION_EXECUTION_RESERVED: {
       const legacy = requestLegacyLocalStop(
         sessionDir,
         sessionId,
@@ -140,24 +140,24 @@ export async function requestSessionStop(
         options.legacyLocalCancel,
       );
       if (legacy !== null) return legacy;
-      return { code: SessionStopReserved, execution: snapshot };
+      return { code: SESSION_STOP_RESERVED, execution: snapshot };
     }
-    case SessionExecutionExternal:
-      return { code: SessionStopOwnedElsewhere, execution: snapshot };
-    case SessionExecutionInconsistent:
-    case SessionExecutionUnknown:
-      return { code: SessionStopStateUnavailable, execution: snapshot };
-    case SessionExecutionLocal:
+    case SESSION_EXECUTION_EXTERNAL:
+      return { code: SESSION_STOP_OWNED_ELSEWHERE, execution: snapshot };
+    case SESSION_EXECUTION_INCONSISTENT:
+    case SESSION_EXECUTION_UNKNOWN:
+      return { code: SESSION_STOP_STATE_UNAVAILABLE, execution: snapshot };
+    case SESSION_EXECUTION_LOCAL:
       return requestLocalSessionStop(sessionDir, snapshot);
-    case SessionExecutionDetached:
+    case SESSION_EXECUTION_DETACHED:
       return await requestDetachedRemoteStop(
         ctx,
         sessionDir,
         snapshot,
         options.remoteCancel,
       );
-    case SessionExecutionOrphaned:
-    case SessionExecutionRecoveryFailed: {
+    case SESSION_EXECUTION_ORPHANED:
+    case SESSION_EXECUTION_RECOVERY_FAILED: {
       let recoveryErr: unknown = null;
       try {
         await stopOrphanedSessionRunWithSignal(
@@ -180,23 +180,23 @@ export async function requestSessionStop(
       }
       if (recoveryErr !== null) {
         throw new StopStateUnavailableError(
-          { code: SessionStopRecoveryFailed, execution: latest },
+          { code: SESSION_STOP_RECOVERY_FAILED, execution: latest },
           recoveryErr,
         );
       }
       if (inspectErr !== null) {
         throw new StopStateUnavailableError(
-          { code: SessionStopStateUnavailable, execution: latest },
+          { code: SESSION_STOP_STATE_UNAVAILABLE, execution: latest },
           inspectErr,
         );
       }
-      if (latest.state === SessionExecutionIdle) {
-        return { code: SessionStopRecoveryStarted, execution: latest };
+      if (latest.state === SESSION_EXECUTION_IDLE) {
+        return { code: SESSION_STOP_RECOVERY_STARTED, execution: latest };
       }
       return passiveSessionStopResult(latest);
     }
     default:
-      return { code: SessionStopStateUnavailable, execution: snapshot };
+      return { code: SESSION_STOP_STATE_UNAVAILABLE, execution: snapshot };
   }
 }
 
@@ -221,9 +221,9 @@ function requestLegacyLocalStop(
   try {
     latest = inspectSessionExecution(sessionDir, sessionId);
   } catch {
-    return { code: SessionStopAccepted, execution: snapshot };
+    return { code: SESSION_STOP_ACCEPTED, execution: snapshot };
   }
-  return { code: SessionStopAccepted, execution: latest };
+  return { code: SESSION_STOP_ACCEPTED, execution: latest };
 }
 
 function requestLocalSessionStop(
@@ -238,7 +238,7 @@ function requestLocalSessionStop(
       latest = inspectSessionExecution(sessionDir, expected.sessionId);
     } catch (err) {
       throw new StopStateUnavailableError(
-        { code: SessionStopStateUnavailable, execution: expected },
+        { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
         err,
       );
     }
@@ -256,12 +256,12 @@ function requestLocalSessionStop(
     } catch {
       latest = null;
     }
-    if (latest !== null && latest.state !== SessionExecutionLocal) {
+    if (latest !== null && latest.state !== SESSION_EXECUTION_LOCAL) {
       return passiveSessionStopResult(latest);
     }
     if (latest !== null) expected = latest;
     throw new StopStateUnavailableError(
-      { code: SessionStopStateUnavailable, execution: expected },
+      { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
       err,
     );
   }
@@ -271,7 +271,7 @@ function requestLocalSessionStop(
       latest = inspectSessionExecution(sessionDir, expected.sessionId);
     } catch (err) {
       throw new StopStateUnavailableError(
-        { code: SessionStopStateUnavailable, execution: expected },
+        { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
         err,
       );
     }
@@ -282,11 +282,11 @@ function requestLocalSessionStop(
     latest = inspectSessionExecution(sessionDir, expected.sessionId);
   } catch {
     if (expected.activeRun !== undefined) {
-      expected.activeRun.status = RunStateCancelling;
+      expected.activeRun.status = RUN_STATE_CANCELLING;
     }
-    return { code: SessionStopAccepted, execution: expected };
+    return { code: SESSION_STOP_ACCEPTED, execution: expected };
   }
-  return { code: SessionStopAccepted, execution: latest };
+  return { code: SESSION_STOP_ACCEPTED, execution: latest };
 }
 
 function localExecutionForStop(
@@ -294,7 +294,8 @@ function localExecutionForStop(
   expected: SessionExecutionSnapshot,
 ): { runtime: import("./execution.ts").ExecutionRuntime } | null {
   if (
-    expected.activeRun === undefined || expected.state !== SessionExecutionLocal
+    expected.activeRun === undefined ||
+    expected.state !== SESSION_EXECUTION_LOCAL
   ) {
     return null;
   }
@@ -332,14 +333,14 @@ async function requestDetachedRemoteStop(
     | undefined,
 ): Promise<SessionStopResult> {
   if (expected.activeRun === undefined || expected.remoteRunId === "") {
-    return { code: SessionStopStateUnavailable, execution: expected };
+    return { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected };
   }
   if (!expected.canCancelRemote || cancel === undefined) {
     if (isRemoteResponseTerminal(expected.remoteState)) {
       wakeRecoveryCoordinators(sessionDir);
-      return { code: SessionStopRecoveryStarted, execution: expected };
+      return { code: SESSION_STOP_RECOVERY_STARTED, execution: expected };
     }
-    return { code: SessionStopRemoteUnsupported, execution: expected };
+    return { code: SESSION_STOP_REMOTE_UNSUPPORTED, execution: expected };
   }
   let guard: ReturnType<typeof acquireRecovery>;
   try {
@@ -354,7 +355,7 @@ async function requestDetachedRemoteStop(
       latest = inspectSessionExecution(sessionDir, expected.sessionId);
     } catch (err) {
       throw new StopStateUnavailableError(
-        { code: SessionStopStateUnavailable, execution: expected },
+        { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
         err,
       );
     }
@@ -374,7 +375,7 @@ async function requestDetachedRemoteStop(
       lease.ownerInstanceId !== binding.ownerInstanceId ||
       lease.tokenHash !== binding.tokenHash ||
       lease.epoch !== binding.epoch ||
-      defaultRunRecoveryAction(facts) !== RecoveryKeepRemote
+      defaultRunRecoveryAction(facts) !== RECOVERY_KEEP_REMOTE
     ) {
       guard.release();
       released = true;
@@ -383,7 +384,7 @@ async function requestDetachedRemoteStop(
         latest = inspectSessionExecution(sessionDir, expected.sessionId);
       } catch (err) {
         throw new StopStateUnavailableError(
-          { code: SessionStopStateUnavailable, execution: expected },
+          { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
           err,
         );
       }
@@ -403,13 +404,13 @@ async function requestDetachedRemoteStop(
       );
     } catch (err) {
       throw new StopStateUnavailableError(
-        { code: SessionStopStateUnavailable, execution: expected },
+        { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
         err,
       );
     }
     const remote = facts.remoteRun;
     if (remote === null) {
-      return { code: SessionStopStateUnavailable, execution: expected };
+      return { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected };
     }
     try {
       await cancel(ctx, {
@@ -422,7 +423,7 @@ async function requestDetachedRemoteStop(
     } catch (err) {
       if (err instanceof RemoteStopUnsupportedError) {
         markSessionRunRecoveryDetached(sessionDir, run.sessionId, run.id);
-        return { code: SessionStopRemoteUnsupported, execution: expected };
+        return { code: SESSION_STOP_REMOTE_UNSUPPORTED, execution: expected };
       }
       const failure = failRunRecoveryAttempt(
         sessionDir,
@@ -431,7 +432,7 @@ async function requestDetachedRemoteStop(
         new Error(`cancel remote run: ${errorMessage(err)}`),
       );
       throw new StopStateUnavailableError(
-        { code: SessionStopRemoteFailed, execution: expected },
+        { code: SESSION_STOP_REMOTE_FAILED, execution: expected },
         failure,
       );
     }
@@ -439,7 +440,7 @@ async function requestDetachedRemoteStop(
       markSessionRunRecoveryDetached(sessionDir, run.sessionId, run.id);
     } catch (err) {
       throw new StopStateUnavailableError(
-        { code: SessionStopStateUnavailable, execution: expected },
+        { code: SESSION_STOP_STATE_UNAVAILABLE, execution: expected },
         err,
       );
     }
@@ -452,7 +453,7 @@ async function requestDetachedRemoteStop(
     } catch {
       latest = expected;
     }
-    return { code: SessionStopRemoteAccepted, execution: latest };
+    return { code: SESSION_STOP_REMOTE_ACCEPTED, execution: latest };
   } finally {
     if (!released) guard.release();
   }
@@ -461,23 +462,23 @@ async function requestDetachedRemoteStop(
 function passiveSessionStopResult(
   snapshot: SessionExecutionSnapshot,
 ): SessionStopResult {
-  let code: SessionStopCode = SessionStopStateUnavailable;
+  let code: SessionStopCode = SESSION_STOP_STATE_UNAVAILABLE;
   switch (snapshot.state) {
-    case SessionExecutionIdle:
-      code = SessionStopNoActiveRun;
+    case SESSION_EXECUTION_IDLE:
+      code = SESSION_STOP_NO_ACTIVE_RUN;
       break;
-    case SessionExecutionReserved:
-      code = SessionStopReserved;
+    case SESSION_EXECUTION_RESERVED:
+      code = SESSION_STOP_RESERVED;
       break;
-    case SessionExecutionExternal:
-      code = SessionStopOwnedElsewhere;
+    case SESSION_EXECUTION_EXTERNAL:
+      code = SESSION_STOP_OWNED_ELSEWHERE;
       break;
-    case SessionExecutionDetached:
-      code = SessionStopRemoteUnsupported;
+    case SESSION_EXECUTION_DETACHED:
+      code = SESSION_STOP_REMOTE_UNSUPPORTED;
       break;
-    case SessionExecutionOrphaned:
-    case SessionExecutionRecoveryFailed:
-      code = SessionStopRecoveryFailed;
+    case SESSION_EXECUTION_ORPHANED:
+    case SESSION_EXECUTION_RECOVERY_FAILED:
+      code = SESSION_STOP_RECOVERY_FAILED;
       break;
   }
   return { code, execution: snapshot };
@@ -509,7 +510,7 @@ function unknownSnapshot(sessionId: string): SessionExecutionSnapshot {
   return {
     sessionId,
     sessionExists: false,
-    state: SessionExecutionUnknown,
+    state: SESSION_EXECUTION_UNKNOWN,
     phase: "",
     running: false,
     busy: true,

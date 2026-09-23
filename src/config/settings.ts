@@ -1,5 +1,3 @@
-// Ported from internal/config/settings.go
-
 import * as path from "@std/path";
 import {
   configDir as platformConfigDirImpl,

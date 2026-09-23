@@ -1,5 +1,3 @@
-// Ported from internal/provider/registry_test.go
-
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { ProviderConfig } from "../config/mod.ts";
 import {

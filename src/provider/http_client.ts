@@ -1,4 +1,3 @@
-// Ported from internal/provider/http_client.go
 //
 // Deviation: Go returns *http.Client whose Transport exposes Proxy/HTTP2 knobs;
 // Deno has no pluggable Transport. We expose a small HttpClient wrapper over

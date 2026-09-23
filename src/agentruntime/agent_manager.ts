@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/agent_manager.go.
 //
 // `newAgentManager` is the shared construction path that binds a
 // provider-specific execution to a front-end-neutral Runtime: it builds an
@@ -32,11 +31,11 @@ import type { Manager as SandboxManager } from "../sandbox/sandbox.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
   type ExecutionPolicy,
-  ModeYolo,
+  MODE_YOLO,
   policyForSource,
   type RuntimeSource,
+  SOURCE_UNKNOWN,
   type SourceResolutionInput,
-  SourceUnknown,
 } from "./source.ts";
 import {
   resolveManagerPolicy,
@@ -106,7 +105,7 @@ export function newAgentManager(opts: AgentManagerOptions): AgentManager {
     throw new Error("agent model is required");
   }
   const runtime = opts.runtime;
-  const policy = runtime.resolvedExecutionPolicy(ModeYolo);
+  const policy = runtime.resolvedExecutionPolicy(MODE_YOLO);
   const runtimeManager = runtime.manager;
   const entrySource = runtime.entrySource;
   // The Runtime's session manager is authoritative. Do not let a caller's
@@ -137,7 +136,7 @@ export function newAgentManager(opts: AgentManagerOptions): AgentManager {
     if (manager !== undefined && manager === runtimeManager) {
       return policy.source;
     }
-    return SourceUnknown;
+    return SOURCE_UNKNOWN;
   };
   const compaction = compactionSettingsFromConfig(
     effectiveSettings.compaction ??
@@ -163,7 +162,7 @@ export function newAgentManager(opts: AgentManagerOptions): AgentManager {
         current: currentSourceFor(manager),
         requested: entrySource,
       };
-      return resolveManagerPolicy(manager, input, "", requestedMode, ModeYolo)
+      return resolveManagerPolicy(manager, input, "", requestedMode, MODE_YOLO)
         .mode;
     },
     beforeToolCallForSession: (
@@ -181,7 +180,7 @@ export function newAgentManager(opts: AgentManagerOptions): AgentManager {
       try {
         const resolved = resolveManagerSource(manager, input);
         return beforeToolCallForPolicy(
-          policyForSource(resolved.source, ModeYolo),
+          policyForSource(resolved.source, MODE_YOLO),
           undefined,
         ) ?? undefined;
       } catch (err) {

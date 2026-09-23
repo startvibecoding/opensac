@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/attachments_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import type { Attachment } from "../types.ts";
 import {

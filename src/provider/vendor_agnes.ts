@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_agnes.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_agnes.go init() adapters. */

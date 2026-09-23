@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/tool_policy.go.
 //
 // The non-overridable source policy evaluated before approval: a forced mode
 // controls agent behavior only, it never disables this guard. High-risk bash
@@ -18,9 +17,9 @@ import type { ExecutionPolicy } from "./source.ts";
 /** CommandRisk is the unattended-execution risk assigned to a bash command. */
 export type CommandRisk = "low" | "medium" | "high";
 
-export const CommandRiskLow: CommandRisk = "low";
-export const CommandRiskMedium: CommandRisk = "medium";
-export const CommandRiskHigh: CommandRisk = "high";
+export const COMMAND_RISK_LOW: CommandRisk = "low";
+export const COMMAND_RISK_MEDIUM: CommandRisk = "medium";
+export const COMMAND_RISK_HIGH: CommandRisk = "high";
 
 /** ToolCallPolicyDecision is the source policy result for one tool call. */
 export interface ToolCallPolicyDecision {
@@ -46,7 +45,7 @@ export function evaluateToolCall(
   const command = typeof args?.["command"] === "string"
     ? args["command"] as string
     : "";
-  if (classifyBashCommand(command) !== CommandRiskHigh) {
+  if (classifyBashCommand(command) !== COMMAND_RISK_HIGH) {
     return ALLOW;
   }
   return {
@@ -63,7 +62,7 @@ export function evaluateToolCall(
 export function classifyBashCommand(command: string): CommandRisk {
   command = command.trim();
   if (containsHighRiskBash(command)) {
-    return CommandRiskHigh;
+    return COMMAND_RISK_HIGH;
   }
 
   const mediumRiskPrefixes = [
@@ -87,7 +86,7 @@ export function classifyBashCommand(command: string): CommandRisk {
   ];
   for (const prefix of mediumRiskPrefixes) {
     if (command.startsWith(prefix)) {
-      return CommandRiskMedium;
+      return COMMAND_RISK_MEDIUM;
     }
   }
 
@@ -121,11 +120,11 @@ export function classifyBashCommand(command: string): CommandRisk {
   ];
   for (const prefix of lowRiskPrefixes) {
     if (command.startsWith(prefix)) {
-      return CommandRiskLow;
+      return COMMAND_RISK_LOW;
     }
   }
 
-  return CommandRiskMedium;
+  return COMMAND_RISK_MEDIUM;
 }
 
 function containsHighRiskBash(command: string): boolean {

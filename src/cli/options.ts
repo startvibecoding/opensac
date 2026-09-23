@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main.go (shared CLI flag/options surface).
+// (shared CLI flag/options surface).
 //
 // This module owns the options carried by the root command and shared
 // subcommands. It deliberately stays free of Cliffy types so focused tests can

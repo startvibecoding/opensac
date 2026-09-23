@@ -1,4 +1,4 @@
-// Ported from vibe-browser pkg/cdp/client.go (v0.1.5).
+// (v0.1.5).
 //
 // Implements the Chrome DevTools Protocol client: it manages a WebSocket
 // connection to a Chrome/Chromium browser instance, dispatches CDP commands,

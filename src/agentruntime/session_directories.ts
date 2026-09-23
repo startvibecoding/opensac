@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/session_directories.go.
 //
 // Validates the ACP directory-root contract: absolute, cleaned, deterministic
 // and duplicate-free paths. `path/filepath` maps to `@std/path`.

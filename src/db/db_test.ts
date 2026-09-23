@@ -1,5 +1,3 @@
-// Ported from internal/db/db_test.go and the recovery test surface.
-
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   close,

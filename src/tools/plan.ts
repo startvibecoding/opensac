@@ -1,5 +1,3 @@
-// Ported from internal/tools/plan.go.
-
 import {
   newPlanToolResult,
   type PlanStep,

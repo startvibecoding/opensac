@@ -1,4 +1,3 @@
-// Ported from internal/session/projects.go
 //
 // Project and session-metadata registry. These are short administrative writes:
 // they intentionally skip the runtime lease fence and rely on single-statement

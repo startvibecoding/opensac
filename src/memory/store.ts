@@ -1,4 +1,3 @@
-// Ported from internal/memory/store.go
 //
 // Package memory implements persistent memory storage: a human-readable
 // Markdown file (memory.md) managed through the ACP management plane.

@@ -1,5 +1,3 @@
-// Translated from internal/agentruntime/knowledge_cron_test.go.
-
 import { assert, assertEquals } from "@std/assert";
 import { createKnowledgeBase, getKnowledgeBase } from "../session/mod.ts";
 import {

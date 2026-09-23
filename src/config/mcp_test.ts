@@ -1,6 +1,3 @@
-// Ported from internal/config/mcp_test.go and the MCP cases of
-// manage_additions_test.go.
-
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {

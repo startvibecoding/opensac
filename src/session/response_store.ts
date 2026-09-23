@@ -1,4 +1,3 @@
-// Ported from internal/session/response_store.go
 //
 // The durable Response-API runtime store: turn lineage, sanitized native item
 // archives, cross-protocol tool-execution idempotency records, background run

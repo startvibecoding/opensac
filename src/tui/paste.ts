@@ -1,4 +1,4 @@
-// Ported from internal/tui/app_paste.go: large pastes fold into a numbered
+// large pastes fold into a numbered
 // marker (`[paste #1 +15 lines]`) inserted into the input, and expand back to
 // their original text at submit time. Small pastes insert directly.
 //

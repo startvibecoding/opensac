@@ -1,4 +1,3 @@
-// Ported from internal/config/settings_test.go, settings_zero_test.go,
 // settings_sparse_test.go, settings_maintenance_test.go, manage_additions_test.go.
 
 import { assert, assertEquals, assertThrows } from "@std/assert";

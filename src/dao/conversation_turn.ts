@@ -1,5 +1,3 @@
-// Ported from internal/dao/conversation_turn.go
-
 import type { DB } from "../db/mod.ts";
 import {
   execChanges,

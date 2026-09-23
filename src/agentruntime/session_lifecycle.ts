@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/session_lifecycle.go
 //
 // Front-end-neutral persisted session lifecycle. Channel binding stays adapter
 // policy input, and cascade deletion runs on the same Runtime-owned mutation

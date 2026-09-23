@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/knowledge_mcp.go
 //
 // The protocol adapter for a configured Knowledge MCP server. Storage/query
 // work is delegated to `KnowledgeBaseService` and only bounded, snapshot-backed

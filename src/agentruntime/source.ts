@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/policy.go and source.go.
 //
 // This is the single source-of-truth resolver: the runtime source vocabulary,
 // the per-run execution mode policy, and the source-precedence rules shared by
@@ -23,18 +22,18 @@ export type RuntimeSource = string;
 /** Concise compatibility alias for RuntimeSource. */
 export type Source = RuntimeSource;
 
-export const SourceUnknown: RuntimeSource = "";
-export const SourceTUI: RuntimeSource = "tui";
-export const SourceWeChat: RuntimeSource = "wechat";
-export const SourceFeishu: RuntimeSource = "feishu";
-export const SourceACP: RuntimeSource = "acp";
-export const SourceCLI: RuntimeSource = "cli";
-export const SourceCron: RuntimeSource = "cron";
+export const SOURCE_UNKNOWN: RuntimeSource = "";
+export const SOURCE_TUI: RuntimeSource = "tui";
+export const SOURCE_WE_CHAT: RuntimeSource = "wechat";
+export const SOURCE_FEISHU: RuntimeSource = "feishu";
+export const SOURCE_ACP: RuntimeSource = "acp";
+export const SOURCE_CLI: RuntimeSource = "cli";
+export const SOURCE_CRON: RuntimeSource = "cron";
 
-export const ModePlan = "plan";
-export const ModeAgent = "agent";
-export const ModeYolo = "yolo";
-export const ModeOS = "os";
+export const MODE_PLAN = "plan";
+export const MODE_AGENT = "agent";
+export const MODE_YOLO = "yolo";
+export const MODE_OS = "os";
 
 /** Describes the mode semantics shared by all adapters for one run. */
 export class ExecutionPolicy {
@@ -49,7 +48,7 @@ export class ExecutionPolicy {
   iterationBudget: IterationBudgetPolicy;
 
   constructor(init?: Partial<ExecutionPolicy>) {
-    this.source = init?.source ?? SourceUnknown;
+    this.source = init?.source ?? SOURCE_UNKNOWN;
     this.defaultMode = init?.defaultMode ?? "";
     this.iterationBudget = init?.iterationBudget ?? {
       soft: 0,
@@ -63,12 +62,12 @@ export class ExecutionPolicy {
 
   /** Reports whether a source has a non-overridable execution mode. */
   hasForcedMode(): boolean {
-    return this.source === SourceWeChat || this.source === SourceFeishu;
+    return this.source === SOURCE_WE_CHAT || this.source === SOURCE_FEISHU;
   }
 
   /** Returns the source-mandated mode, if any. */
   forcedMode(): string {
-    return this.hasForcedMode() ? ModeYolo : "";
+    return this.hasForcedMode() ? MODE_YOLO : "";
   }
 
   /**
@@ -94,7 +93,7 @@ export class ExecutionPolicy {
     if (requested !== "") return requested;
     if (session !== "") return session;
     let defaultMode = trimSpace(this.defaultMode);
-    if (defaultMode === "") defaultMode = ModeYolo;
+    if (defaultMode === "") defaultMode = MODE_YOLO;
     if (!isValidMode(defaultMode)) {
       throw new Error(`invalid default mode ${JSON.stringify(defaultMode)}`);
     }
@@ -136,12 +135,12 @@ export class ModeResolver {
 /** Maps persisted channel bindings to a runtime source. */
 export function sourceFromChannelType(channelType: string): RuntimeSource {
   switch (trimSpace(channelType).toLowerCase()) {
-    case SourceWeChat:
-      return SourceWeChat;
-    case SourceFeishu:
-      return SourceFeishu;
+    case SOURCE_WE_CHAT:
+      return SOURCE_WE_CHAT;
+    case SOURCE_FEISHU:
+      return SOURCE_FEISHU;
     default:
-      return SourceUnknown;
+      return SOURCE_UNKNOWN;
   }
 }
 
@@ -149,7 +148,7 @@ export function sourceFromChannelType(channelType: string): RuntimeSource {
 export function sourceFromSessionHeader(
   header: Header | null | undefined,
 ): RuntimeSource {
-  if (header === null || header === undefined) return SourceUnknown;
+  if (header === null || header === undefined) return SOURCE_UNKNOWN;
   return sourceFromChannelType(header.channelType ?? "");
 }
 
@@ -163,8 +162,8 @@ export function sourceFromSessionHeader(
  */
 export function sourceWaitsForMembers(source: RuntimeSource): boolean {
   switch (source) {
-    case SourceTUI:
-    case SourceACP:
+    case SOURCE_TUI:
+    case SOURCE_ACP:
       return true;
     default:
       return false;
@@ -182,10 +181,10 @@ export function policyForSource(
 /** Reports whether mode is one of the public execution modes. */
 export function isValidMode(mode: string): boolean {
   switch (trimSpace(mode)) {
-    case ModePlan:
-    case ModeAgent:
-    case ModeYolo:
-    case ModeOS:
+    case MODE_PLAN:
+    case MODE_AGENT:
+    case MODE_YOLO:
+    case MODE_OS:
       return true;
     default:
       return false;
@@ -200,7 +199,7 @@ export function isValidMode(mode: string): boolean {
  * protections remain mode-independent.
  */
 export function resolveUnattendedMode(sessionMode: string): string {
-  return trimSpace(sessionMode) === ModeOS ? ModeOS : ModeYolo;
+  return trimSpace(sessionMode) === MODE_OS ? MODE_OS : MODE_YOLO;
 }
 
 /**
@@ -258,22 +257,23 @@ export function resolveSource(input: SourceResolutionInput): SourceResolution {
   const header = sourceFromSessionHeader(input.sessionHeader);
 
   const result: SourceResolution = {
-    source: SourceUnknown,
+    source: SOURCE_UNKNOWN,
     conflicted: false,
     diagnostics: [],
   };
-  if (binding !== SourceUnknown) {
+  if (binding !== SOURCE_UNKNOWN) {
     result.source = binding;
-  } else if (header !== SourceUnknown) {
+  } else if (header !== SOURCE_UNKNOWN) {
     result.source = header;
-  } else if (input.current !== undefined && input.current !== SourceUnknown) {
+  } else if (input.current !== undefined && input.current !== SOURCE_UNKNOWN) {
     result.source = input.current;
   } else {
-    result.source = input.requested ?? SourceUnknown;
+    result.source = input.requested ?? SOURCE_UNKNOWN;
   }
 
   if (
-    binding !== SourceUnknown && header !== SourceUnknown && binding !== header
+    binding !== SOURCE_UNKNOWN && header !== SOURCE_UNKNOWN &&
+    binding !== header
   ) {
     result.conflicted = true;
     result.diagnostics.push(
@@ -283,8 +283,8 @@ export function resolveSource(input: SourceResolutionInput): SourceResolution {
     );
   }
   if (
-    binding !== SourceUnknown && input.current !== undefined &&
-    input.current !== SourceUnknown && binding !== input.current
+    binding !== SOURCE_UNKNOWN && input.current !== undefined &&
+    input.current !== SOURCE_UNKNOWN && binding !== input.current
   ) {
     result.conflicted = true;
     result.diagnostics.push(
@@ -294,8 +294,8 @@ export function resolveSource(input: SourceResolutionInput): SourceResolution {
     );
   }
   if (
-    header !== SourceUnknown && input.current !== undefined &&
-    input.current !== SourceUnknown && header !== input.current
+    header !== SOURCE_UNKNOWN && input.current !== undefined &&
+    input.current !== SOURCE_UNKNOWN && header !== input.current
   ) {
     result.conflicted = true;
     result.diagnostics.push(
@@ -331,13 +331,13 @@ export function resolveSourceFromSession(
 
 function isKnownRequestedSource(source: RuntimeSource): boolean {
   switch (source) {
-    case SourceTUI:
-    case SourceWeChat:
-    case SourceFeishu:
-    case SourceACP:
-    case SourceCLI:
-    case SourceCron:
-    case SourceUnknown:
+    case SOURCE_TUI:
+    case SOURCE_WE_CHAT:
+    case SOURCE_FEISHU:
+    case SOURCE_ACP:
+    case SOURCE_CLI:
+    case SOURCE_CRON:
+    case SOURCE_UNKNOWN:
       return true;
     default:
       return false;
@@ -366,7 +366,11 @@ export function resolvePolicy(
     validateSourceCandidates(input);
   } catch (err) {
     return {
-      resolution: { source: SourceUnknown, conflicted: false, diagnostics: [] },
+      resolution: {
+        source: SOURCE_UNKNOWN,
+        conflicted: false,
+        diagnostics: [],
+      },
       mode: "",
       error: asError(err),
     };
@@ -411,7 +415,7 @@ export function resolvePolicyFromSession(
     if (error instanceof SourceConflictError) {
       return {
         resolution: {
-          source: SourceUnknown,
+          source: SOURCE_UNKNOWN,
           conflicted: true,
           diagnostics: error.diagnostics,
         },
@@ -420,7 +424,11 @@ export function resolvePolicyFromSession(
       };
     }
     return {
-      resolution: { source: SourceUnknown, conflicted: false, diagnostics: [] },
+      resolution: {
+        source: SOURCE_UNKNOWN,
+        conflicted: false,
+        diagnostics: [],
+      },
       mode: "",
       error,
     };
@@ -444,7 +452,7 @@ export function validateSourceCandidates(input: SourceResolutionInput): void {
   ];
   for (const [name, source] of candidates) {
     if (
-      source !== undefined && source !== SourceUnknown &&
+      source !== undefined && source !== SOURCE_UNKNOWN &&
       !isKnownRequestedSource(source)
     ) {
       throw new Error(`unknown ${name} source ${JSON.stringify(source)}`);

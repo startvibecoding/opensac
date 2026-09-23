@@ -1,4 +1,3 @@
-// Ported from GoStreamingMarkdown parser/parser_test.go, renderer/renderer_test.go
 // and gsm/gsm_test.go. Outputs are byte-identical to the Go library for
 // well-formed Markdown and for pure-ASCII input (verified by differential
 // testing); see the note at the end of this file for the one intentional

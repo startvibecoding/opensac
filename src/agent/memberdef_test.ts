@@ -1,4 +1,4 @@
-// Translated from internal/agent/memberdef_test.go (pure cases).
+// (pure cases).
 
 import { assertEquals } from "@std/assert";
 import { type MemberDef, newMemberDefRegistry } from "./memberdef.ts";

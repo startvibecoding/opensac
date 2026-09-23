@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/windows.go
-
 import * as path from "@std/path";
 import { shellArgs } from "../platform/platform.ts";
 import type { CommandSpec, ExecOpts, Sandbox } from "./sandbox.ts";

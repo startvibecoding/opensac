@@ -1,5 +1,3 @@
-// Ported from internal/contextfiles/contextfiles.go
-
 import * as path from "@std/path";
 import { projectDirName, projectPathFor } from "../config/mod.ts";
 

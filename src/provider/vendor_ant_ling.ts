@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_ant_ling.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_ant_ling.go init() adapters. */

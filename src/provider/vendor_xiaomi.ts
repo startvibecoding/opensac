@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_xiaomi.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_xiaomi.go init() adapters. */

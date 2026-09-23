@@ -4,7 +4,7 @@
 // mutates the draft lives here so the React layer stays a thin projection and
 // the behavior is unit-testable without a TTY.
 //
-// Ported from internal/tui/input.go (history + submit), command_suggest.go
+// (history + submit), command_suggest.go
 // (dropdown), and app_paste.go (folding).
 
 import { Editor } from "./components/editor/editor.ts";

@@ -1,5 +1,3 @@
-// Ported from internal/skillhub/client_helpers.go and factory.go
-
 import { endpoint, type HttpClient, statusText } from "./http.ts";
 import type { SkillSummary } from "./types.ts";
 

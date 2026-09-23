@@ -1,5 +1,3 @@
-// Ported from internal/provider/anthropic/register.go
-
 import {
   type ModelCompat as ConfigModelCompat,
   modelMaxTokensWasSet,

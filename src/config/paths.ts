@@ -1,5 +1,3 @@
-// Ported from internal/config/paths.go
-
 import * as path from "@std/path";
 
 /** Project-level configuration directory name. */

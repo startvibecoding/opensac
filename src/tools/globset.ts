@@ -1,4 +1,3 @@
-// Ported from go-ripgrep/pkg/globset/globset.go.
 //
 // A faithful translation of the small gitignore-style glob compiler and matcher
 // the tools package uses for ignore handling and the `include` filter. Go's

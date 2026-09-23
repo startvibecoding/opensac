@@ -1,4 +1,3 @@
-// Translated from internal/agent tests covering the Agent instance model:
 // coverage_test.go (LoadHistory/GetContextUsage), max_tokens_test.go
 // (EscalatedMaxTokens), parallel_test.go (tool-execution normalization), and
 // the image-admission cases from agent_test.go (ToolResultImageCapabilityGate,

@@ -1,4 +1,4 @@
-// Ported from internal/acp/acp.go and internal/acp/extensions.go (the
+// (the
 // deterministic server-support helpers).
 //
 // This module owns the ACP pieces that do not need a live provider or Agent:
@@ -12,7 +12,10 @@
 
 import { createHash } from "node:crypto";
 import { decodeBase64Url, encodeBase64Url } from "@std/encoding/base64url";
-import { type Response as DoctorResponse, StatusError } from "../doctor/mod.ts";
+import {
+  type Response as DoctorResponse,
+  STATUS_ERROR,
+} from "../doctor/mod.ts";
 import type { Message } from "../provider/types.ts";
 import type { Manager } from "../session/manager.ts";
 import type { SessionUpdate } from "./protocol.ts";
@@ -48,7 +51,7 @@ export function startupErrorFromDoctor(
   result: DoctorResponse,
 ): ACPStartupError | null {
   for (const check of result.checks) {
-    if (check.status !== StatusError) continue;
+    if (check.status !== STATUS_ERROR) continue;
     let code = "config_invalid";
     let message = (check.detail ?? "").trim().toLowerCase();
     if (check.id === "cwd") {

@@ -1,5 +1,3 @@
-// Ported from internal/imageproc/policy.go
-
 /** Provider/vision family used to tune image limits. */
 export type Family =
   | "generic"

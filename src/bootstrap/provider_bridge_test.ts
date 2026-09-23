@@ -1,5 +1,3 @@
-// Translated from bootstrap/provider_bridge_test.go.
-
 import { assertEquals, assertNotEquals } from "@std/assert";
 import {
   type ChatParams as PublicChatParams,

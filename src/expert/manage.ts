@@ -1,5 +1,3 @@
-// Ported from internal/expert/manage.go
-
 import * as path from "@std/path";
 import { type Manifest, sourceGlobal, sourceProject } from "./expert.ts";
 import { agentsDirName, loadBundle, manifestFileName } from "./bundle.ts";
@@ -16,8 +14,8 @@ import type { Summary } from "./expert.ts";
  * have a scope: they are packaged with the binary and always read-only.
  */
 export type Scope = string;
-export const ScopeGlobal: Scope = sourceGlobal;
-export const ScopeProject: Scope = sourceProject;
+export const SCOPE_GLOBAL: Scope = sourceGlobal;
+export const SCOPE_PROJECT: Scope = sourceProject;
 
 /**
  * The editable representation of an expert bundle. Agent values are complete
@@ -125,12 +123,12 @@ export class Manager {
 
   scopeDir(scope: Scope): string {
     switch (scope) {
-      case ScopeGlobal:
+      case SCOPE_GLOBAL:
         if (this.globalDir.trim() !== "") {
           return path.normalize(this.globalDir);
         }
         return globalExpertsDir();
-      case ScopeProject: {
+      case SCOPE_PROJECT: {
         const dir = new Center(this.projectDir).projectExpertsDir();
         if (dir === "") {
           throw new Error(

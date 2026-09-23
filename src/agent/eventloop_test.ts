@@ -1,7 +1,7 @@
 // Focused tests for the event-loop consumer (port of eventloop.go).
 
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { type Event, EventAgentEnd, EventAgentStart } from "./events.ts";
+import { type Event, EVENT_AGENT_END, EVENT_AGENT_START } from "./events.ts";
 import { consumeEvents, eventHandlerFunc } from "./eventloop.ts";
 
 async function* stream(...events: Event[]): AsyncIterable<Event> {
@@ -11,12 +11,12 @@ async function* stream(...events: Event[]): AsyncIterable<Event> {
 Deno.test("consumeEvents forwards every event until the stream closes", async () => {
   const seen: number[] = [];
   await consumeEvents(
-    stream({ type: EventAgentStart }, { type: EventAgentEnd }),
+    stream({ type: EVENT_AGENT_START }, { type: EVENT_AGENT_END }),
     eventHandlerFunc((e) => {
       seen.push(e.type);
     }),
   );
-  assertEquals(seen, [EventAgentStart, EventAgentEnd]);
+  assertEquals(seen, [EVENT_AGENT_START, EVENT_AGENT_END]);
 });
 
 Deno.test("consumeEvents stops when the handler throws", async () => {
@@ -25,9 +25,9 @@ Deno.test("consumeEvents stops when the handler throws", async () => {
     () =>
       consumeEvents(
         stream(
-          { type: EventAgentStart },
-          { type: EventAgentEnd },
-          { type: EventAgentStart },
+          { type: EVENT_AGENT_START },
+          { type: EVENT_AGENT_END },
+          { type: EVENT_AGENT_START },
         ),
         eventHandlerFunc((e) => {
           seen.push(e.type);
@@ -47,7 +47,7 @@ Deno.test("consumeEvents stops on abort", async () => {
   await assertRejects(
     () =>
       consumeEvents(
-        stream({ type: EventAgentStart }),
+        stream({ type: EVENT_AGENT_START }),
         eventHandlerFunc((e) => {
           seen.push(e.type);
         }),

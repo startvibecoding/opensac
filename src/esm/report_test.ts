@@ -1,5 +1,3 @@
-// Translated from internal/esm/report_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   auditVerdictPass,

@@ -1,5 +1,3 @@
-// Ported from internal/agent/subagent_wait.go.
-
 import {
   newTextToolResult,
   type Tool,

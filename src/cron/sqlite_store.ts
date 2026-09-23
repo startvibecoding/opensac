@@ -1,4 +1,3 @@
-// Ported from internal/cron/sqlite_store.go.
 //
 // Persists cron jobs in the shared sessions.db database. Query construction
 // lives in dao.CronDAO; this type only maps persistence records to the cron

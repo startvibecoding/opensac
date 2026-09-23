@@ -1,4 +1,3 @@
-// Ported from internal/mcp/mcp.go
 //
 // Deliberate deviations from the Go original:
 //   - `context.Context` maps to `AbortSignal`; timeouts use `AbortSignal.timeout`.
@@ -29,6 +28,7 @@ import { type MCPServer } from "../config/mcp.ts";
 import {
   mcpMaxResponseBytes,
   mcpProtocolVersion,
+  parseRPCMessage,
   RPCError,
   type RPCRequest,
   rpcResponseIDKey,
@@ -287,12 +287,8 @@ export class Client {
     try {
       for await (const line of readLines(stream)) {
         if (line.trim() === "") continue;
-        let msg: RPCRequest;
-        try {
-          msg = JSON.parse(line) as RPCRequest;
-        } catch {
-          continue;
-        }
+        const msg = parseRPCMessage(line);
+        if (msg === undefined) continue;
         if ((msg.method ?? "") !== "") {
           void this.handleInboundRequest(msg);
           continue;
@@ -628,11 +624,9 @@ export class Client {
       throw new Error(`MCP response exceeds ${mcpMaxResponseBytes} bytes`);
     }
     if (text.trim() === "") return {};
-    let rpcResp: RPCRequest;
-    try {
-      rpcResp = JSON.parse(text) as RPCRequest;
-    } catch (err) {
-      throw new Error(`decode MCP response: ${(err as Error).message}`);
+    const rpcResp = parseRPCMessage(text);
+    if (rpcResp === undefined) {
+      throw new Error("decode MCP response: malformed or non-object JSON");
     }
     if (rpcResp.jsonrpc !== "2.0") {
       throw new Error(
@@ -750,12 +744,8 @@ export class Client {
         if (dataLines.length === 0) continue;
         const payload = dataLines.join("\n");
         dataLines = [];
-        let msg: RPCRequest;
-        try {
-          msg = JSON.parse(payload) as RPCRequest;
-        } catch {
-          continue;
-        }
+        const msg = parseRPCMessage(payload);
+        if (msg === undefined) continue;
         if ((msg.method ?? "") !== "") {
           void this.handleInboundRequest(msg);
           continue;
@@ -975,12 +965,8 @@ export async function parseSSECallResponse(
     if (payload.length === 0) return undefined;
     const joined = payload.join("\n");
     payload = [];
-    let rpcResp: RPCRequest;
-    try {
-      rpcResp = JSON.parse(joined) as RPCRequest;
-    } catch {
-      return undefined;
-    }
+    const rpcResp = parseRPCMessage(joined);
+    if (rpcResp === undefined) return undefined;
     if (
       rpcResp.jsonrpc !== "2.0" ||
       rpcResponseIDKey(rpcResp.id) !== String(expectID)

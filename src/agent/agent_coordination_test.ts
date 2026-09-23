@@ -1,4 +1,4 @@
-// Translated from internal/agent/agent_approval_test.go (the Agent-bound
+// (the Agent-bound
 // approval/question coordination) and internal/agent/send_event_test.go (the
 // context-aware event send).
 //
@@ -12,7 +12,7 @@ import { assert, assertEquals } from "@std/assert";
 import type { AllowConfig } from "../config/allow.ts";
 import type { ApprovalSettings } from "../config/settings.ts";
 import { EventChannel } from "./event_channel.ts";
-import { EventToolApprovalRequest } from "./events.ts";
+import { EVENT_TOOL_APPROVAL_REQUEST } from "./events.ts";
 import type { Event } from "./events.ts";
 import type { EventSink } from "./agent.ts";
 import { newAgent } from "./agent.ts";
@@ -26,7 +26,7 @@ function sinkFor(channel: EventChannel): EventSink {
 async function waitApprovalId(channel: EventChannel): Promise<string> {
   const result = await channel.next();
   assert(!result.done, "expected an approval request event");
-  assertEquals(result.value.type, EventToolApprovalRequest);
+  assertEquals(result.value.type, EVENT_TOOL_APPROVAL_REQUEST);
   const id = result.value.approvalId ?? "";
   assert(id !== "", "approval ID must be non-empty");
   return id;

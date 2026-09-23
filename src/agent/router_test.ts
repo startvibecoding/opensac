@@ -1,4 +1,4 @@
-// Translated from internal/agent/router behavior (no dedicated Go test).
+// (no dedicated Go test).
 // Unknown handlers are routed; global handlers receive every event.
 
 import { assertEquals } from "@std/assert";

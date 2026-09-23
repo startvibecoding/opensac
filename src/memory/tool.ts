@@ -1,5 +1,3 @@
-// Ported from internal/memory/tool.go
-
 import {
   newTextToolResult,
   type Tool,

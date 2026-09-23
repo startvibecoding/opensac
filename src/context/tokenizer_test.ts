@@ -1,4 +1,4 @@
-// Ported from internal/context/tokenizer_bench_test.go (the deterministic
+// (the deterministic
 // accuracy test; the Go benchmarks were not translated).
 
 import { assertEquals } from "@std/assert";

@@ -1,5 +1,3 @@
-// Ported from internal/provider/hosted_tools.go
-
 /**
  * The OpenSAC-configured search capability. It is controlled by the local
  * web-search settings/session switch.

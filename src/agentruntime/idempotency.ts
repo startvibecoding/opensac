@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/idempotency.go.
 //
 // Submission-key reconciliation against canonical started events. Go's
 // `context.Context` is dropped because the DAO layer is synchronous;

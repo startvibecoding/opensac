@@ -1,4 +1,4 @@
-// Ported from the public Go package `agent` (agent/external_tool.go).
+// (agent/external_tool.go).
 //
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`.

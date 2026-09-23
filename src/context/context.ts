@@ -1,5 +1,3 @@
-// Ported from internal/context/context.go
-
 import type { Message, Usage } from "../provider/types.ts";
 import { genericTokenEstimator, type TokenEstimator } from "./tokenizer.ts";
 

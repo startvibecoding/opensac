@@ -1,4 +1,3 @@
-// Translated from internal/mcp/mcp_sse_integration_test.go
 //
 // The legacy HTTP+SSE transport maps `httptest` + `http.Flusher` to a
 // `Deno.serve` response backed by a manually-driven `ReadableStream`.

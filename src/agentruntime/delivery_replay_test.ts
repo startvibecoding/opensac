@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/delivery_replay_test.go, plus focused
 // delivery-event coverage from delivery_events.go.
 
 import { assertEquals } from "@std/assert";

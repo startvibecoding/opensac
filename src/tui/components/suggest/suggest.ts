@@ -1,14 +1,10 @@
-// Ported from internal/tui/components/suggest/suggest.go: the autocomplete
+// the autocomplete
 // suggestion dropdown for slash commands. Prefix-matches items against the
 // current query, wraps the selection, and renders a rounded-border dropdown
 // with a scroll window centered on the cursor.
 
 import { displayWidth, truncateDisplay } from "../../formatters.ts";
-
-const DIM = "\u001B[38;5;240m";
-const ACCENT = "\u001B[38;5;86m";
-const BOLD = "\u001B[1m";
-const RESET = "\u001B[0m";
+import { ACCENT, BOLD, DIM, RESET } from "../../theme.ts";
 
 /** One autocomplete suggestion. */
 export interface SuggestItem {

@@ -1,5 +1,3 @@
-// Ported from internal/provider/discover.go
-
 import type { HttpClient } from "./http_client.ts";
 import { applyHeaders, newHttpClientWithOptions } from "./http_client.ts";
 

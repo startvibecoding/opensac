@@ -1,5 +1,3 @@
-// Ported from internal/skillhub/local.go
-
 import * as path from "@std/path";
 import type { InstalledState, Market, SkillSummary } from "./types.ts";
 

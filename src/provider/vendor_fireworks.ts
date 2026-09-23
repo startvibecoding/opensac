@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_fireworks.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_fireworks.go init() adapters. */

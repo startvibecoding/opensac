@@ -1,5 +1,3 @@
-// Ported from internal/util/path.go
-
 import * as path from "@std/path";
 
 /**

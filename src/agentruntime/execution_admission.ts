@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/execution_admission.go.
 //
 // Front-end-neutral admission/lease acquisition. A stale durable Run blocking
 // admission is reconciled through the same lease-first Runtime recovery path

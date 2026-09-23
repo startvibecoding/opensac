@@ -1,4 +1,3 @@
-// Ported from internal/agent/eventloop.go.
 //
 // Go's `<-chan Event` maps to an `AsyncIterable<Event>`; `context.Context`
 // maps to an optional `AbortSignal`.
@@ -24,7 +23,7 @@ export function eventHandlerFunc(
  * the signal aborts, or the handler throws.
  *
  * Cancellation boundary: the Agent loop's terminal events
- * (EventRunFinished/EventDone/EventError/EventAgentEnd) are sent
+ * (EVENT_RUN_FINISHED/EVENT_DONE/EVENT_ERROR/EVENT_AGENT_END) are sent
  * unconditionally, so a consumer that returns here on abort can leave a
  * cancelled run parked on one of those sends. In-process adapters that must let
  * the run finish its terminal bookkeeping keep draining the stream (the TUI

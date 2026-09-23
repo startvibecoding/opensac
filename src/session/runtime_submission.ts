@@ -1,4 +1,3 @@
-// Ported from internal/session/runtime_submission.go
 //
 // Durable admission identity for one original or retry submission. Only a
 // digest of the transport key is persisted.

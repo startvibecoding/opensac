@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/git_test.go
-
 import { assert } from "@std/assert";
 import * as path from "@std/path";
 import { gitAccessRequired, isGitDeniedPath } from "./git.ts";

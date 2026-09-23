@@ -1,4 +1,4 @@
-// Ported from internal/session/session.go (shared session error sentinels).
+// (shared session error sentinels).
 //
 // Only the sentinels needed by currently ported modules live here; the
 // remaining session.go errors move in with the Manager port.

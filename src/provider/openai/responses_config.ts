@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/responses_config.go
-
 import type { ResponsesConfig } from "../../config/mod.ts";
 import type {
   ResponsesHostedToolsConfig,

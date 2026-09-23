@@ -1,19 +1,18 @@
-// Ported from internal/tui/components/editor/editor.go: a multi-line text
+// a multi-line text
 // editor component. Enter submits (SubmitMsg), Alt+Enter / Ctrl+J insert a
 // newline. The Go original is a Bubble Tea Model; the TS projection keeps the
 // same state and view logic as a plain class with a string-keyed handler so
 // the Ink layer can map `useInput` events onto it without owning semantics.
 
 import { displayWidth } from "../../formatters.ts";
+import { DIM, RESET } from "../../theme.ts";
 import { Buffer } from "./buffer.ts";
 
 export const CURSOR_BLINK_INTERVAL_MS = 530;
 
-/** Style constants mirroring the Go lipgloss styles. */
+/** Editor-specific surface constants mirroring the Go lipgloss styles. */
 const BG = "\u001B[48;5;236m";
 const REVERSE = "\u001B[7m";
-const DIM = "\u001B[38;5;240m";
-const RESET = "\u001B[0m";
 
 export interface EditorOptions {
   width: number;

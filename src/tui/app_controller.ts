@@ -1,4 +1,4 @@
-// Ported from internal/tui/agent_events.go: the App's agent-event dispatch.
+// the App's agent-event dispatch.
 // The Go method lives on the Bubble Tea App; the TS projection splits it into
 // this controller (storage + queues + decision routing) with two injection
 // points: a `RunHandle` for the ExecutionRuntime/DecisionService bridge and
@@ -8,34 +8,34 @@ import type { Event } from "../agent/events.ts";
 import type { TaskPlan } from "../tools/tool.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
-  EventDone,
-  EventError,
-  EventHostedItem,
-  EventPlanUpdate,
-  EventQuestionRequest,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolApprovalRequest,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolResult,
-  EventTurnEnd,
-  EventTurnStart,
-  TaskCanceled,
-  TaskFailed,
-  TaskIncomplete,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_PLAN_UPDATE,
+  EVENT_QUESTION_REQUEST,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_RESULT,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
   type TaskStatus,
-  TaskSuccess,
 } from "../agent/events.ts";
 import type { RunState } from "../agentruntime/run_state.ts";
 import type { ContextUsage } from "../context/context.ts";
 import {
-  DecisionApproval,
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
   type DecisionKind,
-  DecisionQuestion,
 } from "../agentruntime/decision.ts";
 import { AgentActivityStore } from "./activity.ts";
 import { ActivityManager } from "./activity_manager.ts";
@@ -183,12 +183,12 @@ export class AppController {
     }
 
     switch (event.type) {
-      case EventTextDelta:
+      case EVENT_TEXT_DELTA:
         this.store.appendAssistantDelta(event.textDelta ?? "");
         this.#cb.scheduleRender();
         return;
 
-      case EventThinkDelta: {
+      case EVENT_THINK_DELTA: {
         const delta = event.thinkDelta ?? "";
         this.store.appendThinkDelta(delta);
         if (!this.#thinkBlockOpen) {
@@ -200,7 +200,7 @@ export class AppController {
         return;
       }
 
-      case EventHostedItem:
+      case EVENT_HOSTED_ITEM:
         if (event.hostedItem) {
           let line = "hosted item";
           if (event.hostedItem.type) line += ` [${event.hostedItem.type}]`;
@@ -210,7 +210,7 @@ export class AppController {
         this.#cb.scheduleRender();
         return;
 
-      case EventTurnStart:
+      case EVENT_TURN_START:
         // A new turn owns a fresh activity timeline (Go turn lifecycle).
         this.activityManager.clear();
         this.#thinkBlockOpen = false;
@@ -218,7 +218,7 @@ export class AppController {
         this.store.beginAssistantSlot();
         return;
 
-      case EventToolCall:
+      case EVENT_TOOL_CALL:
         if (event.toolCall) {
           this.store.appendToolExecutionStart(
             event.toolCall.id,
@@ -233,7 +233,7 @@ export class AppController {
         }
         return;
 
-      case EventToolExecutionStart:
+      case EVENT_TOOL_EXECUTION_START:
         this.store.appendToolExecutionStart(
           event.toolCallId ?? "",
           event.toolName ?? "",
@@ -246,8 +246,8 @@ export class AppController {
         );
         return;
 
-      case EventToolExecutionEnd:
-      case EventToolResult:
+      case EVENT_TOOL_EXECUTION_END:
+      case EVENT_TOOL_RESULT:
         this.store.appendToolResult({
           toolCallID: event.toolCallId ?? "",
           toolName: event.toolName,
@@ -266,7 +266,7 @@ export class AppController {
         this.#cb.scheduleRender();
         return;
 
-      case EventTurnEnd:
+      case EVENT_TURN_END:
         this.store.commitActiveStream();
         if (event.contextUsage !== undefined) {
           this.contextUsage = event.contextUsage;
@@ -278,7 +278,7 @@ export class AppController {
         this.#cb.scheduleRender();
         return;
 
-      case EventPlanUpdate:
+      case EVENT_PLAN_UPDATE:
         if (event.plan !== undefined) {
           this.#currentPlan = event.plan;
           this.#planByToolCall.set(event.toolCallId ?? "", event.plan);
@@ -286,35 +286,35 @@ export class AppController {
         this.#cb.scheduleRender();
         return;
 
-      case EventStatus:
+      case EVENT_STATUS:
         if (!event.retryStatus && event.statusMessage) {
           this.addMessage(event.statusMessage, "status");
           this.#cb.scheduleRender();
         }
         return;
 
-      case EventToolApprovalRequest:
+      case EVENT_TOOL_APPROVAL_REQUEST:
         this.#handleApprovalRequest(event);
         return;
 
-      case EventQuestionRequest:
+      case EVENT_QUESTION_REQUEST:
         this.#handleQuestionRequest(event);
         return;
 
-      case EventRunFinished:
+      case EVENT_RUN_FINISHED:
         this.#handleRunFinished(event);
         return;
 
-      case EventDone:
-      case EventError:
-        // Legacy terminal events: EventRunFinished is the single canonical
-        // terminal; EventDone/EventError after it are ignored, and EventError
+      case EVENT_DONE:
+      case EVENT_ERROR:
+        // Legacy terminal events: EVENT_RUN_FINISHED is the single canonical
+        // terminal; EVENT_DONE/EVENT_ERROR after it are ignored, and EVENT_ERROR
         // before it terminalizes the run as failed.
         if (this.runTerminalHandled) return;
         this.#handleRunFinished(
-          event.type === EventError
-            ? { ...event, type: EventRunFinished, status: TaskFailed }
-            : { ...event, type: EventRunFinished, status: TaskSuccess },
+          event.type === EVENT_ERROR
+            ? { ...event, type: EVENT_RUN_FINISHED, status: TASK_FAILED }
+            : { ...event, type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
         );
         return;
 
@@ -335,7 +335,10 @@ export class AppController {
       return;
     }
     if (this.#run) {
-      const err = this.#run.registerDecision(next.approvalID, DecisionApproval);
+      const err = this.#run.registerDecision(
+        next.approvalID,
+        DECISION_APPROVAL,
+      );
       if (err !== undefined) {
         this.addMessage(`duplicate approval request: ${err}`, "error");
         return;
@@ -393,7 +396,7 @@ export class AppController {
     if (this.#run) {
       const err = this.#run.registerDecision(
         event.questionId ?? "",
-        DecisionQuestion,
+        DECISION_QUESTION,
       );
       if (err !== undefined) {
         this.addMessage(`duplicate question request: ${err}`, "error");
@@ -454,13 +457,13 @@ export class AppController {
     if (this.#run) {
       let state: RunState = "completed";
       switch (event.status) {
-        case TaskFailed:
+        case TASK_FAILED:
           state = "failed";
           break;
-        case TaskCanceled:
+        case TASK_CANCELED:
           state = "cancelled";
           break;
-        case TaskIncomplete:
+        case TASK_INCOMPLETE:
           state = "incomplete";
           break;
       }
@@ -472,16 +475,16 @@ export class AppController {
     this.isThinking = false;
     this.store.commitActiveStream();
     switch (event.status) {
-      case TaskFailed:
+      case TASK_FAILED:
         this.addMessage(
           `Error: ${event.error?.message ?? "run failed"}`,
           "error",
         );
         break;
-      case TaskIncomplete:
+      case TASK_INCOMPLETE:
         this.addMessage("Session ended: incomplete", "warning");
         break;
-      case TaskCanceled:
+      case TASK_CANCELED:
         this.addMessage("Run canceled", "warning");
         break;
       default:

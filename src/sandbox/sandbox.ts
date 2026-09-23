@@ -1,4 +1,3 @@
-// Ported from internal/sandbox/sandbox.go
 //
 // The Go original wraps commands as `*exec.Cmd`; Deno has no such type, so a
 // `CommandSpec` descriptor is returned instead and the caller spawns it.

@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/execution_test.go,
 // execution_events_test.go, execution_persistence_test.go, and the durable
 // portions of execution_observation_test.go.
 //
@@ -9,24 +8,24 @@
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import {
   type Event as AgentEvent,
-  EventRetry,
-  EventRunFinished,
-  EventTextDelta,
-  EventToolExecutionStart,
-  TaskError,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_TEXT_DELTA,
+  EVENT_TOOL_EXECUTION_START,
+  TASK_ERROR,
 } from "../agent/events.ts";
-import { RetryDecisionRequired, SideEffectUnknown } from "./error_info.ts";
+import { RETRY_DECISION_REQUIRED, SIDE_EFFECT_UNKNOWN } from "./error_info.ts";
 import { ExecutionRuntime } from "./execution.ts";
 import { type RunEvent, type RunEventSink } from "./run_event.ts";
 import { type DurableRun, type DurableRunStore } from "./run_store.ts";
 import {
+  RUN_STATE_CANCELLED,
+  RUN_STATE_CANCELLING,
+  RUN_STATE_COMPLETED,
+  RUN_STATE_FAILED,
+  RUN_STATE_RUNNING,
+  RUN_STATE_WAITING_APPROVAL,
   type RunState,
-  RunStateCancelled,
-  RunStateCancelling,
-  RunStateCompleted,
-  RunStateFailed,
-  RunStateRunning,
-  RunStateWaitingApproval,
 } from "./run_state.ts";
 
 function makeRun(partial: Partial<DurableRun>): DurableRun {
@@ -149,7 +148,7 @@ Deno.test("execution runtime exclusive begin and finish", () => {
   assert(ctx.aborted);
   runtime.finish("run-1");
   assert(!runtime.active().active);
-  assertEquals(runtime.stateValue(), RunStateCompleted);
+  assertEquals(runtime.stateValue(), RUN_STATE_COMPLETED);
   runtime.begin(undefined, "run-2");
 });
 
@@ -157,20 +156,20 @@ Deno.test("execution runtime cancel needs explicit terminal state", () => {
   const runtime = new ExecutionRuntime();
   const ctx = runtime.begin(undefined, "run-1");
   assert(runtime.cancel());
-  assertEquals(runtime.stateValue(), RunStateCancelling);
+  assertEquals(runtime.stateValue(), RUN_STATE_CANCELLING);
   assert(ctx.aborted);
-  runtime.finishWithState("run-1", RunStateCancelled);
-  assertEquals(runtime.stateValue(), RunStateCancelled);
+  runtime.finishWithState("run-1", RUN_STATE_CANCELLED);
+  assertEquals(runtime.stateValue(), RUN_STATE_CANCELLED);
 });
 
 Deno.test("execution runtime wait and resume", () => {
   const runtime = new ExecutionRuntime();
   runtime.begin(undefined, "run-1");
-  assertEquals(runtime.stateValue(), RunStateRunning);
+  assertEquals(runtime.stateValue(), RUN_STATE_RUNNING);
   runtime.waitForApproval("run-1");
-  assertEquals(runtime.stateValue(), RunStateWaitingApproval);
+  assertEquals(runtime.stateValue(), RUN_STATE_WAITING_APPROVAL);
   runtime.resume("run-1");
-  assertEquals(runtime.stateValue(), RunStateRunning);
+  assertEquals(runtime.stateValue(), RUN_STATE_RUNNING);
   assertThrows(() => runtime.waitForQuestion("other"));
   runtime.finish("run-1");
 });
@@ -178,9 +177,9 @@ Deno.test("execution runtime wait and resume", () => {
 Deno.test("execution runtime explicit terminal states", () => {
   const runtime = new ExecutionRuntime();
   runtime.begin(undefined, "run-1");
-  runtime.finishWithState("run-1", RunStateFailed);
-  assertEquals(runtime.stateValue(), RunStateFailed);
-  assertThrows(() => runtime.finishWithState("run-1", RunStateCompleted));
+  runtime.finishWithState("run-1", RUN_STATE_FAILED);
+  assertEquals(runtime.stateValue(), RUN_STATE_FAILED);
+  assertThrows(() => runtime.finishWithState("run-1", RUN_STATE_COMPLETED));
 });
 
 Deno.test("execution runtime finish ignores different run", () => {
@@ -204,7 +203,7 @@ Deno.test("execution runtime begin and finish with events", () => {
     model: "",
     mode: "",
   });
-  runtime.finishWithEvent("run-1", RunStateCompleted, {
+  runtime.finishWithEvent("run-1", RUN_STATE_COMPLETED, {
     sessionId: "session-1",
     runId: "",
     eventType: "finished",
@@ -225,11 +224,11 @@ Deno.test("execution runtime wait sees terminal transition", async () => {
   runtime.begin(undefined, "run-wait");
   const finished = (async () => {
     await new Promise((r) => setTimeout(r, 10));
-    runtime.finishWithState("run-wait", RunStateCompleted);
+    runtime.finishWithState("run-wait", RUN_STATE_COMPLETED);
   })();
   await runtime.wait();
   await finished;
-  assertEquals(runtime.stateValue(), RunStateCompleted);
+  assertEquals(runtime.stateValue(), RUN_STATE_COMPLETED);
 });
 
 Deno.test("execution runtime begin durable uses atomic start store", () => {
@@ -280,7 +279,7 @@ Deno.test("execution runtime durable lifecycle", () => {
     model: "",
     mode: "",
   });
-  runtime.finishDurable("run-1", RunStateCompleted, "", {
+  runtime.finishDurable("run-1", RUN_STATE_COMPLETED, "", {
     sessionId: run.sessionId,
     runId: "",
     eventType: "finished",
@@ -291,10 +290,10 @@ Deno.test("execution runtime durable lifecycle", () => {
   });
   assertEquals(store.created.length, 1);
   assertEquals(store.finished.length, 1);
-  assertEquals(store.finished[0].state, RunStateCompleted);
+  assertEquals(store.finished[0].state, RUN_STATE_COMPLETED);
   assertEquals(sink.events.length, 2);
   assertEquals(sink.events[0].runId, "run-1");
-  assertEquals(sink.events[1].status, RunStateCompleted);
+  assertEquals(sink.events[1].status, RUN_STATE_COMPLETED);
 });
 
 Deno.test("execution runtime update durable persists running", () => {
@@ -314,15 +313,15 @@ Deno.test("execution runtime update durable persists running", () => {
       mode: "",
     },
   );
-  runtime.updateDurable("run-1", RunStateRunning, "remote started");
-  assertEquals(runtime.stateValue(), RunStateRunning);
+  runtime.updateDurable("run-1", RUN_STATE_RUNNING, "remote started");
+  assertEquals(runtime.stateValue(), RUN_STATE_RUNNING);
   assertEquals(store.finished.length, 1);
-  assertEquals(store.finished[0].state, RunStateRunning);
+  assertEquals(store.finished[0].state, RUN_STATE_RUNNING);
 });
 
 Deno.test("execution runtime update durable rejects terminal state", () => {
   const runtime = new ExecutionRuntime();
-  assertThrows(() => runtime.updateDurable("run-1", RunStateCompleted, ""));
+  assertThrows(() => runtime.updateDurable("run-1", RUN_STATE_COMPLETED, ""));
 });
 
 Deno.test("execution runtime cancel durable persists cancelling", () => {
@@ -344,7 +343,7 @@ Deno.test("execution runtime cancel durable persists cancelling", () => {
   );
   assert(runtime.cancelDurable("requested"));
   assertEquals(store.finished.length, 1);
-  assertEquals(store.finished[0].state, RunStateCancelling);
+  assertEquals(store.finished[0].state, RUN_STATE_CANCELLING);
 });
 
 Deno.test("execution runtime durable begin compensates create failure", () => {
@@ -368,7 +367,7 @@ Deno.test("execution runtime durable begin compensates create failure", () => {
     )
   );
   assert(!runtime.active().active);
-  assertEquals(runtime.stateValue(), RunStateFailed);
+  assertEquals(runtime.stateValue(), RUN_STATE_FAILED);
 });
 
 Deno.test("execution runtime intent admission and linked retry", () => {
@@ -403,7 +402,7 @@ Deno.test("execution runtime intent admission and linked retry", () => {
     model: "",
     mode: "",
   });
-  runtime.finishDurable("run-1", RunStateFailed, "failed", {
+  runtime.finishDurable("run-1", RUN_STATE_FAILED, "failed", {
     sessionId: "session-1",
     runId: "",
     eventType: "failed",
@@ -461,7 +460,7 @@ Deno.test("execution runtime observe agent event persists retry and safe termina
   });
 
   const observed = runtime.observeAgentEvent({
-    type: EventRetry,
+    type: EVENT_RETRY,
     retryAttempt: 2,
     retryMaxAttempts: 3,
     retryAfterMs: 1200,
@@ -484,27 +483,27 @@ Deno.test("execution runtime observe agent event persists retry and safe termina
   assert(retryInfo.message.includes("[redacted]"));
   assertEquals(sink.events.length, 2);
   assertEquals(sink.events[1].eventType, "run_retrying");
-  assertEquals(sink.events[1].status, RunStateRunning);
+  assertEquals(sink.events[1].status, RUN_STATE_RUNNING);
   const dataText = sink.events[1].data as string;
   assert(dataText.includes(`"message":`));
   assert(!dataText.includes("sk-secret-123"));
 
   runtime.observeAgentEvent({
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     textDelta: "partial answer",
   } as AgentEvent);
   runtime.observeAgentEvent({
-    type: EventToolExecutionStart,
+    type: EVENT_TOOL_EXECUTION_START,
     toolName: "bash",
   } as AgentEvent);
   const terminal = runtime.observeAgentEvent({
-    type: EventRunFinished,
-    status: TaskError,
+    type: EVENT_RUN_FINISHED,
+    status: TASK_ERROR,
     error: new Error("HTTP 503 provider returned secret diagnostic"),
   } as AgentEvent);
   assert(terminal.error !== undefined);
-  assertEquals(terminal.error!.retryMode, RetryDecisionRequired);
-  assertEquals(terminal.error!.sideEffectState, SideEffectUnknown);
+  assertEquals(terminal.error!.retryMode, RETRY_DECISION_REQUIRED);
+  assertEquals(terminal.error!.sideEffectState, SIDE_EFFECT_UNKNOWN);
   assert(terminal.error!.partialOutput === true);
   assertEquals(
     terminal.error!.message,
@@ -542,13 +541,13 @@ Deno.test("execution runtime shutdown persists terminal event and is idempotent"
   });
   await runtime.shutdown("process stopped");
   await runtime.shutdown("process stopped again");
-  assertEquals(runtime.stateValue(), RunStateCancelled);
+  assertEquals(runtime.stateValue(), RUN_STATE_CANCELLED);
   assertEquals(store.finished.length, 1);
-  assertEquals(store.finished[0].state, RunStateCancelled);
+  assertEquals(store.finished[0].state, RUN_STATE_CANCELLED);
   assert(!store.finished[0].message.includes("process stopped"));
   assertEquals(sink.events.length, 2);
   assertEquals(sink.events[1].eventType, "finished");
-  assertEquals(sink.events[1].status, RunStateCancelled);
+  assertEquals(sink.events[1].status, RUN_STATE_CANCELLED);
   const data = sink.events[1].data as {
     errorInfo: { code: string; message: string };
   };
@@ -570,7 +569,7 @@ Deno.test("execution runtime shutdown waits for bound agent loop", async () => {
       else ctx.addEventListener("abort", () => resolve(), { once: true });
     });
     while (!release) await new Promise((r) => setTimeout(r, 5));
-    runtime.finishWithState("run-shutdown", RunStateCancelled);
+    runtime.finishWithState("run-shutdown", RUN_STATE_CANCELLED);
   })();
 
   await assertRejects(
@@ -584,5 +583,5 @@ Deno.test("execution runtime shutdown waits for bound agent loop", async () => {
   await runtime.shutdownContext(undefined, "shutdown requested");
   await finished;
   assert(!runtime.active().active);
-  assertEquals(runtime.stateValue(), RunStateCancelled);
+  assertEquals(runtime.stateValue(), RUN_STATE_CANCELLED);
 });

@@ -1,5 +1,3 @@
-// Ported from internal/dao/channel_tools_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { BindingDAO, type ChannelToolRecord, SessionDAO } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";

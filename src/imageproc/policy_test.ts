@@ -1,5 +1,3 @@
-// Ported from internal/imageproc/policy_test.go
-
 import { assertEquals } from "@std/assert";
 import { type Family, type Hint, inferFamily, policyForHint } from "./mod.ts";
 

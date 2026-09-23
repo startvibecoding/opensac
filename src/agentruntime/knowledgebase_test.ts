@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/knowledgebase_test.go.
 //
 // Includes the model Indexer/Librarian enrichment cases now that the
 // `SessionRuntime` resource assembly is ported: the verified co-mention edge
@@ -42,8 +41,8 @@ import {
 import { knowledgeLibrarianSessionIDForBase } from "./knowledge_librarian.ts";
 import { maxKnowledgeCapsuleChars } from "./knowledge_context.ts";
 import { attachSessionResources } from "./attach.ts";
-import { RunStateCompleted } from "./run_state.ts";
-import { ModeYolo, SourceACP } from "./source.ts";
+import { RUN_STATE_COMPLETED } from "./run_state.ts";
+import { MODE_YOLO, SOURCE_ACP } from "./source.ts";
 import {
   defaultKnowledgeBaseIndexPolicy,
   type KnowledgeBaseProviderFactory,
@@ -490,7 +489,7 @@ Deno.test(
       preprocessProfile: "documents",
       provider: "indexer",
       model: model.id,
-      mode: ModeYolo,
+      mode: MODE_YOLO,
       schedule: "manual",
       enabled: true,
     });
@@ -528,7 +527,7 @@ Deno.test(
       const run = getSessionRun(sessionDir, snapshot.runId ?? "");
       assert(run !== null, "index Run missing");
       assertEquals(run!.model, model.id);
-      assertEquals(run!.status, RunStateCompleted);
+      assertEquals(run!.status, RUN_STATE_COMPLETED);
 
       const reused = await service.index(undefined, base.id);
       assertEquals(reused.id, snapshot.id);
@@ -589,7 +588,7 @@ Deno.test(
       preprocessProfile: "documents",
       provider: "librarian",
       model: model.id,
-      mode: ModeYolo,
+      mode: MODE_YOLO,
       schedule: "manual",
       enabled: true,
     });
@@ -605,8 +604,8 @@ Deno.test(
     callerManager.init();
     const caller = await attachSessionResources({
       id: callerManager.getHeader()!.id,
-      source: SourceACP,
-      entrySource: SourceACP,
+      source: SOURCE_ACP,
+      entrySource: SOURCE_ACP,
       workDir: callerWorkDir,
       manager: callerManager,
       registry: newRegistry(callerWorkDir, undefined),
@@ -614,7 +613,7 @@ Deno.test(
       settings: { ...defaultSettings(), sessionDir },
     });
     try {
-      caller.configureSession(mock, "librarian", model, ModeYolo, "");
+      caller.configureSession(mock, "librarian", model, MODE_YOLO, "");
       const capsule = await service.librarianCapsule(
         undefined,
         caller,
@@ -639,7 +638,7 @@ Deno.test(
           "librarian Run incorrectly used caller session or has no identity",
         );
         if (run.model === model.id) {
-          librarianRunFound = run.status === RunStateCompleted;
+          librarianRunFound = run.status === RUN_STATE_COMPLETED;
         }
       }
       assert(

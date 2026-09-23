@@ -1,4 +1,3 @@
-// Ported from internal/cron/maintenance.go.
 //
 // This module owns the projection helpers that keep Runtime-owned maintenance
 // jobs out of user-facing cron surfaces. The scheduler-bound half of the Go file

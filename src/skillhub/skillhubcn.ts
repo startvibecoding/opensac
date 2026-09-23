@@ -1,5 +1,3 @@
-// Ported from internal/skillhub/skillhubcn.go
-
 import {
   boundedLimit,
   download as downloadStream,

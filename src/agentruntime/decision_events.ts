@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/decision_events.go.
 //
 // Decision ledger: adapters persist each approval/question transition as a run
 // event whose type is `decisionEventType(status)` and whose Data carries the
@@ -25,18 +24,18 @@ import {
 import { type RunEvent, type RunEventSink } from "./run_event.ts";
 
 /** Decision statuses recorded in the durable ledger. */
-export const DecisionStatusPending = "pending";
-export const DecisionStatusRequested = "requested";
-export const DecisionStatusResolved = "resolved";
-export const DecisionStatusCancelled = "cancelled";
-export const DecisionStatusTimedOut = "timed_out";
+export const DECISION_STATUS_PENDING = "pending";
+export const DECISION_STATUS_REQUESTED = "requested";
+export const DECISION_STATUS_RESOLVED = "resolved";
+export const DECISION_STATUS_CANCELLED = "cancelled";
+export const DECISION_STATUS_TIMED_OUT = "timed_out";
 
 /**
  * The canonical record-source label adapters project for decision entries
  * (trajectory windows, transcript filters). Owned here so no adapter
  * re-spells the envelope vocabulary.
  */
-export const DecisionRecordSource = "decision";
+export const DECISION_RECORD_SOURCE = "decision";
 
 /**
  * The minimal durable decision envelope: the record under the canonical key.
@@ -74,7 +73,7 @@ export function newDecisionRecord(
   payload: unknown,
   expiresAt?: Date,
 ): DecisionRecord {
-  if (status === DecisionStatusPending) {
+  if (status === DECISION_STATUS_PENDING) {
     return newDecisionRequestRecordWithDeadline(request, payload, expiresAt);
   }
   return newDecisionResolutionRecord(

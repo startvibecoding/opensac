@@ -1,4 +1,3 @@
-// Ported from internal/imageproc/imageproc.go
 //
 // Unlike the Go original, decoding/encoding goes through npm codecs
 // (`imagescript` for PNG/JPEG/GIF + resize/crop/encode, `@jsquash/webp` for

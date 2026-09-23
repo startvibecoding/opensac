@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/durable_ops.go.
 //
 // Runtime-owned entry points for canonical Run lifecycle transitions when no
 // live `ExecutionRuntime` is available. All persistence is delegated to

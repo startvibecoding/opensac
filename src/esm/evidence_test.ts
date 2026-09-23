@@ -1,5 +1,3 @@
-// Translated from internal/esm/evidence_test.go
-
 import { assertEquals } from "@std/assert";
 import {
   type Event,

@@ -1,4 +1,3 @@
-// Ported from internal/stats/dashboard.go
 //
 // Go `go:embed` maps to runtime reads of the same files next to this module;
 // `deno compile --include src/stats/dashboard.html` (etc.) embeds them so the

@@ -1,5 +1,3 @@
-// Ported from internal/provider/image_coordinates.go
-
 import type { ImageContent } from "./types.ts";
 
 /**

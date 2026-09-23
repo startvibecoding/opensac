@@ -1,5 +1,3 @@
-// Ported from internal/db/repair.go
-
 /** Records a secondary index src/db rebuilt while opening a database. */
 export interface IndexRepair {
   /** The canonical database path whose indexes were rebuilt. */

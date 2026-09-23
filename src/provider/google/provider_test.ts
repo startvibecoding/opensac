@@ -1,4 +1,3 @@
-// Ported from internal/provider/google/provider_test.go
 //
 // Deviation: the Go tests inject a custom http.RoundTripper via `p.client`.
 // This port injects a fake `HttpClient` and builds plain Response-like objects
@@ -202,7 +201,7 @@ Deno.test("GoogleRetriesEarlyStreamReadError", async () => {
     if (e.type === streamRetry) retryEvent = e;
     if (e.type === streamDone) sawDone = true;
     if (e.type === streamError) {
-      throw new Error(`unexpected StreamError: ${e.error}`);
+      throw new Error(`unexpected STREAM_ERROR: ${e.error}`);
     }
   }
   assert(retryEvent !== undefined && sawDone);

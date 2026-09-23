@@ -1,5 +1,3 @@
-// Ported from internal/workflow/skill_test.go.
-
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import { ensureProjectSkill, skillName } from "./skill.ts";

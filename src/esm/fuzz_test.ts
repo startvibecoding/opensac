@@ -1,4 +1,3 @@
-// Translated from internal/esm/report_fuzz_test.go
 //
 // Deno ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
 // property test over the same seeds plus generated inputs.

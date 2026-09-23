@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor.go
-
 import type { ProviderConfig } from "../config/mod.ts";
 
 /** AdapterConfig is the provider configuration after vendor defaults are applied. */

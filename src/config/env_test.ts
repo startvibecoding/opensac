@@ -1,4 +1,4 @@
-// Ported from internal/config/env.go (the Go package ships no env test, so these
+// (the Go package ships no env test, so these
 // cover the ported behaviour directly).
 
 import { assert, assertEquals, assertThrows } from "@std/assert";

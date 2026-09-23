@@ -1,10 +1,9 @@
-// Ported from internal/dao/database.go
 //
 // The DAO-facing handle to a managed connection plus the small SQL helpers the
 // DAO modules use. Managed connection ownership belongs exclusively to src/db.
 
 import type { SQLInputValue } from "node:sqlite";
-import { type DB, runInTx } from "../db/mod.ts";
+import { type DB, recordQueryTiming, runInTx } from "../db/mod.ts";
 
 /**
  * Sentinel matching Go's `sql.ErrNoRows`. DAO methods throw this exact object
@@ -96,13 +95,23 @@ export function wrapStandaloneDatabase(db: DB | null): Database | null {
   return new Database(db, false);
 }
 
+/** Runs `fn` and records its wall time against the slow-query baseline. */
+function timed<T>(sql: string, fn: () => T): T {
+  const started = performance.now();
+  try {
+    return fn();
+  } finally {
+    recordQueryTiming(sql, performance.now() - started);
+  }
+}
+
 /** Runs a query and returns every row. */
 export function queryAll<T = Row>(
   db: DB,
   sql: string,
   params: Param[] = [],
 ): T[] {
-  return db.query<T>(sql, ...params);
+  return timed(sql, () => db.query<T>(sql, ...params));
 }
 
 /**
@@ -114,7 +123,7 @@ export function queryOne<T = Row>(
   sql: string,
   params: Param[] = [],
 ): T {
-  const row = db.get<T>(sql, ...params);
+  const row = timed(sql, () => db.get<T>(sql, ...params));
   if (row === undefined) throw ErrNoRows;
   return row;
 }
@@ -125,12 +134,12 @@ export function queryOptional<T = Row>(
   sql: string,
   params: Param[] = [],
 ): T | undefined {
-  return db.get<T>(sql, ...params) ?? undefined;
+  return timed(sql, () => db.get<T>(sql, ...params)) ?? undefined;
 }
 
 /** Runs a statement and returns `changes`, mapping 0/undefined to 0. */
 export function execChanges(db: DB, sql: string, params: Param[] = []): number {
-  const result = db.run(sql, ...params);
+  const result = timed(sql, () => db.run(sql, ...params));
   return Number(result.changes ?? 0);
 }
 
@@ -140,7 +149,7 @@ export function execReturning<T>(
   sql: string,
   params: Param[] = [],
 ): T {
-  const row = db.get<Record<string, unknown>>(sql, ...params);
+  const row = timed(sql, () => db.get<Record<string, unknown>>(sql, ...params));
   if (row === undefined) throw ErrNoRows;
   const values = Object.values(row);
   return values[0] as T;

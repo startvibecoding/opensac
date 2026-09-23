@@ -1,4 +1,3 @@
-// Ported from internal/browser/browser.go.
 //
 // The opensac `browser` tool: it controls a Chromium-family browser through the
 // ported vibe-browser SDK. Registration helpers mirror the Go package.
@@ -29,9 +28,9 @@ import { Client, type Options } from "./client.ts";
 import type { Cookie, HTMLOptions, ScreenshotOptions } from "./protocol.ts";
 
 /** The tool name registered with the shared registry. */
-export const ToolName = "browser";
+export const TOOL_NAME = "browser";
 /** The built-in skill that documents the tool. */
-export const SkillName = "vibe-browser";
+export const SKILL_NAME = "vibe-browser";
 const defaultViewportWidth = 1920;
 const defaultViewportHeight = 1080;
 
@@ -44,13 +43,13 @@ export function registerTool(registry: Registry | undefined): void {
 /** Removes the browser tool from a registry. */
 export function removeTool(registry: Registry | undefined): void {
   if (!registry) return;
-  registry.remove(ToolName);
+  registry.remove(TOOL_NAME);
 }
 
 /** Reports whether the browser tool is registered. */
 export function isToolRegistered(registry: Registry | undefined): boolean {
   if (!registry) return false;
-  return registry.get(ToolName) !== undefined;
+  return registry.get(TOOL_NAME) !== undefined;
 }
 
 /** The browser tool. */
@@ -63,7 +62,7 @@ export class BrowserTool implements Tool {
   }
 
   name(): string {
-    return ToolName;
+    return TOOL_NAME;
   }
 
   description(): string {

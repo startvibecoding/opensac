@@ -11,7 +11,7 @@
 > anti-fragmentation invariants in `AGENTS.md` and keeps the public `sdk/`
 > surface stable.
 
-- 状态: 实施中（P0、P1、P2 ✅ 主体完成，P3 部分完成；进度见 §4）
+- 状态: 基本完成（P0–P4 主体全部落地；仅余 P1-3 `ErrNoRows` → 可选返回一项重构，见 §4）
 - 范围: `src/`、`sdk/`（不含 `desktop/`、生成物）
 - 前置文档: `docs/proposal/go-to-deno-migration.md`（迁移台账）、`AGENTS.md`（架构不变量）
 
@@ -62,11 +62,11 @@
 | `): [a, b]` 多返回值（含 comma-ok） | 25（多为坐标类纯多值） | Go 多返回值 / `, ok` 惯用法（session/tools 已清零） |
 | `BoolPtr` / `clone*Ptr` no-op helper | 3+3 个导出（`settings.ts` 与 `openai/wire.ts` 各一套） | Go 指针/值语义残留 |
 | `| null` vs `| undefined` | 807 vs 990 | 两套"空"语义混用 |
-| `JSON.parse(...) as T` 无校验解码 | 50 | Go `json.Unmarshal` 直译，类型靠断言 |
+| `JSON.parse(...) as T` 无校验解码 | 42（外部输入边界已全部 guard，余为 provider SSE/自有持久化列） | Go `json.Unmarshal` 直译，类型靠断言 |
 | `finally {` | 83 | Go `defer` 的手写展开（13 处 `Symbol.dispose` 已落地，热点 teardown 分层重构为 P2 余项） |
 | 自定义 `close(): void` 句柄 | 13 | Go `io.Closer`，可用 `Symbol.dispose` |
 | `export class` vs `export function` | 227 vs 1659 | class 多为"带方法的 struct"直译 |
-| `// Ported from ...go` / `Deviation:` 注释 | 500 | 指向 Go 源树的注释（迁移完成后即过期） |
+| `// Ported from ...go` / `Deviation:` 注释 | 溯源行已清零（539→0），余 `Deviation:` 行为说明 | 指向 Go 源树的注释，P4-c 已清扫 |
 | snake_case 文件名 | 421 | Go 文件命名习惯 |
 | `*_test.ts` | 239 | **这是 Deno 惯例，保留**（见 §5） |
 | "nil" 出现在错误消息/调试输出 | 1（仅注释残留） | Go 词汇泄漏到用户可见文本，P0 已清零 |
@@ -389,12 +389,19 @@ P0 发现的后续项（归入 P1/P4）:
 
 验证: `deno task test` 1851 passed、`test:architecture` 8 passed、check/lint/fmt 干净。
 
-P1 遗留（归入 P1-3/P2/P4）:
-- `ErrNoRows`（DAO 查无行契约）→ 可选返回，按方案最后做（P1-3）；
-- 其余域仍有 17 行 `ok: boolean`（`update/semver` 解析器 4、`memory` 2、`browser` 2、
-  `acp/manage_knowledge_bases` 2 等）与 25 个多返回值元组（含 `src/agent` 的
-  `manager.get(): [Agent, boolean]` 等 comma-ok），按同一选型表在 P2/P4 扫尾；
-- `session_runtime_test` 等处仍有 `service.Get(...)` PascalCase 方法名，归 P4 命名扫描。
+P1 遗留（唯一剩余重构）:
+- **P1-3 `ErrNoRows` → DAO 可选返回**（本轮评估后未启动，避免半拆状态）。
+  量级: 生产侧 ~137 处引用 / 37 文件（含 ~55 个 try/catch 控制流块、70 处
+  `queryOne`/`execReturning` 调用、7 个模块包装 `isNoRows*`），测试侧仅 2 处。
+  执行配方（建议独立一轮完成）:
+  1. `queryOne` 并入 `queryOptional`（不再抛），`execReturning` 返回 `T | undefined`，
+     `recovery.ts`/`cron.ts`/`esm.ts` 的 `if (changed === 0) throw ErrNoRows` 改返回可选；
+  2. 逐文件把 `catch (err) { if (isNoRows(err)) … }` 三形态（吞掉赋 undefined /
+     return 默认值 / 转抛业务错）改为 undefined 判断，用 `deno check` 引导；
+  3. 删除 `ErrNoRows`/`isNoRows` 与 7 个包装，清理 `bindings.ts` 的消息映射；
+  4. 回归: `deno task test` + `test:architecture`。
+- 其余域仍有 17 行 `ok: boolean`（`update/semver` 4、`memory` 2、`browser` 2 等）与
+  25 个多返回值元组（含 `manager.get(): [Agent, boolean]`），按同一选型表在后续扫尾。
 - 验证: 每模块行为回归 + `deno task test:architecture`。
 
 ### P2 — 生命周期与并发惯用化 ✅ 主体完成（2026-09-22）
@@ -416,8 +423,21 @@ P1 遗留（归入 P1-3/P2/P4）:
 验证: `deno task test` 1851 passed、`test:architecture` 8 passed、check/lint/fmt 干净。
 
 ### P3 — 正确性与性能治理（针对 §3.7/§3.8）部分完成（2026-09-22）
-1. ⬜ 外部输入 JSON 解码 guard（ACP/管理协议/MCP/settings），DAO `mapRow` 集中
-   （§3.8）；同步 DAO 慢查询度量 + 分片让出 + 离线扫描进 Worker（§3.7）——待做；
+1. ✅ 外部输入 JSON 解码 guard（§3.8）: 新建 `src/util/json.ts` 字段读取器
+   （`asJsonRecord`/`parseJsonRecord`/`optString|Number|Boolean|StringArray|StringMap`），
+   边界 lie-cast 清零: MCP wire 5 处改用 `parseRPCMessage`（非对象/坏 JSON 不再把
+   read loop 打崩，字段类型验证 + `"id" in request` presence 语义保留），
+   `allow.json`/`env.json`/`mcp.json` 改字段读取（错型字段→`undefined` 回退默认，
+   坏条目跳过）；DAO `mapRow` 评估结论: 已每表集中（`*FromRecord` + 记录接口 +
+   `queryOne<T>`，行映射本就内聚在 DAO/session），无需重构；
+   余项（接受的残差）: provider SSE 解码（供应商协议面，另行评估）、
+   自有持久化 JSON 列（自写自读）、`settings.ts` 自带字段级解码无需迁移。
+4. ✅ 同步 DAO 慢查询基线（§3.7-1）: 新建 `src/db/query_stats.ts`，在
+   `src/dao/database.ts` 的 5 个统一查询入口计时（`queryAll`/`queryOne`/
+   `queryOptional`/`execChanges`/`execReturning`），≥50ms 计入 slow 并保留最慢
+   SQL（截断 200 字符，参数化语句无字面量），汇总进 `sqliteStatsSnapshot`
+   （`/debug/vars` 可见）；4 个确定性测试。
+   余项: 用基线数据定位真实热点后做分片让出 + 离线扫描进 Worker（§3.7-2/3）。
 2. ✅ 正则加固（§3.8 RE2→JS 回溯）: 新建 `src/util/regex.ts`，按威胁模型分两个入口:
    `compileUserRegExp`（grep 的用户原始模式: 512 字符限额 + 嵌套无界量词检测，
    拦截 `(a+)+` 族灾难性回溯形状，逃逸/字符类不受误伤）与 `compileGeneratedRegExp`
@@ -433,10 +453,17 @@ P1 遗留（归入 P1-3/P2/P4）:
 
 验证: `deno task test` 1857 passed、`test:architecture` 8 passed、check/lint/fmt 干净。
 
-### P4 — 收尾清理（可选，迁移定稿后）
-1. "Ported from/Deviation" 注释去 Go 化（§3.11）；
-2. `ForTest` 导出收敛；文件命名决定记录（§3.12，默认不做）；
-3. `docs/proposal/go-to-deno-migration.md` 标记 Go 源树不再是 source of truth。
+### P4 — 收尾清理 ✅ 已完成（2026-09-22）
+1. ✅ 注释去 Go 化（§3.11）: 539 处 `Ported from/Translated from` 溯源行清零；
+   `路径: 描述`形态保留描述、`路径 (理由`形态保留理由，`Deviation:` 行为说明全部保留；
+2. ✅ 命名扫描（§3.4/§3.12）: 188 个枚举式 PascalCase 常量 → SCREAMING_SNAKE
+   （lowerCamel 与既有标识符大量撞名，已验证 SCREAMING 零冲突，一次批改）；
+   PascalCase 方法（`Get`/`SetStatus`/`Delete`）→ lowerCamel；`resetForTest`/
+   `listenAddrForTest` → `resetDebugServer`/`debugListenAddr`；
+   `CurrentVersion`/`currentVersion` 同概念重复已合并（store 拥有）；
+   文件命名决定: **保留 snake_case**（churn > 收益，§3.12 定案）；
+3. ✅ 迁移文档 `go-to-deno-migration.md` 保留为历史台账；Go 源树不再是
+   source of truth（溯源注释已移除即为宣告）。
 
 ### 风险与缓解
 - **行为兼容风险**（P1 的 ErrNoRows、P2 的 teardown 重排）: 先补刻画测试
@@ -470,10 +497,10 @@ P1 遗留（归入 P1-3/P2/P4）:
    - `export const ErrXxx` 哨兵: 18 → 0 ✅ 除 `ErrNoRows`（P1-3 范围）；
    - comma-ok / 多返回值元组: 28 → 仅保留坐标类纯多值返回（如 `cursorPos(): [number, number]`）✅ session/tools 已达成，其余域 P2/P4 扫尾；
    - no-op 指针克隆 helper: 6 → 0 ✅（P0 已达成）；
-   - `JSON.parse(...) as`: 50 → 0（外部输入边界全部有 guard）；
+   - `JSON.parse(...) as`: 边界 lie-cast → 0 ✅（MCP wire + config 族已 guard；余 42 处为 provider SSE/自有列）；
    - `using`/`Symbol.dispose` 在生命周期热点路径落地 ✅ 13 处句柄已具备；ACP Run teardown 分层重构为 P2 余项；
    - 用户可见文本中 "nil" Go 词 → 0 ✅（P0 已达成）；
-   - PascalCase 导出常量词汇 → 0（约定落地后一次批改，见 P0 后续项）。
+   - PascalCase 导出常量词汇 → 0 ✅（188 个已批改为 SCREAMING_SNAKE，仅余 `ErrNoRows` 随 P1-3 消亡）。
 2. 行为不变: 全量 `deno task test`、`deno task test:architecture`、
    `deno task check`、`deno lint` 通过；TUI/CLI/ACP 跨入口契约测试覆盖触及面。
 3. 长任务可靠性不回退: 心跳续租、流式输出在慢查询压力下不被饿死（P3 加基线）。

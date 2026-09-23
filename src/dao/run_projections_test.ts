@@ -1,5 +1,3 @@
-// Ported from internal/dao/run_projections_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   ProjectDAO,

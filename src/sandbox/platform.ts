@@ -1,4 +1,3 @@
-// Ported from internal/sandbox/platform_{linux,darwin,windows,other}.go
 //
 // The dedicated bwrap (Linux), seatbelt (macOS), and Windows backends are
 // selected here. Platforms without a dedicated backend fall back to the no-op

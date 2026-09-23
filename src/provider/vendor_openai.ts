@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_openai.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_openai.go init() adapters. */

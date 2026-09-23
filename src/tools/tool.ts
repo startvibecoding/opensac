@@ -1,4 +1,3 @@
-// Ported from internal/tools/tool.go.
 //
 // The tool contract, result types, and the per-session tool Registry. This is
 // the hub the agent/runtime uses to enumerate and construct tools.

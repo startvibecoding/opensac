@@ -1,11 +1,10 @@
-// Ported from the `PlanDelivery` cases of
 // internal/agentruntime/delivery_coordinator_test.go, plus focused coverage for
 // `deliveryOperationText`.
 
 import { assert, assertEquals } from "@std/assert";
 import {
-  AttachmentAudio,
-  AttachmentImage,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_IMAGE,
   type SessionAttachment,
 } from "./attachment.ts";
 import {
@@ -22,7 +21,7 @@ function attachment(
     sessionId: "session",
     runId: "run",
     origin: "",
-    kind: AttachmentImage,
+    kind: ATTACHMENT_IMAGE,
     filename: "",
     mediaType: "",
     bytes: 0,
@@ -55,13 +54,13 @@ Deno.test("PlanDeliveryFallbackStaysAfterCaptionWhenMediaAlsoExists", () => {
     attachments: [
       attachment({
         id: "native-image",
-        kind: AttachmentImage,
+        kind: ATTACHMENT_IMAGE,
         filename: "screen.png",
         sha256: "image-hash",
       }),
       attachment({
         id: "unsupported-audio",
-        kind: AttachmentAudio,
+        kind: ATTACHMENT_AUDIO,
         filename: "voice.amr",
         sha256: "audio-hash",
       }),

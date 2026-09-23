@@ -1,4 +1,3 @@
-// Ported from internal/session/run_recovery.go
 //
 // The durable diagnostic/retry state for orphan reconciliation. It never grants
 // ownership: the recovery lease remains the sole authority for changing a Run.

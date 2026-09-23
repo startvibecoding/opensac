@@ -1,5 +1,3 @@
-// Translated from internal/agent/max_tokens_test.go.
-
 import { assertEquals } from "@std/assert";
 import type { Model } from "../provider/types.ts";
 import { resolveMaxTokens, resolveMaxTokensValue } from "./max_tokens.ts";

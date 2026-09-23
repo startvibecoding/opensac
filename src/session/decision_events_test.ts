@@ -1,5 +1,3 @@
-// Ported from internal/session/decision_events_test.go
-
 import { assert, assertFalse } from "@std/assert";
 import { decisionEventType, isDecisionEventType } from "./decision_events.ts";
 

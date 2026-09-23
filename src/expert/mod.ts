@@ -63,7 +63,7 @@ export {
   type ManagedBundle,
   Manager,
   type Scope,
-  ScopeGlobal,
-  ScopeProject,
+  SCOPE_GLOBAL,
+  SCOPE_PROJECT,
   validateAgentID,
 } from "./manage.ts";

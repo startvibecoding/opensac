@@ -1,4 +1,4 @@
-// Ported from internal/acp/acp.go (the ACP stdio server shell and its
+// (the ACP stdio server shell and its
 // non-prompt handlers) and internal/acp/extensions.go (the server-bound half
 // of the Phase 1 additive extensions).
 //
@@ -75,12 +75,12 @@ import {
   openSessionForWorkDir,
 } from "../agentruntime/session_lifecycle.ts";
 import {
-  ConfigOptionBrowser,
-  ConfigOptionExpert,
-  ConfigOptionMode,
-  ConfigOptionSandbox,
-  ConfigOptionThinkingLevel,
-  ConfigOptionWebSearch,
+  CONFIG_OPTION_BROWSER,
+  CONFIG_OPTION_EXPERT,
+  CONFIG_OPTION_MODE,
+  CONFIG_OPTION_SANDBOX,
+  CONFIG_OPTION_THINKING_LEVEL,
+  CONFIG_OPTION_WEB_SEARCH,
   type ProviderCatalog,
   sessionConfigOptionsWithProviders,
 } from "../agentruntime/session_options.ts";
@@ -103,11 +103,11 @@ import {
   resourceIds,
 } from "../agentruntime/input_materializer.ts";
 import {
+  RUN_STATE_CANCELLED,
+  RUN_STATE_COMPLETED,
+  RUN_STATE_FAILED,
+  RUN_STATE_TIMED_OUT,
   type RunState,
-  RunStateCancelled,
-  RunStateCompleted,
-  RunStateFailed,
-  RunStateTimedOut,
 } from "../agentruntime/run_state.ts";
 import { generateID } from "../session/entry.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
@@ -133,39 +133,39 @@ import type { SessionRun } from "../session/run_store.ts";
 import type { SessionRuntime } from "../agentruntime/session_runtime.ts";
 import type { SessionConfigOption } from "../agentruntime/session_options.ts";
 import {
-  DecisionApproval,
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
   type DecisionKind,
-  DecisionQuestion,
   type DecisionRequest,
   DecisionService,
 } from "../agentruntime/decision.ts";
 import type { DecisionRecord } from "../agentruntime/decision_record.ts";
 import {
   type Event as AgentEvent,
-  EventCompactionEnd,
-  EventCompactionStart,
-  EventDone,
-  EventError,
-  EventHostedItem,
-  EventPlanUpdate,
-  EventQuestionRequest,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolExecutionUpdate,
-  EventToolResult,
-  EventTurnEnd,
-  EventTurnStart,
-  EventUsage,
-  TaskCanceled,
-  TaskFailed,
-  TaskIncomplete,
-  TaskSuccess,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_PLAN_UPDATE,
+  EVENT_QUESTION_REQUEST,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_EXECUTION_UPDATE,
+  EVENT_TOOL_RESULT,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
+  EVENT_USAGE,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
 } from "../agent/events.ts";
 import type { ContextUsage } from "../context/mod.ts";
 import type { AgentManager } from "../agent/manager.ts";
@@ -192,22 +192,22 @@ import {
 import { SessionRunEventSink } from "../agentruntime/run_event.ts";
 import { deleteSessionWithMutation } from "../agentruntime/session_lifecycle.ts";
 import {
-  ModeYolo,
+  MODE_YOLO,
   resolveSourceFromSession,
-  SourceACP,
-  SourceUnknown,
+  SOURCE_ACP,
+  SOURCE_UNKNOWN,
 } from "../agentruntime/source.ts";
 import {
   classifyError,
   displayErrorMessage,
   type ErrorInfo,
-  FailureIncomplete,
-  PhaseAdmission,
-  PhaseModel,
-  PhasePersistence,
-  PhaseTool,
-  PhaseTransport,
-  RetryUser,
+  FAILURE_INCOMPLETE,
+  PHASE_ADMISSION,
+  PHASE_MODEL,
+  PHASE_PERSISTENCE,
+  PHASE_TOOL,
+  PHASE_TRANSPORT,
+  RETRY_USER,
   type RunPhase,
 } from "../agentruntime/error_info.ts";
 import {
@@ -1947,11 +1947,11 @@ export class AcpServer {
     let terminalStatus = "";
     if (!state.terminal) {
       switch (ev.type) {
-        case EventRunFinished:
+        case EVENT_RUN_FINISHED:
           state.terminal = true;
           switch (ev.status) {
-            case TaskFailed:
-            case TaskCanceled:
+            case TASK_FAILED:
+            case TASK_CANCELED:
               terminalStatus = "failed";
               break;
             default:
@@ -1959,11 +1959,11 @@ export class AcpServer {
               terminalStatus = "completed";
           }
           break;
-        case EventError:
+        case EVENT_ERROR:
           state.terminal = true;
           terminalStatus = "failed";
           break;
-        case EventDone:
+        case EVENT_DONE:
           state.terminal = true;
           terminalStatus = "completed";
           break;
@@ -2292,7 +2292,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2336,7 +2336,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2346,7 +2346,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2570,7 +2570,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2601,7 +2601,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhasePersistence),
+          acpFailureRPCError(error, null, PHASE_PERSISTENCE),
         );
         return;
       }
@@ -2730,7 +2730,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2754,7 +2754,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2810,7 +2810,7 @@ export class AcpServer {
           this.writeResponse(
             req.idRaw,
             null,
-            acpFailureRPCError(error, null, PhasePersistence),
+            acpFailureRPCError(error, null, PHASE_PERSISTENCE),
           );
           return;
         }
@@ -2850,7 +2850,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhasePersistence),
+          acpFailureRPCError(error, null, PHASE_PERSISTENCE),
         );
         return;
       }
@@ -2882,7 +2882,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2942,7 +2942,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -2978,7 +2978,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -3012,7 +3012,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhasePersistence),
+          acpFailureRPCError(error, null, PHASE_PERSISTENCE),
         );
         return;
       }
@@ -3025,7 +3025,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -3064,7 +3064,7 @@ export class AcpServer {
       if (record.payload === undefined || record.payload === null) continue;
       if (!this.pending.has(id)) this.pending.set(id, () => {});
       switch (record.kind) {
-        case DecisionQuestion: {
+        case DECISION_QUESTION: {
           const request = record.payload as QuestionRequest;
           const projection = questionProjectionFor(
             this.acpInitialized(),
@@ -3086,7 +3086,7 @@ export class AcpServer {
           this.notifyRequest(id, method, payload);
           break;
         }
-        case DecisionApproval:
+        case DECISION_APPROVAL:
           this.notifyRequest(id, "session/request_permission", record.payload);
           break;
       }
@@ -3255,14 +3255,14 @@ export class AcpServer {
       runId: runID,
       kind,
     };
-    let source: string = SourceACP;
+    let source: string = SOURCE_ACP;
     const rt = this.sessionRuntime(sessionID);
     if (rt !== null && rt.runtime !== null) {
       let sessionMode = rt.runtime.configSnapshot().mode;
       if (sessionMode === "") sessionMode = this.mode;
       try {
         const resolved = rt.runtime.resolvePolicy(sessionMode, "", this.mode);
-        if (resolved.resolution.source !== SourceUnknown) {
+        if (resolved.resolution.source !== SOURCE_UNKNOWN) {
           source = resolved.resolution.source;
         }
       } catch {
@@ -3306,7 +3306,7 @@ export class AcpServer {
       resolvePending = resolve;
     });
     this.pending.set(id, resolvePending);
-    this.registerDecision(sessionID, id, DecisionQuestion);
+    this.registerDecision(sessionID, id, DECISION_QUESTION);
     const timeout = this.effectiveQuestionTimeoutMs();
     const deadline = new Date(Date.now() + timeout);
     const request: QuestionRequest = {
@@ -3336,7 +3336,7 @@ export class AcpServer {
         sessionID,
         this.sessionRunID(sessionID),
         id,
-        DecisionQuestion,
+        DECISION_QUESTION,
         "pending",
         "",
         request,
@@ -3350,13 +3350,13 @@ export class AcpServer {
       this.notifyRequest(id, method, payload);
     } catch {
       this.deletePending(id);
-      this.resolveDecision(sessionID, id, DecisionQuestion, "", "cancelled");
+      this.resolveDecision(sessionID, id, DECISION_QUESTION, "", "cancelled");
       return "";
     }
     const stopDeadlineReminders = this.scheduleDecisionDeadline(
       sessionID,
       id,
-      DecisionQuestion,
+      DECISION_QUESTION,
       timeout,
       deadline,
     );
@@ -3364,12 +3364,12 @@ export class AcpServer {
       const outcome = await racePendingRequest(pending, ctx, timeout);
       if (outcome.kind === "aborted") {
         this.deletePending(id);
-        this.resolveDecision(sessionID, id, DecisionQuestion, "", "cancelled");
+        this.resolveDecision(sessionID, id, DECISION_QUESTION, "", "cancelled");
         return "";
       }
       if (outcome.kind === "timed_out") {
         this.deletePending(id);
-        this.resolveDecision(sessionID, id, DecisionQuestion, "", "timed_out");
+        this.resolveDecision(sessionID, id, DECISION_QUESTION, "", "timed_out");
         return "";
       }
       const decoded = questionAnswer(
@@ -3379,7 +3379,7 @@ export class AcpServer {
       this.resolveDecision(
         sessionID,
         id,
-        DecisionQuestion,
+        DECISION_QUESTION,
         decoded.answer,
         decoded.status,
       );
@@ -3429,7 +3429,7 @@ export class AcpServer {
       resolvePending = resolve;
     });
     this.pending.set(id, resolvePending);
-    this.registerDecision(sessionID, id, DecisionApproval);
+    this.registerDecision(sessionID, id, DECISION_APPROVAL);
     const timeout = this.effectivePermissionTimeoutMs();
     const deadline = new Date(Date.now() + timeout);
     const rawInput = toolRawInput(args);
@@ -3438,7 +3438,7 @@ export class AcpServer {
         sessionID,
         this.sessionRunID(sessionID),
         id,
-        DecisionApproval,
+        DECISION_APPROVAL,
         "pending",
         "",
         {
@@ -3473,13 +3473,13 @@ export class AcpServer {
       });
     } catch {
       this.deletePending(id);
-      this.resolveDecision(sessionID, id, DecisionApproval, "", "cancelled");
+      this.resolveDecision(sessionID, id, DECISION_APPROVAL, "", "cancelled");
       return false;
     }
     const stopDeadlineReminders = this.scheduleDecisionDeadline(
       sessionID,
       id,
-      DecisionApproval,
+      DECISION_APPROVAL,
       timeout,
       deadline,
     );
@@ -3490,7 +3490,7 @@ export class AcpServer {
         this.resolveDecision(
           sessionID,
           id,
-          DecisionApproval,
+          DECISION_APPROVAL,
           "",
           outcome.kind === "aborted" ? "cancelled" : "timed_out",
         );
@@ -3504,7 +3504,7 @@ export class AcpServer {
       if (selected !== undefined) {
         value = typeof selected.optionId === "string" ? selected.optionId : "";
       }
-      this.resolveDecision(sessionID, id, DecisionApproval, value, "resolved");
+      this.resolveDecision(sessionID, id, DECISION_APPROVAL, value, "resolved");
       return selected !== undefined && selected.outcome === "selected" &&
         selected.optionId === "allow-once";
     } finally {
@@ -3758,7 +3758,7 @@ export class AcpServer {
     ) {
       thinking = thinkingEntry.thinkingLevel;
     }
-    const effectiveMode = runtime.resolvePolicy(mode, mode, ModeYolo).mode;
+    const effectiveMode = runtime.resolvePolicy(mode, mode, MODE_YOLO).mode;
     runtime.configureSession(p, providerName, model, effectiveMode, thinking);
     if (persistDefaults && !hasModel) {
       mgr.appendModelChange(providerName, model.id);
@@ -3823,12 +3823,12 @@ export class AcpServer {
     }
     const resolvedSource = resolveSourceFromSession(sessionDir, sessionId, {
       sessionHeader: mgr.getHeader(),
-      requested: SourceACP,
+      requested: SOURCE_ACP,
     });
     const runtime = await attachSessionResources({
       id: sessionId,
       source: resolvedSource.source,
-      entrySource: SourceACP,
+      entrySource: SOURCE_ACP,
       workDir: cwd,
       manager: mgr,
       registry,
@@ -3983,7 +3983,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4002,7 +4002,7 @@ export class AcpServer {
     try {
       runtime = await attachSessionResources({
         id,
-        source: SourceACP,
+        source: SOURCE_ACP,
         workDir: cwd,
         manager: mgr,
         registry,
@@ -4037,7 +4037,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4185,7 +4185,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhasePersistence),
+          acpFailureRPCError(error, null, PHASE_PERSISTENCE),
         );
         return;
       }
@@ -4232,7 +4232,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4333,7 +4333,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhasePersistence),
+          acpFailureRPCError(error, null, PHASE_PERSISTENCE),
         );
         return;
       }
@@ -4364,7 +4364,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4411,7 +4411,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4508,7 +4508,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4555,7 +4555,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhasePersistence),
+        acpFailureRPCError(error, null, PHASE_PERSISTENCE),
       );
       return;
     }
@@ -4576,7 +4576,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhasePersistence),
+          acpFailureRPCError(error, null, PHASE_PERSISTENCE),
         );
         return;
       }
@@ -4616,16 +4616,19 @@ export class AcpServer {
     switch (configId) {
       case "thought_level":
       case "thinking":
-        configId = ConfigOptionThinkingLevel;
+        configId = CONFIG_OPTION_THINKING_LEVEL;
         break;
       case "web-search":
       case "websearch":
-        configId = ConfigOptionWebSearch;
+        configId = CONFIG_OPTION_WEB_SEARCH;
         break;
     }
     let value: string;
     try {
-      value = acpConfigValue(inRequest.value, configId === ConfigOptionExpert);
+      value = acpConfigValue(
+        inRequest.value,
+        configId === CONFIG_OPTION_EXPERT,
+      );
     } catch (error) {
       this.writeResponse(
         req.idRaw,
@@ -4646,8 +4649,9 @@ export class AcpServer {
     const runtime = rt.runtime;
     try {
       if (
-        configId === ConfigOptionSandbox || configId === ConfigOptionBrowser ||
-        configId === ConfigOptionWebSearch
+        configId === CONFIG_OPTION_SANDBOX ||
+        configId === CONFIG_OPTION_BROWSER ||
+        configId === CONFIG_OPTION_WEB_SEARCH
       ) {
         const parsed = parseBoolean(value.trim());
         if (parsed === undefined) {
@@ -4661,7 +4665,7 @@ export class AcpServer {
         this.withSessionMutationLease(sessionId, () => {
           runtime.setCapabilityOption(configId, parsed);
         });
-      } else if (configId === ConfigOptionExpert) {
+      } else if (configId === CONFIG_OPTION_EXPERT) {
         await this.withSessionMutationLeaseAsync(sessionId, async () => {
           await runtime.setConfigOption(configId, value);
           this.refreshSessionExpertTools(rt);
@@ -4728,7 +4732,7 @@ export class AcpServer {
       // the mode here therefore affects the next prompt and stays safe.
       await this.withSessionMutationLeaseAsync(
         sessionId,
-        () => runtime.setConfigOption(ConfigOptionMode, modeId),
+        () => runtime.setConfigOption(CONFIG_OPTION_MODE, modeId),
       );
     } catch (error) {
       this.writeResponse(
@@ -4860,7 +4864,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhaseAdmission),
+        acpFailureRPCError(error, null, PHASE_ADMISSION),
       );
       return;
     }
@@ -4877,7 +4881,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhaseAdmission),
+          acpFailureRPCError(error, null, PHASE_ADMISSION),
         );
         return;
       }
@@ -4904,17 +4908,17 @@ export class AcpServer {
       return;
     }
     let effectiveMode = sessionMode;
-    let runSource = SourceACP;
+    let runSource = SOURCE_ACP;
     try {
-      const resolved = runtime.resolvePolicy(sessionMode, "", ModeYolo);
+      const resolved = runtime.resolvePolicy(sessionMode, "", MODE_YOLO);
       effectiveMode = resolved.mode;
       runSource = resolved.resolution.source;
-      if (runSource === "") runSource = SourceACP;
+      if (runSource === "") runSource = SOURCE_ACP;
     } catch (error) {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhaseAdmission),
+        acpFailureRPCError(error, null, PHASE_ADMISSION),
       );
       return;
     }
@@ -4941,7 +4945,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        acpFailureRPCError(error, null, PhaseAdmission),
+        acpFailureRPCError(error, null, PHASE_ADMISSION),
       );
       return;
     }
@@ -4999,7 +5003,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhaseAdmission),
+          acpFailureRPCError(error, null, PHASE_ADMISSION),
         );
         return;
       }
@@ -5030,7 +5034,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhaseAdmission),
+          acpFailureRPCError(error, null, PHASE_ADMISSION),
         );
         return;
       }
@@ -5046,7 +5050,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhaseAdmission),
+          acpFailureRPCError(error, null, PHASE_ADMISSION),
         );
         return;
       }
@@ -5109,7 +5113,7 @@ export class AcpServer {
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(failure, null, PhaseAdmission),
+          acpFailureRPCError(failure, null, PHASE_ADMISSION),
         );
         return;
       }
@@ -5155,11 +5159,11 @@ export class AcpServer {
       try {
         artifacts = runtime.beginArtifactCollection(runID);
       } catch (error) {
-        await finishEarly(RunStateFailed, errorMessage(error));
+        await finishEarly(RUN_STATE_FAILED, errorMessage(error));
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, null, PhaseAdmission),
+          acpFailureRPCError(error, null, PHASE_ADMISSION),
         );
         return;
       }
@@ -5276,7 +5280,7 @@ export class AcpServer {
         rt.activeThinking = "";
         let info: ErrorInfo | null = null;
         try {
-          info = execution.recordFailure(error, { phase: PhaseAdmission });
+          info = execution.recordFailure(error, { phase: PHASE_ADMISSION });
         } catch (observeError) {
           console.error(
             `[acp] record agent build failure for ${runID}: ${
@@ -5288,13 +5292,13 @@ export class AcpServer {
           `[acp] build agent for ${runID} failed: ${errorMessage(error)}`,
         );
         await finishEarly(
-          RunStateFailed,
+          RUN_STATE_FAILED,
           info !== null ? displayErrorMessage(info) : errorMessage(error),
         );
         this.writeResponse(
           req.idRaw,
           null,
-          acpFailureRPCError(error, info, PhaseAdmission),
+          acpFailureRPCError(error, info, PHASE_ADMISSION),
         );
         return;
       }
@@ -5320,8 +5324,8 @@ export class AcpServer {
             // activity and must not mutate the parent Run's terminal facts.
             if (
               (coreEvent.agentId ?? "") === "" ||
-              (coreEvent.type !== EventRunFinished &&
-                coreEvent.type !== EventError)
+              (coreEvent.type !== EVENT_RUN_FINISHED &&
+                coreEvent.type !== EVENT_ERROR)
             ) {
               try {
                 const observation = execution.observeAgentEvent(coreEvent);
@@ -5341,22 +5345,22 @@ export class AcpServer {
             // the ACP request into a failed parent run.
             if ((coreEvent.agentId ?? "") !== "") continue;
             switch (coreEvent.type) {
-              case EventQuestionRequest:
+              case EVENT_QUESTION_REQUEST:
                 void this.handleQuestion(signal, rt, runID, coreEvent);
                 break;
-              case EventRunFinished:
+              case EVENT_RUN_FINISHED:
                 terminalSeen = true;
-                switch (coreEvent.status ?? TaskSuccess) {
-                  case TaskFailed:
+                switch (coreEvent.status ?? TASK_SUCCESS) {
+                  case TASK_FAILED:
                     runErr = coreEvent.error ?? new Error("run failed");
                     stopReason = normalizeStopReason(
                       coreEvent.stopReason ?? "",
                     );
                     break;
-                  case TaskCanceled:
+                  case TASK_CANCELED:
                     stopReason = "cancelled";
                     break;
-                  case TaskIncomplete:
+                  case TASK_INCOMPLETE:
                     stopReason = "max_tokens";
                     break;
                   default:
@@ -5365,13 +5369,13 @@ export class AcpServer {
                     );
                 }
                 break;
-              case EventDone:
+              case EVENT_DONE:
                 if (!terminalSeen) {
                   legacyTerminalSeen = true;
                   stopReason = normalizeStopReason(coreEvent.stopReason ?? "");
                 }
                 break;
-              case EventError:
+              case EVENT_ERROR:
                 if (!terminalSeen) {
                   legacyTerminalSeen = true;
                   runErr = coreEvent.error ??
@@ -5389,7 +5393,7 @@ export class AcpServer {
               terminalInfo = execution.recordFailure(runErr, {
                 code: "event_stream_interrupted",
                 type: "transport_error",
-                phase: PhaseTransport,
+                phase: PHASE_TRANSPORT,
                 messageKey: "run.error.streamInterrupted",
                 message: "The run stopped before it could finish.",
               });
@@ -5408,7 +5412,7 @@ export class AcpServer {
             this.writeResponse(
               req.idRaw,
               null,
-              acpFailureRPCError(runErr, terminalInfo, PhaseModel),
+              acpFailureRPCError(runErr, terminalInfo, PHASE_MODEL),
             );
             return;
           }
@@ -5444,18 +5448,18 @@ export class AcpServer {
             }
           }
           cancel();
-          let state: RunState = RunStateCompleted;
+          let state: RunState = RUN_STATE_COMPLETED;
           if (isTimeoutError(runErr)) {
-            state = RunStateTimedOut;
+            state = RUN_STATE_TIMED_OUT;
           } else if (stopReason === "cancelled" || isAbortError(runErr)) {
-            state = RunStateCancelled;
+            state = RUN_STATE_CANCELLED;
           } else if (runErr !== null) {
-            state = RunStateFailed;
+            state = RUN_STATE_FAILED;
           }
           let message = "";
           let data: unknown;
           if (runErr !== null) {
-            const info = acpFailureInfo(runErr, terminalInfo, PhaseModel);
+            const info = acpFailureInfo(runErr, terminalInfo, PHASE_MODEL);
             message = displayErrorMessage(info);
             data = { error: message, errorInfo: info };
           }
@@ -5722,7 +5726,7 @@ export class AcpServer {
       this.observeSubagentEvent(sessionId, ev);
     }
     switch (ev.type) {
-      case EventHostedItem: {
+      case EVENT_HOSTED_ITEM: {
         const item = ev.hostedItem;
         if (item !== undefined) {
           let status = item.status ?? "";
@@ -5739,7 +5743,7 @@ export class AcpServer {
         }
         break;
       }
-      case EventTextDelta: {
+      case EVENT_TEXT_DELTA: {
         const textDelta = ev.textDelta ?? "";
         this.notify(sessionId, {
           sessionUpdate: "agent_message_chunk",
@@ -5748,7 +5752,7 @@ export class AcpServer {
         });
         break;
       }
-      case EventThinkDelta: {
+      case EVENT_THINK_DELTA: {
         const thinkDelta = ev.thinkDelta ?? "";
         this.notify(sessionId, {
           sessionUpdate: "agent_thought_chunk",
@@ -5757,7 +5761,7 @@ export class AcpServer {
         });
         break;
       }
-      case EventToolCall: {
+      case EVENT_TOOL_CALL: {
         const call = ev.toolCall;
         if (call !== undefined) {
           const title = this.toolTitles.rememberToolTitle(
@@ -5776,7 +5780,7 @@ export class AcpServer {
         }
         break;
       }
-      case EventToolExecutionStart: {
+      case EVENT_TOOL_EXECUTION_START: {
         const toolCallId = ev.toolCallId ?? "";
         const toolName = ev.toolName ?? "";
         this.notify(sessionId, {
@@ -5793,7 +5797,7 @@ export class AcpServer {
         });
         break;
       }
-      case EventToolExecutionEnd: {
+      case EVENT_TOOL_EXECUTION_END: {
         const toolCallId = ev.toolCallId ?? "";
         const toolName = ev.toolName ?? "";
         let status = "completed";
@@ -5801,7 +5805,7 @@ export class AcpServer {
         const rawOutput: Record<string, unknown> = { content: toolContent };
         if (ev.toolError !== undefined) {
           status = "failed";
-          const info = acpFailureInfo(ev.toolError, null, PhaseTool);
+          const info = acpFailureInfo(ev.toolError, null, PHASE_TOOL);
           toolContent = displayErrorMessage(info);
           rawOutput.content = toolContent;
           rawOutput.errorInfo = info;
@@ -5844,7 +5848,7 @@ export class AcpServer {
         });
         break;
       }
-      case EventToolExecutionUpdate: {
+      case EVENT_TOOL_EXECUTION_UPDATE: {
         const content = textToolContent(renderScalar(ev.partialResult));
         this.notify(sessionId, {
           sessionUpdate: "tool_call_update",
@@ -5853,9 +5857,9 @@ export class AcpServer {
         });
         break;
       }
-      case EventToolResult:
+      case EVENT_TOOL_RESULT:
         break;
-      case EventPlanUpdate: {
+      case EVENT_PLAN_UPDATE: {
         const plan = ev.plan;
         if (plan !== undefined) {
           this.notify(sessionId, {
@@ -5866,14 +5870,14 @@ export class AcpServer {
         }
         break;
       }
-      case EventUsage:
+      case EVENT_USAGE:
         this.emitUsageUpdate(sessionId, ev, true);
         break;
-      case EventDone:
+      case EVENT_DONE:
         this.emitUsageUpdate(sessionId, ev, false);
         break;
-      case EventError:
-      case EventRunFinished: {
+      case EVENT_ERROR:
+      case EVENT_RUN_FINISHED: {
         // Terminal errors use the same structured Runtime contract as the
         // prompt response and durable replay. Child-agent terminal events were
         // already projected above as subagent lifecycle events and must not
@@ -5882,34 +5886,34 @@ export class AcpServer {
         if (!this.markTerminalNotified(sessionId)) return;
         let status = "failed";
         let info: ErrorInfo | null = null;
-        if (ev.type === EventRunFinished) {
+        if (ev.type === EVENT_RUN_FINISHED) {
           switch (ev.status) {
-            case TaskSuccess:
+            case TASK_SUCCESS:
               status = "completed";
               break;
-            case TaskCanceled:
+            case TASK_CANCELED:
               status = "cancelled";
               break;
-            case TaskIncomplete:
+            case TASK_INCOMPLETE:
               status = "incomplete";
               break;
           }
         }
         if (status !== "completed") {
-          let classified = acpFailureInfo(ev.error, null, PhaseModel);
-          if (ev.status === TaskCanceled) {
+          let classified = acpFailureInfo(ev.error, null, PHASE_MODEL);
+          if (ev.status === TASK_CANCELED) {
             classified = classifyError(
               new DOMException("The operation was aborted.", "AbortError"),
-              { phase: PhaseModel },
+              { phase: PHASE_MODEL },
             );
-          } else if (ev.status === TaskIncomplete) {
+          } else if (ev.status === TASK_INCOMPLETE) {
             classified.code = "run_incomplete";
             classified.type = "incomplete_error";
-            classified.failureClass = FailureIncomplete;
-            classified.phase = PhaseModel;
+            classified.failureClass = FAILURE_INCOMPLETE;
+            classified.phase = PHASE_MODEL;
             classified.messageKey = "run.error.incomplete";
             classified.message = "The run ended before it could complete.";
-            classified.retryMode = RetryUser;
+            classified.retryMode = RETRY_USER;
             classified.retryable = true;
           }
           info = classified;
@@ -5926,13 +5930,13 @@ export class AcpServer {
         this.notifyExtension("_opensac/session_event", params);
         break;
       }
-      case EventRetry:
+      case EVENT_RETRY:
         this.notifyExtension(
           "_opensac/session_event",
           acpRetryEvent(sessionId, ev),
         );
         break;
-      case EventStatus:
+      case EVENT_STATUS:
         if (ev.retryStatus === true) return;
         this.notifyExtension("_opensac/session_event", {
           sessionId,
@@ -5940,7 +5944,7 @@ export class AcpServer {
           message: ev.statusMessage ?? "",
         });
         break;
-      case EventTurnStart:
+      case EVENT_TURN_START:
         // A model turn begins after any preceding tool executions. Assigning a
         // new ID here keeps its streamed text/thought separate from earlier
         // turns and leaves the tool cards at their canonical transcript point.
@@ -5951,9 +5955,9 @@ export class AcpServer {
           message: ev.statusMessage ?? "",
         });
         break;
-      case EventCompactionStart:
-      case EventCompactionEnd:
-      case EventTurnEnd:
+      case EVENT_COMPACTION_START:
+      case EVENT_COMPACTION_END:
+      case EVENT_TURN_END:
         this.notifyExtension("_opensac/session_event", {
           sessionId,
           event: acpEventName(ev.type),
@@ -6157,7 +6161,7 @@ export class AcpServer {
         } else if (ev.type === streamError) {
           if (ev.error !== undefined && ev.error !== null) {
             return {
-              error: acpFailureRPCError(ev.error, null, PhaseModel),
+              error: acpFailureRPCError(ev.error, null, PHASE_MODEL),
             };
           }
         }

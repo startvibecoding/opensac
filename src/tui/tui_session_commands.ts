@@ -20,10 +20,10 @@ import {
   saveProjectSettingsPatch,
 } from "../config/settings.ts";
 import { loadAllow } from "../config/allow.ts";
-import { EventTextDelta } from "../agent/events.ts";
+import { EVENT_TEXT_DELTA } from "../agent/events.ts";
 import { newSQLiteCronStore } from "../cron/sqlite_store.ts";
 import type { CronStore } from "../cron/cron.ts";
-import { AttachmentImage } from "../agentruntime/attachment.ts";
+import { ATTACHMENT_IMAGE } from "../agentruntime/attachment.ts";
 import { newRegistry } from "../tools/tool.ts";
 import { Agent } from "../agent/agent.ts";
 import { prompt as systemInitPrompt } from "../systeminit/systeminit.ts";
@@ -416,7 +416,7 @@ export class TuiSessionCommands {
         eventId: `tui-paste-${crypto.randomUUID()}`,
         itemIndex: 0,
         reference: "",
-        kind: AttachmentImage,
+        kind: ATTACHMENT_IMAGE,
         filenameHint: "clipboard.png",
         mediaTypeHint: "image/png",
         sizeHint: bytes.length,
@@ -519,7 +519,9 @@ export class TuiSessionCommands {
     try {
       let answer = "";
       for await (const ev of agent.run(question)) {
-        if (ev.type === EventTextDelta && ev.textDelta) answer += ev.textDelta;
+        if (ev.type === EVENT_TEXT_DELTA && ev.textDelta) {
+          answer += ev.textDelta;
+        }
       }
       return {
         message: [

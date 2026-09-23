@@ -1,4 +1,3 @@
-// Ported from internal/session/delivery_store.go
 //
 // The durable Run delivery outbox: run-level intents plus ordered,
 // independently recoverable operations. A terminal transaction creates the plan

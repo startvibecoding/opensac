@@ -1,4 +1,3 @@
-// Ported from internal/ai/title/title.go
 //
 // Provider-neutral conversation title generation through the common provider
 // interface. Provider-specific request/response handling stays inside the

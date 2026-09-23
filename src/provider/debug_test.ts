@@ -1,4 +1,3 @@
-// Ported from internal/provider/debug_test.go
 //
 // Deviation: Go's fallback test relies on json.Marshal rejecting a malformed
 // json.RawMessage. JSON.stringify does not reject arbitrary strings, so the

@@ -414,16 +414,5 @@ function handleESMPanelKey(ev: KeyEvent, session: TUISession): boolean {
   }
 }
 
-/** Footer line for the editor input area. */
-export function inputFooter(busy: boolean, value: string): ReactElement {
-  return (
-    <Text dimColor>
-      {busy
-        ? "working… (ctrl+c to cancel)"
-        : `${value.length} chars — enter to send`}
-    </Text>
-  );
-}
-
 /** Re-exported for tests that drive the shell without a TTY. */
 export { splitInputChunk };

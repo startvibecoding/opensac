@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/expert.go.
 //
 // ExpertBinding is the resolved expert identity of one session. It is owned by
 // SessionRuntime, resolved once from the persisted session header binding, and
@@ -22,7 +21,7 @@ import {
 import type { Message } from "../provider/types.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import {
-  ConfigOptionExpert,
+  CONFIG_OPTION_EXPERT,
   type SessionConfigOption,
   type SessionConfigOptionChoice,
 } from "./session_options.ts";
@@ -308,7 +307,7 @@ export function expertConfigOption(
   }
   return {
     type: "select",
-    id: ConfigOptionExpert,
+    id: CONFIG_OPTION_EXPERT,
     name: "Expert",
     category: "expert",
     currentValue: current,

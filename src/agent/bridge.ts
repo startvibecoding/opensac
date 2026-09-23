@@ -1,4 +1,3 @@
-// Ported from internal/agent/bridge.go.
 //
 // This module maps the front-end-neutral internal agent/provider value types to
 // the public `sdk/agent` types (and back). The Go source keeps a parallel set
@@ -104,37 +103,37 @@ import type { FileDiff, TaskPlan } from "../tools/mod.ts";
 import type { Agent } from "./agent.ts";
 import {
   type Event,
-  EventAgentEnd,
-  EventAgentStart,
-  EventBudgetPressure,
-  EventCompactionEnd,
-  EventCompactionStart,
-  EventContextPressure,
-  EventDone,
-  EventError,
-  EventHostedItem,
-  EventMessageEnd,
-  EventMessageStart,
-  EventMessageUpdate,
-  EventPlanUpdate,
-  EventQuestionRequest,
-  EventQuestionResponse,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolApprovalRequest,
-  EventToolApprovalResponse,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolExecutionUpdate,
-  EventToolResult,
-  EventTurnEnd,
-  EventTurnStart,
+  EVENT_AGENT_END,
+  EVENT_AGENT_START,
+  EVENT_BUDGET_PRESSURE,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_CONTEXT_PRESSURE,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_MESSAGE_END,
+  EVENT_MESSAGE_START,
+  EVENT_MESSAGE_UPDATE,
+  EVENT_PLAN_UPDATE,
+  EVENT_QUESTION_REQUEST,
+  EVENT_QUESTION_RESPONSE,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_APPROVAL_RESPONSE,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_EXECUTION_UPDATE,
+  EVENT_TOOL_RESULT,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
+  EVENT_USAGE,
   type EventType,
-  EventUsage,
   type ToolImage,
 } from "./events.ts";
 
@@ -420,71 +419,71 @@ export function toolImagesToPublic(
 /**
  * Converts the internal event enum to the public enum. The enums intentionally
  * retain their historical ordering, so this must not be a numeric cast:
- * EventRetry was added in different positions. The Go source omits an explicit
- * `StreamThinkSignature` case and therefore falls through to the `EventStatus`
+ * EVENT_RETRY was added in different positions. The Go source omits an explicit
+ * `StreamThinkSignature` case and therefore falls through to the `EVENT_STATUS`
  * default; that behavior is preserved here for 1:1 fidelity.
  */
 export function eventTypeToPublic(t: EventType): PublicEventType {
   switch (t) {
-    case EventAgentStart:
+    case EVENT_AGENT_START:
       return publicEventAgentStart;
-    case EventAgentEnd:
+    case EVENT_AGENT_END:
       return publicEventAgentEnd;
-    case EventTurnStart:
+    case EVENT_TURN_START:
       return publicEventTurnStart;
-    case EventTurnEnd:
+    case EVENT_TURN_END:
       return publicEventTurnEnd;
-    case EventMessageStart:
+    case EVENT_MESSAGE_START:
       return publicEventMessageStart;
-    case EventMessageUpdate:
+    case EVENT_MESSAGE_UPDATE:
       return publicEventMessageUpdate;
-    case EventMessageEnd:
+    case EVENT_MESSAGE_END:
       return publicEventMessageEnd;
-    case EventTextDelta:
+    case EVENT_TEXT_DELTA:
       return publicEventTextDelta;
-    case EventThinkDelta:
+    case EVENT_THINK_DELTA:
       return publicEventThinkDelta;
-    case EventHostedItem:
+    case EVENT_HOSTED_ITEM:
       return publicEventHostedItem;
-    case EventToolCall:
+    case EVENT_TOOL_CALL:
       return publicEventToolCall;
-    case EventToolExecutionStart:
+    case EVENT_TOOL_EXECUTION_START:
       return publicEventToolExecutionStart;
-    case EventToolExecutionUpdate:
+    case EVENT_TOOL_EXECUTION_UPDATE:
       return publicEventToolExecutionUpdate;
-    case EventToolExecutionEnd:
+    case EVENT_TOOL_EXECUTION_END:
       return publicEventToolExecutionEnd;
-    case EventToolResult:
+    case EVENT_TOOL_RESULT:
       return publicEventToolResult;
-    case EventToolApprovalRequest:
+    case EVENT_TOOL_APPROVAL_REQUEST:
       return publicEventToolApprovalRequest;
-    case EventToolApprovalResponse:
+    case EVENT_TOOL_APPROVAL_RESPONSE:
       return publicEventToolApprovalResponse;
-    case EventQuestionRequest:
+    case EVENT_QUESTION_REQUEST:
       return publicEventQuestionRequest;
-    case EventQuestionResponse:
+    case EVENT_QUESTION_RESPONSE:
       return publicEventQuestionResponse;
-    case EventPlanUpdate:
+    case EVENT_PLAN_UPDATE:
       return publicEventPlanUpdate;
-    case EventStatus:
+    case EVENT_STATUS:
       return publicEventStatus;
-    case EventDone:
+    case EVENT_DONE:
       return publicEventDone;
-    case EventError:
+    case EVENT_ERROR:
       return publicEventError;
-    case EventUsage:
+    case EVENT_USAGE:
       return publicEventUsage;
-    case EventRetry:
+    case EVENT_RETRY:
       return publicEventRetry;
-    case EventCompactionStart:
+    case EVENT_COMPACTION_START:
       return publicEventCompactionStart;
-    case EventCompactionEnd:
+    case EVENT_COMPACTION_END:
       return publicEventCompactionEnd;
-    case EventContextPressure:
+    case EVENT_CONTEXT_PRESSURE:
       return publicEventContextPressure;
-    case EventBudgetPressure:
+    case EVENT_BUDGET_PRESSURE:
       return publicEventBudgetPressure;
-    case EventRunFinished:
+    case EVENT_RUN_FINISHED:
       return publicEventRunFinished;
     default:
       return publicEventStatus;
@@ -783,7 +782,7 @@ export function streamEventTypeToPublic(
       return publicStreamRetry;
     default:
       // Faithful to bridge.go: an unmapped type (notably the internal
-      // think-signature event) falls through to StreamStart.
+      // think-signature event) falls through to STREAM_START.
       return publicStreamStart;
   }
 }

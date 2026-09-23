@@ -1,4 +1,3 @@
-// Ported from internal/session/runtime_lease_status_test.go
 //
 // The Manager-based holder setup is replaced with a direct lease row so the
 // preflight itself is exercised without the not-yet-ported session Manager.

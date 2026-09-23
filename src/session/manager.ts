@@ -1,4 +1,4 @@
-// Ported from internal/session/session.go (the SQLite-backed Manager).
+// (the SQLite-backed Manager).
 //
 // The Manager owns one session's state and persistence: it loads the session
 // header and entry log from the shared sessions.db, reconstructs the current
@@ -93,9 +93,10 @@ import {
   SessionIDExistsError,
   SessionModifiedError,
 } from "./session_errors.ts";
+import { currentVersion } from "./store.ts";
 
-/** Current persisted session schema version. */
-export const CurrentVersion = 3;
+/** Current persisted session entry-format version (owned by `store.ts`). */
+export { currentVersion };
 
 /** The union of every entry the Manager may hold in memory. */
 export type SessionEntry =
@@ -354,7 +355,7 @@ export class Manager {
       if (candidate === "") candidate = generateID();
       this.header = {
         type: entrySession,
-        version: CurrentVersion,
+        version: currentVersion,
         id: candidate,
         timestamp: now,
         cwd: this.cwd,
@@ -1309,7 +1310,7 @@ export function rotateBoundSession(
     channelType,
     channelId,
     oldSessionId,
-    CurrentVersion,
+    currentVersion,
     id,
     new Date().toISOString(),
   );

@@ -1,4 +1,3 @@
-// Ported from internal/context/tokenizer.go
 //
 // Deviation: `json.RawMessage` tool-call arguments map to `unknown` (decoded
 // JSON). Byte-length accounting serializes them back to text with the same

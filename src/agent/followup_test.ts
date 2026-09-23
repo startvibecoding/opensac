@@ -1,11 +1,11 @@
-// Translated from internal/agent/follow_up_test.go (pure cases that do not
+// (pure cases that do not
 // require the agent loop). The Go tests also cover the loop wake path; that
 // lands with the core loop port.
 
 import { assert, assertEquals } from "@std/assert";
 import type { Message } from "../provider/types.ts";
 import {
-  MemberStatusDone,
+  MEMBER_STATUS_DONE,
   newMemberCompletion,
   newMemberMailbox,
 } from "./mailbox.ts";
@@ -24,7 +24,7 @@ Deno.test("composeFollowUps returns pending completions", async () => {
     {
       ...newMemberCompletion(),
       memberId: "pm",
-      status: MemberStatusDone,
+      status: MEMBER_STATUS_DONE,
       payload: "PRD 已完成",
     },
   );
@@ -88,7 +88,7 @@ function newMemberCompletion2(
     ...newMemberCompletion(),
     memberId,
     displayName,
-    status: MemberStatusDone,
+    status: MEMBER_STATUS_DONE,
     payload,
   };
 }

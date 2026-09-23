@@ -1,4 +1,3 @@
-// Ported from internal/session/execution_intent.go
 //
 // The durable, adapter-neutral record of an accepted user request. Request and
 // policy snapshots are opaque to session storage; the shared Runtime owns their

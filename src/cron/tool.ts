@@ -1,4 +1,3 @@
-// Ported from internal/cron/tool.go.
 //
 // The model-facing `cron` tool for managing the current session's scheduled
 // tasks. The Go tool holds a `*Scheduler` it never uses (manual runs are

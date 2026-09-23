@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/tool_policy_test.go, plus focused coverage
 // for the `.EvaluateToolCall` method projection.
 
 import { assert, assertEquals, assertFalse } from "@std/assert";
@@ -6,13 +5,13 @@ import type { BeforeToolCallContext } from "../agent/agent.ts";
 import {
   type ExecutionPolicy,
   policyForSource,
-  SourceCLI,
-  SourceWeChat,
+  SOURCE_CLI,
+  SOURCE_WE_CHAT,
 } from "./source.ts";
 import {
   beforeToolCallForPolicy,
   classifyBashCommand,
-  CommandRiskHigh,
+  COMMAND_RISK_HIGH,
   evaluateToolCall,
 } from "./tool_policy.ts";
 
@@ -33,14 +32,14 @@ Deno.test("ClassifyBashCommandHighRiskVariants", () => {
   ) {
     assertEquals(
       classifyBashCommand(command),
-      CommandRiskHigh,
+      COMMAND_RISK_HIGH,
       `ClassifyBashCommand(${JSON.stringify(command)})`,
     );
   }
 });
 
 Deno.test("EvaluateToolCallBlocksForcedModeHighRiskBash", () => {
-  const policy = policyForSource(SourceWeChat, "agent");
+  const policy = policyForSource(SOURCE_WE_CHAT, "agent");
   const blocked = evaluateToolCall(policy, "bash", {
     command: "/bin/rm -fr /",
   });
@@ -52,7 +51,7 @@ Deno.test("EvaluateToolCallBlocksForcedModeHighRiskBash", () => {
 });
 
 Deno.test("NonChannelPolicyDoesNotInstallHardCommandGuard", () => {
-  const policy = policyForSource(SourceCLI, "agent");
+  const policy = policyForSource(SOURCE_CLI, "agent");
   const decision = evaluateToolCall(policy, "bash", { command: "rm -rf /" });
   assertFalse(decision.block);
   assertEquals(beforeToolCallForPolicy(policy, null), null);
@@ -60,7 +59,7 @@ Deno.test("NonChannelPolicyDoesNotInstallHardCommandGuard", () => {
 });
 
 Deno.test("BeforeToolCallForPolicyRunsSourcePolicyBeforeAdapterHook", () => {
-  const policy: ExecutionPolicy = policyForSource(SourceWeChat, "agent");
+  const policy: ExecutionPolicy = policyForSource(SOURCE_WE_CHAT, "agent");
   let adapterCalled = false;
   const hook = beforeToolCallForPolicy(policy, () => {
     adapterCalled = true;

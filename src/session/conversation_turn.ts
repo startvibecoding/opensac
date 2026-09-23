@@ -1,4 +1,3 @@
-// Ported from internal/session/conversation_turn.go
 //
 // The durable conversation-turn boundary index used by Session fork
 // resolution. It is intentionally separate from SessionRun because a Run may

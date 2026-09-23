@@ -1,5 +1,3 @@
-// Ported from internal/util/truncate_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { truncateString, truncateWithSuffix } from "./truncate.ts";
 

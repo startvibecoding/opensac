@@ -1,6 +1,8 @@
 // Shared JSON-RPC vocabulary for the MCP client and server (ported from the
 // RPCRequest/RPCError types and protocol constants in internal/mcp/mcp.go).
 
+import { optString, parseJsonRecord } from "../util/json.ts";
+
 /** Advertised MCP protocol revision (matches the Go constant byte for byte). */
 export const mcpProtocolVersion = "2025-11-25";
 
@@ -29,6 +31,24 @@ export class RPCError extends Error {
     this.code = code;
     this.data = data;
   }
+}
+
+/**
+ * Decodes one JSON-RPC envelope from untrusted wire text. Returns undefined
+ * for malformed JSON or a non-object payload; field types are validated and
+ * key presence is preserved so `"id" in request` keeps its semantics.
+ */
+export function parseRPCMessage(text: string): RPCRequest | undefined {
+  const r = parseJsonRecord(text);
+  if (r === undefined) return undefined;
+  const out: RPCRequest = {};
+  if ("jsonrpc" in r) out.jsonrpc = optString(r, "jsonrpc");
+  if ("id" in r) out.id = r.id;
+  if ("method" in r) out.method = optString(r, "method");
+  if ("params" in r) out.params = r.params;
+  if ("result" in r) out.result = r.result;
+  if ("error" in r) out.error = r.error;
+  return out;
 }
 
 /** Builds a response envelope for `serveStdio`. */

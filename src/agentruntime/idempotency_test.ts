@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/idempotency_test.go.
 //
 // The Go fixture creates a session through the Manager; this port builds
 // canonical runs directly (foreign-key enforcement is off and a session with no

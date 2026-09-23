@@ -43,7 +43,7 @@ import {
 import { ensureRuleFile, ruleFilePath } from "../contextfiles/contextfiles.ts";
 import { registerDelegateSubAgentTool } from "../agent/subagent.ts";
 import type { AgentManager } from "../agent/manager.ts";
-import { ConfigOptionBrowser } from "../agentruntime/session_options.ts";
+import { CONFIG_OPTION_BROWSER } from "../agentruntime/session_options.ts";
 import { ExpertSwitchRequiresForkError } from "../agentruntime/expert.ts";
 import { fork, forkWithExpert } from "../agentruntime/fork.ts";
 import {
@@ -956,7 +956,10 @@ export class TuiCommands {
       };
     }
     try {
-      this.#host.runtime.setCapabilityOption(ConfigOptionBrowser, arg === "on");
+      this.#host.runtime.setCapabilityOption(
+        CONFIG_OPTION_BROWSER,
+        arg === "on",
+      );
     } catch (err) {
       return { message: (err as Error).message, error: true };
     }

@@ -1,5 +1,3 @@
-// Translated from internal/skillhub/completion_test.go
-
 import { assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import { LocalIndex } from "./local.ts";

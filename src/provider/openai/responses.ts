@@ -1,4 +1,3 @@
-// Ported from internal/provider/openai/responses.go
 //
 // `Chat(ctx, params) <-chan StreamEvent` maps to
 // `chatResponses(p, params): AsyncIterable<StreamEvent>`. Raw JSON documents
@@ -612,7 +611,7 @@ export function buildResponsesRequest(
 }
 
 /**
- * Describes intentional local field omissions. Emitted on StreamStart so
+ * Describes intentional local field omissions. Emitted on STREAM_START so
  * callers can audit compatibility decisions without changing the request
  * contract or persisting sensitive request data.
  */

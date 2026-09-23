@@ -1,14 +1,14 @@
-// Ported from internal/acp/acp.go (the ACP request-metadata vocabulary).
+// (the ACP request-metadata vocabulary).
 //
 // ACP clients exchange workspace/parent/editor metadata in `_meta` under both
 // the `opensac` and the namespaced `opensac.dev` keys. Unknown metadata is ignored
 // by design so clients can roll out optional fields independently.
 
 import {
-  ModeAgent,
-  ModeOS,
-  ModePlan,
-  ModeYolo,
+  MODE_AGENT,
+  MODE_OS,
+  MODE_PLAN,
+  MODE_YOLO,
 } from "../agentruntime/source.ts";
 import type { SessionRuntime } from "../agentruntime/session_runtime.ts";
 
@@ -143,10 +143,10 @@ export function sessionModes(
   return {
     currentModeId: mode,
     availableModes: [
-      { id: ModeAgent, name: "Agent" },
-      { id: ModePlan, name: "Plan" },
-      { id: ModeYolo, name: "Yolo" },
-      { id: ModeOS, name: "OS" },
+      { id: MODE_AGENT, name: "Agent" },
+      { id: MODE_PLAN, name: "Plan" },
+      { id: MODE_YOLO, name: "Yolo" },
+      { id: MODE_OS, name: "OS" },
     ],
   };
 }

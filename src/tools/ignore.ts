@@ -1,4 +1,3 @@
-// Ported from go-ripgrep/pkg/ignore/ignore.go.
 //
 // The nested ignore stack used by the grep/find traversal to honor
 // `.gitignore`, `.ignore`, and `.rgignore` files (plus the global gitignore)

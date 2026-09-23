@@ -101,7 +101,7 @@ export function mustUsage(
   for (const event of events) {
     if (event.type === 5 && event.usage !== undefined) return event.usage;
   }
-  throw new Error("no StreamUsage event received");
+  throw new Error("no STREAM_USAGE event received");
 }
 
 /** Captures the JSON request body from a mock request. */

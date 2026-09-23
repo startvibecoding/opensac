@@ -1,5 +1,3 @@
-// Ported from internal/tools/ls.go.
-
 import type { Registry, Tool, ToolContext, ToolResult } from "./tool.ts";
 import { newTextToolResult } from "./tool.ts";
 

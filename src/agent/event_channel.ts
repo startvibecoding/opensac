@@ -1,4 +1,3 @@
-// Ported from the eventSink / `chan Event` plumbing of internal/agent/agent.go.
 //
 // Go's buffered `chan Event` (capacity 100) plus the race-free `eventSink` map
 // to a single-threaded async channel: the run task pushes events and the

@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/decision.go.
 //
 // `DecisionService` owns pending decision identity and first-response-wins
 // semantics for Approval/Question. Protocol-specific payloads and rendering
@@ -12,8 +11,8 @@ import { replayDecisions } from "./decision_replay.ts";
 /** Identifies an interactive decision that can pause a run. */
 export type DecisionKind = string;
 
-export const DecisionApproval: DecisionKind = "approval";
-export const DecisionQuestion: DecisionKind = "question";
+export const DECISION_APPROVAL: DecisionKind = "approval";
+export const DECISION_QUESTION: DecisionKind = "question";
 
 /** The adapter-neutral identity of a pending decision. */
 export interface DecisionRequest {
@@ -86,7 +85,7 @@ export class DecisionService {
       throw new Error("decision ID and run ID are required");
     }
     if (
-      request.kind !== DecisionApproval && request.kind !== DecisionQuestion
+      request.kind !== DECISION_APPROVAL && request.kind !== DECISION_QUESTION
     ) {
       throw new Error(`unsupported decision kind: ${request.kind}`);
     }

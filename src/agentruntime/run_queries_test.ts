@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/run_queries_test.go.
 //
 // The Go fixture uses the agentruntime `RunStore`; this port builds canonical
 // runs through the session layer directly (the `RunStore` wrapper lands with the

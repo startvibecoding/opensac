@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/think_split.go
-
 // The tag literals use Unicode escapes so the source is not rewritten by
 // tooling that treats "<...>" as markup.
 export const thinkOpenTag = "\u003cthink\u003e";

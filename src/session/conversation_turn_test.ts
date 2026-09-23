@@ -1,4 +1,3 @@
-// Ported from internal/session/fork_test.go and run_recovery_test.go
 // (conversation turn boundaries).
 //
 // Go drives turn admission through the session Manager; the not-yet-ported

@@ -12,16 +12,16 @@ import {
   truncatePlain,
 } from "./activity.ts";
 import {
-  EventDone,
-  EventError,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolCall,
-  EventToolResult,
-  TaskCanceled,
-  TaskFailed,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_RESULT,
+  TASK_CANCELED,
+  TASK_FAILED,
 } from "../agent/events.ts";
 import { Translator } from "./i18n.ts";
 import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
@@ -30,26 +30,26 @@ import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
 
 Deno.test("activity store ignores lead and approval/question events", () => {
   assertEquals(
-    AgentActivityStore.isBackgroundAgentEvent({ type: EventTextDelta }),
+    AgentActivityStore.isBackgroundAgentEvent({ type: EVENT_TEXT_DELTA }),
     false,
   );
   assertEquals(
     AgentActivityStore.isBackgroundAgentEvent({
-      type: EventTextDelta,
+      type: EVENT_TEXT_DELTA,
       agentId: "a1",
     }, "a1"),
     false,
   );
   assertEquals(
     AgentActivityStore.isBackgroundAgentEvent({
-      type: EventTextDelta,
+      type: EVENT_TEXT_DELTA,
       agentId: "a1",
     }, "lead"),
     true,
   );
   assertEquals(
     AgentActivityStore.isBackgroundAgentEvent({
-      type: EventToolCall,
+      type: EVENT_TOOL_CALL,
       agentId: "a1",
     }),
     true,
@@ -59,15 +59,18 @@ Deno.test("activity store ignores lead and approval/question events", () => {
 Deno.test("activity store folds deltas, tools, and terminal states", () => {
   const store = new AgentActivityStore();
   const now = new Date();
-  store.record({ type: EventTextDelta, agentId: "a1", textDelta: "Hel" }, now);
-  store.record({ type: EventTextDelta, agentId: "a1", textDelta: "lo" }, now);
   store.record(
-    { type: EventThinkDelta, agentId: "a1", thinkDelta: "hmm" },
+    { type: EVENT_TEXT_DELTA, agentId: "a1", textDelta: "Hel" },
+    now,
+  );
+  store.record({ type: EVENT_TEXT_DELTA, agentId: "a1", textDelta: "lo" }, now);
+  store.record(
+    { type: EVENT_THINK_DELTA, agentId: "a1", thinkDelta: "hmm" },
     now,
   );
   store.record(
     {
-      type: EventToolCall,
+      type: EVENT_TOOL_CALL,
       agentId: "a1",
       toolName: "read_file",
       toolArgs: { path: "/x" },
@@ -75,15 +78,15 @@ Deno.test("activity store folds deltas, tools, and terminal states", () => {
     now,
   );
   store.record({
-    type: EventToolResult,
+    type: EVENT_TOOL_RESULT,
     agentId: "a1",
     toolName: "read_file",
     toolResult: " contents ",
   }, now);
   store.record({
-    type: EventRunFinished,
+    type: EVENT_RUN_FINISHED,
     agentId: "a1",
-    status: TaskFailed,
+    status: TASK_FAILED,
     error: new Error("boom"),
   }, now);
 
@@ -101,19 +104,19 @@ Deno.test("activity store folds deltas, tools, and terminal states", () => {
 
 Deno.test("activity store keeps terminal state on late events", () => {
   const store = new AgentActivityStore();
-  store.record({ type: EventDone, agentId: "a1" });
+  store.record({ type: EVENT_DONE, agentId: "a1" });
   assertEquals(store.get("a1")!.state, "done");
   // A late error must not flip a terminal state
-  store.record({ type: EventError, agentId: "a1", error: new Error("late") });
+  store.record({ type: EVENT_ERROR, agentId: "a1", error: new Error("late") });
   assertEquals(store.get("a1")!.state, "done");
 });
 
 Deno.test("activity store records workflow kind and cancellation", () => {
   const store = new AgentActivityStore();
   store.record({
-    type: EventRunFinished,
+    type: EVENT_RUN_FINISHED,
     agentId: "workflow:build",
-    status: TaskCanceled,
+    status: TASK_CANCELED,
   });
   const act = store.get("workflow:build")!;
   assertEquals(act.kind, "workflow");
@@ -123,7 +126,7 @@ Deno.test("activity store records workflow kind and cancellation", () => {
 Deno.test("activity store caps the event timeline", () => {
   const store = new AgentActivityStore();
   for (let i = 0; i < 250; i++) {
-    store.record({ type: EventStatus, agentId: "a1", statusMessage: `s${i}` });
+    store.record({ type: EVENT_STATUS, agentId: "a1", statusMessage: `s${i}` });
   }
   const act = store.get("a1")!;
   assertEquals(act.events.length, 200);
@@ -136,12 +139,12 @@ Deno.test("renderAgentActivity shows header, sections, and timeline", () => {
   const store = new AgentActivityStore();
   const now = new Date("2026-09-20T12:00:30");
   store.record(
-    { type: EventTextDelta, agentId: "a1", textDelta: "answer" },
+    { type: EVENT_TEXT_DELTA, agentId: "a1", textDelta: "answer" },
     new Date("2026-09-20T12:00:00"),
   );
   store.record(
     {
-      type: EventToolCall,
+      type: EVENT_TOOL_CALL,
       agentId: "a1",
       toolName: "bash",
       toolArgs: { cmd: "ls" },
@@ -211,7 +214,7 @@ Deno.test("renderActivitySummary shows last 4 agents with state", () => {
   const store = new AgentActivityStore();
   for (let i = 0; i < 6; i++) {
     store.record({
-      type: EventTextDelta,
+      type: EVENT_TEXT_DELTA,
       agentId: `a${i}`,
       textDelta: `text ${i}`,
     });

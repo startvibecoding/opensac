@@ -1,4 +1,3 @@
-// Ported from internal/agent/provider.go.
 //
 // This is the internal agent package's provider contract. It duplicates the
 // protocol-neutral `src/provider` interfaces (the Go source does too) and is
@@ -55,24 +54,24 @@ export interface StreamEvent {
 /** StreamEventType identifies the type of stream event. */
 export type StreamEventType = number;
 
-export const StreamStart: StreamEventType = 0;
-export const StreamTextDelta: StreamEventType = 1;
-export const StreamThinkDelta: StreamEventType = 2;
-export const StreamToolCall: StreamEventType = 3;
-export const StreamUsage: StreamEventType = 4;
-export const StreamDone: StreamEventType = 5;
-export const StreamError: StreamEventType = 6;
+export const STREAM_START: StreamEventType = 0;
+export const STREAM_TEXT_DELTA: StreamEventType = 1;
+export const STREAM_THINK_DELTA: StreamEventType = 2;
+export const STREAM_TOOL_CALL: StreamEventType = 3;
+export const STREAM_USAGE: StreamEventType = 4;
+export const STREAM_DONE: StreamEventType = 5;
+export const STREAM_ERROR: StreamEventType = 6;
 
 /** ThinkingLevel represents the thinking/reasoning level. */
 export type ThinkingLevel = string;
 
-export const ThinkingOff: ThinkingLevel = "off";
-export const ThinkingMinimal: ThinkingLevel = "minimal";
-export const ThinkingLow: ThinkingLevel = "low";
-export const ThinkingMedium: ThinkingLevel = "medium";
-export const ThinkingHigh: ThinkingLevel = "high";
-export const ThinkingXHigh: ThinkingLevel = "xhigh";
-export const ThinkingMax: ThinkingLevel = "max";
+export const THINKING_OFF: ThinkingLevel = "off";
+export const THINKING_MINIMAL: ThinkingLevel = "minimal";
+export const THINKING_LOW: ThinkingLevel = "low";
+export const THINKING_MEDIUM: ThinkingLevel = "medium";
+export const THINKING_HIGH: ThinkingLevel = "high";
+export const THINKING_X_HIGH: ThinkingLevel = "xhigh";
+export const THINKING_MAX: ThinkingLevel = "max";
 
 /** Represents a model configuration. */
 export interface Model {

@@ -1,4 +1,3 @@
-// Ported from internal/esm/report.go
 //
 // The structured role reports an isolated ESM worker/critic/audit/recovery
 // sub-agent returns as its final assistant response, plus their tolerant JSON

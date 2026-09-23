@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main_knowledge_mcp.go: the `knowledge-mcp serve`
+// the `knowledge-mcp serve`
 // subcommand that exposes explicitly configured knowledge bases over the MCP
 // stdio transport.
 

@@ -1,4 +1,3 @@
-// Ported from internal/session/database_reset.go
 //
 // Moves the shared sessions database aside and creates a fresh, migrated one in
 // its place. The previous database and its sidecars are renamed (never deleted)

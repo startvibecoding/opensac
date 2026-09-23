@@ -6,20 +6,20 @@ import { assert, assertEquals } from "@std/assert";
 import { AppController, type RunHandle } from "./app_controller.ts";
 import type { Event } from "../agent/events.ts";
 import {
-  EventDone,
-  EventError,
-  EventPlanUpdate,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolCall,
-  EventToolExecutionStart,
-  EventToolResult,
-  EventTurnEnd,
-  EventTurnStart,
-  TaskCanceled,
-  TaskFailed,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_PLAN_UPDATE,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_RESULT,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
+  TASK_CANCELED,
+  TASK_FAILED,
 } from "../agent/events.ts";
 import { Translator } from "./i18n.ts";
 
@@ -56,13 +56,17 @@ function ev(partial: Partial<Event>): Event {
 
 Deno.test("plan updates set the current plan and tag their tool row", () => {
   const { c } = controller("lead");
-  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   c.handleAgentEvent(
-    ev({ type: EventToolExecutionStart, toolCallId: "tc-p", toolName: "plan" }),
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "tc-p",
+      toolName: "plan",
+    }),
   );
   c.handleAgentEvent(
     ev({
-      type: EventPlanUpdate,
+      type: EVENT_PLAN_UPDATE,
       toolCallId: "tc-p",
       plan: {
         title: "T",
@@ -73,7 +77,7 @@ Deno.test("plan updates set the current plan and tag their tool row", () => {
   );
   c.handleAgentEvent(
     ev({
-      type: EventToolResult,
+      type: EVENT_TOOL_RESULT,
       toolCallId: "tc-p",
       toolName: "plan",
       toolResult: "Plan: T",
@@ -86,11 +90,11 @@ Deno.test("plan updates set the current plan and tag their tool row", () => {
 Deno.test("lead streaming events feed the transcript store", () => {
   const { c } = controller("lead");
   c.attachRun(runHandle().handle);
-  c.handleAgentEvent(ev({ type: EventTurnStart }));
-  c.handleAgentEvent(ev({ type: EventTextDelta, textDelta: "hel" }));
-  c.handleAgentEvent(ev({ type: EventTextDelta, textDelta: "lo" }));
-  c.handleAgentEvent(ev({ type: EventThinkDelta, thinkDelta: "hmm" }));
-  c.handleAgentEvent(ev({ type: EventTurnEnd }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
+  c.handleAgentEvent(ev({ type: EVENT_TEXT_DELTA, textDelta: "hel" }));
+  c.handleAgentEvent(ev({ type: EVENT_TEXT_DELTA, textDelta: "lo" }));
+  c.handleAgentEvent(ev({ type: EVENT_THINK_DELTA, thinkDelta: "hmm" }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_END }));
   // Turn start reserved slot 0; think converted it; assistant slot 1 empty;
   // turn end committed both.
   assertEquals(c.store.currentAssistantIdx, -1);
@@ -101,14 +105,14 @@ Deno.test("lead streaming events feed the transcript store", () => {
 Deno.test("background events route to the activity store, not the transcript", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(
-    ev({ type: EventTextDelta, agentId: "sub-1", textDelta: "sub text" }),
+    ev({ type: EVENT_TEXT_DELTA, agentId: "sub-1", textDelta: "sub text" }),
   );
   assertEquals(c.store.messages.length, 0);
   assertEquals(c.activities.size, 1);
   assertEquals(c.activities.get("sub-1")?.fullText, "sub text");
   // Lead's own events never become background activity
   c.handleAgentEvent(
-    ev({ type: EventTextDelta, agentId: "lead", textDelta: "x" }),
+    ev({ type: EVENT_TEXT_DELTA, agentId: "lead", textDelta: "x" }),
   );
   assertEquals(c.activities.size, 1);
 });
@@ -116,14 +120,14 @@ Deno.test("background events route to the activity store, not the transcript", (
 Deno.test("tool events open and terminalize rows", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({
-    type: EventToolExecutionStart,
+    type: EVENT_TOOL_EXECUTION_START,
     toolCallId: "t1",
     toolName: "bash",
     toolArgs: { cmd: "ls" },
   }));
   assertEquals(c.store.toolResults[0].status, "running");
   c.handleAgentEvent(ev({
-    type: EventToolResult,
+    type: EVENT_TOOL_RESULT,
     toolCallId: "t1",
     toolName: "bash",
     toolResult: "out",
@@ -134,7 +138,7 @@ Deno.test("tool events open and terminalize rows", () => {
 Deno.test("tool call event uses the embedded ToolCallBlock id/name", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({
-    type: EventToolCall,
+    type: EVENT_TOOL_CALL,
     toolCall: { id: "tc-1", name: "read" },
   }));
   assertEquals(c.store.toolResults[0].toolCallID, "tc-1");
@@ -143,10 +147,10 @@ Deno.test("tool call event uses the embedded ToolCallBlock id/name", () => {
 
 Deno.test("status messages become transcript rows; retry-status skipped", () => {
   const { c, messages } = controller("lead");
-  c.handleAgentEvent(ev({ type: EventStatus, statusMessage: "thinking..." }));
+  c.handleAgentEvent(ev({ type: EVENT_STATUS, statusMessage: "thinking..." }));
   assertEquals(messages, ["thinking..."]);
   c.handleAgentEvent(ev({
-    type: EventStatus,
+    type: EVENT_STATUS,
     retryStatus: true,
     statusMessage: "internal",
   }));
@@ -159,12 +163,16 @@ Deno.test("run finished terminalizes the run and interrupted tools", () => {
   c.attachRun(handle);
   c.isThinking = true;
   c.handleAgentEvent(
-    ev({ type: EventToolExecutionStart, toolCallId: "t1", toolName: "bash" }),
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "t1",
+      toolName: "bash",
+    }),
   );
   c.handleAgentEvent(
     ev({
-      type: EventRunFinished,
-      status: TaskFailed,
+      type: EVENT_RUN_FINISHED,
+      status: TASK_FAILED,
       error: new Error("boom"),
     }),
   );
@@ -176,7 +184,7 @@ Deno.test("run finished terminalizes the run and interrupted tools", () => {
   // Success path
   const { handle: h2, finished: f2 } = runHandle();
   c.attachRun(h2);
-  c.handleAgentEvent(ev({ type: EventRunFinished, status: "success" }));
+  c.handleAgentEvent(ev({ type: EVENT_RUN_FINISHED, status: "success" }));
   assertEquals(f2, ["completed"]);
 });
 
@@ -184,28 +192,28 @@ Deno.test("cancellation maps to cancelled and adds a message", () => {
   const { c, messages } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({ type: EventRunFinished, status: TaskCanceled }));
+  c.handleAgentEvent(ev({ type: EVENT_RUN_FINISHED, status: TASK_CANCELED }));
   assertEquals(finished, ["cancelled"]);
   assertEquals(messages.some((m) => m.toLowerCase().includes("cancel")), true);
 });
 
-Deno.test("legacy EventDone/EventError terminalize when RunFinished is absent", () => {
+Deno.test("legacy EVENT_DONE/EVENT_ERROR terminalize when RunFinished is absent", () => {
   const { c } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({ type: EventError, error: new Error("legacy") }));
+  c.handleAgentEvent(ev({ type: EVENT_ERROR, error: new Error("legacy") }));
   assertEquals(finished, ["failed"]);
   assertEquals(c.runTerminalHandled, true);
-  // A trailing legacy EventDone is ignored
-  c.handleAgentEvent(ev({ type: EventDone }));
+  // A trailing legacy EVENT_DONE is ignored
+  c.handleAgentEvent(ev({ type: EVENT_DONE }));
   assertEquals(finished, ["failed"]);
 });
 
-Deno.test("legacy EventDone terminalizes the run as completed", () => {
+Deno.test("legacy EVENT_DONE terminalizes the run as completed", () => {
   const { c } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({ type: EventDone }));
+  c.handleAgentEvent(ev({ type: EVENT_DONE }));
   assertEquals(finished, ["completed"]);
   assertEquals(c.runTerminalHandled, true);
 });
@@ -215,7 +223,7 @@ Deno.test("approval requests register a decision and queue", () => {
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
   c.handleAgentEvent(ev({
-    type: 15, // EventToolApprovalRequest
+    type: 15, // EVENT_TOOL_APPROVAL_REQUEST
     approvalId: "ap-1",
     approvalTool: "bash",
     approvalArgs: { cmd: "rm" },
@@ -233,7 +241,7 @@ Deno.test("member questions route to the lead mailbox path, not the human", () =
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
   c.handleAgentEvent(ev({
-    type: 17, // EventQuestionRequest
+    type: 17, // EVENT_QUESTION_REQUEST
     agentId: "sub-1",
     memberDisplayName: "Worker",
     questionText: "what next?",
@@ -336,7 +344,7 @@ Deno.test({
   async fn() {
     const { c } = controller("lead");
     c.handleAgentEvent(
-      ev({ type: EventTextDelta, textDelta: "streaming answer" }),
+      ev({ type: EVENT_TEXT_DELTA, textDelta: "streaming answer" }),
     );
     c.handleAgentEvent(ev({
       type: 15,
@@ -378,10 +386,10 @@ Deno.test({
 Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
   const { c } = controller("lead");
   c.attachRun(runHandle().handle);
-  c.handleAgentEvent(ev({ type: EventTurnStart }));
-  c.handleAgentEvent(ev({ type: EventThinkDelta, thinkDelta: "hmm" }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
+  c.handleAgentEvent(ev({ type: EVENT_THINK_DELTA, thinkDelta: "hmm" }));
   c.handleAgentEvent(ev({
-    type: EventToolCall,
+    type: EVENT_TOOL_CALL,
     toolCall: { id: "t1", name: "bash" },
     toolArgs: { command: "ls" },
   }));
@@ -399,7 +407,7 @@ Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
   assertEquals(think?.content, "hmm");
 
   c.handleAgentEvent(ev({
-    type: EventToolResult,
+    type: EVENT_TOOL_RESULT,
     toolCallId: "t1",
     toolResult: "ok",
   }));
@@ -409,7 +417,7 @@ Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
 
   // Turn end finalizes the open thinking block.
   // After completion, thinking is removed from timeline (now in transcript).
-  c.handleAgentEvent(ev({ type: EventTurnEnd }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_END }));
   assertEquals(
     c.activityManager.buildTimeline().find((i) => i.type === "thinking"),
     undefined,
@@ -420,13 +428,13 @@ Deno.test("run finish interrupts tools that never returned", () => {
   const { c } = controller("lead");
   const { handle } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   c.handleAgentEvent(ev({
-    type: EventToolExecutionStart,
+    type: EVENT_TOOL_EXECUTION_START,
     toolCallId: "t9",
     toolName: "bash",
   }));
-  c.handleAgentEvent(ev({ type: EventRunFinished, status: TaskCanceled }));
+  c.handleAgentEvent(ev({ type: EVENT_RUN_FINISHED, status: TASK_CANCELED }));
   const tool = c.activityManager.buildTimeline().find((i) => i.type === "tool");
   assertEquals(tool?.status, "interrupted");
   // No thinking block was opened, so none is finalized.
@@ -439,13 +447,13 @@ Deno.test("run finish interrupts tools that never returned", () => {
 
 Deno.test("new turn resets the activity timeline", () => {
   const { c } = controller("lead");
-  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   c.handleAgentEvent(ev({
-    type: EventToolCall,
+    type: EVENT_TOOL_CALL,
     toolCall: { id: "a", name: "grep" },
   }));
   assertEquals(c.activityManager.buildTimeline().length, 1);
-  c.handleAgentEvent(ev({ type: EventTurnStart }));
+  c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   assertEquals(c.activityManager.buildTimeline().length, 0);
 });
 
@@ -455,15 +463,15 @@ Deno.test({
   sanitizeResources: false,
   async fn() {
     const { c } = controller("lead");
-    c.handleAgentEvent(ev({ type: EventTurnStart }));
+    c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
     c.handleAgentEvent(ev({
-      type: EventToolExecutionStart,
+      type: EVENT_TOOL_EXECUTION_START,
       toolCallId: "t-bash",
       toolName: "bash",
       toolArgs: { command: "cd /a/b & ls" },
     }));
     c.handleAgentEvent(ev({
-      type: EventToolExecutionStart,
+      type: EVENT_TOOL_EXECUTION_START,
       toolCallId: "t-read",
       toolName: "read",
       toolArgs: { path: "src/main.ts" },

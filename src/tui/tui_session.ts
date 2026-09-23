@@ -12,7 +12,7 @@ import {
   Builder,
   type SessionRuntime,
 } from "../agentruntime/session_runtime.ts";
-import { resolveUnattendedMode, SourceTUI } from "../agentruntime/source.ts";
+import { resolveUnattendedMode, SOURCE_TUI } from "../agentruntime/source.ts";
 import { newAgentManager } from "../agentruntime/agent_manager.ts";
 import type { AgentManager } from "../agent/manager.ts";
 import { canAutoRun, Supervisor } from "../esm/mod.ts";
@@ -77,7 +77,7 @@ import type { Objective } from "../esm/state.ts";
 import { Store as ESMStore } from "../esm/store.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
 import { displayWidth } from "./formatters.ts";
-import { EventError, TaskFailed } from "../agent/events.ts";
+import { EVENT_ERROR, TASK_FAILED } from "../agent/events.ts";
 
 export interface TUISessionOptions {
   provider: string;
@@ -205,7 +205,7 @@ export class TUISession implements CommandHost {
       this.#settings,
       sandboxLevelFromSettings(this.#settings),
     ).build(undefined, {
-      source: SourceTUI,
+      source: SOURCE_TUI,
       workDir: this.#workDir,
       workflows: false,
       browser: false,
@@ -913,8 +913,8 @@ export class TUISession implements CommandHost {
       if (!this.controller.runTerminalHandled) {
         this.controller.handleAgentEvent(
           {
-            type: EventError,
-            status: TaskFailed,
+            type: EVENT_ERROR,
+            status: TASK_FAILED,
             error: err instanceof Error ? err : new Error(String(err)),
           } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
         );
@@ -1461,7 +1461,7 @@ export class TUISession implements CommandHost {
     if (header !== null) {
       this.#workDir = header.cwd !== "" ? header.cwd : this.#workDir;
     }
-    await this.#runtime.bindSession(manager, SourceTUI);
+    await this.#runtime.bindSession(manager, SOURCE_TUI);
   }
 
   /** Binds a provider/model pair chosen in a dialog to the live session. */

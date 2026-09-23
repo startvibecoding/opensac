@@ -1,5 +1,3 @@
-// Translated from internal/mcp/server_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { type ServerHandler, type ServerTool, serveStdio } from "./server.ts";
 

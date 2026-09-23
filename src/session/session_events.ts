@@ -1,4 +1,4 @@
-// Ported from internal/session/session.go (capability + event + sequenced
+// (capability + event + sequenced
 // message projections).
 //
 // These are the read/write projections adapters use to replay a session: the

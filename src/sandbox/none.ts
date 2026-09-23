@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/none.go
-
 import { shellArgs } from "../platform/platform.ts";
 import type { CommandSpec, ExecOpts, Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";

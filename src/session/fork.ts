@@ -1,4 +1,3 @@
-// Ported from internal/session/fork.go
 //
 // Durable, idempotent session forking. A fork snapshots a source session's
 // transcript up to a resolved boundary into a new child session inside the

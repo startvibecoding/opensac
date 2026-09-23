@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/delivery_replay.go.
 //
 // Protocol-neutral projection of durable delivery handoffs. The actual message
 // remains in the session transcript. `json.RawMessage` maps to decoded

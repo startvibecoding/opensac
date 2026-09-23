@@ -1,4 +1,3 @@
-// Translated from the SQLite-store cases of internal/cron/cron_test.go.
 //
 // The Go concurrency cases (two goroutines racing ClaimDue, 500 goroutines
 // minting IDs) reduce to deterministic sequential assertions because Deno is

@@ -1,4 +1,4 @@
-// Ported from internal/tools/write.go (the file-diff and atomic-write helpers).
+// (the file-diff and atomic-write helpers).
 //
 // These helpers are shared by the write/edit/insert tools. Go's `os.FileMode`
 // maps to Deno's Unix `mode`; the atomic writes use a temp file in the target

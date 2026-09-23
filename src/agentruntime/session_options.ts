@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/session_options.go.
 //
 // The front-end-neutral representation of a session's mutable settings. ACP
 // serializes `SessionConfigOption` directly as a select option; other adapters
@@ -19,7 +18,7 @@ import {
   thinkingXHigh,
 } from "../provider/types.ts";
 import { qualifiedModel } from "../provider/factory/factory.ts";
-import { ModeAgent, ModeOS, ModePlan, ModeYolo } from "./source.ts";
+import { MODE_AGENT, MODE_OS, MODE_PLAN, MODE_YOLO } from "./source.ts";
 
 /** One select option in a mutable session setting. */
 export interface SessionConfigOption {
@@ -40,19 +39,19 @@ export interface SessionConfigOptionChoice {
 }
 
 /** Stable protocol-neutral option identifiers. */
-export const ConfigOptionProvider = "provider";
-export const ConfigOptionModel = "model";
-export const ConfigOptionMode = "mode";
-export const ConfigOptionThinkingLevel = "thinking_level";
-export const ConfigOptionSandbox = "sandbox";
-export const ConfigOptionBrowser = "browser";
-export const ConfigOptionWebSearch = "web_search";
+export const CONFIG_OPTION_PROVIDER = "provider";
+export const CONFIG_OPTION_MODEL = "model";
+export const CONFIG_OPTION_MODE = "mode";
+export const CONFIG_OPTION_THINKING_LEVEL = "thinking_level";
+export const CONFIG_OPTION_SANDBOX = "sandbox";
+export const CONFIG_OPTION_BROWSER = "browser";
+export const CONFIG_OPTION_WEB_SEARCH = "web_search";
 /**
  * Selects the Runtime-owned expert bundle for a session. Replacing one non-empty
  * value is deliberately rejected by `SetExpert`; adapters must create a fork
  * with `forkWithExpert` instead.
  */
-export const ConfigOptionExpert = "expert";
+export const CONFIG_OPTION_EXPERT = "expert";
 
 /** The set of providers available to a session runtime. */
 export type ProviderCatalog = Record<string, Provider>;
@@ -124,7 +123,7 @@ export function sessionConfigOptionsWithProviders(
   const options: SessionConfigOption[] = [
     {
       type: "select",
-      id: ConfigOptionProvider,
+      id: CONFIG_OPTION_PROVIDER,
       name: "Provider",
       category: "provider",
       currentValue: providerName,
@@ -132,7 +131,7 @@ export function sessionConfigOptionsWithProviders(
     },
     {
       type: "select",
-      id: ConfigOptionModel,
+      id: CONFIG_OPTION_MODEL,
       name: "Model",
       category: "model",
       currentValue: model === null ? "" : qualifiedModel(providerName, model),
@@ -140,22 +139,22 @@ export function sessionConfigOptionsWithProviders(
     },
     {
       type: "select",
-      id: ConfigOptionMode,
+      id: CONFIG_OPTION_MODE,
       name: "Mode",
       category: "mode",
       currentValue: mode,
       options: [
-        { value: ModeAgent, name: "Agent" },
-        { value: ModePlan, name: "Plan" },
-        { value: ModeYolo, name: "Yolo" },
-        { value: ModeOS, name: "OS" },
+        { value: MODE_AGENT, name: "Agent" },
+        { value: MODE_PLAN, name: "Plan" },
+        { value: MODE_YOLO, name: "Yolo" },
+        { value: MODE_OS, name: "OS" },
       ],
     },
   ];
   if (model !== null && model.reasoning) {
     options.push({
       type: "select",
-      id: ConfigOptionThinkingLevel,
+      id: CONFIG_OPTION_THINKING_LEVEL,
       name: "Thinking level",
       category: "thought_level",
       currentValue: thinking,

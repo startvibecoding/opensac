@@ -1,9 +1,7 @@
-// Ported from internal/agentruntime/run_replay_test.go.
-
 import { assertEquals } from "@std/assert";
 import type { SessionRunEvent } from "../session/session_events.ts";
 import { replayRunEvents, replayRunEventsJSON } from "./run_replay.ts";
-import { RunStateCompleted, RunStateRunning } from "./run_state.ts";
+import { RUN_STATE_COMPLETED, RUN_STATE_RUNNING } from "./run_state.ts";
 
 function event(overrides: Partial<SessionRunEvent>): SessionRunEvent {
   return {
@@ -56,7 +54,7 @@ Deno.test("ReplayRunEvents reconstructs terminal state", () => {
   assertEquals(replay.sessionId, "session-1");
   assertEquals(replay.runId, "run-1");
   assertEquals(replay.events.length, 3);
-  assertEquals(replay.status, RunStateCompleted);
+  assertEquals(replay.status, RUN_STATE_COMPLETED);
   assertEquals(replay.terminal, true);
 });
 
@@ -69,7 +67,7 @@ Deno.test("ReplayRunEvents keeps pending run non-terminal", () => {
       status: "running",
     }),
   ], "run-1");
-  assertEquals(replay.status, RunStateRunning);
+  assertEquals(replay.status, RUN_STATE_RUNNING);
   assertEquals(replay.terminal, false);
 });
 

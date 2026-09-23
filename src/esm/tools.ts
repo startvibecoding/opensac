@@ -1,4 +1,3 @@
-// Ported from internal/esm/tools.go
 //
 // The model-facing get_esm / update_esm tools plus the compact plain-text
 // objective renderer shared by TUI and tools.

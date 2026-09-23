@@ -1,11 +1,9 @@
-// Ported from internal/agentruntime/decision_events_test.go.
-
 import { assert, assertEquals, assertFalse } from "@std/assert";
-import { DecisionApproval, DecisionQuestion } from "./decision.ts";
+import { DECISION_APPROVAL, DECISION_QUESTION } from "./decision.ts";
 import {
   buildDecisionEvent,
-  DecisionStatusPending,
-  DecisionStatusResolved,
+  DECISION_STATUS_PENDING,
+  DECISION_STATUS_RESOLVED,
   decodeDecisionEvent,
   loadDecisionRecords,
   loadRunDecisionRecords,
@@ -22,15 +20,15 @@ Deno.test("Build and decode decision event round trip", () => {
       id: "approval-1",
       sessionId: "s-1",
       runId: "r-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
     },
-    status: DecisionStatusPending,
+    status: DECISION_STATUS_PENDING,
     payload: { tool: "bash" },
     expiresAt: deadline,
     source: "tui",
   });
   assertEquals(event.eventType, "decision_pending");
-  assertEquals(event.status, DecisionStatusPending);
+  assertEquals(event.status, DECISION_STATUS_PENDING);
   assertEquals(event.source, "tui");
 
   const record = decodeDecisionEvent({
@@ -47,8 +45,8 @@ Deno.test("Build and decode decision event round trip", () => {
   });
   assert(record !== null);
   assertEquals(record.id, "approval-1");
-  assertEquals(record.kind, DecisionApproval);
-  assertEquals(record.status, DecisionStatusPending);
+  assertEquals(record.kind, DECISION_APPROVAL);
+  assertEquals(record.status, DECISION_STATUS_PENDING);
   assertEquals(record.sessionId, "s-1");
   assertEquals(record.runId, "r-1");
   assertEquals(record.expiresAt?.getTime(), deadline.getTime());
@@ -58,8 +56,8 @@ Deno.test("DecodeDecisionEvent defaults identity and rejects foreign", () => {
   const data = {
     decision: {
       id: "q-1",
-      kind: DecisionQuestion,
-      status: DecisionStatusPending,
+      kind: DECISION_QUESTION,
+      status: DECISION_STATUS_PENDING,
     },
   };
   const record = decodeDecisionEvent({
@@ -138,26 +136,26 @@ Deno.test("NewDecisionRecord shape by status", () => {
     id: "d-1",
     sessionId: "s-1",
     runId: "r-1",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   };
   const deadline = new Date(Date.now() + 60_000);
   const pending = newDecisionRecord(
     request,
-    DecisionStatusPending,
+    DECISION_STATUS_PENDING,
     "",
     { tool: "bash" },
     deadline,
   );
-  assertEquals(pending.status, DecisionStatusPending);
+  assertEquals(pending.status, DECISION_STATUS_PENDING);
   assertEquals(pending.expiresAt?.getTime(), deadline.getTime());
   const resolved = newDecisionRecord(
     request,
-    DecisionStatusResolved,
+    DECISION_STATUS_RESOLVED,
     "allow",
     null,
     undefined,
   );
-  assertEquals(resolved.status, DecisionStatusResolved);
+  assertEquals(resolved.status, DECISION_STATUS_RESOLVED);
   assertEquals(resolved.value, "allow");
   assertEquals(resolved.expiresAt, undefined);
 });
@@ -171,18 +169,18 @@ Deno.test("Load decision records by session and run", () => {
         id: "a",
         sessionId: "s-1",
         runId: "r-1",
-        kind: DecisionApproval,
+        kind: DECISION_APPROVAL,
       },
-      status: DecisionStatusPending,
+      status: DECISION_STATUS_PENDING,
     },
     {
       request: {
         id: "a",
         sessionId: "s-1",
         runId: "r-1",
-        kind: DecisionApproval,
+        kind: DECISION_APPROVAL,
       },
-      status: DecisionStatusResolved,
+      status: DECISION_STATUS_RESOLVED,
       value: "allow",
     },
     {
@@ -190,9 +188,9 @@ Deno.test("Load decision records by session and run", () => {
         id: "b",
         sessionId: "s-1",
         runId: "r-2",
-        kind: DecisionQuestion,
+        kind: DECISION_QUESTION,
       },
-      status: DecisionStatusPending,
+      status: DECISION_STATUS_PENDING,
     },
   ];
   for (const transition of transitions) {

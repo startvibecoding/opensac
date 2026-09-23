@@ -1,5 +1,3 @@
-// Ported from internal/provider/base.go
-
 import type { Model } from "./types.ts";
 
 /** BaseProvider provides common functionality for provider implementations. */

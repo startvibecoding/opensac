@@ -1,4 +1,3 @@
-// Translated from internal/mcp/mcp_http_integration_test.go
 //
 // `net/http/httptest` maps to `Deno.serve` on an ephemeral localhost port.
 

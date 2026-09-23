@@ -1,4 +1,3 @@
-// Ported from internal/skills/skills.go
 //
 // Go's io/fs + go:embed is replaced by a small `SkillFS` interface (used for
 // embedded built-in skills) plus direct Deno FS access for project/global dirs.

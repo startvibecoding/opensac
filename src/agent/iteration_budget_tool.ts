@@ -1,5 +1,3 @@
-// Ported from internal/agent/iteration_budget_tool.go.
-
 import {
   newTextToolResult,
   type Tool,
@@ -7,8 +5,8 @@ import {
   type ToolResult,
 } from "../tools/tool.ts";
 import {
+  ITERATION_BUDGET_TOOL_NAME,
   iterationBudgetFromToolContext,
-  IterationBudgetToolName,
 } from "./iteration_budget.ts";
 
 /**
@@ -20,7 +18,7 @@ import {
  */
 export class ExtendBudgetTool implements Tool {
   name(): string {
-    return IterationBudgetToolName;
+    return ITERATION_BUDGET_TOOL_NAME;
   }
 
   description(): string {

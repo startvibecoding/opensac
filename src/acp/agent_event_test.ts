@@ -1,4 +1,3 @@
-// Translated from the agent-event projection cases of
 // internal/acp/acp_mcp_test.go and internal/acp/acp_phase1_test.go plus the
 // terminal/usage assertions of the ACP server. Fixtures construct an
 // `AcpServer`, bind an in-memory sink, and call `handleAgentEvent` directly,
@@ -13,21 +12,21 @@ import {
 } from "./server.ts";
 import {
   type Event as AgentEvent,
-  EventDone,
-  EventError,
-  EventHostedItem,
-  EventPlanUpdate,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventTurnStart,
-  EventUsage,
-  TaskCanceled,
-  TaskIncomplete,
-  TaskSuccess,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_PLAN_UPDATE,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TURN_START,
+  EVENT_USAGE,
+  TASK_CANCELED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
 } from "../agent/events.ts";
 import {
   type Message,
@@ -153,7 +152,7 @@ Deno.test("handleAgentEvent projects tool-result images", () => {
   server.handleAgentEvent(
     "session-1",
     {
-      type: EventToolExecutionEnd,
+      type: EVENT_TOOL_EXECUTION_END,
       toolCallId: "call-read",
       toolName: "read",
       toolResult: "image attached",
@@ -190,22 +189,22 @@ Deno.test("tool boundary starts a new assistant message", () => {
   server.sessions.set("session-1", rt);
 
   server.handleAgentEvent("session-1", {
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     textDelta: "before tool",
   });
   server.handleAgentEvent("session-1", {
-    type: EventToolCall,
+    type: EVENT_TOOL_CALL,
     toolCall: { id: "call-1", name: "read" },
   });
   server.handleAgentEvent("session-1", {
-    type: EventToolExecutionEnd,
+    type: EVENT_TOOL_EXECUTION_END,
     toolCallId: "call-1",
     toolName: "read",
     toolResult: "done",
   });
-  server.handleAgentEvent("session-1", { type: EventTurnStart });
+  server.handleAgentEvent("session-1", { type: EVENT_TURN_START });
   server.handleAgentEvent("session-1", {
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     textDelta: "final answer",
   });
 
@@ -231,7 +230,7 @@ Deno.test("plan update uses the standard plan variant", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
-    type: EventPlanUpdate,
+    type: EVENT_PLAN_UPDATE,
     plan: {
       title: "Implementation",
       steps: [{ title: "Inspect", status: "running" }],
@@ -250,7 +249,7 @@ Deno.test("opensac status uses an extension notification", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
-    type: EventStatus,
+    type: EVENT_STATUS,
     statusMessage: "working",
   });
   const message = parseMessages(output.toString())[0];
@@ -261,7 +260,7 @@ Deno.test("opensac retry uses a structured extension notification", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
-    type: EventRetry,
+    type: EVENT_RETRY,
     retryAttempt: 2,
     retryMaxAttempts: 4,
     retryAfterMs: 1500,
@@ -284,7 +283,7 @@ Deno.test("hosted item uses a non-executable tool update", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
-    type: EventHostedItem,
+    type: EVENT_HOSTED_ITEM,
     hostedItem: {
       id: "search-1",
       type: "web_search_call",
@@ -304,7 +303,7 @@ Deno.test("tool diff uses ACP structured content and locations", () => {
   const oldText = "before\n";
   const path = "/tmp/acp-diff.txt";
   server.handleAgentEvent("session-1", {
-    type: EventToolExecutionEnd,
+    type: EVENT_TOOL_EXECUTION_END,
     toolCallId: "write-1",
     toolName: "write_file",
     toolDiff: makeDiff(path, oldText, "after\n"),
@@ -326,7 +325,7 @@ Deno.test("tool diff includes null oldText for a created file", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
-    type: EventToolExecutionEnd,
+    type: EVENT_TOOL_EXECUTION_END,
     toolCallId: "write-1",
     toolName: "write_file",
     toolDiff: makeDiff("/tmp/new.txt", null, "new"),
@@ -341,11 +340,11 @@ Deno.test("streamed content chunks share a message ID", () => {
   const output = new SyncBuffer();
   const server = newFixtureServer(output);
   server.handleAgentEvent("session-1", {
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     textDelta: "hello",
   });
   server.handleAgentEvent("session-1", {
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     textDelta: " world",
   });
   const messages = parseMessages(output.toString());
@@ -369,11 +368,11 @@ Deno.test("usage event emits a cumulative usage update", () => {
 
   // A turn that finishes before any usage event keeps the standard ACP
   // payload: the additive cache extension is omitted, never zero-filled.
-  server.handleAgentEvent("session-1", { type: EventDone });
+  server.handleAgentEvent("session-1", { type: EVENT_DONE });
   assertEquals(lastUpdate(output.toString())._meta, undefined);
 
   server.handleAgentEvent("session-1", {
-    type: EventUsage,
+    type: EVENT_USAGE,
     usage: makeUsage({
       input: 10,
       output: 5,
@@ -405,7 +404,7 @@ Deno.test("usage event emits a cumulative usage update", () => {
   assertEquals(meta.totalInputTokens, 58);
 
   server.handleAgentEvent("session-1", {
-    type: EventUsage,
+    type: EVENT_USAGE,
     usage: makeUsage({
       input: 4,
       output: 2,
@@ -475,7 +474,7 @@ Deno.test("persisted session usage shares the usage-update baseline", () => {
   server.sessions.set("session-1", rt);
 
   server.handleAgentEvent("session-1", {
-    type: EventUsage,
+    type: EVENT_USAGE,
     usage: makeUsage({
       input: 6,
       output: 4,
@@ -510,21 +509,21 @@ Deno.test("terminal run events project the structured status", () => {
     code?: string;
   }> = [
     {
-      event: { type: EventRunFinished, status: TaskSuccess },
+      event: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
       status: "completed",
     },
     {
-      event: { type: EventRunFinished, status: TaskCanceled },
+      event: { type: EVENT_RUN_FINISHED, status: TASK_CANCELED },
       status: "cancelled",
       code: "run_cancelled",
     },
     {
-      event: { type: EventRunFinished, status: TaskIncomplete },
+      event: { type: EVENT_RUN_FINISHED, status: TASK_INCOMPLETE },
       status: "incomplete",
       code: "run_incomplete",
     },
     {
-      event: { type: EventError, error: new Error("boom") },
+      event: { type: EVENT_ERROR, error: new Error("boom") },
       status: "failed",
     },
   ];
@@ -558,8 +557,8 @@ Deno.test("child terminal events never project a parent terminal", () => {
   const server = newFixtureServer(output);
   server.sessions.set("session-1", new ACPSessionRuntime());
   server.handleAgentEvent("session-1", {
-    type: EventRunFinished,
-    status: TaskSuccess,
+    type: EVENT_RUN_FINISHED,
+    status: TASK_SUCCESS,
     agentId: "child-1",
   });
   assertEquals(

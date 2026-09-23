@@ -1,4 +1,3 @@
-// Ported from internal/session/runtime_lease_bus.go
 //
 // A best-effort, host-only UDP wake-up bus so every opensac process on this host
 // that shares a session directory learns when a Session lease is acquired,

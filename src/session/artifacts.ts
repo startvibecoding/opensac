@@ -1,4 +1,3 @@
-// Ported from internal/session/artifacts.go
 //
 // Read-only projections of persisted session attachment rows for adapter replay
 // surfaces. The bytes stay in the Runtime-owned private store referenced by the

@@ -1,5 +1,3 @@
-// Ported from internal/provider/google/register.go
-
 import {
   type ModelCompat as ConfigModelCompat,
   type ModelConfig,

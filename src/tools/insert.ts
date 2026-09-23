@@ -1,4 +1,3 @@
-// Ported from internal/tools/insert.go.
 //
 // Inserts content at one structural position in a text file. The in-memory path
 // mirrors Go byte-for-byte; files larger than `insertInMemoryLimit` use the

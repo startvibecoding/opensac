@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/registry.go.
 //
 // `BuildRegistry` is the only registry-construction API for non-test adapters:
 // it creates the base registry and applies explicit adapter tool policy while

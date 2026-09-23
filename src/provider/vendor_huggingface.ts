@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_huggingface.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_huggingface.go init() adapters. */

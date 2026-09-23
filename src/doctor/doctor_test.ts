@@ -1,5 +1,3 @@
-// Ported from internal/doctor/doctor_test.go.
-
 import { assertEquals, assertStrictEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
@@ -14,8 +12,8 @@ import {
   type Check,
   type Response,
   run,
-  StatusError,
-  StatusOK,
+  STATUS_ERROR,
+  STATUS_OK,
   validateProvider,
 } from "./doctor.ts";
 
@@ -56,7 +54,7 @@ Deno.test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
     const result = run(workDir, "test-version");
     assertStrictEquals(result.ok, false);
     const providerCheck = checkByID(result, "provider.default");
-    assertEquals(providerCheck.status, StatusError);
+    assertEquals(providerCheck.status, STATUS_ERROR);
     assertEquals(providerCheck.detail, "doctor-test: missing API key");
     assertEquals(
       providerCheck.fix,
@@ -114,9 +112,9 @@ Deno.test("ValidateProviderReportsMissingModelWhenNoModelCanBeSelected", () => {
   );
   assertEquals(checks.length, 2);
   assertEquals(checks[0].id, "provider.default");
-  assertEquals(checks[0].status, StatusOK);
+  assertEquals(checks[0].status, STATUS_OK);
   assertEquals(checks[1].id, "model.default");
-  assertEquals(checks[1].status, StatusError);
+  assertEquals(checks[1].status, STATUS_ERROR);
 });
 
 Deno.test("RunNeverSerializesAPIKey", () => {

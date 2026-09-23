@@ -1,4 +1,3 @@
-// Ported from internal/esm/evidence.go
 //
 // The per-role tool-call evidence accumulator. TUI and ACP adapters must
 // share this tracker so the "tool-backed evidence" checks in

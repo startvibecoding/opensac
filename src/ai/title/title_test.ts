@@ -1,5 +1,3 @@
-// Ported from internal/ai/title/title_test.go
-
 import { assertEquals } from "@std/assert";
 import { Generator, maxTitleRunes, normalizeTitle } from "./title.ts";
 import {

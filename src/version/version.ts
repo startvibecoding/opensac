@@ -1,4 +1,3 @@
-// Ported from internal/version/version.go
 //
 // Package version contains the product version shared by every entry point.
 // Release builds replace `version` through a build-time constant; source builds

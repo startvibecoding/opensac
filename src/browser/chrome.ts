@@ -1,4 +1,4 @@
-// Ported from vibe-browser internal/chrome/launcher.go (v0.1.5).
+// (v0.1.5).
 //
 // Handles launching and managing Chrome/Chromium-based browsers plus CDP URL
 // discovery. Supports Chrome, Chromium, Brave, Edge, and variants.
@@ -10,14 +10,14 @@
 
 import type { BrowserType, LaunchOptions } from "./protocol.ts";
 
-/** DefaultCDPPort is the default Chrome DevTools Protocol port. */
-export const DefaultCDPPort = 9222;
-/** AlternateCDPPort is the fallback port for CDP. */
-export const AlternateCDPPort = 9229;
-/** DefaultViewportWidth is the default browser window width. */
-export const DefaultViewportWidth = 1920;
-/** DefaultViewportHeight is the default browser window height. */
-export const DefaultViewportHeight = 1080;
+/** DEFAULT_CDP_PORT is the default Chrome DevTools Protocol port. */
+export const DEFAULT_CDP_PORT = 9222;
+/** ALTERNATE_CDP_PORT is the fallback port for CDP. */
+export const ALTERNATE_CDP_PORT = 9229;
+/** DEFAULT_VIEWPORT_WIDTH is the default browser window width. */
+export const DEFAULT_VIEWPORT_WIDTH = 1920;
+/** DEFAULT_VIEWPORT_HEIGHT is the default browser window height. */
+export const DEFAULT_VIEWPORT_HEIGHT = 1080;
 
 /** A running browser process. */
 export class Process {
@@ -238,7 +238,7 @@ export function extractHostPort(wsUrl: string): { host: string; port: number } {
   const slash = url.indexOf("/");
   const hostPort = slash >= 0 ? url.slice(0, slash) : url;
   const colon = hostPort.indexOf(":");
-  let port = DefaultCDPPort;
+  let port = DEFAULT_CDP_PORT;
   let host = hostPort;
   if (colon >= 0) {
     host = hostPort.slice(0, colon);
@@ -280,7 +280,7 @@ export async function discoverCdpUrl(
   portIn: number,
 ): Promise<string> {
   const host = hostIn || "127.0.0.1";
-  const port = portIn || DefaultCDPPort;
+  const port = portIn || DEFAULT_CDP_PORT;
 
   try {
     const info = await fetchJson(`http://${host}:${port}/json/version`) as {
@@ -321,7 +321,7 @@ export async function discoverCdpUrl(
 
 /** Tries to find a running browser on the common CDP ports. */
 export async function autoConnectCdp(): Promise<string> {
-  for (const port of [DefaultCDPPort, AlternateCDPPort]) {
+  for (const port of [DEFAULT_CDP_PORT, ALTERNATE_CDP_PORT]) {
     try {
       return await discoverCdpUrl("127.0.0.1", port);
     } catch {
@@ -329,7 +329,7 @@ export async function autoConnectCdp(): Promise<string> {
     }
   }
   throw new Error(
-    `no running browser found; launch Chrome with --remote-debugging-port=${DefaultCDPPort} or use --cdp-url`,
+    `no running browser found; launch Chrome with --remote-debugging-port=${DEFAULT_CDP_PORT} or use --cdp-url`,
   );
 }
 
@@ -372,7 +372,7 @@ export async function launch(
   signal?: AbortSignal,
 ): Promise<Process> {
   const execPath = opts.executablePath || findBrowser(opts.browser ?? "");
-  const port = DefaultCDPPort;
+  const port = DEFAULT_CDP_PORT;
   const remoteAddr = "127.0.0.1";
 
   let userDataDir = opts.userDataDir ?? "";
@@ -403,10 +403,10 @@ export async function launch(
 
   const viewportWidth = opts.viewportWidth && opts.viewportWidth > 0
     ? opts.viewportWidth
-    : DefaultViewportWidth;
+    : DEFAULT_VIEWPORT_WIDTH;
   const viewportHeight = opts.viewportHeight && opts.viewportHeight > 0
     ? opts.viewportHeight
-    : DefaultViewportHeight;
+    : DEFAULT_VIEWPORT_HEIGHT;
   args.push(`--window-size=${viewportWidth},${viewportHeight}`);
 
   if (opts.extensions && opts.extensions.length > 0) {

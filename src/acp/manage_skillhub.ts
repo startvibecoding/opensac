@@ -1,4 +1,3 @@
-// Ported from internal/acp/manage_skillhub.go and
 // internal/acp/manage_skillhub_catalog.go (the SkillHub half of the
 // `opensac/manage/*` Phase 3 management plane).
 //
@@ -33,8 +32,8 @@ import {
   clientsForSettings,
   type InstallRequest,
   type Market,
-  MarketClawHub,
-  MarketSkillHub,
+  MARKET_CLAW_HUB,
+  MARKET_SKILL_HUB,
   newLocalIndex,
   Service as SkillHubService,
 } from "../skillhub/mod.ts";
@@ -716,7 +715,7 @@ function manageSkillHubMarket(
 ): Market {
   let resolved = value.trim();
   if (resolved === "") resolved = fallback;
-  if (resolved !== MarketSkillHub && resolved !== MarketClawHub) {
+  if (resolved !== MARKET_SKILL_HUB && resolved !== MARKET_CLAW_HUB) {
     throw new Error(`unsupported skill market ${JSON.stringify(resolved)}`);
   }
   return resolved;
@@ -818,8 +817,8 @@ export async function handleManageSkillHubOfficial(
 ): Promise<void> {
   try {
     const { input, service } = manageSkillHubCatalog(s, req);
-    const market = manageSkillHubMarket(input.market, MarketSkillHub);
-    if (market !== MarketSkillHub) {
+    const market = manageSkillHubMarket(input.market, MARKET_SKILL_HUB);
+    if (market !== MARKET_SKILL_HUB) {
       writeManageSkillHubCatalogError(
         s,
         req,

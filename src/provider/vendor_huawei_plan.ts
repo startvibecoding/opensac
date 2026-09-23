@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_huawei_plan.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_huawei_plan.go init() adapters. */

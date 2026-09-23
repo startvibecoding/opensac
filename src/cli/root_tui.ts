@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main.go runInteractive: the CLI root interactive
+// the CLI root interactive
 // action. Assembles the TUISession (shared runtime + controller + input state),
 // renders the TuiShell, and lets the shell's raw-stdin loop drive input.
 // React createElement is used because this module is plain TS (no .tsx).

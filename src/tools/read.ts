@@ -1,4 +1,3 @@
-// Ported from internal/tools/read.go.
 //
 // Faithful port except that `imageproc.prepareFile` is async, so `execute`
 // awaits it. Go's `encoding/base64` maps to `@std/encoding`.

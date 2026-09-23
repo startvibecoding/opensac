@@ -1,5 +1,3 @@
-// Ported from internal/provider/toolcall_id.go
-
 let toolCallFallbackCounter = 0;
 
 /** Returns a process-wide unique fallback ID for tool calls. */

@@ -1,4 +1,3 @@
-// Ported from internal/db/db.go
 //
 // Package db owns the process-wide SQLite connection lifecycle.
 //

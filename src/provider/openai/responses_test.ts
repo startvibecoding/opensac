@@ -1,4 +1,4 @@
-// Ported from internal/provider/openai/responses_runtime_test.go (non-session
+// (non-session
 // cases) and the Responses API cases in provider_test.go.
 
 import { assert, assertEquals } from "@std/assert";

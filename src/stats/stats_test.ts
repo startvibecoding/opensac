@@ -1,4 +1,3 @@
-// Ported from internal/stats/stats_test.go
 //
 // Raw INSERTs in the Go tests map to StatsDAO.insert over the shared
 // connection; the test never constructs SQL itself.

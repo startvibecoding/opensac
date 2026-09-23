@@ -1,4 +1,3 @@
-// Ported from internal/workflow/skill.go.
 //
 // `path/filepath` maps to `@std/path`; `os.OpenFile(..., O_EXCL)` maps to
 // `Deno.writeTextFile({ createNew: true })`. The bundled skill and progressive

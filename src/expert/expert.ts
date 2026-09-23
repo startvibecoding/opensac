@@ -1,5 +1,3 @@
-// Ported from internal/expert/expert.go
-
 import type { ExpertFS } from "./fs.ts";
 
 // Supported expertType values in expert.json.

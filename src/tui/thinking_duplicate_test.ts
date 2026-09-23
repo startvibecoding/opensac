@@ -5,7 +5,7 @@
 import { assertEquals } from "@std/assert";
 import { App } from "./app.tsx";
 import { AppController } from "./app_controller.ts";
-import { EventThinkDelta, EventTurnStart } from "../agent/events.ts";
+import { EVENT_THINK_DELTA, EVENT_TURN_START } from "../agent/events.ts";
 import React from "react";
 import { render } from "ink";
 
@@ -46,10 +46,10 @@ function capture(controller: AppController): string {
 
 Deno.test("active think block appears once, not twice", () => {
   const c = makeController();
-  c.handleAgentEvent({ type: EventTurnStart });
+  c.handleAgentEvent({ type: EVENT_TURN_START });
   c.handleAgentEvent(
     {
-      type: EventThinkDelta,
+      type: EVENT_THINK_DELTA,
       thinkDelta: "let me reason about this carefully",
     } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
   );
@@ -63,9 +63,9 @@ Deno.test("active think block appears once, not twice", () => {
 
 Deno.test("multiple think deltas accumulate into one line", () => {
   const c = makeController();
-  c.handleAgentEvent({ type: EventTurnStart });
+  c.handleAgentEvent({ type: EVENT_TURN_START });
   const ev = (delta: string) =>
-    ({ type: EventThinkDelta, thinkDelta: delta }) as unknown as Parameters<
+    ({ type: EVENT_THINK_DELTA, thinkDelta: delta }) as unknown as Parameters<
       AppController["handleAgentEvent"]
     >[0];
   c.handleAgentEvent(ev("part one "));

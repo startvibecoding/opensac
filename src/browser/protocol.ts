@@ -1,4 +1,4 @@
-// Ported from vibe-browser pkg/protocol/types.go (v0.1.5).
+// (v0.1.5).
 //
 // The protocol defines the core types and message format for the external
 // vibe-browser SDK. The wire format is JSON-RPC style over Unix domain sockets
@@ -71,10 +71,10 @@ export interface SnapshotOptions {
 }
 
 /**
- * DefaultHTMLMaxBytes is the soft cap applied to GetHTML results when no
+ * DEFAULT_HTML_MAX_BYTES is the soft cap applied to GetHTML results when no
  * explicit maxBytes is requested.
  */
-export const DefaultHTMLMaxBytes = 50 * 1024;
+export const DEFAULT_HTML_MAX_BYTES = 50 * 1024;
 
 /**
  * HTMLOptions configures GetHTML output. It is the size-control counterpart to
@@ -106,11 +106,11 @@ export type BrowserType =
   | "chrome-canary"
   | "";
 
-export const BrowserChrome: BrowserType = "chrome";
-export const BrowserChromium: BrowserType = "chromium";
-export const BrowserBrave: BrowserType = "brave";
-export const BrowserEdge: BrowserType = "edge";
-export const BrowserChromeCanary: BrowserType = "chrome-canary";
+export const BROWSER_CHROME: BrowserType = "chrome";
+export const BROWSER_CHROMIUM: BrowserType = "chromium";
+export const BROWSER_BRAVE: BrowserType = "brave";
+export const BROWSER_EDGE: BrowserType = "edge";
+export const BROWSER_CHROME_CANARY: BrowserType = "chrome-canary";
 
 /** LaunchOptions configure browser launch. */
 export interface LaunchOptions {

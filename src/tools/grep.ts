@@ -1,4 +1,3 @@
-// Ported from internal/tools/grep.go.
 //
 // The Go tool delegates to the `go-ripgrep` SDK. This port reuses the ported
 // `globset.ts`/`ignore.ts` for the `include` filter and ignore handling and

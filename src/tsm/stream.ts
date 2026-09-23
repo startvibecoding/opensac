@@ -1,4 +1,3 @@
-// Ported from GoStreamingMarkdown/gsm/gsm.go
 //
 // Streaming Markdown rendering for terminal output: a thin facade over the
 // parser and renderer packages, with one-shot and streaming modes.

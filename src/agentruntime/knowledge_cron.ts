@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/knowledge_cron.go.
 //
 // Namespaced scheduled reindex jobs inside the shared cron store. The store is
 // keyed only by sessionDir, so every scheduler process (ACP, CLI) can claim a
@@ -15,9 +14,9 @@ import {
   KnowledgeIndexJob,
 } from "./knowledge_index_job.ts";
 import type { KnowledgeBaseService } from "./knowledgebase.ts";
-import { SourceCron } from "./source.ts";
+import { SOURCE_CRON } from "./source.ts";
 
-export const KnowledgeBaseCronJobPrefix = "knowledge-base-index:";
+export const KNOWLEDGE_BASE_CRON_JOB_PREFIX = "knowledge-base-index:";
 
 /** The result of attempting to route one cron job. */
 export interface KnowledgeBaseCronOutcome {
@@ -27,15 +26,15 @@ export interface KnowledgeBaseCronOutcome {
 
 /** Derives the shared cron identity of one knowledge base's reindex schedule. */
 export function knowledgeBaseCronJobID(knowledgeBaseID: string): string {
-  return KnowledgeBaseCronJobPrefix + knowledgeBaseID.trim();
+  return KNOWLEDGE_BASE_CRON_JOB_PREFIX + knowledgeBaseID.trim();
 }
 
 /** Extracts the knowledge base identity from a namespaced cron job ID. */
 export function knowledgeBaseIDFromCronJobID(
   jobID: string,
 ): { id: string; ok: boolean } {
-  const ok = jobID.startsWith(KnowledgeBaseCronJobPrefix);
-  const id = jobID.slice(KnowledgeBaseCronJobPrefix.length).trim();
+  const ok = jobID.startsWith(KNOWLEDGE_BASE_CRON_JOB_PREFIX);
+  const id = jobID.slice(KNOWLEDGE_BASE_CRON_JOB_PREFIX.length).trim();
   return { id: ok ? id : "", ok: ok && id !== "" };
 }
 
@@ -57,7 +56,7 @@ export async function runKnowledgeBaseCronJob(
   if (service === null) {
     throw new KnowledgeBaseServiceMissingError();
   }
-  const job: KnowledgeIndexJob = service.startIndex(ctx, id, SourceCron);
+  const job: KnowledgeIndexJob = service.startIndex(ctx, id, SOURCE_CRON);
   const snapshot = await job.wait(ctx);
   return {
     handled: true,

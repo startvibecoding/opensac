@@ -1,5 +1,3 @@
-// Ported from internal/agent/max_tokens.go.
-
 import type { Model } from "../provider/types.ts";
 
 const defaultAutoMaxTokens = 8192;

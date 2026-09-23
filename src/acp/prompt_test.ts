@@ -1,7 +1,6 @@
 // Focused tests for the ACP prompt-run slice of src/acp/server.ts: the prompt
 // admission/assembly/durable-claim/event-loop wiring of `handlePrompt`, the
 // question and permission reverse requests, and the ESM steering source.
-// Translated from internal/acp/acp_admission_test.go, esm_steering_test.go and
 // the prompt assertions of acp_phase1_test.go; the stdio process integration
 // test belongs to the CLI slice. Fixtures bind a mock provider catalog so a
 // session runtime is fully configured and call the handlers directly.

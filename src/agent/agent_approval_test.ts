@@ -1,4 +1,4 @@
-// Translated from internal/agent/approval_test.go (NeedsApproval decision
+// (NeedsApproval decision
 // logic). The Agent-construction helpers are replaced with the minimal
 // ApprovalConfig view the decision now takes.
 

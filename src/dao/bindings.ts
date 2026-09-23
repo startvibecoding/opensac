@@ -1,5 +1,3 @@
-// Ported from internal/dao/bindings.go
-
 import type { DB } from "../db/mod.ts";
 import { runInTx } from "../db/mod.ts";
 import {

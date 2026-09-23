@@ -1,4 +1,3 @@
-// Translated from internal/acp/manage_skillhub_test.go and the SkillHub catalog
 // case of acp_manage_test.go. These exercise the `opensac/manage/skillhub/*`
 // family ported into src/acp/manage_skillhub.ts against an in-memory ACP server
 // fixture, mirroring the Go `newManageFixtureServer`.

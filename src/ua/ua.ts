@@ -1,4 +1,3 @@
-// Ported from internal/ua/ua.go
 //
 // Package ua provides User-Agent string generation for vibecoding.
 

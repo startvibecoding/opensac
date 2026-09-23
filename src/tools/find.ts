@@ -1,4 +1,3 @@
-// Ported from internal/tools/find.go.
 //
 // The Go tool delegates to the `go-fd` SDK. This port implements an equivalent
 // native filesystem walk: basename glob matching with smart-case, honoring

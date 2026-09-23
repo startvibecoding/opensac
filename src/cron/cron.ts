@@ -1,4 +1,3 @@
-// Ported from internal/cron/cron.go and session_store.go.
 //
 // Package cron implements scheduled task management. Cron jobs are persisted in
 // sessions.db and executed by spawning agents. This module ports the domain

@@ -1,4 +1,3 @@
-// Ported from internal/platform/platform.go
 //
 // Package platform provides cross-platform compatibility utilities.
 

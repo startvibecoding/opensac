@@ -1,5 +1,3 @@
-// Ported from internal/provider/factory/factory_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { defaultSettings, type Settings } from "../../config/mod.ts";
 import { MockProvider } from "../mock.ts";

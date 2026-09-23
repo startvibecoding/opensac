@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/run_queries.go.
 //
 // Read-only inspection boundaries over the canonical Run rows. Durable
 // lifecycle writes remain owned by `ExecutionRuntime`/`RunStore`; these

@@ -1,4 +1,4 @@
-// Ported from internal/session/session.go (root database helpers).
+// (root database helpers).
 //
 // These helpers own the shared sessions.db path rules and the DAO-owned root
 // database handle so adapters and DAOs never duplicate the session directory

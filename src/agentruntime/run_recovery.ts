@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/run_recovery.go.
 //
 // Lease-first orphan convergence for one canonical Session database. Ownership
 // is decided only by the fenced recovery lease, never by process-local state;
@@ -34,23 +33,23 @@ import {
 import { newDecisionResolutionRecord } from "./decision_record.ts";
 import { replayDecisions } from "./decision_replay.ts";
 import {
-  DecisionApproval,
-  DecisionQuestion,
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
   type DecisionRequest,
   type DecisionResolution,
 } from "./decision.ts";
 import { type RunEvent } from "./run_event.ts";
 import { durableRunStatus, sessionRunEventFromRuntime } from "./run_store.ts";
 import {
+  RUN_STATE_CANCELLED,
+  RUN_STATE_FAILED,
   type RunState,
-  RunStateCancelled,
-  RunStateFailed,
 } from "./run_state.ts";
 
 export type RecoveryAction = string;
 
-export const RecoveryFailLocal: RecoveryAction = "fail_local";
-export const RecoveryKeepRemote: RecoveryAction = "keep_remote";
+export const RECOVERY_FAIL_LOCAL: RecoveryAction = "fail_local";
+export const RECOVERY_KEEP_REMOTE: RecoveryAction = "keep_remote";
 
 /** A caller-owned policy that decides how one orphaned Run is reconciled. */
 export type RunRecoveryPolicy = (run: SessionRun) => RecoveryAction;
@@ -85,7 +84,7 @@ interface RecoveryAttemptResult {
  * not evidence that a provider task still exists.
  */
 export function defaultRunRecoveryPolicy(_run: SessionRun): RecoveryAction {
-  return RecoveryFailLocal;
+  return RECOVERY_FAIL_LOCAL;
 }
 
 /**
@@ -153,7 +152,7 @@ export async function recoverOrphanedRunsWithTrigger(
           trigger,
           "owner_lost",
           reason,
-          RunStateFailed,
+          RUN_STATE_FAILED,
         );
         attempts[index] = { index, run, action };
       } catch (err) {
@@ -178,10 +177,10 @@ export async function recoverOrphanedRunsWithTrigger(
       continue;
     }
     switch (attempt.action) {
-      case RecoveryKeepRemote:
+      case RECOVERY_KEEP_REMOTE:
         result.kept.push(attempt.run);
         break;
-      case RecoveryFailLocal:
+      case RECOVERY_FAIL_LOCAL:
         result.failed.push(attempt.run);
         break;
       default:
@@ -235,10 +234,10 @@ export async function recoverOrphanedSessionRunWithSignal(
     "admission",
     "owner_lost",
     "run remained active when the session became available for a new local execution",
-    RunStateFailed,
+    RUN_STATE_FAILED,
   );
-  if (action === RecoveryKeepRemote) result.kept.push(run);
-  else if (action === RecoveryFailLocal) result.failed.push(run);
+  if (action === RECOVERY_KEEP_REMOTE) result.kept.push(run);
+  else if (action === RECOVERY_FAIL_LOCAL) result.failed.push(run);
   else result.skipped.push(run);
   return result;
 }
@@ -288,10 +287,10 @@ export async function stopOrphanedSessionRunWithSignal(
     "user_stop",
     "cancelled_by_user_after_owner_loss",
     "run cancelled by user after its execution owner was lost",
-    RunStateCancelled,
+    RUN_STATE_CANCELLED,
   );
-  if (action === RecoveryKeepRemote) result.kept.push(run);
-  else if (action === RecoveryFailLocal) result.failed.push(run);
+  if (action === RECOVERY_KEEP_REMOTE) result.kept.push(run);
+  else if (action === RECOVERY_FAIL_LOCAL) result.failed.push(run);
   else result.skipped.push(run);
   return result;
 }
@@ -383,9 +382,9 @@ async function recoverOrphanedRun(
     const action = policy !== null
       ? policy(run)
       : defaultRunRecoveryAction(facts);
-    if (action === RecoveryKeepRemote) {
+    if (action === RECOVERY_KEEP_REMOTE) {
       markSessionRunRecoveryDetached(sessionDir, run.sessionId, run.id);
-      return RecoveryKeepRemote;
+      return RECOVERY_KEEP_REMOTE;
     }
     if (beforeFail !== null) {
       try {
@@ -487,7 +486,7 @@ async function recoverOrphanedRun(
         ),
       );
     }
-    return RecoveryFailLocal;
+    return RECOVERY_FAIL_LOCAL;
   } finally {
     guard.release();
   }
@@ -514,11 +513,11 @@ function recoveryDecisionResolutionEvents(
     let value = "";
     let eventType = "decision_resolved";
     switch (requestRecord.kind) {
-      case DecisionApproval:
+      case DECISION_APPROVAL:
         value = "deny_once";
         eventType = "approval_resolved";
         break;
-      case DecisionQuestion:
+      case DECISION_QUESTION:
         eventType = "question_resolved";
     }
     const resolution: DecisionResolution = {
@@ -551,7 +550,7 @@ export function defaultRunRecoveryAction(
   facts: SessionExecutionFacts,
 ): RecoveryAction {
   if (facts.activeRuns.length !== 1 || facts.remoteRun === null) {
-    return RecoveryFailLocal;
+    return RECOVERY_FAIL_LOCAL;
   }
   const run = facts.activeRuns[0];
   const remote = facts.remoteRun;
@@ -561,9 +560,9 @@ export function defaultRunRecoveryAction(
     remote.responseId === "" || remote.provider === "" ||
     remote.api !== "openai-responses"
   ) {
-    return RecoveryFailLocal;
+    return RECOVERY_FAIL_LOCAL;
   }
-  return RecoveryKeepRemote;
+  return RECOVERY_KEEP_REMOTE;
 }
 
 /**

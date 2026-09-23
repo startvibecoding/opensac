@@ -1,4 +1,3 @@
-// Ported from internal/session/execution_facts_test.go
 //
 // The Go tests create the session through the (not yet ported) Manager; the
 // tests here use direct DAO session/Run persistence plus the portable lease

@@ -1,6 +1,4 @@
-// Ported from internal/agentruntime/session_runtime.go, plus the
 // `(*SessionRuntime)` methods of agent_build.go, artifact.go, expert.go, and
-// registry.go.
 //
 // SessionRuntime is the front-end-neutral state required to construct and run
 // an agent session. Adapters may wrap it with protocol-specific locks, approval
@@ -37,7 +35,7 @@ import {
 import {
   registerTool as registerBrowserTool,
   removeTool as removeBrowserTool,
-  SkillName as BrowserSkillName,
+  SKILL_NAME as BrowserSkillName,
 } from "../browser/mod.ts";
 import type { AllowConfig } from "../config/allow.ts";
 import {
@@ -114,11 +112,11 @@ import {
 } from "./input_materializer.ts";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import {
-  AttachmentAudio,
-  AttachmentFile,
-  AttachmentImage,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
   type AttachmentKind,
-  AttachmentVideo,
   type SessionAttachment,
 } from "./attachment.ts";
 import { formatKnowledgeCapsules } from "./knowledge_context.ts";
@@ -140,14 +138,14 @@ import {
 } from "./expert.ts";
 import { normalizeAdditionalDirectories } from "./session_directories.ts";
 import {
-  ConfigOptionBrowser,
-  ConfigOptionExpert,
-  ConfigOptionMode,
-  ConfigOptionModel,
-  ConfigOptionProvider,
-  ConfigOptionSandbox,
-  ConfigOptionThinkingLevel,
-  ConfigOptionWebSearch,
+  CONFIG_OPTION_BROWSER,
+  CONFIG_OPTION_EXPERT,
+  CONFIG_OPTION_MODE,
+  CONFIG_OPTION_MODEL,
+  CONFIG_OPTION_PROVIDER,
+  CONFIG_OPTION_SANDBOX,
+  CONFIG_OPTION_THINKING_LEVEL,
+  CONFIG_OPTION_WEB_SEARCH,
   type ProviderCatalog,
   type SessionConfigOption,
   sessionConfigOptionsWithProviders,
@@ -159,12 +157,12 @@ import {
 } from "./session_source.ts";
 import {
   ExecutionPolicy,
-  ModeYolo,
+  MODE_YOLO,
   policyForSource,
   resolveIterationBudget,
   type RuntimeSource,
+  SOURCE_UNKNOWN,
   type SourceResolution,
-  SourceUnknown,
   sourceWaitsForMembers,
 } from "./source.ts";
 import { beforeToolCallForPolicy } from "./tool_policy.ts";
@@ -240,9 +238,9 @@ export class SessionRuntime {
 
   constructor(init: SessionRuntimeInit = {}) {
     this.id = init.id ?? "";
-    this.source = init.source ?? SourceUnknown;
-    this.entrySource = init.entrySource ?? SourceUnknown;
-    this.policy = init.policy ?? policyForSource(SourceUnknown, "");
+    this.source = init.source ?? SOURCE_UNKNOWN;
+    this.entrySource = init.entrySource ?? SOURCE_UNKNOWN;
+    this.policy = init.policy ?? policyForSource(SOURCE_UNKNOWN, "");
     this.workDir = init.workDir ?? "";
     this.manager = init.manager;
     this.inputs = init.inputs ?? null;
@@ -361,7 +359,7 @@ export class SessionRuntime {
     const policySource = this.policy.source;
     let policyDefault = this.policy.defaultMode;
     const manager = this.manager;
-    if (source === SourceUnknown && policySource !== SourceUnknown) {
+    if (source === SOURCE_UNKNOWN && policySource !== SOURCE_UNKNOWN) {
       source = policySource;
     }
     if (policyDefault === "") {
@@ -389,7 +387,7 @@ export class SessionRuntime {
     const policySource = this.policy.source;
     let policyDefault = this.policy.defaultMode;
     const manager = this.manager;
-    if (source === SourceUnknown && policySource !== SourceUnknown) {
+    if (source === SOURCE_UNKNOWN && policySource !== SOURCE_UNKNOWN) {
       source = policySource;
     }
     if (policyDefault === "") {
@@ -417,8 +415,8 @@ export class SessionRuntime {
     if (header === null) {
       throw new Error("initialized session manager is required");
     }
-    let entrySource = requested ?? SourceUnknown;
-    if (entrySource === SourceUnknown) {
+    let entrySource = requested ?? SOURCE_UNKNOWN;
+    if (entrySource === SOURCE_UNKNOWN) {
       entrySource = this.entrySource;
     }
     const resolved = resolveManagerSource(manager, { requested: entrySource });
@@ -473,9 +471,9 @@ export class SessionRuntime {
       );
     }
     if (mode.trim() === "") {
-      mode = ModeYolo;
+      mode = MODE_YOLO;
     }
-    const { mode: effectiveMode } = this.resolvePolicy("", mode, ModeYolo);
+    const { mode: effectiveMode } = this.resolvePolicy("", mode, MODE_YOLO);
     thinking = validateThinkingLevel(thinking);
     if (this.closed) {
       throw new Error("agent runtime is closed");
@@ -618,13 +616,13 @@ export class SessionRuntime {
     let browserEnabled = this.browserEnabled;
     let webSearchEnabled = this.webSearchEnabled;
     switch (id) {
-      case ConfigOptionSandbox:
+      case CONFIG_OPTION_SANDBOX:
         sandboxEnabled = enabled;
         break;
-      case ConfigOptionBrowser:
+      case CONFIG_OPTION_BROWSER:
         browserEnabled = enabled;
         break;
-      case ConfigOptionWebSearch:
+      case CONFIG_OPTION_WEB_SEARCH:
         webSearchEnabled = enabled;
         break;
       default:
@@ -704,14 +702,14 @@ export class SessionRuntime {
     options = options.concat([
       {
         type: "boolean",
-        id: ConfigOptionBrowser,
+        id: CONFIG_OPTION_BROWSER,
         name: "Browser",
         category: "browser",
         currentValue: this.browserEnabled ? "true" : "false",
       },
       {
         type: "boolean",
-        id: ConfigOptionWebSearch,
+        id: CONFIG_OPTION_WEB_SEARCH,
         name: "Web search",
         category: "web_search",
         currentValue: this.webSearchEnabled ? "true" : "false",
@@ -742,7 +740,7 @@ export class SessionRuntime {
     }
     const modeChange = manager.getLatestModeChange();
     if (modeChange !== null && modeChange.mode.trim() !== "") {
-      mode = this.resolvePolicy("", modeChange.mode, ModeYolo).mode;
+      mode = this.resolvePolicy("", modeChange.mode, MODE_YOLO).mode;
     }
     const thinkingChange = manager.getLatestThinkingLevelChange();
     if (
@@ -763,10 +761,10 @@ export class SessionRuntime {
     this.ensureOpen();
     id = id.trim();
     value = value.trim();
-    if (id === "" || (value === "" && id !== ConfigOptionExpert)) {
+    if (id === "" || (value === "" && id !== CONFIG_OPTION_EXPERT)) {
       throw new Error("config option id and value are required");
     }
-    if (id === ConfigOptionExpert) {
+    if (id === CONFIG_OPTION_EXPERT) {
       await this.setExpert(value);
       return;
     }
@@ -789,7 +787,7 @@ export class SessionRuntime {
       }
     }
     switch (id) {
-      case ConfigOptionProvider: {
+      case CONFIG_OPTION_PROVIDER: {
         const target = this.providerByName(value);
         let targetName = value;
         let matched = false;
@@ -824,7 +822,7 @@ export class SessionRuntime {
         this.lastUsed = new Date();
         return;
       }
-      case ConfigOptionModel: {
+      case CONFIG_OPTION_MODEL: {
         if (value.includes("/")) {
           const qualified = parseQualifiedModel(value);
           if (qualified === undefined) {
@@ -847,8 +845,8 @@ export class SessionRuntime {
         this.lastUsed = new Date();
         return;
       }
-      case ConfigOptionMode: {
-        const mode = this.resolvePolicy(currentMode, value, ModeYolo).mode;
+      case CONFIG_OPTION_MODE: {
+        const mode = this.resolvePolicy(currentMode, value, MODE_YOLO).mode;
         if (manager !== undefined) {
           manager.appendModeChange(mode);
         }
@@ -856,11 +854,11 @@ export class SessionRuntime {
         this.lastUsed = new Date();
         return;
       }
-      case ConfigOptionThinkingLevel: {
+      case CONFIG_OPTION_THINKING_LEVEL: {
         if (currentModel === null || !currentModel.reasoning) {
           throw new Error(
             `config option ${
-              JSON.stringify(ConfigOptionThinkingLevel)
+              JSON.stringify(CONFIG_OPTION_THINKING_LEVEL)
             } is unavailable for model ${
               JSON.stringify(
                 qualifiedModel(
@@ -1292,7 +1290,7 @@ export class SessionRuntime {
       if (resource.resourceId === "") {
         throw new Error("prepared input resource ID is required");
       }
-      const record = inputs.Get(sessionID, resource.resourceId);
+      const record = inputs.get(sessionID, resource.resourceId);
       if (record.status === "deleted" || record.status === "missing") {
         throw new Error(
           `prepared input ${record.id} is unavailable (status ${record.status})`,
@@ -1356,7 +1354,7 @@ export class SessionRuntime {
     }
     const records: InputResource[] = [];
     for (const prepared of input.resources) {
-      records.push(inputs.Get(sessionID, prepared.resourceId));
+      records.push(inputs.get(sessionID, prepared.resourceId));
     }
     let text = input.text.trim();
     const manifest = inputs.buildManifest(records);
@@ -1386,8 +1384,8 @@ export class SessionRuntime {
     validateAttachmentReferenceForResolver(ref);
     const kind = attachment.kind as AttachmentKind;
     if (
-      kind !== AttachmentImage && kind !== AttachmentFile &&
-      kind !== AttachmentAudio && kind !== AttachmentVideo
+      kind !== ATTACHMENT_IMAGE && kind !== ATTACHMENT_FILE &&
+      kind !== ATTACHMENT_AUDIO && kind !== ATTACHMENT_VIDEO
     ) {
       throw new Error(
         `provider attachment kind ${
@@ -1444,7 +1442,7 @@ export class SessionRuntime {
       },
       signal,
     );
-    service.SetStatus(sessionID, record.id, "generated");
+    service.setStatus(sessionID, record.id, "generated");
     record.status = "generated";
     return record;
   }
@@ -1640,7 +1638,7 @@ export class SessionRuntime {
     }
     settings = settingsValue;
     let mode = opts.mode ?? "";
-    if (mode === "") mode = ModeYolo;
+    if (mode === "") mode = MODE_YOLO;
     if (opts.extraContext !== undefined && opts.extraContext !== "") {
       extraContext = opts.extraContext;
     }
@@ -1656,7 +1654,7 @@ export class SessionRuntime {
     if (maxToolConcurrency <= 0) {
       maxToolConcurrency = toolExecutionEffectiveMaxConcurrency(te);
     }
-    const policy = this.resolvedExecutionPolicy(ModeYolo);
+    const policy = this.resolvedExecutionPolicy(MODE_YOLO);
     mode = policy.resolveMode("", mode);
     const beforeToolCall =
       beforeToolCallForPolicy(policy, opts.beforeToolCall) ??
@@ -1946,7 +1944,7 @@ export class Builder {
       registerBrowserTool(registry);
     }
     const resolved = resolveManagerSource(opts.manager, {
-      requested: opts.source ?? SourceUnknown,
+      requested: opts.source ?? SOURCE_UNKNOWN,
     });
     let inputs: InputMaterializer | null = null;
     let attachments: AttachmentService | null = null;
@@ -1964,7 +1962,7 @@ export class Builder {
     const runtime = new SessionRuntime({
       id: opts.id ?? "",
       source: resolved.source,
-      entrySource: opts.source ?? SourceUnknown,
+      entrySource: opts.source ?? SOURCE_UNKNOWN,
       policy: policyForSource(resolved.source, ""),
       workDir: opts.workDir,
       manager: opts.manager,

@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/git_paths.go
-
 import * as path from "@std/path";
 import { canonicalSandboxPath } from "./policy.ts";
 

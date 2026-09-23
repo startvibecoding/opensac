@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_test.go
-
 import { assertEquals } from "@std/assert";
 import type { ProviderConfig } from "../config/mod.ts";
 import { resolveAdapterConfig, vendorFromBaseURL } from "./mod.ts";

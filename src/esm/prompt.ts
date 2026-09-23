@@ -1,4 +1,3 @@
-// Ported from internal/esm/prompt.go
 //
 // The ESM steering/continuation prompts and the isolated worker/critic/audit/
 // recovery sub-agent task prompts. Objective text is user data: it is escaped

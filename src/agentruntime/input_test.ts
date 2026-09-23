@@ -5,8 +5,8 @@
 
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
-  AttachmentFile,
-  AttachmentImage,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
   defaultAttachmentPolicy,
   type SessionAttachment,
 } from "./attachment.ts";
@@ -38,13 +38,13 @@ async function publishTestArtifact(
   const record = await service.acceptArtifact(sessionId, runId, {
     origin: "test",
     reference: "runtime-artifact",
-    kind: AttachmentFile,
+    kind: ATTACHMENT_FILE,
     filename,
     mediaType: "text/plain",
     sizeHint: bytes.length,
     open: () => ({ bytes, filename, mediaType: "text/plain" }),
   });
-  service.SetStatus(sessionId, record.id, "generated");
+  service.setStatus(sessionId, record.id, "generated");
   record.status = "generated";
   return record;
 }
@@ -80,7 +80,7 @@ Deno.test("AcceptArtifactStoresPrivateContentAndReopensIt", async () => {
     );
     assertEquals(record.status, "generated");
     assertEquals(record.origin, "test");
-    assertEquals(record.kind, AttachmentFile);
+    assertEquals(record.kind, ATTACHMENT_FILE);
     assert(record.storageKey.startsWith("artifacts/"));
     assert(!record.storageKey.startsWith(".opensac/"));
     assertEquals(record.bytes, "generated report".length);
@@ -175,7 +175,7 @@ Deno.test("AcceptArtifactRejectsUnsupportedKindAndKindMismatch", async () => {
       service.acceptArtifact(sessionId, "run-1", {
         origin: "test",
         reference: "",
-        kind: AttachmentImage,
+        kind: ATTACHMENT_IMAGE,
         filename: "not-an-image.txt",
         mediaType: "image/png",
         sizeHint: 5,
@@ -194,7 +194,7 @@ Deno.test("SetStatusRejectsUnknownStatusAndMissingRow", () => {
     assertEquals(
       (() => {
         try {
-          service.SetStatus(sessionId, "0123456789abcdef", "bogus");
+          service.setStatus(sessionId, "0123456789abcdef", "bogus");
           return false;
         } catch {
           return true;
@@ -205,7 +205,7 @@ Deno.test("SetStatusRejectsUnknownStatusAndMissingRow", () => {
     assertEquals(
       (() => {
         try {
-          service.SetStatus(sessionId, "0123456789abcdef", "generated");
+          service.setStatus(sessionId, "0123456789abcdef", "generated");
           return false;
         } catch {
           return true;

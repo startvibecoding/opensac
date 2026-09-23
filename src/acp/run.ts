@@ -1,4 +1,3 @@
-// Ported from the stdio dispatch loop and startup assembly of
 // internal/acp/acp.go (`Run`, `resolveACPModelSelection`,
 // `resolveACPProviderSelection`).
 //
@@ -46,7 +45,7 @@ import {
   newAgentManager,
   RecoveryCoordinator,
   SessionRuntime,
-  SourceACP,
+  SOURCE_ACP,
 } from "../agentruntime/mod.ts";
 import { sandboxSettingsOptions } from "../config/settings.ts";
 import { subscribeRuntimeLeaseNotifications } from "../session/runtime_lease_bus.ts";
@@ -419,8 +418,8 @@ async function runACPInner(
   srv.ruleContent = resources.ruleContent;
 
   srv.runtime = new SessionRuntime({
-    source: SourceACP,
-    entrySource: SourceACP,
+    source: SOURCE_ACP,
+    entrySource: SOURCE_ACP,
     workDir: cwd,
     sandboxMgr: sbMgr,
     skillsMgr: resources.skillsMgr,

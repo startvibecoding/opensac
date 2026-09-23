@@ -1,4 +1,3 @@
-// Ported from internal/session/knowledge_database.go
 //
 // Path derivation, private-database open, and transaction wrappers for the
 // per-knowledge-base graph/FTS store. Each knowledge base gets one private

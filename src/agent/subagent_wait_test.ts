@@ -1,4 +1,3 @@
-// Translated from internal/agent/subagent_wait_test.go. The manager/factory and
 // registry cases (`RegisterSubAgentTools`, child-registry stripping) move with
 // the AgentManager and subagent_tools modules.
 
@@ -10,8 +9,8 @@ import {
 } from "@std/assert";
 import type { ToolResult } from "../tools/tool.ts";
 import {
+  MEMBER_STATUS_DONE,
   MemberMailbox,
-  MemberStatusDone,
   newMemberMailbox,
 } from "./mailbox.ts";
 import type { MemberCompletion } from "./mailbox.ts";
@@ -106,7 +105,7 @@ Deno.test("subagent_wait pending summary excludes payload", async () => {
   mbox.enqueue(completion({
     memberId: "engineer",
     displayName: "工程师",
-    status: MemberStatusDone,
+    status: MEMBER_STATUS_DONE,
     payload: "SECRET-PAYLOAD-CONTENT",
   }));
 
@@ -135,7 +134,7 @@ Deno.test("subagent_wait returns on activity", async () => {
   setTimeout(() => {
     mbox.enqueue(completion({
       memberId: "qa",
-      status: MemberStatusDone,
+      status: MEMBER_STATUS_DONE,
       payload: "passed",
     }));
   }, 30);

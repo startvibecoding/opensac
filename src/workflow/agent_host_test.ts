@@ -1,4 +1,4 @@
-// Translated from internal/workflow/integration_test.go: the workflow
+// the workflow
 // AgentHost binding to AgentManager and the end-to-end workflow_run tool.
 
 import { assert, assertEquals } from "@std/assert";

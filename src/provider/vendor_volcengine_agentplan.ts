@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_volcengine_agentplan.go
-
 import type { AdapterConfig, VendorAdapter } from "./vendor.ts";
 import { registerVendorAdapter } from "./vendor.ts";
 

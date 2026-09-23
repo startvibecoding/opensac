@@ -1,4 +1,3 @@
-// Ported from internal/session/identity_lock.go
 //
 // Serializes operations for one external channel identity. It is shared by
 // inbound dispatch and session lifecycle management. Entries are evicted once

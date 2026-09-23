@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/git.go
-
 import * as path from "@std/path";
 
 const gitAccessStore = new WeakMap<AbortSignal, boolean>();

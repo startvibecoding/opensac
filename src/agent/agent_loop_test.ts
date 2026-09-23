@@ -1,5 +1,3 @@
-// Translated from internal/agent/loop_terminal_test.go and
-// internal/agent/truncation_test.go.
 //
 // These tests exercise the ported Agent Core loop through its public Run
 // entry points with a scripted provider, guarding the canonical terminal
@@ -25,12 +23,12 @@ import { composeFollowUps } from "./followup.ts";
 import { newMemberMailbox } from "./mailbox.ts";
 import {
   type Event,
-  EventError,
-  EventRunFinished,
-  TaskCanceled,
-  TaskIncomplete,
+  EVENT_ERROR,
+  EVENT_RUN_FINISHED,
+  TASK_CANCELED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
   type TaskStatus,
-  TaskSuccess,
 } from "./events.ts";
 
 function scriptedModel(): Model {
@@ -96,10 +94,10 @@ async function collectTerminal(
   let reason = "";
   let errorEvent = false;
   for await (const event of events) {
-    if (event.type === EventRunFinished) {
+    if (event.type === EVENT_RUN_FINISHED) {
       status = event.status;
       reason = event.stopReason ?? "";
-    } else if (event.type === EventError) {
+    } else if (event.type === EVENT_ERROR) {
       errorEvent = true;
     }
   }
@@ -123,7 +121,7 @@ Deno.test("loop reports truncated output as incomplete", async () => {
   const { status, reason } = await collectTerminal(
     agent.run("write a very long answer"),
   );
-  assertEquals(status, TaskIncomplete);
+  assertEquals(status, TASK_INCOMPLETE);
   assertEquals(reason, "output_limit");
   assertEquals(provider.calls, 1);
 });
@@ -160,7 +158,7 @@ Deno.test("loop marks a recovered turn a success", async () => {
   const { status, reason, errorEvent } = await collectTerminal(
     agent.run("start"),
   );
-  assertEquals(status, TaskSuccess);
+  assertEquals(status, TASK_SUCCESS);
   assertEquals(errorEvent, false);
   assertEquals(provider.calls, 2);
   assert(reason === "stop");
@@ -188,6 +186,6 @@ Deno.test("run cancelled during member wait terminalizes as canceled", async () 
   const { status, reason } = await collectTerminal(
     agent.run("start", controller.signal),
   );
-  assertEquals(status, TaskCanceled);
+  assertEquals(status, TASK_CANCELED);
   assertEquals(reason, "aborted");
 });

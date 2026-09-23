@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_minimax.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_minimax.go init() adapters. */

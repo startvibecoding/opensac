@@ -1,4 +1,3 @@
-// Translated from internal/browser/browser_test.go plus focused helper cases
 // for the ported protocol/client surface.
 
 import { assert, assertEquals } from "@std/assert";
@@ -13,7 +12,7 @@ import {
   newTool,
   registerTool,
   removeTool,
-  SkillName,
+  SKILL_NAME,
 } from "./mod.ts";
 import { formatAxTree, runeAlignedPrefix, truncateHtml } from "./ops.ts";
 
@@ -34,10 +33,10 @@ async function testPng(width: number, height: number): Promise<Uint8Array> {
 Deno.test("built-in browser skill is discoverable", () => {
   const manager = newManagerWithProjectDirs("", []);
   manager.load();
-  const skill = manager.get(SkillName);
+  const skill = manager.get(SKILL_NAME);
   assert(skill);
   assertEquals(skill.source, "builtin");
-  const context = manager.buildSkillContext(SkillName);
+  const context = manager.buildSkillContext(SKILL_NAME);
   for (
     const want of [
       "# Vibe Browser",

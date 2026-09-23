@@ -1,5 +1,3 @@
-// Translated from internal/esm/prompt_test.go
-
 import { assert } from "@std/assert";
 import {
   auditTaskPrompt,

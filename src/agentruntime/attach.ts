@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/attach.go.
 //
 // `AttachedResources` are adapter-policy-selected resources attached to the
 // common runtime. Use this only when protocol-specific registry or MCP policy
@@ -23,7 +22,7 @@ import { resolveManagerSource } from "./session_source.ts";
 import {
   policyForSource,
   type RuntimeSource,
-  SourceUnknown,
+  SOURCE_UNKNOWN,
 } from "./source.ts";
 
 /** Adapter-policy-selected resources attached to the common runtime. */
@@ -76,11 +75,11 @@ export async function attachSessionResources(
     resources.additionalDirectories ?? [],
   );
   const resolved = resolveManagerSource(manager, {
-    requested: resources.source ?? SourceUnknown,
+    requested: resources.source ?? SOURCE_UNKNOWN,
   });
-  let entrySource = resources.entrySource ?? SourceUnknown;
-  if (entrySource === SourceUnknown) {
-    entrySource = resources.source ?? SourceUnknown;
+  let entrySource = resources.entrySource ?? SOURCE_UNKNOWN;
+  if (entrySource === SOURCE_UNKNOWN) {
+    entrySource = resources.source ?? SOURCE_UNKNOWN;
   }
   const attachments = new AttachmentService(
     manager.getSessionDir(),

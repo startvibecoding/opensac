@@ -1,6 +1,5 @@
-// Ported from internal/db/stats.go
-
 import { beginWaitStats, busyRetryStats } from "./busy.ts";
+import { queryStats } from "./query_stats.ts";
 
 /** The expvar name under which the process-wide SQLite contention metrics are published. */
 export const SQLITE_EXPVAR_KEY = "opensac_sqlite";
@@ -13,11 +12,17 @@ export const SQLITE_EXPVAR_KEY = "opensac_sqlite";
 export function sqliteStatsSnapshot(): Record<string, number> {
   const { hits, totalWaitMs } = busyRetryStats();
   const { count, totalMs, maxMs } = beginWaitStats();
+  const query = queryStats();
   return {
     busyRetryHits: hits,
     busyRetryWaitMs: Math.trunc(totalWaitMs),
     beginCount: count,
     beginTotalWaitMs: Math.trunc(totalMs),
     beginMaxWaitMs: Math.trunc(maxMs),
+    queryCount: query.count,
+    queryTotalMs: Math.trunc(query.totalMs),
+    queryMaxMs: Math.trunc(query.maxMs),
+    querySlowCount: query.slowCount,
+    querySlowTotalMs: Math.trunc(query.slowTotalMs),
   };
 }

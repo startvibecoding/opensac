@@ -1,4 +1,3 @@
-// Ported from internal/session/database_recovery_notice.go
 //
 // A database that src/db had to back up and rebuild after a schema migration
 // failure is announced over the same advisory UDP bus as runtime lease changes,

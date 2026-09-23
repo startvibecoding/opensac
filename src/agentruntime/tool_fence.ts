@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/tool_fence.go.
 //
 // `beforeToolExecuteForRuntime` is the Runtime ownership fence installed for
 // every Agent built by a SessionRuntime, including managed children. It runs

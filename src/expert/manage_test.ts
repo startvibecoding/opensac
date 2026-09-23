@@ -1,5 +1,3 @@
-// Ported from internal/expert/manage_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
@@ -8,8 +6,8 @@ import {
   Manager,
   manifestFileName,
   roleLead,
-  ScopeGlobal,
-  ScopeProject,
+  SCOPE_GLOBAL,
+  SCOPE_PROJECT,
   sourceBuiltin,
   sourceProject,
   typeAgent,
@@ -50,8 +48,8 @@ Deno.test("manager global create update delete", () => {
     manager.globalDir = globalDir;
     const draft = managedAgentDraft("desktop-team");
 
-    const created = manager.create(ScopeGlobal, draft);
-    assertEquals(created.scope, ScopeGlobal);
+    const created = manager.create(SCOPE_GLOBAL, draft);
+    assertEquals(created.scope, SCOPE_GLOBAL);
     assertEquals(created.manifest.name, "desktop-team");
     assertEquals(
       Deno.statSync(path.join(globalDir, "desktop-team", manifestFileName))
@@ -60,9 +58,9 @@ Deno.test("manager global create update delete", () => {
     );
 
     draft.manifest.displayName.zh = "已修改主角团";
-    const updated = manager.update(ScopeGlobal, draft);
+    const updated = manager.update(SCOPE_GLOBAL, draft);
     assertEquals(updated.manifest.displayName.zh, "已修改主角团");
-    manager.delete(ScopeGlobal, "desktop-team");
+    manager.delete(SCOPE_GLOBAL, "desktop-team");
     let exists = true;
     try {
       Deno.statSync(path.join(globalDir, "desktop-team"));
@@ -79,7 +77,7 @@ Deno.test("manager project scope and invalid draft", () => {
       const manager = new Manager(project);
       manager.globalDir = path.join(globalTmp, "experts");
       const draft = managedAgentDraft("project-team");
-      manager.create(ScopeProject, draft);
+      manager.create(SCOPE_PROJECT, draft);
       const projectPath = path.join(
         project,
         ".opensac",
@@ -93,7 +91,7 @@ Deno.test("manager project scope and invalid draft", () => {
       invalid.agents["lead"] = "---\nname: other\n---\nwrong identity\n";
       let threw = false;
       try {
-        manager.create(ScopeGlobal, invalid);
+        manager.create(SCOPE_GLOBAL, invalid);
       } catch {
         threw = true;
       }
@@ -126,11 +124,11 @@ Deno.test("manager rejects builtin and preserves precedence", () => {
 
         const global = managedAgentDraft("frontend-developer");
         global.manifest.displayName.zh = "全局覆盖";
-        manager.create(ScopeGlobal, global);
+        manager.create(SCOPE_GLOBAL, global);
 
         const projectDraft = managedAgentDraft("frontend-developer");
         projectDraft.manifest.displayName.zh = "项目覆盖";
-        manager.create(ScopeProject, projectDraft);
+        manager.create(SCOPE_PROJECT, projectDraft);
 
         for (const item of manager.list()) {
           if (item.name === "frontend-developer") {

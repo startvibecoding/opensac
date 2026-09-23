@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/execution_snapshot_test.go.
 //
 // The Go tests drive a real session database and build raw
 // `session_runtime_leases` fixtures to exercise the external/legacy/mismatched
@@ -22,18 +21,18 @@ import {
   type DurableRun,
   ExecutionRuntime,
   inspectSessionExecution,
+  RUN_STATE_COMPLETED,
+  RUN_STATE_FAILED,
+  RUN_STATE_RUNNING,
   type RunEvent,
-  RunStateCompleted,
-  RunStateFailed,
-  RunStateRunning,
   RunStore,
-  SessionExecutionDetached,
-  SessionExecutionExternal,
-  SessionExecutionIdle,
-  SessionExecutionInconsistent,
-  SessionExecutionLocal,
-  SessionExecutionOrphaned,
-  SessionExecutionReserved,
+  SESSION_EXECUTION_DETACHED,
+  SESSION_EXECUTION_EXTERNAL,
+  SESSION_EXECUTION_IDLE,
+  SESSION_EXECUTION_INCONSISTENT,
+  SESSION_EXECUTION_LOCAL,
+  SESSION_EXECUTION_ORPHANED,
+  SESSION_EXECUTION_RESERVED,
 } from "./mod.ts";
 
 function makeRun(overrides: Partial<DurableRun>): DurableRun {
@@ -134,14 +133,14 @@ Deno.test("inspectSessionExecutionTracksLocalLifecycle", () => {
         makeRun({
           id: "run-local",
           sessionId: "snapshot-local",
-          status: RunStateRunning,
+          status: RUN_STATE_RUNNING,
           startedAt: now,
         }),
         runEvent("snapshot-local", "run-local", "started"),
       );
 
       let snapshot = inspectSessionExecution(sessionDir, "snapshot-local");
-      assertEquals(snapshot.state, SessionExecutionLocal);
+      assertEquals(snapshot.state, SESSION_EXECUTION_LOCAL);
       assert(snapshot.running, "local run should be running");
       assert(!snapshot.canSubmit, "local run must not allow submit");
       assert(snapshot.canCancelLocal, "local run must allow local cancel");
@@ -157,18 +156,18 @@ Deno.test("inspectSessionExecutionTracksLocalLifecycle", () => {
 
       execution.finishDurable(
         "run-local",
-        RunStateCompleted,
+        RUN_STATE_COMPLETED,
         "",
         runEvent("snapshot-local", "run-local", "finished"),
       );
       snapshot = inspectSessionExecution(sessionDir, "snapshot-local");
-      assertEquals(snapshot.state, SessionExecutionReserved);
+      assertEquals(snapshot.state, SESSION_EXECUTION_RESERVED);
       assertEquals(snapshot.phase, "releasing");
       assert(!snapshot.canSubmit, "releasing lease must not allow submit");
 
       lease.release();
       snapshot = inspectSessionExecution(sessionDir, "snapshot-local");
-      assertEquals(snapshot.state, SessionExecutionIdle);
+      assertEquals(snapshot.state, SESSION_EXECUTION_IDLE);
       assert(!snapshot.busy, "idle session must not be busy");
       assert(snapshot.canSubmit, "idle session must allow submit");
     } finally {
@@ -192,7 +191,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
       name: "external",
       leasePurpose: "execution",
       leaseRunId: "run-active",
-      wantState: SessionExecutionExternal,
+      wantState: SESSION_EXECUTION_EXTERNAL,
       wantLinkage: "bound",
       wantRunning: true,
     },
@@ -200,7 +199,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
       name: "legacy unbound",
       leasePurpose: "run",
       leaseRunId: "",
-      wantState: SessionExecutionExternal,
+      wantState: SESSION_EXECUTION_EXTERNAL,
       wantLinkage: "legacy_unbound",
       wantRunning: true,
     },
@@ -208,7 +207,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
       name: "mismatched",
       leasePurpose: "execution",
       leaseRunId: "other-run",
-      wantState: SessionExecutionInconsistent,
+      wantState: SESSION_EXECUTION_INCONSISTENT,
       wantLinkage: "mismatched",
       wantRunning: false,
     },
@@ -216,7 +215,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
       name: "orphaned",
       leasePurpose: "",
       leaseRunId: "",
-      wantState: SessionExecutionOrphaned,
+      wantState: SESSION_EXECUTION_ORPHANED,
       wantLinkage: "none",
       wantRunning: false,
     },
@@ -289,7 +288,7 @@ Deno.test("inspectSessionExecutionProjectsMutationAsReserved", () => {
     const lease = acquireMutation(sessionDir, "snapshot-reserved");
     try {
       const snapshot = inspectSessionExecution(sessionDir, "snapshot-reserved");
-      assertEquals(snapshot.state, SessionExecutionReserved);
+      assertEquals(snapshot.state, SESSION_EXECUTION_RESERVED);
       assert(!snapshot.running, "mutation reservation must not be running");
       assert(snapshot.busy, "mutation reservation must be busy");
       assert(!snapshot.canSubmit, "mutation reservation must not allow submit");
@@ -322,7 +321,7 @@ Deno.test(
       );
 
       let snapshot = inspectSessionExecution(sessionDir, "snapshot-remote");
-      assertEquals(snapshot.state, SessionExecutionOrphaned);
+      assertEquals(snapshot.state, SESSION_EXECUTION_ORPHANED);
 
       const remote: ResponseRun = {
         id: 0,
@@ -343,7 +342,7 @@ Deno.test(
       saveResponseRun(sessionDir, remote);
 
       snapshot = inspectSessionExecution(sessionDir, "snapshot-remote");
-      assertEquals(snapshot.state, SessionExecutionDetached);
+      assertEquals(snapshot.state, SESSION_EXECUTION_DETACHED);
       assert(snapshot.running, "detached remote run should be running");
       assert(snapshot.canCancelRemote, "detached remote run must allow cancel");
       assert(!snapshot.canSubmit, "detached remote run must not allow submit");
@@ -382,10 +381,10 @@ Deno.test("reattachDurableRunPromotesRecoveryLeaseAndRegistersLocal", () => {
         makeRun({
           id: "run-reattach",
           sessionId: "snapshot-reattach",
-          status: RunStateRunning,
+          status: RUN_STATE_RUNNING,
           startedAt: now,
         }),
-        RunStateRunning,
+        RUN_STATE_RUNNING,
         runEvent("snapshot-reattach", "run-reattach", "started"),
       );
       const binding = lease.binding();
@@ -393,12 +392,12 @@ Deno.test("reattachDurableRunPromotesRecoveryLeaseAndRegistersLocal", () => {
       assertEquals(binding.runId, "run-reattach");
 
       const snapshot = inspectSessionExecution(sessionDir, "snapshot-reattach");
-      assertEquals(snapshot.state, SessionExecutionLocal);
+      assertEquals(snapshot.state, SESSION_EXECUTION_LOCAL);
       assert(snapshot.canCancelLocal, "reattached run must allow local cancel");
 
       execution.finishDurable(
         "run-reattach",
-        RunStateFailed,
+        RUN_STATE_FAILED,
         "test cleanup",
         runEvent("snapshot-reattach", "run-reattach", "failed"),
       );

@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/run_event.go.
 //
 // `RunEvent` is the front-end-neutral durable representation of a run event.
 // Adapters may keep their protocol payload in `data`, but persistence is owned

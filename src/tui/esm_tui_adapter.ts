@@ -23,11 +23,11 @@ import {
 } from "../../sdk/agent/mod.ts";
 import {
   Event,
-  EventRunFinished,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolCall,
-  EventToolExecutionEnd,
+  EVENT_RUN_FINISHED,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
   type TaskStatus,
 } from "../agent/events.ts";
 import {
@@ -211,21 +211,21 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
     switch (ev.type) {
       case eventTextDelta:
         out = {
-          type: EventTextDelta,
+          type: EVENT_TEXT_DELTA,
           agentId: childId,
           textDelta: ev.textDelta,
         };
         break;
       case eventThinkDelta:
         out = {
-          type: EventThinkDelta,
+          type: EVENT_THINK_DELTA,
           agentId: childId,
           thinkDelta: ev.thinkDelta,
         };
         break;
       case eventToolCall:
         out = {
-          type: EventToolCall,
+          type: EVENT_TOOL_CALL,
           agentId: childId,
           toolName: ev.toolName,
           toolCallId: ev.toolCallId,
@@ -234,7 +234,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
         break;
       case eventToolExecutionEnd:
         out = {
-          type: EventToolExecutionEnd,
+          type: EVENT_TOOL_EXECUTION_END,
           agentId: childId,
           toolName: ev.toolName,
           toolCallId: ev.toolCallId,
@@ -245,7 +245,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
         break;
       case eventRunFinished:
         out = {
-          type: EventRunFinished,
+          type: EVENT_RUN_FINISHED,
           agentId: childId,
           status: ev.status as TaskStatus | undefined,
           error: ev.error,

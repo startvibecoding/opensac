@@ -1,4 +1,4 @@
-// Ported from internal/acp/extensions.go (the pure, server-independent
+// (the pure, server-independent
 // extension projections).
 //
 // These helpers build the additive `opensac/*` extension payloads that the ACP

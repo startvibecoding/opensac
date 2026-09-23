@@ -1,4 +1,3 @@
-// Translated from internal/agent tests covering the background Responses
 // request builders and the background tool-call entry points:
 // agent_test.go (TestBuildBackgroundParamsDoNotLeakResponsesOptionsToOther
 // Protocols) and tool_launch_test.go
@@ -16,7 +15,10 @@ import {
   type ToolContext,
   type ToolResult,
 } from "../tools/mod.ts";
-import { EventToolExecutionEnd, EventToolExecutionStart } from "./events.ts";
+import {
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+} from "./events.ts";
 import { newAgent, newAgentWithLoopConfig } from "./agent.ts";
 import { newToolLaunchOrder } from "./tool_launch.ts";
 import { testModel } from "./agent_testutil.ts";
@@ -190,13 +192,13 @@ Deno.test(
     let queuedStarted = false;
     const drained = (async () => {
       for await (const ev of first) {
-        if (ev.type === EventToolExecutionEnd) {
+        if (ev.type === EVENT_TOOL_EXECUTION_END) {
           failedResult = ev.toolResult ?? "";
         }
       }
       for await (const ev of second) {
         if (
-          ev.type === EventToolExecutionStart && ev.toolCallId === queued.id
+          ev.type === EVENT_TOOL_EXECUTION_START && ev.toolCallId === queued.id
         ) {
           queuedStarted = true;
         }

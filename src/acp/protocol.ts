@@ -1,5 +1,4 @@
-// Ported from internal/acp/acp.go (the ACP wire vocabulary) and
-// internal/acp/extensions.go.
+// (the ACP wire vocabulary) and
 //
 // The Agent Client Protocol wire shapes. Go struct tags are preserved as the
 // serialized keys (camelCase where the tags are camelCase), so `JSON.stringify`

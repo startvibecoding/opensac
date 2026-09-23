@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/delivery.go.
 //
 // The deterministic, I/O-free delivery planner: it freezes the run-level
 // transport target and the ordered outbox operations that the terminal
@@ -12,10 +11,10 @@
 
 import { createHash } from "node:crypto";
 import {
-  AttachmentFile,
-  AttachmentImage,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
   type AttachmentKind,
-  AttachmentVideo,
   type SessionAttachment,
 } from "./attachment.ts";
 
@@ -213,9 +212,10 @@ export function planDelivery(
       throw new Error("delivery attachment does not belong to Run");
     }
     const kind: AttachmentKind = attachment.kind;
-    const native = (kind === AttachmentImage && request.capability.sendImage) ||
-      (kind === AttachmentFile && request.capability.sendFile) ||
-      (kind === AttachmentVideo && request.capability.sendVideo);
+    const native =
+      (kind === ATTACHMENT_IMAGE && request.capability.sendImage) ||
+      (kind === ATTACHMENT_FILE && request.capability.sendFile) ||
+      (kind === ATTACHMENT_VIDEO && request.capability.sendVideo);
     if (!native) {
       let name = (attachment.filename ?? "").trim();
       if (name === "") name = kind;

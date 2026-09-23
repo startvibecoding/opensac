@@ -1,4 +1,3 @@
-// Translated from internal/session/session_test.go,
 // additional_directories_test.go, and content_override_test.go (Manager slice).
 //
 // Covers the SQLite-backed Manager: construction/init, append family, replay,

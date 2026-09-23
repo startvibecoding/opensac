@@ -1,6 +1,4 @@
-// Interactive TUI slash-command dispatch. Ported from internal/tui/commands.go
-// and its satellite files (commands_session.go, commands_stats.go,
-// commands_statusline.go, commands_expert.go, esm.go, btw.go, skillhub.go).
+// Interactive TUI slash-command dispatch.
 //
 // The dispatcher owns command syntax and user-facing status/error lines only.
 // Every mutation goes through a {@link CommandHost} — the session assembly in

@@ -1,4 +1,4 @@
-// Ported from internal/session/store.go (in-memory Store).
+// (in-memory Store).
 //
 // The Go tree has no dedicated MemoryStore test; these cases exercise the
 // interface contract the agent and TUI layers rely on.

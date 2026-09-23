@@ -1,19 +1,17 @@
-// Ported from internal/agent/iteration_budget.go.
-
 import { type RunContext } from "./run_context.ts";
 import type { ToolContext } from "../tools/tool.ts";
 
 /**
- * IterationBudgetToolName is the model-facing renewal tool for the main loop's
+ * ITERATION_BUDGET_TOOL_NAME is the model-facing renewal tool for the main loop's
  * iteration budget.
  */
-export const IterationBudgetToolName = "extend_budget";
+export const ITERATION_BUDGET_TOOL_NAME = "extend_budget";
 
 const defaultIterationBudgetSoft = 200;
 const defaultRenewFactor = 0.5;
 const defaultMaxRenewals = 2;
 /** Default total wall-clock cap for one run, in milliseconds (16 hours). */
-export const DefaultIterationBudgetWallClock = 16 * 60 * 60 * 1000;
+export const DEFAULT_ITERATION_BUDGET_WALL_CLOCK = 16 * 60 * 60 * 1000;
 
 /**
  * IterationBudgetPolicy bounds the main loop's iteration count and governs
@@ -60,7 +58,9 @@ export function normalizeIterationBudgetPolicy(
     out.minInterval = Math.floor(out.soft / 10);
     if (out.minInterval < 1) out.minInterval = 1;
   }
-  if (out.maxWallClock <= 0) out.maxWallClock = DefaultIterationBudgetWallClock;
+  if (out.maxWallClock <= 0) {
+    out.maxWallClock = DEFAULT_ITERATION_BUDGET_WALL_CLOCK;
+  }
   return out;
 }
 

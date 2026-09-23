@@ -1,4 +1,3 @@
-// Ported from internal/tools/question.go.
 //
 // Go attaches the `QuestionAsker` to `context.Context` via a private key; the
 // port carries it on the `ToolContext`. The `AskQuestion` method is async.

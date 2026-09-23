@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/knowledge_index_job.go.
 //
 // KnowledgeIndexJob tracks one asynchronous scan/index pass. Scans always run
 // as background tasks so neither the ACP transport nor any management RPC
@@ -29,10 +28,10 @@ export function knowledgeBaseDisabledError(id: string): Error {
  * where a background scan currently is; callers poll them periodically and
  * never block a transport while a scan runs.
  */
-export const KnowledgeIndexPhaseScanning = "scanning";
-export const KnowledgeIndexPhaseIndexing = "indexing";
-export const KnowledgeIndexPhaseEnriching = "enriching";
-export const KnowledgeIndexPhaseCommitting = "committing";
+export const KNOWLEDGE_INDEX_PHASE_SCANNING = "scanning";
+export const KNOWLEDGE_INDEX_PHASE_INDEXING = "indexing";
+export const KNOWLEDGE_INDEX_PHASE_ENRICHING = "enriching";
+export const KNOWLEDGE_INDEX_PHASE_COMMITTING = "committing";
 
 /** A point-in-time view of one background index job. */
 export interface KnowledgeIndexProgress {

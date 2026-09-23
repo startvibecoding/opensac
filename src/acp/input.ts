@@ -1,4 +1,4 @@
-// Ported from internal/acp/acp.go (the ACP prompt/input conversion layer).
+// (the ACP prompt/input conversion layer).
 //
 // The ACP protocol delivers prompt content blocks; every resource must be
 // normalized into the Runtime-owned input contract (`InputIngress`) rather than
@@ -14,11 +14,11 @@ import { createHash } from "node:crypto";
 import { isAbsolute, join, relative, resolve, SEPARATOR } from "@std/path";
 import { decodeBase64 } from "@std/encoding/base64";
 import {
-  AttachmentAudio,
-  AttachmentFile,
-  AttachmentImage,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
   type AttachmentKind,
-  AttachmentVideo,
 } from "../agentruntime/attachment.ts";
 import {
   type InputIngress,
@@ -331,13 +331,13 @@ export function acpAttachmentKind(
   contentType: string,
   mediaType: string,
 ): AttachmentKind {
-  if (contentType.trim().toLowerCase() === "image") return AttachmentImage;
-  if (contentType.trim().toLowerCase() === "audio") return AttachmentAudio;
+  if (contentType.trim().toLowerCase() === "image") return ATTACHMENT_IMAGE;
+  if (contentType.trim().toLowerCase() === "audio") return ATTACHMENT_AUDIO;
   const baseType = (mediaType.split(";")[0] ?? "").trim().toLowerCase();
-  if (baseType.startsWith("image/")) return AttachmentImage;
-  if (baseType.startsWith("audio/")) return AttachmentAudio;
-  if (baseType.startsWith("video/")) return AttachmentVideo;
-  return AttachmentFile;
+  if (baseType.startsWith("image/")) return ATTACHMENT_IMAGE;
+  if (baseType.startsWith("audio/")) return ATTACHMENT_AUDIO;
+  if (baseType.startsWith("video/")) return ATTACHMENT_VIDEO;
+  return ATTACHMENT_FILE;
 }
 
 /**
@@ -375,7 +375,7 @@ export function acpPromptRequestSnapshot(
   }
   if (runtime !== null && runtime !== undefined && runtime.inputs !== null) {
     for (const prepared of input.resources) {
-      const record = runtime.inputs.Get(runtime.id, prepared.resourceId);
+      const record = runtime.inputs.get(runtime.id, prepared.resourceId);
       resources.push({
         id: record.id,
         kind: record.kind,

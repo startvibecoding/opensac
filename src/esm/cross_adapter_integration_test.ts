@@ -1,5 +1,3 @@
-// Translated from internal/esm/cross_adapter_integration_test.go
-
 import { assertEquals } from "@std/assert";
 import { roleWorker, Supervisor } from "./runtime_core.ts";
 import { statusActive } from "./state.ts";

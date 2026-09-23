@@ -1,4 +1,3 @@
-// Ported from internal/agent/parallel.go.
 //
 // BoundedParallel applies fn to every item with at most max concurrent workers.
 // Results retain the input order even when calls finish out of order. A

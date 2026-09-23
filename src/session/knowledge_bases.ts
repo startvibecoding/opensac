@@ -1,4 +1,3 @@
-// Ported from internal/session/knowledge_bases.go
 //
 // Runtime-owned persistence and orchestration for Desktop-managed knowledge
 // bases. Each base is a user-selected directory indexed into one private,
@@ -30,7 +29,7 @@ import {
 } from "./knowledge_database.ts";
 
 /** The knowledge-store schema version of a completed graph snapshot. */
-export const KnowledgeGraphSchemaVersion = 1;
+export const KNOWLEDGE_GRAPH_SCHEMA_VERSION = 1;
 
 /** Thrown when a knowledge base has no completed active index. */
 export class KnowledgeBaseUnindexedError extends Error {
@@ -300,7 +299,7 @@ export function storeKnowledgeGraphSnapshot(
   migrateLegacyKnowledgeBaseStorage(sessionDir);
   const now = new Date();
   graph.snapshot.status = "completed";
-  graph.snapshot.schemaVersion = KnowledgeGraphSchemaVersion;
+  graph.snapshot.schemaVersion = KNOWLEDGE_GRAPH_SCHEMA_VERSION;
   graph.snapshot.fileCount = graph.files.length;
   graph.snapshot.chunkCount = graph.chunks.length;
   graph.snapshot.nodeCount = graph.nodes.length;
@@ -366,7 +365,7 @@ export function reuseKnowledgeSnapshotIfFilesMatch(
       const snapshot = knowledgeSnapshotFromRecord(snapshotRecord);
       if (
         snapshot.status !== "completed" ||
-        snapshot.schemaVersion !== KnowledgeGraphSchemaVersion
+        snapshot.schemaVersion !== KNOWLEDGE_GRAPH_SCHEMA_VERSION
       ) {
         return;
       }
@@ -465,7 +464,7 @@ export function prepareKnowledgeGraphReusePlan(
       }
       if (
         snapshot.status !== "completed" ||
-        snapshot.schemaVersion !== KnowledgeGraphSchemaVersion
+        snapshot.schemaVersion !== KNOWLEDGE_GRAPH_SCHEMA_VERSION
       ) {
         return;
       }

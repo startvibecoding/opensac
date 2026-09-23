@@ -1,4 +1,3 @@
-// Ported from internal/agent/tool_launch.go.
 //
 // ToolLaunchOrder keeps the *start* of one parallel tool-call batch in the
 // declared provider order without serializing or blocking the batch: calls still

@@ -1,4 +1,4 @@
-// Ported from internal/session/session_test.go (capability/event/sequenced
+// (capability/event/sequenced
 // projections).
 //
 // The Go tests drive these through the session Manager; the not-yet-ported

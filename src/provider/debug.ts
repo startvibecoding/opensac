@@ -1,5 +1,3 @@
-// Ported from internal/provider/debug.go
-
 import type { ToolCallBlock, Usage } from "./types.ts";
 
 /**

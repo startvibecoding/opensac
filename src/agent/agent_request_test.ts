@@ -1,4 +1,3 @@
-// Translated from internal/agent/agent_test.go covering the Agent's request
 // assembly and compaction decisions: the SetForceCompact/ShouldCompact cases
 // (TestSetForceCompact_ShouldCompactReturnsTrue,
 // TestSetForceCompact_NoMessagesDoesNotForce,

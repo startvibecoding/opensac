@@ -1,11 +1,10 @@
-// Ported from internal/agentruntime/decision_record_test.go,
 // decision_replay_test.go, decision_resolver_test.go, decision_contract_test.go,
 // and decision_rehydrate_test.go.
 
 import { assertEquals, assertThrows } from "@std/assert";
 import {
-  DecisionApproval,
-  DecisionQuestion,
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
   DecisionService,
 } from "./decision.ts";
 import {
@@ -23,7 +22,7 @@ Deno.test("DecisionRecord keeps protocol-neutral payload", () => {
     id: "approval-1",
     sessionId: "session-1",
     runId: "run-1",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   };
   const record = newDecisionRequestRecord(request, { tool: "bash" });
   assertEquals(record.status, "pending");
@@ -48,7 +47,7 @@ Deno.test("ReplayDecisions omits expired pending", () => {
       id: "expired",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "pending",
       expiresAt: new Date(now.getTime() - 1000),
     },
@@ -56,7 +55,7 @@ Deno.test("ReplayDecisions omits expired pending", () => {
       id: "active",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionQuestion,
+      kind: DECISION_QUESTION,
       status: "pending",
       expiresAt: new Date(now.getTime() + 60_000),
     },
@@ -76,7 +75,7 @@ Deno.test("ExpiredDecisions honors later resolution", () => {
       id: "approval-1",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "pending",
       expiresAt: new Date(now.getTime() - 1000),
     },
@@ -84,7 +83,7 @@ Deno.test("ExpiredDecisions honors later resolution", () => {
       id: "approval-1",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "resolved",
     },
   ], now);
@@ -97,27 +96,27 @@ Deno.test("ReplayDecisions pairs request and resolution", () => {
       id: "approval-1",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "pending",
     },
     {
       id: "question-1",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionQuestion,
+      kind: DECISION_QUESTION,
       status: "pending",
     },
     {
       id: "approval-1",
       sessionId: "",
       runId: "run-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "resolved",
       value: "approve_once",
     },
   ]);
   assertEquals(pending.size, 1);
-  assertEquals(pending.get("question-1")?.kind, DecisionQuestion);
+  assertEquals(pending.get("question-1")?.kind, DECISION_QUESTION);
 });
 
 Deno.test("DecisionService bind and clearRunWithValue", () => {
@@ -125,7 +124,7 @@ Deno.test("DecisionService bind and clearRunWithValue", () => {
   service.register({
     id: "question-1",
     runId: "run-1",
-    kind: DecisionQuestion,
+    kind: DECISION_QUESTION,
   });
   let resolved = "";
   service.bind("question-1", (value) => {
@@ -133,7 +132,7 @@ Deno.test("DecisionService bind and clearRunWithValue", () => {
   });
   service.resolve({
     id: "question-1",
-    kind: DecisionQuestion,
+    kind: DECISION_QUESTION,
     status: "resolved",
     value: "yes",
   });
@@ -142,7 +141,7 @@ Deno.test("DecisionService bind and clearRunWithValue", () => {
   service.register({
     id: "approval-1",
     runId: "run-1",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   });
   resolved = "";
   service.bind("approval-1", (value) => {
@@ -162,26 +161,26 @@ Deno.test("DecisionService contract across kinds and runs", () => {
       id: "approval-1",
       runId: "run-1",
       sessionId: "session-1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
     },
     {
       id: "question-1",
       runId: "run-1",
       sessionId: "session-1",
-      kind: DecisionQuestion,
+      kind: DECISION_QUESTION,
     },
     {
       id: "approval-2",
       runId: "run-2",
       sessionId: "session-2",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
     },
   ];
   for (const request of requests) service.register(request);
   assertThrows(() =>
     service.resolve({
       id: "approval-1",
-      kind: DecisionQuestion,
+      kind: DECISION_QUESTION,
       status: "resolved",
     })
   );
@@ -199,7 +198,7 @@ Deno.test("DecisionService concurrent first response wins", async () => {
   service.register({
     id: "approval-race",
     runId: "run-race",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   });
   const workers = 16;
   const results = await Promise.all(
@@ -208,7 +207,7 @@ Deno.test("DecisionService concurrent first response wins", async () => {
         try {
           service.resolve({
             id: "approval-race",
-            kind: DecisionApproval,
+            kind: DECISION_APPROVAL,
             status: "resolved",
             value: `decision-${i}`,
           });
@@ -229,14 +228,14 @@ Deno.test("DecisionService rehydrate is sorted and idempotent", () => {
       id: "z",
       sessionId: "s",
       runId: "r",
-      kind: DecisionQuestion,
+      kind: DECISION_QUESTION,
       status: "pending",
     },
     {
       id: "a",
       sessionId: "s",
       runId: "r",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "pending",
     },
   ]);
@@ -248,7 +247,7 @@ Deno.test("DecisionService rehydrate is sorted and idempotent", () => {
       id: "a",
       sessionId: "s",
       runId: "r",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "pending",
     },
   ]);
@@ -263,7 +262,7 @@ Deno.test("DecisionService rehydrate rejects conflict", () => {
       id: "d",
       sessionId: "s",
       runId: "r1",
-      kind: DecisionApproval,
+      kind: DECISION_APPROVAL,
       status: "pending",
     },
   ]);
@@ -273,7 +272,7 @@ Deno.test("DecisionService rehydrate rejects conflict", () => {
         id: "d",
         sessionId: "s",
         runId: "r2",
-        kind: DecisionApproval,
+        kind: DECISION_APPROVAL,
         status: "pending",
       },
     ])
@@ -285,7 +284,7 @@ Deno.test("DecisionService clearRun resumes bound waiters", () => {
   service.register({
     id: "approval-clear",
     runId: "run-clear",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   });
   let resumed: string | null = null;
   service.bind("approval-clear", (value) => {
@@ -294,7 +293,7 @@ Deno.test("DecisionService clearRun resumes bound waiters", () => {
   service.register({
     id: "approval-sticky",
     runId: "run-clear",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   });
   service.bind("approval-sticky", () => {
     throw new Error("resume failed");
@@ -315,7 +314,7 @@ Deno.test("DecisionService failed commit retries without double resume", () => {
   service.register({
     id: "approval-commit",
     runId: "run-commit",
-    kind: DecisionApproval,
+    kind: DECISION_APPROVAL,
   });
   let resumes = 0;
   service.bind("approval-commit", () => {

@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/recovery_coordinator.go.
 //
 // Periodically drives lease-first orphan convergence for one canonical Session
 // database. Multiple processes may scan the same DB; the fenced recovery CAS

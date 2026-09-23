@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/decision_record.go.
 //
 // `DecisionRecord` is the protocol-neutral durable projection of a pending or
 // resolved Approval/Question. Adapters may persist their legacy payload beside

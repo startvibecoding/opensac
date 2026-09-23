@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/input_materializer.go.
 //
 // `InputMaterializer` owns project-relative input files and their
 // session-backed records. Artifact bytes deliberately use a different private
@@ -24,11 +23,11 @@ import { generateID } from "../session/entry.ts";
 import { queryRootDatabase, writeRootDatabase } from "../session/database.ts";
 import { appendInputResourceEventTx } from "../session/input_resources.ts";
 import {
-  AttachmentAudio,
-  AttachmentFile,
-  AttachmentImage,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
   type AttachmentKind,
-  AttachmentVideo,
   sanitizeAttachmentFilename,
   validatePathComponent,
 } from "./attachment.ts";
@@ -39,10 +38,10 @@ import type {
 } from "./knowledge_context.ts";
 
 const VALID_INPUT_KINDS: ReadonlySet<string> = new Set([
-  AttachmentImage,
-  AttachmentFile,
-  AttachmentAudio,
-  AttachmentVideo,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_FILE,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_VIDEO,
 ]);
 
 /**
@@ -230,7 +229,7 @@ export class InputMaterializer {
       }
     }
 
-    const maxBytes = ingress.kind === AttachmentImage
+    const maxBytes = ingress.kind === ATTACHMENT_IMAGE
       ? this.policy.maxImageBytes
       : this.policy.maxFileBytes;
     if (ingress.sizeHint > maxBytes) {
@@ -300,7 +299,7 @@ export class InputMaterializer {
       throw new Error(`detect input media type: ${err}`);
     }
     let mediaType = detectedType;
-    if (ingress.kind === AttachmentImage) {
+    if (ingress.kind === ATTACHMENT_IMAGE) {
       if (!detectedType.toLowerCase().startsWith("image/")) {
         removeResource();
         throw new Error(
@@ -426,7 +425,7 @@ export class InputMaterializer {
    * Explicitly removes a resource, including one already attached to a Run. The
    * record remains as an audit/replay tombstone.
    */
-  Delete(sessionId: string, resourceId: string): void {
+  delete(sessionId: string, resourceId: string): void {
     this.deleteResource(sessionId, resourceId, true);
   }
 
@@ -562,7 +561,7 @@ export class InputMaterializer {
   }
 
   /** Returns one persisted input resource belonging to `sessionId`. */
-  Get(sessionId: string, resourceId: string): InputResource {
+  get(sessionId: string, resourceId: string): InputResource {
     validatePathComponent(sessionId);
     validatePathComponent(resourceId);
     let record: InputResource | null = null;

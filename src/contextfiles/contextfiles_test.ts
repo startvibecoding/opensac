@@ -1,5 +1,3 @@
-// Ported from internal/contextfiles/contextfiles_test.go
-
 import { assert, assertEquals, assertFalse } from "@std/assert";
 import * as path from "@std/path";
 import {

@@ -1,4 +1,4 @@
-// Ported from internal/config/settings.go (defaultProviderConfigs).
+// (defaultProviderConfigs).
 //
 // This table is mechanically converted from the Go source map literal; do not
 // edit by hand. Field names follow the settings.json JSON schema (camelCase).

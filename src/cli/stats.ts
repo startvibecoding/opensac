@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main_stats.go: the `stats` subcommand. Runs the
+// the `stats` subcommand. Runs the
 // dashboard HTTP server (src/stats, already migrated) or prints the summary
 // tables directly in the terminal. The browser opener is best-effort and
 // never fatal, matching the Go command.

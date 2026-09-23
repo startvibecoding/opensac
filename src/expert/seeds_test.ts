@@ -1,5 +1,3 @@
-// Ported from internal/expert/seeds_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { builtinFS, type Bundle, loadBundleFS } from "./mod.ts";
 import {

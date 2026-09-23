@@ -1,4 +1,4 @@
-// Ported from internal/provider/openai/responses_runtime_test.go (session
+// (session
 // cases). The non-session fallback/diagnostics/hosted-lifecycle cases live in
 // responses_test.ts.
 //

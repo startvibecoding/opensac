@@ -1,4 +1,3 @@
-// Ported from internal/sandbox/mac_test.go
 //
 // The Go tests are darwin-only, but the profile builder and temp-profile
 // lifecycle are platform-neutral, so they run everywhere.

@@ -24,6 +24,7 @@ import type { Translator } from "./i18n.ts";
 import { formatToolRow } from "./tool_row_format.ts";
 import { CompactThinkingRow } from "./thinking_display.tsx";
 import { CompactToolRow } from "./tool_execution_display.tsx";
+import { stripANSI } from "./renderutil.ts";
 
 export interface AppProps {
   /** The event-dispatch controller owning the transcript. */
@@ -63,12 +64,6 @@ export interface TranscriptRow {
     | "tool"
     | "error"
     | "warning";
-}
-
-/** Strips ANSI for <Text> children so Ink owns styling. */
-function plain(s: string): string {
-  // deno-lint-ignore no-control-regex
-  return s.replace(/\u001B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\-_])/g, "");
 }
 
 /** The full-screen layout with enhanced TurnCard display. */
@@ -196,7 +191,9 @@ export function App({
       {!overlayOpen && streaming.map((row) => renderRow(row, true))}
       {controller.shownApproval && (
         <Box flexDirection="column" borderStyle="round">
-          <Text bold>Approval required</Text>
+          <Text bold color="yellow">
+            {controller.translator.text("approval.required")}
+          </Text>
           <Text>
             {controller.shownApproval.toolName}{" "}
             {JSON.stringify(controller.shownApproval.args ?? {})}
@@ -212,7 +209,9 @@ export function App({
         </Box>
       )}
       {!overlayOpen && controller.isThinking && (
-        <Text dimColor>~ working...</Text>
+        <Text dimColor>
+          ~ {controller.translator.text("thinking.in_progress")}
+        </Text>
       )}
     </Box>
   );
@@ -240,7 +239,9 @@ function renderRow(row: TranscriptRow, streaming: boolean): ReactElement {
     return <Text key={row.id} color="yellow">{row.text}</Text>;
   }
   return (
-    <Text key={row.id}>{streaming ? plain(clip(row.text, 6)) : row.text}</Text>
+    <Text key={row.id}>
+      {streaming ? stripANSI(clip(row.text, 6)) : row.text}
+    </Text>
   );
 }
 
@@ -309,7 +310,7 @@ function store_end(controller: AppController): number {
 }
 
 function clip(text: string, maxLines = 6): string {
-  const lines = plain(text).split("\n");
+  const lines = stripANSI(text).split("\n");
   if (lines.length <= maxLines) return text;
   return lines.slice(lines.length - maxLines).join("\n") + "\n";
 }

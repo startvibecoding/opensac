@@ -1,5 +1,3 @@
-// Ported from internal/dao/esm_guidance.go
-
 import type { DB } from "../db/mod.ts";
 import { ErrNoRows, execChanges, queryAll } from "./database.ts";
 

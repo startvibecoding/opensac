@@ -1,5 +1,3 @@
-// Translated from internal/mcp/config_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import { type MCPServer, saveMCPConfig } from "../config/mcp.ts";

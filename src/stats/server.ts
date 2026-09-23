@@ -1,4 +1,3 @@
-// Ported from internal/stats/server.go
 //
 // `net/http.ServeMux` maps to a small path router over the standard web
 // Request/Response API; `http.Server` maps to `Deno.serve`.

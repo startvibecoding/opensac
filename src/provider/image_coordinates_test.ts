@@ -1,5 +1,3 @@
-// Ported from internal/provider/image_coordinates_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   mapNormalizedRectToOriginal,

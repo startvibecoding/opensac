@@ -1,4 +1,4 @@
-// Translated from internal/agent/cache_test.go, max_tokens_test.go (clamp),
+// (clamp),
 // and agent_test.go (repairDanglingToolCalls), plus focused tests for the
 // remaining stateless agent_context.go helpers.
 

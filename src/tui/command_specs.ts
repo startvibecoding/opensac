@@ -1,4 +1,3 @@
-// Ported from internal/tui/command_specs.go and the dispatch prologue of
 // internal/tui/commands.go (handleCommand).
 //
 // CommandSpec keeps slash-command syntax stable while localizing user-facing

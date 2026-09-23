@@ -1,4 +1,4 @@
-// Ported from the public Go package `agent` (agent/provider.go).
+// (agent/provider.go).
 //
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`.

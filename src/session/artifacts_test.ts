@@ -1,5 +1,3 @@
-// Ported from internal/session/artifacts_test.go
-
 import { assertEquals, assertFalse } from "@std/assert";
 import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
 import { closeAll } from "../db/mod.ts";

@@ -1,4 +1,4 @@
-// Ported from internal/agent/agent.go (the `Agent` instance model) and the
+// (the `Agent` instance model) and the
 // Agent-bound accessors of internal/agent/agent_context.go.
 //
 // This module ports the Agent type, its constructors, the frozen-prompt build,
@@ -97,9 +97,9 @@ import {
 import { createHash } from "node:crypto";
 import {
   type Event,
-  EventAgentEnd,
-  EventQuestionRequest,
-  EventToolApprovalRequest,
+  EVENT_AGENT_END,
+  EVENT_QUESTION_REQUEST,
+  EVENT_TOOL_APPROVAL_REQUEST,
 } from "./events.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
@@ -138,34 +138,34 @@ import {
   retryErrorDetail,
 } from "../provider/mod.ts";
 import {
-  EventAgentStart,
-  EventBudgetPressure,
-  EventCompactionEnd,
-  EventCompactionStart,
-  EventContextPressure,
-  EventDone,
-  EventError,
-  EventHostedItem,
-  EventMessageEnd,
-  EventMessageStart,
-  EventPlanUpdate,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolResult,
-  EventTurnEnd,
-  EventTurnStart,
-  EventUsage,
-  TaskCanceled,
-  TaskFailed,
-  TaskIncomplete,
+  EVENT_AGENT_START,
+  EVENT_BUDGET_PRESSURE,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_CONTEXT_PRESSURE,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_MESSAGE_END,
+  EVENT_MESSAGE_START,
+  EVENT_PLAN_UPDATE,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_RESULT,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
+  EVENT_USAGE,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
   type TaskStatus,
-  TaskSuccess,
 } from "./events.ts";
 import { compactWithOptions } from "../context/compaction.ts";
 import { generateID } from "../session/entry.ts";
@@ -220,10 +220,10 @@ import {
 } from "./agent_context.ts";
 import {
   contextWithIterationBudget,
+  ITERATION_BUDGET_TOOL_NAME,
   type IterationBudget,
   iterationBudgetFromContext,
   iterationBudgetPolicyEnabled,
-  IterationBudgetToolName,
   newIterationBudget,
   normalizeIterationBudgetPolicy,
 } from "./iteration_budget.ts";
@@ -464,9 +464,9 @@ export interface AgentLoopConfig extends Config {
     ctx: BeforeToolExecuteContext,
   ) => ToolCallBlockResult | undefined;
   afterToolCall?: (ctx: AfterToolCallContext) => ToolCallResult | undefined;
-  /** Context usage percentage (0-1) that triggers EventContextPressure. */
+  /** Context usage percentage (0-1) that triggers EVENT_CONTEXT_PRESSURE. */
   contextPressureThreshold?: number;
-  /** Remaining iteration ratio (0-1) that triggers EventBudgetPressure. */
+  /** Remaining iteration ratio (0-1) that triggers EVENT_BUDGET_PRESSURE. */
   budgetPressureThreshold?: number;
   /** Governs model-requested iteration renewals. */
   iterationBudget?: IterationBudgetPolicy;
@@ -1128,9 +1128,9 @@ export class Agent {
     return [cloneMessages(this.#messages), cloneAgentContext(this.#context)];
   }
 
-  /** Builds the canonical EventAgentEnd event carrying the message history. */
+  /** Builds the canonical EVENT_AGENT_END event carrying the message history. */
   agentEndEvent(): Event {
-    return { type: EventAgentEnd, messages: [...this.#messages] };
+    return { type: EVENT_AGENT_END, messages: [...this.#messages] };
   }
 
   /**
@@ -1242,7 +1242,7 @@ export class Agent {
     // stops here instead of parking on a sink whose consumer already stopped
     // reading.
     this.sendEvent(ch, {
-      type: EventToolApprovalRequest,
+      type: EVENT_TOOL_APPROVAL_REQUEST,
       toolCallId,
       approvalId,
       approvalTool: toolName,
@@ -1288,7 +1288,7 @@ export class Agent {
     });
 
     this.sendEvent(ch, {
-      type: EventQuestionRequest,
+      type: EVENT_QUESTION_REQUEST,
       questionId,
       questionText: question,
       questionOptions: options,
@@ -1529,14 +1529,14 @@ export class Agent {
             const cause = err instanceof Error ? err : new Error(String(err));
             this.#emitRunFinished(
               sink,
-              TaskFailed,
+              TASK_FAILED,
               "session_reload",
               cause,
               undefined,
               undefined,
             );
             sink({
-              type: EventError,
+              type: EVENT_ERROR,
               error: new Error(
                 `reload runtime-owned user entry: ${cause.message}`,
               ),
@@ -1548,7 +1548,7 @@ export class Agent {
         if (!this.#beginConversationTurn(msg)) {
           this.#emitRunFinished(
             sink,
-            TaskFailed,
+            TASK_FAILED,
             "turn_start",
             new Error("failed to start conversation turn"),
             undefined,
@@ -1588,14 +1588,14 @@ export class Agent {
             const cause = err instanceof Error ? err : new Error(String(err));
             this.#emitRunFinished(
               sink,
-              TaskFailed,
+              TASK_FAILED,
               "session_save",
               cause,
               undefined,
               undefined,
             );
             sink({
-              type: EventError,
+              type: EVENT_ERROR,
               error: new Error(
                 `save user message to session: ${cause.message}`,
               ),
@@ -1642,7 +1642,7 @@ export class Agent {
       if (!this.#beginConversationTurnForRun()) {
         this.#emitRunFinished(
           sink,
-          TaskFailed,
+          TASK_FAILED,
           "turn_start",
           new Error("failed to start conversation turn"),
           undefined,
@@ -1660,7 +1660,7 @@ export class Agent {
 
   /**
    * Emits the single canonical terminal event for this run. It must be emitted
-   * exactly once per run, immediately before EventAgentEnd.
+   * exactly once per run, immediately before EVENT_AGENT_END.
    */
   #emitRunFinished(
     ch: EventSink,
@@ -1680,13 +1680,13 @@ export class Agent {
     if (turnOpen && this.config.session !== undefined) {
       let turnStatus = "failed";
       switch (status) {
-        case TaskSuccess:
+        case TASK_SUCCESS:
           turnStatus = "completed";
           break;
-        case TaskCanceled:
+        case TASK_CANCELED:
           turnStatus = "cancelled";
           break;
-        case TaskIncomplete:
+        case TASK_INCOMPLETE:
           turnStatus = "incomplete";
           break;
       }
@@ -1699,7 +1699,7 @@ export class Agent {
       }
     }
     ch({
-      type: EventRunFinished,
+      type: EVENT_RUN_FINISHED,
       done: true,
       status,
       stopReason: reason,
@@ -1725,8 +1725,8 @@ export class Agent {
     const messages = (await this.config.getFollowUpMessages(ctx)) ?? [];
     if (messages.length === 0) return false;
     for (const msg of messages) {
-      this.sendEvent(ch, { type: EventMessageStart, message: msg });
-      this.sendEvent(ch, { type: EventMessageEnd, message: msg });
+      this.sendEvent(ch, { type: EVENT_MESSAGE_START, message: msg });
+      this.sendEvent(ch, { type: EVENT_MESSAGE_END, message: msg });
       this.#messages = [...this.#messages, msg];
       this.#messageIds = [...this.#messageIds, ""];
       this.#context.messages = [...this.#context.messages, msg];
@@ -1800,9 +1800,9 @@ export class Agent {
     child.#context.tools = [];
     let summary = "";
     for await (const event of child.runWithMessages(messages, signal)) {
-      if (event.type === EventTextDelta) {
+      if (event.type === EVENT_TEXT_DELTA) {
         summary += event.textDelta ?? "";
-      } else if (event.type === EventError) {
+      } else if (event.type === EVENT_ERROR) {
         if (event.error !== undefined) throw event.error;
       }
     }
@@ -2046,7 +2046,7 @@ export class Agent {
         ];
       }
       this.sendEvent(ch, {
-        type: EventStatus,
+        type: EVENT_STATUS,
         statusMessage: `Context guard omitted oversized ${
           toolName === "" ? "tool" : toolName
         } output; asking model to retry with a narrower scope.`,
@@ -2095,7 +2095,7 @@ export class Agent {
       }
     };
 
-    this.sendEvent(ch, { type: EventCompactionStart });
+    this.sendEvent(ch, { type: EVENT_COMPACTION_START });
     const msgs = [...this.#messages];
     const msgIds = [...this.#messageIds];
     const previousSummary = this.previousCompactionSummary(msgs);
@@ -2154,7 +2154,7 @@ export class Agent {
           );
         } catch (err) {
           this.sendEvent(ch, {
-            type: EventStatus,
+            type: EVENT_STATUS,
             statusMessage: `Failed to persist compaction: ${
               (err as Error).message
             }`,
@@ -2162,7 +2162,7 @@ export class Agent {
         }
       }
       this.sendEvent(ch, {
-        type: EventCompactionEnd,
+        type: EVENT_COMPACTION_END,
         statusMessage: `Context compacted: ${result.tokensBefore} tokens`,
       });
       return undefined;
@@ -2174,13 +2174,13 @@ export class Agent {
         (cause instanceof DOMException && cause.name === "AbortError")
       ) {
         this.sendEvent(ch, {
-          type: EventCompactionEnd,
+          type: EVENT_COMPACTION_END,
           statusMessage: "Context compaction canceled",
           stopReason: "canceled",
         });
         return cause;
       }
-      this.sendEvent(ch, { type: EventCompactionEnd, error: cause });
+      this.sendEvent(ch, { type: EVENT_COMPACTION_END, error: cause });
       return new Error(`compaction failed: ${cause.message}`);
     }
   }
@@ -2204,14 +2204,14 @@ export class Agent {
     }
     state.contextOverflowRetried = true;
     this.sendEvent(ch, {
-      type: EventStatus,
+      type: EVENT_STATUS,
       statusMessage:
         `Context too large (${cause.message}); compacting context and retrying...`,
     });
     const err = await this.compact(ctx, ch, true);
     if (err !== undefined) {
       this.sendEvent(ch, {
-        type: EventStatus,
+        type: EVENT_STATUS,
         statusMessage:
           `Context compaction failed (${err.message}); dropping oldest messages to fit the context window...`,
       });
@@ -2281,7 +2281,7 @@ export class Agent {
           );
         } catch (err) {
           this.sendEvent(ch, {
-            type: EventStatus,
+            type: EVENT_STATUS,
             statusMessage:
               `Warning: failed to persist image removal for entry ${o.entryId}: ${
                 (err as Error).message
@@ -2292,19 +2292,19 @@ export class Agent {
       const scope = stripAll ? "the whole conversation" : "this turn";
       if (hasVisibleOutput) {
         this.sendEvent(ch, {
-          type: EventStatus,
+          type: EVENT_STATUS,
           statusMessage:
             `The provider rejected ${removed} image(s) during content inspection and removed them from ${scope}; the current turn cannot be safely retried because it already produced output.`,
         });
         return false;
       }
       this.sendEvent(ch, {
-        type: EventStatus,
+        type: EVENT_STATUS,
         statusMessage:
           `The provider rejected ${removed} image(s) during content inspection; removed them from ${scope} and retrying without them.`,
       });
       this.sendEvent(ch, {
-        type: EventRetry,
+        type: EVENT_RETRY,
         retryAttempt: state.contentRejectionStage,
         retryMaxAttempts: maxContentRejectionStages,
         retryReason: "content_rejected",
@@ -2338,9 +2338,9 @@ export class Agent {
         `⚠️ 供应商响应超时（长时间未收到数据），正在自动重试第 ${state.streamTimeoutRetries}/${maxRetries} 次…`;
     }
     const delay = streamRecoveryRetryDelay(state.streamTimeoutRetries);
-    this.sendEvent(ch, { type: EventStatus, statusMessage: msg });
+    this.sendEvent(ch, { type: EVENT_STATUS, statusMessage: msg });
     this.sendEvent(ch, {
-      type: EventRetry,
+      type: EVENT_RETRY,
       retryAttempt: state.streamTimeoutRetries,
       retryMaxAttempts: maxRetries,
       retryAfterMs: delay,
@@ -2407,7 +2407,7 @@ export class Agent {
     if (streamTimeout) retryMaxAttempts = 0;
     const delay = streamRecoveryRetryDelay(state.streamFailureRetries);
     this.sendEvent(ch, {
-      type: EventStatus,
+      type: EVENT_STATUS,
       statusMessage: retryCompatibilityStatus(
         state.streamFailureRetries,
         retryMaxAttempts,
@@ -2419,7 +2419,7 @@ export class Agent {
       retryAfterMs: delay,
     });
     this.sendEvent(ch, {
-      type: EventRetry,
+      type: EVENT_RETRY,
       statusMessage: retryErrorDetail(cause),
       retryAttempt: state.streamFailureRetries,
       retryMaxAttempts,
@@ -2506,7 +2506,7 @@ export class Agent {
         );
       } catch (err) {
         this.sendEvent(ch, {
-          type: EventStatus,
+          type: EVENT_STATUS,
           statusMessage: `Failed to persist context recovery: ${
             (err as Error).message
           }`,
@@ -2514,7 +2514,7 @@ export class Agent {
       }
     }
     this.sendEvent(ch, {
-      type: EventStatus,
+      type: EVENT_STATUS,
       statusMessage:
         `Context recovery: dropped ${cut} oldest messages after provider context overflow`,
     });
@@ -2907,7 +2907,7 @@ export class Agent {
         } catch (err) {
           const errMsg = `parse tool arguments: ${(err as Error).message}`;
           this.sendEvent(ch, {
-            type: EventToolExecutionEnd,
+            type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
             toolName: tc.name,
             toolResult: errMsg,
@@ -2927,7 +2927,7 @@ export class Agent {
           JSON.stringify(tc.name)
         } is not registered for this run`;
         this.sendEvent(ch, {
-          type: EventToolExecutionEnd,
+          type: EVENT_TOOL_EXECUTION_END,
           toolCallId: tc.id,
           toolName: tc.name,
           toolResult: errMsg,
@@ -2937,7 +2937,7 @@ export class Agent {
       }
       if (launch !== null) await launch.waitStart();
       this.sendEvent(ch, {
-        type: EventToolExecutionStart,
+        type: EVENT_TOOL_EXECUTION_START,
         toolCallId: tc.id,
         toolName: tc.name,
         toolArgs: params,
@@ -2948,7 +2948,7 @@ export class Agent {
           JSON.stringify(tc.name)
         } is unavailable in OS mode; only bash is registered`;
         this.sendEvent(ch, {
-          type: EventToolExecutionEnd,
+          type: EVENT_TOOL_EXECUTION_END,
           toolCallId: tc.id,
           toolName: tc.name,
           toolResult: errMsg,
@@ -2960,7 +2960,7 @@ export class Agent {
       if (found === undefined) {
         const errMsg = `unknown tool: ${tc.name}`;
         this.sendEvent(ch, {
-          type: EventToolExecutionEnd,
+          type: EVENT_TOOL_EXECUTION_END,
           toolCallId: tc.id,
           toolName: tc.name,
           toolResult: errMsg,
@@ -2981,7 +2981,7 @@ export class Agent {
             ? "Tool execution was blocked"
             : blockResult.reason;
           this.sendEvent(ch, {
-            type: EventToolExecutionEnd,
+            type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
             toolName: tc.name,
             toolResult: reason,
@@ -3015,7 +3015,7 @@ export class Agent {
             const reason =
               "Git metadata access denied; .git is protected by the sandbox";
             this.sendEvent(ch, {
-              type: EventToolExecutionEnd,
+              type: EVENT_TOOL_EXECUTION_END,
               toolCallId: tc.id,
               toolName: tc.name,
               toolResult: reason,
@@ -3036,7 +3036,7 @@ export class Agent {
         if (!approved) {
           const reason = "Tool execution denied by user";
           this.sendEvent(ch, {
-            type: EventToolExecutionEnd,
+            type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
             toolName: tc.name,
             toolResult: reason,
@@ -3082,7 +3082,7 @@ export class Agent {
         if (claimErr !== null) {
           const errMsg = `record tool execution: ${claimErr.message}`;
           this.sendEvent(ch, {
-            type: EventToolExecutionEnd,
+            type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
             toolName: tc.name,
             toolResult: errMsg,
@@ -3109,7 +3109,7 @@ export class Agent {
             ? "interrupted"
             : "reused";
           this.sendEvent(ch, {
-            type: EventToolExecutionEnd,
+            type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
             toolName: tc.name,
             toolResult: reusedResult.content,
@@ -3118,7 +3118,7 @@ export class Agent {
             toolImages: toolResultImages(reusedResult.contents ?? []),
           });
           this.sendEvent(ch, {
-            type: EventToolResult,
+            type: EVENT_TOOL_RESULT,
             toolCallId: tc.id,
             toolName: tc.name,
             toolResult: reusedResult.content,
@@ -3151,7 +3151,7 @@ export class Agent {
               ? "Tool execution was blocked before the side effect fence"
               : blockResult.reason;
             this.sendEvent(ch, {
-              type: EventToolExecutionEnd,
+              type: EVENT_TOOL_EXECUTION_END,
               toolCallId: tc.id,
               toolName: tc.name,
               toolResult: reason,
@@ -3225,14 +3225,14 @@ export class Agent {
         }
         if (resultPlan !== undefined) {
           this.sendEvent(ch, {
-            type: EventPlanUpdate,
+            type: EVENT_PLAN_UPDATE,
             toolCallId: tc.id,
             toolName: tc.name,
             plan: resultPlan,
           });
         }
         this.sendEvent(ch, {
-          type: EventToolExecutionEnd,
+          type: EVENT_TOOL_EXECUTION_END,
           toolCallId: tc.id,
           toolName: tc.name,
           toolResult: resultContent,
@@ -3241,7 +3241,7 @@ export class Agent {
           toolImages: toolResultImages(resultContents ?? []),
         });
         this.sendEvent(ch, {
-          type: EventToolResult,
+          type: EVENT_TOOL_RESULT,
           toolCallId: tc.id,
           toolName: tc.name,
           toolResult: resultContent,
@@ -3393,7 +3393,7 @@ export class Agent {
   async loop(ctx: RunContext, ch: EventSink): Promise<void> {
     const provider = this.config.provider;
     if (provider === undefined) throw new Error("agent has no provider");
-    ch({ type: EventAgentStart });
+    ch({ type: EVENT_AGENT_START });
 
     const runAbort = new AbortController();
     const signals: AbortSignal[] = [this.#abortController.signal];
@@ -3460,7 +3460,7 @@ export class Agent {
             lastRenewals = renewals;
             budgetPressureFired = false;
             this.sendEvent(ch, {
-              type: EventStatus,
+              type: EVENT_STATUS,
               statusMessage: `Iteration budget renewed to ${limit} turns`,
             });
           }
@@ -3472,13 +3472,13 @@ export class Agent {
           );
           this.#emitRunFinished(
             ch,
-            TaskIncomplete,
+            TASK_INCOMPLETE,
             "wall_clock_limit",
             err,
             undefined,
             undefined,
           );
-          ch({ type: EventError, error: err, stopReason: "wall_clock_limit" });
+          ch({ type: EVENT_ERROR, error: err, stopReason: "wall_clock_limit" });
           ch(this.agentEndEvent());
           return;
         }
@@ -3486,26 +3486,26 @@ export class Agent {
           const err = abortErrorFrom(runAbort.signal);
           this.#emitRunFinished(
             ch,
-            TaskCanceled,
+            TASK_CANCELED,
             "aborted",
             err,
             undefined,
             undefined,
           );
-          ch({ type: EventError, error: err, stopReason: "aborted" });
+          ch({ type: EVENT_ERROR, error: err, stopReason: "aborted" });
           ch(this.agentEndEvent());
           return;
         }
 
-        this.sendEvent(ch, { type: EventTurnStart });
+        this.sendEvent(ch, { type: EVENT_TURN_START });
         let truncated = false;
 
         if (this.config.getSteeringMessages !== undefined) {
           const steeringMessages = this.config.getSteeringMessages();
           if (steeringMessages.length > 0) {
             for (const msg of steeringMessages) {
-              this.sendEvent(ch, { type: EventMessageStart, message: msg });
-              this.sendEvent(ch, { type: EventMessageEnd, message: msg });
+              this.sendEvent(ch, { type: EVENT_MESSAGE_START, message: msg });
+              this.sendEvent(ch, { type: EVENT_MESSAGE_END, message: msg });
               this.#messages = [...this.#messages, msg];
               this.#messageIds = [...this.#messageIds, ""];
               this.#context.messages = [...this.#context.messages, msg];
@@ -3530,13 +3530,13 @@ export class Agent {
           }
           this.#emitRunFinished(
             ch,
-            TaskIncomplete,
+            TASK_INCOMPLETE,
             "context_limit",
             err,
             undefined,
             undefined,
           );
-          ch({ type: EventError, error: err, stopReason: "context_limit" });
+          ch({ type: EVENT_ERROR, error: err, stopReason: "context_limit" });
           ch(this.agentEndEvent());
           return;
         }
@@ -3560,14 +3560,14 @@ export class Agent {
         if (imgErr !== undefined) {
           this.#emitRunFinished(
             ch,
-            TaskIncomplete,
+            TASK_INCOMPLETE,
             "image_request_limit",
             imgErr,
             undefined,
             undefined,
           );
           ch({
-            type: EventError,
+            type: EVENT_ERROR,
             error: imgErr,
             stopReason: "image_request_limit",
           });
@@ -3598,13 +3598,13 @@ export class Agent {
             const cause = err instanceof Error ? err : new Error(String(err));
             this.#emitRunFinished(
               ch,
-              TaskFailed,
+              TASK_FAILED,
               "error",
               cause,
               undefined,
               undefined,
             );
-            ch({ type: EventError, error: cause, stopReason: "error" });
+            ch({ type: EVENT_ERROR, error: cause, stopReason: "error" });
             ch(this.agentEndEvent());
             return;
           }
@@ -3638,14 +3638,14 @@ export class Agent {
               case streamTextDelta:
                 textContent += event.textDelta ?? "";
                 this.sendEvent(ch, {
-                  type: EventTextDelta,
+                  type: EVENT_TEXT_DELTA,
                   textDelta: event.textDelta,
                 });
                 break;
               case streamThinkDelta:
                 thinkContent += event.thinkDelta ?? "";
                 this.sendEvent(ch, {
-                  type: EventThinkDelta,
+                  type: EVENT_THINK_DELTA,
                   thinkDelta: event.thinkDelta,
                 });
                 break;
@@ -3655,7 +3655,7 @@ export class Agent {
               case streamHostedItem:
                 if (event.hostedItem !== undefined) {
                   this.sendEvent(ch, {
-                    type: EventHostedItem,
+                    type: EVENT_HOSTED_ITEM,
                     hostedItem: event.hostedItem,
                   });
                 }
@@ -3685,14 +3685,14 @@ export class Agent {
                       } returned malformed JSON arguments (${argErr.message}). The original arguments were not executed; the safe fallback was {}. Treat this tool call as failed and reconstruct valid JSON before trying again. Do not assume any side effect occurred.`,
                     );
                     this.sendEvent(ch, {
-                      type: EventStatus,
+                      type: EVENT_STATUS,
                       statusMessage:
                         `Warning: failed to parse tool arguments: ${argErr.message}`,
                     });
                   }
                   toolCalls.push(toolCall);
                   this.sendEvent(ch, {
-                    type: EventToolCall,
+                    type: EVENT_TOOL_CALL,
                     toolCall,
                     toolArgs: args ?? undefined,
                   });
@@ -3717,7 +3717,7 @@ export class Agent {
                   retryMaxAttempts = event.retryMax ?? 0;
                 }
                 this.sendEvent(ch, {
-                  type: EventStatus,
+                  type: EVENT_STATUS,
                   statusMessage: retryCompatibilityStatus(
                     event.retryAttempt ?? 0,
                     retryMaxAttempts,
@@ -3729,7 +3729,7 @@ export class Agent {
                   retryAfterMs: event.retryAfterMs,
                 });
                 this.sendEvent(ch, {
-                  type: EventRetry,
+                  type: EVENT_RETRY,
                   statusMessage: event.retryDetail,
                   retryAttempt: event.retryAttempt,
                   retryMaxAttempts,
@@ -3751,13 +3751,13 @@ export class Agent {
             const err = abortErrorFrom(runAbort.signal);
             this.#emitRunFinished(
               ch,
-              TaskCanceled,
+              TASK_CANCELED,
               "aborted",
               err,
               usage,
               undefined,
             );
-            ch({ type: EventError, error: err, stopReason: "aborted" });
+            ch({ type: EVENT_ERROR, error: err, stopReason: "aborted" });
             ch(this.agentEndEvent());
             return;
           }
@@ -3780,7 +3780,7 @@ export class Agent {
             ) {
               responsesReplayFallback = true;
               this.sendEvent(ch, {
-                type: EventStatus,
+                type: EVENT_STATUS,
                 statusMessage: retryCompatibilityStatus(1, 1, 0),
                 retryStatus: true,
                 responseStateFailureClass: failureClass,
@@ -3788,7 +3788,7 @@ export class Agent {
                 retryMaxAttempts: 1,
               });
               this.sendEvent(ch, {
-                type: EventRetry,
+                type: EVENT_RETRY,
                 retryAttempt: 1,
                 retryMaxAttempts: 1,
                 retryReason: "response_state",
@@ -3859,14 +3859,14 @@ export class Agent {
           }
           this.#emitRunFinished(
             ch,
-            TaskFailed,
+            TASK_FAILED,
             stopReason,
             finalErr,
             usage,
             undefined,
           );
           ch({
-            type: EventError,
+            type: EVENT_ERROR,
             error: finalErr,
             stopReason,
             responseStateFailureClass: responseState.remoteStateActive
@@ -3889,7 +3889,7 @@ export class Agent {
               escalated = true;
               this.config.maxTokens = nextMax;
               this.sendEvent(ch, {
-                type: EventRetry,
+                type: EVENT_RETRY,
                 retryAttempt: 1,
                 retryMaxAttempts: 1,
                 retryMaxTokens: nextMax,
@@ -3927,7 +3927,7 @@ export class Agent {
             this.#messageIds = [...this.#messageIds, ""];
             this.#context.messages = [...this.#context.messages, recovery];
             this.sendEvent(ch, {
-              type: EventRetry,
+              type: EVENT_RETRY,
               retryAttempt: recoveryAttempts + 1,
               retryMaxAttempts: maxOutputRecoveryAttempts + 1,
               retryMaxTokens: params.maxTokens,
@@ -3952,7 +3952,7 @@ export class Agent {
           emptyResponseRetries++;
           if (emptyResponseRetries <= maxEmptyResponseRetries) {
             this.sendEvent(ch, {
-              type: EventStatus,
+              type: EVENT_STATUS,
               statusMessage: retryCompatibilityStatus(
                 emptyResponseRetries,
                 maxEmptyResponseRetries,
@@ -3963,7 +3963,7 @@ export class Agent {
               retryMaxAttempts: maxEmptyResponseRetries,
             });
             this.sendEvent(ch, {
-              type: EventRetry,
+              type: EVENT_RETRY,
               retryAttempt: emptyResponseRetries,
               retryMaxAttempts: maxEmptyResponseRetries,
               retryReason: "empty_response",
@@ -3977,7 +3977,7 @@ export class Agent {
           );
           this.#emitRunFinished(
             ch,
-            TaskFailed,
+            TASK_FAILED,
             "empty_response",
             new Error(
               `provider returned an empty response ${emptyResponseRetries} times in a row`,
@@ -3985,7 +3985,7 @@ export class Agent {
             usage,
             undefined,
           );
-          ch({ type: EventError, error: err, stopReason: "empty_response" });
+          ch({ type: EVENT_ERROR, error: err, stopReason: "empty_response" });
           ch(this.agentEndEvent());
           return;
         }
@@ -4050,14 +4050,14 @@ export class Agent {
             const cause = err instanceof Error ? err : new Error(String(err));
             this.#emitRunFinished(
               ch,
-              TaskFailed,
+              TASK_FAILED,
               "session_save",
               cause,
               usage,
               undefined,
             );
             ch({
-              type: EventError,
+              type: EVENT_ERROR,
               error: new Error(
                 `save assistant message to session: ${cause.message}`,
               ),
@@ -4076,7 +4076,7 @@ export class Agent {
           calculateCost(usage, this.config.model);
         }
         this.sendEvent(ch, {
-          type: EventUsage,
+          type: EVENT_USAGE,
           usage,
           contextUsage: this.getContextUsage(),
         });
@@ -4112,26 +4112,26 @@ export class Agent {
             const err = abortErrorFrom(runAbort.signal);
             this.#emitRunFinished(
               ch,
-              TaskCanceled,
+              TASK_CANCELED,
               "aborted",
               err,
               undefined,
               undefined,
             );
-            ch({ type: EventError, error: err, stopReason: "aborted" });
+            ch({ type: EVENT_ERROR, error: err, stopReason: "aborted" });
             ch(this.agentEndEvent());
             return;
           }
           const contextUsage = this.getContextUsage();
           this.sendEvent(ch, {
-            type: EventTurnEnd,
+            type: EVENT_TURN_END,
             turnMessage: assistantMsg,
             contextUsage,
           });
           if (truncated) {
             this.#emitRunFinished(
               ch,
-              TaskIncomplete,
+              TASK_INCOMPLETE,
               "output_limit",
               new Error(
                 "provider output was truncated and could not be continued",
@@ -4140,7 +4140,7 @@ export class Agent {
               attachments,
             );
             ch({
-              type: EventError,
+              type: EVENT_ERROR,
               error: new Error(
                 `provider output truncated (stop reason ${
                   JSON.stringify(stopReason)
@@ -4153,14 +4153,14 @@ export class Agent {
           }
           this.#emitRunFinished(
             ch,
-            TaskSuccess,
+            TASK_SUCCESS,
             stopReason,
             undefined,
             usage,
             attachments,
           );
           ch({
-            type: EventDone,
+            type: EVENT_DONE,
             stopReason,
             usage,
             attachments,
@@ -4204,14 +4204,14 @@ export class Agent {
             const cause = err instanceof Error ? err : new Error(String(err));
             this.#emitRunFinished(
               ch,
-              TaskFailed,
+              TASK_FAILED,
               "session_save",
               cause,
               usage,
               undefined,
             );
             ch({
-              type: EventError,
+              type: EVENT_ERROR,
               error: new Error(
                 `save tool result to session: ${cause.message}`,
               ),
@@ -4228,8 +4228,8 @@ export class Agent {
           const notice = newSystemInjectedUserMessage(
             "[System] Tool-call recovery notice:\n" + recoveryText,
           );
-          this.sendEvent(ch, { type: EventMessageStart, message: notice });
-          this.sendEvent(ch, { type: EventMessageEnd, message: notice });
+          this.sendEvent(ch, { type: EVENT_MESSAGE_START, message: notice });
+          this.sendEvent(ch, { type: EVENT_MESSAGE_END, message: notice });
           this.injectTransientMessage(notice);
           let retryReason = "invalid_tool_arguments";
           if (
@@ -4239,7 +4239,7 @@ export class Agent {
             retryReason = "empty_tool_arguments";
           }
           this.sendEvent(ch, {
-            type: EventRetry,
+            type: EVENT_RETRY,
             retryAttempt: 1,
             retryMaxAttempts: 1,
             retryReason,
@@ -4261,11 +4261,11 @@ export class Agent {
                 `[System] You have been making tool calls for ${consecutiveNoText} consecutive turns without any text response. Please explain what you are doing and whether you are stuck. If you are making progress, briefly describe your current task and continue. If you are truly stuck, please stop and explain the issue.`,
               );
               this.sendEvent(ch, {
-                type: EventMessageStart,
+                type: EVENT_MESSAGE_START,
                 message: warningMsg,
               });
               this.sendEvent(ch, {
-                type: EventMessageEnd,
+                type: EVENT_MESSAGE_END,
                 message: warningMsg,
               });
               const warningIndex = this.#messages.length;
@@ -4282,14 +4282,14 @@ export class Agent {
                     : new Error(String(err));
                   this.#emitRunFinished(
                     ch,
-                    TaskFailed,
+                    TASK_FAILED,
                     "session_save",
                     cause,
                     usage,
                     undefined,
                   );
                   ch({
-                    type: EventError,
+                    type: EVENT_ERROR,
                     error: new Error(
                       `save warning message to session: ${cause.message}`,
                     ),
@@ -4307,13 +4307,13 @@ export class Agent {
               );
               this.#emitRunFinished(
                 ch,
-                TaskIncomplete,
+                TASK_INCOMPLETE,
                 "stuck",
                 undefined,
                 usage,
                 undefined,
               );
-              ch({ type: EventError, error: err, stopReason: "stuck" });
+              ch({ type: EVENT_ERROR, error: err, stopReason: "stuck" });
               ch(this.agentEndEvent());
               return;
             }
@@ -4322,7 +4322,7 @@ export class Agent {
 
         const contextUsage = this.getContextUsage();
         this.sendEvent(ch, {
-          type: EventTurnEnd,
+          type: EVENT_TURN_END,
           turnMessage: assistantMsg,
           turnToolResults: toolResults,
           contextUsage,
@@ -4340,7 +4340,7 @@ export class Agent {
               Math.round(contextUsage.percent)
             }% of context window used (${contextUsage.totalTokens}/${contextUsage.contextWindow} tokens). Compaction will trigger soon. Consider saving important context to memory.md and wrapping up the current task.`;
             this.sendEvent(ch, {
-              type: EventContextPressure,
+              type: EVENT_CONTEXT_PRESSURE,
               pressureMessage: warnMsg,
               pressureType: "context",
               pressurePercent: contextUsage.percent,
@@ -4364,14 +4364,14 @@ export class Agent {
               if (budget !== undefined) {
                 if (budget.canRenew()) {
                   warnMsg +=
-                    ` If the task is genuinely unfinished, call ${IterationBudgetToolName} with a concrete reason.`;
+                    ` If the task is genuinely unfinished, call ${ITERATION_BUDGET_TOOL_NAME} with a concrete reason.`;
                 } else {
                   warnMsg +=
                     " The iteration budget can no longer be extended; finish the task and summarize progress.";
                 }
               }
               this.sendEvent(ch, {
-                type: EventBudgetPressure,
+                type: EVENT_BUDGET_PRESSURE,
                 pressureMessage: warnMsg,
                 pressureType: "budget",
                 pressurePercent: remaining * 100,
@@ -4397,14 +4397,14 @@ export class Agent {
           ) {
             this.#emitRunFinished(
               ch,
-              TaskSuccess,
+              TASK_SUCCESS,
               "should_stop",
               undefined,
               usage,
               undefined,
             );
             ch({
-              type: EventDone,
+              type: EVENT_DONE,
               stopReason: "should_stop",
               usage,
               contextUsage,
@@ -4437,8 +4437,8 @@ export class Agent {
           const steeringMessages = this.config.getSteeringMessages();
           if (steeringMessages.length > 0) {
             for (const msg of steeringMessages) {
-              this.sendEvent(ch, { type: EventMessageStart, message: msg });
-              this.sendEvent(ch, { type: EventMessageEnd, message: msg });
+              this.sendEvent(ch, { type: EVENT_MESSAGE_START, message: msg });
+              this.sendEvent(ch, { type: EVENT_MESSAGE_END, message: msg });
               this.#messages = [...this.#messages, msg];
               this.#messageIds = [...this.#messageIds, ""];
               this.#context.messages = [...this.#context.messages, msg];
@@ -4457,13 +4457,13 @@ export class Agent {
       }
       this.#emitRunFinished(
         ch,
-        TaskIncomplete,
+        TASK_INCOMPLETE,
         "max_iterations",
         undefined,
         undefined,
         undefined,
       );
-      ch({ type: EventError, error: maxErr, stopReason: "max_iterations" });
+      ch({ type: EVENT_ERROR, error: maxErr, stopReason: "max_iterations" });
       ch(this.agentEndEvent());
     } finally {
       // Go's `defer cancelRun()`: the loop-owned run context is cancelled when

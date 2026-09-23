@@ -1,4 +1,4 @@
-// Ported from internal/tui/activity.go: folds the agent event stream of
+// folds the agent event stream of
 // background/team agents into per-agent activity snapshots, and renders those
 // snapshots for the status line and the tool modal's agent tabs.
 //
@@ -8,32 +8,32 @@
 import type { Event } from "../agent/events.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
-  EventDone,
-  EventError,
-  EventHostedItem,
-  EventQuestionRequest,
-  EventQuestionResponse,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolApprovalRequest,
-  EventToolApprovalResponse,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolResult,
-  TaskCanceled,
-  TaskFailed,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_QUESTION_REQUEST,
+  EVENT_QUESTION_RESPONSE,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_APPROVAL_RESPONSE,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_RESULT,
+  TASK_CANCELED,
+  TASK_FAILED,
 } from "../agent/events.ts";
 import { sprintf } from "./i18n.ts";
 import {
   classifyError,
   displayErrorMessage,
-  PhaseModel,
-  PhaseTool,
-  SideEffectUnknown,
+  PHASE_MODEL,
+  PHASE_TOOL,
+  SIDE_EFFECT_UNKNOWN,
 } from "../agentruntime/error_info.ts";
 import { Translator } from "./i18n.ts";
 
@@ -96,10 +96,10 @@ export class AgentActivityStore {
       return false;
     }
     switch (event.type) {
-      case EventToolApprovalRequest:
-      case EventToolApprovalResponse:
-      case EventQuestionRequest:
-      case EventQuestionResponse:
+      case EVENT_TOOL_APPROVAL_REQUEST:
+      case EVENT_TOOL_APPROVAL_RESPONSE:
+      case EVENT_QUESTION_REQUEST:
+      case EVENT_QUESTION_RESPONSE:
         return false;
       default:
         return true;
@@ -139,7 +139,7 @@ export class AgentActivityStore {
 
     act.updatedAt = now;
     switch (event.type) {
-      case EventStatus: {
+      case EVENT_STATUS: {
         if (event.retryStatus) break;
         if (event.statusMessage) {
           act.lastResult = truncatePlain(event.statusMessage, 160);
@@ -147,14 +147,14 @@ export class AgentActivityStore {
         }
         break;
       }
-      case EventRetry: {
+      case EVENT_RETRY: {
         act.state = "running";
         const line = retryStatusMessage(event);
         act.lastResult = truncatePlain(line, 160);
         this.#appendLine(act, now, line);
         break;
       }
-      case EventThinkDelta: {
+      case EVENT_THINK_DELTA: {
         act.state = "running";
         act.lastThink = truncatePlain(
           act.lastThink + (event.thinkDelta ?? ""),
@@ -163,7 +163,7 @@ export class AgentActivityStore {
         act.fullThink += event.thinkDelta ?? "";
         break;
       }
-      case EventTextDelta: {
+      case EVENT_TEXT_DELTA: {
         act.state = "running";
         act.lastText = truncatePlain(
           act.lastText + (event.textDelta ?? ""),
@@ -172,7 +172,7 @@ export class AgentActivityStore {
         act.fullText += event.textDelta ?? "";
         break;
       }
-      case EventHostedItem: {
+      case EVENT_HOSTED_ITEM: {
         act.state = "running";
         if (event.hostedItem) {
           let line = "activity.hosted_item";
@@ -183,8 +183,8 @@ export class AgentActivityStore {
         }
         break;
       }
-      case EventToolCall:
-      case EventToolExecutionStart: {
+      case EVENT_TOOL_CALL:
+      case EVENT_TOOL_EXECUTION_START: {
         act.state = "running";
         let name = event.toolName ?? "";
         if (!name && event.toolCall) name = event.toolCall.name;
@@ -203,16 +203,16 @@ export class AgentActivityStore {
         }
         break;
       }
-      case EventToolResult:
-      case EventToolExecutionEnd: {
+      case EVENT_TOOL_RESULT:
+      case EVENT_TOOL_EXECUTION_END: {
         let name = event.toolName ?? "";
         if (!name && event.toolCall) name = event.toolCall.name;
         let result = (event.toolResult ?? "").trim();
         if (event.toolError) {
           act.state = "error";
           const info = classifyError(event.toolError, {
-            phase: PhaseTool,
-            sideEffectState: SideEffectUnknown,
+            phase: PHASE_TOOL,
+            sideEffectState: SIDE_EFFECT_UNKNOWN,
           });
           result = displayErrorMessage(info);
         }
@@ -228,10 +228,10 @@ export class AgentActivityStore {
         }
         break;
       }
-      case EventRunFinished: {
+      case EVENT_RUN_FINISHED: {
         if (isTerminalActivityState(act.state)) break;
         switch (event.status) {
-          case TaskFailed: {
+          case TASK_FAILED: {
             act.state = "error";
             const message = activityFailureMessage(event.error);
             act.lastResult = truncatePlain(message, 320);
@@ -243,7 +243,7 @@ export class AgentActivityStore {
             );
             break;
           }
-          case TaskCanceled:
+          case TASK_CANCELED:
             act.state = "canceled";
             this.#appendLine(act, now, "activity.canceled");
             break;
@@ -253,13 +253,13 @@ export class AgentActivityStore {
         }
         break;
       }
-      case EventDone: {
+      case EVENT_DONE: {
         if (isTerminalActivityState(act.state)) break;
         act.state = "done";
         this.#appendLine(act, now, "activity.done");
         break;
       }
-      case EventError: {
+      case EVENT_ERROR: {
         if (isTerminalActivityState(act.state)) break;
         act.state = "error";
         const message = activityFailureMessage(event.error);
@@ -302,7 +302,7 @@ function retryStatusMessage(event: Event): string {
 
 function activityFailureMessage(err?: Error): string {
   const info = classifyError(err ?? new Error("unknown error"), {
-    phase: PhaseModel,
+    phase: PHASE_MODEL,
   });
   const message = displayErrorMessage(info).trim();
   return message || "The run could not be completed.";

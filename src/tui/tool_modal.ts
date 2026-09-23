@@ -1,4 +1,4 @@
-// Ported from internal/tui/tool_modal.go: the expanded tool-output modal.
+// the expanded tool-output modal.
 // The Go original is App-coupled (targets from a.toolResults, activity from
 // a.agentActivities); the TS projection splits ownership the same way the
 // rest of the slice does — a state/geometry class owning scrolling, target
@@ -6,12 +6,8 @@
 
 import { displayWidth } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
-
-/** Style constants matching the Go toolModalStyle (rounded border + padding). */
-const ACCENT = "\u001B[38;5;86m";
-const BOLD = "\u001B[1m";
-const DIM = "\u001B[38;5;240m";
-const RESET = "\u001B[0m";
+// Style constants matching the Go toolModalStyle (rounded border + padding).
+import { ACCENT, BOLD, DIM, RESET } from "./theme.ts";
 
 /** One modal content target (a tool result or a background agent). */
 export interface ToolModalTarget {

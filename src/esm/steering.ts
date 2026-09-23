@@ -1,4 +1,3 @@
-// Ported from internal/esm/steering.go
 //
 // Projects the latest active ESM objective into an already running Agent at its
 // normal steering boundaries. It never starts a run: the adapter remains

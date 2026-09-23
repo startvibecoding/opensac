@@ -1,4 +1,4 @@
-// Ported from internal/sandbox/sandbox_test.go (bwrap cases).
+// (bwrap cases).
 
 import { assert, assertEquals } from "@std/assert";
 import {

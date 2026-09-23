@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/delivery_events.go.
 //
 // Delivery compatibility payloads and events stay at the Runtime boundary so
 // channel recovery never hand-assembles them. `json.RawMessage` maps to

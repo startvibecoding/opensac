@@ -1,4 +1,3 @@
-// Ported from internal/provider/openai/responses_codec.go
 //
 // Raw JSON documents (Go `json.RawMessage`) are carried as strings so streaming
 // argument buffers and canonical archives keep their exact byte-level payload

@@ -1,4 +1,3 @@
-// Ported from internal/session/input_resources.go
 //
 // Runtime-owned input resource lifecycle events. Transport references are
 // intentionally absent; the events are the canonical lifecycle projection.

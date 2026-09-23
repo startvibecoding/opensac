@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/agent_manager_test.go plus focused
 // checks on the shared-construction guards.
 //
 // The Go integration case (`TestAgentManagerAppliesBoundSessionPolicyWithoutParent`)
@@ -14,14 +13,14 @@ import {
   type AgentManagerRuntime,
   newAgentManager,
 } from "./agent_manager.ts";
-import { SourceUnknown } from "./source.ts";
+import { SOURCE_UNKNOWN } from "./source.ts";
 
 function stubRuntime(): AgentManagerRuntime {
   return {
     id: "s",
     manager: undefined,
     execution: undefined,
-    entrySource: SourceUnknown,
+    entrySource: SOURCE_UNKNOWN,
     sandboxMgr: undefined,
     extraContext: "",
     ruleContent: "",

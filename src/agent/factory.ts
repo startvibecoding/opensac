@@ -1,4 +1,3 @@
-// Ported from internal/agent/factory.go.
 //
 // AgentFactory creates Agent instances with consistent configuration, giving
 // each agent its own Registry (workDir, sandbox, JobManager). It also bridges

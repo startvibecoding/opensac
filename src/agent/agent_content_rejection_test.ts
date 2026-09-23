@@ -1,4 +1,3 @@
-// Translated from internal/agent/content_rejection_recovery_test.go.
 //
 // Content-rejection recovery strips provider-refused images in two stages,
 // records durable overrides so replay never re-sends them, and heals a turn

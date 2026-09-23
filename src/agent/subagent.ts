@@ -1,4 +1,3 @@
-// Ported from internal/agent/subagent.go and subagent_tools.go.
 //
 // The sub-agent tools create, monitor, message, answer, and destroy managed
 // children through AgentManager. Go's goroutine-per-spawn maps to a
@@ -28,18 +27,18 @@ import { newTextToolResult } from "../tools/tool.ts";
 import type { AgentAdapter } from "./bridge.ts";
 import {
   type Event,
-  EventDone,
-  EventError,
-  EventQuestionRequest,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolApprovalRequest,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolResult,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_QUESTION_REQUEST,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_RESULT,
   type EventType,
   type TaskStatus as InternalTaskStatus,
 } from "./events.ts";
@@ -52,14 +51,14 @@ import {
 import { goDurationString } from "./agent_support.ts";
 import type { AgentManager } from "./manager.ts";
 import {
+  MEMBER_ITEM_QUESTION,
+  MEMBER_STATUS_CANCELED,
+  MEMBER_STATUS_DONE,
+  MEMBER_STATUS_ERROR,
+  MEMBER_STATUS_INCOMPLETE,
+  MEMBER_STATUS_QUESTION,
   type MemberCompletion,
-  MemberItemQuestion,
   type MemberMailbox,
-  MemberStatusCanceled,
-  MemberStatusDone,
-  MemberStatusError,
-  MemberStatusIncomplete,
-  MemberStatusQuestion,
   newMemberCompletion,
 } from "./mailbox.ts";
 import type { MemberDef } from "./memberdef.ts";
@@ -74,7 +73,7 @@ import {
 } from "./subagent_support.ts";
 
 export { subAgentToolNames } from "./subagent_support.ts";
-export { MemberCompletion, MemberItemQuestion, MemberStatusQuestion };
+export { MEMBER_ITEM_QUESTION, MEMBER_STATUS_QUESTION, MemberCompletion };
 export { SubAgentWaitTool };
 
 type EventSink = (ev: Event) => boolean;
@@ -168,16 +167,16 @@ export function forwardChildAgentEvent(
     ev.toolName = e.toolCall.name;
   }
   switch (ev.type) {
-    case EventTextDelta:
-    case EventThinkDelta:
-    case EventToolCall:
-    case EventToolExecutionStart:
-    case EventToolExecutionEnd:
-    case EventToolResult:
-    case EventStatus:
-    case EventDone:
-    case EventError:
-    case EventRunFinished:
+    case EVENT_TEXT_DELTA:
+    case EVENT_THINK_DELTA:
+    case EVENT_TOOL_CALL:
+    case EVENT_TOOL_EXECUTION_START:
+    case EVENT_TOOL_EXECUTION_END:
+    case EVENT_TOOL_RESULT:
+    case EVENT_STATUS:
+    case EVENT_DONE:
+    case EVENT_ERROR:
+    case EVENT_RUN_FINISHED:
       return sendParentEvent(sink, ev);
     default:
       return false;
@@ -197,7 +196,7 @@ export function forwardMemberQuestion(
 ): void {
   if (sink !== undefined) {
     const ev: Event = {
-      type: EventQuestionRequest,
+      type: EVENT_QUESTION_REQUEST,
       agentId: childId,
       questionId: e.questionId,
       questionText: e.questionText,
@@ -540,7 +539,7 @@ export class SubAgentSpawnTool implements Tool {
         for await (const e of a.run(buildSubAgentTask(task), run.signal)) {
           if (e.type === eventToolApprovalRequest && sink !== undefined) {
             sendParentEvent(sink, {
-              type: EventToolApprovalRequest,
+              type: EVENT_TOOL_APPROVAL_REQUEST,
               agentId: a.id(),
               approvalId: e.approvalId,
               approvalTool: e.approvalTool,
@@ -569,7 +568,7 @@ export class SubAgentSpawnTool implements Tool {
             case eventDone: {
               const response = lastAssistantResponse(a);
               this.manager.markDone(a.id(), response);
-              notifier.notify(MemberStatusDone, response);
+              notifier.notify(MEMBER_STATUS_DONE, response);
               break;
             }
             case eventError: {
@@ -581,7 +580,7 @@ export class SubAgentSpawnTool implements Tool {
               );
               this.manager.markError(a.id(), runErr);
               notifier.notify(
-                MemberStatusError,
+                MEMBER_STATUS_ERROR,
                 memberTerminalPayload(runErr, a),
               );
               break;
@@ -599,7 +598,7 @@ export class SubAgentSpawnTool implements Tool {
             );
             this.manager.markError(a.id(), runErr);
             notifier.notify(
-              MemberStatusError,
+              MEMBER_STATUS_ERROR,
               memberTerminalPayload(runErr, a),
             );
           }
@@ -642,13 +641,13 @@ export class SubAgentSpawnTool implements Tool {
 function terminalMemberStatus(status: TaskStatus | undefined): string {
   switch (status) {
     case taskFailed:
-      return MemberStatusError;
+      return MEMBER_STATUS_ERROR;
     case taskIncomplete:
-      return MemberStatusIncomplete;
+      return MEMBER_STATUS_INCOMPLETE;
     case taskCanceled:
-      return MemberStatusCanceled;
+      return MEMBER_STATUS_CANCELED;
     default:
-      return MemberStatusDone;
+      return MEMBER_STATUS_DONE;
   }
 }
 
@@ -822,7 +821,7 @@ export class DelegateSubAgentTool implements Tool {
         for await (const e of a.run(buildSubAgentTask(task), run.signal)) {
           if (e.type === eventToolApprovalRequest && sink !== undefined) {
             sendParentEvent(sink, {
-              type: EventToolApprovalRequest,
+              type: EVENT_TOOL_APPROVAL_REQUEST,
               agentId: a.id(),
               approvalId: e.approvalId,
               approvalTool: e.approvalTool,
@@ -1046,7 +1045,7 @@ export class SubAgentSendTool implements Tool {
         for await (const e of a.run(message, run.signal)) {
           if (e.type === eventToolApprovalRequest && sink !== undefined) {
             sendParentEvent(sink, {
-              type: EventToolApprovalRequest,
+              type: EVENT_TOOL_APPROVAL_REQUEST,
               agentId: a.id(),
               approvalId: e.approvalId,
               approvalTool: e.approvalTool,

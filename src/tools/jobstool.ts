@@ -1,5 +1,3 @@
-// Ported from internal/tools/jobstool.go.
-
 import type { BashTool } from "./bash.ts";
 import type { BackgroundJob } from "./jobmanager.ts";
 import { formatGoDuration } from "./jobmanager.ts";

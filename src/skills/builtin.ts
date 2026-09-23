@@ -1,4 +1,3 @@
-// Ported from internal/skills/builtin.go
 //
 // Go embeds builtin/* with go:embed. Deno has no equivalent embed API, so the
 // built-in SKILL.md files are inlined into `builtin_content.ts` (generated from

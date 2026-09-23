@@ -1,5 +1,3 @@
-// Ported from internal/provider/registry.go
-
 import type { ProviderConfig } from "../config/mod.ts";
 import type { Provider } from "./provider.ts";
 import {

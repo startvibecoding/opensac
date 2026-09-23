@@ -1,4 +1,3 @@
-// Translated from the unit cases of internal/acp/acp_phase1_test.go and
 // internal/acp/acp_mcp_test.go plus focused coverage for the pure projection
 // helpers (whose Go counterparts are exercised indirectly by the process tests
 // that still need the ACP server slice).
@@ -9,10 +8,10 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   type Event,
-  EventCompactionEnd,
-  EventCompactionStart,
-  EventTurnEnd,
-  EventTurnStart,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
   type EventType,
 } from "../agent/events.ts";
 import {
@@ -144,10 +143,10 @@ Deno.test("parseJSONRawToMapDecodesObjectsOnly", () => {
 });
 
 Deno.test("acpEventNameMapsCompactionAndTurnEvents", () => {
-  assertEquals(acpEventName(EventCompactionStart), "compaction_started");
-  assertEquals(acpEventName(EventCompactionEnd), "compaction_finished");
-  assertEquals(acpEventName(EventTurnStart), "turn_started");
-  assertEquals(acpEventName(EventTurnEnd), "turn_finished");
+  assertEquals(acpEventName(EVENT_COMPACTION_START), "compaction_started");
+  assertEquals(acpEventName(EVENT_COMPACTION_END), "compaction_finished");
+  assertEquals(acpEventName(EVENT_TURN_START), "turn_started");
+  assertEquals(acpEventName(EVENT_TURN_END), "turn_finished");
   assertEquals(acpEventName(unknownEventType), "unknown");
 });
 

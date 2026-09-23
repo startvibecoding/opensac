@@ -1,4 +1,3 @@
-// Ported from internal/acp/manage.go / manage_env.go / manage_experts.go /
 // manage_application.go (the Phase 3 `opensac/manage/*` management plane).
 //
 // This slice owns the secret-safe management surface: the shared manage
@@ -104,15 +103,15 @@ import {
   type ManagedBundle,
   Manager as ExpertManager,
   type Scope,
-  ScopeGlobal,
-  ScopeProject,
+  SCOPE_GLOBAL,
+  SCOPE_PROJECT,
   type Summary as ExpertSummary,
 } from "../expert/mod.ts";
 import {
-  ModeAgent,
-  ModeOS,
-  ModePlan,
-  ModeYolo,
+  MODE_AGENT,
+  MODE_OS,
+  MODE_PLAN,
+  MODE_YOLO,
 } from "../agentruntime/source.ts";
 import {
   handleManageSkillHubActivate,
@@ -310,10 +309,10 @@ export function manageDecodeWhitelist(
 
 /** The mode vocabulary this ACP process exposes through session/set_mode. */
 export const manageAllowedModes: Record<string, boolean> = {
-  [ModeAgent]: true,
-  [ModePlan]: true,
-  [ModeYolo]: true,
-  [ModeOS]: true,
+  [MODE_AGENT]: true,
+  [MODE_PLAN]: true,
+  [MODE_YOLO]: true,
+  [MODE_OS]: true,
 };
 
 // ─── opensac/manage router ──────────────────────────────────────────────────────
@@ -772,11 +771,11 @@ function manageExpertManager(
   input: ManageExpertsRequest,
 ): { manager: ExpertManager; scope: Scope; cwd: string } {
   let scope = input.scope;
-  if (scope === "") scope = ScopeGlobal;
-  if (scope !== ScopeGlobal && scope !== ScopeProject) {
+  if (scope === "") scope = SCOPE_GLOBAL;
+  if (scope !== SCOPE_GLOBAL && scope !== SCOPE_PROJECT) {
     throw new Error(`expert scope ${JSON.stringify(scope)} is not supported`);
   }
-  if (scope === ScopeGlobal) {
+  if (scope === SCOPE_GLOBAL) {
     return { manager: new ExpertManager(""), scope, cwd: "" };
   }
   let cwd = "";
@@ -1038,7 +1037,7 @@ export function manageApplicationView(
   settings: Settings,
 ): Record<string, unknown> {
   let defaultMode = (settings.defaultMode ?? "").trim();
-  if (defaultMode === "") defaultMode = ModeYolo;
+  if (defaultMode === "") defaultMode = MODE_YOLO;
   const sandbox = settings.sandbox;
   const compaction = settings.compaction;
   const statusLine = settings.statusLine;
@@ -1544,7 +1543,7 @@ export function manageSettingsView(
   settings: Settings,
 ): Record<string, unknown> {
   let defaultMode = (settings.defaultMode ?? "").trim();
-  if (defaultMode === "") defaultMode = ModeYolo;
+  if (defaultMode === "") defaultMode = MODE_YOLO;
   const disabled = skillsDisabled(settings) ?? [];
   return {
     defaultProvider: settings.defaultProvider ?? "",

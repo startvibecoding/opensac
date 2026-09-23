@@ -1,4 +1,4 @@
-// Ported from internal/agentruntime/input.go (the `AttachmentService` half).
+// (the `AttachmentService` half).
 //
 // The canonical Runtime-owned attachment store: intake, private-storage
 // persistence, integrity-checked reads, and expiry cleanup. Platform adapters
@@ -17,12 +17,12 @@ import { AttachmentDAO, type AttachmentRecord, ErrNoRows } from "../dao/mod.ts";
 import { generateID } from "../session/entry.ts";
 import { queryRootDatabase, writeRootDatabase } from "../session/database.ts";
 import {
-  AttachmentAudio,
-  AttachmentFile,
-  AttachmentImage,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
   type AttachmentKind,
   type AttachmentPolicy,
-  AttachmentVideo,
   parseAttachmentTimestamp,
   sanitizeAttachmentFilename,
   type SessionAttachment,
@@ -54,10 +54,10 @@ export interface ArtifactStream {
 }
 
 const VALID_KINDS: ReadonlySet<string> = new Set([
-  AttachmentImage,
-  AttachmentFile,
-  AttachmentAudio,
-  AttachmentVideo,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_FILE,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_VIDEO,
 ]);
 
 /**
@@ -118,7 +118,7 @@ export class AttachmentService {
     // pass beside it reclaims storage whose rows are gone.
     reconcileArtifactStorageOpportunistic(this.sessionDir, this.policy);
 
-    const maxBytes = ingress.kind === AttachmentImage
+    const maxBytes = ingress.kind === ATTACHMENT_IMAGE
       ? this.policy.maxImageBytes
       : this.policy.maxFileBytes;
     if (ingress.sizeHint > maxBytes) {
@@ -174,7 +174,7 @@ export class AttachmentService {
     } catch (err) {
       detectErr = err;
     }
-    if (ingress.kind === AttachmentImage) {
+    if (ingress.kind === ATTACHMENT_IMAGE) {
       if (
         detectErr !== null || !detectedType.toLowerCase().startsWith("image/")
       ) {
@@ -252,7 +252,7 @@ export class AttachmentService {
   }
 
   /** Returns one attachment record belonging to `sessionID`. */
-  Get(sessionID: string, attachmentID: string): SessionAttachment {
+  get(sessionID: string, attachmentID: string): SessionAttachment {
     validatePathComponent(sessionID);
     validatePathComponent(attachmentID);
     let record: SessionAttachment | null = null;
@@ -272,7 +272,7 @@ export class AttachmentService {
     sessionID: string,
     attachmentID: string,
   ): Promise<{ record: SessionAttachment; file: Deno.FsFile }> {
-    const record = this.Get(sessionID, attachmentID);
+    const record = this.get(sessionID, attachmentID);
     if (
       record.expiresAt.getTime() !== 0 &&
       Date.now() > record.expiresAt.getTime()
@@ -367,7 +367,7 @@ export class AttachmentService {
    * accepted -> generated -> expired transitions; adapters do not write
    * attachment rows directly.
    */
-  SetStatus(sessionID: string, attachmentID: string, status: string): void {
+  setStatus(sessionID: string, attachmentID: string, status: string): void {
     validatePathComponent(sessionID);
     validatePathComponent(attachmentID);
     if (

@@ -1,4 +1,4 @@
-// Ported from internal/tui: the transcript storage half of the App — the
+// the transcript storage half of the App — the
 // messages array, the assistant/think streaming slots, and the tool-result
 // state machine (agent_events.go appendToolExecutionStart/appendToolResult/
 // finalizeInterruptedTools, input.go streaming builders, and state.go's
@@ -86,7 +86,7 @@ export class TranscriptStore {
   // ── streaming slots ────────────────────────────────────────────────────────
 
   /**
-   * Reserves the assistant display slot (Go EventTurnStart handling) so later
+   * Reserves the assistant display slot (Go EVENT_TURN_START handling) so later
    * tool output cannot shift the assistant index underneath us.
    */
   beginAssistantSlot(): void {
@@ -113,7 +113,7 @@ export class TranscriptStore {
 
   /**
    * Appends a think delta. When the active assistant slot is still an empty
-   * placeholder it converts to the think slot (Go EventThinkDelta handling).
+   * placeholder it converts to the think slot (Go EVENT_THINK_DELTA handling).
    */
   appendThinkDelta(delta: string): void {
     if (

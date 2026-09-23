@@ -1,4 +1,4 @@
-// Ported from vibe-browser pkg/browser/browser.go (v0.1.5).
+// (v0.1.5).
 //
 // High-level browser automation operations wrapping the CDP client: navigation,
 // interaction, accessibility snapshots, screenshots, cookies, and waits.
@@ -13,7 +13,7 @@ import { extractHostPort, listTargets } from "./chrome.ts";
 import {
   type ClickOptions,
   type Cookie,
-  DefaultHTMLMaxBytes,
+  DEFAULT_HTML_MAX_BYTES,
   type HTMLOptions,
   type NavigationOptions,
   type ScreenshotOptions,
@@ -983,7 +983,7 @@ function resultBool(result: RuntimeEvalResult | undefined): boolean {
 
 /** Applies the byte/character caps described by opts. */
 export function truncateHtml(html: string, opts?: HTMLOptions): string {
-  let maxBytes = DefaultHTMLMaxBytes;
+  let maxBytes = DEFAULT_HTML_MAX_BYTES;
   let maxChars = 0;
   if (opts) {
     if (opts.maxBytes !== 0) maxBytes = opts.maxBytes ?? maxBytes;

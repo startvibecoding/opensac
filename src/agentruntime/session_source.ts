@@ -1,4 +1,3 @@
-// Ported from the SessionRuntime-bound source-resolution helpers in
 // internal/agentruntime/session_runtime.go (`resolveManagerSource` /
 // `resolveManagerPolicy`).
 //

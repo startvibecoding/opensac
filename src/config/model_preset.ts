@@ -1,4 +1,3 @@
-// Ported from internal/config/model_preset.go.
 //
 // PresetModelConfig returns the best available draft defaults for a model ID.
 // The current provider wins, followed by an exact model-ID match elsewhere in

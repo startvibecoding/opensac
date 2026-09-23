@@ -1,5 +1,3 @@
-// Ported from internal/provider/idle_timeout_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   isStreamTimeoutError,

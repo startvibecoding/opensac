@@ -16,10 +16,10 @@
  */
 export type AttachmentKind = "image" | "file" | "audio" | "video";
 
-export const AttachmentImage: AttachmentKind = "image";
-export const AttachmentFile: AttachmentKind = "file";
-export const AttachmentAudio: AttachmentKind = "audio";
-export const AttachmentVideo: AttachmentKind = "video";
+export const ATTACHMENT_IMAGE: AttachmentKind = "image";
+export const ATTACHMENT_FILE: AttachmentKind = "file";
+export const ATTACHMENT_AUDIO: AttachmentKind = "audio";
+export const ATTACHMENT_VIDEO: AttachmentKind = "video";
 
 /**
  * The canonical persisted attachment record. The content itself lives under

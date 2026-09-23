@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/think_split_test.go
-
 import { assertEquals } from "@std/assert";
 import { ThinkSplitter } from "./think_split.ts";
 

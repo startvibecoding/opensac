@@ -1,19 +1,17 @@
-// Translated from internal/agentruntime/maintenance_cron_test.go.
-
 import { assert, assertRejects } from "@std/assert";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import {
   defaultMaintenancePolicy,
   isMaintenanceCronJobID,
-  MaintenanceCronJobPrefix,
+  MAINTENANCE_CRON_JOB_PREFIX,
+  MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
   maintenancePolicyFromSettings,
   maintenanceStorageReconcileJobID,
-  MaintenanceStorageReconcileSchedule,
   runMaintenanceCronJob,
 } from "./maintenance_cron.ts";
 import {
   artifactStorageDirectoryName,
-  ReconcileGraceMs,
+  RECONCILE_GRACE_MS,
 } from "./storage_reconcile.ts";
 import { newManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
@@ -55,7 +53,7 @@ Deno.test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
   const unknown = (await assertRejects(() =>
     runMaintenanceCronJob(
       makeSessionRoot(),
-      MaintenanceCronJobPrefix + "unknown-task",
+      MAINTENANCE_CRON_JOB_PREFIX + "unknown-task",
       policy,
     )
   )) as Error;
@@ -79,7 +77,7 @@ Deno.test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
   const aged = writeArtifactDirectory(
     root,
     "7123456789abcdef",
-    policy.retention + ReconcileGraceMs + 3_600_000,
+    policy.retention + RECONCILE_GRACE_MS + 3_600_000,
     "stale",
   );
 
@@ -100,14 +98,15 @@ Deno.test("maintenancePolicyFromSettings", () => {
   const fromNil = maintenancePolicyFromSettings(undefined);
   assert(
     fromNil.reclaimAttachmentStorage === true &&
-      fromNil.storageReconcileSchedule === MaintenanceStorageReconcileSchedule,
+      fromNil.storageReconcileSchedule ===
+        MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
     "nil settings policy should be the default",
   );
 
   const empty = maintenancePolicyFromSettings({});
   assert(
     empty.reclaimAttachmentStorage === true &&
-      empty.storageReconcileSchedule === MaintenanceStorageReconcileSchedule,
+      empty.storageReconcileSchedule === MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
     "empty settings policy should be enabled on the default cadence",
   );
 
@@ -135,7 +134,7 @@ Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
   const aged = writeArtifactDirectory(
     root,
     "6123456789abcdef",
-    policy.retention + ReconcileGraceMs + 3_600_000,
+    policy.retention + RECONCILE_GRACE_MS + 3_600_000,
     "stale",
   );
 
@@ -172,6 +171,6 @@ Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
 
 Deno.test("IsMaintenanceCronJobIDMatchesPrefixOnly", () => {
   assert(isMaintenanceCronJobID(maintenanceStorageReconcileJobID()));
-  assert(isMaintenanceCronJobID(MaintenanceCronJobPrefix + "anything"));
+  assert(isMaintenanceCronJobID(MAINTENANCE_CRON_JOB_PREFIX + "anything"));
   assert(!isMaintenanceCronJobID("cron-user"));
 });

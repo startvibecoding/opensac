@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/policy.go
-
 import * as path from "@std/path";
 import { isGitDeniedPath } from "./git.ts";
 import type { Options } from "./sandbox.ts";

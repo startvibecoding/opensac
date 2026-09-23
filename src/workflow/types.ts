@@ -1,4 +1,3 @@
-// Ported from internal/workflow/types.go.
 //
 // The workflow data model and the injectable Host/Store contracts. The Go
 // structs' `json:"..."` tags are camelCase and map directly to the TS property

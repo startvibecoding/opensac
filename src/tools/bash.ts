@@ -1,4 +1,4 @@
-// Ported from internal/tools/bash.go (+ bash_unix.go / bash_windows.go).
+// (+ bash_unix.go / bash_windows.go).
 //
 // Executes shell commands, optionally in a sandbox, with sync and background
 // (`async=true`) modes. Go's `os/exec` maps to `Deno.Command`; `context.Context`

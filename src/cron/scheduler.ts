@@ -1,5 +1,3 @@
-// Ported from internal/cron/scheduler.go and the scheduler-bound half of
-// internal/cron/maintenance.go.
 //
 // The Scheduler checks for due cron jobs and executes them through the shared
 // Runtime: Runtime-owned maintenance is dispatched to `runMaintenanceCronJob`,
@@ -15,31 +13,31 @@
 // scheduler's run context is detached from the stop lifecycle with
 // `AbortSignal.timeout` instead of `context.WithoutCancel`.
 
-import { type Event, EventTextDelta } from "../agent/events.ts";
+import { type Event, EVENT_TEXT_DELTA } from "../agent/events.ts";
 import { type AgentManager } from "../agent/manager.ts";
 import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
 import { ExecutionRuntime } from "../agentruntime/execution.ts";
 import {
   defaultMaintenancePolicy,
   isMaintenanceCronJobID,
+  MAINTENANCE_STORAGE_RECONCILE_JOB_NAME,
+  MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
   type MaintenancePolicy,
   maintenanceStorageReconcileJobID,
-  MaintenanceStorageReconcileJobName,
-  MaintenanceStorageReconcileSchedule,
   runMaintenanceCronJob,
 } from "../agentruntime/maintenance_cron.ts";
 import { SessionRunEventSink } from "../agentruntime/run_event.ts";
 import {
+  RUN_STATE_COMPLETED,
+  RUN_STATE_FAILED,
   type RunState,
-  RunStateCompleted,
-  RunStateFailed,
 } from "../agentruntime/run_state.ts";
 import { type DurableRun, RunStore } from "../agentruntime/run_store.ts";
 import {
-  ModeYolo,
+  MODE_YOLO,
   resolvePolicy,
   resolvePolicyFromSession,
-  SourceCron,
+  SOURCE_CRON,
   type SourceResolutionInput,
 } from "../agentruntime/source.ts";
 import { generateID } from "../session/entry.ts";
@@ -301,8 +299,8 @@ export class Scheduler {
     let response = "";
     let execution: ExecutionRuntime | null = null;
     let runId = "";
-    let runSource = SourceCron;
-    let effectiveMode = ModeYolo;
+    let runSource = SOURCE_CRON;
+    let effectiveMode = MODE_YOLO;
     let runData: unknown = undefined;
     let runCtxSignal: AbortSignal | undefined;
     let releaseRuntime: (() => void) | null = null;
@@ -388,16 +386,20 @@ export class Scheduler {
       let resolution;
       try {
         const result = resolvePolicy(
-          { requested: SourceCron } satisfies SourceResolutionInput,
+          { requested: SOURCE_CRON } satisfies SourceResolutionInput,
           "",
           job.mode ?? "",
-          ModeYolo,
+          MODE_YOLO,
         );
         resolution = result.resolution;
         effectiveMode = result.mode;
         policyErr = result.error;
       } catch (err) {
-        resolution = { source: SourceCron, conflicted: false, diagnostics: [] };
+        resolution = {
+          source: SOURCE_CRON,
+          conflicted: false,
+          diagnostics: [],
+        };
         policyErr = asError(err);
       }
       if (
@@ -408,17 +410,17 @@ export class Scheduler {
           job.sessionId!,
           {
             sessionHeader: sess.getHeader(),
-            requested: SourceCron,
+            requested: SOURCE_CRON,
           } satisfies SourceResolutionInput,
           "",
           job.mode ?? "",
-          ModeYolo,
+          MODE_YOLO,
         );
         resolution = result.resolution;
         effectiveMode = result.mode;
         policyErr = result.error;
       }
-      runSource = resolution.source !== "" ? resolution.source : SourceCron;
+      runSource = resolution.source !== "" ? resolution.source : SOURCE_CRON;
       if (policyErr !== null) {
         lastErr = new Error(
           `resolve cron execution policy: ${errorMessage(policyErr)}`,
@@ -490,7 +492,7 @@ export class Scheduler {
             for await (
               const event of a.inner.run(job.prompt ?? "", runCtxSignal)
             ) {
-              if (event.type === EventTextDelta) {
+              if (event.type === EVENT_TEXT_DELTA) {
                 response += event.textDelta ?? "";
               }
               if (event.error !== undefined) {
@@ -507,8 +509,8 @@ export class Scheduler {
 
       if (execution !== null) {
         const status: RunState = lastErr !== null
-          ? RunStateFailed
-          : RunStateCompleted;
+          ? RUN_STATE_FAILED
+          : RUN_STATE_COMPLETED;
         const message = lastErr !== null ? lastErr.message : "";
         const data = message === "" ? runData : {
           cronJobId: job.id ?? "",
@@ -519,7 +521,7 @@ export class Scheduler {
           execution.finishDurable(runId, status, message, {
             sessionId: job.sessionId!,
             runId,
-            eventType: status === RunStateFailed ? "failed" : "finished",
+            eventType: status === RUN_STATE_FAILED ? "failed" : "finished",
             source: runSource,
             status,
             model: "",
@@ -706,7 +708,7 @@ export class Scheduler {
       return;
     }
     let schedule = (policy.storageReconcileSchedule ?? "").trim();
-    if (schedule === "") schedule = MaintenanceStorageReconcileSchedule;
+    if (schedule === "") schedule = MAINTENANCE_STORAGE_RECONCILE_SCHEDULE;
     if (existing !== null) {
       if ((existing.schedule ?? "") === schedule) return;
       const updated = normalizeMaintenanceSchedule(
@@ -727,7 +729,7 @@ export class Scheduler {
     }
     const job: CronJob = {
       id,
-      name: MaintenanceStorageReconcileJobName,
+      name: MAINTENANCE_STORAGE_RECONCILE_JOB_NAME,
       prompt: "Runtime-owned maintenance; never executed as an agent prompt.",
       schedule,
       mode: "yolo",
@@ -777,17 +779,17 @@ export function normalizeMaintenanceSchedule(
   try {
     return normalizeJobSchedule({ ...job, schedule });
   } catch {
-    if (schedule !== MaintenanceStorageReconcileSchedule) {
+    if (schedule !== MAINTENANCE_STORAGE_RECONCILE_SCHEDULE) {
       logCron(
         "invalid maintenance schedule",
         `${
           JSON.stringify(schedule)
-        } (using ${MaintenanceStorageReconcileSchedule})`,
+        } (using ${MAINTENANCE_STORAGE_RECONCILE_SCHEDULE})`,
       );
       try {
         return normalizeJobSchedule({
           ...job,
-          schedule: MaintenanceStorageReconcileSchedule,
+          schedule: MAINTENANCE_STORAGE_RECONCILE_SCHEDULE,
         });
       } catch {
         return null;

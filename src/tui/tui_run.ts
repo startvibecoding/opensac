@@ -1,4 +1,4 @@
-// Ported from internal/tui/run.go: the TuiRun adapter bridging the TUI to the
+// the TuiRun adapter bridging the TUI to the
 // shared execution lifecycle. It owns decision registration/persistence via
 // the DecisionService + ExecutionRuntime event sink, terminal decision
 // status mapping, and implements the AppController RunHandle contract.
@@ -7,9 +7,9 @@
 
 import type { ExecutionRuntime } from "../agentruntime/execution.ts";
 import {
-  DecisionApproval,
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
   type DecisionKind,
-  DecisionQuestion,
   type DecisionRequest,
   type DecisionResolution,
   DecisionService,
@@ -160,4 +160,4 @@ export class TuiRun implements RunHandle {
 
 /** Re-exported for the controller contract typing. */
 export type { DecisionKind, DecisionRequest };
-export { DecisionApproval, DecisionQuestion };
+export { DECISION_APPROVAL, DECISION_QUESTION };

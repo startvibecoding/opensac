@@ -1,5 +1,3 @@
-// Translated from internal/agent/parallel_test.go.
-
 import { assertEquals } from "@std/assert";
 import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import { boundedParallel } from "./parallel.ts";

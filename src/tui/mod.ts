@@ -118,7 +118,7 @@ export {
   TuiRun,
 } from "./tui_run.ts";
 export { TUISession } from "./tui_session.ts";
-export { inputFooter, TuiShell } from "./tui_shell.tsx";
+export { TuiShell } from "./tui_shell.tsx";
 export { type InputAction, InputState } from "./input_state.ts";
 export {
   coalesceSplitPaste,

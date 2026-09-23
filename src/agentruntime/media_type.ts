@@ -1,6 +1,5 @@
 // Media-type sniffing for Runtime input and artifact intake.
 //
-// Ported from the subset of Go's `net/http/sniff.go` that
 // `detectAttachmentMediaType` depends on. `detectContentType` implements the
 // WHATWG MIME sniffing algorithm over at most the first 512 bytes and always
 // returns a valid MIME type, falling back to "application/octet-stream".

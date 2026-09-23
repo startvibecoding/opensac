@@ -1,5 +1,3 @@
-// Ported from internal/expert/bundle.go
-
 import * as path from "@std/path";
 import {
   type AgentDef,

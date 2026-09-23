@@ -1,4 +1,3 @@
-// Ported from internal/provider/http_client_test.go
 //
 // Deviation: Go asserts on *http.Transport internals (Proxy function,
 // ForceAttemptHTTP2). Deno has no pluggable transport, so the port exposes the

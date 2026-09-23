@@ -1,4 +1,3 @@
-// Ported from internal/mcp/config.go
 //
 // Loads usable MCP servers from global and project mcp.json. Missing config
 // files are ignored. Obvious template placeholders are skipped so creating a

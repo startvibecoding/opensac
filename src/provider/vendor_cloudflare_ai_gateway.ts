@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_cloudflare_ai_gateway.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_cloudflare_ai_gateway.go init() adapters. */

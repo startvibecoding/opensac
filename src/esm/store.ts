@@ -1,4 +1,3 @@
-// Ported from internal/esm/store.go + guidance.go
 //
 // The durable Enable Supervisor Mode objective store backed by the shared
 // sessions database. Every read/write goes through the DAO layer

@@ -1,5 +1,3 @@
-// Ported from internal/sandbox/bwrap.go and internal/sandbox/bwrap_capabilities.go
-
 import * as path from "@std/path";
 import { lookPathSync } from "../platform/platform.ts";
 import { normalizeTmpSize, pathsOverlap } from "./policy.ts";

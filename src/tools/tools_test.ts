@@ -1,4 +1,3 @@
-// Translated from internal/tools/*_test.go.
 //
 // Covers the Registry, the standard tools (read/ls/write/edit/insert/plan/
 // find/grep/bash/jobs/kill/question/skill_ref/image_generation),

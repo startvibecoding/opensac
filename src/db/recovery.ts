@@ -1,5 +1,3 @@
-// Ported from internal/db/recovery.go
-
 import type { DB } from "./db.ts";
 
 /**

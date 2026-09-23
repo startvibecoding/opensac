@@ -1,5 +1,3 @@
-// Ported from internal/dao/runtime_lease_test.go
-
 import { assertEquals } from "@std/assert";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";

@@ -1,10 +1,19 @@
-// Ported from internal/tui/agent_tabbar.go: the horizontal tab bar showing
+// the horizontal tab bar showing
 // all active agents (lead + team members). Hidden with zero or one agent.
 // The Go original reads live state from agent.AgentManager; the TS projection
 // takes a plain snapshot array so the renderer stays DOM-free and testable.
 
 import { displayWidth, truncateDisplay } from "./formatters.ts";
 import { type MessageID, Translator } from "./i18n.ts";
+import {
+  ACCENT as accent,
+  BOLD as bold,
+  DIM as dim,
+  GREEN as green,
+  ORANGE as orange,
+  RED as red,
+  RESET as reset,
+} from "./theme.ts";
 
 export type AgentTabState =
   | "running"
@@ -19,14 +28,6 @@ export interface AgentTab {
   id: string;
   state: AgentTabState;
 }
-
-const accent = "\u001B[38;5;86m";
-const bold = "\u001B[1m";
-const dim = "\u001B[38;5;240m";
-const green = "\u001B[38;5;82m";
-const red = "\u001B[38;5;196m";
-const orange = "\u001B[38;5;214m";
-const reset = "\u001B[0m";
 
 function stateIcon(state: AgentTabState): string {
   switch (state) {

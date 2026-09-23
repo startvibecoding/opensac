@@ -1,5 +1,3 @@
-// Ported from internal/expert/center_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
@@ -259,7 +257,7 @@ Deno.test("center get", () => {
         } catch {
           threw = true;
         }
-        assert(threw, "Get(does-not-exist) should fail");
+        assert(threw, "get(does-not-exist) should fail");
         // Name hygiene.
         for (const bad of ["", "  ", "../escape", "a/b", "a\\b", ".."]) {
           let badThrew = false;
@@ -268,7 +266,7 @@ Deno.test("center get", () => {
           } catch {
             badThrew = true;
           }
-          assert(badThrew, `Get(${JSON.stringify(bad)}) should fail`);
+          assert(badThrew, `get(${JSON.stringify(bad)}) should fail`);
         }
       });
     });

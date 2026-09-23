@@ -1,5 +1,3 @@
-// Ported from internal/provider/content_rejection.go
-
 import { errMessage } from "./context_overflow.ts";
 
 /**

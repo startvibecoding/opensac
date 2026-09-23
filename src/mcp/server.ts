@@ -1,11 +1,15 @@
-// Ported from internal/mcp/server.go
 //
 // A standard stdio MCP server. Protocol framing, initialize and tool dispatch
 // live here so domain packages provide handlers instead of their own JSON-RPC
 // loop.
 
-import { mcpProtocolVersion, serverError, serverResult } from "./rpc.ts";
-import type { RPCRequest } from "./rpc.ts";
+import {
+  mcpProtocolVersion,
+  parseRPCMessage,
+  type RPCRequest,
+  serverError,
+  serverResult,
+} from "./rpc.ts";
 
 /** A tool exposed by a local MCP server. Mirrors the MCP tools/list contract. */
 export interface ServerTool {
@@ -87,10 +91,8 @@ export async function serveStdio(
 
   for await (const line of readLines(input)) {
     if (signal.aborted) throw signal.reason;
-    let request: RPCRequest;
-    try {
-      request = JSON.parse(line) as RPCRequest;
-    } catch {
+    const request = parseRPCMessage(line);
+    if (request === undefined) {
       await write(serverError(null, -32700, "parse error"));
       continue;
     }

@@ -1,5 +1,3 @@
-// Translated from internal/cron/tool_test.go.
-
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { CronJob } from "./cron.ts";
 import {

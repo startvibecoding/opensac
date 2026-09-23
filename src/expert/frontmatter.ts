@@ -1,5 +1,3 @@
-// Ported from internal/expert/frontmatter.go
-
 import { type Frontmatter, newFrontmatter } from "./expert.ts";
 
 /** Opens and closes a frontmatter block. */

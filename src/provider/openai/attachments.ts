@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/attachments.go
-
 import type { AttachmentContent } from "../attachments.ts";
 import { validateAttachmentReferenceForResolver } from "../attachments.ts";
 import type { Attachment } from "../types.ts";

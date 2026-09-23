@@ -1,5 +1,3 @@
-// Ported from internal/dao/dao_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { CronDAO, type CronJobRecord, isNoRowsRun } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";

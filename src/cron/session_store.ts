@@ -1,4 +1,3 @@
-// Ported from internal/cron/session_store.go.
 //
 // Constrains a shared CronStore to one session so the scheduler and API cannot
 // read or mutate another session's jobs by guessing an ID.

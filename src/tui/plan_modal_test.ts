@@ -8,9 +8,9 @@ import { TUISession } from "./tui_session.ts";
 import { defaultSettings } from "../config/settings.ts";
 import type { Event } from "../agent/events.ts";
 import {
-  EventPlanUpdate,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
+  EVENT_PLAN_UPDATE,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
 } from "../agent/events.ts";
 
 function ev(partial: Partial<Event>): Event {
@@ -57,7 +57,7 @@ const plan = {
 Deno.test("plan modal renders the current plan in a framed box", () => {
   const { session, controller } = harness();
   controller.handleAgentEvent(
-    ev({ type: EventPlanUpdate, toolCallId: "tc-plan", plan }),
+    ev({ type: EVENT_PLAN_UPDATE, toolCallId: "tc-plan", plan }),
   );
   session.openPlanModal();
   const view = session.planModalView();
@@ -73,14 +73,18 @@ Deno.test("plan modal renders the current plan in a framed box", () => {
 Deno.test("tool rows keep the plan payload for rendering", () => {
   const { session, controller } = harness();
   controller.handleAgentEvent(
-    ev({ type: EventToolExecutionStart, toolCallId: "tc", toolName: "plan" }),
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "tc",
+      toolName: "plan",
+    }),
   );
   controller.handleAgentEvent(
-    ev({ type: EventPlanUpdate, toolCallId: "tc", plan }),
+    ev({ type: EVENT_PLAN_UPDATE, toolCallId: "tc", plan }),
   );
   controller.handleAgentEvent(
     ev({
-      type: EventToolExecutionEnd,
+      type: EVENT_TOOL_EXECUTION_END,
       toolCallId: "tc",
       toolName: "plan",
       toolResult: "Plan: Demo plan",

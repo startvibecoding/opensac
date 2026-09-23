@@ -1,5 +1,3 @@
-// Translated from internal/esm/store_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
 import {

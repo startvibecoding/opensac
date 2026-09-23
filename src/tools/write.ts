@@ -1,4 +1,4 @@
-// Ported from internal/tools/write.go (the write tool; diff/atomic helpers live
+// (the write tool; diff/atomic helpers live
 // in io_helpers.ts).
 
 import {

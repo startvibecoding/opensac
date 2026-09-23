@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/artifact.go.
 //
 // `ArtifactCollector` owns the generated artifacts registered during one
 // Runtime run. It is created by SessionRuntime before Agent construction so
@@ -14,10 +13,10 @@
 import * as path from "@std/path";
 import type { AttachmentKind, SessionAttachment } from "./attachment.ts";
 import {
-  AttachmentAudio,
-  AttachmentFile,
-  AttachmentImage,
-  AttachmentVideo,
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
 } from "./attachment.ts";
 import type { AttachmentService } from "./input.ts";
 import { detectAttachmentMediaType } from "./media_type.ts";
@@ -185,7 +184,7 @@ export class ArtifactCollector {
       },
       signal,
     );
-    service.SetStatus(sessionID, record.id, "generated");
+    service.setStatus(sessionID, record.id, "generated");
     record.status = "generated";
     if (this.closed) {
       throw new Error("artifact collector closed while registering artifact");
@@ -209,10 +208,10 @@ export async function classifyArtifact(
     case "":
     case "auto":
       return {
-        kind: isImage ? AttachmentImage : AttachmentFile,
+        kind: isImage ? ATTACHMENT_IMAGE : ATTACHMENT_FILE,
         mediaType,
       };
-    case AttachmentImage:
+    case ATTACHMENT_IMAGE:
       if (!isImage) {
         throw new Error(
           `artifact requested as image but detected ${
@@ -220,10 +219,10 @@ export async function classifyArtifact(
           }`,
         );
       }
-      return { kind: AttachmentImage, mediaType };
-    case AttachmentFile:
-      return { kind: AttachmentFile, mediaType };
-    case AttachmentAudio:
+      return { kind: ATTACHMENT_IMAGE, mediaType };
+    case ATTACHMENT_FILE:
+      return { kind: ATTACHMENT_FILE, mediaType };
+    case ATTACHMENT_AUDIO:
       if (!lowerMedia.startsWith("audio/")) {
         throw new Error(
           `artifact requested as audio but detected ${
@@ -231,8 +230,8 @@ export async function classifyArtifact(
           }`,
         );
       }
-      return { kind: AttachmentAudio, mediaType };
-    case AttachmentVideo:
+      return { kind: ATTACHMENT_AUDIO, mediaType };
+    case ATTACHMENT_VIDEO:
       if (!lowerMedia.startsWith("video/")) {
         throw new Error(
           `artifact requested as video but detected ${
@@ -240,7 +239,7 @@ export async function classifyArtifact(
           }`,
         );
       }
-      return { kind: AttachmentVideo, mediaType };
+      return { kind: ATTACHMENT_VIDEO, mediaType };
     default:
       throw new Error(
         `unsupported artifact kind ${JSON.stringify(requestedKind)}`,

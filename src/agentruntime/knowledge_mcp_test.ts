@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/knowledge_mcp_test.go.
 //
 // Go's `TestKnowledgeMCPConnectsAsStandardTool` spawns a subprocess MCP server
 // and connects a real stdio client. This port drives the same standard stdio

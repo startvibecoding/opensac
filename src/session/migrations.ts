@@ -1,4 +1,3 @@
-// Ported from internal/session/migrations.go
 //
 // Schema migration owner. Migrations are applied in ascending version order
 // regardless of their position in this list; new migrations must always append

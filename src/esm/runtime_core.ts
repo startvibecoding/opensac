@@ -1,4 +1,3 @@
-// Ported from internal/esm/runtime_core.go
 //
 // The front-end-neutral ESM supervisor extracted from the TUI implementation.
 // TUI/ACP hosts implement RuntimeAdapter to run one isolated role and

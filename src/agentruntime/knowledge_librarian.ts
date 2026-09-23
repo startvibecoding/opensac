@@ -1,4 +1,4 @@
-// Ported from internal/agentruntime/knowledge_librarian.go (the deterministic
+// (the deterministic
 // half: the dedicated Librarian session identity, its session open helper, and
 // the role instructions/prompt/capsule builders).
 //

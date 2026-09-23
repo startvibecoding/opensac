@@ -1,4 +1,3 @@
-// Ported from internal/tools/file_lock.go.
 //
 // Coordinates in-process writes to individual files. It deliberately supports
 // acquiring only one file at a time. Go's `context.Context` maps to an

@@ -1,4 +1,4 @@
-// Ported from internal/agentruntime/knowledge_context.go (the capsule
+// (the capsule
 // vocabulary, the bounded capsule formatting, and the byte-bounded text
 // truncation helper).
 //

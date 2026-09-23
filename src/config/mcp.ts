@@ -1,6 +1,10 @@
-// Ported from internal/config/mcp.go
-
 import * as path from "@std/path";
+import {
+  asJsonRecord,
+  optBoolean,
+  optString,
+  optStringArray,
+} from "../util/json.ts";
 import { configDir } from "./settings.ts";
 import { projectPath } from "./paths.ts";
 
@@ -60,11 +64,62 @@ function configToJSON(cfg: MCPConfig): Record<string, unknown> {
   return o;
 }
 
+function keyValuesFromJSON(value: unknown): MCPKeyValue[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: MCPKeyValue[] = [];
+  for (const rec of value) {
+    const name = optString(rec, "name");
+    const val = optString(rec, "value");
+    if (name === undefined || val === undefined) continue;
+    out.push({ name, value: val });
+  }
+  return out;
+}
+
+function serverFromJSON(value: unknown): MCPServer | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const name = optString(rec, "name");
+  if (name === undefined) return undefined;
+  const srv: MCPServer = { name };
+  const type = optString(rec, "type");
+  if (type !== undefined) srv.type = type;
+  const command = optString(rec, "command");
+  if (command !== undefined) srv.command = command;
+  const url = optString(rec, "url");
+  if (url !== undefined) srv.url = url;
+  const messageUrl = optString(rec, "messageUrl");
+  if (messageUrl !== undefined) srv.messageUrl = messageUrl;
+  const args = optStringArray(rec, "args");
+  if (args !== undefined) srv.args = args;
+  const enabled = optBoolean(rec, "enabled");
+  if (enabled !== undefined) srv.enabled = enabled;
+  const headers = keyValuesFromJSON(rec["headers"]);
+  if (headers !== undefined) srv.headers = headers;
+  const env = keyValuesFromJSON(rec["env"]);
+  if (env !== undefined) srv.env = env;
+  return srv;
+}
+
+/** Decodes an mcp.json document into the config schema, skipping bad entries. */
+export function mcpConfigFromJSON(value: unknown): MCPConfig {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return {};
+  const rawServers = rec["mcpServers"];
+  if (!Array.isArray(rawServers)) return {};
+  const mcpServers: MCPServer[] = [];
+  for (const entry of rawServers) {
+    const srv = serverFromJSON(entry);
+    if (srv !== undefined) mcpServers.push(srv);
+  }
+  return { mcpServers };
+}
+
 /** Reads and parses mcp.json from `p`. */
 export function loadMCPConfig(p: string): MCPConfig {
   const data = Deno.readTextFileSync(p);
   try {
-    return JSON.parse(data) as MCPConfig;
+    return mcpConfigFromJSON(JSON.parse(data));
   } catch (err) {
     throw new Error(`parse MCP config: ${(err as Error).message}`);
   }

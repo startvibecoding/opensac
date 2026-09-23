@@ -1,4 +1,3 @@
-// Ported from internal/provider/openai/provider.go
 //
 // Wire structs keep the Go JSON tag keys (snake_case) as TypeScript property
 // names, so serialization is a direct `JSON.stringify`. `Chat(ctx, params)

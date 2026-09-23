@@ -1,4 +1,4 @@
-// Ported from internal/tui/i18n: language resolution (language.go), the
+// (language.go), the
 // immutable Translator with fallback chain zh → en → message id (catalog.go),
 // and the bilingual message catalogs (messages.go).
 //
@@ -138,6 +138,7 @@ export const catalogs: Record<Language, Record<MessageID, string>> = {
     "activity.tool_started": "tool started: %s",
     "activity.tool_result": "tool result",
     "activity.done": "done",
+    "approval.required": "Approval required",
     "activity.error": "error: %s",
     "activity.canceled": "canceled",
     "activity.no_activity": "no activity captured yet",
@@ -873,6 +874,7 @@ export const catalogs: Record<Language, Record<MessageID, string>> = {
     "activity.tool_started": "工具已开始：%s",
     "activity.tool_result": "工具结果",
     "activity.done": "完成",
+    "approval.required": "需要批准",
     "activity.error": "错误：%s",
     "activity.canceled": "已取消",
     "activity.no_activity": "暂无活动记录",

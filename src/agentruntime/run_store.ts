@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/run_store.go.
 //
 // The Runtime-owned persistence boundary used by `ExecutionRuntime` to
 // coordinate canonical Run rows with in-memory lifecycle transitions, plus the

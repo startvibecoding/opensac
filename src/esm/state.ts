@@ -1,4 +1,3 @@
-// Ported from internal/esm/state.go
 //
 // The persisted lifecycle vocabulary and value bag for one supervised
 // objective. TokensUsed and TimeUsedMS are observability counters only; ESM no

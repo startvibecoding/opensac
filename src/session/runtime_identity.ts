@@ -1,4 +1,4 @@
-// Ported from internal/session/runtime_lock.go (process identity).
+// (process identity).
 //
 // The runtime owner identity names one OS process for lease ownership and
 // advisory notifications. It is computed once per process. Keeping it in its

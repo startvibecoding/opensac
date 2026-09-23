@@ -1,4 +1,3 @@
-// Ported from internal/workflow/js_test.go.
 //
 // The goja-specific `TestGojaUndefinedAndNullExportAsNil` is dropped (no goja
 // equivalent): the Deno worker already normalizes undefined/null to null.

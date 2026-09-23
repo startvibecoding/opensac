@@ -1,4 +1,4 @@
-// Ported from internal/session/run_store.go (normalizedRunJSON).
+// (normalizedRunJSON).
 //
 // A shared JSON normalization helper for the durable Run/delivery stores: an
 // absent or invalid value collapses to an empty object so a partially written

@@ -1,4 +1,4 @@
-// Ported from internal/esm/guidance.go (prompt rendering half)
+// (prompt rendering half)
 //
 // The Store guidance methods (add/pending/consume) live in store.ts; this
 // module owns the prompt projection of queued guidance.

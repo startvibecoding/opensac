@@ -1,4 +1,3 @@
-// Ported from internal/agent/memberdef.go.
 //
 // MemberDef is the agent-package view of one expert-team member: a persona
 // prompt plus optional capability overrides. internal/agent never parses bundle

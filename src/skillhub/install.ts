@@ -1,4 +1,3 @@
-// Ported from internal/skillhub/install.go
 //
 // Go's archive/zip is replaced with the local zip reader in ./zip.ts. The
 // streaming copy limit is preserved by bounding the buffered download.

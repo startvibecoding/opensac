@@ -1,4 +1,3 @@
-// Ported from internal/update/update.go
 //
 // Package update provides non-blocking version update detection based on the
 // npm registry. It never blocks the user: network checks run in the background

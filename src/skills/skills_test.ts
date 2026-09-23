@@ -1,4 +1,3 @@
-// Ported from internal/skills/skills_test.go and skills_disabled_test.go
 // (representative subset).
 
 import { assert, assertEquals } from "@std/assert";

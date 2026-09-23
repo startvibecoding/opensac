@@ -1,4 +1,3 @@
-// Ported from internal/doctor/doctor.go.
 //
 // Package doctor owns the machine-readable installation and runtime checks.
 // CLI and ACP deliberately render this same result instead of maintaining
@@ -33,10 +32,10 @@ import * as providerfactory from "../provider/factory/mod.ts";
 import * as skills from "../skills/mod.ts";
 import * as appversion from "../version/version.ts";
 
-export const StatusOK = "ok";
-export const StatusWarn = "warn";
-export const StatusError = "error";
-export const StatusSkip = "skip";
+export const STATUS_OK = "ok";
+export const STATUS_WARN = "warn";
+export const STATUS_ERROR = "error";
+export const STATUS_SKIP = "skip";
 
 export interface Check {
   id: string;
@@ -66,7 +65,7 @@ export function run(cwd: string, version: string): Response {
   const checks: Check[] = [];
   checks.push({
     id: "cli",
-    status: StatusOK,
+    status: STATUS_OK,
     title: "opensac CLI",
     detail: version,
   });
@@ -85,7 +84,7 @@ export function run(cwd: string, version: string): Response {
   if (settingsErr !== undefined) {
     checks.push({
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: "settings unavailable",
       fix: "Fix settings.json syntax",
@@ -103,14 +102,14 @@ export function run(cwd: string, version: string): Response {
 
   const result: Response = { ok: true, version, summary: "", checks };
   for (const check of checks) {
-    if (check.status === StatusError) {
+    if (check.status === STATUS_ERROR) {
       result.ok = false;
       if (result.summary === "") result.summary = summaryFor(check);
     }
   }
   if (result.summary === "") {
     for (const check of checks) {
-      if (check.status === StatusWarn) {
+      if (check.status === STATUS_WARN) {
         result.summary = summaryFor(check);
         break;
       }
@@ -124,13 +123,13 @@ function checkEnvironment(cwd: string): Check[] {
   const checks: Check[] = [
     {
       id: "environment.os",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "OS / Arch",
       detail: `${platform.os()}/${platform.arch()}`,
     },
     {
       id: "environment.deno",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "Deno version",
       detail: Deno.version.deno,
     },
@@ -139,14 +138,14 @@ function checkEnvironment(cwd: string): Check[] {
   if (statExists(shell) === undefined) {
     checks.push({
       id: "environment.shell",
-      status: StatusWarn,
+      status: STATUS_WARN,
       title: "Shell",
       detail: shell + " (not found)",
     });
   } else {
     checks.push({
       id: "environment.shell",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "Shell",
       detail: shell,
     });
@@ -155,14 +154,14 @@ function checkEnvironment(cwd: string): Check[] {
   if (statExists(home) === undefined) {
     checks.push({
       id: "environment.home",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Home directory",
       detail: home + " (not accessible)",
     });
   } else {
     checks.push({
       id: "environment.home",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "Home directory",
       detail: home,
     });
@@ -177,7 +176,7 @@ function checkCWD(cwd: string): Check {
     if (stat.error !== undefined) detail = stat.error.message;
     return {
       id: "cwd",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Working directory",
       detail,
       fix: "Start opensac from an existing directory",
@@ -185,7 +184,7 @@ function checkCWD(cwd: string): Check {
   }
   return {
     id: "cwd",
-    status: StatusOK,
+    status: STATUS_OK,
     title: "Working directory",
     detail: cwd,
   };
@@ -201,7 +200,7 @@ function checkSettingsFiles(
     if (stat.info.isDirectory) {
       return {
         id: "config",
-        status: StatusError,
+        status: STATUS_ERROR,
         title: "settings",
         detail: p + " is a directory",
         fix: "Replace settings.json with a file",
@@ -210,17 +209,17 @@ function checkSettingsFiles(
     if (settingsErr !== undefined) {
       return {
         id: "config",
-        status: StatusError,
+        status: STATUS_ERROR,
         title: "settings",
         detail: p + ": " + settingsErr.message,
         fix: "Fix settings.json syntax",
       };
     }
-    return { id: "config", status: StatusOK, title: "settings", detail: p };
+    return { id: "config", status: STATUS_OK, title: "settings", detail: p };
   } else if (!stat.notExist && stat.error !== undefined) {
     return {
       id: "config",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "settings",
       detail: stat.error.message,
     };
@@ -229,7 +228,7 @@ function checkSettingsFiles(
   if (statExists(projectPath) !== undefined && settingsErr === undefined) {
     return {
       id: "config",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "settings",
       detail: projectPath,
     };
@@ -237,7 +236,7 @@ function checkSettingsFiles(
   if (settingsErr !== undefined) {
     return {
       id: "config",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "settings",
       detail: settingsErr.message,
       fix: "Create or fix settings.json",
@@ -245,7 +244,7 @@ function checkSettingsFiles(
   }
   return {
     id: "config",
-    status: StatusSkip,
+    status: STATUS_SKIP,
     title: "settings",
     detail: p + " (not found; defaults in use)",
   };
@@ -274,7 +273,7 @@ function checkConfigFiles(
     if (stat.notExist) {
       checks.push({
         id: file.id,
-        status: StatusSkip,
+        status: STATUS_SKIP,
         title: file.title,
         detail: file.path + " (not found)",
       });
@@ -283,7 +282,7 @@ function checkConfigFiles(
     if (stat.error !== undefined) {
       checks.push({
         id: file.id,
-        status: StatusError,
+        status: STATUS_ERROR,
         title: file.title,
         detail: stat.error.message,
       });
@@ -292,7 +291,7 @@ function checkConfigFiles(
     if (stat.info!.isDirectory) {
       checks.push({
         id: file.id,
-        status: StatusError,
+        status: STATUS_ERROR,
         title: file.title,
         detail: file.path + " is a directory",
       });
@@ -300,12 +299,12 @@ function checkConfigFiles(
     }
     checks.push({
       id: file.id,
-      status: StatusOK,
+      status: STATUS_OK,
       title: file.title,
       detail: file.path,
     });
   }
-  const parseStatus = settingsErr !== undefined ? StatusError : StatusOK;
+  const parseStatus = settingsErr !== undefined ? STATUS_ERROR : STATUS_OK;
   const parseDetail = settingsErr !== undefined
     ? "failed to parse settings"
     : "loaded successfully";
@@ -338,7 +337,7 @@ export function validateProvider(
   if (settings === undefined) {
     return [{
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: "settings unavailable",
       fix: "Fix settings.json syntax",
@@ -349,7 +348,7 @@ export function validateProvider(
   if (name === "") {
     return [{
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: "no default provider configured",
       fix: "Set defaultProvider in settings.json",
@@ -361,7 +360,7 @@ export function validateProvider(
   ) {
     return [{
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: name + ": unknown provider",
       fix: "Add the provider to settings.json",
@@ -371,7 +370,7 @@ export function validateProvider(
   if (pc === undefined || (pc.baseUrl ?? "").trim() === "") {
     return [{
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: name + ": missing base URL",
       fix: "Set " + name + ".baseUrl",
@@ -381,7 +380,7 @@ export function validateProvider(
   if (apiKey === "" || apiKey.startsWith("${") || apiKey.startsWith("!")) {
     return [{
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: name + ": missing API key",
       fix: "Set " + name + ".apiKey or " + apiKeyEnv(name, pc),
@@ -402,13 +401,13 @@ export function validateProvider(
       return [
         {
           id: "provider.default",
-          status: StatusOK,
+          status: STATUS_OK,
           title: "Default provider",
           detail: name,
         },
         {
           id: "model.default",
-          status: StatusError,
+          status: STATUS_ERROR,
           title: "Default model",
           detail,
           fix: "Choose a model listed for this provider",
@@ -417,7 +416,7 @@ export function validateProvider(
     }
     return [{
       id: "provider.default",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Default provider",
       detail: name + ": configuration is unusable",
       fix: "Check the provider base URL and configuration",
@@ -426,14 +425,14 @@ export function validateProvider(
 
   const checks: Check[] = [{
     id: "provider.default",
-    status: StatusOK,
+    status: STATUS_OK,
     title: "Default provider",
     detail: name,
   }];
   if (model !== "") {
     checks.push({
       id: "model.default",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "Default model",
       detail: model,
     });
@@ -457,7 +456,7 @@ function checkConfiguredProviders(settings: Settings): Check[] {
     configured++;
     checks.push({
       id: "provider." + stableID(name),
-      status: StatusOK,
+      status: STATUS_OK,
       title: "Provider",
       detail: name,
     });
@@ -465,7 +464,7 @@ function checkConfiguredProviders(settings: Settings): Check[] {
   if (configured === 0 && names.length === 0) {
     checks.push({
       id: "providers",
-      status: StatusWarn,
+      status: STATUS_WARN,
       title: "Providers",
       detail: "no providers configured",
     });
@@ -485,7 +484,7 @@ function checkEnvironmentOverrides(): Check[] {
     if ((Deno.env.get(override.env) ?? "") !== "") {
       checks.push({
         id: "environment." + stableID(override.env),
-        status: StatusWarn,
+        status: STATUS_WARN,
         title: "Environment override",
         detail: override.env + " overrides " + override.name,
       });
@@ -499,14 +498,14 @@ function checkSandbox(settings: Settings | undefined): Check[] {
   if (bwrap !== null && bwrap !== "") {
     return appendSandboxConfig([{
       id: "sandbox",
-      status: StatusOK,
+      status: STATUS_OK,
       title: "Sandbox",
       detail: bwrap,
     }], settings);
   }
   return appendSandboxConfig([{
     id: "sandbox",
-    status: StatusWarn,
+    status: STATUS_WARN,
     title: "Sandbox",
     detail: "bwrap not found",
   }], settings);
@@ -521,7 +520,7 @@ function appendSandboxConfig(
   const level = valueOr(settings.sandbox?.level ?? "", "none");
   return [...checks, {
     id: "sandbox.config",
-    status: StatusOK,
+    status: STATUS_OK,
     title: "Sandbox config",
     detail: `enabled=${enabled}, level=${level}`,
   }];
@@ -534,7 +533,7 @@ function checkMCP(cwd: string): Check[] {
   } catch {
     return [{
       id: "mcp",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "MCP",
       detail: "MCP configuration could not be loaded",
       fix: "Fix mcp.json syntax",
@@ -543,7 +542,7 @@ function checkMCP(cwd: string): Check[] {
   if (servers.length === 0) {
     return [{
       id: "mcp",
-      status: StatusSkip,
+      status: STATUS_SKIP,
       title: "MCP",
       detail: "none configured",
     }];
@@ -552,7 +551,7 @@ function checkMCP(cwd: string): Check[] {
   for (const server of servers) {
     checks.push({
       id: "mcp." + stableID(server.name ?? ""),
-      status: StatusOK,
+      status: STATUS_OK,
       title: "MCP server",
       detail: server.name ?? "",
     });
@@ -564,7 +563,7 @@ function checkSessions(settings: Settings | undefined): Check {
   if (settings === undefined) {
     return {
       id: "sessions",
-      status: StatusSkip,
+      status: STATUS_SKIP,
       title: "Sessions",
       detail: "settings unavailable",
     };
@@ -574,7 +573,7 @@ function checkSessions(settings: Settings | undefined): Check {
   if (stat.notExist) {
     return {
       id: "sessions",
-      status: StatusSkip,
+      status: STATUS_SKIP,
       title: "Sessions",
       detail: p + " (not created yet)",
     };
@@ -582,7 +581,7 @@ function checkSessions(settings: Settings | undefined): Check {
   if (stat.error !== undefined) {
     return {
       id: "sessions",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Sessions",
       detail: stat.error.message,
     };
@@ -590,19 +589,19 @@ function checkSessions(settings: Settings | undefined): Check {
   if (!stat.info!.isDirectory) {
     return {
       id: "sessions",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Sessions",
       detail: p + " is not a directory",
     };
   }
-  return { id: "sessions", status: StatusOK, title: "Sessions", detail: p };
+  return { id: "sessions", status: STATUS_OK, title: "Sessions", detail: p };
 }
 
 function checkSkills(cwd: string, settings: Settings | undefined): Check[] {
   if (settings === undefined) {
     return [{
       id: "skills",
-      status: StatusSkip,
+      status: STATUS_SKIP,
       title: "Skills",
       detail: "settings unavailable",
     }];
@@ -610,12 +609,12 @@ function checkSkills(cwd: string, settings: Settings | undefined): Check[] {
   const p = getGlobalSkillsDir(settings);
   const globalStat = statResult(p);
   if (globalStat.info !== undefined) {
-    return [{ id: "skills", status: StatusOK, title: "Skills", detail: p }];
+    return [{ id: "skills", status: STATUS_OK, title: "Skills", detail: p }];
   }
   if (!globalStat.notExist && globalStat.error !== undefined) {
     return [{
       id: "skills",
-      status: StatusError,
+      status: STATUS_ERROR,
       title: "Skills",
       detail: globalStat.error.message,
     }];
@@ -624,7 +623,7 @@ function checkSkills(cwd: string, settings: Settings | undefined): Check[] {
     if (statExists(projectPath) !== undefined) {
       return [{
         id: "skills",
-        status: StatusOK,
+        status: STATUS_OK,
         title: "Skills",
         detail: projectPath,
       }];
@@ -632,7 +631,7 @@ function checkSkills(cwd: string, settings: Settings | undefined): Check[] {
   }
   return [{
     id: "skills",
-    status: StatusSkip,
+    status: STATUS_SKIP,
     title: "Skills",
     detail: p + " (not created)",
   }];
@@ -644,7 +643,7 @@ function checkContext(cwd: string, settings: Settings | undefined): Check[] {
     const enabled = settings.contextFiles?.enabled ?? false;
     checks.push({
       id: "context.files",
-      status: enabled ? StatusOK : StatusSkip,
+      status: enabled ? STATUS_OK : STATUS_SKIP,
       title: "Context files",
       detail: `enabled=${enabled}`,
     });
@@ -661,7 +660,7 @@ function checkContext(cwd: string, settings: Settings | undefined): Check[] {
     if (info !== undefined && !info.isDirectory) {
       checks.push({
         id: "context.project",
-        status: StatusOK,
+        status: STATUS_OK,
         title: "Project context",
         detail: name,
       });
@@ -673,7 +672,7 @@ function checkContext(cwd: string, settings: Settings | undefined): Check[] {
   ) {
     checks.push({
       id: "context.project",
-      status: StatusSkip,
+      status: STATUS_SKIP,
       title: "Project context",
       detail: "none found",
     });
@@ -683,7 +682,7 @@ function checkContext(cwd: string, settings: Settings | undefined): Check[] {
     if (statExists(path.join(configDir(), name)) !== undefined) {
       checks.push({
         id: "context.global",
-        status: StatusOK,
+        status: STATUS_OK,
         title: "Global context",
         detail: name,
       });
@@ -692,7 +691,7 @@ function checkContext(cwd: string, settings: Settings | undefined): Check[] {
   }
   checks.push({
     id: "context.global",
-    status: StatusSkip,
+    status: STATUS_SKIP,
     title: "Global context",
     detail: "none found",
   });

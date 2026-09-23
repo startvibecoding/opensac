@@ -1,10 +1,10 @@
-// Translated from internal/agent/mailbox_test.go (pure cases).
+// (pure cases).
 
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
+  MEMBER_STATUS_DONE,
+  MEMBER_STATUS_ERROR,
   type MemberCompletion,
-  MemberStatusDone,
-  MemberStatusError,
   newMemberCompletion,
   newMemberMailbox,
 } from "./mailbox.ts";
@@ -22,7 +22,7 @@ Deno.test("member mailbox drain steering order and format", () => {
     completion({
       memberId: "pm",
       displayName: "产品经理",
-      status: MemberStatusDone,
+      status: MEMBER_STATUS_DONE,
       payload: "PRD 已完成",
     }),
   );
@@ -30,7 +30,7 @@ Deno.test("member mailbox drain steering order and format", () => {
     completion({
       memberId: "engineer",
       displayName: "工程师",
-      status: MemberStatusDone,
+      status: MEMBER_STATUS_DONE,
       payload: "Result: done",
     }),
   );
@@ -64,7 +64,9 @@ Deno.test("member mailbox drain steering order and format", () => {
 Deno.test("member mailbox drain truncates done payload runes", () => {
   const m = newMemberMailbox();
   const payload = "测".repeat(4000);
-  m.enqueue(completion({ memberId: "qa", status: MemberStatusDone, payload }));
+  m.enqueue(
+    completion({ memberId: "qa", status: MEMBER_STATUS_DONE, payload }),
+  );
   const msgs = m.drainSteering()!;
   assertEquals(msgs.length, 1);
   const content = msgs[0].content!;
@@ -79,7 +81,7 @@ Deno.test("member mailbox drain error truncation and next step", () => {
     completion({
       memberId: "engineer",
       displayName: "工程师",
-      status: MemberStatusError,
+      status: MEMBER_STATUS_ERROR,
       payload,
     }),
   );
@@ -97,7 +99,11 @@ Deno.test("member mailbox drain error truncation and next step", () => {
 Deno.test("member mailbox drain error short payload keeps next step", () => {
   const m = newMemberMailbox();
   m.enqueue(
-    completion({ memberId: "qa", status: MemberStatusError, payload: "boom" }),
+    completion({
+      memberId: "qa",
+      status: MEMBER_STATUS_ERROR,
+      payload: "boom",
+    }),
   );
   const content = m.drainSteering()![0].content!;
   assert(content.includes("payload:\nboom\n"));
@@ -108,10 +114,14 @@ Deno.test("member mailbox pending summary does not drain", () => {
   const m = newMemberMailbox();
   assertEquals(m.pendingSummary(), null);
   m.enqueue(
-    completion({ memberId: "pm", status: MemberStatusDone, payload: "PRD" }),
+    completion({ memberId: "pm", status: MEMBER_STATUS_DONE, payload: "PRD" }),
   );
   m.enqueue(
-    completion({ memberId: "qa", status: MemberStatusError, payload: "boom" }),
+    completion({
+      memberId: "qa",
+      status: MEMBER_STATUS_ERROR,
+      payload: "boom",
+    }),
   );
 
   const summary = m.pendingSummary()!;
@@ -128,7 +138,7 @@ Deno.test("member mailbox pending summary does not drain", () => {
 Deno.test("member mailbox wait for activity signal", async () => {
   const m = newMemberMailbox();
   setTimeout(
-    () => m.enqueue(completion({ memberId: "pm", status: MemberStatusDone })),
+    () => m.enqueue(completion({ memberId: "pm", status: MEMBER_STATUS_DONE })),
     20,
   );
   const start = Date.now();
@@ -155,7 +165,7 @@ Deno.test("member mailbox wait for activity aborts", async () => {
 
 Deno.test("member mailbox drain clears activity signal", async () => {
   const m = newMemberMailbox();
-  m.enqueue(completion({ memberId: "pm", status: MemberStatusDone }));
+  m.enqueue(completion({ memberId: "pm", status: MEMBER_STATUS_DONE }));
   assertEquals(m.drainSteering()!.length, 1);
   const timedOut = await m.waitForActivity(undefined, 30);
   assert(timedOut);

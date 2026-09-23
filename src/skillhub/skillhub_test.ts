@@ -1,5 +1,3 @@
-// Translated from internal/skillhub/*_test.go
-
 import {
   assert,
   assertEquals,

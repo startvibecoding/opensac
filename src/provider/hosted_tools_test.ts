@@ -1,5 +1,3 @@
-// Ported from internal/provider/hosted_tools_test.go
-
 import { assertEquals } from "@std/assert";
 import {
   hostedToolImageGeneration,

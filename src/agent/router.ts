@@ -1,4 +1,3 @@
-// Ported from internal/agent/router.go.
 //
 // Routes public `sdk/agent` events from agents to consumers (UI, parent
 // agents). Concurrency guards are dropped (Deno is single-threaded).

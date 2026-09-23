@@ -1,6 +1,5 @@
-// Ported from internal/config/env.go
-
 import * as path from "@std/path";
+import { optStringMap, parseJsonRecord } from "../util/json.ts";
 import { configDir } from "./settings.ts";
 
 /** Environment variables injected into bash and skill tools. */
@@ -18,10 +17,8 @@ export function loadEnv(): EnvConfig {
   const c: EnvConfig = { vars: {} };
   try {
     const data = Deno.readTextFileSync(globalEnvPath());
-    const parsed = JSON.parse(data) as Partial<EnvConfig>;
-    if (parsed && typeof parsed === "object" && parsed.vars) {
-      c.vars = parsed.vars;
-    }
+    const vars = optStringMap(parseJsonRecord(data), "vars");
+    if (vars !== undefined) c.vars = vars;
   } catch {
     // Missing or invalid file: keep the empty default.
   }

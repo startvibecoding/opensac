@@ -1,4 +1,3 @@
-// Ported from internal/session/runtime_lock.go
 //
 // The Session-wide runtime lease: a fenced, heartbeat-renewed SQLite row that
 // gives one process authority over a Session's execution path. Ownership is

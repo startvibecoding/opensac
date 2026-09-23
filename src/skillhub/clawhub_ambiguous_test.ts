@@ -1,5 +1,3 @@
-// Translated from internal/skillhub/clawhub_ambiguous_test.go
-
 import {
   assert,
   assertEquals,

@@ -1,5 +1,3 @@
-// Ported from internal/version/version_test.go
-
 import { assertEquals, assertNotEquals } from "@std/assert";
 import { current, setVersion } from "./version.ts";
 

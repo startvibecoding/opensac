@@ -1,4 +1,3 @@
-// Ported from internal/session/run_store.go
 //
 // The durable Run lifecycle persistence: canonical Run rows, their first and
 // terminal events, delivery-plan finalization, and the read/list projections

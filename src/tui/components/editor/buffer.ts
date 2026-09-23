@@ -1,4 +1,4 @@
-// Ported from internal/tui/components/editor/buffer.go: a Unicode-aware
+// a Unicode-aware
 // multi-line text buffer. Text is stored as lines (no trailing newline);
 // the cursor is (line, col) with col a rune offset, plus a preferred column
 // for vertical navigation. maxHeight/width wrapping is handled by the editor

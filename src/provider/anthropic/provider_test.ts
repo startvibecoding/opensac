@@ -1,4 +1,3 @@
-// Ported from internal/provider/anthropic/provider_test.go
 //
 // Deviation: the Go tests inject a custom http.RoundTripper via `p.client`.
 // This port injects a fake `HttpClient` and builds plain Response-like objects
@@ -149,7 +148,7 @@ function mustUsage(events: StreamEvent[]): Usage {
   for (const e of events) {
     if (e.type === streamUsage && e.usage !== undefined) return e.usage;
   }
-  throw new Error("no StreamUsage event received");
+  throw new Error("no STREAM_USAGE event received");
 }
 
 async function captureBody(
@@ -206,7 +205,7 @@ Deno.test("AnthropicRetriesEarlyStreamReadError", async () => {
     if (e.type === streamRetry) retryEvent = e;
     if (e.type === streamDone) sawDone = true;
     if (e.type === streamError) {
-      throw new Error(`unexpected StreamError: ${e.error}`);
+      throw new Error(`unexpected STREAM_ERROR: ${e.error}`);
     }
   }
   assert(retryEvent !== undefined && sawDone);

@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/recovery_coordinator_test.go.
 //
 // The Go case drives a live external owner row with raw SQL; that fixture
 // belongs to the runtime-lease/DAO tests and is omitted here. This covers the

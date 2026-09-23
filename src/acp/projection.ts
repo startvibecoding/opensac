@@ -1,4 +1,4 @@
-// Ported from internal/acp/acp.go and internal/acp/extensions.go (the pure,
+// (the pure,
 // server-independent half of the ACP projection layer).
 //
 // These helpers turn Agent Core events, task plans, tool results, and canonical
@@ -15,10 +15,10 @@ import { isAbsolute } from "@std/path";
 import { decodeBase64Url, encodeBase64Url } from "@std/encoding/base64url";
 import {
   type Event,
-  EventCompactionEnd,
-  EventCompactionStart,
-  EventTurnEnd,
-  EventTurnStart,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
   type EventType,
   type ToolImage,
 } from "../agent/events.ts";
@@ -85,13 +85,13 @@ export function acpRunStatus(status: string): string {
 /** Maps an internal Agent event type onto its additive ACP event name. */
 export function acpEventName(eventType: EventType): string {
   switch (eventType) {
-    case EventCompactionStart:
+    case EVENT_COMPACTION_START:
       return "compaction_started";
-    case EventCompactionEnd:
+    case EVENT_COMPACTION_END:
       return "compaction_finished";
-    case EventTurnStart:
+    case EVENT_TURN_START:
       return "turn_started";
-    case EventTurnEnd:
+    case EVENT_TURN_END:
       return "turn_finished";
     default:
       return "unknown";

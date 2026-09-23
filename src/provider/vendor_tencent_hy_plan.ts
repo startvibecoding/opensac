@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_tencent_hy_plan.go
-
 import type { AdapterConfig, VendorAdapter } from "./vendor.ts";
 import { registerVendorAdapter } from "./vendor.ts";
 

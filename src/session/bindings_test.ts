@@ -1,4 +1,3 @@
-// Ported from internal/session/bindings_test.go
 //
 // The Manager-based bound-session setup is replaced with direct channel-tool
 // persistence so the portable binding surface is exercised without the

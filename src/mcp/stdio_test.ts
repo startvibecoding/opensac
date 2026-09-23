@@ -1,4 +1,3 @@
-// Translated from internal/mcp/mcp_stdio_test.go
 //
 // Real stdio MCP handshakes against shell fixtures (Unix only), plus the
 // command-resolution and environment helpers.

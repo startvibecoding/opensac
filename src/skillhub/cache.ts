@@ -1,4 +1,3 @@
-// Ported from internal/skillhub/cache.go
 //
 // Deno is single-threaded, so the Go sync.Mutex is dropped. Entries are cloned
 // on read/write to preserve the Go value-copy semantics.

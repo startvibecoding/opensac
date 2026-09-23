@@ -1,4 +1,3 @@
-// Ported from internal/cron/schedule.go.
 //
 // Parses a human-readable schedule string into a next-run time and stamps a
 // job's mode/schedule normalization. Deviations from Go: `time.Time` maps to

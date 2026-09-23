@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_google_gemini.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_google_gemini.go init() adapters. */

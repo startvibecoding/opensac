@@ -47,7 +47,7 @@ export function testMemberDef(id: string): MemberDef {
   };
 }
 
-/** The minimal normal provider stream (StreamStart + StreamDone). */
+/** The minimal normal provider stream (STREAM_START + STREAM_DONE). */
 export function doneStream(): StreamEvent[] {
   return [{ type: streamStart }, { type: streamDone, stopReason: "stop" }];
 }

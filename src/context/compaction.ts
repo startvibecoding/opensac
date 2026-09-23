@@ -1,4 +1,3 @@
-// Ported from internal/context/compaction.go
 //
 // Deviations:
 // - `context.Context` maps to an optional `AbortSignal` threaded through the

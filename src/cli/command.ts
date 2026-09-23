@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main.go (`newRootCommand`, `newACPCommand`,
+// (`newRootCommand`, `newACPCommand`,
 // `registerRootFlags`, `registerACPFlags`, and the root action dispatch).
 //
 // The Cliffy command tree is thin: it maps flags into `CLIOptions` and calls

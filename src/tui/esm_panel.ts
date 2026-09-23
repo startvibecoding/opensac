@@ -1,4 +1,4 @@
-// Ported from internal/tui/esm_panel.go: renders the Supervisor Mode progress
+// renders the Supervisor Mode progress
 // panel. The Go original reads App state; this projection parameterizes the
 // objective snapshot and the active agent's activity so every function stays
 // pure and testable. The ESM runtime itself is src/esm (already migrated).

@@ -10,12 +10,7 @@
 
 import { displayWidth, truncateDisplay } from "./formatters.ts";
 import type { KeyEvent } from "./keys.ts";
-
-const ACCENT = "\u001B[38;5;86m";
-const DIM = "\u001B[38;5;240m";
-const BOLD = "\u001B[1m";
-const RED = "\u001B[38;5;196m";
-const RESET = "\u001B[0m";
+import { ACCENT, BOLD, DIM, RED, RESET } from "./theme.ts";
 
 /** Max selectable rows shown at once (Go authMaxVisibleOptions). */
 export const MAX_VISIBLE_ITEMS = 5;

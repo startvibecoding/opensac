@@ -1,5 +1,3 @@
-// Ported from internal/expert/center.go
-
 import * as path from "@std/path";
 import { projectPathFor } from "../config/mod.ts";
 import { configDir } from "../platform/platform.ts";

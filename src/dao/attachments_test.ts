@@ -1,6 +1,3 @@
-// Ported from internal/dao/attachments_test.go and the coverage in
-// run_projections_test.go.
-
 import { assert, assertEquals } from "@std/assert";
 import { AttachmentDAO, type AttachmentRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";

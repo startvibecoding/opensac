@@ -1,4 +1,3 @@
-// Ported from internal/session/fork_test.go
 //
 // Deviation: the Go fixture drives transcript writes through the (not yet
 // ported) Manager; these tests append entries/turns directly through the shared

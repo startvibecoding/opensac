@@ -1,4 +1,4 @@
-// Ported from internal/session/session.go (replay core).
+// (replay core).
 //
 // The current-branch reconstruction engine: it walks persisted entries,
 // applies message content overrides, and folds compaction summaries into the

@@ -1,4 +1,3 @@
-// Ported from internal/session/lock_registry.go
 //
 // Process-local map of per-key mutexes whose entries are evicted once no
 // caller references them anymore. Long-running processes otherwise

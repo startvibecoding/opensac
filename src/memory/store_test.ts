@@ -1,5 +1,3 @@
-// Ported from internal/memory/store_test.go
-
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import * as path from "@std/path";
 import { extractSection, Store } from "./store.ts";

@@ -274,7 +274,7 @@ function parseEscape(
  * Joins a run of queued events that looks like a paste split into key events
  * (text, then Enter, then more text — terminals that do not use bracketed paste
  * deliver each pasted line as typed text plus Return). Returns the pasted text
- * or null when the run is ordinary typing. Ported from the Go App's
+ * or null when the run is ordinary typing. This mirrors the Go App's
  * `coalescedSplitPaste`.
  */
 export function coalesceSplitPaste(events: KeyEvent[]): string | null {

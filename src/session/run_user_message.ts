@@ -1,4 +1,3 @@
-// Ported from internal/session/run_user_message.go
 //
 // The Runtime-owned transcript identity and admission helpers for a Run's
 // canonical user/assistant entries. Deterministic IDs make terminal retries and

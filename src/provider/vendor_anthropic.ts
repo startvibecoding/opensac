@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_anthropic.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_anthropic.go init() adapters. */

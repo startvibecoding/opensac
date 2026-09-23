@@ -1,4 +1,3 @@
-// Ported from internal/workflow/agent_host.go.
 //
 // AgentHost runs workflow tasks through the existing AgentManager. Go's
 // `chan<- internalagent.Event` maps to an `EventSink` threaded through the tool
@@ -16,7 +15,7 @@ import {
   taskFailed,
   taskIncomplete,
 } from "../../sdk/agent/mod.ts";
-import { type Event, EventToolApprovalRequest } from "../agent/events.ts";
+import { type Event, EVENT_TOOL_APPROVAL_REQUEST } from "../agent/events.ts";
 import type { AgentManager } from "../agent/manager.ts";
 import type { RunContext } from "../agent/run_context.ts";
 import {
@@ -108,7 +107,7 @@ export class AgentHost implements Host {
           ev.type === eventToolApprovalRequest && this.parentSink !== undefined
         ) {
           sendParentEvent(this.parentSink, {
-            type: EventToolApprovalRequest,
+            type: EVENT_TOOL_APPROVAL_REQUEST,
             agentId: a.id(),
             approvalId: ev.approvalId,
             approvalTool: ev.approvalTool,

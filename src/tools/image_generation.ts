@@ -1,4 +1,3 @@
-// Ported from internal/tools/image_generation.go.
 //
 // A local tool backed by either the OpenAI Images API or the Responses API
 // native image_generation hosted tool. Go's `net/http` maps to `fetch`; the

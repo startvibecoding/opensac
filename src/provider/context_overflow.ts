@@ -1,5 +1,3 @@
-// Ported from internal/provider/context_overflow.go
-
 /**
  * Matches provider error messages that indicate the request was rejected
  * because it exceeds the model's context window. Patterns are matched

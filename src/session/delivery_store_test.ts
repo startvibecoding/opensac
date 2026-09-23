@@ -1,4 +1,3 @@
-// Ported from internal/session/delivery_store_test.go
 //
 // Deviation: the Go fixture creates a session through the (not yet ported)
 // Manager and a completed Run through `CreateSessionRun`. This port uses a

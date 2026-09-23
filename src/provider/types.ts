@@ -1,4 +1,3 @@
-// Ported from internal/provider/types.go
 //
 // JSON compatibility notes:
 // - Go struct tags map to camelCase fields; `omitempty` maps to optional (`?`)
@@ -481,7 +480,7 @@ export const thinkingMax: ThinkingLevel = "max";
 
 /**
  * Ensures a valid thinking level is returned.
- * Empty or invalid values fall back to ThinkingMedium for reasoning models.
+ * Empty or invalid values fall back to THINKING_MEDIUM for reasoning models.
  */
 export function normalizeThinkingLevel(level: ThinkingLevel): ThinkingLevel {
   switch (level) {
@@ -548,21 +547,21 @@ export const streamRetry: StreamEventType = 9; // Retry attempt in progress
 /** StreamEvent represents a single event from a streaming response. */
 export interface StreamEvent {
   type: StreamEventType;
-  /** for StreamTextDelta */
+  /** for STREAM_TEXT_DELTA */
   textDelta?: string;
-  /** for StreamThinkDelta */
+  /** for STREAM_THINK_DELTA */
   thinkDelta?: string;
   /** for StreamThinkSignature */
   thinkSignature?: string;
-  /** for StreamToolCall */
+  /** for STREAM_TOOL_CALL */
   toolCall?: ToolCallBlock;
   /** for StreamHostedItem */
   hostedItem?: HostedItem;
-  /** for StreamUsage */
+  /** for STREAM_USAGE */
   usage?: Usage;
-  /** for StreamError */
+  /** for STREAM_ERROR */
   error?: Error;
-  /** for StreamDone: "stop", "length", "toolUse", "error", "aborted" */
+  /** for STREAM_DONE: "stop", "length", "toolUse", "error", "aborted" */
   stopReason?: string;
   /** for StreamRetry: current retry attempt number */
   retryAttempt?: number;

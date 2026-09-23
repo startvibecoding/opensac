@@ -1,4 +1,3 @@
-// Translated from internal/acp/acp_phase1_test.go and the server-bound cases
 // of internal/acp/acp_mcp_test.go / acp_artifact_test.go.
 //
 // These exercise the ACP server shell (`src/acp/server.ts`): the transport and
@@ -21,19 +20,19 @@ import {
 } from "./server.ts";
 import type { ACPRPCRequest } from "./wire.ts";
 import {
-  DecisionApproval,
-  DecisionQuestion,
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
 } from "../agentruntime/decision.ts";
 import {
   type Event as AgentEvent,
-  EventDone,
-  EventError,
-  EventRunFinished,
-  EventTextDelta,
-  EventToolExecutionEnd,
-  TaskCanceled,
-  TaskFailed,
-  TaskSuccess,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_RUN_FINISHED,
+  EVENT_TEXT_DELTA,
+  EVENT_TOOL_EXECUTION_END,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_SUCCESS,
 } from "../agent/events.ts";
 import { run as doctorRun } from "../doctor/doctor.ts";
 
@@ -331,7 +330,7 @@ Deno.test("scheduleDecisionDeadline emits both marks and stops cleanly", async (
     const stop = server.scheduleDecisionDeadline(
       "session-1",
       "req-1",
-      DecisionQuestion,
+      DECISION_QUESTION,
       timeoutMs,
       deadline,
     );
@@ -362,7 +361,7 @@ Deno.test("scheduleDecisionDeadline stops before the first mark", async () => {
   const stop = server.scheduleDecisionDeadline(
     "session-1",
     "req-2",
-    DecisionApproval,
+    DECISION_APPROVAL,
     40,
     new Date(Date.now() + 40),
   );
@@ -383,7 +382,7 @@ Deno.test("scheduleDecisionDeadline skips the final notice for short timeouts", 
   const stop = server.scheduleDecisionDeadline(
     "session-1",
     "req-3",
-    DecisionApproval,
+    DECISION_APPROVAL,
     20,
     new Date(Date.now() + 20),
   );
@@ -408,7 +407,7 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
 
   // Parent-scoped events never produce subagent projections.
   server.observeSubagentEvent("session-1", {
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     textDelta: "parent",
   });
   assertEquals(
@@ -420,7 +419,7 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
   server.observeSubagentEvent(
     "session-1",
     {
-      type: EventTextDelta,
+      type: EVENT_TEXT_DELTA,
       agentId: "child-1",
       textDelta: "child",
       memberId: "engineer",
@@ -431,7 +430,7 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
     } satisfies AgentEvent,
   );
   server.observeSubagentEvent("session-1", {
-    type: EventToolExecutionEnd,
+    type: EVENT_TOOL_EXECUTION_END,
     agentId: "child-1",
     toolCallId: "call-1",
   });
@@ -449,12 +448,12 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
   // The canonical terminal projects exactly one "completed".
   output.reset();
   server.observeSubagentEvent("session-1", {
-    type: EventRunFinished,
+    type: EVENT_RUN_FINISHED,
     agentId: "child-1",
-    status: TaskSuccess,
+    status: TASK_SUCCESS,
   });
   server.observeSubagentEvent("session-1", {
-    type: EventDone,
+    type: EVENT_DONE,
     agentId: "child-1",
     done: true,
   });
@@ -466,24 +465,24 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
   // A failing child maps to "failed".
   output.reset();
   server.observeSubagentEvent("session-1", {
-    type: EventRunFinished,
+    type: EVENT_RUN_FINISHED,
     agentId: "child-2",
-    status: TaskFailed,
+    status: TASK_FAILED,
   });
   events = sessionEventParams(parseMessages(output.toString()), "subagent");
   assertEquals(events.length, 2);
   assertEquals(events[0].status, "started");
   assertEquals(events[1].status, "failed");
 
-  // A cancelled child maps to "failed" and a legacy EventError adds nothing.
+  // A cancelled child maps to "failed" and a legacy EVENT_ERROR adds nothing.
   output.reset();
   server.observeSubagentEvent("session-1", {
-    type: EventRunFinished,
+    type: EVENT_RUN_FINISHED,
     agentId: "child-3",
-    status: TaskCanceled,
+    status: TASK_CANCELED,
   });
   server.observeSubagentEvent("session-1", {
-    type: EventError,
+    type: EVENT_ERROR,
     agentId: "child-3",
   });
   events = sessionEventParams(parseMessages(output.toString()), "subagent");
@@ -494,7 +493,7 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
   // Legacy-only streams still pair started with completed.
   output.reset();
   server.observeSubagentEvent("session-2", {
-    type: EventDone,
+    type: EVENT_DONE,
     agentId: "child-4",
     done: true,
   });
@@ -508,7 +507,7 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
   server.clearSubagentProjections("session-2");
   output.reset();
   server.observeSubagentEvent("session-2", {
-    type: EventTextDelta,
+    type: EVENT_TEXT_DELTA,
     agentId: "child-4",
   });
   events = sessionEventParams(parseMessages(output.toString()), "subagent");

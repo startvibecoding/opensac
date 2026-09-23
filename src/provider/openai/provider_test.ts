@@ -1,4 +1,3 @@
-// Ported from internal/provider/openai/provider_test.go
 //
 // Go's httptest-based mock client is replaced by an injected fetch client
 // (see test_helpers.ts) that returns prepared Response objects.

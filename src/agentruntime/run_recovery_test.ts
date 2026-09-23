@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/run_recovery_test.go plus focused
 // RunStore coverage.
 //
 // Deviations: Go's goroutine worker pool maps to an async bounded pool, so the
@@ -23,8 +22,8 @@ import {
   recoverOrphanedRuns,
   recoverOrphanedRunsWithTrigger,
   recoverOrphanedSessionRun,
-  RecoveryFailLocal,
-  RecoveryKeepRemote,
+  RECOVERY_FAIL_LOCAL,
+  RECOVERY_KEEP_REMOTE,
   recoveryWorkerLimit,
   RunStore,
 } from "./mod.ts";
@@ -92,7 +91,7 @@ Deno.test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
     const cleaned: string[] = [];
     const result = await recoverOrphanedRuns(
       sessionDir,
-      (run) => run.id === "remote" ? RecoveryKeepRemote : RecoveryFailLocal,
+      (run) => run.id === "remote" ? RECOVERY_KEEP_REMOTE : RECOVERY_FAIL_LOCAL,
       (run) => {
         cleaned.push(run.id);
       },
@@ -252,7 +251,7 @@ Deno.test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => 
     const remote = await recoverOrphanedSessionRun(
       sessionDir,
       "session-remote",
-      () => RecoveryKeepRemote,
+      () => RECOVERY_KEEP_REMOTE,
       null,
     );
     assertEquals(remote.kept.map((r) => r.id), ["remote"]);
@@ -295,7 +294,7 @@ Deno.test("DefaultRunRecoveryPolicyDoesNotTrustSourceAlone", () => {
     defaultRunRecoveryPolicy(
       { source: "responses_background" } as SessionRun,
     ),
-    RecoveryFailLocal,
+    RECOVERY_FAIL_LOCAL,
   );
 });
 

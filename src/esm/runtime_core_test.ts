@@ -1,5 +1,3 @@
-// Translated from internal/esm/runtime_core_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   EsmDeadlineExceededError,

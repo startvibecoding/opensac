@@ -1,4 +1,3 @@
-// Ported from GoStreamingMarkdown/renderer/renderer.go
 //
 // Converts a Markdown AST into ANSI-styled terminal output. Zero external
 // dependencies.

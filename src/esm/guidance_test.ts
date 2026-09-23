@@ -1,5 +1,3 @@
-// Translated from internal/esm/guidance_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { formatTime } from "./store.ts";
 import { roleWorker, Supervisor } from "./runtime_core.ts";

@@ -1,4 +1,4 @@
-// Ported from golang.org/x/mod/semver (v0.37.0).
+// (v0.37.0).
 //
 // Package semver implements comparison of semantic version strings.
 // In this package, semantic version strings must begin with a leading "v",

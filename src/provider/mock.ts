@@ -1,5 +1,3 @@
-// Ported from internal/provider/mock.go
-
 import type { Provider } from "./provider.ts";
 import type { ChatParams, Model, StreamEvent } from "./types.ts";
 import { streamError } from "./types.ts";

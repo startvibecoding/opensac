@@ -1,5 +1,3 @@
-// Translated from internal/agentruntime/storage_reconcile_test.go.
-
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
@@ -48,7 +46,7 @@ async function publishTestArtifact(
     sizeHint: bytes.length,
     open: () => ({ bytes, filename, mediaType: "text/plain" }),
   });
-  service.SetStatus(sessionId, record.id, "generated");
+  service.setStatus(sessionId, record.id, "generated");
   return record;
 }
 

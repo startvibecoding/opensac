@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/run_replay.go.
 //
 // `RunReplay` is the adapter-neutral projection of persisted run events. It is
 // intentionally read-only: adapters decide how to render or recover protocol
@@ -8,18 +7,18 @@ import type { SessionRunEvent } from "../session/session_events.ts";
 import type { RunEvent } from "./run_event.ts";
 import {
   isTerminalRunState,
+  RUN_STATE_CANCELLED,
+  RUN_STATE_CANCELLING,
+  RUN_STATE_COMPLETED,
+  RUN_STATE_CREATED,
+  RUN_STATE_FAILED,
+  RUN_STATE_INCOMPLETE,
+  RUN_STATE_QUEUED,
+  RUN_STATE_RUNNING,
+  RUN_STATE_TIMED_OUT,
+  RUN_STATE_WAITING_APPROVAL,
+  RUN_STATE_WAITING_QUESTION,
   type RunState,
-  RunStateCancelled,
-  RunStateCancelling,
-  RunStateCompleted,
-  RunStateCreated,
-  RunStateFailed,
-  RunStateIncomplete,
-  RunStateQueued,
-  RunStateRunning,
-  RunStateTimedOut,
-  RunStateWaitingApproval,
-  RunStateWaitingQuestion,
 } from "./run_state.ts";
 
 export interface RunReplay {
@@ -74,55 +73,55 @@ export function runStateFromEvent(event: SessionRunEvent): RunState | null {
   switch (event.eventType) {
     case "started":
     case "remote_started":
-      return RunStateRunning;
+      return RUN_STATE_RUNNING;
     case "waiting_for_approval":
     case "approval_requested":
-      return RunStateWaitingApproval;
+      return RUN_STATE_WAITING_APPROVAL;
     case "waiting_for_question":
     case "question_requested":
-      return RunStateWaitingQuestion;
+      return RUN_STATE_WAITING_QUESTION;
     case "cancelling":
     case "cancel_requested":
-      return RunStateCancelling;
+      return RUN_STATE_CANCELLING;
     case "finished":
     case "completed":
-      return RunStateCompleted;
+      return RUN_STATE_COMPLETED;
     case "failed":
-      return RunStateFailed;
+      return RUN_STATE_FAILED;
     case "canceled":
     case "cancelled":
-      return RunStateCancelled;
+      return RUN_STATE_CANCELLED;
     case "timed_out":
     case "timeout":
-      return RunStateTimedOut;
+      return RUN_STATE_TIMED_OUT;
     case "incomplete":
-      return RunStateIncomplete;
+      return RUN_STATE_INCOMPLETE;
   }
   switch (event.status) {
     case "created":
-      return RunStateCreated;
+      return RUN_STATE_CREATED;
     case "queued":
-      return RunStateQueued;
+      return RUN_STATE_QUEUED;
     case "running":
-      return RunStateRunning;
+      return RUN_STATE_RUNNING;
     case "waiting_for_approval":
-      return RunStateWaitingApproval;
+      return RUN_STATE_WAITING_APPROVAL;
     case "waiting_for_question":
-      return RunStateWaitingQuestion;
+      return RUN_STATE_WAITING_QUESTION;
     case "cancelling":
     case "terminalizing":
-      return RunStateCancelling;
+      return RUN_STATE_CANCELLING;
     case "completed":
-      return RunStateCompleted;
+      return RUN_STATE_COMPLETED;
     case "failed":
-      return RunStateFailed;
+      return RUN_STATE_FAILED;
     case "cancelled":
     case "canceled":
-      return RunStateCancelled;
+      return RUN_STATE_CANCELLED;
     case "timed_out":
-      return RunStateTimedOut;
+      return RUN_STATE_TIMED_OUT;
     case "incomplete":
-      return RunStateIncomplete;
+      return RUN_STATE_INCOMPLETE;
     default:
       return null;
   }

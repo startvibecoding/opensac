@@ -1,4 +1,3 @@
-// Ported from internal/session/schema.go
 //
 // This module is the schema owner for the canonical session/run database. It
 // creates the current schema only for an empty database and validates existing

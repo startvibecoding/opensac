@@ -1,5 +1,3 @@
-// Ported from internal/dao/stats.go
-
 import type { DB } from "../db/mod.ts";
 import { execChanges, type Param, queryAll, queryOne } from "./database.ts";
 

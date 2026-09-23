@@ -1,6 +1,4 @@
-// Ported from internal/agentruntime/execution.go, execution_events.go,
 // execution_persistence.go, execution_observation.go, and
-// execution_snapshot.go.
 //
 // `ExecutionRuntime` owns the adapter-neutral active run state for one session.
 // When configured with a `DurableRunStore` and `RunEventSink` it also owns the
@@ -18,21 +16,21 @@
 import type { Message } from "../provider/types.ts";
 import {
   type Event as AgentEvent,
-  EventCompactionEnd,
-  EventCompactionStart,
-  EventContextPressure,
-  EventError,
-  EventHostedItem,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolApprovalRequest,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  TaskCanceled,
-  TaskIncomplete,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_CONTEXT_PRESSURE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  TASK_CANCELED,
+  TASK_INCOMPLETE,
   taskStatusIsSuccessful,
 } from "../agent/events.ts";
 import { readSessionExecutionFacts } from "../session/execution_facts.ts";
@@ -60,27 +58,27 @@ import {
   diagnosticMessage,
   type ErrorClassificationOptions,
   type ErrorInfo,
-  FailureIncomplete,
-  PhaseApproval,
-  PhaseContext,
-  PhaseModel,
-  PhaseTerminalization,
-  PhaseTool,
-  PhaseTransport,
+  FAILURE_INCOMPLETE,
+  PHASE_APPROVAL,
+  PHASE_CONTEXT,
+  PHASE_MODEL,
+  PHASE_TERMINALIZATION,
+  PHASE_TOOL,
+  PHASE_TRANSPORT,
+  RETRY_USER,
   type RetryInfo,
   retryModeForSafety,
-  RetryUser,
   type RunPhase,
-  SideEffectMutating,
-  SideEffectNone,
-  SideEffectReadOnly,
+  SIDE_EFFECT_MUTATING,
+  SIDE_EFFECT_NONE,
+  SIDE_EFFECT_READ_ONLY,
+  SIDE_EFFECT_UNKNOWN,
   type SideEffectState,
-  SideEffectUnknown,
 } from "./error_info.ts";
 import { wakeRecoveryCoordinators } from "./recovery_coordinator.ts";
 import {
   defaultRunRecoveryAction,
-  RecoveryKeepRemote,
+  RECOVERY_KEEP_REMOTE,
 } from "./run_recovery.ts";
 import {
   type RunEvent,
@@ -92,17 +90,17 @@ import {
 } from "./run_event.ts";
 import {
   isTerminalRunState,
+  RUN_STATE_CANCELLED,
+  RUN_STATE_CANCELLING,
+  RUN_STATE_COMPLETED,
+  RUN_STATE_FAILED,
+  RUN_STATE_INCOMPLETE,
+  RUN_STATE_RUNNING,
+  RUN_STATE_TERMINALIZING,
+  RUN_STATE_TIMED_OUT,
+  RUN_STATE_WAITING_APPROVAL,
+  RUN_STATE_WAITING_QUESTION,
   type RunState,
-  RunStateCancelled,
-  RunStateCancelling,
-  RunStateCompleted,
-  RunStateFailed,
-  RunStateIncomplete,
-  RunStateRunning,
-  RunStateTerminalizing,
-  RunStateTimedOut,
-  RunStateWaitingApproval,
-  RunStateWaitingQuestion,
 } from "./run_state.ts";
 import {
   type DurableConversationTurnEventFinisher,
@@ -117,25 +115,25 @@ import {
   type DurableTerminalPersistenceStore,
 } from "./run_store.ts";
 
-export const DefaultTerminalPersistenceTimeoutMs = 10_000;
+export const DEFAULT_TERMINAL_PERSISTENCE_TIMEOUT_MS = 10_000;
 const terminalPersistenceRetryInitialMs = 50;
 const terminalPersistenceRetryMaximumMs = 500;
 
 /** The adapter-neutral lifecycle state of a session's execution ownership. */
 export type SessionExecutionState = string;
 
-export const SessionExecutionIdle: SessionExecutionState = "idle";
-export const SessionExecutionReserved: SessionExecutionState = "reserved";
-export const SessionExecutionLocal: SessionExecutionState = "local";
-export const SessionExecutionExternal: SessionExecutionState = "external";
-export const SessionExecutionDetached: SessionExecutionState =
+export const SESSION_EXECUTION_IDLE: SessionExecutionState = "idle";
+export const SESSION_EXECUTION_RESERVED: SessionExecutionState = "reserved";
+export const SESSION_EXECUTION_LOCAL: SessionExecutionState = "local";
+export const SESSION_EXECUTION_EXTERNAL: SessionExecutionState = "external";
+export const SESSION_EXECUTION_DETACHED: SessionExecutionState =
   "detached_remote";
-export const SessionExecutionOrphaned: SessionExecutionState = "orphaned";
-export const SessionExecutionRecoveryFailed: SessionExecutionState =
+export const SESSION_EXECUTION_ORPHANED: SessionExecutionState = "orphaned";
+export const SESSION_EXECUTION_RECOVERY_FAILED: SessionExecutionState =
   "recovery_failed";
-export const SessionExecutionInconsistent: SessionExecutionState =
+export const SESSION_EXECUTION_INCONSISTENT: SessionExecutionState =
   "inconsistent";
-export const SessionExecutionUnknown: SessionExecutionState = "unknown";
+export const SESSION_EXECUTION_UNKNOWN: SessionExecutionState = "unknown";
 
 /** The canonical non-terminal Run projection carried by a snapshot. */
 export interface SessionRunSummary {
@@ -221,8 +219,8 @@ export class ExecutionRuntime {
   terminalPrepared = false;
   terminalEventRecorded = false;
   facts: ExecutionFacts = {
-    phase: PhaseModel,
-    sideEffects: SideEffectNone,
+    phase: PHASE_MODEL,
+    sideEffects: SIDE_EFFECT_NONE,
     partialOutput: false,
     lastRetry: {},
     lastRetryActive: false,
@@ -335,7 +333,7 @@ export class ExecutionRuntime {
     this.cancelFn = () => controller.abort();
     this.running = null;
     this.finished = false;
-    this.state = RunStateRunning;
+    this.state = RUN_STATE_RUNNING;
     this.durable = null;
     this.durablePersisted = false;
     this.startEvent = emptyRunEvent();
@@ -350,8 +348,8 @@ export class ExecutionRuntime {
     this.terminalPrepared = false;
     this.terminalEventRecorded = false;
     this.facts = {
-      phase: PhaseModel,
-      sideEffects: SideEffectNone,
+      phase: PHASE_MODEL,
+      sideEffects: SIDE_EFFECT_NONE,
       partialOutput: false,
       lastRetry: {},
       lastRetryActive: false,
@@ -375,7 +373,7 @@ export class ExecutionRuntime {
       this.cancel();
       const active = this.activeLocked(this.runId);
       if (active) {
-        const inner = this.finishInMemory(this.runId, RunStateFailed, false);
+        const inner = this.finishInMemory(this.runId, RUN_STATE_FAILED, false);
         this.closeDone(inner);
       } else {
         this.unregisterLocalExecution();
@@ -390,18 +388,18 @@ export class ExecutionRuntime {
   }
 
   waitForApproval(runId: string): void {
-    this.waitFor(runId, RunStateWaitingApproval);
+    this.waitFor(runId, RUN_STATE_WAITING_APPROVAL);
   }
 
   waitForQuestion(runId: string): void {
-    this.waitFor(runId, RunStateWaitingQuestion);
+    this.waitFor(runId, RUN_STATE_WAITING_QUESTION);
   }
 
   private waitFor(runId: string, state: RunState): void {
     if (!this.activeLocked(runId)) {
       throw new Error(`execution is not active: ${runId}`);
     }
-    if (this.state !== RunStateRunning) {
+    if (this.state !== RUN_STATE_RUNNING) {
       throw new Error(`execution ${runId} is not running: ${this.state}`);
     }
     const previous = this.state;
@@ -415,17 +413,17 @@ export class ExecutionRuntime {
       throw new Error(`execution is not active: ${runId}`);
     }
     if (
-      this.state !== RunStateWaitingApproval &&
-      this.state !== RunStateWaitingQuestion
+      this.state !== RUN_STATE_WAITING_APPROVAL &&
+      this.state !== RUN_STATE_WAITING_QUESTION
     ) {
       throw new Error(`execution ${runId} is not waiting: ${this.state}`);
     }
     const previous = this.state;
-    this.state = RunStateRunning;
+    this.state = RUN_STATE_RUNNING;
     this.persistNonTerminalTransition(
       runId,
       previous,
-      RunStateRunning,
+      RUN_STATE_RUNNING,
       "resumed",
       "",
     );
@@ -523,7 +521,7 @@ export class ExecutionRuntime {
     const cancel = this.cancelFn;
     const a = this.running;
     if (cancel === null || this.finished) return false;
-    this.state = RunStateCancelling;
+    this.state = RUN_STATE_CANCELLING;
     cancel();
     if (a !== null) a.abort();
     return true;
@@ -573,7 +571,7 @@ export class ExecutionRuntime {
       this.recordEvent(event);
     } catch (err) {
       try {
-        this.finishWithState(runId, RunStateFailed);
+        this.finishWithState(runId, RUN_STATE_FAILED);
       } catch {
         // best effort compensation
       }
@@ -619,7 +617,7 @@ export class ExecutionRuntime {
   /** Transitions the active run to completed. */
   finish(runId: string): void {
     try {
-      this.finishWithState(runId, RunStateCompleted);
+      this.finishWithState(runId, RUN_STATE_COMPLETED);
     } catch {
       // Go's `Finish` discards the terminal-transition error.
     }
@@ -700,7 +698,7 @@ export class ExecutionRuntime {
     if (!hasRunner) {
       if (!this.activeLocked(runId)) return;
       this.persistShutdownTerminalLocked(runId, message);
-      const done = this.finishInMemory(runId, RunStateCancelled, false);
+      const done = this.finishInMemory(runId, RUN_STATE_CANCELLED, false);
       this.closeDone(done);
       return;
     }
@@ -725,7 +723,7 @@ export class ExecutionRuntime {
       const store = this.runStore();
       if (store !== null) {
         try {
-          store.update(runId, RunStateCancelling, message);
+          store.update(runId, RUN_STATE_CANCELLING, message);
         } catch (err) {
           updateErr = new Error(
             `persist run cancellation: ${errorMessage(err)}`,
@@ -758,7 +756,7 @@ export class ExecutionRuntime {
     if (durable === null) return;
     const durableRun = durable;
     const facts = this.facts;
-    if (this.terminalEventSet && this.terminalState !== RunStateCancelled) {
+    if (this.terminalEventSet && this.terminalState !== RUN_STATE_CANCELLED) {
       throw new Error(
         `execution terminal state already selected: ${this.terminalState}`,
       );
@@ -771,7 +769,7 @@ export class ExecutionRuntime {
         runId,
         eventType: "finished",
         source: durableRun.source,
-        status: RunStateCancelled,
+        status: RUN_STATE_CANCELLED,
         model: durableRun.model,
         mode: durableRun.mode,
         timestamp: new Date(),
@@ -781,7 +779,7 @@ export class ExecutionRuntime {
       if (event.model === "") event.model = startEvent.model;
       if (event.mode === "") event.mode = startEvent.mode;
       terminalInfo = terminalErrorInfoFor(
-        RunStateCancelled,
+        RUN_STATE_CANCELLED,
         message,
         facts,
         durableRun,
@@ -796,7 +794,7 @@ export class ExecutionRuntime {
       );
       this.terminalEvent = event;
       this.terminalEventSet = true;
-      this.terminalState = RunStateCancelled;
+      this.terminalState = RUN_STATE_CANCELLED;
       this.terminalMessage = message;
       this.terminalErrorInfo = terminalInfo;
       this.facts.lastError = terminalInfo;
@@ -809,7 +807,7 @@ export class ExecutionRuntime {
       );
     } else {
       terminalInfo = terminalErrorInfoFor(
-        RunStateCancelled,
+        RUN_STATE_CANCELLED,
         message,
         facts,
         durableRun,
@@ -878,7 +876,7 @@ export class ExecutionRuntime {
       try {
         id = atomicFinisher.finishRunAndConversationTurn(
           durableRun,
-          RunStateCancelled,
+          RUN_STATE_CANCELLED,
           message,
           event,
         );
@@ -904,7 +902,7 @@ export class ExecutionRuntime {
       }
     } else {
       try {
-        store.finish(runId, RunStateCancelled, message);
+        store.finish(runId, RUN_STATE_CANCELLED, message);
       } catch (err) {
         this.finishTerminalAttempt(
           new Error(`finish shutdown durable run: ${errorMessage(err)}`),
@@ -1193,14 +1191,14 @@ export class ExecutionRuntime {
     event.sessionId = run.sessionId;
     event.runId = run.id;
     event.data = withRunAttemptData(event.data, run);
-    if (event.status === "") event.status = RunStateRunning;
+    if (event.status === "") event.status = RUN_STATE_RUNNING;
     if (atomicStart !== null) {
       let startId: string;
       try {
         startId = atomicStart(event);
       } catch (err) {
         try {
-          this.finishWithState(run.id, RunStateFailed);
+          this.finishWithState(run.id, RUN_STATE_FAILED);
         } catch {
           // best effort compensation
         }
@@ -1227,7 +1225,7 @@ export class ExecutionRuntime {
       create();
     } catch (err) {
       try {
-        this.finishWithState(run.id, RunStateFailed);
+        this.finishWithState(run.id, RUN_STATE_FAILED);
       } catch {
         // best effort compensation
       }
@@ -1249,23 +1247,23 @@ export class ExecutionRuntime {
     } catch (err) {
       const message = `record run start event: ${errorMessage(err)}`;
       try {
-        this.finishDurable(run.id, RunStateFailed, message, {
+        this.finishDurable(run.id, RUN_STATE_FAILED, message, {
           sessionId: run.sessionId,
           runId: run.id,
           eventType: "failed",
           source: run.source,
-          status: RunStateFailed,
+          status: RUN_STATE_FAILED,
           model: run.model,
           mode: run.mode,
           timestamp: new Date(),
         });
       } catch {
         try {
-          store.finish(run.id, RunStateFailed, message);
+          store.finish(run.id, RUN_STATE_FAILED, message);
         } catch {
           // ignore best-effort finish failure
         }
-        this.finishInMemory(run.id, RunStateFailed, true);
+        this.finishInMemory(run.id, RUN_STATE_FAILED, true);
       }
       throw new Error(`record run start event: ${errorMessage(err)}`);
     }
@@ -1280,12 +1278,12 @@ export class ExecutionRuntime {
     const message =
       `register local execution binding: ${registrationErr.message}`;
     try {
-      this.finishDurable(run.id, RunStateFailed, message, {
+      this.finishDurable(run.id, RUN_STATE_FAILED, message, {
         sessionId: run.sessionId,
         runId: run.id,
         eventType: "failed",
         source: run.source,
-        status: RunStateFailed,
+        status: RUN_STATE_FAILED,
         model: run.model,
         mode: run.mode,
         timestamp: new Date(),
@@ -1307,7 +1305,7 @@ export class ExecutionRuntime {
     if (this.runStore() === null) {
       throw new Error("execution run store is not configured");
     }
-    if (state === "") state = RunStateRunning;
+    if (state === "") state = RUN_STATE_RUNNING;
     if (isTerminalRunState(state)) {
       throw new Error(`cannot reattach terminal execution state: ${state}`);
     }
@@ -1333,7 +1331,7 @@ export class ExecutionRuntime {
     if (store === null) {
       throw new Error("execution run store is not configured");
     }
-    if (state === "") state = RunStateRunning;
+    if (state === "") state = RUN_STATE_RUNNING;
     if (isTerminalRunState(state)) {
       throw new Error(`cannot reattach terminal execution state: ${state}`);
     }
@@ -1343,7 +1341,7 @@ export class ExecutionRuntime {
         (store as unknown as DurableExecutionOwnershipStore)
           .prepareExistingExecution(runInput.sessionId, runInput.id);
       } catch (err) {
-        this.finishInMemory(runInput.id, RunStateFailed, true);
+        this.finishInMemory(runInput.id, RUN_STATE_FAILED, true);
         throw new Error(
           `prepare durable execution reattach: ${errorMessage(err)}`,
         );
@@ -1369,7 +1367,7 @@ export class ExecutionRuntime {
     try {
       this.registerLocalExecution(run);
     } catch (err) {
-      this.finishInMemory(run.id, RunStateFailed, true);
+      this.finishInMemory(run.id, RUN_STATE_FAILED, true);
       throw new Error(`register reattached execution: ${errorMessage(err)}`);
     }
     return signal;
@@ -1437,7 +1435,7 @@ export class ExecutionRuntime {
     const { runId, active } = this.active();
     if (!active) return false;
     try {
-      store.update(runId, RunStateCancelling, message);
+      store.update(runId, RUN_STATE_CANCELLING, message);
     } catch (err) {
       throw new Error(`persist run cancellation: ${errorMessage(err)}`);
     }
@@ -1478,7 +1476,7 @@ export class ExecutionRuntime {
           "TimeoutError",
         ),
       );
-    }, DefaultTerminalPersistenceTimeoutMs);
+    }, DEFAULT_TERMINAL_PERSISTENCE_TIMEOUT_MS);
     const onParentAbort = () => controller.abort(abortReason(ctx));
     if (ctx !== undefined) {
       if (ctx.aborted) controller.abort(abortReason(ctx));
@@ -1661,7 +1659,7 @@ export class ExecutionRuntime {
           durableRun.assistantEntryId,
         );
       }
-      if (state !== RunStateCompleted) {
+      if (state !== RUN_STATE_COMPLETED) {
         terminalInfo = terminalErrorInfoFor(
           state,
           message,
@@ -1705,7 +1703,7 @@ export class ExecutionRuntime {
         }
       }
       this.terminalPrepared = true;
-      if (this.activeLocked(runId)) this.state = RunStateTerminalizing;
+      if (this.activeLocked(runId)) this.state = RUN_STATE_TERMINALIZING;
       this.notifyDurableStateChanged();
     }
     const atomicFinisher =
@@ -1859,7 +1857,8 @@ export class ExecutionRuntime {
    */
   observeAgentEvent(ev: AgentEvent): AgentEventObservation {
     if (
-      ev.type === EventRunFinished && ev.assistantMessage?.role === "assistant"
+      ev.type === EVENT_RUN_FINISHED &&
+      ev.assistantMessage?.role === "assistant"
     ) {
       const { runId: activeId, active } = this.active();
       if (active) {
@@ -1870,37 +1869,37 @@ export class ExecutionRuntime {
         );
       }
     }
-    if (!this.facts.phase) this.facts.phase = PhaseModel;
+    if (!this.facts.phase) this.facts.phase = PHASE_MODEL;
     switch (ev.type) {
-      case EventTextDelta:
+      case EVENT_TEXT_DELTA:
         if ((ev.textDelta ?? "").trim() !== "") this.facts.partialOutput = true;
         break;
-      case EventThinkDelta:
-      case EventHostedItem:
+      case EVENT_THINK_DELTA:
+      case EVENT_HOSTED_ITEM:
         if (
           (ev.thinkDelta ?? "").trim() !== "" || ev.hostedItem !== undefined
         ) {
           this.facts.partialOutput = true;
         }
         break;
-      case EventContextPressure:
-      case EventCompactionStart:
-      case EventCompactionEnd:
-        this.facts.phase = PhaseContext;
+      case EVENT_CONTEXT_PRESSURE:
+      case EVENT_COMPACTION_START:
+      case EVENT_COMPACTION_END:
+        this.facts.phase = PHASE_CONTEXT;
         break;
-      case EventToolExecutionStart:
-        this.facts.phase = PhaseTool;
+      case EVENT_TOOL_EXECUTION_START:
+        this.facts.phase = PHASE_TOOL;
         this.facts.sideEffects = combineSideEffectState(
           this.facts.sideEffects,
           toolSideEffectState(ev.toolName ?? ""),
         );
         break;
-      case EventToolExecutionEnd:
-        this.facts.phase = PhaseTool;
+      case EVENT_TOOL_EXECUTION_END:
+        this.facts.phase = PHASE_TOOL;
         {
           let effect = toolSideEffectState(ev.toolName ?? "");
           if (ev.toolExecutionState === "interrupted") {
-            effect = SideEffectUnknown;
+            effect = SIDE_EFFECT_UNKNOWN;
           }
           this.facts.sideEffects = combineSideEffectState(
             this.facts.sideEffects,
@@ -1908,31 +1907,31 @@ export class ExecutionRuntime {
           );
         }
         break;
-      case EventToolApprovalRequest:
-        this.facts.phase = PhaseApproval;
+      case EVENT_TOOL_APPROVAL_REQUEST:
+        this.facts.phase = PHASE_APPROVAL;
         break;
-      case EventStatus:
+      case EVENT_STATUS:
         if ((ev.responseStateFailureClass ?? "") !== "") {
-          this.facts.phase = PhaseTransport;
+          this.facts.phase = PHASE_TRANSPORT;
         }
         break;
     }
     const facts = this.facts;
     const run = this.durable ?? emptyDurableRun("", "");
     switch (ev.type) {
-      case EventRetry: {
+      case EVENT_RETRY: {
         const retry = retryInfoFromAgentEvent(ev, facts.phase);
         this.facts.lastRetry = retry;
         this.facts.lastRetryActive = true;
         this.persistRetryProgress(run, facts, retry);
         return { retry };
       }
-      case EventError: {
+      case EVENT_ERROR: {
         const info = this.errorInfoForAgentFailure(ev.error, facts, run);
         const recorded = this.recordErrorInfo(info);
         return { error: recorded };
       }
-      case EventRunFinished: {
+      case EVENT_RUN_FINISHED: {
         if (taskStatusIsSuccessful(ev.status ?? "")) {
           this.clearRetryProgress(run);
           return {};
@@ -1982,22 +1981,22 @@ export class ExecutionRuntime {
       intentId: run.intentId,
     };
     switch (ev.status) {
-      case TaskCanceled:
+      case TASK_CANCELED:
         return applyErrorDefaults(
           info,
           "run_cancelled",
           "canceled",
           "canceled",
-          RetryUser,
+          RETRY_USER,
           false,
           "run.error.cancelled",
         );
-      case TaskIncomplete:
+      case TASK_INCOMPLETE:
         return applyErrorDefaults(
           info,
           "run_incomplete",
           "incomplete_error",
-          FailureIncomplete,
+          FAILURE_INCOMPLETE,
           retryModeForSafety(info),
           false,
           "run.error.incomplete",
@@ -2055,7 +2054,7 @@ export class ExecutionRuntime {
         runId: run.id,
         eventType: "run_retrying",
         source: run.source,
-        status: RunStateRunning,
+        status: RUN_STATE_RUNNING,
         model: run.model,
         mode: run.mode,
         timestamp: new Date(),
@@ -2232,7 +2231,7 @@ export function inspectSessionExecution(
   const snapshot: SessionExecutionSnapshot = {
     sessionId,
     sessionExists: false,
-    state: SessionExecutionUnknown,
+    state: SESSION_EXECUTION_UNKNOWN,
     phase: "",
     running: false,
     busy: true,
@@ -2269,18 +2268,18 @@ export function inspectSessionExecution(
     snapshot.leaseTokenIdentity = lease.tokenHash;
   }
   if (facts.activeRuns.length > 1) {
-    snapshot.state = SessionExecutionInconsistent;
+    snapshot.state = SESSION_EXECUTION_INCONSISTENT;
     snapshot.linkageState = "mismatched";
     return snapshot;
   }
   if (facts.activeRuns.length === 0) {
     if (facts.lease !== null && facts.lease.valid) {
-      snapshot.state = SessionExecutionReserved;
+      snapshot.state = SESSION_EXECUTION_RESERVED;
       snapshot.phase = leasePhase(facts.lease.purpose, false);
       snapshot.displayOwnerScope = leaseOwnerScope(sessionDir, facts.lease);
       return snapshot;
     }
-    snapshot.state = SessionExecutionIdle;
+    snapshot.state = SESSION_EXECUTION_IDLE;
     snapshot.busy = false;
     snapshot.canSubmit = true;
     snapshot.displayOwnerScope = "none";
@@ -2306,11 +2305,11 @@ export function inspectSessionExecution(
   }
   const lease = facts.lease;
   if (lease === null || !lease.valid) {
-    if (defaultRunRecoveryAction(facts) === RecoveryKeepRemote) {
+    if (defaultRunRecoveryAction(facts) === RECOVERY_KEEP_REMOTE) {
       const remoteTerminal = isRemoteResponseTerminal(
         facts.remoteRun?.state ?? "",
       );
-      snapshot.state = SessionExecutionDetached;
+      snapshot.state = SESSION_EXECUTION_DETACHED;
       snapshot.phase = "executing";
       snapshot.running = !remoteTerminal;
       const cancelRequested = facts.remoteRun?.cancelRequested ?? false;
@@ -2327,14 +2326,14 @@ export function inspectSessionExecution(
       return snapshot;
     }
     if (facts.recovery !== null && facts.recovery.state === "failed") {
-      snapshot.state = SessionExecutionRecoveryFailed;
+      snapshot.state = SESSION_EXECUTION_RECOVERY_FAILED;
       snapshot.phase = "recovering";
       snapshot.recoveryAction = "retry_recovery";
       snapshot.displayOwnerScope = "none";
       wakeRecoveryCoordinators(sessionDir);
       return snapshot;
     }
-    snapshot.state = SessionExecutionOrphaned;
+    snapshot.state = SESSION_EXECUTION_ORPHANED;
     snapshot.phase = "recovering";
     snapshot.recoveryAction = "recover_orphan";
     snapshot.displayOwnerScope = "none";
@@ -2353,39 +2352,39 @@ export function inspectSessionExecution(
   switch (lease.purpose) {
     case "recovery":
       if (lease.runId !== run.id) {
-        snapshot.state = SessionExecutionInconsistent;
+        snapshot.state = SESSION_EXECUTION_INCONSISTENT;
         return snapshot;
       }
-      snapshot.state = SessionExecutionReserved;
+      snapshot.state = SESSION_EXECUTION_RESERVED;
       snapshot.phase = "recovering";
       snapshot.recoveryAction = "retry_recovery";
       return snapshot;
     case "admission":
     case "mutation":
     case "fork":
-      snapshot.state = SessionExecutionInconsistent;
+      snapshot.state = SESSION_EXECUTION_INCONSISTENT;
       snapshot.phase = leasePhase(lease.purpose, true);
       return snapshot;
     case "execution":
       if (lease.runId !== run.id) {
-        snapshot.state = SessionExecutionInconsistent;
+        snapshot.state = SESSION_EXECUTION_INCONSISTENT;
         return snapshot;
       }
       break;
     case "run":
       if (lease.runId !== "" && lease.runId !== run.id) {
-        snapshot.state = SessionExecutionInconsistent;
+        snapshot.state = SESSION_EXECUTION_INCONSISTENT;
         return snapshot;
       }
       break;
     default:
-      snapshot.state = SessionExecutionInconsistent;
+      snapshot.state = SESSION_EXECUTION_INCONSISTENT;
       return snapshot;
   }
 
   snapshot.phase = "executing";
   if (registeredLocalExecution(facts.databaseIdentity, run, lease) !== null) {
-    snapshot.state = SessionExecutionLocal;
+    snapshot.state = SESSION_EXECUTION_LOCAL;
     snapshot.running = true;
     snapshot.canCancelLocal = true;
     snapshot.displayOwnerScope = "local";
@@ -2396,11 +2395,11 @@ export function inspectSessionExecution(
     localBinding !== null && sameLeaseIdentity(localBinding, lease) &&
     lease.purpose === "execution"
   ) {
-    snapshot.state = SessionExecutionInconsistent;
+    snapshot.state = SESSION_EXECUTION_INCONSISTENT;
     snapshot.displayOwnerScope = "local";
     return snapshot;
   }
-  snapshot.state = SessionExecutionExternal;
+  snapshot.state = SESSION_EXECUTION_EXTERNAL;
   snapshot.running = true;
   return snapshot;
 }
@@ -2499,17 +2498,17 @@ export function terminalErrorInfoFor(
     intentId: run.intentId,
   };
   switch (state) {
-    case RunStateCancelled:
+    case RUN_STATE_CANCELLED:
       return classifyError(
         new DOMException("The operation was aborted.", "AbortError"),
         opts,
       );
-    case RunStateTimedOut:
+    case RUN_STATE_TIMED_OUT:
       return classifyError(
         new DOMException("The operation timed out.", "TimeoutError"),
         opts,
       );
-    case RunStateIncomplete: {
+    case RUN_STATE_INCOMPLETE: {
       const info: ErrorInfo = {
         phase: opts.phase,
         attempt: opts.attempt,
@@ -2524,7 +2523,7 @@ export function terminalErrorInfoFor(
         info,
         "run_incomplete",
         "incomplete_error",
-        FailureIncomplete,
+        FAILURE_INCOMPLETE,
         retryModeForSafety(info),
         false,
         "run.error.incomplete",
@@ -2542,9 +2541,9 @@ export function enrichErrorInfo(
 ): ErrorInfo {
   const out: ErrorInfo = { ...info };
   if (!out.phase) out.phase = facts.phase;
-  if (!out.phase) out.phase = PhaseTerminalization;
+  if (!out.phase) out.phase = PHASE_TERMINALIZATION;
   if (!out.sideEffectState) out.sideEffectState = facts.sideEffects;
-  if (!out.sideEffectState) out.sideEffectState = SideEffectNone;
+  if (!out.sideEffectState) out.sideEffectState = SIDE_EFFECT_NONE;
   if (facts.partialOutput) out.partialOutput = true;
   if (!out.attempt) out.attempt = facts.lastRetry.attempt;
   if (!out.maxAttempts) out.maxAttempts = facts.lastRetry.maxAttempts;
@@ -2555,7 +2554,7 @@ export function enrichErrorInfo(
 }
 
 function retryInfoFromAgentEvent(ev: AgentEvent, phase: RunPhase): RetryInfo {
-  if (!phase) phase = PhaseModel;
+  if (!phase) phase = PHASE_MODEL;
   const info: RetryInfo = {
     attempt: ev.retryAttempt,
     maxAttempts: ev.retryMaxAttempts,
@@ -2589,16 +2588,16 @@ function combineSideEffectState(
   current: SideEffectState,
   next: SideEffectState,
 ): SideEffectState {
-  if (current === SideEffectMutating || next === SideEffectMutating) {
-    return SideEffectMutating;
+  if (current === SIDE_EFFECT_MUTATING || next === SIDE_EFFECT_MUTATING) {
+    return SIDE_EFFECT_MUTATING;
   }
-  if (current === SideEffectUnknown || next === SideEffectUnknown) {
-    return SideEffectUnknown;
+  if (current === SIDE_EFFECT_UNKNOWN || next === SIDE_EFFECT_UNKNOWN) {
+    return SIDE_EFFECT_UNKNOWN;
   }
-  if (current === SideEffectReadOnly || next === SideEffectReadOnly) {
-    return SideEffectReadOnly;
+  if (current === SIDE_EFFECT_READ_ONLY || next === SIDE_EFFECT_READ_ONLY) {
+    return SIDE_EFFECT_READ_ONLY;
   }
-  return SideEffectNone;
+  return SIDE_EFFECT_NONE;
 }
 
 function toolSideEffectState(name: string): SideEffectState {
@@ -2613,9 +2612,9 @@ function toolSideEffectState(name: string): SideEffectState {
     case "search_files":
     case "find":
     case "web_search":
-      return SideEffectReadOnly;
+      return SIDE_EFFECT_READ_ONLY;
     default:
-      return SideEffectUnknown;
+      return SIDE_EFFECT_UNKNOWN;
   }
 }
 

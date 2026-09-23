@@ -1,4 +1,3 @@
-// Ported from internal/session/bindings.go
 //
 // Channel/session bindings and channel-tool selections. These are short
 // administrative writes that intentionally skip the runtime lease fence.

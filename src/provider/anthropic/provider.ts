@@ -1,4 +1,3 @@
-// Ported from internal/provider/anthropic/provider.go
 //
 // Wire structs keep the Go JSON tag keys (snake_case) as TypeScript property
 // names, mirroring the existing convention that a TS field name equals its

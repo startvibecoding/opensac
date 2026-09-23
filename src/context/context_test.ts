@@ -1,5 +1,3 @@
-// Ported from internal/context/context_test.go
-
 import { assert, assertEquals, assertFalse } from "@std/assert";
 import { MockProvider, newMockProvider } from "../provider/mock.ts";
 import type { Provider } from "../provider/provider.ts";

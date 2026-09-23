@@ -1,7 +1,6 @@
-// Translated from internal/agent/terminal_contract_test.go.
 //
-// Guards the canonical terminal contract: exactly one EventRunFinished per run,
-// emitted before the legacy terminal events and followed by EventAgentEnd; the
+// Guards the canonical terminal contract: exactly one EVENT_RUN_FINISHED per run,
+// emitted before the legacy terminal events and followed by EVENT_AGENT_END; the
 // terminal status distinguishes success/failed/incomplete/canceled.
 
 import { assert, assertEquals } from "@std/assert";
@@ -26,20 +25,20 @@ import {
 } from "./agent.ts";
 import {
   type Event,
-  EventAgentEnd,
-  EventDone,
-  EventError,
-  EventRetry,
-  EventRunFinished,
-  EventStatus,
-  EventToolExecutionStart,
-  TaskCanceled,
-  TaskFailed,
-  TaskIncomplete,
+  EVENT_AGENT_END,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TOOL_EXECUTION_START,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
   type TaskStatus,
   taskStatusIsSuccessful,
   taskStatusIsTerminal,
-  TaskSuccess,
 } from "./events.ts";
 import { eventToPublic, eventTypeToPublic } from "./bridge.ts";
 import { eventRunFinished as publicEventRunFinished } from "../../sdk/agent/types.ts";
@@ -85,23 +84,25 @@ async function collectRunEvents(
 }
 
 function requireSingleRunFinished(events: Event[]): Event {
-  const finished = events.filter((e) => e.type === EventRunFinished);
-  assertEquals(finished.length, 1, "EventRunFinished count");
-  const finishedIdx = events.findIndex((e) => e.type === EventRunFinished);
+  const finished = events.filter((e) => e.type === EVENT_RUN_FINISHED);
+  assertEquals(finished.length, 1, "EVENT_RUN_FINISHED count");
+  const finishedIdx = events.findIndex((e) => e.type === EVENT_RUN_FINISHED);
   for (const ev of events.slice(finishedIdx + 1)) {
     if (
-      ev.type !== EventDone && ev.type !== EventError &&
-      ev.type !== EventAgentEnd
+      ev.type !== EVENT_DONE && ev.type !== EVENT_ERROR &&
+      ev.type !== EVENT_AGENT_END
     ) {
-      throw new Error(`non-terminal event ${ev.type} after EventRunFinished`);
+      throw new Error(`non-terminal event ${ev.type} after EVENT_RUN_FINISHED`);
     }
   }
   for (let i = 0; i < finishedIdx; i++) {
-    if (events[i].type === EventDone || events[i].type === EventError) {
-      throw new Error("legacy terminal event emitted before EventRunFinished");
+    if (events[i].type === EVENT_DONE || events[i].type === EVENT_ERROR) {
+      throw new Error(
+        "legacy terminal event emitted before EVENT_RUN_FINISHED",
+      );
     }
   }
-  assertEquals(events[events.length - 1].type, EventAgentEnd);
+  assertEquals(events[events.length - 1].type, EVENT_AGENT_END);
   return finished[0];
 }
 
@@ -114,7 +115,7 @@ Deno.test("run finished success on normal completion", async () => {
   ], 3);
   const events = await collectRunEvents(agent.run("hi"));
   const finished = requireSingleRunFinished(events);
-  assertEquals(finished.status, TaskSuccess);
+  assertEquals(finished.status, TASK_SUCCESS);
   assert(finished.error === undefined);
   assertEquals(finished.stopReason, "stop");
   assert(taskStatusIsTerminal(finished.status!));
@@ -132,7 +133,7 @@ Deno.test("run finished failed on stream error", async () => {
   ], 3);
   const events = await collectRunEvents(agent.run("hi"));
   const finished = requireSingleRunFinished(events);
-  assertEquals(finished.status, TaskFailed);
+  assertEquals(finished.status, TASK_FAILED);
   assert(finished.error !== undefined);
 });
 
@@ -156,19 +157,19 @@ Deno.test("run projects provider retry metadata", async () => {
   let status: Event | undefined;
   let retry: Event | undefined;
   events.forEach((event, i) => {
-    if (event.type === EventStatus && event.retryStatus === true) {
+    if (event.type === EVENT_STATUS && event.retryStatus === true) {
       statusIndex = i;
       status = event;
-    } else if (event.type === EventRetry) {
+    } else if (event.type === EVENT_RETRY) {
       retryIndex = i;
       retry = event;
     }
   });
   assert(
     statusIndex >= 0,
-    "provider retry must preserve the compatibility EventStatus",
+    "provider retry must preserve the compatibility EVENT_STATUS",
   );
-  assert(retryIndex >= 0, "provider retry must emit EventRetry");
+  assert(retryIndex >= 0, "provider retry must emit EVENT_RETRY");
   assert(
     statusIndex < retryIndex,
     "compatibility status must precede retry event",
@@ -196,7 +197,7 @@ Deno.test("run finished incomplete on max iterations", async () => {
   ], 1);
   const events = await collectRunEvents(agent.run("loop forever"));
   const finished = requireSingleRunFinished(events);
-  assertEquals(finished.status, TaskIncomplete);
+  assertEquals(finished.status, TASK_INCOMPLETE);
   assertEquals(finished.stopReason, "max_iterations");
 });
 
@@ -257,7 +258,7 @@ Deno.test("run finished canceled on abort", async () => {
     const next = await iterator.next();
     assert(!next.done, "event stream closed before tool execution started");
     events.push(next.value);
-    if (next.value.type === EventToolExecutionStart) started = true;
+    if (next.value.type === EVENT_TOOL_EXECUTION_START) started = true;
   }
   agent.abort();
   for (;;) {
@@ -266,14 +267,14 @@ Deno.test("run finished canceled on abort", async () => {
     events.push(next.value);
   }
   const finished = requireSingleRunFinished(events);
-  assertEquals(finished.status, TaskCanceled);
+  assertEquals(finished.status, TASK_CANCELED);
 });
 
 Deno.test("run finished bridge preserves terminal contract", () => {
-  assertEquals(eventTypeToPublic(EventRunFinished), publicEventRunFinished);
+  assertEquals(eventTypeToPublic(EVENT_RUN_FINISHED), publicEventRunFinished);
   const pub = eventToPublic({
-    type: EventRunFinished,
-    status: TaskCanceled,
+    type: EVENT_RUN_FINISHED,
+    status: TASK_CANCELED,
     stopReason: "aborted",
     done: true,
   });
@@ -285,18 +286,18 @@ Deno.test("run finished bridge preserves terminal contract", () => {
 
 Deno.test("task status helpers", () => {
   const terminal: Record<string, boolean> = {
-    [TaskSuccess]: true,
-    [TaskIncomplete]: true,
-    [TaskFailed]: true,
-    [TaskCanceled]: true,
+    [TASK_SUCCESS]: true,
+    [TASK_INCOMPLETE]: true,
+    [TASK_FAILED]: true,
+    [TASK_CANCELED]: true,
     "": false,
     running: false,
   };
   for (const [status, want] of Object.entries(terminal)) {
     assertEquals(taskStatusIsTerminal(status as TaskStatus), want);
   }
-  assert(taskStatusIsSuccessful(TaskSuccess));
-  for (const status of [TaskIncomplete, TaskFailed, TaskCanceled]) {
+  assert(taskStatusIsSuccessful(TASK_SUCCESS));
+  for (const status of [TASK_INCOMPLETE, TASK_FAILED, TASK_CANCELED]) {
     assert(!taskStatusIsSuccessful(status as TaskStatus));
   }
 });

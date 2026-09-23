@@ -1,4 +1,3 @@
-// Ported from internal/db/busy.go
 //
 // SQLite writer contention: every non-read-only transaction begins with
 // BEGIN IMMEDIATE and takes the single writer lock up front. The bounded retry

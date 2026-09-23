@@ -1,4 +1,4 @@
-// Ported from cmd/mothx/main.go run() + main_util.go runPrint(): the CLI
+// () + main_util.go runPrint(): the CLI
 // root `-p` print action. Runs one canonical durable turn through the shared
 // runtime and streams the agent events to stdout/stderr (text or NDJSON).
 // The interactive TUI action lands in the next slice; this is the command
@@ -8,21 +8,21 @@ import { createWithOptions } from "../provider/factory/factory.ts";
 import { consumeEvents } from "../agent/eventloop.ts";
 import type { Event } from "../agent/events.ts";
 import {
-  EventHostedItem,
-  EventRunFinished,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolApprovalRequest,
-  EventToolCall,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
-  EventToolResult,
-  TaskCanceled,
-  TaskFailed,
-  TaskIncomplete,
+  EVENT_HOSTED_ITEM,
+  EVENT_RUN_FINISHED,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_RESULT,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
 } from "../agent/events.ts";
 import { Builder } from "../agentruntime/session_runtime.ts";
-import { SourceCLI } from "../agentruntime/source.ts";
+import { SOURCE_CLI } from "../agentruntime/source.ts";
 import { RunStore } from "../agentruntime/run_store.ts";
 import { ExecutionRuntime } from "../agentruntime/execution.ts";
 import { SessionRunEventSink } from "../agentruntime/run_event.ts";
@@ -114,7 +114,7 @@ export async function runPrintAction(
     .build(
       undefined,
       {
-        source: SourceCLI,
+        source: SOURCE_CLI,
         workDir,
         workflows: options.workflows === true,
         browser: false,
@@ -257,23 +257,23 @@ export async function runPrintAction(
     await consumeEvents(events, {
       handleAgentEvent(event: Event): void {
         switch (event.type) {
-          case EventToolApprovalRequest:
+          case EVENT_TOOL_APPROVAL_REQUEST:
             throw new Error(
               `tool approval required in print mode for ${event.approvalTool}; rerun interactively, use --mode yolo, or whitelist the command`,
             );
-          case EventTextDelta:
+          case EVENT_TEXT_DELTA:
             if (options.json) {
               emitJSON({ type: "text_delta", text: event.textDelta });
             } else {
               textBuffer += event.textDelta ?? "";
             }
             return;
-          case EventThinkDelta:
+          case EVENT_THINK_DELTA:
             if (options.json) {
               emitJSON({ type: "think_delta", think: event.thinkDelta });
             }
             return;
-          case EventHostedItem:
+          case EVENT_HOSTED_ITEM:
             if (options.json && event.hostedItem) {
               emitJSON({
                 type: "hosted_item",
@@ -281,7 +281,7 @@ export async function runPrintAction(
               });
             }
             return;
-          case EventToolCall:
+          case EVENT_TOOL_CALL:
             drainText();
             if (options.json) {
               emitJSON({
@@ -294,14 +294,14 @@ export async function runPrintAction(
               writeError(`[tool: ${event.toolCall?.name}]`);
             }
             return;
-          case EventToolExecutionStart:
+          case EVENT_TOOL_EXECUTION_START:
             if (options.json) {
               emitJSON({ type: "tool_execution_start", name: event.toolName });
             } else {
               writeError(`[running: ${event.toolName}] `);
             }
             return;
-          case EventToolExecutionEnd:
+          case EVENT_TOOL_EXECUTION_END:
             if (options.json) {
               emitJSON({
                 type: "tool_execution_end",
@@ -314,13 +314,14 @@ export async function runPrintAction(
               );
             }
             return;
-          case EventToolResult:
+          case EVENT_TOOL_RESULT:
             return;
-          case EventRunFinished:
+          case EVENT_RUN_FINISHED:
             drainText();
-            if (event.status === TaskFailed) terminalState = "failed";
-            else if (event.status === TaskCanceled) terminalState = "cancelled";
-            else if (event.status === TaskIncomplete) {
+            if (event.status === TASK_FAILED) terminalState = "failed";
+            else if (event.status === TASK_CANCELED) {
+              terminalState = "cancelled";
+            } else if (event.status === TASK_INCOMPLETE) {
               terminalState = "incomplete";
             }
             return;

@@ -1,6 +1,4 @@
-// Translated from internal/agentruntime/artifact_test.go, attach_test.go,
 // session_runtime_bind_test.go, and the expert/model/mode cases of
-// session_runtime_config_test.go.
 //
 // Deviations: the async resource loaders are awaited; mock/`SessionRuntime`
 // construction uses the ported camelCase API; `t.TempDir()` maps to
@@ -19,27 +17,27 @@ import {
   type InputIngress,
   InputMaterializer,
 } from "./input_materializer.ts";
-import { AttachmentFile } from "./attachment.ts";
+import { ATTACHMENT_FILE } from "./attachment.ts";
 import { AttachmentService } from "./input.ts";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import type { SessionAttachment } from "./attachment.ts";
 import { ExpertSwitchRequiresForkError } from "./expert.ts";
 import {
-  ConfigOptionExpert,
-  ConfigOptionModel,
-  ConfigOptionThinkingLevel,
+  CONFIG_OPTION_EXPERT,
+  CONFIG_OPTION_MODEL,
+  CONFIG_OPTION_THINKING_LEVEL,
 } from "./session_options.ts";
 import { attachSessionResources } from "./attach.ts";
 import { buildRegistry } from "./registry.ts";
 import { ExecutionRuntime } from "./execution.ts";
-import { RunStateCancelled } from "./run_state.ts";
+import { RUN_STATE_CANCELLED } from "./run_state.ts";
 import { SessionRuntime } from "./session_runtime.ts";
 import {
-  ModeAgent,
-  ModePlan,
-  ModeYolo,
-  SourceACP,
-  SourceTUI,
+  MODE_AGENT,
+  MODE_PLAN,
+  MODE_YOLO,
+  SOURCE_ACP,
+  SOURCE_TUI,
 } from "./source.ts";
 
 function makeModel(overrides: Partial<Model> = {}): Model {
@@ -164,8 +162,8 @@ Deno.test("artifactCollectorObserverReceivesPersistedRecord", async () => {
       assertEquals(record.id, items[0].id);
       assertEquals(record.status, "generated");
       assertEquals(record.filename, "report.txt");
-      assertEquals(record.kind, AttachmentFile);
-      const stored = service.Get(manager.getHeader()!.id, record.id);
+      assertEquals(record.kind, ATTACHMENT_FILE);
+      const stored = service.get(manager.getHeader()!.id, record.id);
       assertEquals(stored.status, "generated");
     } finally {
       collector.close();
@@ -199,7 +197,7 @@ Deno.test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () =>
       Deno.writeTextFileSync(`${workDir}/second.txt`, "second");
       await collector.register("second.txt", "", "auto");
       assertEquals(collector.artifacts().length, 2);
-      const stored = service.Get(manager.getHeader()!.id, record.id);
+      const stored = service.get(manager.getHeader()!.id, record.id);
       assertEquals(stored.status, "generated");
     } finally {
       collector.close();
@@ -216,7 +214,7 @@ Deno.test("attachSessionResourcesUsesManagerIdentity", async () => {
   try {
     const registry = newRegistry(workDir, newNoneSandbox());
     const runtime = await attachSessionResources({
-      source: SourceACP,
+      source: SOURCE_ACP,
       workDir,
       manager,
       registry,
@@ -240,12 +238,12 @@ Deno.test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
   const manager = newManager(workDir, Deno.makeTempDirSync());
   manager.init();
   try {
-    const runtime = new SessionRuntime({ source: SourceTUI, workDir });
-    await runtime.bindSession(manager, SourceTUI);
+    const runtime = new SessionRuntime({ source: SOURCE_TUI, workDir });
+    await runtime.bindSession(manager, SOURCE_TUI);
     assert(runtime.manager === manager);
     assertEquals(runtime.id, manager.getHeader()!.id);
     assertEquals(runtime.workDir, manager.getHeader()!.cwd);
-    assertEquals(runtime.source, SourceTUI);
+    assertEquals(runtime.source, SOURCE_TUI);
   } finally {
     closeDatabases();
   }
@@ -257,12 +255,12 @@ Deno.test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
   const first = newManager(workDir, sessionDir);
   first.init();
   try {
-    const runtime = new SessionRuntime({ source: SourceTUI, workDir });
-    await runtime.bindSession(first, SourceTUI);
+    const runtime = new SessionRuntime({ source: SOURCE_TUI, workDir });
+    await runtime.bindSession(first, SOURCE_TUI);
     const invalid = newManager(workDir, sessionDir);
     invalid.init();
     invalid.setExpertBinding("does-not-exist");
-    await assertRejects(() => runtime.bindSession(invalid, SourceTUI));
+    await assertRejects(() => runtime.bindSession(invalid, SOURCE_TUI));
     assert(runtime.manager === first);
     assertEquals(runtime.id, first.getHeader()!.id);
   } finally {
@@ -274,9 +272,9 @@ Deno.test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
   const manager = newManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
   manager.init();
   try {
-    const runtime = new SessionRuntime({ source: SourceTUI });
+    const runtime = new SessionRuntime({ source: SOURCE_TUI });
     runtime.close();
-    await assertRejects(() => runtime.bindSession(manager, SourceTUI));
+    await assertRejects(() => runtime.bindSession(manager, SOURCE_TUI));
   } finally {
     closeDatabases();
   }
@@ -322,8 +320,8 @@ Deno.test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () =>
     const p = newMockProvider("test-provider", [model], []);
     const runtime = new SessionRuntime({
       id: manager.getHeader()!.id,
-      source: SourceACP,
-      entrySource: SourceACP,
+      source: SOURCE_ACP,
+      entrySource: SOURCE_ACP,
       workDir,
       manager,
     });
@@ -331,28 +329,28 @@ Deno.test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () =>
       p,
       "test-provider",
       model,
-      ModeYolo,
+      MODE_YOLO,
       thinkingMedium,
     );
     const expertOption = runtime.configOptions().find((o) =>
-      o.id === ConfigOptionExpert
+      o.id === CONFIG_OPTION_EXPERT
     )!;
     assert(expertOption.id !== "");
     assertEquals(expertOption.currentValue, "");
     assert(expertOption.options!.length >= 3);
     assertEquals(expertOption.options![0].value, "");
-    await runtime.setConfigOption(ConfigOptionExpert, "studio");
+    await runtime.setConfigOption(CONFIG_OPTION_EXPERT, "studio");
     assertEquals(manager.getExpertId(), "studio");
     assert(runtime.teamExpertActive());
     assertEquals(
-      optionCurrentValue(runtime.configOptions(), ConfigOptionExpert),
+      optionCurrentValue(runtime.configOptions(), CONFIG_OPTION_EXPERT),
       "studio",
     );
     await assertRejects(
-      () => runtime.setConfigOption(ConfigOptionExpert, "solo"),
+      () => runtime.setConfigOption(CONFIG_OPTION_EXPERT, "solo"),
       ExpertSwitchRequiresForkError,
     );
-    await runtime.setConfigOption(ConfigOptionExpert, "");
+    await runtime.setConfigOption(CONFIG_OPTION_EXPERT, "");
     assertEquals(manager.getExpertId(), "");
     assert(!runtime.teamExpertActive());
   } finally {
@@ -380,8 +378,8 @@ Deno.test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
     const p = newMockProvider("test-provider", [modelOne, modelTwo], []);
     const runtime = new SessionRuntime({
       id: manager.getHeader()!.id,
-      source: SourceACP,
-      entrySource: SourceACP,
+      source: SOURCE_ACP,
+      entrySource: SOURCE_ACP,
       workDir,
       manager,
     });
@@ -389,24 +387,30 @@ Deno.test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
       p,
       "test-provider",
       modelOne,
-      ModeAgent,
+      MODE_AGENT,
       thinkingMedium,
     );
     assertEquals(
-      optionCurrentValue(runtime.configOptions(), ConfigOptionModel),
+      optionCurrentValue(runtime.configOptions(), CONFIG_OPTION_MODEL),
       "test-provider/model-one",
     );
-    await runtime.setConfigOption(ConfigOptionModel, "test-provider/model-two");
-    await runtime.setConfigOption("mode", ModePlan);
     await runtime.setConfigOption(
-      ConfigOptionThinkingLevel,
+      CONFIG_OPTION_MODEL,
+      "test-provider/model-two",
+    );
+    await runtime.setConfigOption("mode", MODE_PLAN);
+    await runtime.setConfigOption(
+      CONFIG_OPTION_THINKING_LEVEL,
       thinkingHigh,
     );
     assertEquals(
-      optionCurrentValue(runtime.configOptions(), ConfigOptionModel),
+      optionCurrentValue(runtime.configOptions(), CONFIG_OPTION_MODEL),
       "test-provider/model-two",
     );
-    assertEquals(optionCurrentValue(runtime.configOptions(), "mode"), ModePlan);
+    assertEquals(
+      optionCurrentValue(runtime.configOptions(), "mode"),
+      MODE_PLAN,
+    );
   } finally {
     closeDatabases();
   }
@@ -492,7 +496,7 @@ Deno.test("sessionRuntimeShutdownReleasesResourcesAfterTerminalPersistenceFailur
   execution.setAgent({
     abort() {
       setTimeout(() => {
-        execution.finishInMemory("run-shutdown", RunStateCancelled, true);
+        execution.finishInMemory("run-shutdown", RUN_STATE_CANCELLED, true);
       }, 0);
     },
   });

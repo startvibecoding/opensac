@@ -1,5 +1,3 @@
-// Ported from internal/dao/delivery.go
-
 import type { DB } from "../db/mod.ts";
 import { execChanges, inList, queryAll, queryOne } from "./database.ts";
 

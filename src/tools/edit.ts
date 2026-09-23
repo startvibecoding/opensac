@@ -1,5 +1,3 @@
-// Ported from internal/tools/edit.go.
-
 import {
   buildFileDiff,
   formatFileDiffSummary,

@@ -1,5 +1,3 @@
-// Ported from internal/config/allow_test.go
-
 import { assert } from "@std/assert";
 import * as path from "@std/path";
 import {

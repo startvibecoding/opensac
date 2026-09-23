@@ -1,4 +1,3 @@
-// Ported from internal/session/runtime_lease_status.go
 //
 // Read-only preflight over the leases a session directory currently records as
 // active, used by destructive maintenance to refuse while another process may

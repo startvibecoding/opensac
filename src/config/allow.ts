@@ -1,6 +1,5 @@
-// Ported from internal/config/allow.go
-
 import * as path from "@std/path";
+import { optBoolean, optStringArray, parseJsonRecord } from "../util/json.ts";
 import { configDir } from "./settings.ts";
 import { projectPath } from "./paths.ts";
 
@@ -57,21 +56,16 @@ export function loadAllow(): AllowConfig {
   // Project: overrides autoEdit and is the sole source of editPaths.
   try {
     const data = Deno.readTextFileSync(projectAllowPath());
-    let p: AllowConfig | undefined;
-    try {
-      p = JSON.parse(data) as AllowConfig;
-    } catch {
-      p = undefined;
-    }
+    const p = parseJsonRecord(data);
     if (p) {
       const v = readAllowAutoEdit(data);
       if (v !== undefined) {
         c.autoEdit = v;
         c.projectAutoEditSet = true;
       }
-      c.editPaths = p.editPaths;
-      c.bashCommands = p.bashCommands;
-      c.bashPrefixes = p.bashPrefixes;
+      c.editPaths = optStringArray(p, "editPaths");
+      c.bashCommands = optStringArray(p, "bashCommands");
+      c.bashPrefixes = optStringArray(p, "bashPrefixes");
     }
   } catch {
     // missing project file
@@ -243,10 +237,7 @@ export function saveGlobalAutoEditValue(v: boolean): void {
 function writeGlobalAllowAutoEdit(v: boolean): void {
   let existing: Record<string, unknown> = {};
   try {
-    existing = JSON.parse(Deno.readTextFileSync(globalAllowPath())) as Record<
-      string,
-      unknown
-    >;
+    existing = parseJsonRecord(Deno.readTextFileSync(globalAllowPath())) ?? {};
   } catch {
     existing = {};
   }
@@ -258,16 +249,9 @@ function writeGlobalAllowAutoEdit(v: boolean): void {
 }
 
 function readAllowAutoEdit(data: string): boolean | undefined {
-  let raw: Record<string, unknown>;
-  try {
-    raw = JSON.parse(data) as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
-  if (!("autoEdit" in raw)) return undefined;
-  const v = raw["autoEdit"];
-  if (typeof v !== "boolean") return undefined;
-  return v;
+  const raw = parseJsonRecord(data);
+  if (raw === undefined || !("autoEdit" in raw)) return undefined;
+  return optBoolean(raw, "autoEdit");
 }
 
 function writeProjectAllowFile(

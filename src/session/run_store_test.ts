@@ -1,4 +1,3 @@
-// Ported from internal/session/run_store_test.go
 //
 // Deviation: the Go fixture creates a session through the (not yet ported)
 // Manager and acquires a runtime lease with `TryLockRuntime`. Foreign-key

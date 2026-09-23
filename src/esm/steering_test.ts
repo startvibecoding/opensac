@@ -1,5 +1,3 @@
-// Translated from internal/esm/steering_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { SteeringSource } from "./steering.ts";
 import { cleanup, makeStore } from "./test_helpers.ts";

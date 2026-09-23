@@ -1,5 +1,3 @@
-// Ported from internal/dao/attachments.go
-
 import type { DB } from "../db/mod.ts";
 import { ErrNoRows, execChanges, queryAll, queryOne } from "./database.ts";
 

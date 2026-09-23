@@ -4,7 +4,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { Builder, SessionRuntime } from "./session_runtime.ts";
-import { SourceTUI } from "./source.ts";
+import { SOURCE_TUI } from "./source.ts";
 import { createSession } from "./session_lifecycle.ts";
 import { createWithOptions } from "../provider/factory/factory.ts";
 import {
@@ -25,7 +25,7 @@ Deno.test("buildAgent hydrates the agent with prior session messages", async () 
     settings,
     sandboxLevelFromSettings(settings),
   ).build(undefined, {
-    source: SourceTUI,
+    source: SOURCE_TUI,
     workDir,
     workflows: false,
     browser: false,
@@ -79,7 +79,7 @@ Deno.test("buildAgent without hydrateHistory leaves history empty", async () => 
     settings,
     sandboxLevelFromSettings(settings),
   ).build(undefined, {
-    source: SourceTUI,
+    source: SOURCE_TUI,
     workDir,
     workflows: false,
     browser: false,

@@ -1,4 +1,4 @@
-// Ported from internal/sandbox/policy_test.go (bwrap-specific cases omitted).
+// (bwrap-specific cases omitted).
 
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import * as path from "@std/path";

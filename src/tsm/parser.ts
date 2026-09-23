@@ -1,5 +1,3 @@
-// Ported from GoStreamingMarkdown/parser/parser.go
-
 import { computeIDs, newNode, Node, NodeType } from "./node.ts";
 
 // ── Preprocessor (LaTeX) ────────────────────────────────────────────────────

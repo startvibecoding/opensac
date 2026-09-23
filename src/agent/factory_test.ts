@@ -1,4 +1,3 @@
-// Translated from internal/agent/subagent_test.go and manager_test.go
 // (AgentFactory runtime-config inheritance, provider-name propagation, and the
 // compile-time AgentAdapter interface assertion).
 

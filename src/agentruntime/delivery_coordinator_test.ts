@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/delivery_coordinator_test.go.
 //
 // Deviations: the Go fixture creates a session through the Manager; this port
 // creates the canonical completed Run directly (the session Manager lands with
@@ -17,7 +16,7 @@ import {
 } from "../session/delivery_store.ts";
 import { createSessionRun, type SessionRun } from "../session/run_store.ts";
 import {
-  DefaultDeliveryRetryWindowMs,
+  DEFAULT_DELIVERY_RETRY_WINDOW_MS,
   DeliveryCoordinator,
   deliveryFailureRetryable,
   emptyDeliveryResult,
@@ -316,7 +315,7 @@ Deno.test("DeliveryCoordinatorRetriesTransientFailuresWithinTheWindow", async ()
 
     // Past the window the operation is abandoned as before.
     await coordinator.reconcileDue(
-      new Date(now.getTime() + DefaultDeliveryRetryWindowMs + 60_000),
+      new Date(now.getTime() + DEFAULT_DELIVERY_RETRY_WINDOW_MS + 60_000),
       fail,
     );
     op = getDeliveryOperation(sessionDir, "window-op")!;
@@ -353,14 +352,14 @@ Deno.test("DeliveryCoordinatorReopenedOperationGetsAFreshWindow", async () => {
       error: new Error("provider unavailable"),
     });
     await coordinator.reconcileDue(
-      new Date(now.getTime() + DefaultDeliveryRetryWindowMs + 60_000),
+      new Date(now.getTime() + DEFAULT_DELIVERY_RETRY_WINDOW_MS + 60_000),
       fail,
     );
     let op = getDeliveryOperation(sessionDir, "reopen-op")!;
     assertEquals(op.status, "failed");
 
     const reopenedAt = new Date(
-      now.getTime() + DefaultDeliveryRetryWindowMs + 2 * 60_000,
+      now.getTime() + DEFAULT_DELIVERY_RETRY_WINDOW_MS + 2 * 60_000,
     );
     assert(reopenFailedDeliveryOperation(sessionDir, "reopen-op", reopenedAt));
     assert(deliveryFailureRetryable("delivery_retries_exhausted"));

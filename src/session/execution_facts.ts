@@ -1,4 +1,3 @@
-// Ported from internal/session/execution_facts.go
 //
 // Deviation: `context.Context` is dropped (the DAO layer is synchronous) and
 // `time.Time` maps to `Date`.

@@ -1,5 +1,3 @@
-// Ported from internal/update/update_test.go
-
 import { assertEquals, assertNotEquals } from "@std/assert";
 import {
   cachePath,

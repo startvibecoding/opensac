@@ -1,4 +1,4 @@
-// Ported from internal/tui/formatters.go (pure helpers) — display-width
+// (pure helpers) — display-width
 // truncation, bash-output compaction, and duration formatting. The
 // i18n-coupled formatters (formatToolArgsWithTranslator etc.) migrate with
 // the Ink tool-result components.

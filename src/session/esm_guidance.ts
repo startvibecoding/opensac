@@ -1,4 +1,3 @@
-// Ported from internal/session/esm_guidance.go
 //
 // Runtime-owned ESM guidance rows. Execution-path writes run the fenced
 // runtime-lease check inside their transaction so a stale process cannot append

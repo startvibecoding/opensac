@@ -1,5 +1,3 @@
-// Translated from internal/mcp/mcp_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { RPCError } from "./rpc.ts";
 import {

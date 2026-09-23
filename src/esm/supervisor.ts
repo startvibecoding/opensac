@@ -1,4 +1,3 @@
-// Ported from internal/esm/supervisor.go
 //
 // The canonical TUI ESM role-result application semantics. Both the TUI and
 // ACP adapters apply results through these functions so completion,

@@ -1,4 +1,4 @@
-// Ported from internal/dao/knowledge_fts_test.go (package dao internal test).
+// (package dao internal test).
 
 import { assert, assertEquals } from "@std/assert";
 import {

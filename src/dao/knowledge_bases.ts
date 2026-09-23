@@ -1,5 +1,3 @@
-// Ported from internal/dao/knowledge_bases.go
-
 import type { DB } from "../db/mod.ts";
 import {
   execChanges,

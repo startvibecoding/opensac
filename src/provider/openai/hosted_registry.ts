@@ -1,5 +1,3 @@
-// Ported from internal/provider/openai/hosted_registry.go
-
 /**
  * Deliberately scoped to the OpenAI Responses codec. Other providers can expose
  * the same provider-neutral observations without inheriting OpenAI request or

@@ -1,5 +1,3 @@
-// Ported from internal/tools/killtool.go.
-
 import type { BashTool } from "./bash.ts";
 import {
   newTextToolResult,

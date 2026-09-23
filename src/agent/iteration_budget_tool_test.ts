@@ -1,13 +1,13 @@
-// Translated from internal/agent/iteration_budget_test.go (the pure
+// (the pure
 // ExtendBudgetTool + tool-context cases; the loop-driven cases move with the
 // core loop).
 
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { ToolContext } from "../tools/tool.ts";
 import {
+  ITERATION_BUDGET_TOOL_NAME,
   iterationBudgetFromToolContext,
   type IterationBudgetPolicy,
-  IterationBudgetToolName,
   newIterationBudget,
   toolContextWithIterationBudget,
 } from "./iteration_budget.ts";
@@ -29,7 +29,7 @@ function policy(
 
 Deno.test("extend_budget tool metadata and rejection without a budget", () => {
   const tool = newExtendBudgetTool();
-  assertEquals(tool.name(), IterationBudgetToolName);
+  assertEquals(tool.name(), ITERATION_BUDGET_TOOL_NAME);
   const ctx: ToolContext = {};
   assertThrows(
     () => tool.execute(ctx, { reason: "x" }),

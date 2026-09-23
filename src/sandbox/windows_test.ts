@@ -1,4 +1,4 @@
-// Ported from internal/sandbox/windows.go (the Go package ships no Windows test,
+// (the Go package ships no Windows test,
 // so these cover the ported behaviour directly).
 
 import { assert, assertEquals } from "@std/assert";

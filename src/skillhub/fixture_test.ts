@@ -1,5 +1,3 @@
-// Translated from internal/skillhub/fixture_test.go
-
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { newClawHubClient } from "./clawhub.ts";
 import { clientsForSettings } from "./factory.ts";

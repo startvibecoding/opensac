@@ -1,5 +1,3 @@
-// Ported from internal/dao/runtime_submission.go
-
 import type { DB } from "../db/mod.ts";
 import { ErrNoRows, execChanges, queryOne } from "./database.ts";
 

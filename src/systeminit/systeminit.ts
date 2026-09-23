@@ -1,4 +1,3 @@
-// Ported from internal/systeminit/systeminit.go
 //
 // Package systeminit builds the prompt used by the /systeminit command to
 // generate (or refresh) a project-level AGENTS.md guide for AI agents.

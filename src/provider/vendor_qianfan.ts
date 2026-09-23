@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_qianfan.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_qianfan.go init() adapters. */

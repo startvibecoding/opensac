@@ -1,4 +1,3 @@
-// Ported from internal/agent/manager.go.
 //
 // AgentManager owns the lifecycle of every agent instance: registration,
 // creation (with parent validation and sub-agent policy enforcement), status
@@ -28,8 +27,8 @@ import {
   validateSubAgentPolicy,
 } from "./subagent_support.ts";
 import {
-  MemberItemQuestion,
-  MemberStatusQuestion,
+  MEMBER_ITEM_QUESTION,
+  MEMBER_STATUS_QUESTION,
   newMemberCompletion,
 } from "./mailbox.ts";
 
@@ -122,10 +121,10 @@ export class AgentManager {
     options: string[],
   ): void {
     const completion = newMemberCompletion();
-    completion.kind = MemberItemQuestion;
+    completion.kind = MEMBER_ITEM_QUESTION;
     completion.memberId = memberID;
     completion.displayName = displayName;
-    completion.status = MemberStatusQuestion;
+    completion.status = MEMBER_STATUS_QUESTION;
     completion.payload = question;
     completion.questionId = questionID;
     completion.options = [...options];
@@ -512,8 +511,8 @@ export class AgentManager {
     const parentID = this.parentOf.get(id);
     if (parentID !== undefined) st.parentId = parentID;
     const previous = st.state;
-    // Terminal state is sticky. Canonical EventRunFinished is followed by
-    // legacy EventDone/EventError for compatibility; those events must never
+    // Terminal state is sticky. Canonical EVENT_RUN_FINISHED is followed by
+    // legacy EVENT_DONE/EVENT_ERROR for compatibility; those events must never
     // overwrite incomplete, canceled, error, or success with another outcome.
     if (isTerminalManagedState(previous) && previous !== state) {
       return;

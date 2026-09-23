@@ -1,4 +1,4 @@
-// Ported from the public Go package `agent` (agent/types.go).
+// (agent/types.go).
 //
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`. Implementation wiring (the internal builder and provider bridge)

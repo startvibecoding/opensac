@@ -1,5 +1,3 @@
-// Ported from internal/provider/retry.go
-
 import { isContentRejectionError } from "./content_rejection.ts";
 import { errMessage } from "./context_overflow.ts";
 import { isAbortLike, isTimeoutLike } from "../util/errors.ts";

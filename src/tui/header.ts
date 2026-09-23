@@ -1,10 +1,11 @@
-// Ported from internal/tui/header.go: the two-panel startup header — the
+// the two-panel startup header — the
 // ASCII logo and a rounded-border info panel (version, provider | model,
 // cwd, rename notice). The Go original renders through lipgloss styles; this
 // projection renders the same layout with ANSI 256-color codes so the output
 // stays a plain string for Ink <Text> and for tests.
 
 import { displayWidth, truncateDisplay } from "./formatters.ts";
+import { ACCENT as accent, BOLD as bold, RESET as reset } from "./theme.ts";
 
 export const opensacLogo = ` ██  ███  ████ █  █  ███  ██   ███
 █  █ █  █ █    ██ █ █    █  █ █
@@ -13,10 +14,6 @@ export const opensacLogo = ` ██  ███  ████ █  █  ███
  ██  █    ████ █  █ ███  █  █  ███`;
 
 const renameNotice = "Spring Autumn Cicada";
-
-const accent = "\u001B[38;5;86m";
-const bold = "\u001B[1m";
-const reset = "\u001B[0m";
 
 /** Width in display cells of the widest logo line. */
 export function logoWidth(): number {

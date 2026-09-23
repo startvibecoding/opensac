@@ -1,5 +1,3 @@
-// Ported from internal/systeminit/systeminit_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import { COMMAND, prompt } from "./systeminit.ts";
 

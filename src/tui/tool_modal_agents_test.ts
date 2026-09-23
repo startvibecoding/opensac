@@ -8,11 +8,11 @@ import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
 import { defaultSettings } from "../config/settings.ts";
 import {
-  EventStatus,
-  EventTextDelta,
-  EventThinkDelta,
-  EventToolExecutionEnd,
-  EventToolExecutionStart,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
 } from "../agent/events.ts";
 
 function makeSession(controller: AppController): TUISession {
@@ -49,17 +49,17 @@ Deno.test("tool modal lists sub-agent targets with detailed progress", () => {
       AppController["handleAgentEvent"]
     >[0];
   controller.handleAgentEvent(
-    bg({ type: EventStatus, statusMessage: "started scan" }),
+    bg({ type: EVENT_STATUS, statusMessage: "started scan" }),
   );
   controller.handleAgentEvent(
-    bg({ type: EventThinkDelta, thinkDelta: "thinking hard" }),
+    bg({ type: EVENT_THINK_DELTA, thinkDelta: "thinking hard" }),
   );
   controller.handleAgentEvent(
-    bg({ type: EventTextDelta, textDelta: "partial answer" }),
+    bg({ type: EVENT_TEXT_DELTA, textDelta: "partial answer" }),
   );
   controller.handleAgentEvent(
     bg({
-      type: EventToolExecutionStart,
+      type: EVENT_TOOL_EXECUTION_START,
       toolCallId: "tc-1",
       toolName: "bash",
       toolArgs: { command: "ls -la" },
@@ -107,7 +107,7 @@ Deno.test(
       extra as unknown as Parameters<AppController["handleAgentEvent"]>[0];
     controller.handleAgentEvent(
       ev({
-        type: EventToolExecutionStart,
+        type: EVENT_TOOL_EXECUTION_START,
         toolCallId: "tc-9",
         toolName: "bash",
         toolArgs: { command: "npm test" },
@@ -115,7 +115,7 @@ Deno.test(
     );
     controller.handleAgentEvent(
       ev({
-        type: EventToolExecutionEnd,
+        type: EVENT_TOOL_EXECUTION_END,
         toolCallId: "tc-9",
         toolName: "bash",
         toolArgs: { command: "npm test" },

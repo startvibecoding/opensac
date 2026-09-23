@@ -44,3 +44,9 @@ export {
   takeMigrationRecoveries,
 } from "./recovery.ts";
 export { SQLITE_EXPVAR_KEY, sqliteStatsSnapshot } from "./stats.ts";
+export {
+  queryStats,
+  recordQueryTiming,
+  resetQueryStats,
+  slowQueryThresholdMs,
+} from "./query_stats.ts";

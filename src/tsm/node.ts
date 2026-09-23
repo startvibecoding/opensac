@@ -1,4 +1,3 @@
-// Ported from GoStreamingMarkdown/parser/node.go
 //
 // Zero-dependency CommonMark-compatible Markdown AST. The pipeline mirrors the
 // Go/Swift original: Preprocess (LaTeX) → Parse → Rewrite (speculative

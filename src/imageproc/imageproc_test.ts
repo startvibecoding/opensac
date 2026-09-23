@@ -1,4 +1,3 @@
-// Ported from internal/imageproc/imageproc_test.go
 //
 // Test images are generated with the same npm codec used by the implementation;
 // the assertions mirror the Go tests (geometry/limits/MIME, not exact bytes).

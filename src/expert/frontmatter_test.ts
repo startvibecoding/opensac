@@ -1,5 +1,3 @@
-// Ported from internal/expert/frontmatter_test.go
-
 import { assertEquals, assertThrows } from "@std/assert";
 import { type Frontmatter, newFrontmatter } from "./expert.ts";
 import { parseFrontmatter } from "./frontmatter.ts";

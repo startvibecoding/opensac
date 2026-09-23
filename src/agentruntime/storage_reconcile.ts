@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/storage_reconcile.go.
 //
 // Reclaims Runtime-private artifact directories that no durable attachment row
 // references any more and that are already past retention plus a grace window.
@@ -22,7 +21,7 @@ import type { AttachmentService } from "./input.ts";
  * artifact directory may be reclaimed, so the sweep cannot race an intake that
  * has created its directory but not yet committed the durable row.
  */
-export const ReconcileGraceMs = 24 * 60 * 60 * 1000;
+export const RECONCILE_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The Runtime-private subtree `acceptArtifact` writes into. It is spelled once
@@ -98,7 +97,7 @@ export function artifactReclaimFloor(
 ): Date {
   if (policy.retention <= 0) return new Date(now.getTime());
   return new Date(
-    now.getTime() - (policy.retention + ReconcileGraceMs),
+    now.getTime() - (policy.retention + RECONCILE_GRACE_MS),
   );
 }
 

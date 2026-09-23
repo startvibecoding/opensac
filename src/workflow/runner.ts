@@ -1,4 +1,3 @@
-// Ported from internal/workflow/runner.go and the runtime-bound helpers of
 // internal/workflow/js.go (resolveJSValue, lookupResult, resultsText, logs).
 //
 // `context.Context` maps to `AbortSignal`; Go goroutines/channels map to

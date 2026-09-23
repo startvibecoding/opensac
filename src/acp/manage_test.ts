@@ -1,4 +1,3 @@
-// Translated from internal/acp/manage_env_test.go, manage_experts_test.go, and
 // the application-settings cases of acp_manage_test.go. These exercise the
 // `opensac/manage/*` families ported into src/acp/manage.ts against an
 // in-memory ACP server fixture, mirroring the Go `newManageFixtureServer`.
@@ -1051,7 +1050,6 @@ async function withEnvAsync(
 }
 
 // ─── skills / mcp / stats / memory / deliveries ───────────────────────────────
-// Translated from the skills/mcp/stats/memory cases of acp_manage_test.go and
 // from manage_delivery_test.go.
 
 function writeManageSkill(

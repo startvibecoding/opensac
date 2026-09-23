@@ -1,22 +1,20 @@
-// Ported from internal/agent/mailbox.go.
-
 import {
   type Message,
   newSystemInjectedUserMessage,
 } from "../provider/types.ts";
 
 // Member completion statuses carried by MemberCompletion.status.
-export const MemberStatusDone = "done";
-export const MemberStatusError = "error";
-export const MemberStatusCanceled = "canceled";
-export const MemberStatusIncomplete = "incomplete";
+export const MEMBER_STATUS_DONE = "done";
+export const MEMBER_STATUS_ERROR = "error";
+export const MEMBER_STATUS_CANCELED = "canceled";
+export const MEMBER_STATUS_INCOMPLETE = "incomplete";
 
 // Member notification kinds.
-export const MemberItemCompletion = "completion";
-export const MemberItemQuestion = "question";
+export const MEMBER_ITEM_COMPLETION = "completion";
+export const MEMBER_ITEM_QUESTION = "question";
 
-/** The status projected for MemberItemQuestion entries in summaries. */
-export const MemberStatusQuestion = "question";
+/** The status projected for MEMBER_ITEM_QUESTION entries in summaries. */
+export const MEMBER_STATUS_QUESTION = "question";
 
 const memberPayloadRunes = 3500;
 const memberErrorPayloadRunes = 3000;
@@ -155,7 +153,7 @@ export function newMemberMailbox(): MemberMailbox {
 }
 
 function formatMemberItem(c: MemberCompletion): string {
-  if (c.kind === MemberItemQuestion) return formatMemberQuestion(c);
+  if (c.kind === MEMBER_ITEM_QUESTION) return formatMemberQuestion(c);
   return formatMemberCompletion(c);
 }
 
@@ -193,7 +191,7 @@ function formatMemberCompletion(c: MemberCompletion): string {
   }
   b += `status: ${c.status}\n`;
   b += "payload:\n";
-  if (c.status === MemberStatusError) {
+  if (c.status === MEMBER_STATUS_ERROR) {
     b += truncateMemberPayload(c.payload, memberErrorPayloadRunes);
     b += "\n";
     b += `下一步：如仍需该成员，用 subagent_spawn(member:${

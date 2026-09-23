@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/error_info.go.
 //
 // `ErrorInfo` is the durable, adapter-neutral description of an execution
 // failure. It is written on the Run row and projected on terminal events, so
@@ -31,16 +30,16 @@ export type FailureClass =
   | "persistence"
   | "internal";
 
-export const FailureValidation: FailureClass = "validation";
-export const FailurePolicy: FailureClass = "policy";
-export const FailureTransient: FailureClass = "transient";
-export const FailureProvider: FailureClass = "provider";
-export const FailureTool: FailureClass = "tool";
-export const FailureTransport: FailureClass = "transport";
-export const FailureCancelled: FailureClass = "canceled";
-export const FailureIncomplete: FailureClass = "incomplete";
-export const FailurePersistence: FailureClass = "persistence";
-export const FailureInternal: FailureClass = "internal";
+export const FAILURE_VALIDATION: FailureClass = "validation";
+export const FAILURE_POLICY: FailureClass = "policy";
+export const FAILURE_TRANSIENT: FailureClass = "transient";
+export const FAILURE_PROVIDER: FailureClass = "provider";
+export const FAILURE_TOOL: FailureClass = "tool";
+export const FAILURE_TRANSPORT: FailureClass = "transport";
+export const FAILURE_CANCELLED: FailureClass = "canceled";
+export const FAILURE_INCOMPLETE: FailureClass = "incomplete";
+export const FAILURE_PERSISTENCE: FailureClass = "persistence";
+export const FAILURE_INTERNAL: FailureClass = "internal";
 
 /** Indicates where a failure or retry occurred. */
 export type RunPhase =
@@ -53,14 +52,14 @@ export type RunPhase =
   | "transport"
   | "terminalization";
 
-export const PhaseAdmission: RunPhase = "admission";
-export const PhaseModel: RunPhase = "model";
-export const PhaseContext: RunPhase = "context";
-export const PhaseTool: RunPhase = "tool";
-export const PhaseApproval: RunPhase = "approval";
-export const PhasePersistence: RunPhase = "persistence";
-export const PhaseTransport: RunPhase = "transport";
-export const PhaseTerminalization: RunPhase = "terminalization";
+export const PHASE_ADMISSION: RunPhase = "admission";
+export const PHASE_MODEL: RunPhase = "model";
+export const PHASE_CONTEXT: RunPhase = "context";
+export const PHASE_TOOL: RunPhase = "tool";
+export const PHASE_APPROVAL: RunPhase = "approval";
+export const PHASE_PERSISTENCE: RunPhase = "persistence";
+export const PHASE_TRANSPORT: RunPhase = "transport";
+export const PHASE_TERMINALIZATION: RunPhase = "terminalization";
 
 /**
  * States who may make progress after a failure. Automatic retry is owned by
@@ -74,11 +73,11 @@ export type RetryMode =
   | "user"
   | "decision_required";
 
-export const RetryNone: RetryMode = "none";
-export const RetryAutomatic: RetryMode = "automatic";
-export const RetryReconcile: RetryMode = "reconcile";
-export const RetryUser: RetryMode = "user";
-export const RetryDecisionRequired: RetryMode = "decision_required";
+export const RETRY_NONE: RetryMode = "none";
+export const RETRY_AUTOMATIC: RetryMode = "automatic";
+export const RETRY_RECONCILE: RetryMode = "reconcile";
+export const RETRY_USER: RetryMode = "user";
+export const RETRY_DECISION_REQUIRED: RetryMode = "decision_required";
 
 /**
  * Deliberately conservative. A runtime must not replay an execution with
@@ -86,10 +85,10 @@ export const RetryDecisionRequired: RetryMode = "decision_required";
  */
 export type SideEffectState = "none" | "read_only" | "mutating" | "unknown";
 
-export const SideEffectNone: SideEffectState = "none";
-export const SideEffectReadOnly: SideEffectState = "read_only";
-export const SideEffectMutating: SideEffectState = "mutating";
-export const SideEffectUnknown: SideEffectState = "unknown";
+export const SIDE_EFFECT_NONE: SideEffectState = "none";
+export const SIDE_EFFECT_READ_ONLY: SideEffectState = "read_only";
+export const SIDE_EFFECT_MUTATING: SideEffectState = "mutating";
+export const SIDE_EFFECT_UNKNOWN: SideEffectState = "unknown";
 
 /**
  * The durable, adapter-neutral description of an execution failure. `message`
@@ -181,16 +180,16 @@ export function classifyError(
     intentId: opts.intentId,
     requestId: opts.requestId,
   };
-  if (!info.sideEffectState) info.sideEffectState = SideEffectNone;
-  if (!info.phase) info.phase = PhaseModel;
+  if (!info.sideEffectState) info.sideEffectState = SIDE_EFFECT_NONE;
+  if (!info.phase) info.phase = PHASE_MODEL;
 
   if (isAbortError(err)) {
     return applyErrorDefaults(
       info,
       "run_cancelled",
       "canceled",
-      FailureCancelled,
-      RetryUser,
+      FAILURE_CANCELLED,
+      RETRY_USER,
       false,
       "run.error.cancelled",
     );
@@ -200,19 +199,19 @@ export function classifyError(
       info,
       "run_timed_out",
       "timeout_error",
-      FailureCancelled,
+      FAILURE_CANCELLED,
       retryModeForSafety(info),
       false,
       "run.error.timedOut",
     );
   }
   if (isContextOverflowError(err)) {
-    info.phase = PhaseContext;
+    info.phase = PHASE_CONTEXT;
     return applyErrorDefaults(
       info,
       "context_overflow",
       "context_error",
-      FailureProvider,
+      FAILURE_PROVIDER,
       retryModeForSafety(info),
       false,
       "run.error.contextOverflow",
@@ -226,8 +225,8 @@ export function classifyError(
       info,
       "content_rejected",
       "content_error",
-      FailurePolicy,
-      RetryUser,
+      FAILURE_POLICY,
+      RETRY_USER,
       false,
       "run.error.contentRejected",
     );
@@ -238,7 +237,7 @@ export function classifyError(
       info,
       code,
       "provider_error",
-      FailureTransient,
+      FAILURE_TRANSIENT,
       retryModeForSafety(info),
       true,
       key,
@@ -249,10 +248,10 @@ export function classifyError(
   if (!info.type) info.type = "server_error";
   if (!info.messageKey) info.messageKey = "run.error.failed";
   if (!info.retryMode) info.retryMode = retryModeForSafety(info);
-  if (info.retryMode === RetryAutomatic) info.retryMode = RetryUser;
-  info.retryable = info.retryMode === RetryUser ||
-    info.retryMode === RetryDecisionRequired;
-  if (!info.failureClass) info.failureClass = FailureInternal;
+  if (info.retryMode === RETRY_AUTOMATIC) info.retryMode = RETRY_USER;
+  info.retryable = info.retryMode === RETRY_USER ||
+    info.retryMode === RETRY_DECISION_REQUIRED;
+  if (!info.failureClass) info.failureClass = FAILURE_INTERNAL;
   return info;
 }
 
@@ -270,20 +269,21 @@ export function applyErrorDefaults(
   info.failureClass = cls;
   if (!info.messageKey) info.messageKey = key;
   info.retryMode = mode;
-  info.retryable = retryable || mode === RetryAutomatic || mode === RetryUser ||
-    mode === RetryDecisionRequired;
+  info.retryable = retryable || mode === RETRY_AUTOMATIC ||
+    mode === RETRY_USER ||
+    mode === RETRY_DECISION_REQUIRED;
   return info;
 }
 
 export function retryModeForSafety(info: ErrorInfo): RetryMode {
   if (
     info.partialOutput === true ||
-    info.sideEffectState === SideEffectMutating ||
-    info.sideEffectState === SideEffectUnknown
+    info.sideEffectState === SIDE_EFFECT_MUTATING ||
+    info.sideEffectState === SIDE_EFFECT_UNKNOWN
   ) {
-    return RetryDecisionRequired;
+    return RETRY_DECISION_REQUIRED;
   }
-  return RetryAutomatic;
+  return RETRY_AUTOMATIC;
 }
 
 function retryableErrorCode(

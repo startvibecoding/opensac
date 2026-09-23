@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_kimi.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_kimi.go init() adapters. */

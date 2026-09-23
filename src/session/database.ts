@@ -1,4 +1,3 @@
-// Ported from internal/session/database.go
 //
 // The DAO-owned root database entry points plus the database recovery/index
 // repair projections a front-end drains exactly once.

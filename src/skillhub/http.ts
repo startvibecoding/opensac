@@ -1,4 +1,3 @@
-// Ported from internal/skillhub/http.go
 //
 // The Go port injects an *http.Client / http.RoundTripper for tests; here the
 // equivalent seam is a plain fetch-like function so callers and tests can

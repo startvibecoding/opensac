@@ -1,4 +1,3 @@
-// Ported from internal/workflow/tools.go.
 //
 // `json.RawMessage` parameter schemas map to plain JSON objects; the Go error
 // returns map to `throw`. `workflow_run` executes worker agents through the

@@ -10,15 +10,15 @@ import {
   resolveManagerPolicy,
   resolveManagerSource,
 } from "./session_source.ts";
-import { SourceConflictError, SourceTUI, SourceWeChat } from "./source.ts";
+import { SOURCE_TUI, SOURCE_WE_CHAT, SourceConflictError } from "./source.ts";
 
 Deno.test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = newManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
-    const resolved = resolveManagerSource(manager, { requested: SourceTUI });
-    assertEquals(resolved.source, SourceWeChat);
+    const resolved = resolveManagerSource(manager, { requested: SOURCE_TUI });
+    assertEquals(resolved.source, SOURCE_WE_CHAT);
     assertEquals(resolved.conflicted, false);
   } finally {
     closeDatabases();
@@ -26,8 +26,8 @@ Deno.test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
 });
 
 Deno.test("resolveManagerSourceFallsBackToRequestWithoutManager", () => {
-  const resolved = resolveManagerSource(undefined, { requested: SourceTUI });
-  assertEquals(resolved.source, SourceTUI);
+  const resolved = resolveManagerSource(undefined, { requested: SOURCE_TUI });
+  assertEquals(resolved.source, SOURCE_TUI);
   assertEquals(resolved.conflicted, false);
 });
 
@@ -37,7 +37,7 @@ Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
     const manager = newManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     assertThrows(
-      () => resolveManagerSource(manager, { current: SourceTUI }),
+      () => resolveManagerSource(manager, { current: SOURCE_TUI }),
       SourceConflictError,
     );
   } finally {
@@ -52,12 +52,12 @@ Deno.test("resolveManagerPolicyAppliesForcedChannelMode", () => {
     manager.initWithBinding("wechat", "source-user");
     const result = resolveManagerPolicy(
       manager,
-      { requested: SourceTUI },
+      { requested: SOURCE_TUI },
       "plan",
       "plan",
       "agent",
     );
-    assertEquals(result.resolution.source, SourceWeChat);
+    assertEquals(result.resolution.source, SOURCE_WE_CHAT);
     assertEquals(result.mode, "yolo");
   } finally {
     closeDatabases();

@@ -1,4 +1,3 @@
-// Ported from internal/tools/jobmanager.go.
 //
 // Manages background processes started through `bash async=true`. Go's
 // `*exec.Cmd`/`context.CancelFunc` map to a process id plus a kill callback

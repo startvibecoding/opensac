@@ -1,4 +1,3 @@
-// Ported from internal/session/decision_events.go
 //
 // The durable decision ledger records every approval/question transition as a
 // run event. A canonical name is decisionEventPrefix + the decision status

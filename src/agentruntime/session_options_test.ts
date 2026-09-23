@@ -11,11 +11,11 @@ import {
   thinkingOff,
 } from "../provider/types.ts";
 import type { Provider } from "../provider/provider.ts";
-import { ModeYolo } from "./source.ts";
+import { MODE_YOLO } from "./source.ts";
 import {
-  ConfigOptionMode,
-  ConfigOptionProvider,
-  ConfigOptionThinkingLevel,
+  CONFIG_OPTION_MODE,
+  CONFIG_OPTION_PROVIDER,
+  CONFIG_OPTION_THINKING_LEVEL,
   providerDisplayName,
   sessionConfigOptionsWithProviders,
   validateThinkingLevel,
@@ -44,11 +44,11 @@ Deno.test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
     providers,
     [model("z", "Zed"), model("a", "Alpha"), model("a", "Alpha")],
     model("a", "Alpha", true),
-    ModeYolo,
+    MODE_YOLO,
     thinkingHigh,
   );
 
-  const provider = options.find((o) => o.id === ConfigOptionProvider)!;
+  const provider = options.find((o) => o.id === CONFIG_OPTION_PROVIDER)!;
   assertEquals(provider.options!.map((c) => c.value), ["openai", "test-api"]);
   assertEquals(provider.options!.map((c) => c.name), ["OpenAI", "Test API"]);
 
@@ -58,11 +58,11 @@ Deno.test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
     "test/z",
   ]);
 
-  const mode = options.find((o) => o.id === ConfigOptionMode)!;
-  assertEquals(mode.currentValue, ModeYolo);
+  const mode = options.find((o) => o.id === CONFIG_OPTION_MODE)!;
+  assertEquals(mode.currentValue, MODE_YOLO);
 
   // Thinking level appears only for a reasoning model.
-  const thinking = options.find((o) => o.id === ConfigOptionThinkingLevel)!;
+  const thinking = options.find((o) => o.id === CONFIG_OPTION_THINKING_LEVEL)!;
   assertEquals(thinking.currentValue, thinkingHigh);
   assertEquals(thinking.options!.map((c) => c.value), [
     thinkingOff,
@@ -81,10 +81,13 @@ Deno.test("SessionConfigOptionsOmitsThinkingForNonReasoningModel", () => {
     {},
     [model("a", "Alpha")],
     model("a", "Alpha"),
-    ModeYolo,
+    MODE_YOLO,
     thinkingHigh,
   );
-  assertEquals(options.some((o) => o.id === ConfigOptionThinkingLevel), false);
+  assertEquals(
+    options.some((o) => o.id === CONFIG_OPTION_THINKING_LEVEL),
+    false,
+  );
 });
 
 Deno.test("ValidateThinkingLevelAcceptsKnownAndRejectsUnknown", () => {

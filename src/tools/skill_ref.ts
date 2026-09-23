@@ -1,5 +1,3 @@
-// Ported from internal/tools/skill_ref.go.
-
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
   newTextToolResult,

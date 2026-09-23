@@ -1,5 +1,3 @@
-// Ported from internal/agent/compaction.go.
-
 import type { CompactionSettings as ConfigCompactionSettings } from "../config/settings.ts";
 import type { CompactionSettings } from "../context/compaction.ts";
 

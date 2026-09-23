@@ -1,4 +1,4 @@
-// Ported from internal/tui/renderutil/ansi_wrap.go: ANSI-aware text wrapping.
+// ANSI-aware text wrapping.
 // WrapPlainText hard-wraps model text to display-cell widths; WrapANSI wraps
 // styled text preserving escape sequences. Tabs normalize to three spaces.
 

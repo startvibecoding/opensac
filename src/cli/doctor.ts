@@ -1,12 +1,12 @@
-// Ported from cmd/mothx/main_doctor.go: the `doctor` subcommand and its
+// the `doctor` subcommand and its
 // human/JSON projections.
 
 import {
   run as runDoctor,
-  StatusError,
-  StatusOK,
-  StatusSkip,
-  StatusWarn,
+  STATUS_ERROR,
+  STATUS_OK,
+  STATUS_SKIP,
+  STATUS_WARN,
 } from "../doctor/doctor.ts";
 
 export interface DoctorCommandOptions {
@@ -42,13 +42,13 @@ export function executeDoctorCommand(
 
 function doctorIcon(status: string): string {
   switch (status) {
-    case StatusOK:
+    case STATUS_OK:
       return "[ok]";
-    case StatusWarn:
+    case STATUS_WARN:
       return "[warn]";
-    case StatusError:
+    case STATUS_ERROR:
       return "[error]";
-    case StatusSkip:
+    case STATUS_SKIP:
       return "[skip]";
     default:
       return "[skip]";

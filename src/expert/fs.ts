@@ -1,4 +1,3 @@
-// Ported from the fs.FS-facing parts of internal/expert.
 //
 // Go loads builtin bundles from an embed.FS and tests from testing/fstest.MapFS.
 // Deno has no io/fs, so a minimal read-only filesystem interface stands in for

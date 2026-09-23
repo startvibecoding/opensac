@@ -1,4 +1,3 @@
-// Ported from internal/skillhub/types.go
 //
 // Package skillhub provides marketplace clients and safe local installation
 // for skills.
@@ -7,9 +6,9 @@
 export type Market = "skillhub.cn" | "clawhub.ai";
 
 /** The built-in SkillHub.cn market id. */
-export const MarketSkillHub: Market = "skillhub.cn";
+export const MARKET_SKILL_HUB: Market = "skillhub.cn";
 /** The built-in ClawHub.ai market id. */
-export const MarketClawHub: Market = "clawhub.ai";
+export const MARKET_CLAW_HUB: Market = "clawhub.ai";
 
 export interface MarketCapabilities {
   search: boolean;

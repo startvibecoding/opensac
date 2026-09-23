@@ -1,4 +1,3 @@
-// Ported from internal/context/deepseek_tokenizer.go
 //
 // DeepSeek V3's tokenizer is a byte-level BPE tokenizer. The vocabulary and
 // merge ranks are loaded from the vendored tokenizer JSON so token estimates

@@ -1,4 +1,3 @@
-// Ported from internal/workflow/runner_test.go and the remaining cases of
 // internal/workflow/semantics_test.go (results/log ordering).
 
 import {

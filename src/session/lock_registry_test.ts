@@ -1,5 +1,3 @@
-// Ported from internal/session/lock_registry_test.go
-
 import { assert } from "@std/assert";
 import { newLockRegistry } from "./lock_registry.ts";
 

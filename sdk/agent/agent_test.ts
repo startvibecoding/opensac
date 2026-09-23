@@ -1,4 +1,4 @@
-// Translated from the public Go package `agent` tests (agent/image_coordinates_test.go)
+// (agent/image_coordinates_test.go)
 // plus focused coverage for the pure helpers added by agent/types.go,
 // agent/provider.go, and agent/builder.go.
 

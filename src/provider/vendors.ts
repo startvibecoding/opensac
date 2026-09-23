@@ -1,4 +1,4 @@
-// Ported from internal/provider/vendor_*.go init() ordering.
+// () ordering.
 //
 // Go registers every vendor adapter from package-level init() functions, which
 // run in filename byte order. This module reproduces that order explicitly so

@@ -1,4 +1,4 @@
-// Ported from internal/acp/manage_knowledge_bases.go (the knowledge-base
+// (the knowledge-base
 // family of the `opensac/manage/*` Phase 3 management plane) together with the
 // knowledge-base schedule projection from manage.go (`syncKnowledgeBaseSchedule`
 // and the in-process cron runtime it lazily starts).
@@ -42,7 +42,7 @@ import {
   knowledgeBaseIDFromCronJobID,
   runKnowledgeBaseCronJob,
 } from "../agentruntime/knowledge_cron.ts";
-import { SourceACP as SourceACPValue } from "../agentruntime/source.ts";
+import { SOURCE_ACP as SourceACPValue } from "../agentruntime/source.ts";
 import { normalizeJobSchedule, parseSchedule } from "../cron/schedule.ts";
 import type { CronJob, CronStore } from "../cron/cron.ts";
 import { newSQLiteCronStore } from "../cron/sqlite_store.ts";

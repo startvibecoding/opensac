@@ -1,5 +1,3 @@
-// Ported from internal/provider/attachments.go
-
 import type { Attachment } from "./types.ts";
 
 /**

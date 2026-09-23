@@ -1,5 +1,3 @@
-// Ported from internal/provider/vendor_deepseek.go
-
 import { registerVendorAdapter, SimpleVendorAdapter } from "./vendor.ts";
 
 /** Registers the Go vendor_deepseek.go init() adapters. */

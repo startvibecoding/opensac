@@ -1,5 +1,3 @@
-// Ported from internal/provider/discover_test.go
-
 import { assert, assertEquals } from "@std/assert";
 import {
   modelsEndpoint,

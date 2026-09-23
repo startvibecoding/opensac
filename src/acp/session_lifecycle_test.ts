@@ -17,9 +17,12 @@ import {
 import { type ACPRPCRequest, encodeSessionCursor } from "./mod.ts";
 import type { Settings } from "../config/settings.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
-import { DecisionQuestion, DecisionService } from "../agentruntime/decision.ts";
+import {
+  DECISION_QUESTION,
+  DecisionService,
+} from "../agentruntime/decision.ts";
 import type { ExecutionRuntime } from "../agentruntime/execution.ts";
-import { PhasePersistence } from "../agentruntime/error_info.ts";
+import { PHASE_PERSISTENCE } from "../agentruntime/error_info.ts";
 import { listAllDetailed, openByIDExact } from "../session/manager.ts";
 
 class SyncBuffer implements AcpServerSink {
@@ -386,7 +389,7 @@ Deno.test("decision ledger persists, replays, and terminalizes on close", () => 
     id,
     "run-1",
     "q1",
-    DecisionQuestion,
+    DECISION_QUESTION,
     "pending",
     "",
     {
@@ -416,7 +419,7 @@ Deno.test("decision ledger persists, replays, and terminalizes on close", () => 
 
 Deno.test("acpFailureRPCError projects mismatch and generic envelopes", () => {
   const mismatch = new SessionProviderMismatchError("p1", "m1", "p2");
-  const mismatchError = acpFailureRPCError(mismatch, null, PhasePersistence);
+  const mismatchError = acpFailureRPCError(mismatch, null, PHASE_PERSISTENCE);
   assertEquals(mismatchError.code, -32002);
   const data = mismatchError.data as Record<string, unknown>;
   assertEquals(data.sessionProvider, "p1");
@@ -425,7 +428,7 @@ Deno.test("acpFailureRPCError projects mismatch and generic envelopes", () => {
   const generic = acpFailureRPCError(
     new Error("boom"),
     null,
-    PhasePersistence,
+    PHASE_PERSISTENCE,
   );
   assertEquals(generic.code, -32000);
   assert(generic.message.trim() !== "");

@@ -1,4 +1,4 @@
-// Translated from internal/agent/manager_test.go (AgentManager lifecycle and
+// (AgentManager lifecycle and
 // AgentFactory wiring cases). The concurrency case is omitted: Deno is
 // single-threaded, so the manager's map updates are already atomic.
 //

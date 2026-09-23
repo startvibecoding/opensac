@@ -1,4 +1,4 @@
-// Ported from internal/agentruntime/knowledge_indexer.go (the deterministic
+// (the deterministic
 // Indexer helpers: the bounded prompt, the strict response parser, and the
 // evidence-verified co-mention edge projection).
 //

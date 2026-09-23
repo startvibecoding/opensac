@@ -1,4 +1,4 @@
-// Ported from internal/agent/agent.go (stateless support helpers).
+// (stateless support helpers).
 //
 // The `Agent` struct and its methods stay with the not-yet-ported core loop in
 // `agent.ts`. This module ports the pure helpers the loop is built on:

@@ -1,4 +1,3 @@
-// Ported from internal/agentruntime/decision_replay.go.
 //
 // Reconstructs the latest pending decision set from durable request/resolution
 // records. It is intentionally protocol-neutral; adapters remain responsible

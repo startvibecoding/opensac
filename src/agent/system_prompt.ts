@@ -1,5 +1,3 @@
-// Ported from internal/agent/system_prompt.go.
-
 import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import {
   arch,

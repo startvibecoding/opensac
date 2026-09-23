@@ -1,4 +1,3 @@
-// Translated from internal/agentruntime/tool_fence_test.go.
 //
 // The Go test drives a real session database, admits an execution lease, begins
 // a durable Run, and asserts the fence follows fenced ownership: a fresh lease
@@ -15,8 +14,8 @@ import { closeDatabases, openRootDB } from "../session/root_db.ts";
 import {
   type DurableRun,
   ExecutionRuntime,
-  RunStateFailed,
-  RunStateRunning,
+  RUN_STATE_FAILED,
+  RUN_STATE_RUNNING,
   RunStore,
 } from "./mod.ts";
 import { beforeToolExecuteForRuntime } from "./tool_fence.ts";
@@ -87,7 +86,7 @@ Deno.test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
         makeRun({
           id: "fence-run",
           sessionId: "fence-session",
-          status: RunStateRunning,
+          status: RUN_STATE_RUNNING,
           startedAt: now,
         }),
         {
@@ -144,7 +143,7 @@ Deno.test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
       try {
         execution.finishDurable(
           "fence-run",
-          RunStateFailed,
+          RUN_STATE_FAILED,
           "lease displaced",
           {
             sessionId: "fence-session",

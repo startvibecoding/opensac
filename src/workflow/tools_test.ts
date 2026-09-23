@@ -1,4 +1,3 @@
-// Ported from internal/workflow/tools_test.go.
 //
 // The `RegisterTools`/`workflow_run` end-to-end and `AgentHost` cases depend on
 // the not-yet-ported Agent Core (`internal/agent`) and are deferred to backlog

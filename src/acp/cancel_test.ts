@@ -1,4 +1,3 @@
-// Translated from the cancellation cases of internal/acp/acp_mcp_test.go plus
 // focused admission coverage for the ACP prompt-admission fence
 // (`acquirePromptAdmission`). Fixtures construct an `AcpServer`, bind an
 // in-memory sink, and call the handlers directly.

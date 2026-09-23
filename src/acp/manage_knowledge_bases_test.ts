@@ -1,4 +1,3 @@
-// Translated from the knowledge-base/cron cases of
 // internal/acp/acp_manage_test.go (TestManageKnowledgeBaseMCPApplyQuickAddsCanonicalServer,
 // TestManageKnowledgeBasesCreateScanQueryAndDelete,
 // TestKnowledgeBaseScheduleUsesSharedCronAndDurableIndexRun,
@@ -26,7 +25,7 @@ import {
   updateKnowledgeBase,
 } from "../session/knowledge_bases.ts";
 import { newSQLiteCronStore } from "../cron/sqlite_store.ts";
-import { KnowledgeBaseCronJobPrefix } from "../agentruntime/knowledge_cron.ts";
+import { KNOWLEDGE_BASE_CRON_JOB_PREFIX } from "../agentruntime/knowledge_cron.ts";
 import {
   defaultSettings,
   getSessionDir,
@@ -203,7 +202,7 @@ Deno.test("knowledge base schedule syncs create, update and delete on cron store
 
   const store = newSQLiteCronStore(sessionDir);
   syncKnowledgeBaseScheduleWithStore(store, base);
-  const jobID = KnowledgeBaseCronJobPrefix + base.id;
+  const jobID = KNOWLEDGE_BASE_CRON_JOB_PREFIX + base.id;
   const job = store.get(jobID);
   assertEquals(job.name, "Knowledge base: Product notes");
   assertEquals(job.schedule, "@daily");

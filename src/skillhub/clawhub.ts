@@ -1,5 +1,3 @@
-// Ported from internal/skillhub/clawhub.go
-
 import {
   boundedLimit,
   download as downloadStream,

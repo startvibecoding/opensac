@@ -1,5 +1,3 @@
-// Ported from internal/util/truncate.go
-
 /** Returns a valid UTF-8 prefix of `s` whose byte length is at most `maxBytes`. */
 export function truncateString(s: string, maxBytes: number): string {
   if (maxBytes <= 0) return "";

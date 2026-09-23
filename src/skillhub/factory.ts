@@ -1,5 +1,3 @@
-// Ported from internal/skillhub/factory.go
-
 import type { SkillHubSettings } from "../config/settings.ts";
 import { newClawHubClient } from "./clawhub.ts";
 import { defaultHttpClient, type HttpClient } from "./http.ts";
