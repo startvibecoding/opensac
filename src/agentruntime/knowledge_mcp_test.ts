@@ -13,8 +13,8 @@ import { serveStdio } from "../mcp/server.ts";
 import { createKnowledgeBase } from "../session/mod.ts";
 import { KnowledgeMCPHandler, knowledgeMCPToolName } from "./knowledge_mcp.ts";
 import {
+  createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
-  newKnowledgeBaseService,
 } from "./knowledgebase.ts";
 
 function tempDir(): string {
@@ -48,7 +48,7 @@ async function prepareIndexedBase(): Promise<{
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );

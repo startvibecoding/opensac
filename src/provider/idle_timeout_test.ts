@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import {
+  createIdleTimeoutStream,
   isStreamTimeoutError,
-  newIdleTimeoutStream,
   StreamTimeoutError,
 } from "./mod.ts";
 
@@ -31,7 +31,7 @@ function chunkStream(
 }
 
 Deno.test("IdleTimeoutAllowsContinuousData", async () => {
-  const stream = newIdleTimeoutStream(chunkStream(["a", "b", "c"]), 50);
+  const stream = createIdleTimeoutStream(chunkStream(["a", "b", "c"]), 50);
   assert(stream !== null);
   const reader = stream!.getReader();
   const decoder = new TextDecoder();
@@ -57,7 +57,7 @@ Deno.test("IdleTimeoutAllowsContinuousData", async () => {
 });
 
 Deno.test("IdleTimeoutFiresOnStall", async () => {
-  const stream = newIdleTimeoutStream(chunkStream(["a"]), 50);
+  const stream = createIdleTimeoutStream(chunkStream(["a"]), 50);
   assert(stream !== null);
   const reader = stream!.getReader();
 

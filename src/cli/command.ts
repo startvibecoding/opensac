@@ -1,4 +1,4 @@
-// (`newRootCommand`, `newACPCommand`,
+// (`createRootCommand`, `createACPCommand`,
 // `registerRootFlags`, `registerACPFlags`, and the root action dispatch).
 //
 // The Cliffy command tree is thin: it maps flags into `CLIOptions` and calls
@@ -164,7 +164,7 @@ function sharedExecutionFlags(
 }
 
 /** Builds the `acp` subcommand. */
-export function newACPCommand(version: string): Command {
+export function createACPCommand(version: string): Command {
   const flags = defaultCLIOptions();
   const cmd = sharedProviderFlags(new Command(), flags);
   sharedExecutionFlags(
@@ -209,7 +209,7 @@ export function newACPCommand(version: string): Command {
 
 /** Builds the `doctor` subcommand. */
 // deno-lint-ignore no-explicit-any
-function newDoctorCommand(version: string): any {
+function createDoctorCommand(version: string): any {
   return new Command()
     .description("Check environment, configuration, and provider status")
     .noExit()
@@ -224,7 +224,7 @@ function newDoctorCommand(version: string): any {
 
 /** Builds the `knowledge-mcp` parent with its `serve` subcommand. */
 // deno-lint-ignore no-explicit-any
-function newKnowledgeMCPCommand(): any {
+function createKnowledgeMCPCommand(): any {
   const knowledgeBases: string[] = [];
   let sessionDir = "";
   const serve = new Command()
@@ -263,7 +263,7 @@ function newKnowledgeMCPCommand(): any {
 
 /** Builds the `stats` subcommand. */
 // deno-lint-ignore no-explicit-any
-function newStatsCommand(): any {
+function createStatsCommand(): any {
   const opts: StatsCommandOptions = defaultStatsOptions();
   return new Command()
     .description("Show usage statistics")
@@ -299,7 +299,7 @@ function newStatsCommand(): any {
 
 /** Builds the `speedtest` subcommand. */
 // deno-lint-ignore no-explicit-any
-function newSpeedtestCommand(): any {
+function createSpeedtestCommand(): any {
   const flags = {
     provider: "",
     model: "",
@@ -387,7 +387,7 @@ function parseSpeedtestDurationMs(value: string): number {
 }
 
 /** Builds the complete root command tree. */
-export function newRootCommand(version = currentVersion()): Command {
+export function createRootCommand(version = currentVersion()): Command {
   const flags = defaultCLIOptions();
   const root = new Command()
     .name("opensac")
@@ -474,11 +474,11 @@ export function newRootCommand(version = currentVersion()): Command {
   // deno-lint-ignore no-explicit-any
   const anyRoot = root as any;
   anyRoot
-    .command("acp", newACPCommand(version))
-    .command("doctor", newDoctorCommand(version))
-    .command("knowledge-mcp", newKnowledgeMCPCommand())
-    .command("stats", newStatsCommand())
-    .command("speedtest", newSpeedtestCommand());
+    .command("acp", createACPCommand(version))
+    .command("doctor", createDoctorCommand(version))
+    .command("knowledge-mcp", createKnowledgeMCPCommand())
+    .command("stats", createStatsCommand())
+    .command("speedtest", createSpeedtestCommand());
 
   return root;
 }

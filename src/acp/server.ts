@@ -27,9 +27,9 @@ import { isAbortError, isTimeoutError } from "../util/errors.ts";
 import { isAbsolute, normalize } from "@std/path";
 import {
   calculateCost,
+  createUserMessage,
   type Message,
   type Model,
-  newUserMessage,
   streamError,
   streamTextDelta,
   type ThinkingLevel,
@@ -37,7 +37,7 @@ import {
   type Usage,
 } from "../provider/types.ts";
 import type { Provider } from "../provider/provider.ts";
-import { createWithOptions, resolveModel } from "../provider/factory/mod.ts";
+import { create, resolveModel } from "../provider/factory/mod.ts";
 import {
   getSessionDir,
   isWebSearchEnabled,
@@ -51,7 +51,7 @@ import {
   prompt as systeminitPrompt,
 } from "../systeminit/systeminit.ts";
 import { ESMSteeringSource, ESMStore } from "../esm/mod.ts";
-import { AgentAdapter, newAgentAdapter } from "../agent/bridge.ts";
+import { AgentAdapter, createAgentAdapter } from "../agent/bridge.ts";
 import type { Agent } from "../agent/agent.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import type { Manager as SandboxManager } from "../sandbox/sandbox.ts";
@@ -67,7 +67,7 @@ import {
   buildRegistry,
   defaultPlanToolPolicy,
 } from "../agentruntime/registry.ts";
-import { newAgentManager } from "../agentruntime/agent_manager.ts";
+import { createAgentManager } from "../agentruntime/agent_manager.ts";
 import { attachSessionResources } from "../agentruntime/attach.ts";
 import {
   createSession,
@@ -1979,8 +1979,8 @@ export class AcpServer {
     if (!first && terminalStatus === "") return;
     let parentID = "";
     if (this.agentMgr !== null) {
-      const [parent, ok] = this.agentMgr.parent(ev.agentId!);
-      if (ok && parent !== undefined) parentID = String(parent);
+      const parent = this.agentMgr.parent(ev.agentId!);
+      if (parent !== undefined) parentID = String(parent);
     }
     if (first) {
       this.emitSubagentEvent(sessionId, agentId, parentID, "started", meta);
@@ -3603,11 +3603,11 @@ export class AcpServer {
   }
 
   /**
-   * Builds the ACP tool registry (Go's `newToolRegistry`). It is the only
+   * Builds the ACP tool registry (Go's `NewToolRegistry`). It is the only
    * registry construction path for ACP sessions; a failure returns null so the
    * session-establishing handler can clean up and report the structured error.
    */
-  newToolRegistry(cwd: string, _mgr: SessionManager): ToolsRegistry | null {
+  createToolRegistry(cwd: string, _mgr: SessionManager): ToolsRegistry | null {
     if (cwd === "") cwd = this.cwd;
     try {
       return buildRegistry(cwd, this.sbMgr, this.settings, {
@@ -3661,7 +3661,7 @@ export class AcpServer {
     if (this.settings === null) {
       throw new Error("ACP settings are required");
     }
-    const manager = newAgentManager({
+    const manager = createAgentManager({
       runtime,
       provider: snapshot.provider,
       providerName: snapshot.providerName,
@@ -3792,7 +3792,7 @@ export class AcpServer {
   }
 
   /** Creates the canonical durable run lifecycle for one ACP session. */
-  newSessionExecution(): ExecutionRuntime {
+  createSessionExecution(): ExecutionRuntime {
     const execution = new ExecutionRuntime();
     if (this.settings !== null) {
       const sessionDir = getSessionDir(this.settings);
@@ -3817,7 +3817,7 @@ export class AcpServer {
     }
     const sessionDir = getSessionDir(this.settings);
     const mgr = openSessionForWorkDir(cwd, sessionDir, sessionId);
-    const registry = this.newToolRegistry(cwd, mgr);
+    const registry = this.createToolRegistry(cwd, mgr);
     if (registry === null) {
       throw new Error("build ACP registry failed");
     }
@@ -3859,7 +3859,7 @@ export class AcpServer {
       runtime.close();
       throw error;
     }
-    const execution = this.newSessionExecution();
+    const execution = this.createSessionExecution();
     runtime.setExecution(execution);
     const decisions = new DecisionService();
     const rt = new ACPSessionRuntime();
@@ -3987,7 +3987,7 @@ export class AcpServer {
       );
       return;
     }
-    const registry = this.newToolRegistry(cwd, mgr);
+    const registry = this.createToolRegistry(cwd, mgr);
     if (registry === null) {
       await safeDeleteSession(sessionDir, id);
       this.writeResponse(
@@ -4041,7 +4041,7 @@ export class AcpServer {
       );
       return;
     }
-    const execution = this.newSessionExecution();
+    const execution = this.createSessionExecution();
     runtime.setExecution(execution);
     const old = this.sessions.get(id) ?? null;
     if (old !== null) old.closeResources();
@@ -4964,7 +4964,7 @@ export class AcpServer {
     try {
       let execution = rt.execution;
       if (execution === null) {
-        execution = this.newSessionExecution();
+        execution = this.createSessionExecution();
         rt.execution = execution;
       }
       const startedAt = new Date();
@@ -5305,8 +5305,8 @@ export class AcpServer {
       execution.setAgent(a);
       let agentMgr = rt.agentMgr;
       if (agentMgr === null) agentMgr = this.agentMgr;
-      if (agentMgr !== null) agentMgr.register(newAgentAdapter(a));
-      rt.agent = newAgentAdapter(a);
+      if (agentMgr !== null) agentMgr.register(createAgentAdapter(a));
+      rt.agent = createAgentAdapter(a);
       // The runtime lock is held for the full lifetime of the admitted Run so
       // another adapter cannot race its terminal persistence with a new Run.
       admissionTransferred = true;
@@ -6146,7 +6146,7 @@ export class AcpServer {
     const outText: string[] = [];
     try {
       const events = p.chat({
-        messages: [newUserMessage(sampling.prompt)],
+        messages: [createUserMessage(sampling.prompt)],
         systemPrompt: sampling.systemPrompt,
         thinkingLevel: snapshot.thinkingLevel,
         maxTokens,
@@ -6269,7 +6269,7 @@ function createACPProvider(
   providerName: string,
   modelId: string,
 ): { provider: Provider; model: Model } {
-  return createWithOptions(settings, providerName, modelId, {
+  return create(settings, providerName, modelId, {
     builtinAnthropicCacheControl: true,
     requireModel: true,
   });

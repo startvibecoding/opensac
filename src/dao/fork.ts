@@ -4,7 +4,7 @@ import {
   execReturning,
   inList,
   queryAll,
-  queryOne,
+  queryOptional,
 } from "./database.ts";
 
 export interface ForkRequestRecord {
@@ -70,8 +70,8 @@ export class ForkDAO {
     executor: DB,
     hash: string,
     source: string,
-  ): ForkRequestRecord {
-    return queryOne<ForkRequestRecord>(
+  ): ForkRequestRecord | undefined {
+    return queryOptional<ForkRequestRecord>(
       executor,
       `SELECT ${requestColumns} FROM session_fork_requests
        WHERE request_key_hash = ? AND source_session_id = ? LIMIT 1`,
@@ -79,8 +79,8 @@ export class ForkDAO {
     );
   }
 
-  findSession(executor: DB, id: string): ForkSessionRecord {
-    return queryOne<ForkSessionRecord>(
+  findSession(executor: DB, id: string): ForkSessionRecord | undefined {
+    return queryOptional<ForkSessionRecord>(
       executor,
       `SELECT ${sessionColumns} FROM sessions WHERE id = ? LIMIT 1`,
       [id],
@@ -93,21 +93,21 @@ export class ForkDAO {
     statuses: string[],
   ): number {
     const { sql, params } = inList(statuses);
-    return queryOne<{ n: number }>(
+    return queryOptional<{ n: number }>(
       executor,
       `SELECT COUNT(*) AS n FROM session_runs
        WHERE session_id = ? AND status IN (${sql})`,
       [sessionId, ...params],
-    ).n;
+    )?.n ?? 0;
   }
 
   openTurnCount(executor: DB, sessionId: string): number {
-    return queryOne<{ n: number }>(
+    return queryOptional<{ n: number }>(
       executor,
       `SELECT COUNT(*) AS n FROM conversation_turns
        WHERE session_id = ? AND status = ?`,
       [sessionId, "open"],
-    ).n;
+    )?.n ?? 0;
   }
 
   listEntries(executor: DB, sessionId: string): ForkEntryRecord[] {
@@ -122,8 +122,8 @@ export class ForkDAO {
     executor: DB,
     sessionId: string,
     seq: number,
-  ): ForkEntryRecord {
-    return queryOne<ForkEntryRecord>(
+  ): ForkEntryRecord | undefined {
+    return queryOptional<ForkEntryRecord>(
       executor,
       `SELECT ${entryColumns} FROM entries
        WHERE session_id = ? AND seq = ? LIMIT 1`,
@@ -136,30 +136,30 @@ export class ForkDAO {
     sessionId: string,
     statuses: string[],
   ): ForkFingerprintRecord {
-    const maxSeq = queryOne<{ v: number }>(
+    const maxSeq = queryOptional<{ v: number }>(
       executor,
       `SELECT COALESCE(MAX(seq), 0) AS v FROM entries WHERE session_id = ?`,
       [sessionId],
-    ).v;
-    const leaf = queryOne<{ v: string }>(
+    )?.v ?? 0;
+    const leaf = queryOptional<{ v: string }>(
       executor,
       `SELECT COALESCE((SELECT id FROM entries WHERE session_id = ?
         ORDER BY seq DESC LIMIT 1), '') AS v`,
       [sessionId],
-    ).v;
-    const openTurns = queryOne<{ n: number }>(
+    )?.v ?? "";
+    const openTurns = queryOptional<{ n: number }>(
       executor,
       `SELECT COUNT(*) AS n FROM conversation_turns
        WHERE session_id = ? AND status = ?`,
       [sessionId, "open"],
-    ).n;
+    )?.n ?? 0;
     const { sql, params } = inList(statuses);
-    const activeRuns = queryOne<{ n: number }>(
+    const activeRuns = queryOptional<{ n: number }>(
       executor,
       `SELECT COUNT(*) AS n FROM session_runs
        WHERE session_id = ? AND status IN (${sql})`,
       [sessionId, ...params],
-    ).n;
+    )?.n ?? 0;
     return { maxSeq: maxSeq, leaf, openTurns, activeRuns };
   }
 
@@ -198,7 +198,7 @@ export class ForkDAO {
   }
 
   insertEntry(executor: DB, record: ForkEntryRecord): number {
-    return execReturning<number>(
+    const seq = execReturning<number>(
       executor,
       `INSERT INTO entries (session_id, id, type, parent_id, timestamp, data)
        VALUES (?, ?, ?, ?, ?, ?) RETURNING seq`,
@@ -211,6 +211,8 @@ export class ForkDAO {
         record.data,
       ],
     );
+    if (seq === undefined) throw new Error("insert entry did not return a seq");
+    return seq;
   }
 
   insertTurn(
@@ -257,12 +259,12 @@ export class ForkDAO {
     );
   }
 
-  currentEntryId(executor: DB, session: string): string {
-    return queryOne<{ id: string }>(
+  currentEntryId(executor: DB, session: string): string | undefined {
+    return queryOptional<{ id: string }>(
       executor,
       `SELECT id FROM entries WHERE session_id = ? ORDER BY seq DESC LIMIT 1`,
       [session],
-    ).id;
+    )?.id;
   }
 
   titleExists(
@@ -271,14 +273,15 @@ export class ForkDAO {
     typ: string,
     title: string,
   ): boolean {
-    return queryOne<{ n: number }>(
+    const row = queryOptional<{ n: number }>(
       executor,
       `SELECT COUNT(*) AS n FROM entries AS e
        JOIN sessions AS s ON s.id = e.session_id
        WHERE s.parent_session = ? AND e.type = ?
          AND json_extract(e.data, '$.name') = ?`,
       [parent, typ, title],
-    ).n > 0;
+    );
+    return (row?.n ?? 0) > 0;
   }
 
   insertForkRequest(executor: DB, record: ForkRequestRecord): void {
@@ -314,7 +317,7 @@ export class ForkDAO {
     );
   }
 
-  result(executor: DB, id: string): ForkSessionRecord {
+  result(executor: DB, id: string): ForkSessionRecord | undefined {
     return this.findSession(executor, id);
   }
 }

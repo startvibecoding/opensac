@@ -2,7 +2,7 @@ import type { BashTool } from "./bash.ts";
 import type { BackgroundJob } from "./jobmanager.ts";
 import { formatGoDuration } from "./jobmanager.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -60,7 +60,7 @@ export class JobsTool implements Tool {
       for (const job of jm.listJobs()) {
         if (job.isDone()) jm.removeJob(job.id);
       }
-      return newTextToolResult("Cleaned up finished jobs.");
+      return createTextToolResult("Cleaned up finished jobs.");
     }
 
     const jobIdParam = params["jobId"];
@@ -70,12 +70,12 @@ export class JobsTool implements Tool {
       if (!job) {
         throw new Error(`job ${id} not found`);
       }
-      return newTextToolResult(formatJobDetail(job));
+      return createTextToolResult(formatJobDetail(job));
     }
 
     const jobs = jm.listJobs();
     if (jobs.length === 0) {
-      return newTextToolResult("No background jobs.");
+      return createTextToolResult("No background jobs.");
     }
     jobs.sort((a, b) => a.id - b.id);
 
@@ -83,7 +83,7 @@ export class JobsTool implements Tool {
     for (const job of jobs) {
       result += job.status() + "\n";
     }
-    return newTextToolResult(result);
+    return createTextToolResult(result);
   }
 }
 

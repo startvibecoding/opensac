@@ -2,9 +2,9 @@
 
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import type { Tool } from "../tools/tool.ts";
-import { newRegistry } from "../tools/tool.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
-import { newTestFactoryAndManager } from "./agent_testutil.ts";
+import { createRegistry } from "../tools/tool.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
+import { createTestFactoryAndManager } from "./agent_testutil.ts";
 import { subAgentToolNames } from "./subagent_support.ts";
 import {
   DelegateSubAgentTool,
@@ -25,7 +25,7 @@ function parse(text: string): Record<string, unknown> {
 }
 
 Deno.test("SubAgentToolsImplementToolInterface", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tools: Tool[] = [
     new SubAgentSpawnTool(mgr),
     new SubAgentStatusTool(mgr),
@@ -39,7 +39,7 @@ Deno.test("SubAgentToolsImplementToolInterface", () => {
 });
 
 Deno.test("SubAgentToolsDescriptions", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tools: Tool[] = [
     new SubAgentSpawnTool(mgr),
     new SubAgentStatusTool(mgr),
@@ -54,10 +54,10 @@ Deno.test("SubAgentToolsDescriptions", () => {
 });
 
 Deno.test("SubAgentToolNamesMatchRegisteredTools", () => {
-  const [, mgr] = newTestFactoryAndManager();
-  const registry = newRegistry(
+  const [, mgr] = createTestFactoryAndManager();
+  const registry = createRegistry(
     Deno.makeTempDirSync({ prefix: "opensac-agent-registry-" }),
-    newNoneSandbox(),
+    createNoneSandbox(),
   );
   registerSubAgentTools(registry, mgr);
 
@@ -75,7 +75,7 @@ Deno.test("SubAgentToolNamesMatchRegisteredTools", () => {
 });
 
 Deno.test("SubAgentStatusTool", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const a = mgr.create({ id: "test-agent" });
   const tool = new SubAgentStatusTool(mgr);
   const result = tool.execute({}, { handle: a.id() });
@@ -83,13 +83,13 @@ Deno.test("SubAgentStatusTool", () => {
 });
 
 Deno.test("SubAgentStatusToolNotFound", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentStatusTool(mgr);
   assertThrows(() => tool.execute({}, { handle: "nonexistent" }));
 });
 
 Deno.test("SubAgentStatusToolAfterParentFinish", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   mgr.create({ id: "main" });
   mgr.create({ id: "sub-1", parentId: "main" });
   mgr.markDone("sub-1", "finished work");
@@ -103,13 +103,13 @@ Deno.test("SubAgentStatusToolAfterParentFinish", () => {
 });
 
 Deno.test("SubAgentStatusToolMissingHandle", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentStatusTool(mgr);
   assertThrows(() => tool.execute({}, {}));
 });
 
 Deno.test("SubAgentSendTool", async () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const a = mgr.create({ id: "test-agent" });
   const tool = new SubAgentSendTool(mgr);
   const result = tool.execute({}, { handle: a.id(), message: "do something" });
@@ -119,7 +119,7 @@ Deno.test("SubAgentSendTool", async () => {
 });
 
 Deno.test("SubAgentSendToolNotFound", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentSendTool(mgr);
   assertThrows(() =>
     tool.execute({}, { handle: "nonexistent", message: "test" })
@@ -127,52 +127,51 @@ Deno.test("SubAgentSendToolNotFound", () => {
 });
 
 Deno.test("SubAgentSendToolMissingParams", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentSendTool(mgr);
   assertThrows(() => tool.execute({}, { handle: "x" }));
 });
 
 Deno.test("SubAgentDestroyTool", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const a = mgr.create({ id: "to-destroy" });
   const tool = new SubAgentDestroyTool(mgr);
   const result = tool.execute({}, { handle: a.id() });
   assertEquals(parse(result.text)["status"], "destroyed");
-  const [, ok] = mgr.get("to-destroy");
-  assert(!ok);
+  assertEquals(mgr.get("to-destroy"), undefined);
 });
 
 Deno.test("SubAgentDestroyToolNotFound", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentDestroyTool(mgr);
   assertThrows(() => tool.execute({}, { handle: "nonexistent" }));
 });
 
 Deno.test("SubAgentDestroyToolMissingHandle", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentDestroyTool(mgr);
   assertThrows(() => tool.execute({}, {}));
 });
 
 Deno.test("SubAgentSpawnToolMissingTask", () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentSpawnTool(mgr);
   assertThrows(() => tool.execute({}, {}));
 });
 
 Deno.test("DelegateSubAgentToolMissingTask", async () => {
-  const [, mgr] = newTestFactoryAndManager();
+  const [, mgr] = createTestFactoryAndManager();
   const tool = new DelegateSubAgentTool(mgr);
   await assertRejects(() => tool.execute({}, {}));
 });
 
 /** Polls the manager until the agent reaches a terminal state. */
 async function waitForManagedAgentToStop(
-  mgr: ReturnType<typeof newTestFactoryAndManager>[1],
+  mgr: ReturnType<typeof createTestFactoryAndManager>[1],
   id: string,
 ): Promise<void> {
   for (let i = 0; i < 200; i++) {
-    const [st] = mgr.status(id);
+    const st = mgr.status(id);
     if (
       st !== undefined &&
       (st.state === "done" || st.state === "error" || st.state === "canceled" ||

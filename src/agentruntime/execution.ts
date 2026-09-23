@@ -2098,11 +2098,8 @@ export class ExecutionRuntime {
     const store = this.runStore();
     if (store === null || !hasMethod(store, "executionBinding")) return;
     const ownershipStore = store as unknown as DurableExecutionOwnershipStore;
-    const { binding, ok } = ownershipStore.executionBinding(
-      run.sessionId,
-      run.id,
-    );
-    if (!ok || binding === null) return;
+    const binding = ownershipStore.executionBinding(run.sessionId, run.id);
+    if (binding === null) return;
     if (
       binding.purpose !== "execution" || binding.sessionId !== run.sessionId ||
       binding.runId !== run.id
@@ -2196,7 +2193,7 @@ interface DurableExecutionOwnershipStore {
   executionBinding(
     sessionId: string,
     runId: string,
-  ): { binding: RuntimeLeaseBinding | null; ok: boolean };
+  ): RuntimeLeaseBinding | null;
   prepareExistingExecution(sessionId: string, runId: string): void;
 }
 

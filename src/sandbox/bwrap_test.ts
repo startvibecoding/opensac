@@ -3,10 +3,9 @@
 import { assert, assertEquals } from "@std/assert";
 import {
   bwrapCapabilitiesComplete,
+  createBwrapSandbox,
   findBwrap,
   Level,
-  newBwrapSandbox,
-  newBwrapSandboxWithOptions,
   probeBwrapCapabilities,
 } from "./mod.ts";
 
@@ -24,12 +23,12 @@ function indexArgs(args: string[], ...seq: string[]): number {
   return -1;
 }
 
-Deno.test("newBwrapSandbox name and level", () => {
-  const sb = newBwrapSandbox("/tmp", Level.Standard);
+Deno.test("createBwrapSandbox name and level", () => {
+  const sb = createBwrapSandbox("/tmp", Level.Standard);
   assertEquals(sb.name(), "bwrap");
   assertEquals(sb.level(), Level.Standard);
 
-  const strict = newBwrapSandbox("/tmp", Level.Strict);
+  const strict = createBwrapSandbox("/tmp", Level.Strict);
   assertEquals(strict.name(), "bwrap");
   assertEquals(strict.level(), Level.Strict);
 });
@@ -55,16 +54,15 @@ Deno.test("bwrapCapabilities require every runtime flag", () => {
 });
 
 Deno.test("probeBwrapCapabilities missing path", () => {
-  const { caps, ok } = probeBwrapCapabilities("/definitely/missing/bwrap");
-  assert(!ok);
-  assert(!bwrapCapabilitiesComplete(caps));
+  const caps = probeBwrapCapabilities("/definitely/missing/bwrap");
+  assert(caps === undefined);
 });
 
 Deno.test("probeBwrapCapabilities real binary", () => {
   const path = findBwrap();
   if (path === "") return; // bwrap unavailable
-  const { caps, ok } = probeBwrapCapabilities(path);
-  assert(ok, "bwrap --help probe failed");
+  const caps = probeBwrapCapabilities(path);
+  assert(caps !== undefined, "bwrap --help probe failed");
   assert(
     bwrapCapabilitiesComplete(caps),
     "bwrap missing required capabilities",
@@ -73,7 +71,7 @@ Deno.test("probeBwrapCapabilities real binary", () => {
 
 Deno.test("bwrap args use complete isolation profile", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const sb = newBwrapSandboxWithOptions(project, Level.Standard, {
+  const sb = createBwrapSandbox(project, Level.Standard, {
     tmpSize: "4096",
   });
   const args = sb.buildBwrapArgs(
@@ -108,7 +106,7 @@ Deno.test("bwrap args use complete isolation profile", () => {
 
 Deno.test("bwrap args do not rebind dev devices", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const sb = newBwrapSandboxWithOptions(project, Level.Standard, {
+  const sb = createBwrapSandbox(project, Level.Standard, {
     allowedRead: ["/dev/null", "/dev/urandom", "/etc/ssl"],
   });
   const args = sb.buildBwrapArgs(
@@ -127,7 +125,7 @@ Deno.test("bwrap args do not rebind dev devices", () => {
 
 Deno.test("bwrap normalizes human readable tmpSize", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const sb = newBwrapSandboxWithOptions(project, Level.Standard, {
+  const sb = createBwrapSandbox(project, Level.Standard, {
     tmpSize: "100m",
   });
   const args = sb.buildBwrapArgs(
@@ -143,7 +141,7 @@ Deno.test("bwrap normalizes human readable tmpSize", () => {
 Deno.test("bwrap args preserve host network", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const forOpts = (networkAccess: boolean) =>
-    newBwrapSandbox(project, Level.Standard).buildBwrapArgs(
+    createBwrapSandbox(project, Level.Standard).buildBwrapArgs(
       {},
       { workDir: project, networkAccess },
       "/bin/sh",
@@ -155,7 +153,7 @@ Deno.test("bwrap args preserve host network", () => {
 });
 
 Deno.test("bwrap wrapCommand returns a command spec", () => {
-  const sb = newBwrapSandbox("/tmp", Level.Standard);
+  const sb = createBwrapSandbox("/tmp", Level.Standard);
   const spec = sb.wrapCommand(undefined, "/bin/bash", "echo hello", {
     workDir: "/tmp",
     envVars: { FOO: "bar" },
@@ -167,7 +165,7 @@ Deno.test("bwrap wrapCommand returns a command spec", () => {
 
 Deno.test("bwrap strict level binds project read-only", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const sb = newBwrapSandbox(project, Level.Strict);
+  const sb = createBwrapSandbox(project, Level.Strict);
   const args = sb.buildBwrapArgs(
     sb.options,
     { workDir: project },

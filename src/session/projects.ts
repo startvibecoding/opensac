@@ -4,11 +4,7 @@
 // SQLite transactions for correctness, so they stay usable while a Run lease is
 // held.
 
-import {
-  isNoRows,
-  ProjectDAO,
-  type SessionMetadataRecord,
-} from "../dao/mod.ts";
+import { ProjectDAO, type SessionMetadataRecord } from "../dao/mod.ts";
 import { generateID } from "./entry.ts";
 import { openExistingSessionDB, openRootDB } from "./root_db.ts";
 
@@ -148,14 +144,8 @@ export function latestSessionTitle(
 ): { name: string; source: string } {
   const db = openExistingSessionDB(sessionDir);
   if (db === null) return { name: "", source: "" };
-  let data: string;
-  try {
-    data = new ProjectDAO(db.db).latestSessionInfoData(sessionId);
-  } catch (err) {
-    // DAO throws ErrNoRows when there is no session_info entry.
-    if (isNoRows(err)) return { name: "", source: "" };
-    throw err;
-  }
+  const data = new ProjectDAO(db.db).latestSessionInfoData(sessionId);
+  if (data === undefined) return { name: "", source: "" };
   const entry = JSON.parse(data) as { name?: string; source?: string };
   return { name: entry.name ?? "", source: entry.source ?? "" };
 }

@@ -135,14 +135,14 @@ export class Manager {
     }
     this.#initErr = normalizeErr;
 
-    this.#sandboxes.set(Level.None, newNoneSandbox());
+    this.#sandboxes.set(Level.None, createNoneSandbox());
     this.#sandboxes.set(
       Level.Standard,
-      newPlatformSandboxWithOptions(projectDir, Level.Standard, effective),
+      createPlatformSandbox(projectDir, Level.Standard, effective),
     );
     this.#sandboxes.set(
       Level.Strict,
-      newPlatformSandboxWithOptions(projectDir, Level.Strict, effective),
+      createPlatformSandbox(projectDir, Level.Strict, effective),
     );
   }
 
@@ -210,15 +210,10 @@ export class Manager {
   }
 }
 
-/** Creates a manager with the default sandbox policy. */
-export function newManager(projectDir: string): Manager {
-  return new Manager(projectDir, {});
-}
-
-/** Creates a manager using the supplied sandbox policy. */
-export function newManagerWithOptions(
+/** Creates a manager (default sandbox policy unless `opts` is given). */
+export function createManager(
   projectDir: string,
-  opts: Options,
+  opts: Options = {},
 ): Manager {
   return new Manager(projectDir, opts);
 }
@@ -241,6 +236,6 @@ export function formatSandboxInfo(s: Sandbox | undefined): string {
 
 // Forward declarations resolved by ./platform.ts and ./none.ts to avoid an
 // import cycle between the manager and its backends.
-import { newNoneSandbox } from "./none.ts";
-import { newPlatformSandboxWithOptions } from "./platform.ts";
+import { createNoneSandbox } from "./none.ts";
+import { createPlatformSandbox } from "./platform.ts";
 import { normalizeOptions } from "./policy.ts";

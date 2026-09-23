@@ -80,7 +80,7 @@ interface Fixture {
   root: string;
 }
 
-function newFixture(): Fixture {
+function createFixture(): Fixture {
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-life-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
@@ -104,7 +104,7 @@ function errorOf(message: Record<string, unknown>): Record<string, unknown> {
 }
 
 Deno.test("session/list scopes to the workspace and projects additive _meta", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
   const idA = makeSession(sessionDir, workA, "sess-a");
@@ -128,7 +128,7 @@ Deno.test("session/list scopes to the workspace and projects additive _meta", ()
 });
 
 Deno.test("session/list rejects a cwd outside the negotiated workspace", () => {
-  const { server, sink, root } = newFixture();
+  const { server, sink, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
   Deno.mkdirSync(workA, { recursive: true });
@@ -142,7 +142,7 @@ Deno.test("session/list rejects a cwd outside the negotiated workspace", () => {
 });
 
 Deno.test("session/list rejects an invalid cursor and pages by offset", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   makeSession(sessionDir, workA, "sess-a");
 
@@ -165,7 +165,7 @@ Deno.test("session/list rejects an invalid cursor and pages by offset", () => {
 });
 
 Deno.test("opensac/session/listAll validates scope and filters by query", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
   makeSession(sessionDir, workA, "sess-a");
@@ -203,7 +203,7 @@ Deno.test("opensac/session/listAll validates scope and filters by query", () => 
 });
 
 Deno.test("opensac/session/setTitle persists and notifies", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-title");
 
@@ -228,7 +228,7 @@ Deno.test("opensac/session/setTitle persists and notifies", () => {
 });
 
 Deno.test("opensac/session/setWorkDir guards and moves the session", async () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
   const workD = path.join(root, "d");
@@ -282,7 +282,7 @@ Deno.test("opensac/session/setWorkDir guards and moves the session", async () =>
 });
 
 Deno.test("session/close shuts down an open runtime and is workspace-guarded", async () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-close");
 
@@ -306,7 +306,7 @@ Deno.test("session/close shuts down an open runtime and is workspace-guarded", a
 });
 
 Deno.test("opensac/session/delete removes an idle session and rejects an active one", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-del");
 
@@ -342,7 +342,7 @@ Deno.test("opensac/session/delete removes an idle session and rejects an active 
 });
 
 Deno.test("opensac/session/history pages the canonical transcript", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-hist");
   const mgr = openByIDExact(sessionDir, id);
@@ -376,7 +376,7 @@ Deno.test("opensac/session/history pages the canonical transcript", () => {
 });
 
 Deno.test("decision ledger persists, replays, and terminalizes on close", () => {
-  const { server, sink, sessionDir, root } = newFixture();
+  const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-dec");
   const rt = new ACPSessionRuntime();

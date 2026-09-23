@@ -4,13 +4,13 @@
 // (TestExecuteBackgroundToolCallOrderedReleasesQueuedCalls).
 
 import { assert, assertEquals } from "@std/assert";
-import { type MockProvider, newMockProvider } from "../provider/mock.ts";
-import { newUserMessage, type ToolCallBlock } from "../provider/types.ts";
-import { newManager } from "../session/manager.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
+import { createMockProvider, type MockProvider } from "../provider/mock.ts";
+import { createUserMessage, type ToolCallBlock } from "../provider/types.ts";
+import { createManager } from "../session/manager.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
 import {
-  newRegistry,
-  newTextToolResult,
+  createRegistry,
+  createTextToolResult,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -19,8 +19,8 @@ import {
   EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
 } from "./events.ts";
-import { newAgent, newAgentWithLoopConfig } from "./agent.ts";
-import { newToolLaunchOrder } from "./tool_launch.ts";
+import { createAgent, createAgentWithLoopConfig } from "./agent.ts";
+import { createToolLaunchOrder } from "./tool_launch.ts";
 import { testModel } from "./agent_testutil.ts";
 
 Deno.test(
@@ -28,21 +28,21 @@ Deno.test(
   () => {
     for (const api of ["openai-chat", "anthropic-messages", "google-gemini"]) {
       const workDir = Deno.makeTempDirSync();
-      const sess = newManager(workDir, workDir);
+      const sess = createManager(workDir, workDir);
       sess.init();
-      const p: MockProvider = newMockProvider(
+      const p: MockProvider = createMockProvider(
         "other-vendor",
         [testModel("model-1", "Model 1")],
         [],
       );
       p.setAPI(api);
-      const a = newAgent(
+      const a = createAgent(
         { provider: p, model: p.models()[0], session: sess, mode: "agent" },
-        newRegistry(workDir, newNoneSandbox()),
+        createRegistry(workDir, createNoneSandbox()),
       );
       const params = a.buildBackgroundChatParams(
         "turn-1",
-        newUserMessage("hello"),
+        createUserMessage("hello"),
       );
       assertEquals(
         params.responseOptions,
@@ -57,19 +57,19 @@ Deno.test(
   "buildBackgroundReplayParams drops remote lineage and replays local archive",
   () => {
     const workDir = Deno.makeTempDirSync();
-    const sess = newManager(workDir, workDir);
+    const sess = createManager(workDir, workDir);
     sess.init();
-    const p: MockProvider = newMockProvider(
+    const p: MockProvider = createMockProvider(
       "openai",
       [testModel("model-1", "Model 1")],
       [],
     );
     p.setAPI("openai-responses");
-    const a = newAgent(
+    const a = createAgent(
       { provider: p, model: p.models()[0], session: sess, mode: "agent" },
-      newRegistry(workDir, newNoneSandbox()),
+      createRegistry(workDir, createNoneSandbox()),
     );
-    a.loadHistoryMessages([newUserMessage("hello")]);
+    a.loadHistoryMessages([createUserMessage("hello")]);
     const params = a.buildBackgroundReplayParams("turn-1");
     assert(params.responseOptions !== undefined);
     assertEquals(params.responseOptions.previousResponseId, "");
@@ -79,12 +79,12 @@ Deno.test(
 );
 
 Deno.test("responsesStateFallbackError is false without a supporting provider", () => {
-  const p: MockProvider = newMockProvider(
+  const p: MockProvider = createMockProvider(
     "mock",
     [testModel("model-1", "Model 1")],
     [],
   );
-  const a = newAgent({ provider: p, model: p.models()[0] }, undefined);
+  const a = createAgent({ provider: p, model: p.models()[0] }, undefined);
   assertEquals(a.responsesStateFallbackError(new Error("boom")), false);
 });
 
@@ -125,7 +125,7 @@ class OrderedProbeTool implements Tool {
     params: Record<string, unknown>,
   ): ToolResult {
     this.entered.push(Number(params["index"]));
-    return newTextToolResult(`probe ${Number(params["index"])}`);
+    return createTextToolResult(`probe ${Number(params["index"])}`);
   }
 }
 
@@ -145,9 +145,12 @@ Deno.test(
   "executeBackgroundToolCallOrdered releases the queued call after a parse failure",
   async () => {
     const tool = new OrderedProbeTool(1);
-    const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+    const registry = createRegistry(
+      Deno.makeTempDirSync(),
+      createNoneSandbox(),
+    );
     registry.register(tool);
-    const mock: MockProvider = newMockProvider(
+    const mock: MockProvider = createMockProvider(
       "mock",
       [{
         ...testModel("model1", "Model 1"),
@@ -156,7 +159,7 @@ Deno.test(
       }],
       [],
     );
-    const a = newAgentWithLoopConfig({
+    const a = createAgentWithLoopConfig({
       provider: mock,
       model: mock.models()[0],
       mode: "yolo",
@@ -166,7 +169,7 @@ Deno.test(
       maxIterations: 1,
     }, registry);
 
-    const order = newToolLaunchOrder(2)!;
+    const order = createToolLaunchOrder(2)!;
     const failed: ToolCallBlock = {
       id: "call-0",
       name: "ordered_probe",

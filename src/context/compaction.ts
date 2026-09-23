@@ -11,10 +11,10 @@ import { retryDelay } from "../provider/retry.ts";
 import {
   type ChatParams,
   type ContentBlock,
+  createSystemInjectedUserMessage,
+  createUserMessage,
   type Message,
   type Model,
-  newSystemInjectedUserMessage,
-  newUserMessage,
   normalizeThinkingLevel,
   streamError,
   type StreamEvent,
@@ -678,7 +678,7 @@ async function generateSummaryInsertThenCompressWithOptions(
     : tpl.instruction;
 
   // Create the compression instruction message (system_injected)
-  const compressionMsg = newSystemInjectedUserMessage(instruction);
+  const compressionMsg = createSystemInjectedUserMessage(instruction);
 
   // Build messages: original conversation + compression instruction
   const compactionMessages: Message[] = [...messages, compressionMsg];
@@ -926,7 +926,7 @@ async function summarizeToolResultWithOptions(
 ): Promise<string> {
   if (options.summarize !== undefined) {
     const prompt = toolResultSummaryPrompt(msg);
-    return options.summarize(signal, [newUserMessage(prompt)], 2048);
+    return options.summarize(signal, [createUserMessage(prompt)], 2048);
   }
 
   const maxRateLimitRetries = 2;
@@ -979,7 +979,7 @@ async function summarizeToolResultOnceWithOptions(
     // Do not send a standalone toolResult message. Provider protocols require
     // a tool result to follow an assistant tool call, which is not present in
     // this independent sub-request. Encode the result as delimited user text.
-    messages: [newUserMessage(prompt)],
+    messages: [createUserMessage(prompt)],
     systemPrompt,
     thinkingLevel: normalizeThinkingLevel(options.thinkingLevel ?? ""),
     maxTokens: 2048,

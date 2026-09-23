@@ -8,7 +8,7 @@ import {
   writeFileAtomic,
 } from "./io_helpers.ts";
 import {
-  newDiffToolResult,
+  createDiffToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -96,7 +96,7 @@ export class WriteTool implements Tool {
     if (!oldExists) {
       diff.oldText = null;
     }
-    return newDiffToolResult(
+    return createDiffToolResult(
       `File written: ${p} (${utf8Length(content)} bytes)\n${
         formatFileDiffSummary(diff)
       }`,

@@ -388,7 +388,7 @@ export function validateProvider(
   }
 
   try {
-    providerfactory.createWithOptions(settings, name, model, {
+    providerfactory.create(settings, name, model, {
       requireModel: true,
     });
   } catch (err) {

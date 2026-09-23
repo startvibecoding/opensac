@@ -5,9 +5,9 @@
 
 import { assert, assertEquals } from "@std/assert";
 import type { Message } from "../provider/types.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import type { Manager } from "../session/manager.ts";
-import { type Agent, newAgentWithLoopConfig } from "./agent.ts";
+import { type Agent, createAgentWithLoopConfig } from "./agent.ts";
 import type { LoopRecoveryState } from "./agent.ts";
 import type { Event } from "./events.ts";
 
@@ -35,7 +35,7 @@ function hasImage(msg: Message): boolean {
   return false;
 }
 
-function newRecoveryState(): LoopRecoveryState {
+function createRecoveryState(): LoopRecoveryState {
   return {
     contextOverflowRetried: false,
     contentRejectionStage: 0,
@@ -51,14 +51,14 @@ function collectSink(): { sink: (ev: Event) => boolean; events: Event[] } {
   return { sink: (ev) => (events.push(ev), true), events };
 }
 
-function newContentRejectionAgent(
+function createContentRejectionAgent(
   messages: Message[],
 ): { agent: Agent; sess: Manager } {
-  const sess = newManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
+  const sess = createManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
   sess.init();
   const ids: string[] = [];
   for (const msg of messages) ids.push(sess.appendMessage(msg));
-  const agent = newAgentWithLoopConfig({ session: sess }, undefined);
+  const agent = createAgentWithLoopConfig({ session: sess }, undefined);
   agent.loadHistoryState(messages, ids);
   return { agent, sess };
 }
@@ -73,9 +73,9 @@ function defaultMessages(): Message[] {
 }
 
 Deno.test("content rejection recovery strips in two stages", () => {
-  const { agent, sess } = newContentRejectionAgent(defaultMessages());
+  const { agent, sess } = createContentRejectionAgent(defaultMessages());
   const { sink } = collectSink();
-  const state = newRecoveryState();
+  const state = createRecoveryState();
   const cause = new Error(
     `API error 400: {"message":"<400> InternalError.Algo.DataInspectionFailed: Input image data may contain inappropriate content."}`,
   );
@@ -102,9 +102,9 @@ Deno.test("content rejection recovery strips in two stages", () => {
 });
 
 Deno.test("content rejection recovery ignores other errors", () => {
-  const { agent } = newContentRejectionAgent(defaultMessages());
+  const { agent } = createContentRejectionAgent(defaultMessages());
   const { sink } = collectSink();
-  const state = newRecoveryState();
+  const state = createRecoveryState();
   assert(
     !agent.tryRecoverContentRejection(
       sink,
@@ -117,9 +117,9 @@ Deno.test("content rejection recovery ignores other errors", () => {
 });
 
 Deno.test("content rejection recovery heals without retry after partial output", () => {
-  const { agent, sess } = newContentRejectionAgent(defaultMessages());
+  const { agent, sess } = createContentRejectionAgent(defaultMessages());
   const { sink } = collectSink();
-  const state = newRecoveryState();
+  const state = createRecoveryState();
   const cause = new Error(
     "Input image data may contain inappropriate content",
   );
@@ -136,9 +136,9 @@ Deno.test("content rejection recovery escalates when turn has no images", () => 
     imageMessage("toolResult", "historical"),
     { role: "user", content: "text only current turn", timestamp: new Date() },
   ];
-  const { agent } = newContentRejectionAgent(messages);
+  const { agent } = createContentRejectionAgent(messages);
   const { sink } = collectSink();
-  const state = newRecoveryState();
+  const state = createRecoveryState();
   const cause = new Error(
     "Input image data may contain inappropriate content",
   );

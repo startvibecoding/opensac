@@ -20,7 +20,7 @@ export type HttpClient = (
 ) => Promise<Response>;
 
 /** Builds a default fetch-based client when none is supplied. */
-export function newHTTPClient(client?: HttpClient): HttpClient {
+export function createHTTPClient(client?: HttpClient): HttpClient {
   if (client !== undefined) return client;
   return defaultHttpClient;
 }

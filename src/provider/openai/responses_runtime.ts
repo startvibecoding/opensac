@@ -19,8 +19,8 @@ import {
   type ResponsesCompletedObject,
 } from "./responses.ts";
 import {
+  createResponsesNormalizer,
   decodeResponsesOutputItem,
-  newResponsesNormalizer,
   responsesConversationID,
 } from "./responses_codec.ts";
 import { validateResponsesCapabilities } from "./responses_config.ts";
@@ -386,7 +386,7 @@ export class ResponsesRunManager {
 }
 
 /** Returns a Provider-bound background run manager. */
-export function newResponsesRunManager(
+export function createResponsesRunManager(
   provider: Provider,
   sessionDir: string,
 ): ResponsesRunManager {
@@ -415,7 +415,7 @@ function responsesHostedPolicyExceeded(
   if (policies === undefined || Object.keys(policies).length === 0) {
     return false;
   }
-  const normalizer = newResponsesNormalizer();
+  const normalizer = createResponsesNormalizer();
   normalizer.hostedPolicies = policies;
   const output = response.output ?? [];
   for (let index = 0; index < output.length; index++) {
@@ -444,7 +444,7 @@ function archiveBackgroundResponseWithPolicy(
   if (response.incomplete_details !== undefined) {
     incompleteReason = response.incomplete_details?.reason ?? "";
   }
-  const normalizer = newResponsesNormalizer();
+  const normalizer = createResponsesNormalizer();
   normalizer.hostedPolicies = policies;
   const output = response.output ?? [];
   for (let index = 0; index < output.length; index++) {

@@ -6,11 +6,11 @@
 import { assert, assertEquals } from "@std/assert";
 import {
   computeIDs,
+  createStream,
   defaultOption,
   defaultTheme,
   gsmRender,
   lightTheme,
-  newStream,
   Node,
   NodeType,
   parse,
@@ -293,8 +293,8 @@ Deno.test("wrapANSI word boundary", () => {
 
 // ── gsm streaming facade ────────────────────────────────────────────────────
 
-Deno.test("newStream default width and empty output", () => {
-  const s = newStream(0);
+Deno.test("createStream default width and empty output", () => {
+  const s = createStream(0);
   assertEquals(s.output(), "");
   s.update("# hi");
   assert(s.output().includes("# hi"));
@@ -311,7 +311,7 @@ Deno.test("stream preserves Unicode order for SSE text", () => {
     "OSCANNER_BASE_URL",
     "环境变量覆盖能力",
   ];
-  const s = newStream(80);
+  const s = createStream(80);
   const runes = Array.from(sseText);
   let accumulated = "";
   for (let i = 0; i < runes.length; i += 7) {

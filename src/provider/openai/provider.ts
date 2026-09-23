@@ -9,11 +9,14 @@ import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
 import {
   applyHeaders,
+  createStreamHttpClient,
   type HttpClient,
   type HTTPClientOptions,
-  newStreamHttpClientWithOptions,
 } from "../http_client.ts";
-import { newIdleTimeoutStream, streamIdleTimeoutMs } from "../idle_timeout.ts";
+import {
+  createIdleTimeoutStream,
+  streamIdleTimeoutMs,
+} from "../idle_timeout.ts";
 import type { Provider as ProviderInterface } from "../provider.ts";
 import {
   formatRetryMessage,
@@ -240,7 +243,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
   }
 
   /** Returns a durable background Responses run manager for a session dir. */
-  newResponsesRunManager(sessionDir: string): ResponsesRunManager {
+  createResponsesRunManager(sessionDir: string): ResponsesRunManager {
     return new ResponsesRunManager(this, sessionDir);
   }
 
@@ -486,7 +489,10 @@ export class Provider extends BaseProvider implements ProviderInterface {
         return;
       }
 
-      const streamBody = newIdleTimeoutStream(resp.body, streamIdleTimeoutMs);
+      const streamBody = createIdleTimeoutStream(
+        resp.body,
+        streamIdleTimeoutMs,
+      );
       const state = { visibleOutput: false };
       let streamErr: Error | undefined;
       try {
@@ -1388,47 +1394,33 @@ export function defaultModels(): Model[] {
   ];
 }
 
-/** Creates a new OpenAI provider with default models. */
-export function newProvider(apiKey: string, baseURL: string): Provider {
-  return newProviderWithModels(apiKey, baseURL, defaultModels());
-}
-
-/** Creates a new OpenAI provider with custom models. */
-export function newProviderWithModels(
+/**
+ * Creates an OpenAI provider. Without explicit transport options a failed
+ * client construction falls back to a bare streaming client (Go parity);
+ * explicit options keep the original failure.
+ */
+export function createOpenAIProvider(
   apiKey: string,
   baseURL: string,
-  models: Model[],
+  models: Model[] = defaultModels(),
+  opts: HTTPClientOptions | undefined = undefined,
 ): Provider {
   try {
-    return newProviderWithModelsAndProxy(apiKey, baseURL, "", models);
-  } catch {
-    const hc = newStreamHttpClientWithOptions({});
-    return newProviderWithHTTPClient(apiKey, baseURL, models, hc);
+    return createOpenAIProviderWithHTTPClient(
+      apiKey,
+      baseURL,
+      models,
+      createStreamHttpClient(opts ?? {}),
+    );
+  } catch (err) {
+    if (opts !== undefined) throw err;
+    const hc = createStreamHttpClient({});
+    return createOpenAIProviderWithHTTPClient(apiKey, baseURL, models, hc);
   }
 }
 
-export function newProviderWithModelsAndProxy(
-  apiKey: string,
-  baseURL: string,
-  proxyURL: string,
-  models: Model[],
-): Provider {
-  return newProviderWithModelsAndOptions(apiKey, baseURL, models, {
-    proxyUrl: proxyURL,
-  });
-}
-
-export function newProviderWithModelsAndOptions(
-  apiKey: string,
-  baseURL: string,
-  models: Model[],
-  opts: HTTPClientOptions,
-): Provider {
-  const client = newStreamHttpClientWithOptions(opts);
-  return newProviderWithHTTPClient(apiKey, baseURL, models, client);
-}
-
-export function newProviderWithHTTPClient(
+/** Creates a provider bound to the given HTTP client (the TS test seam). */
+export function createOpenAIProviderWithHTTPClient(
   apiKey: string,
   baseURL: string,
   models: Model[],

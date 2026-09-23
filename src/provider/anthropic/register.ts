@@ -5,11 +5,7 @@ import {
 } from "../../config/mod.ts";
 import { register } from "../registry.ts";
 import type { Model, ModelCompat, ModelPricing } from "../types.ts";
-import {
-  defaultModels,
-  newProvider,
-  newProviderWithModelsAndProxy,
-} from "./provider.ts";
+import { createAnthropicProvider, defaultModels } from "./provider.ts";
 
 /** Resolves the model list for an Anthropic-compatible provider config. */
 export function resolveAnthropicModels(
@@ -92,14 +88,14 @@ function cloneBool(v: boolean | undefined): boolean | undefined {
 }
 
 /** Builds an Anthropic provider from a provider config. */
-function createAnthropicProvider(cfg: ProviderConfig): ReturnType<
-  typeof newProvider
+function anthropicProviderFromConfig(cfg: ProviderConfig): ReturnType<
+  typeof createAnthropicProvider
 > {
-  return newProviderWithModelsAndProxy(
+  return createAnthropicProvider(
     cfg.apiKey ?? "",
     cfg.baseUrl ?? "",
-    cfg.httpProxy ?? "",
     resolveAnthropicModels(cfg),
+    { proxyUrl: cfg.httpProxy ?? "" },
   );
 }
 
@@ -108,9 +104,15 @@ function createAnthropicProvider(cfg: ProviderConfig): ReturnType<
 // Anthropic-style providers.
 register(
   "anthropic",
-  (cfg) => cfg == null ? newProvider("", "") : createAnthropicProvider(cfg),
+  (cfg) =>
+    cfg == null
+      ? createAnthropicProvider("", "")
+      : anthropicProviderFromConfig(cfg),
 );
 register(
   "anthropic-messages",
-  (cfg) => cfg == null ? newProvider("", "") : createAnthropicProvider(cfg),
+  (cfg) =>
+    cfg == null
+      ? createAnthropicProvider("", "")
+      : anthropicProviderFromConfig(cfg),
 );

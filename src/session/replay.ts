@@ -10,7 +10,7 @@
 // arguments clone structurally instead of as raw bytes.
 
 import type { ContentBlock, Message } from "../provider/types.ts";
-import { newSystemInjectedUserMessage } from "../provider/types.ts";
+import { createSystemInjectedUserMessage } from "../provider/types.ts";
 import {
   type CompactionEntry,
   type ContentOverrideEntry,
@@ -167,7 +167,7 @@ export function applyCompactionEntry(
   state: ReplayState,
   entry: CompactionEntry,
 ): void {
-  const summary = newSystemInjectedUserMessage(entry.summary);
+  const summary = createSystemInjectedUserMessage(entry.summary);
   if (entry.firstKeptEntryId === "") {
     state.messages = [summary];
     state.entryIDs = [""];
@@ -227,7 +227,7 @@ export function applySequencedCompactionEntry(
 ): void {
   if (state === null) return;
 
-  const summary = newSystemInjectedUserMessage(entry.summary);
+  const summary = createSystemInjectedUserMessage(entry.summary);
   if (entry.firstKeptEntryId === "") {
     state.messages = [{ seq, entryID: entry.id, message: summary }];
     state.entryIDs = [entry.id];

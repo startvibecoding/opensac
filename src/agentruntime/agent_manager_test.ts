@@ -11,7 +11,7 @@ import type { Provider } from "../provider/provider.ts";
 import {
   type AgentManagerOptions,
   type AgentManagerRuntime,
-  newAgentManager,
+  createAgentManager,
 } from "./agent_manager.ts";
 import { SOURCE_UNKNOWN } from "./source.ts";
 
@@ -32,15 +32,15 @@ function stubRuntime(): AgentManagerRuntime {
   };
 }
 
-Deno.test("newAgentManagerRequiresSharedDependencies", () => {
+Deno.test("agentManagerRequiresSharedDependencies", () => {
   assertThrows(
-    () => newAgentManager({} as unknown as AgentManagerOptions),
+    () => createAgentManager({} as unknown as AgentManagerOptions),
     Error,
     "agent runtime is required",
   );
   assertThrows(
     () =>
-      newAgentManager(
+      createAgentManager(
         { runtime: stubRuntime() } as unknown as AgentManagerOptions,
       ),
     Error,
@@ -48,7 +48,7 @@ Deno.test("newAgentManagerRequiresSharedDependencies", () => {
   );
   assertThrows(
     () =>
-      newAgentManager(
+      createAgentManager(
         {
           runtime: stubRuntime(),
           settings: defaultSettings(),
@@ -59,7 +59,7 @@ Deno.test("newAgentManagerRequiresSharedDependencies", () => {
   );
   assertThrows(
     () =>
-      newAgentManager(
+      createAgentManager(
         {
           runtime: stubRuntime(),
           settings: defaultSettings(),

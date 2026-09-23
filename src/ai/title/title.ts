@@ -8,9 +8,9 @@
 
 import {
   type ChatParams,
+  createUserMessage,
   type Message,
   type Model,
-  newUserMessage,
   type Provider,
   streamError,
   streamTextDelta,
@@ -59,7 +59,7 @@ export class Generator {
     const fallback = fallbackTitle(messages);
 
     const input: Message[] = [...messages];
-    input.push(newUserMessage(titlePrompt));
+    input.push(createUserMessage(titlePrompt));
     let raw = "";
     const params: ChatParams = {
       messages: input,

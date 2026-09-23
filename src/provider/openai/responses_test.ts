@@ -5,9 +5,9 @@ import { assert, assertEquals } from "@std/assert";
 import { createProvider } from "../registry.ts";
 import {
   type ChatParams,
+  createToolResultMessage,
+  createUserMessage,
   type Model,
-  newToolResultMessageWithContents,
-  newUserMessage,
   streamError,
   type StreamEvent,
   streamHostedItem,
@@ -20,7 +20,7 @@ import {
   thinkingOff,
   thinkingXHigh,
 } from "../types.ts";
-import { newProviderWithModels, type Provider } from "./provider.ts";
+import { createOpenAIProvider, type Provider } from "./provider.ts";
 // Side-effect import: registers the OpenAI provider factories.
 import "./register.ts";
 import {
@@ -33,8 +33,8 @@ import {
 import { validateResponsesCapabilities } from "./responses_config.ts";
 import {
   chatAndCollect,
+  createMockOpenAIProvider,
   decodeBody,
-  newMockOpenAIProvider,
 } from "./test_helpers.ts";
 
 function model(id: string, extra: Partial<Model> = {}): Model {
@@ -69,7 +69,7 @@ function readResponsesFixture(name: string): string {
 }
 
 Deno.test("ResponsesChatFallsBackToSynchronousWhenBackgroundCoordinatorIsUnavailable", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
   );
@@ -79,7 +79,7 @@ Deno.test("ResponsesChatFallsBackToSynchronousWhenBackgroundCoordinatorIsUnavail
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("stay available")],
+      messages: [createUserMessage("stay available")],
     }),
   );
   assertEquals(requests.length, 1);
@@ -102,7 +102,7 @@ Deno.test("ResponsesRequestDiagnosticsDescribeLocalFieldOmissions", () => {
 });
 
 Deno.test("ResponsesStreamEmitsHostedItemLifecycleEvents", async () => {
-  const { provider: p } = newMockOpenAIProvider(
+  const { provider: p } = createMockOpenAIProvider(
     [model("responses-hosted")],
     readResponsesFixture("hosted_lifecycle.sse"),
   );
@@ -111,7 +111,7 @@ Deno.test("ResponsesStreamEmitsHostedItemLifecycleEvents", async () => {
     p,
     params({
       modelId: "responses-hosted",
-      messages: [newUserMessage("search")],
+      messages: [createUserMessage("search")],
     }),
   );
   const lifecycle = events
@@ -124,7 +124,7 @@ Deno.test("ResponsesStreamEmitsHostedItemLifecycleEvents", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIRequest", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
     (req) => {
@@ -137,7 +137,7 @@ Deno.test("OpenAIResponsesAPIRequest", async () => {
     params({
       modelId: "responses-test",
       systemPrompt: "You are a helper.",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingXHigh,
     }),
   );
@@ -154,7 +154,7 @@ Deno.test("OpenAIResponsesAPIRequest", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIConfigOverrides", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
   );
@@ -168,7 +168,7 @@ Deno.test("OpenAIResponsesAPIConfigOverrides", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       maxTokens: 1234,
       thinkingLevel: "minimal",
     }),
@@ -183,7 +183,7 @@ Deno.test("OpenAIResponsesAPIConfigOverrides", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIConfigAndResponseOptions", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
   );
@@ -200,7 +200,7 @@ Deno.test("OpenAIResponsesAPIConfigAndResponseOptions", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       responseOptions: {
         parallelTools: false,
         maxToolCalls: 2,
@@ -233,7 +233,7 @@ Deno.test("OpenAIResponsesAPIConfigAndResponseOptions", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIConfigFieldsAreEncoded", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
   );
@@ -254,7 +254,7 @@ Deno.test("OpenAIResponsesAPIConfigFieldsAreEncoded", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("find a file")],
+      messages: [createUserMessage("find a file")],
     }),
   );
   const raw = decodeBody(requests[0]);
@@ -273,7 +273,7 @@ Deno.test("OpenAIResponsesAPIConfigFieldsAreEncoded", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIPreviousResponseIDIsEncoded", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
   );
@@ -283,7 +283,7 @@ Deno.test("OpenAIResponsesAPIPreviousResponseIDIsEncoded", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("continue")],
+      messages: [createUserMessage("continue")],
       responseOptions: { previousResponseId: "resp_previous" },
     }),
   );
@@ -293,7 +293,7 @@ Deno.test("OpenAIResponsesAPIPreviousResponseIDIsEncoded", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIConversationCanBeSuppressedForReplay", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -305,7 +305,7 @@ Deno.test("OpenAIResponsesAPIConversationCanBeSuppressedForReplay", () => {
   const req = buildResponsesRequest(
     p,
     params({
-      messages: [newUserMessage("replay")],
+      messages: [createUserMessage("replay")],
       responseOptions: { suppressConversation: true },
     }),
     "responses-test",
@@ -317,7 +317,7 @@ Deno.test("OpenAIResponsesAPIConversationCanBeSuppressedForReplay", () => {
 });
 
 Deno.test("OpenAIResponsesAPINativeReplayItemsArePreserved", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
   );
@@ -326,7 +326,7 @@ Deno.test("OpenAIResponsesAPINativeReplayItemsArePreserved", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("must not be rebuilt")],
+      messages: [createUserMessage("must not be rebuilt")],
       responseOptions: {
         replayItems: [
           {
@@ -351,7 +351,7 @@ Deno.test("OpenAIResponsesAPINativeReplayItemsArePreserved", async () => {
 });
 
 Deno.test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -379,12 +379,12 @@ Deno.test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
           timestamp: new Date(),
         },
         (() => {
-          const result = newToolResultMessageWithContents(
+          const result = createToolResultMessage(
             "call_custom",
             "shell_script",
             "hello",
-            null,
             false,
+            null,
           );
           result.toolKind = "custom";
           return result;
@@ -412,13 +412,14 @@ Deno.test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
 });
 
 Deno.test("OpenAIResponsesAPICustomToolContentListOutput", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
-  const result = newToolResultMessageWithContents(
+  const result = createToolResultMessage(
     "call-custom",
     "render",
     "",
+    false,
     [
       { type: "text", text: "preview" },
       {
@@ -430,7 +431,6 @@ Deno.test("OpenAIResponsesAPICustomToolContentListOutput", () => {
         file: { id: "file_123", filename: "report.csv" },
       },
     ],
-    false,
   );
   result.toolKind = "custom";
   const items = convertResponsesInput(p, params({ messages: [result] }));
@@ -449,7 +449,7 @@ Deno.test("OpenAIResponsesAPICustomToolContentListOutput", () => {
 });
 
 Deno.test("OpenAIResponsesAPIRejectsInvalidCustomToolFormat", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -475,7 +475,7 @@ Deno.test("OpenAIResponsesAPIRejectsInvalidCustomToolFormat", () => {
 });
 
 Deno.test("OpenAIResponsesAPIRejectsInvalidNativeReplayItem", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -499,7 +499,7 @@ Deno.test("OpenAIResponsesAPIRejectsInvalidNativeReplayItem", () => {
 });
 
 Deno.test("OpenAIResponsesAPIRejectsInvalidConfig", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -514,7 +514,7 @@ Deno.test("OpenAIResponsesAPIRejectsInvalidConfig", () => {
 });
 
 Deno.test("OpenAIResponsesAPIValidatesStrictStructuredOutputSchema", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -561,7 +561,7 @@ Deno.test("OpenAIResponsesAPIValidatesStrictStructuredOutputSchema", () => {
 });
 
 Deno.test("OpenAIResponsesStateFallbackError", () => {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
   p.setUseResponsesAPI(true);
@@ -590,7 +590,7 @@ Deno.test("OpenAIResponsesAPIStreamToolCall", async () => {
   for (const line of lines) sse += `data: ${line}\n`;
   sse += "data: [DONE]\n";
 
-  const { provider: p } = newMockOpenAIProvider(
+  const { provider: p } = createMockOpenAIProvider(
     [model("mock", { reasoning: true })],
     sse,
   );
@@ -598,7 +598,7 @@ Deno.test("OpenAIResponsesAPIStreamToolCall", async () => {
   const events = await chatAndCollect(
     p,
     params({
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   let gotText = "";
@@ -626,13 +626,13 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyTextEvent", async () => {
     'data: {"type":"response.output_text.done","text":"done-only"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   p.setUseResponsesAPI(true);
   let text = "";
   for (
     const event of await chatAndCollect(
       p,
-      params({ messages: [newUserMessage("hello")] }),
+      params({ messages: [createUserMessage("hello")] }),
     )
   ) {
     if (event.type === streamTextDelta) text += event.textDelta;
@@ -644,13 +644,13 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyRefusalEvent", async () => {
   const sse =
     'data: {"type":"response.refusal.done","refusal":"cannot comply"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n';
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   p.setUseResponsesAPI(true);
   let text = "";
   for (
     const event of await chatAndCollect(
       p,
-      params({ messages: [newUserMessage("hello")] }),
+      params({ messages: [createUserMessage("hello")] }),
     )
   ) {
     if (event.type === streamTextDelta) text += event.textDelta;
@@ -662,7 +662,7 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
   const sse =
     'data: {"type":"response.reasoning_summary_text.done","text":"think-only"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n';
-  const { provider: p } = newMockOpenAIProvider(
+  const { provider: p } = createMockOpenAIProvider(
     [model("mock", { reasoning: true })],
     sse,
   );
@@ -672,7 +672,7 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
     const event of await chatAndCollect(
       p,
       params({
-        messages: [newUserMessage("hello")],
+        messages: [createUserMessage("hello")],
         thinkingLevel: thinkingLow,
       }),
     )
@@ -683,7 +683,7 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
 });
 
 Deno.test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", {
       reasoning: true,
       compat: {
@@ -698,7 +698,7 @@ Deno.test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
     }),
   );
@@ -709,7 +709,7 @@ Deno.test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
 });
 
 Deno.test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
-  const { provider: p } = newMockOpenAIProvider(
+  const { provider: p } = createMockOpenAIProvider(
     [model("responses-test", {
       compat: { supportsLongCacheRetention: false },
     })],
@@ -721,7 +721,7 @@ Deno.test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   assertEquals(events.length, 1);
@@ -730,7 +730,7 @@ Deno.test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
 });
 
 Deno.test("OpenAIResponsesAPIPromptCacheCanBeDisabled", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
   );
@@ -740,7 +740,7 @@ Deno.test("OpenAIResponsesAPIPromptCacheCanBeDisabled", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
     }),
   );
@@ -749,7 +749,7 @@ Deno.test("OpenAIResponsesAPIPromptCacheCanBeDisabled", async () => {
 });
 
 Deno.test("OpenAIResponsesAPINoReasoningWhenOff", async () => {
-  const { provider: p, requests } = newMockOpenAIProvider(
+  const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
   );
@@ -758,7 +758,7 @@ Deno.test("OpenAIResponsesAPINoReasoningWhenOff", async () => {
     p,
     params({
       modelId: "responses-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingOff,
     }),
   );

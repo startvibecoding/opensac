@@ -4,7 +4,7 @@
 // The interactive TUI action lands in the next slice; this is the command
 // path that must exist for scripts and CI.
 
-import { createWithOptions } from "../provider/factory/factory.ts";
+import { create } from "../provider/factory/factory.ts";
 import { consumeEvents } from "../agent/eventloop.ts";
 import type { Event } from "../agent/events.ts";
 import {
@@ -79,7 +79,7 @@ export async function runPrintAction(
   const mdWidth = options.mdWidth ?? 80;
   const workDir = options.workDir !== "" ? options.workDir : Deno.cwd();
 
-  const created = createWithOptions(settings, options.provider, options.model, {
+  const created = create(settings, options.provider, options.model, {
     requireModel: true,
   });
   const providerName = options.provider !== ""

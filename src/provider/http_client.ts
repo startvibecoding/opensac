@@ -90,32 +90,22 @@ function build(opts: HTTPClientOptions, timeoutMs: number): HttpClient {
   return result;
 }
 
-/** Returns a provider HTTP client. */
-export function newHttpClient(timeoutMs: number, proxyUrl: string): HttpClient {
-  return newHttpClientWithOptions(timeoutMs, { proxyUrl });
-}
-
 /** Returns a provider HTTP client with transport options. */
-export function newHttpClientWithOptions(
+export function createHttpClient(
   timeoutMs: number,
-  opts: HTTPClientOptions,
+  opts: HTTPClientOptions = {},
 ): HttpClient {
   return build(opts, timeoutMs);
 }
 
 /**
- * Returns an HTTP client suited to long-lived streaming requests. Unlike
- * newHttpClientWithOptions, it does not impose a single wall-clock timeout that
- * would cap the entire (potentially long) SSE body; callers bound stalls with
- * the idle-timeout stream wrapper instead.
+ * Returns an HTTP client suited to long-lived streaming requests. It does not
+ * impose a single wall-clock timeout that would cap the entire (potentially
+ * long) SSE body; callers bound stalls with the idle-timeout stream wrapper
+ * instead.
  */
-export function newStreamHttpClient(proxyUrl: string): HttpClient {
-  return newStreamHttpClientWithOptions({ proxyUrl });
-}
-
-/** newStreamHttpClient with explicit options. */
-export function newStreamHttpClientWithOptions(
-  opts: HTTPClientOptions,
+export function createStreamHttpClient(
+  opts: HTTPClientOptions = {},
 ): HttpClient {
   return build(opts, 0);
 }

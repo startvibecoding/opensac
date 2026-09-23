@@ -6,7 +6,7 @@
 // `AbortSignal`, so `context.DeadlineExceeded` maps to a `TimeoutError` reason.
 
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission as sessionAcquireExecutionAdmission,
   getSessionRun,
@@ -23,7 +23,7 @@ import {
 } from "./mod.ts";
 
 function initRecoveryTestSession(sessionDir: string, id: string): void {
-  const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+  const manager = createManager(Deno.makeTempDirSync(), sessionDir);
   manager.initWithID(id);
 }
 

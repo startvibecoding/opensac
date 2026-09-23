@@ -50,23 +50,8 @@ export function findBwrap(): string {
 /** Probes the flags advertised by the bwrap at `p`. */
 export function probeBwrapCapabilities(
   p: string,
-): { caps: BwrapCapabilities; ok: boolean } {
-  const empty: BwrapCapabilities = {
-    unshareUser: false,
-    unsharePid: false,
-    unshareIpc: false,
-    unshareUts: false,
-    newSession: false,
-    dieWithParent: false,
-    mountProc: false,
-    mountDev: false,
-    mountTmpfs: false,
-    tmpfsSize: false,
-    mountBind: false,
-    changeDir: false,
-    hostname: false,
-  };
-  if (p === "") return { caps: empty, ok: false };
+): BwrapCapabilities | undefined {
+  if (p === "") return undefined;
 
   let output = "";
   try {
@@ -76,31 +61,28 @@ export function probeBwrapCapabilities(
       stderr: "piped",
     })
       .outputSync();
-    if (!result.success) return { caps: empty, ok: false };
+    if (!result.success) return undefined;
     output = new TextDecoder().decode(result.stdout) +
       new TextDecoder().decode(result.stderr);
   } catch {
-    return { caps: empty, ok: false };
+    return undefined;
   }
 
   const has = (flag: string) => output.includes(flag);
   return {
-    caps: {
-      unshareUser: has("--unshare-user"),
-      unsharePid: has("--unshare-pid"),
-      unshareIpc: has("--unshare-ipc"),
-      unshareUts: has("--unshare-uts"),
-      newSession: has("--new-session"),
-      dieWithParent: has("--die-with-parent"),
-      mountProc: has("--proc"),
-      mountDev: has("--dev"),
-      mountTmpfs: has("--tmpfs"),
-      tmpfsSize: has("--size"),
-      mountBind: has("--bind") && has("--ro-bind"),
-      changeDir: has("--chdir"),
-      hostname: has("--hostname"),
-    },
-    ok: true,
+    unshareUser: has("--unshare-user"),
+    unsharePid: has("--unshare-pid"),
+    unshareIpc: has("--unshare-ipc"),
+    unshareUts: has("--unshare-uts"),
+    newSession: has("--new-session"),
+    dieWithParent: has("--die-with-parent"),
+    mountProc: has("--proc"),
+    mountDev: has("--dev"),
+    mountTmpfs: has("--tmpfs"),
+    tmpfsSize: has("--size"),
+    mountBind: has("--bind") && has("--ro-bind"),
+    changeDir: has("--chdir"),
+    hostname: has("--hostname"),
   };
 }
 
@@ -153,9 +135,11 @@ export class BwrapSandbox implements GitAccessSandbox {
       return this.#markUnavailable("bwrap binary not found in PATH");
     }
 
-    const { caps, ok } = probeBwrapCapabilities(this.#bwrapPath);
+    const caps = probeBwrapCapabilities(this.#bwrapPath);
+    if (caps === undefined) {
+      return this.#markUnavailable("failed to query bwrap capabilities");
+    }
     this.#capabilities = caps;
-    if (!ok) return this.#markUnavailable("failed to query bwrap capabilities");
     if (!bwrapCapabilitiesComplete(caps)) {
       return this.#markUnavailable("bwrap is missing required capabilities");
     }
@@ -449,19 +433,11 @@ export class BwrapSandbox implements GitAccessSandbox {
   }
 }
 
-/** Creates a new bubblewrap sandbox with default policy. */
-export function newBwrapSandbox(
+/** Creates a bubblewrap sandbox (default policy unless `opts` is given). */
+export function createBwrapSandbox(
   projectDir: string,
   level: Level,
-): BwrapSandbox {
-  return new BwrapSandbox(projectDir, level, {});
-}
-
-/** Creates a bubblewrap sandbox with a policy. */
-export function newBwrapSandboxWithOptions(
-  projectDir: string,
-  level: Level,
-  opts: Options,
+  opts: Options = {},
 ): BwrapSandbox {
   return new BwrapSandbox(projectDir, level, opts);
 }

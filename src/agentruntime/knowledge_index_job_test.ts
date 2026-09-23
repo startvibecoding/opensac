@@ -1,8 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { createKnowledgeBase } from "../session/mod.ts";
 import {
+  createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
-  newKnowledgeBaseService,
 } from "./knowledgebase.ts";
 import { KNOWLEDGE_INDEX_PHASE_COMMITTING } from "./knowledge_index_job.ts";
 import { SOURCE_ACP } from "./source.ts";
@@ -28,7 +28,7 @@ Deno.test("knowledge base start index runs in background with progress", async (
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -71,7 +71,7 @@ Deno.test("knowledge base start index rejects disabled base synchronously", () =
     schedule: "manual",
     enabled: false,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );

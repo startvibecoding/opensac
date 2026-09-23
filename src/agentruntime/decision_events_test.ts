@@ -2,12 +2,12 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import { DECISION_APPROVAL, DECISION_QUESTION } from "./decision.ts";
 import {
   buildDecisionEvent,
+  createDecisionRecord,
   DECISION_STATUS_PENDING,
   DECISION_STATUS_RESOLVED,
   decodeDecisionEvent,
   loadDecisionRecords,
   loadRunDecisionRecords,
-  newDecisionRecord,
 } from "./decision_events.ts";
 import { replayDecisions } from "./decision_replay.ts";
 import { SessionRunEventSink } from "./run_event.ts";
@@ -139,7 +139,7 @@ Deno.test("NewDecisionRecord shape by status", () => {
     kind: DECISION_APPROVAL,
   };
   const deadline = new Date(Date.now() + 60_000);
-  const pending = newDecisionRecord(
+  const pending = createDecisionRecord(
     request,
     DECISION_STATUS_PENDING,
     "",
@@ -148,7 +148,7 @@ Deno.test("NewDecisionRecord shape by status", () => {
   );
   assertEquals(pending.status, DECISION_STATUS_PENDING);
   assertEquals(pending.expiresAt?.getTime(), deadline.getTime());
-  const resolved = newDecisionRecord(
+  const resolved = createDecisionRecord(
     request,
     DECISION_STATUS_RESOLVED,
     "allow",

@@ -1,7 +1,7 @@
 import type { SkillHubSettings } from "../config/settings.ts";
-import { newClawHubClient } from "./clawhub.ts";
+import { createClawHubClient } from "./clawhub.ts";
 import { defaultHttpClient, type HttpClient } from "./http.ts";
-import { newSkillHubClient } from "./skillhubcn.ts";
+import { createSkillHubClient } from "./skillhubcn.ts";
 import type { Market, MarketClient } from "./types.ts";
 
 /**
@@ -15,7 +15,10 @@ export function clientsForSettings(
 ): MarketClient[] {
   const markets = settings.markets ?? [];
   if (markets.length === 0) {
-    return [newSkillHubClient("", undefined), newClawHubClient("", undefined)];
+    return [
+      createSkillHubClient("", undefined),
+      createClawHubClient("", undefined),
+    ];
   }
   const clients: MarketClient[] = [];
   for (const market of markets) {
@@ -24,10 +27,10 @@ export function clientsForSettings(
     const client = httpClientWithToken(market.apiToken);
     switch (market.id as Market) {
       case "skillhub.cn":
-        clients.push(newSkillHubClient(baseURL, client));
+        clients.push(createSkillHubClient(baseURL, client));
         break;
       case "clawhub.ai":
-        clients.push(newClawHubClient(baseURL, client));
+        clients.push(createClawHubClient(baseURL, client));
         break;
     }
   }

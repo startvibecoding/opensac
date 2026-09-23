@@ -3,14 +3,14 @@
 
 import { assertEquals } from "@std/assert";
 import type { Event } from "../../sdk/agent/types.ts";
-import { newEventRouter, RouterEventHandlerFunc } from "./router.ts";
+import { createEventRouter, RouterEventHandlerFunc } from "./router.ts";
 
 function event(agentId: string): Event {
   return { agentId, type: 0 };
 }
 
 Deno.test("event router routes to agent-specific then global handlers", () => {
-  const router = newEventRouter();
+  const router = createEventRouter();
   const seen: string[] = [];
 
   const h1 = new RouterEventHandlerFunc((e) => seen.push(`h1:${e.agentId}`));

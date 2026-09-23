@@ -194,7 +194,7 @@ export class IterationBudget {
 }
 
 /** Creates a per-run iteration budget handle from a policy. */
-export function newIterationBudget(
+export function createIterationBudget(
   policy: IterationBudgetPolicy,
   soft: number,
 ): IterationBudget {

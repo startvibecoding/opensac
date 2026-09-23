@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryAll, queryOne } from "./database.ts";
+import { execChanges, queryAll, queryOptional } from "./database.ts";
 
 export interface AttachmentRecord {
   id: string;
@@ -58,8 +58,8 @@ export class AttachmentDAO {
     );
   }
 
-  find(sessionId: string, attachmentId: string): AttachmentRecord {
-    return queryOne<AttachmentRecord>(
+  find(sessionId: string, attachmentId: string): AttachmentRecord | undefined {
+    return queryOptional<AttachmentRecord>(
       this.requireDb(),
       `SELECT ${columns} FROM session_attachments WHERE session_id = ? AND id = ? LIMIT 1`,
       [sessionId, attachmentId],
@@ -152,8 +152,4 @@ export class AttachmentDAO {
     if (this.db === null) throw new Error("attachment database is not open");
     return this.db;
   }
-}
-
-export function isNoRowsAttachment(err: unknown): boolean {
-  return err === ErrNoRows;
 }

@@ -9,9 +9,9 @@
 
 import type { RuntimeLeaseGuard } from "../session/mod.ts";
 import {
+  createManager,
   deleteSessionWithMutation as sessionDeleteSessionWithMutation,
   type Manager,
-  newManager,
   openByID,
   openByIDExact,
 } from "../session/mod.ts";
@@ -37,7 +37,7 @@ export function createSession(opts: CreateSessionOptions): Manager {
   if (opts.workDir.trim() === "") {
     throw new Error("session work directory is required");
   }
-  const mgr = newManager(opts.workDir, opts.sessionDir ?? "");
+  const mgr = createManager(opts.workDir, opts.sessionDir ?? "");
   const channelType = (opts.channelType ?? "").trim();
   if (channelType !== "" && channelType !== "local") {
     mgr.initWithIDAndBinding(

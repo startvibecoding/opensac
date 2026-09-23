@@ -4,11 +4,11 @@ import {
   calculateCost,
   type ChatParams,
   type ContentBlock,
+  createAssistantMessage,
+  createMockProvider,
+  createToolResultMessage,
+  createUserMessage,
   type Model,
-  newAssistantMessage,
-  newMockProvider,
-  newToolResultMessage,
-  newUserMessage,
   streamDone,
   streamError,
   type StreamEvent,
@@ -62,7 +62,7 @@ Deno.test("MockProvider", async () => {
     { type: streamTextDelta, textDelta: "Hello" },
     { type: streamDone },
   ];
-  const p = newMockProvider("mock", models, responses);
+  const p = createMockProvider("mock", models, responses);
   assertEquals(p.name(), "mock");
   assertEquals(p.getCallCount(), 0);
   assertEquals(p.models().length, 1);
@@ -85,7 +85,7 @@ Deno.test("MockProviderWithContext", async () => {
     { type: streamTextDelta, textDelta: "Hello" },
     { type: streamDone },
   ];
-  const p = newMockProvider("mock", models, responses);
+  const p = createMockProvider("mock", models, responses);
 
   const controller = new AbortController();
   controller.abort();
@@ -165,7 +165,7 @@ Deno.test("ModelPricingNilModel", () => {
 });
 
 Deno.test("NewUserMessage", () => {
-  const msg = newUserMessage("Hello");
+  const msg = createUserMessage("Hello");
   assertEquals(msg.role, "user");
   assertEquals(msg.content, "Hello");
   assert(msg.timestamp.getTime() !== 0);
@@ -176,14 +176,14 @@ Deno.test("NewAssistantMessage", () => {
     { type: "text", text: "Hello" },
     { type: "thinking", thinking: "Let me think..." },
   ];
-  const msg = newAssistantMessage(contents);
+  const msg = createAssistantMessage(contents);
   assertEquals(msg.role, "assistant");
   assertEquals(msg.contents!.length, 2);
   assert(msg.timestamp.getTime() !== 0);
 });
 
 Deno.test("NewToolResultMessage", () => {
-  const msg = newToolResultMessage(
+  const msg = createToolResultMessage(
     "call_1",
     "ls",
     "file1.txt\nfile2.txt",
@@ -197,7 +197,12 @@ Deno.test("NewToolResultMessage", () => {
 });
 
 Deno.test("NewToolResultMessageError", () => {
-  const msg = newToolResultMessage("call_1", "bash", "command not found", true);
+  const msg = createToolResultMessage(
+    "call_1",
+    "bash",
+    "command not found",
+    true,
+  );
   assert(msg.isError);
 });
 
@@ -267,7 +272,7 @@ Deno.test("ToolCallBlock", () => {
 
 Deno.test("ChatParams", () => {
   const params: ChatParams = {
-    messages: [newUserMessage("Hello")],
+    messages: [createUserMessage("Hello")],
     tools: [{ name: "ls", description: "List files" }],
     systemPrompt: "You are a helpful assistant",
     thinkingLevel: "medium",

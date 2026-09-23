@@ -264,6 +264,7 @@ Deno.test("an expired lease is reclaimed with a fencing epoch bump", () => {
     release();
 
     const record = new RuntimeLeaseDAO(db.db).find(db.db!, "lease-expired");
+    assert(record !== undefined);
     assertEquals(record.state, "released");
   } finally {
     closeAll();
@@ -286,7 +287,7 @@ Deno.test("heartbeat batch renews survivors and marks displaced leases lost", as
 
       const db = openRootDB(sessionDir);
       const beforeA = new RuntimeLeaseDAO(db.db).find(db.db!, "hb-batch-1")
-        .heartbeatAt;
+        ?.heartbeatAt ?? 0;
       // Bump B's epoch to simulate another process taking over.
       db.db!.run(
         "UPDATE session_runtime_leases SET epoch = epoch + 1 WHERE session_id = ?",
@@ -297,7 +298,7 @@ Deno.test("heartbeat batch renews survivors and marks displaced leases lost", as
 
       assert(guardB.lost()?.aborted, "displaced lease B must be marked lost");
       const afterA = new RuntimeLeaseDAO(db.db).find(db.db!, "hb-batch-1")
-        .heartbeatAt;
+        ?.heartbeatAt ?? 0;
       assert(afterA >= beforeA, "surviving lease A must stay renewable");
     } finally {
       guardA.release();
@@ -404,7 +405,7 @@ Deno.test("renewal recovers after repeated timeout ticks", async () => {
       await recovered.renew(snapshotRuntimeLeasesForDir(realKey));
       const record = new RuntimeLeaseDAO(db.db).find(db.db!, "renew-recover");
       assert(
-        record.expiresAt > nowSeconds(),
+        record !== undefined && record.expiresAt > nowSeconds(),
         "the lease must be renewed once the database recovers",
       );
     } finally {

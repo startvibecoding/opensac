@@ -31,21 +31,24 @@ import type { Model } from "../provider/types.ts";
 import { type ThinkingLevel, thinkingMedium } from "../provider/types.ts";
 import type { Provider } from "../provider/provider.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
-import { newManager, newSubAgentManager } from "../session/manager.ts";
-import { Level, Manager as SandboxManager } from "../sandbox/sandbox.ts";
-import { newManagerWithOptions } from "../sandbox/sandbox.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
+import { createManager, createSubAgentManager } from "../session/manager.ts";
+import {
+  createManager as createSandboxManager,
+  Level,
+  Manager as SandboxManager,
+} from "../sandbox/sandbox.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
 import { sessionDir as platformSessionDir } from "../platform/platform.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
-  newRegistry,
-  newRegistryWithConfig,
+  createRegistry,
+  createRegistryWithConfig,
   type Registry,
 } from "../tools/tool.ts";
 import {
   type AgentLoopConfig,
   type Config,
-  newAgentWithLoopConfig,
+  createAgentWithLoopConfig,
 } from "./agent.ts";
 import {
   type BeforeToolCallContext,
@@ -56,9 +59,9 @@ import { compactionSettingsFromConfig } from "./compaction.ts";
 import { composeFollowUps } from "./followup.ts";
 import type { AgentManager } from "./manager.ts";
 import { resolveMaxTokens, resolveMaxTokensValue } from "./max_tokens.ts";
-import { newExternalToolAdapter } from "./external_tool_adapter.ts";
+import { createExternalToolAdapter } from "./external_tool_adapter.ts";
 import { buildSubAgentContext } from "./system_prompt.ts";
-import { AgentAdapter, newAgentAdapter, ProviderAdapter } from "./bridge.ts";
+import { AgentAdapter, createAgentAdapter, ProviderAdapter } from "./bridge.ts";
 import { registerSubAgentTools } from "./subagent.ts";
 import { subAgentToolNames } from "./subagent_support.ts";
 
@@ -188,7 +191,7 @@ export class AgentFactory {
 
   /** Creates a new Agent with a per-agent Registry. */
   create(opts: AgentOptions): AgentAdapter {
-    return createAgent(this, opts);
+    return createAgentFromFactory(this, opts);
   }
 
   /** Returns a clone carrying a parent agent's runtime config. */
@@ -221,8 +224,11 @@ export class AgentFactory {
   }
 }
 
-/** Creates a factory with shared configuration. */
-export function newAgentFactory(
+/**
+ * Creates a factory. Behavior flags default to the shared configuration
+ * (`multiAgentEnabled`) and can be overridden explicitly.
+ */
+export function createAgentFactory(
   provider: Provider | undefined,
   model: Model | undefined,
   settings: Settings | undefined,
@@ -238,43 +244,11 @@ export function newAgentFactory(
       args: Record<string, unknown>,
     ) => boolean)
     | undefined,
-): AgentFactory {
-  return newAgentFactoryWithOptions(
-    provider,
-    model,
-    settings,
-    sandboxMgr,
-    extraContext,
-    ruleContent,
-    skillsMgr,
-    compactionSettings,
-    approvalHandler,
-    {
-      multiAgentEnabled: true,
-      delegateEnabled: false,
-      workflowsEnabled: false,
-    },
-  );
-}
-
-/** Creates a factory with explicit behavior flags. */
-export function newAgentFactoryWithOptions(
-  provider: Provider | undefined,
-  model: Model | undefined,
-  settings: Settings | undefined,
-  sandboxMgr: SandboxManager | undefined,
-  extraContext: string,
-  ruleContent: string,
-  skillsMgr: SkillsManager | undefined,
-  compactionSettings: CompactionSettings,
-  approvalHandler:
-    | ((
-      toolCallId: string,
-      toolName: string,
-      args: Record<string, unknown>,
-    ) => boolean)
-    | undefined,
-  opts: AgentFactoryOptions,
+  opts: AgentFactoryOptions = {
+    multiAgentEnabled: true,
+    delegateEnabled: false,
+    workflowsEnabled: false,
+  },
 ): AgentFactory {
   const allow = opts.allow ?? loadAllow();
   const f = new AgentFactory();
@@ -303,7 +277,7 @@ export function newAgentFactoryWithOptions(
 }
 
 /** Creates a new Agent with per-agent Registry. */
-export function createAgent(
+function createAgentFromFactory(
   f: AgentFactory,
   opts: AgentOptions,
 ): AgentAdapter {
@@ -378,7 +352,7 @@ export function createAgent(
 
   // Create per-agent Registry with isolated workDir/sandbox/JobManager.
   const sb = sandboxForMode(f, mode);
-  const registry = newRegistryWithConfig({
+  const registry = createRegistryWithConfig({
     workDir,
     sandbox: sb,
     toolFilter: opts.tools,
@@ -494,8 +468,8 @@ export function createAgent(
     }
   }
 
-  const a = newAgentWithLoopConfig(loopCfg, registry);
-  return newAgentAdapter(a);
+  const a = createAgentWithLoopConfig(loopCfg, registry);
+  return createAgentAdapter(a);
 }
 
 /** Returns a clone of the factory carrying a parent agent's runtime config. */
@@ -593,14 +567,14 @@ export function composeBeforeToolCall(
 
 /** Returns the appropriate sandbox for the given mode. */
 function sandboxForMode(f: AgentFactory, mode: string) {
-  if (f.sandboxMgr === undefined) return newNoneSandbox();
+  if (f.sandboxMgr === undefined) return createNoneSandbox();
   switch (mode) {
     case "plan":
     case "agent":
       return f.sandboxMgr.getActive();
     case "yolo":
     case "os":
-      return newNoneSandbox();
+      return createNoneSandbox();
     default:
       return f.sandboxMgr.getActive();
   }
@@ -615,8 +589,8 @@ function defaultSession(
   let sessionDir = "";
   if (f.settings !== undefined) sessionDir = getSessionDir(f.settings);
   if (sessionDir === "") sessionDir = platformSessionDir();
-  if (subAgent) return newSubAgentManager(workDir, sessionDir);
-  return newManager(workDir, sessionDir);
+  if (subAgent) return createSubAgentManager(workDir, sessionDir);
+  return createManager(workDir, sessionDir);
 }
 
 /** Creates an agent from public Builder options (Go `CreateFromPublicOptions`). */
@@ -666,23 +640,23 @@ export function buildFromPublicBuilder(b: Builder): AgentAdapter {
 
   let sandboxMgr: SandboxManager | undefined;
   if (cfg.sandboxEnabled) {
-    sandboxMgr = newManagerWithOptions(cfg.workDir, { protectGit: true });
+    sandboxMgr = createSandboxManager(cfg.workDir, { protectGit: true });
     sandboxMgr.setLevel(Level.Standard);
   }
 
-  const sess = newManager(cfg.workDir, cfg.sessionDir);
+  const sess = createManager(cfg.workDir, cfg.sessionDir);
 
   let sb;
   if (sandboxMgr !== undefined) {
     sb = sandboxMgr.getActive();
   } else {
-    sb = newNoneSandbox();
+    sb = createNoneSandbox();
   }
   let registry: Registry;
   if (cfg.disableBuiltinTools) {
-    registry = newRegistry(cfg.workDir, sb);
+    registry = createRegistry(cfg.workDir, sb);
   } else {
-    registry = newRegistryWithConfig({
+    registry = createRegistryWithConfig({
       workDir: cfg.workDir,
       sandbox: sb,
       toolFilter: cfg.tools,
@@ -690,7 +664,7 @@ export function buildFromPublicBuilder(b: Builder): AgentAdapter {
   }
   for (const et of cfg.externalTools) {
     if (et === undefined || et === null) continue;
-    registry.register(newExternalToolAdapter(et));
+    registry.register(createExternalToolAdapter(et));
   }
 
   const agentCfg: Config = {
@@ -716,8 +690,8 @@ export function buildFromPublicBuilder(b: Builder): AgentAdapter {
     maxIterations: cfg.maxIterations,
   };
 
-  const a = newAgentWithLoopConfig(loopCfg, registry);
-  return newAgentAdapter(a);
+  const a = createAgentWithLoopConfig(loopCfg, registry);
+  return createAgentAdapter(a);
 }
 
 // --- Register the internal builder with the public agent package ---

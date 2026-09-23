@@ -1,12 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import {
-  execChanges,
-  inList,
-  isNoRows,
-  queryAll,
-  queryOne,
-  queryOptional,
-} from "./database.ts";
+import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
 
 export interface ProjectRecord {
   id: string;
@@ -77,18 +70,13 @@ export class ProjectDAO {
   }
 
   metadata(sessionId: string): SessionMetadataRecord | null {
-    try {
-      return queryOne<SessionMetadataRecord>(
-        this.requireDb(),
-        `SELECT session_id AS sessionId, project_id AS projectId, pinned,
-                updated_at AS updatedAt
-         FROM session_metadata WHERE session_id = ? LIMIT 1`,
-        [sessionId],
-      );
-    } catch (err) {
-      if (isNoRows(err)) return null;
-      throw err;
-    }
+    return queryOptional<SessionMetadataRecord>(
+      this.requireDb(),
+      `SELECT session_id AS sessionId, project_id AS projectId, pinned,
+              updated_at AS updatedAt
+       FROM session_metadata WHERE session_id = ? LIMIT 1`,
+      [sessionId],
+    ) ?? null;
   }
 
   /**
@@ -132,13 +120,13 @@ export class ProjectDAO {
     );
   }
 
-  latestSessionInfoData(sessionId: string): string {
-    return queryOne<{ data: string }>(
+  latestSessionInfoData(sessionId: string): string | undefined {
+    return queryOptional<{ data: string }>(
       this.requireDb(),
       `SELECT data FROM entries
        WHERE session_id = ? AND type = ? ORDER BY seq DESC LIMIT 1`,
       [sessionId, "session_info"],
-    ).data;
+    )?.data;
   }
 
   now(): string {

@@ -8,7 +8,7 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import { decodeBase64 } from "@std/encoding/base64";
 import * as path from "@std/path";
 import { InputResourceDAO } from "../dao/mod.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import { closeDatabases, openRootDB } from "../session/root_db.ts";
 import { listInputResourceEvents } from "../session/input_resources.ts";
 import { writeRootDatabase } from "../session/database.ts";
@@ -28,7 +28,7 @@ function inputTestSession(): {
 } {
   const root = Deno.makeTempDirSync({ prefix: "opensac-inputmat-" });
   const workDir = Deno.makeTempDirSync({ prefix: "opensac-work-" });
-  const manager = newManager(workDir, root);
+  const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
 }
@@ -85,6 +85,7 @@ Deno.test("InputMaterializerWritesProjectResourceAndManifest", async () => {
 
     const conn = openRootDB(root).db!;
     const stored = new InputResourceDAO(null).find(conn, sessionId, record.id);
+    assert(stored !== undefined);
     assert(!stored.metadata.includes("secret-reference"));
 
     const manifest = materializer.buildManifest([record]);

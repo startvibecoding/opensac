@@ -1,7 +1,7 @@
 //
 // ExpertBinding is the resolved expert identity of one session. It is owned by
 // SessionRuntime, resolved once from the persisted session header binding, and
-// consumed by `buildAgent`/`newAgentManager` so every adapter shares the same
+// consumed by `buildAgent`/`createAgentManager` so every adapter shares the same
 // identity prompt, roster, member definitions, and team capability decision.
 //
 // Deviation: Go's `(*SessionRuntime)` methods that only compute values live as
@@ -101,7 +101,7 @@ export function resolveBoundExpertBundle(
 }
 
 /** Builds the resolved binding value object from a loaded bundle. */
-export function newExpertBinding(bundle: Bundle): ExpertBinding {
+export function createExpertBinding(bundle: Bundle): ExpertBinding {
   const binding: ExpertBinding = {
     id: bundle.name,
     type: bundle.manifest.expertType,

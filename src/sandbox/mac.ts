@@ -152,19 +152,11 @@ export class MacSandbox implements Sandbox {
   }
 }
 
-/** Creates a new macOS sandbox with default policy. */
-export function newMacSandbox(
+/** Creates a macOS sandbox (empty policy unless `opts` is given). */
+export function createMacSandbox(
   projectDir: string,
   level: Level,
-): MacSandbox {
-  return new MacSandbox(projectDir, level, {});
-}
-
-/** Creates a macOS sandbox with a policy. */
-export function newMacSandboxWithOptions(
-  projectDir: string,
-  level: Level,
-  opts: Options,
+  opts: Options = {},
 ): MacSandbox {
   return new MacSandbox(projectDir, level, opts);
 }

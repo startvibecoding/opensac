@@ -7,11 +7,11 @@
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import type { Model } from "../provider/types.ts";
 import { thinkingHigh, thinkingMedium } from "../provider/types.ts";
-import { newMockProvider } from "../provider/mock.ts";
-import { newManager } from "../session/manager.ts";
+import { createMockProvider } from "../provider/mock.ts";
+import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
-import { newRegistry } from "../tools/tool.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
+import { createRegistry } from "../tools/tool.ts";
 import {
   defaultInputPolicy,
   type InputIngress,
@@ -58,11 +58,11 @@ function makeModel(overrides: Partial<Model> = {}): Model {
 function inputTestSession(): {
   root: string;
   workDir: string;
-  manager: ReturnType<typeof newManager>;
+  manager: ReturnType<typeof createManager>;
 } {
   const root = Deno.makeTempDirSync({ prefix: "opensac-rt-root-" });
   const workDir = Deno.makeTempDirSync({ prefix: "opensac-rt-work-" });
-  const manager = newManager(workDir, root);
+  const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, manager };
 }
@@ -114,7 +114,7 @@ function writeExpertFixtures(workDir: string): void {
 }
 
 Deno.test("beginArtifactCollectionDisabledByDefault", () => {
-  const registry = newRegistry(Deno.makeTempDirSync(), undefined);
+  const registry = createRegistry(Deno.makeTempDirSync(), undefined);
   const runtime = new SessionRuntime({ registry });
   const collector = runtime.beginArtifactCollection("run-disabled");
   assertEquals(collector, null);
@@ -144,7 +144,7 @@ Deno.test("artifactCollectorObserverReceivesPersistedRecord", async () => {
       id: manager.getHeader()!.id,
       workDir,
       attachments: service,
-      registry: newRegistry(workDir, undefined),
+      registry: createRegistry(workDir, undefined),
       artifactEnabled: true,
     });
     const collector = runtime.beginArtifactCollection("run-observer")!;
@@ -181,7 +181,7 @@ Deno.test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () =>
       id: manager.getHeader()!.id,
       workDir,
       attachments: service,
-      registry: newRegistry(workDir, undefined),
+      registry: createRegistry(workDir, undefined),
       artifactEnabled: true,
     });
     const collector = runtime.beginArtifactCollection("run-panic")!;
@@ -209,10 +209,10 @@ Deno.test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () =>
 
 Deno.test("attachSessionResourcesUsesManagerIdentity", async () => {
   const workDir = Deno.makeTempDirSync();
-  const manager = newManager(workDir, Deno.makeTempDirSync());
+  const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
   try {
-    const registry = newRegistry(workDir, newNoneSandbox());
+    const registry = createRegistry(workDir, createNoneSandbox());
     const runtime = await attachSessionResources({
       source: SOURCE_ACP,
       workDir,
@@ -235,7 +235,7 @@ Deno.test("attachSessionResourcesRejectsIncompleteOwnership", async () => {
 
 Deno.test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
   const workDir = Deno.makeTempDirSync();
-  const manager = newManager(workDir, Deno.makeTempDirSync());
+  const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
   try {
     const runtime = new SessionRuntime({ source: SOURCE_TUI, workDir });
@@ -252,12 +252,12 @@ Deno.test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
 Deno.test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
   const workDir = Deno.makeTempDirSync();
   const sessionDir = Deno.makeTempDirSync();
-  const first = newManager(workDir, sessionDir);
+  const first = createManager(workDir, sessionDir);
   first.init();
   try {
     const runtime = new SessionRuntime({ source: SOURCE_TUI, workDir });
     await runtime.bindSession(first, SOURCE_TUI);
-    const invalid = newManager(workDir, sessionDir);
+    const invalid = createManager(workDir, sessionDir);
     invalid.init();
     invalid.setExpertBinding("does-not-exist");
     await assertRejects(() => runtime.bindSession(invalid, SOURCE_TUI));
@@ -269,7 +269,7 @@ Deno.test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
 });
 
 Deno.test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
-  const manager = newManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
+  const manager = createManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
   manager.init();
   try {
     const runtime = new SessionRuntime({ source: SOURCE_TUI });
@@ -313,11 +313,11 @@ Deno.test("buildRegistryAppliesAdapterPolicy", () => {
 Deno.test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () => {
   const workDir = Deno.makeTempDirSync();
   writeExpertFixtures(workDir);
-  const manager = newManager(workDir, Deno.makeTempDirSync());
+  const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
   try {
     const model = makeModel();
-    const p = newMockProvider("test-provider", [model], []);
+    const p = createMockProvider("test-provider", [model], []);
     const runtime = new SessionRuntime({
       id: manager.getHeader()!.id,
       source: SOURCE_ACP,
@@ -360,7 +360,7 @@ Deno.test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () =>
 
 Deno.test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
   const workDir = Deno.makeTempDirSync();
-  const manager = newManager(workDir, Deno.makeTempDirSync());
+  const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
   try {
     const modelOne = makeModel({
@@ -375,7 +375,7 @@ Deno.test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
       contextWindow: 65536,
       reasoning: true,
     });
-    const p = newMockProvider("test-provider", [modelOne, modelTwo], []);
+    const p = createMockProvider("test-provider", [modelOne, modelTwo], []);
     const runtime = new SessionRuntime({
       id: manager.getHeader()!.id,
       source: SOURCE_ACP,

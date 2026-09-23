@@ -30,7 +30,7 @@ import {
   decisionEventEnvelope,
   loadRunDecisionRecords,
 } from "./decision_events.ts";
-import { newDecisionResolutionRecord } from "./decision_record.ts";
+import { createDecisionResolutionRecord } from "./decision_record.ts";
 import { replayDecisions } from "./decision_replay.ts";
 import {
   DECISION_APPROVAL,
@@ -526,7 +526,7 @@ function recoveryDecisionResolutionEvents(
       status: "cancelled",
       value,
     };
-    const record = newDecisionResolutionRecord(request, resolution, {
+    const record = createDecisionResolutionRecord(request, resolution, {
       reason,
       code: reasonCode,
     });

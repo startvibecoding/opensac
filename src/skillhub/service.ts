@@ -1,7 +1,7 @@
 import * as path from "@std/path";
 import { projectSkillDirs } from "../skills/skills.ts";
-import { MemoryCache, newMemoryCache } from "./cache.ts";
-import { newClawHubClient } from "./clawhub.ts";
+import { createMemoryCache, MemoryCache } from "./cache.ts";
+import { createClawHubClient } from "./clawhub.ts";
 import {
   type InstallRequest,
   type InstallResult,
@@ -9,7 +9,7 @@ import {
   LocalSkillExistsError,
 } from "./install.ts";
 import { LocalIndex, readMetadata, versionsDiffer } from "./local.ts";
-import { newSkillHubClient } from "./skillhubcn.ts";
+import { createSkillHubClient } from "./skillhubcn.ts";
 import type {
   Category,
   InstalledState,
@@ -40,16 +40,17 @@ export class Service {
     officialHandles: string[],
     ...clients: MarketClient[]
   ) {
-    const resolved = clients.length > 0
-      ? clients
-      : [newSkillHubClient("", undefined), newClawHubClient("", undefined)];
+    const resolved = clients.length > 0 ? clients : [
+      createSkillHubClient("", undefined),
+      createClawHubClient("", undefined),
+    ];
     for (const client of resolved) {
       if (client) this.clients.set(client.market().id, client);
     }
     this.globalDir = globalDir;
     this.projectDirs = projectDirs;
     this.officialHandles = officialHandles;
-    this.cache = newMemoryCache(30_000);
+    this.cache = createMemoryCache(30_000);
   }
 
   /** Builds a service for a work directory's project skill dirs. */

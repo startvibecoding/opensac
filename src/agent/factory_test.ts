@@ -5,14 +5,14 @@ import { assert, assertEquals } from "@std/assert";
 import type { Agent as PublicAgent } from "../../sdk/agent/types.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { Level, Manager as SandboxManager } from "../sandbox/sandbox.ts";
-import { newManager } from "../sandbox/sandbox.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
-import { newMockProvider } from "../provider/mock.ts";
-import { newRegistry } from "../tools/tool.ts";
-import { newAgentWithLoopConfig } from "./agent.ts";
-import { AgentAdapter, newAgentAdapter } from "./bridge.ts";
-import { newAgentFactoryWithOptions } from "./factory.ts";
-import { newAgentManager, runtimeConfigOfManagedAgent } from "./manager.ts";
+import { createManager } from "../sandbox/sandbox.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
+import { createMockProvider } from "../provider/mock.ts";
+import { createRegistry } from "../tools/tool.ts";
+import { createAgentWithLoopConfig } from "./agent.ts";
+import { AgentAdapter, createAgentAdapter } from "./bridge.ts";
+import { createAgentFactory } from "./factory.ts";
+import { createAgentManager, runtimeConfigOfManagedAgent } from "./manager.ts";
 import { emptyCompaction, testModel } from "./agent_testutil.ts";
 
 Deno.env.set(
@@ -22,7 +22,7 @@ Deno.env.set(
 
 // Compile-time assertion: AgentAdapter satisfies the public Agent interface.
 const _adapterSatisfiesInterface: PublicAgent = new AgentAdapter(
-  newAgentWithLoopConfig({ mode: "yolo" }, undefined),
+  createAgentWithLoopConfig({ mode: "yolo" }, undefined),
 );
 void _adapterSatisfiesInterface;
 
@@ -31,14 +31,14 @@ function contains(haystack: string, needle: string): boolean {
 }
 
 Deno.test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
-  const mockProvider = newMockProvider(
+  const mockProvider = createMockProvider(
     "mock",
     [testModel("model1", "Model 1")],
     [],
   );
   const settings: Settings = defaultSettings();
   settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
-  const factory = newAgentFactoryWithOptions(
+  const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],
     settings,
@@ -54,19 +54,19 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
       workflowsEnabled: false,
     },
   );
-  const manager = newAgentManager(factory);
+  const manager = createAgentManager(factory);
 
-  const parentRegistry = newRegistry(
+  const parentRegistry = createRegistry(
     Deno.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
-    newNoneSandbox(),
+    createNoneSandbox(),
   );
-  const parent = newAgentWithLoopConfig({
+  const parent = createAgentWithLoopConfig({
     id: "parent",
     mode: "yolo",
     forcedMode: "yolo",
     beforeToolCall: () => ({ block: true, reason: "inherited policy" }),
   }, parentRegistry);
-  manager.register(newAgentAdapter(parent));
+  manager.register(createAgentAdapter(parent));
 
   const child = manager.create({
     parentId: parent.id(),
@@ -89,14 +89,14 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
 });
 
 Deno.test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
-  const mockProvider = newMockProvider(
+  const mockProvider = createMockProvider(
     "mock",
     [testModel("model1", "Model 1")],
     [],
   );
   const settings: Settings = defaultSettings();
   settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
-  const factory = newAgentFactoryWithOptions(
+  const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],
     settings,
@@ -112,19 +112,19 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
       workflowsEnabled: false,
     },
   );
-  const manager = newAgentManager(factory);
+  const manager = createAgentManager(factory);
 
-  const parentRegistry = newRegistry(
+  const parentRegistry = createRegistry(
     Deno.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
-    newNoneSandbox(),
+    createNoneSandbox(),
   );
-  const parent = newAgentWithLoopConfig({
+  const parent = createAgentWithLoopConfig({
     id: "parent-fence",
     mode: "yolo",
     forcedMode: "yolo",
     beforeToolExecute: () => ({ block: true, reason: "inherited fence" }),
   }, parentRegistry);
-  manager.register(newAgentAdapter(parent));
+  manager.register(createAgentAdapter(parent));
 
   const child = manager.create({
     parentId: parent.id(),
@@ -148,18 +148,18 @@ Deno.test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
 });
 
 Deno.test("AgentFactoryWorkflowPromptNotInheritedByChild", () => {
-  const mockProvider = newMockProvider(
+  const mockProvider = createMockProvider(
     "mock",
     [testModel("model1", "Model 1")],
     [],
   );
-  const sandboxMgr: SandboxManager = newManager(
+  const sandboxMgr: SandboxManager = createManager(
     Deno.makeTempDirSync({ prefix: "opensac-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
   settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
-  const factory = newAgentFactoryWithOptions(
+  const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],
     settings,
@@ -171,7 +171,7 @@ Deno.test("AgentFactoryWorkflowPromptNotInheritedByChild", () => {
     undefined,
     { multiAgentEnabled: true, delegateEnabled: true, workflowsEnabled: true },
   );
-  const mgr = newAgentManager(factory);
+  const mgr = createAgentManager(factory);
 
   const parent = mgr.create({ id: "main" }) as AgentAdapter;
   assert(parent.inner.config.workflows === true);
@@ -185,18 +185,18 @@ Deno.test("AgentFactoryWorkflowPromptNotInheritedByChild", () => {
 });
 
 Deno.test("AgentFactoryPropagatesProviderNameToChildren", () => {
-  const mockProvider = newMockProvider(
+  const mockProvider = createMockProvider(
     "underlying-vendor",
     [testModel("model1", "Model 1")],
     [],
   );
-  const sandboxMgr: SandboxManager = newManager(
+  const sandboxMgr: SandboxManager = createManager(
     Deno.makeTempDirSync({ prefix: "opensac-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
   settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
-  const factory = newAgentFactoryWithOptions(
+  const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],
     settings,
@@ -213,7 +213,7 @@ Deno.test("AgentFactoryPropagatesProviderNameToChildren", () => {
       providerName: "configured-provider",
     },
   );
-  const mgr = newAgentManager(factory);
+  const mgr = createAgentManager(factory);
 
   const parent = mgr.create({ id: "main" }) as AgentAdapter;
   assertEquals(parent.inner.config.vendor, "configured-provider");
@@ -221,7 +221,7 @@ Deno.test("AgentFactoryPropagatesProviderNameToChildren", () => {
   const child = mgr.create({ id: "child", parentId: "main" }) as AgentAdapter;
   assertEquals(child.inner.config.vendor, "configured-provider");
 
-  const nextProvider = newMockProvider(
+  const nextProvider = createMockProvider(
     "next-underlying-vendor",
     [testModel("model2", "Model 2")],
     [],

@@ -5,33 +5,29 @@
 
 import type { Options, Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
-import { newBwrapSandboxWithOptions } from "./bwrap.ts";
-import { newMacSandboxWithOptions } from "./mac.ts";
-import { newWinSandbox } from "./windows.ts";
-import { newNoneSandbox } from "./none.ts";
+import { createBwrapSandbox } from "./bwrap.ts";
+import { createMacSandbox } from "./mac.ts";
+import { createWinSandbox } from "./windows.ts";
+import { createNoneSandbox } from "./none.ts";
 
-/** Creates the platform-specific sandbox for the current OS. */
-export function newPlatformSandbox(
+/**
+ * Creates the platform-specific sandbox for the current OS (default policy
+ * unless `opts` is given).
+ */
+export function createPlatformSandbox(
   projectDir: string,
   level: Level,
-): Sandbox {
-  return newPlatformSandboxWithOptions(projectDir, level, {});
-}
-
-export function newPlatformSandboxWithOptions(
-  projectDir: string,
-  level: Level,
-  opts: Options,
+  opts: Options = {},
 ): Sandbox {
   switch (Deno.build.os) {
     case "linux":
-      return newBwrapSandboxWithOptions(projectDir, level, opts);
+      return createBwrapSandbox(projectDir, level, opts);
     case "darwin":
-      return newMacSandboxWithOptions(projectDir, level, opts);
+      return createMacSandbox(projectDir, level, opts);
     case "windows":
-      return newWinSandbox(projectDir, level);
+      return createWinSandbox(projectDir, level);
     default:
       // Platforms without a dedicated backend (e.g. FreeBSD) run unsandboxed.
-      return newNoneSandbox();
+      return createNoneSandbox();
   }
 }

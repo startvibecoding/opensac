@@ -32,9 +32,9 @@ import {
   updateKnowledgeBase,
 } from "../session/knowledge_bases.ts";
 import {
+  createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
   KnowledgeBaseService,
-  newKnowledgeBaseServiceWithSettings,
 } from "../agentruntime/knowledgebase.ts";
 import type { KnowledgeIndexProgress } from "../agentruntime/knowledge_index_job.ts";
 import {
@@ -45,14 +45,14 @@ import {
 import { SOURCE_ACP as SourceACPValue } from "../agentruntime/source.ts";
 import { normalizeJobSchedule, parseSchedule } from "../cron/schedule.ts";
 import type { CronJob, CronStore } from "../cron/cron.ts";
-import { newSQLiteCronStore } from "../cron/sqlite_store.ts";
+import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import {
+  createScheduler,
   JobAlreadyRunningError,
-  newSchedulerWithSessionDir,
   Scheduler,
 } from "../cron/scheduler.ts";
 import { userVisibleJobs } from "../cron/maintenance.ts";
-import { newAgentManager } from "../agentruntime/agent_manager.ts";
+import { createAgentManager } from "../agentruntime/agent_manager.ts";
 import { maintenancePolicyFromSettings } from "../agentruntime/maintenance_cron.ts";
 import { getSessionDir } from "../config/mod.ts";
 import {
@@ -176,7 +176,7 @@ export function manageKnowledgeBaseService(
     throw new Error("knowledge base runtime is unavailable");
   }
   if (s.knowledgeService !== null) return s.knowledgeService;
-  const service = newKnowledgeBaseServiceWithSettings(
+  const service = createKnowledgeBaseService(
     getSessionDir(s.settings),
     defaultKnowledgeBaseIndexPolicy(),
     s.settings,
@@ -203,7 +203,7 @@ function knowledgeBaseMCPCommand(): string {
 
 export function knowledgeBaseIDFromCronJob(
   job: CronJob,
-): { id: string; ok: boolean } {
+): string | undefined {
   return knowledgeBaseIDFromCronJobID(job.id ?? "");
 }
 
@@ -349,8 +349,9 @@ async function handleKnowledgeBaseCronJob(
   job: CronJob,
   _signal?: AbortSignal,
 ): Promise<{ handled: boolean; response: string; error: Error | null }> {
-  const { ok } = knowledgeBaseIDFromCronJobID(job.id ?? "");
-  if (!ok) return { handled: false, response: "", error: null };
+  if (knowledgeBaseIDFromCronJobID(job.id ?? "") === undefined) {
+    return { handled: false, response: "", error: null };
+  }
   let service: KnowledgeBaseService;
   try {
     service = manageKnowledgeBaseService(s);
@@ -384,8 +385,7 @@ export function syncAllKnowledgeBaseSchedulesWithStore(
     syncKnowledgeBaseScheduleWithStore(store, base);
   }
   for (const job of store.list()) {
-    const { ok } = knowledgeBaseIDFromCronJob(job);
-    if (!ok) continue;
+    if (knowledgeBaseIDFromCronJob(job) === undefined) continue;
     if (!wanted.has(job.id ?? "")) {
       try {
         store.delete(job.id ?? "");
@@ -452,10 +452,10 @@ export function ensureManageCron(s: AcpServer): {
   }
   const settings = s.settings;
   const sessionDir = getSessionDir(settings);
-  const store = newSQLiteCronStore(sessionDir);
+  const store = createSQLiteCronStore(sessionDir);
   let manager = s.cronAgentMgr;
   if (manager === null) {
-    manager = newAgentManager({
+    manager = createAgentManager({
       runtime: s.runtime,
       provider: s.p,
       model: s.m,
@@ -466,7 +466,7 @@ export function ensureManageCron(s: AcpServer): {
     });
     s.cronAgentMgr = manager;
   }
-  const scheduler = newSchedulerWithSessionDir(
+  const scheduler = createScheduler(
     store,
     manager,
     manageCronInterval(),
@@ -805,7 +805,7 @@ export function handleManageCronUpdate(
 function handleManageCronIDOnly(
   s: AcpServer,
   req: ACPRPCRequest,
-): { id: string; ok: boolean } {
+): string | undefined {
   let fields: Record<string, unknown>;
   try {
     fields = manageDecodeWhitelist(
@@ -815,7 +815,7 @@ function handleManageCronIDOnly(
     );
   } catch (err) {
     s.writeResponse(req.idRaw, null, err as RPCError);
-    return { id: "", ok: false };
+    return undefined;
   }
   const id = (manageDecodeOptionalString(fields.id).value ?? "").trim();
   if (id === "") {
@@ -824,17 +824,17 @@ function handleManageCronIDOnly(
       null,
       acpStructuredRPCError(-32602, "invalid_params", "id is required", null),
     );
-    return { id: "", ok: false };
+    return undefined;
   }
-  return { id, ok: true };
+  return id;
 }
 
 export function handleManageCronRemove(
   s: AcpServer,
   req: ACPRPCRequest,
 ): void {
-  const { id, ok } = handleManageCronIDOnly(s, req);
-  if (!ok) return;
+  const id = handleManageCronIDOnly(s, req);
+  if (id === undefined) return;
   let store: CronStore;
   try {
     ({ store } = ensureManageCron(s));
@@ -873,8 +873,8 @@ export function handleManageCronRemove(
 }
 
 export function handleManageCronRun(s: AcpServer, req: ACPRPCRequest): void {
-  const { id, ok } = handleManageCronIDOnly(s, req);
-  if (!ok) return;
+  const id = handleManageCronIDOnly(s, req);
+  if (id === undefined) return;
   let scheduler: Scheduler;
   try {
     ({ scheduler } = ensureManageCron(s));

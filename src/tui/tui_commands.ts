@@ -53,12 +53,12 @@ import {
 } from "../agentruntime/session_lifecycle.ts";
 import { listForDirDetailed, type SessionDetail } from "../session/manager.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
-import { newRunContext } from "../agent/run_context.ts";
+import { createRunContext } from "../agent/run_context.ts";
 import type { Agent } from "../agent/agent.ts";
 import type { Event } from "../agent/events.ts";
 import { Service as SkillHubService } from "../skillhub/service.ts";
 import { projectSkillDirs } from "../skills/skills.ts";
-import { newLocalIndex } from "../skillhub/local.ts";
+import { createLocalIndex } from "../skillhub/local.ts";
 import type { Market } from "../skillhub/types.ts";
 import { clientsForSettings } from "../skillhub/factory.ts";
 import { defaultStore as workflowStore } from "../workflow/tools.ts";
@@ -1359,7 +1359,7 @@ export class TuiCommands {
           };
         }
         case "installed": {
-          const index = newLocalIndex(
+          const index = createLocalIndex(
             this.#skillHubTargetDir(),
             projectSkillDirs(this.#host.workDir),
           );
@@ -1536,10 +1536,10 @@ export class TuiCommands {
       return lines.join("\n");
     }
     for (const id of ids) {
-      const [parentID, hasParent] = manager.parent(id);
+      const parentID = manager.parent(id);
       const childCount = manager.childrenOf(id).length;
       let info = `  ${id} [running]`;
-      if (hasParent) info += ` parent=${parentID}`;
+      if (parentID !== undefined) info += ` parent=${parentID}`;
       if (childCount > 0) info += ` children=${childCount}`;
       lines.push(info);
     }
@@ -1556,8 +1556,10 @@ export class TuiCommands {
     } catch {
       return { message: tr.text("agent.manager_unavailable"), error: true };
     }
-    const [, ok] = manager.get(id);
-    if (!ok) return { message: tr.text("agent.not_found", id), error: true };
+    const existing = manager.get(id);
+    if (existing === undefined) {
+      return { message: tr.text("agent.not_found", id), error: true };
+    }
     this.#activeAgent = id;
     return { message: tr.text("agent.focused", id) };
   }
@@ -1596,7 +1598,7 @@ export class TuiCommands {
       return true;
     };
     try {
-      await agent.compact(newRunContext(), sink, true);
+      await agent.compact(createRunContext(), sink, true);
       return { message: tr.text("compact.done") };
     } catch (err) {
       return { message: (err as Error).message, error: true };

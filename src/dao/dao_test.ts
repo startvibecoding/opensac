@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { CronDAO, type CronJobRecord, isNoRowsRun } from "./mod.ts";
+import { CronDAO, type CronJobRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
 
 Deno.test("cron DAO CRUD and claim", () => {
@@ -27,6 +27,7 @@ Deno.test("cron DAO CRUD and claim", () => {
     };
     cronDAO.create(record);
     const loaded = cronDAO.get(record.id);
+    assert(loaded);
     assert(loaded.name === record.name && loaded.enabled);
 
     const claimed = cronDAO.claimDue(
@@ -37,16 +38,10 @@ Deno.test("cron DAO CRUD and claim", () => {
     assert(claimed, "expected an unstarted enabled job to be claimed");
 
     loaded.name = "updated";
-    cronDAO.update(loaded);
-    cronDAO.delete(record.id);
+    assert(cronDAO.update(loaded));
+    assert(cronDAO.delete(record.id));
 
-    let err: unknown;
-    try {
-      cronDAO.get(record.id);
-    } catch (caught) {
-      err = caught;
-    }
-    assert(isNoRowsRun(err), `Get after delete error = ${String(err)}`);
+    assertEquals(cronDAO.get(record.id), undefined);
     assertEquals(cronDAO.list().length, 0);
   } finally {
     closeTestDbs();

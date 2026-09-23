@@ -383,7 +383,7 @@ export class Manager {
 }
 
 /** Creates a new skills manager. */
-export function newManager(
+export function createManager(
   globalDir: string,
   projectDir: string,
   ...additionalProjectDirs: string[]
@@ -392,7 +392,7 @@ export function newManager(
 }
 
 /** Creates a new skills manager with explicit project directories. */
-export function newManagerWithProjectDirs(
+export function createManagerWithProjectDirs(
   globalDir: string,
   projectDirs: string[],
 ): Manager {

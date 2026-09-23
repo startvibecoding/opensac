@@ -6,7 +6,7 @@
 // `Manager.setSessionBinding`/`setExpertBinding`/`setWorkDir` methods now live
 // with the Manager in `manager.ts`.
 
-import { BindingDAO, isNoRows } from "../dao/mod.ts";
+import { BindingDAO } from "../dao/mod.ts";
 import { openRootDB } from "./root_db.ts";
 
 /** A current external channel binding. */
@@ -111,13 +111,13 @@ export function findBinding(
   const db = openRootDB(sessionDir);
   try {
     const record = new BindingDAO(db.db).find(channelType, channelId);
+    if (record === undefined) return null;
     return {
       sessionId: record.sessionId,
       channelType: record.channelType,
       channelId: record.channelId,
     };
   } catch (err) {
-    if (isNoRows(err)) return null;
     throw new Error(`find session binding: ${message(err)}`);
   }
 }
@@ -131,13 +131,13 @@ export function findBindingBySessionId(
   const db = openRootDB(sessionDir);
   try {
     const record = new BindingDAO(db.db).findBySession(sessionId);
+    if (record === undefined) return null;
     return {
       sessionId: record.sessionId,
       channelType: record.channelType,
       channelId: record.channelId,
     };
   } catch (err) {
-    if (isNoRows(err)) return null;
     throw new Error(`find session binding: ${message(err)}`);
   }
 }

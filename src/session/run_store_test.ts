@@ -6,7 +6,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
-import { newAssistantMessage } from "../provider/types.ts";
+import { createAssistantMessage } from "../provider/types.ts";
 import {
   annotateSessionRunError,
   createSessionRun,
@@ -215,7 +215,10 @@ Deno.test("finish session run and conversation turn commits assistant idempotent
         endedAt: null,
       },
     );
-    const assistant = newAssistantMessage([{ type: "text", text: "answer" }]);
+    const assistant = createAssistantMessage([{
+      type: "text",
+      text: "answer",
+    }]);
     const planTime = new Date(started.getTime() + 1500);
     const plan: DeliveryPlan = {
       intent: {
@@ -383,7 +386,7 @@ Deno.test("finish session run commits when turn already closed", () => {
       "stop",
       new Date(started.getTime() + 1000),
     );
-    const assistant = newAssistantMessage([
+    const assistant = createAssistantMessage([
       { type: "text", text: "answer after closed turn" },
     ]);
     const finished = new Date(started.getTime() + 2000);
@@ -477,7 +480,7 @@ Deno.test("finish session run rolls back invalid delivery plan", () => {
         endedAt: null,
       },
     );
-    const assistant = newAssistantMessage([
+    const assistant = createAssistantMessage([
       { type: "text", text: "must not commit" },
     ]);
     const plan: DeliveryPlan = {

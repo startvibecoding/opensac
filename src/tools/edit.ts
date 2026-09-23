@@ -4,7 +4,7 @@ import {
   writeFileAtomic,
 } from "./io_helpers.ts";
 import {
-  newDiffToolResult,
+  createDiffToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -173,7 +173,7 @@ export class EditTool implements Tool {
       locked = false;
 
       const diff = buildFileDiff(p, originalContent, newContent);
-      return newDiffToolResult(
+      return createDiffToolResult(
         `Applied ${edits.length} edit(s) to ${p}\n${
           formatFileDiffSummary(diff)
         }`,

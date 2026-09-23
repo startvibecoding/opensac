@@ -28,14 +28,14 @@ import type {
 } from "../provider/types.ts";
 import { type Sandbox } from "../sandbox/mod.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
-import { newBashToolWithJobManager } from "./bash.ts";
+import { createBashTool } from "./bash.ts";
 import { EditTool } from "./edit.ts";
 import { FindTool } from "./find.ts";
 import { defaultFileLockManager, FileLockManager } from "./file_lock.ts";
 import { InsertTool } from "./insert.ts";
 import type { FileDiff } from "./io_helpers.ts";
 import { GrepTool } from "./grep.ts";
-import { type JobManager, newJobManager } from "./jobmanager.ts";
+import { createJobManager, type JobManager } from "./jobmanager.ts";
 import { JobsTool } from "./jobstool.ts";
 import { KillTool } from "./killtool.ts";
 import { LsTool } from "./ls.ts";
@@ -141,17 +141,17 @@ export interface PlanStep {
 }
 
 /** Creates a plain text tool result. */
-export function newTextToolResult(text: string): ToolResult {
+export function createTextToolResult(text: string): ToolResult {
   return { text };
 }
 
 /** Creates a text tool result with structured diff metadata. */
-export function newDiffToolResult(text: string, diff: FileDiff): ToolResult {
+export function createDiffToolResult(text: string, diff: FileDiff): ToolResult {
   return { text, diff };
 }
 
 /** Creates a tool result with insert metadata and an optional diff. */
-export function newInsertToolResult(
+export function createInsertToolResult(
   text: string,
   diff: FileDiff | null,
   result: InsertResult,
@@ -160,7 +160,7 @@ export function newInsertToolResult(
 }
 
 /** Creates a tool result carrying a structured task plan. */
-export function newPlanToolResult(
+export function createPlanToolResult(
   text: string,
   plan: TaskPlan,
 ): ToolResult {
@@ -168,19 +168,19 @@ export function newPlanToolResult(
 }
 
 /** Creates a tool result that includes an image. */
-export function newImageToolResult(
+export function createImageToolResult(
   text: string,
   mimeType: string,
   base64Data: string,
 ): ToolResult {
-  return newImageToolResultWithContent(text, {
+  return createImageToolResultWithContent(text, {
     mimeType,
     data: base64Data,
   });
 }
 
 /** Creates a tool result with a fully populated image payload. */
-export function newImageToolResultWithContent(
+export function createImageToolResultWithContent(
   text: string,
   image: ImageContent,
 ): ToolResult {
@@ -429,7 +429,7 @@ export class Registry {
     this.register(new WriteTool(this));
     this.register(new EditTool(this));
     this.register(new InsertTool(this));
-    const bashTool = newBashToolWithJobManager(this, this.#jobManager);
+    const bashTool = createBashTool(this, this.#jobManager);
     this.register(bashTool);
     this.register(new JobsTool(this, bashTool));
     this.register(new KillTool(this, bashTool));
@@ -440,7 +440,7 @@ export class Registry {
 
   /** Registers only the specified tools by name. */
   registerFiltered(toolNames: string[]): void {
-    const bashTool = newBashToolWithJobManager(this, this.#jobManager);
+    const bashTool = createBashTool(this, this.#jobManager);
     const factories: Record<string, () => Tool> = {
       "read": () => new ReadTool(this),
       "ls": () => new LsTool(this),
@@ -544,19 +544,19 @@ function escapes(rel: string): boolean {
 }
 
 /** Creates a new tool registry with a fresh job manager. */
-export function newRegistry(
+export function createRegistry(
   workDir: string,
   sb: Sandbox | undefined,
 ): Registry {
   return new Registry(workDir, sb, {
-    jobManager: newJobManager(),
+    jobManager: createJobManager(),
     fileLocks: defaultFileLockManager(),
     envVars: envList(loadEnv()),
   });
 }
 
 /** Creates a Registry with the given config. */
-export function newRegistryWithConfig(cfg: RegistryConfig): Registry {
+export function createRegistryWithConfig(cfg: RegistryConfig): Registry {
   const fileLocks = cfg.fileLocks ?? defaultFileLockManager();
   let enablePlanTool = true;
   if (cfg.enablePlanTool !== undefined) enablePlanTool = cfg.enablePlanTool;
@@ -567,7 +567,7 @@ export function newRegistryWithConfig(cfg: RegistryConfig): Registry {
   }
 
   const r = new Registry(cfg.workDir, cfg.sandbox, {
-    jobManager: newJobManager(),
+    jobManager: createJobManager(),
     fileLocks,
     skillsMgr: cfg.skillsMgr,
     imageHint: cfg.imageHint,

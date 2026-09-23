@@ -5,7 +5,7 @@ import {
   steeringPrompt,
   workerTaskPrompt,
 } from "./prompt.ts";
-import { newUpdateTool } from "./tools.ts";
+import { createUpdateTool } from "./tools.ts";
 import { statusActive, statusCompleteCandidate } from "./state.ts";
 import { makeObjective } from "./test_helpers.ts";
 
@@ -40,7 +40,7 @@ Deno.test("SteeringPrompt requires full objective audit", () => {
 });
 
 Deno.test("UpdateTool requires reason", () => {
-  const tool = newUpdateTool(null, () => "");
+  const tool = createUpdateTool(null, () => "");
   const params = JSON.stringify(tool.parameters());
   assert(
     params.includes('"required":["status","reason"]'),

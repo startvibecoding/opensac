@@ -9,7 +9,7 @@ import {
   parseGoDurationMs,
   resolveACPTimeout,
 } from "./options.ts";
-import { acpRunOptions, newRootCommand } from "./command.ts";
+import { acpRunOptions, createRootCommand } from "./command.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 
 Deno.test("parseGoDurationMs covers Go duration units", () => {
@@ -118,7 +118,7 @@ Deno.test("doctor command projects JSON and human output", () => {
 });
 
 Deno.test("root command registers acp doctor and knowledge-mcp", async () => {
-  const root = newRootCommand("test-version");
+  const root = createRootCommand("test-version");
   const help = await root.getHelp();
   const names: string[] = ["acp", "doctor", "knowledge-mcp", "stats"];
   for (const name of names) {
@@ -127,7 +127,7 @@ Deno.test("root command registers acp doctor and knowledge-mcp", async () => {
 });
 
 Deno.test("every supported subcommand is wired (no pending placeholders)", async () => {
-  const root = newRootCommand("test-version");
+  const root = createRootCommand("test-version");
   const help = await root.getHelp();
   for (
     const name of [
@@ -155,7 +155,7 @@ Deno.test("every supported subcommand is wired (no pending placeholders)", async
 });
 
 Deno.test("knowledge-mcp serve requires at least one knowledge base", async () => {
-  const root = newRootCommand("test-version");
+  const root = createRootCommand("test-version");
   let threw = false;
   try {
     // deno-lint-ignore no-explicit-any
@@ -172,7 +172,7 @@ Deno.test("knowledge-mcp serve requires at least one knowledge base", async () =
 });
 
 Deno.test("root -P print action is wired (no longer a placeholder)", async () => {
-  const root = newRootCommand("test-version");
+  const root = createRootCommand("test-version");
   const help = await root.getHelp();
   assert(help.includes("prompt..."), help);
   assert(help.includes("--print"), help);

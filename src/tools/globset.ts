@@ -13,7 +13,7 @@ export interface Glob {
 }
 
 /** Compiles a glob pattern into a {@link Glob}. */
-export function newGlob(patternIn: string): Glob {
+export function createGlob(patternIn: string): Glob {
   let pattern = patternIn;
   let isNegated = false;
   if (pattern.startsWith("!")) {
@@ -140,7 +140,7 @@ export class GlobSet {
       if (pat === "" || pat.startsWith("#")) {
         continue;
       }
-      globs.push(newGlob(pat));
+      globs.push(createGlob(pat));
     }
     return new GlobSet(globs);
   }

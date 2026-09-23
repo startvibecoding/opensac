@@ -2,9 +2,8 @@ import type { DB } from "../db/mod.ts";
 import {
   execChanges,
   execReturning,
-  isNoRows,
   queryAll,
-  queryOne,
+  queryOptional,
 } from "./database.ts";
 
 export interface EntryRecord {
@@ -46,7 +45,7 @@ export class ConversationTurnDAO {
   constructor(private readonly db: DB | null) {}
 
   appendEntry(executor: DB, record: EntryRecord): number {
-    return execReturning<number>(
+    const seq = execReturning<number>(
       executor,
       `INSERT INTO entries (session_id, id, type, parent_id, timestamp, data)
        VALUES (?, ?, ?, ?, ?, ?) RETURNING seq`,
@@ -59,10 +58,12 @@ export class ConversationTurnDAO {
         record.data,
       ],
     );
+    if (seq === undefined) throw new Error("insert entry did not return a seq");
+    return seq;
   }
 
-  entry(executor: DB, id: string): EntryRecord {
-    return queryOne<EntryRecord>(
+  entry(executor: DB, id: string): EntryRecord | undefined {
+    return queryOptional<EntryRecord>(
       executor,
       `SELECT ${entryColumns} FROM entries WHERE id = ? LIMIT 1`,
       [id],
@@ -70,26 +71,21 @@ export class ConversationTurnDAO {
   }
 
   currentLeaf(executor: DB, sessionId: string, excludedType: string): string {
-    try {
-      const row = queryOne<{ id: string }>(
-        executor,
-        `SELECT id FROM entries WHERE session_id = ? AND type <> ?
-         ORDER BY seq DESC LIMIT 1`,
-        [sessionId, excludedType],
-      );
-      return row.id;
-    } catch (err) {
-      if (isNoRows(err)) return "";
-      throw err;
-    }
+    const row = queryOptional<{ id: string }>(
+      executor,
+      `SELECT id FROM entries WHERE session_id = ? AND type <> ?
+       ORDER BY seq DESC LIMIT 1`,
+      [sessionId, excludedType],
+    );
+    return row?.id ?? "";
   }
 
   state(
     executor: DB,
     sessionId: string,
     turnId: string,
-  ): ConversationTurnState {
-    return queryOne<ConversationTurnState>(
+  ): ConversationTurnState | undefined {
+    return queryOptional<ConversationTurnState>(
       executor,
       `SELECT ct.intent_id AS intentId, ct.status AS status,
         COALESCE((SELECT json_extract(e.data, '$.runId') FROM entries e
@@ -103,12 +99,12 @@ export class ConversationTurnDAO {
   }
 
   openCount(executor: DB, sessionId: string): number {
-    return queryOne<{ n: number }>(
+    return queryOptional<{ n: number }>(
       executor,
       `SELECT COUNT(*) AS n FROM conversation_turns
        WHERE session_id = ? AND status = ?`,
       [sessionId, "open"],
-    ).n;
+    )?.n ?? 0;
   }
 
   reopen(executor: DB, turn: ConversationTurnRecord): void {

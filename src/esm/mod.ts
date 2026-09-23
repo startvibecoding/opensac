@@ -71,9 +71,9 @@ export {
   workerTaskPrompt,
 } from "./prompt.ts";
 export {
+  createGetTool,
+  createUpdateTool,
   formatObjective,
-  newGetTool,
-  newUpdateTool,
   type RunIDFunc,
   type SessionIDFunc,
 } from "./tools.ts";
@@ -96,6 +96,7 @@ export {
 } from "./supervisor.ts";
 export {
   compactESMError,
+  createRoleIncompleteError,
   EsmCanceledError,
   EsmDeadlineExceededError,
   EsmRoleIncompleteError,
@@ -103,7 +104,6 @@ export {
   isDeadlineExceeded,
   isRoleIncomplete,
   longTaskMaxIterations,
-  newRoleIncompleteError,
   recoveryObserverTimeout,
   type Role,
   roleAudit,

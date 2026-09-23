@@ -50,7 +50,7 @@ export class ActiveRegistry {
 const defaultActiveRegistryInstance = new ActiveRegistry();
 
 /** Creates a fresh active registry. */
-export function newActiveRegistry(): ActiveRegistry {
+export function createActiveRegistry(): ActiveRegistry {
   return new ActiveRegistry();
 }
 

@@ -7,21 +7,17 @@
 
 import { assert, assertEquals, assertFalse, assertThrows } from "@std/assert";
 import type { Model } from "../provider/types.ts";
-import { type MockProvider, newMockProvider } from "../provider/mock.ts";
+import { createMockProvider, type MockProvider } from "../provider/mock.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { AgentAdapter } from "./bridge.ts";
-import {
-  AgentFactory,
-  newAgentFactory,
-  newAgentFactoryWithOptions,
-} from "./factory.ts";
+import { AgentFactory, createAgentFactory } from "./factory.ts";
 import {
   AgentManager,
-  newAgentManager,
+  createAgentManager,
   runtimeConfigOfManagedAgent,
 } from "./manager.ts";
-import { MemberDefRegistry, newMemberDefRegistry } from "./memberdef.ts";
-import { newMemberMailbox } from "./mailbox.ts";
+import { createMemberDefRegistry, MemberDefRegistry } from "./memberdef.ts";
+import { createMemberMailbox } from "./mailbox.ts";
 
 Deno.env.set(
   "OPENSAC_DIR",
@@ -45,8 +41,8 @@ function emptyCompaction() {
   return { enabled: false, reserveTokens: 0, keepRecentTokens: 0 };
 }
 
-function newTestManager(): AgentManager {
-  return newAgentManager(new AgentFactory());
+function createTestManager(): AgentManager {
+  return createAgentManager(new AgentFactory());
 }
 
 function member(id: string): import("./memberdef.ts").MemberDef {
@@ -65,52 +61,50 @@ function member(id: string): import("./memberdef.ts").MemberDef {
 }
 
 Deno.test("AgentManagerCreate", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   const a = m.create({ id: "main" });
   assert(a !== undefined);
   assertEquals(a.id(), "main");
 });
 
 Deno.test("AgentManagerCreateAutoID", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   const a = m.create({});
   assert(a.id() !== "");
 });
 
 Deno.test("AgentManagerCreateWithParent", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
   const child = m.create({ id: "sub-1", parentId: "main" });
   assertEquals(child.parentId(), "main");
   assertEquals(m.getChildren("main"), ["sub-1"]);
-  const [pid, ok] = m.parent("sub-1");
-  assert(ok);
+  const pid = m.parent("sub-1");
   assertEquals(pid, "main");
 });
 
 Deno.test("AgentManagerCreateNestedSubAgentRejected", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
   assertThrows(() => m.create({ id: "sub-sub-1", parentId: "sub-1" }));
 });
 
 Deno.test("AgentManagerCreateMissingParent", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   assertThrows(() => m.create({ id: "orphan", parentId: "nonexistent" }));
 });
 
 Deno.test("AgentManagerGet", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
-  const [a, ok] = m.get("main");
-  assert(ok && a !== undefined);
-  const [, found] = m.get("nonexistent");
-  assertFalse(found);
+  const a = m.get("main");
+  assert(a !== undefined);
+  assertEquals(m.get("nonexistent"), undefined);
 });
 
 Deno.test("AgentManagerDestroy", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
   m.create({ id: "sub-2", parentId: "main" });
@@ -120,7 +114,7 @@ Deno.test("AgentManagerDestroy", () => {
 });
 
 Deno.test("AgentManagerDestroyChild", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
   m.create({ id: "sub-2", parentId: "main" });
@@ -130,12 +124,12 @@ Deno.test("AgentManagerDestroyChild", () => {
 });
 
 Deno.test("AgentManagerDestroyNotFound", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   assertThrows(() => m.destroy("nonexistent"));
 });
 
 Deno.test("AgentManagerFinishCancelsChildrenAndRetainsStatus", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   const parent = m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
   m.markRunning("sub-1");
@@ -148,10 +142,9 @@ Deno.test("AgentManagerFinishCancelsChildrenAndRetainsStatus", () => {
 
   assert(cancelled);
   assertEquals(m.count(), 0);
-  const [, hasParentStatus] = m.status("main");
-  assertFalse(hasParentStatus);
-  const [st, ok] = m.status("sub-1");
-  assert(ok && st !== undefined);
+  assertEquals(m.status("main"), undefined);
+  const st = m.status("sub-1");
+  assert(st !== undefined);
   assertEquals(st.state, "error");
   assertEquals(st.error, "network error");
   assert(parent instanceof AgentAdapter);
@@ -159,7 +152,7 @@ Deno.test("AgentManagerFinishCancelsChildrenAndRetainsStatus", () => {
 });
 
 Deno.test("AgentManagerFinishSuccessKeepsAsyncChildren", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
   m.markRunning("sub-1");
@@ -171,17 +164,15 @@ Deno.test("AgentManagerFinishSuccessKeepsAsyncChildren", () => {
   m.finish("main", undefined);
 
   assertFalse(cancelled);
-  const [, hasMain] = m.get("main");
-  assertFalse(hasMain);
-  const [, hasChild] = m.get("sub-1");
-  assert(hasChild);
-  const [st, ok] = m.status("sub-1");
-  assert(ok && st !== undefined);
+  assertEquals(m.get("main"), undefined);
+  assert(m.get("sub-1") !== undefined);
+  const st = m.status("sub-1");
+  assert(st !== undefined);
   assertEquals(st.state, "running");
 });
 
 Deno.test("AgentManagerList", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "a" });
   m.create({ id: "b" });
   m.create({ id: "c" });
@@ -193,19 +184,18 @@ Deno.test("AgentManagerList", () => {
 });
 
 Deno.test("AgentManagerChildrenEmpty", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   m.create({ id: "main" });
   assertEquals(m.getChildren("main"), undefined);
 });
 
 Deno.test("AgentManagerParentNotFound", () => {
-  const m = newTestManager();
-  const [, ok] = m.parent("nonexistent");
-  assertFalse(ok);
+  const m = createTestManager();
+  assertEquals(m.parent("nonexistent"), undefined);
 });
 
 Deno.test("AgentManagerStatusListenerTerminalTransitions", () => {
-  const m = newTestManager();
+  const m = createTestManager();
   const seen: string[] = [];
   m.addStatusListener((st) => {
     seen.push(`${st.id}:${st.state}`);
@@ -220,15 +210,15 @@ Deno.test("AgentManagerStatusListenerTerminalTransitions", () => {
 
 Deno.test("AgentManagerUpdateRuntimeConfigAffectsFutureAgents", () => {
   const oldModel = model("old-model", "Old", "old-provider");
-  const oldProvider = newMockProvider("old-provider", [oldModel], []);
+  const oldProvider = createMockProvider("old-provider", [oldModel], []);
   const newModel = model("new-model", "New", "new-provider");
-  const newProvider = newMockProvider("new-provider", [newModel], []);
+  const newProvider = createMockProvider("new-provider", [newModel], []);
   const settings: Settings = defaultSettings();
   settings.defaultProvider = "new-provider";
   settings.defaultModel = "new-model";
 
-  const m = newAgentManager(
-    newAgentFactory(
+  const m = createAgentManager(
+    createAgentFactory(
       oldProvider,
       oldModel,
       defaultSettings(),
@@ -259,8 +249,8 @@ Deno.test("AgentManagerUpdateRuntimeConfigAffectsFutureAgents", () => {
 
 Deno.test("ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering", () => {
   const m1 = model("m1", "M1", "");
-  const p = newMockProvider("mock", [m1], []);
-  const factory = newAgentFactoryWithOptions(
+  const p = createMockProvider("mock", [m1], []);
+  const factory = createAgentFactory(
     p,
     m1,
     defaultSettings(),
@@ -276,10 +266,10 @@ Deno.test("ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering", () => {
       workflowsEnabled: false,
     },
   );
-  const manager = newAgentManager(factory);
-  const mailbox = newMemberMailbox();
+  const manager = createAgentManager(factory);
+  const mailbox = createMemberMailbox();
   manager.setMemberContext(
-    newMemberDefRegistry([member("engineer")]),
+    createMemberDefRegistry([member("engineer")]),
     mailbox,
     "team",
   );

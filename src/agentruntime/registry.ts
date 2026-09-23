@@ -11,7 +11,7 @@ import { isPlanToolEnabled, type Settings } from "../config/settings.ts";
 import { type Callbacks, type Client, closeClients } from "../mcp/mcp.ts";
 import type { Manager as SandboxManager } from "../sandbox/sandbox.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
-import { newRegistry, type Registry } from "../tools/tool.ts";
+import { createRegistry, type Registry } from "../tools/tool.ts";
 import { SkillRefTool } from "../tools/skill_ref.ts";
 
 /** An adapter policy callback for tools not yet expressible as capabilities. */
@@ -42,7 +42,7 @@ export function buildRegistry(
   const active = sandboxMgr === null || sandboxMgr === undefined
     ? undefined
     : sandboxMgr.getActive();
-  const registry = newRegistry(workDir, active);
+  const registry = createRegistry(workDir, active);
   if (policy.registerDefaults) {
     if (policy.enablePlanTool === undefined) {
       registry.registerDefaults();

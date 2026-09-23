@@ -99,7 +99,7 @@ export function isRoleIncomplete(err: unknown): boolean {
  * Preserves an adapter's terminal detail while giving the Supervisor one shared
  * classification independent of protocol projection.
  */
-export function newRoleIncompleteError(
+export function createRoleIncompleteError(
   role: Role,
   stopReason: string,
   cause?: unknown,

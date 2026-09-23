@@ -4,11 +4,11 @@
 // Pure helpers (target collection, averaging, formatting) are exported so the
 // table projection is testable without a live provider.
 
-import { createWithOptions } from "../provider/factory/factory.ts";
+import { create } from "../provider/factory/factory.ts";
 import {
   type ChatParams,
+  createUserMessage,
   type Model,
-  newUserMessage,
   type Provider,
   streamDone,
   streamError,
@@ -275,7 +275,7 @@ export async function runSpeedtestRequest(
   }
 
   const params: ChatParams = {
-    messages: [newUserMessage(opts.prompt)],
+    messages: [createUserMessage(opts.prompt)],
     systemPrompt: "",
     thinkingLevel: opts.thinkingLevel,
     maxTokens,
@@ -327,8 +327,8 @@ export async function runSpeedtestRequest(
   result.totalDurationMs = end - start;
   if (firstTokenAt >= 0) result.firstTokenLatencyMs = firstTokenAt - start;
   const tokens = speedtestOutputTokens(usage, output);
-  result.outputTokens = tokens[0];
-  result.estimatedTokens = tokens[1];
+  result.outputTokens = tokens.tokens;
+  result.estimatedTokens = tokens.estimated;
   if (streamErr !== null) {
     result.error = streamErr;
     return result;
@@ -349,9 +349,11 @@ export async function runSpeedtestRequest(
 function speedtestOutputTokens(
   usage: Usage | undefined,
   output: string,
-): [number, boolean] {
-  if (usage !== undefined && usage.output > 0) return [usage.output, false];
-  return [estimateSpeedtestTokens(output), true];
+): { tokens: number; estimated: boolean } {
+  if (usage !== undefined && usage.output > 0) {
+    return { tokens: usage.output, estimated: false };
+  }
+  return { tokens: estimateSpeedtestTokens(output), estimated: true };
 }
 
 export function estimateSpeedtestTokens(output: string): number {
@@ -554,7 +556,7 @@ export async function executeSpeedtestCommand(
           : 0;
         results.push(result);
       } else {
-        const created = createWithOptions(
+        const created = create(
           settings,
           target.provider,
           target.modelId,

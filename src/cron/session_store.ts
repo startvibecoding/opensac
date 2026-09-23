@@ -57,18 +57,10 @@ export class SessionScopedStore implements CronStore {
 }
 
 /** Wraps a shared store in a session scope. */
-export function newSessionScopedStore(
+export function createSessionScopedStore(
   base: CronStore,
   sessionId: string,
-): CronStore {
-  return new SessionScopedStore(base, sessionId, "");
-}
-
-/** Wraps a shared store in a session scope with a default work directory. */
-export function newSessionScopedStoreWithWorkDir(
-  base: CronStore,
-  sessionId: string,
-  workDir: string,
+  workDir = "",
 ): CronStore {
   return new SessionScopedStore(base, sessionId, workDir);
 }

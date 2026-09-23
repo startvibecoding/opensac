@@ -29,9 +29,9 @@ import {
   TASK_SUCCESS,
 } from "../agent/events.ts";
 import {
+  createAssistantMessage,
   type Message,
   type Model,
-  newAssistantMessage,
   type Usage,
 } from "../provider/types.ts";
 import type { FileDiff } from "../tools/mod.ts";
@@ -54,7 +54,7 @@ class SyncBuffer implements AcpServerSink {
   }
 }
 
-function newFixtureServer(sink: SyncBuffer): AcpServer {
+function createFixtureServer(sink: SyncBuffer): AcpServer {
   const server = new AcpServer();
   server.sink = sink;
   return server;
@@ -147,7 +147,7 @@ function makeDiff(
 
 Deno.test("handleAgentEvent projects tool-result images", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   const payload = btoa("screenshot-bytes");
   server.handleAgentEvent(
     "session-1",
@@ -180,7 +180,7 @@ Deno.test("handleAgentEvent projects tool-result images", () => {
 
 Deno.test("tool boundary starts a new assistant message", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   const rt = new ACPSessionRuntime();
   rt.id = "session-1";
   rt.promptID = "prompt-1";
@@ -228,7 +228,7 @@ Deno.test("tool boundary starts a new assistant message", () => {
 
 Deno.test("plan update uses the standard plan variant", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
     type: EVENT_PLAN_UPDATE,
     plan: {
@@ -247,7 +247,7 @@ Deno.test("plan update uses the standard plan variant", () => {
 
 Deno.test("opensac status uses an extension notification", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
     type: EVENT_STATUS,
     statusMessage: "working",
@@ -258,7 +258,7 @@ Deno.test("opensac status uses an extension notification", () => {
 
 Deno.test("opensac retry uses a structured extension notification", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
     type: EVENT_RETRY,
     retryAttempt: 2,
@@ -281,7 +281,7 @@ Deno.test("opensac retry uses a structured extension notification", () => {
 
 Deno.test("hosted item uses a non-executable tool update", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
     type: EVENT_HOSTED_ITEM,
     hostedItem: {
@@ -299,7 +299,7 @@ Deno.test("hosted item uses a non-executable tool update", () => {
 
 Deno.test("tool diff uses ACP structured content and locations", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   const oldText = "before\n";
   const path = "/tmp/acp-diff.txt";
   server.handleAgentEvent("session-1", {
@@ -323,7 +323,7 @@ Deno.test("tool diff uses ACP structured content and locations", () => {
 
 Deno.test("tool diff includes null oldText for a created file", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
     type: EVENT_TOOL_EXECUTION_END,
     toolCallId: "write-1",
@@ -338,7 +338,7 @@ Deno.test("tool diff includes null oldText for a created file", () => {
 
 Deno.test("streamed content chunks share a message ID", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
     type: EVENT_TEXT_DELTA,
     textDelta: "hello",
@@ -359,7 +359,7 @@ Deno.test("streamed content chunks share a message ID", () => {
 
 Deno.test("usage event emits a cumulative usage update", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.m = makeModel({
     contextWindow: 100,
     cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
@@ -455,7 +455,10 @@ Deno.test("persisted session usage shares the usage-update baseline", () => {
     }),
   ];
   for (const usage of history) {
-    const msg: Message = newAssistantMessage([{ type: "text", text: "done" }]);
+    const msg: Message = createAssistantMessage([{
+      type: "text",
+      text: "done",
+    }]);
     msg.usage = usage;
     mgr.appendMessage(msg);
   }
@@ -466,7 +469,7 @@ Deno.test("persisted session usage shares the usage-update baseline", () => {
   assertEquals(seeded.usageCache.cacheWrite, 8);
 
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.m = makeModel({ contextWindow: 100 });
   const rt = new ACPSessionRuntime();
   rt.cost = seeded.cost;
@@ -529,7 +532,7 @@ Deno.test("terminal run events project the structured status", () => {
   ];
   for (const testCase of cases) {
     const output = new SyncBuffer();
-    const server = newFixtureServer(output);
+    const server = createFixtureServer(output);
     server.sessions.set("session-1", new ACPSessionRuntime());
     server.handleAgentEvent("session-1", testCase.event);
     const params = sessionEventParams(
@@ -554,7 +557,7 @@ Deno.test("terminal run events project the structured status", () => {
 
 Deno.test("child terminal events never project a parent terminal", () => {
   const output = new SyncBuffer();
-  const server = newFixtureServer(output);
+  const server = createFixtureServer(output);
   server.sessions.set("session-1", new ACPSessionRuntime());
   server.handleAgentEvent("session-1", {
     type: EVENT_RUN_FINISHED,

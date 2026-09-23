@@ -7,11 +7,9 @@ import {
 import { register } from "../registry.ts";
 import type { Model, ModelCompat, ModelPricing } from "../types.ts";
 import {
+  createGeminiProvider,
+  createVertexProvider,
   defaultModels,
-  newGeminiProvider,
-  newGeminiProviderWithModelsAndProxy,
-  newVertexProvider,
-  newVertexProviderWithModelsAndProxy,
 } from "./provider.ts";
 
 /** Resolves `${VAR}`/`!shell` API key references in a provider config. */
@@ -124,24 +122,20 @@ function cloneBool(v: boolean | undefined): boolean | undefined {
 register(
   "google-gemini",
   (cfg) =>
-    cfg == null
-      ? newGeminiProvider("", "")
-      : newGeminiProviderWithModelsAndProxy(
-        resolveAPIKey(cfg),
-        cfg.baseUrl ?? "",
-        cfg.httpProxy ?? "",
-        convertModels("google-gemini", cfg.models),
-      ),
+    cfg == null ? createGeminiProvider("", "") : createGeminiProvider(
+      resolveAPIKey(cfg),
+      cfg.baseUrl ?? "",
+      convertModels("google-gemini", cfg.models),
+      { proxyUrl: cfg.httpProxy ?? "" },
+    ),
 );
 register(
   "google-vertex",
   (cfg) =>
-    cfg == null
-      ? newVertexProvider("", "")
-      : newVertexProviderWithModelsAndProxy(
-        resolveAPIKey(cfg),
-        cfg.baseUrl ?? "",
-        cfg.httpProxy ?? "",
-        convertModels("google-vertex", cfg.models),
-      ),
+    cfg == null ? createVertexProvider("", "") : createVertexProvider(
+      resolveAPIKey(cfg),
+      cfg.baseUrl ?? "",
+      convertModels("google-vertex", cfg.models),
+      { proxyUrl: cfg.httpProxy ?? "" },
+    ),
 );

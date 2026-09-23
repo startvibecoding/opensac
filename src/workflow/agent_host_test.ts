@@ -3,7 +3,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { defaultSettings } from "../config/settings.ts";
-import { newMockProvider } from "../provider/mock.ts";
+import { createMockProvider } from "../provider/mock.ts";
 import {
   streamDone,
   type StreamEvent,
@@ -11,17 +11,20 @@ import {
   streamTextDelta,
 } from "../provider/mod.ts";
 import type { Model } from "../provider/types.ts";
-import { Level, newManager as newSandboxManager } from "../sandbox/sandbox.ts";
+import {
+  createManager as newSandboxManager,
+  Level,
+} from "../sandbox/sandbox.ts";
 import {
   type AgentFactoryOptions,
-  newAgentFactoryWithOptions,
+  createAgentFactory,
 } from "../agent/factory.ts";
-import { newAgentManager } from "../agent/manager.ts";
+import { createAgentManager } from "../agent/manager.ts";
 import type { Event } from "../agent/events.ts";
 import { emptyCompaction } from "../agent/agent_testutil.ts";
 import { AgentHost, workflowAgentID } from "./agent_host.ts";
-import { newRunToolWithActive } from "./tools.ts";
-import { newActiveRegistry } from "./active.ts";
+import { createRunToolWithActive } from "./tools.ts";
+import { createActiveRegistry } from "./active.ts";
 import {
   type AgentTask,
   type RunState,
@@ -51,7 +54,7 @@ function streamWith(text: string): StreamEvent[] {
 }
 
 function buildManager() {
-  const mock = newMockProvider(
+  const mock = createMockProvider(
     "mock",
     [probeModel()],
     streamWith("audit complete"),
@@ -65,7 +68,7 @@ function buildManager() {
     delegateEnabled: false,
     workflowsEnabled: true,
   };
-  const factory = newAgentFactoryWithOptions(
+  const factory = createAgentFactory(
     mock,
     mock.models()[0],
     settings,
@@ -77,7 +80,7 @@ function buildManager() {
     undefined,
     opts,
   );
-  return newAgentManager(factory);
+  return createAgentManager(factory);
 }
 
 /** An in-memory Store mirroring the Go test memoryStore. */
@@ -140,8 +143,8 @@ Deno.test("workflowAgentID includes the instance key", () => {
 Deno.test("workflow_run tool executes a read-only audit end to end", async () => {
   const manager = buildManager();
   const store = new MemoryStore();
-  const active = newActiveRegistry();
-  const tool = newRunToolWithActive(manager, store, active);
+  const active = createActiveRegistry();
+  const tool = createRunToolWithActive(manager, store, active);
 
   const result = await tool.execute({}, {
     source:
@@ -165,10 +168,10 @@ Deno.test("workflow_run tool executes a read-only audit end to end", async () =>
 
 Deno.test("workflow_run rejects an empty source", async () => {
   const manager = buildManager();
-  const tool = newRunToolWithActive(
+  const tool = createRunToolWithActive(
     manager,
     new MemoryStore(),
-    newActiveRegistry(),
+    createActiveRegistry(),
   );
   let threw = false;
   try {

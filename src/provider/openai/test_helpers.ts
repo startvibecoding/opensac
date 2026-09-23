@@ -3,7 +3,7 @@
 
 import type { HttpClient } from "../http_client.ts";
 import type { ChatParams, Model, StreamEvent } from "../types.ts";
-import { newProviderWithModels, type Provider } from "./provider.ts";
+import { createOpenAIProvider, type Provider } from "./provider.ts";
 
 /** A no-op HTTP client for tests that never issue a request. */
 export function dummyClient(): HttpClient {
@@ -52,12 +52,12 @@ export function mockClient(
  * Creates a provider backed by a mock client that answers every request with the
  * given SSE body.
  */
-export function newMockOpenAIProvider(
+export function createMockOpenAIProvider(
   models: Model[],
   sse: string,
   onRequest?: (req: MockRequest) => void,
 ): MockProvider {
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", models);
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", models);
   const requests: MockRequest[] = [];
   p.client = mockClient(
     () => new Response(sse, { status: 200, headers: {} }),

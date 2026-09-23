@@ -6,12 +6,12 @@ import { assert, assertEquals } from "@std/assert";
 import { Builder, SessionRuntime } from "./session_runtime.ts";
 import { SOURCE_TUI } from "./source.ts";
 import { createSession } from "./session_lifecycle.ts";
-import { createWithOptions } from "../provider/factory/factory.ts";
+import { create } from "../provider/factory/factory.ts";
 import {
   defaultSettings,
   sandboxLevelFromSettings,
 } from "../config/settings.ts";
-import { newUserMessage } from "../provider/types.ts";
+import { createUserMessage } from "../provider/types.ts";
 
 Deno.test("buildAgent hydrates the agent with prior session messages", async () => {
   const workDir = await Deno.makeTempDir();
@@ -19,7 +19,7 @@ Deno.test("buildAgent hydrates the agent with prior session messages", async () 
   const manager = createSession({ workDir });
 
   // Seed one persisted user turn.
-  manager.appendMessages([newUserMessage("remember the number 42")]);
+  manager.appendMessages([createUserMessage("remember the number 42")]);
 
   const runtime: SessionRuntime = await new Builder(
     settings,
@@ -35,7 +35,7 @@ Deno.test("buildAgent hydrates the agent with prior session messages", async () 
 
   const providerName = settings.defaultProvider ?? "";
   const modelID = settings.defaultModel ?? "";
-  const created = createWithOptions(settings, providerName, modelID, {
+  const created = create(settings, providerName, modelID, {
     requireModel: true,
   });
   runtime.configureSession(
@@ -73,7 +73,7 @@ Deno.test("buildAgent without hydrateHistory leaves history empty", async () => 
   const workDir = await Deno.makeTempDir();
   const settings = defaultSettings();
   const manager = createSession({ workDir });
-  manager.appendMessages([newUserMessage("earlier turn")]);
+  manager.appendMessages([createUserMessage("earlier turn")]);
 
   const runtime: SessionRuntime = await new Builder(
     settings,
@@ -89,7 +89,7 @@ Deno.test("buildAgent without hydrateHistory leaves history empty", async () => 
 
   const providerName = settings.defaultProvider ?? "";
   const modelID = settings.defaultModel ?? "";
-  const created = createWithOptions(settings, providerName, modelID, {
+  const created = create(settings, providerName, modelID, {
     requireModel: true,
   });
   runtime.configureSession(

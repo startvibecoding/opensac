@@ -1,5 +1,5 @@
 //
-// `newAgentManager` is the shared construction path that binds a
+// `createAgentManager` is the shared construction path that binds a
 // provider-specific execution to a front-end-neutral Runtime: it builds an
 // `AgentFactory` and `AgentManager` from the Runtime's sandbox, context, rules,
 // and skills, installs the Runtime ownership fences, and resolves every mode
@@ -14,13 +14,13 @@ import {
   type AgentManager,
   type BeforeToolCallContext,
   compactionSettingsFromConfig,
+  createAgentFactory,
+  createMemberDefRegistry,
   type MemberDef,
   type MemberMailbox,
-  newAgentFactoryWithOptions,
-  newMemberDefRegistry,
   type ToolCallBlockResult,
 } from "../agent/mod.ts";
-import { newAgentManager as buildAgentManagerImpl } from "../agent/manager.ts";
+import { createAgentManager as buildAgentManagerImpl } from "../agent/manager.ts";
 import type { AgentFactoryOptions } from "../agent/factory.ts";
 import type { AllowConfig } from "../config/allow.ts";
 import type { Settings } from "../config/settings.ts";
@@ -48,7 +48,7 @@ import {
 } from "./tool_fence.ts";
 
 /**
- * The Runtime view `newAgentManager` consumes. A SessionRuntime satisfies it
+ * The Runtime view `createAgentManager` consumes. A SessionRuntime satisfies it
  * structurally; tests may supply a minimal stand-in.
  */
 export interface AgentManagerRuntime extends ToolFenceRuntime {
@@ -91,7 +91,7 @@ export interface AgentManagerOptions {
  * sandbox, context, rules and skills. All entry points should use this path
  * instead of assembling AgentFactory arguments independently.
  */
-export function newAgentManager(opts: AgentManagerOptions): AgentManager {
+export function createAgentManager(opts: AgentManagerOptions): AgentManager {
   if (!opts || !opts.runtime) {
     throw new Error("agent runtime is required");
   }
@@ -191,7 +191,7 @@ export function newAgentManager(opts: AgentManagerOptions): AgentManager {
     expertIdentity,
     expertRoster,
   };
-  const factory = newAgentFactoryWithOptions(
+  const factory = createAgentFactory(
     opts.provider,
     opts.model,
     effectiveSettings,
@@ -210,11 +210,11 @@ export function newAgentManager(opts: AgentManagerOptions): AgentManager {
   // not be a dead tool outside a team binding. Only a bound team may hold its
   // run open for members, so the wrap-up wait stays team-only and unattended
   // entry points never gain a multi-minute wait.
-  let members: ReturnType<typeof newMemberDefRegistry> | undefined;
+  let members: ReturnType<typeof createMemberDefRegistry> | undefined;
   let expertID = "";
   let teamBound = false;
   if (expertBinding !== null) {
-    members = newMemberDefRegistry(expertBinding.memberDefs);
+    members = createMemberDefRegistry(expertBinding.memberDefs);
     expertID = expertBinding.id;
     teamBound = expertBinding.team;
   }

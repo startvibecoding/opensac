@@ -2,14 +2,14 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { Image } from "imagescript";
-import { newManagerWithProjectDirs } from "../skills/mod.ts";
-import { newRegistry } from "../tools/tool.ts";
+import { createManagerWithProjectDirs } from "../skills/mod.ts";
+import { createRegistry } from "../tools/tool.ts";
 import {
   clientOptions,
   cookieFromParams,
+  createTool,
   htmlOptionsFromParams,
   isToolRegistered,
-  newTool,
   registerTool,
   removeTool,
   SKILL_NAME,
@@ -31,7 +31,7 @@ async function testPng(width: number, height: number): Promise<Uint8Array> {
 }
 
 Deno.test("built-in browser skill is discoverable", () => {
-  const manager = newManagerWithProjectDirs("", []);
+  const manager = createManagerWithProjectDirs("", []);
   manager.load();
   const skill = manager.get(SKILL_NAME);
   assert(skill);
@@ -55,7 +55,7 @@ Deno.test("built-in browser skill is discoverable", () => {
 
 Deno.test("register and remove browser tool", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "browser-" });
-  const registry = newRegistry(tmp, undefined);
+  const registry = createRegistry(tmp, undefined);
 
   registerTool(registry);
   assert(isToolRegistered(registry));
@@ -66,8 +66,8 @@ Deno.test("register and remove browser tool", () => {
 
 Deno.test("screenshot tool result processes image", async () => {
   const tmp = Deno.makeTempDirSync({ prefix: "browser-" });
-  const registry = newRegistry(tmp, undefined);
-  const tool = newTool(registry);
+  const registry = createRegistry(tmp, undefined);
+  const tool = createTool(registry);
 
   const result = await tool.screenshotToolResult(await testPng(200, 100), {
     maxLongEdge: 50,

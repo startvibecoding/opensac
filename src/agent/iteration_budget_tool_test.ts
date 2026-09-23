@@ -5,13 +5,13 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { ToolContext } from "../tools/tool.ts";
 import {
+  createIterationBudget,
   ITERATION_BUDGET_TOOL_NAME,
   iterationBudgetFromToolContext,
   type IterationBudgetPolicy,
-  newIterationBudget,
   toolContextWithIterationBudget,
 } from "./iteration_budget.ts";
-import { newExtendBudgetTool } from "./iteration_budget_tool.ts";
+import { createExtendBudgetTool } from "./iteration_budget_tool.ts";
 
 function policy(
   partial: Partial<IterationBudgetPolicy>,
@@ -28,7 +28,7 @@ function policy(
 }
 
 Deno.test("extend_budget tool metadata and rejection without a budget", () => {
-  const tool = newExtendBudgetTool();
+  const tool = createExtendBudgetTool();
   assertEquals(tool.name(), ITERATION_BUDGET_TOOL_NAME);
   const ctx: ToolContext = {};
   assertThrows(
@@ -39,8 +39,8 @@ Deno.test("extend_budget tool metadata and rejection without a budget", () => {
 });
 
 Deno.test("extend_budget tool grants and rejects missing reason", () => {
-  const tool = newExtendBudgetTool();
-  const b = newIterationBudget(
+  const tool = createExtendBudgetTool();
+  const b = createIterationBudget(
     policy({
       soft: 4,
       hard: 12,

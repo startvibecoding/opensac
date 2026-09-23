@@ -2,7 +2,7 @@
 // tool_launch_test.go exercises the same contract through the agent loop.
 
 import { assert, assertEquals } from "@std/assert";
-import { newToolLaunchOrder } from "./tool_launch.ts";
+import { createToolLaunchOrder } from "./tool_launch.ts";
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | "timeout"> {
   return Promise.race([
@@ -14,13 +14,13 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | "timeout"> {
 }
 
 Deno.test("tool launch order: first call is always free to start", async () => {
-  const order = newToolLaunchOrder(3)!;
+  const order = createToolLaunchOrder(3)!;
   const h0 = order.handle(0);
   assertEquals(await withTimeout(h0.waitStart(), 50), undefined);
 });
 
 Deno.test("tool launch order: later calls wait for predecessor start", async () => {
-  const order = newToolLaunchOrder(3)!;
+  const order = createToolLaunchOrder(3)!;
   const h0 = order.handle(0);
   const h1 = order.handle(1);
   const h2 = order.handle(2);
@@ -37,7 +37,7 @@ Deno.test("tool launch order: later calls wait for predecessor start", async () 
 });
 
 Deno.test("tool launch order: release unblocks the queue idempotently", async () => {
-  const order = newToolLaunchOrder(2)!;
+  const order = createToolLaunchOrder(2)!;
   const h0 = order.handle(0);
   const h1 = order.handle(1);
 
@@ -47,9 +47,9 @@ Deno.test("tool launch order: release unblocks the queue idempotently", async ()
 });
 
 Deno.test("tool launch order: null handle operations are safe", async () => {
-  const order = newToolLaunchOrder(0);
+  const order = createToolLaunchOrder(0);
   assertEquals(order, null);
-  const handle = newToolLaunchOrder(1)!.handle(0);
+  const handle = createToolLaunchOrder(1)!.handle(0);
   handle.release();
   await handle.waitStart();
   assert(true);

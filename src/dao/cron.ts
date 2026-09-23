@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryAll, queryOne } from "./database.ts";
+import { execChanges, queryAll, queryOptional } from "./database.ts";
 
 /**
  * Database representation of a scheduled job. Times are stored as RFC3339
@@ -42,14 +42,13 @@ export class CronDAO {
     ).map(normalize);
   }
 
-  get(id: string): CronJobRecord {
-    return normalize(
-      queryOne<Record<string, unknown>>(
-        this.requireDb(),
-        `SELECT ${columns} FROM cron_jobs WHERE id = ? LIMIT 1`,
-        [id],
-      ),
+  get(id: string): CronJobRecord | undefined {
+    const row = queryOptional<Record<string, unknown>>(
+      this.requireDb(),
+      `SELECT ${columns} FROM cron_jobs WHERE id = ? LIMIT 1`,
+      [id],
     );
+    return row === undefined ? undefined : normalize(row);
   }
 
   create(record: CronJobRecord | null): void {
@@ -65,7 +64,7 @@ export class CronDAO {
     );
   }
 
-  update(record: CronJobRecord | null): void {
+  update(record: CronJobRecord | null): boolean {
     if (record === null) throw new Error("cron job record is missing");
     const changed = execChanges(
       this.requireDb(),
@@ -76,16 +75,16 @@ export class CronDAO {
        WHERE id = ?`,
       [...bindRecord(record).slice(1), record.id],
     );
-    if (changed === 0) throw ErrNoRows;
+    return changed !== 0;
   }
 
-  delete(id: string): void {
+  delete(id: string): boolean {
     const changed = execChanges(
       this.requireDb(),
       `DELETE FROM cron_jobs WHERE id = ?`,
       [id],
     );
-    if (changed === 0) throw ErrNoRows;
+    return changed !== 0;
   }
 
   /**

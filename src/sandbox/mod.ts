@@ -4,14 +4,13 @@ export {
   type AvailabilityErrorProvider,
   type CommandCleanupProvider,
   type CommandSpec,
+  createManager,
   type ExecOpts,
   formatSandboxInfo,
   type GitAccessSandbox,
   Level,
   levelString,
   Manager,
-  newManager,
-  newManagerWithOptions,
   type Options,
   parseLevel,
   type Sandbox,
@@ -30,19 +29,15 @@ export {
   isGitDeniedPath,
 } from "./git.ts";
 export { protectedGitPaths, uniquePaths } from "./git_paths.ts";
-export { newNoneSandbox, NoneSandbox } from "./none.ts";
+export { createNoneSandbox, NoneSandbox } from "./none.ts";
 export {
   type BwrapCapabilities,
   bwrapCapabilitiesComplete,
   BwrapSandbox,
+  createBwrapSandbox,
   findBwrap,
-  newBwrapSandbox,
-  newBwrapSandboxWithOptions,
   probeBwrapCapabilities,
 } from "./bwrap.ts";
-export { MacSandbox, newMacSandbox, newMacSandboxWithOptions } from "./mac.ts";
-export { newWinSandbox, WinSandbox } from "./windows.ts";
-export {
-  newPlatformSandbox,
-  newPlatformSandboxWithOptions,
-} from "./platform.ts";
+export { createMacSandbox, MacSandbox } from "./mac.ts";
+export { createWinSandbox, WinSandbox } from "./windows.ts";
+export { createPlatformSandbox } from "./platform.ts";

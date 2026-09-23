@@ -1,5 +1,5 @@
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -102,21 +102,23 @@ export class MemoryTool implements Tool {
     if (section !== "") {
       const content = this.#store.readSection(section);
       if (content === "") {
-        return newTextToolResult(`Section '${section}' is empty or not found.`);
+        return createTextToolResult(
+          `Section '${section}' is empty or not found.`,
+        );
       }
-      return newTextToolResult(content);
+      return createTextToolResult(content);
     }
 
     // Read all.
     const { content, path, source } = this.#store.read();
     if (content === "") {
-      return newTextToolResult(
+      return createTextToolResult(
         'No memory file found. Use memory(action="add", section="...", content="...") to create one.',
       );
     }
 
     const header = `[source: ${source} — ${path}]\n\n`;
-    return newTextToolResult(header + content);
+    return createTextToolResult(header + content);
   }
 
   #executeAdd(section: string, content: string): ToolResult {
@@ -128,7 +130,7 @@ export class MemoryTool implements Tool {
     }
 
     this.#store.add(section, content);
-    return newTextToolResult(`Added to '${section}': ${content}`);
+    return createTextToolResult(`Added to '${section}': ${content}`);
   }
 
   #executeUpdate(section: string, old: string, newText: string): ToolResult {
@@ -143,7 +145,7 @@ export class MemoryTool implements Tool {
     }
 
     this.#store.update(section, old, newText);
-    return newTextToolResult(
+    return createTextToolResult(
       `Updated in '${section}': '${old}' → '${newText}'`,
     );
   }
@@ -157,6 +159,6 @@ export class MemoryTool implements Tool {
     }
 
     this.#store.delete(section, content);
-    return newTextToolResult(`Deleted from '${section}': ${content}`);
+    return createTextToolResult(`Deleted from '${section}': ${content}`);
   }
 }

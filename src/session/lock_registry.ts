@@ -80,6 +80,6 @@ export class LockRegistry {
 }
 
 /** Creates an empty lock registry. */
-export function newLockRegistry(): LockRegistry {
+export function createLockRegistry(): LockRegistry {
   return new LockRegistry();
 }

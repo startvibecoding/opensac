@@ -6,9 +6,8 @@ import { modelMaxTokensWasSet } from "../../config/mod.ts";
 import { register } from "../registry.ts";
 import type { Model, ModelCompat, ModelPricing } from "../types.ts";
 import {
+  createOpenAIProvider,
   defaultModels,
-  newProvider,
-  newProviderWithModelsAndProxy,
   type Provider,
 } from "./provider.ts";
 
@@ -106,15 +105,15 @@ function cloneBool(v: boolean | undefined): boolean | undefined {
 }
 
 /** Builds an OpenAI provider from a provider config. */
-export function createOpenAIProvider(
+export function openaiProviderFromConfig(
   cfg: ProviderConfig | null | undefined,
 ): Provider {
-  if (cfg == null) return newProvider("", "");
-  const p = newProviderWithModelsAndProxy(
+  if (cfg == null) return createOpenAIProvider("", "");
+  const p = createOpenAIProvider(
     cfg.apiKey ?? "",
     cfg.baseUrl ?? "",
-    cfg.httpProxy ?? "",
     resolveOpenAIModels(cfg),
+    { proxyUrl: cfg.httpProxy ?? "" },
   );
   p.setMaxImagesPerRequest(cfg.maxImagesPerRequest ?? 0);
   if (cfg.api === "openai-responses" || cfg.api === "responses") {
@@ -127,7 +126,7 @@ export function createOpenAIProvider(
 // Mirrors the Go init(): register the generic OpenAI-compatible provider
 // factory in the global registry so Builder/WithProviderByName can construct
 // OpenAI-style providers by name.
-register("openai", (cfg) => createOpenAIProvider(cfg));
-register("openai-chat", (cfg) => createOpenAIProvider(cfg));
-register("openai-responses", (cfg) => createOpenAIProvider(cfg));
-register("responses", (cfg) => createOpenAIProvider(cfg));
+register("openai", (cfg) => openaiProviderFromConfig(cfg));
+register("openai-chat", (cfg) => openaiProviderFromConfig(cfg));
+register("openai-responses", (cfg) => openaiProviderFromConfig(cfg));
+register("responses", (cfg) => openaiProviderFromConfig(cfg));

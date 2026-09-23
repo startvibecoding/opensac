@@ -30,11 +30,11 @@ import {
 } from "../config/mod.ts";
 import {
   clientsForSettings,
+  createLocalIndex,
   type InstallRequest,
   type Market,
   MARKET_CLAW_HUB,
   MARKET_SKILL_HUB,
-  newLocalIndex,
   Service as SkillHubService,
 } from "../skillhub/mod.ts";
 import { projectSkillDirs } from "../skills/mod.ts";
@@ -935,7 +935,7 @@ export function handleManageSkillHubInstalled(
   try {
     const { input, rt } = manageSkillHubCatalog(s, req);
     const settings = manageSettings();
-    const index = newLocalIndex(
+    const index = createLocalIndex(
       getGlobalSkillsDir(settings),
       projectSkillDirs(rt.runtime!.workDir),
     );
@@ -1039,7 +1039,7 @@ export function handleManageSkillHubUninstall(
       // Capture the local managed name before removal so reloading the Runtime
       // context cannot retain a reference to a removed skill.
       const settings = manageSettings();
-      const index = newLocalIndex(
+      const index = createLocalIndex(
         getGlobalSkillsDir(settings),
         projectSkillDirs(rt.runtime!.workDir),
       );

@@ -5,17 +5,6 @@
 import type { SQLInputValue } from "node:sqlite";
 import { type DB, recordQueryTiming, runInTx } from "../db/mod.ts";
 
-/**
- * Sentinel matching Go's `sql.ErrNoRows`. DAO methods throw this exact object
- * when a required single row is missing so callers can compare with `isNoRows`.
- */
-export const ErrNoRows: Error = new Error("sql: no rows in result set");
-
-/** Reports whether an error is the DAO "not found" sentinel. */
-export function isNoRows(err: unknown): boolean {
-  return err === ErrNoRows;
-}
-
 /** A transaction / executor handle. Both are the managed connection. */
 export type Tx = DB;
 export type Executor = DB;
@@ -114,20 +103,6 @@ export function queryAll<T = Row>(
   return timed(sql, () => db.query<T>(sql, ...params));
 }
 
-/**
- * Runs a query expected to return at most one row, throwing `ErrNoRows` when
- * none is found (matching Go's `Scan`).
- */
-export function queryOne<T = Row>(
-  db: DB,
-  sql: string,
-  params: Param[] = [],
-): T {
-  const row = timed(sql, () => db.get<T>(sql, ...params));
-  if (row === undefined) throw ErrNoRows;
-  return row;
-}
-
 /** Runs a query and returns the first row, or `undefined`. */
 export function queryOptional<T = Row>(
   db: DB,
@@ -143,14 +118,14 @@ export function execChanges(db: DB, sql: string, params: Param[] = []): number {
   return Number(result.changes ?? 0);
 }
 
-/** Runs a statement that returns a `RETURNING` scalar. */
+/** Runs a statement that returns a `RETURNING` scalar, or `undefined`. */
 export function execReturning<T>(
   db: DB,
   sql: string,
   params: Param[] = [],
-): T {
+): T | undefined {
   const row = timed(sql, () => db.get<Record<string, unknown>>(sql, ...params));
-  if (row === undefined) throw ErrNoRows;
+  if (row === undefined) return undefined;
   const values = Object.values(row);
   return values[0] as T;
 }

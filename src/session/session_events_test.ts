@@ -8,7 +8,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
 import { ConversationTurnDAO } from "../dao/mod.ts";
-import { newUserMessage } from "../provider/types.ts";
+import { createUserMessage } from "../provider/types.ts";
 import { generateID } from "./entry.ts";
 import { openRootDB } from "./root_db.ts";
 import {
@@ -48,7 +48,7 @@ function appendMessageEntry(
       id,
       parentId,
       timestamp: new Date("2026-01-01T00:00:00Z").toISOString(),
-      message: newUserMessage(text),
+      message: createUserMessage(text),
     }),
   });
 }
@@ -209,7 +209,7 @@ Deno.test("sequenced messages apply overrides and compaction boundaries", () => 
         parentId: "e2",
         timestamp: new Date().toISOString(),
         targetEntryId: "e2",
-        message: newUserMessage("redacted"),
+        message: createUserMessage("redacted"),
         reason: "rejected",
       }),
     });

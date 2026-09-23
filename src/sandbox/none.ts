@@ -48,6 +48,6 @@ export class NoneSandbox implements Sandbox {
 }
 
 /** Creates a new no-op sandbox. */
-export function newNoneSandbox(): NoneSandbox {
+export function createNoneSandbox(): NoneSandbox {
   return new NoneSandbox();
 }

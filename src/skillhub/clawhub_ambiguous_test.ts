@@ -4,7 +4,7 @@ import {
   assertRejects,
   assertStringIncludes,
 } from "@std/assert";
-import { newClawHubClient } from "./clawhub.ts";
+import { createClawHubClient } from "./clawhub.ts";
 import { installSkill } from "./install.ts";
 import { jsonResponse, makeArchive, startServer } from "./test_helpers.ts";
 
@@ -27,7 +27,7 @@ Deno.test("ClawHubDetailResolvesAmbiguousSlug", async () => {
     );
   });
   try {
-    const detail = await newClawHubClient(server.url).detail(undefined, {
+    const detail = await createClawHubClient(server.url).detail(undefined, {
       market: "clawhub.ai",
       id: "custom-mail-fresh100",
     });
@@ -56,7 +56,7 @@ Deno.test("ClawHubDetailCachesResolvedOwner", async () => {
     );
   });
   try {
-    const client = newClawHubClient(server.url);
+    const client = createClawHubClient(server.url);
     await client.detail(undefined, {
       market: "clawhub.ai",
       id: "custom-mail-fresh100",
@@ -85,7 +85,7 @@ Deno.test("ClawHubAmbiguousSlugWithoutExactMatchReturnsHelpfulError", async () =
   );
   try {
     const error = await assertRejects(() =>
-      newClawHubClient(server.url).detail(undefined, {
+      createClawHubClient(server.url).detail(undefined, {
         market: "clawhub.ai",
         id: "custom-mail-fresh100",
       })
@@ -130,7 +130,7 @@ Deno.test("ClawHubInstallResolvesAmbiguousSlugEndToEnd", async () => {
   try {
     const result = await installSkill(
       undefined,
-      newClawHubClient(server.url),
+      createClawHubClient(server.url),
       {
         market: "clawhub.ai",
         id: "custom-mail-fresh100",
@@ -166,7 +166,7 @@ Deno.test("ClawHubExplicitOwnerRefBypassesAmbiguity", async () => {
     );
   });
   try {
-    const client = newClawHubClient(server.url);
+    const client = createClawHubClient(server.url);
     await client.detail(undefined, {
       market: "clawhub.ai",
       id: "@xuxuclassmate/custom-mail-fresh100",

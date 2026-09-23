@@ -10,17 +10,17 @@ import {
   assertStringIncludes,
 } from "@std/assert";
 import {
+  createCancelTool,
+  createLintTool,
+  createRunTool,
   type LintResult,
   lintWorkflowSourceWithin,
-  newCancelTool,
-  newLintTool,
-  newRunTool,
 } from "./tools.ts";
-import { newActiveRegistry } from "./active.ts";
+import { createActiveRegistry } from "./active.ts";
 import { statusCanceled, statusDone, statusError } from "./types.ts";
 
 Deno.test("lint tool validates JavaScript source without running agents", async () => {
-  const result = await newLintTool().execute({}, {
+  const result = await createLintTool().execute({}, {
     source:
       `workflow("lint me", {phases:[phase("scan", agent("handler-audit", {key:"r0", mode:"plan", tools:["read","grep"], prompt:"Audit handler."})), phase("verify", agent("cross-check", {mode:"plan", prompt:resultKey("scan.handler-audit","r0")}))]});`,
   });
@@ -30,7 +30,7 @@ Deno.test("lint tool validates JavaScript source without running agents", async 
 });
 
 Deno.test("lint tool reports workflow errors", async () => {
-  const result = await newLintTool().execute({}, {
+  const result = await createLintTool().execute({}, {
     source:
       `workflow("bad", {phases:[phase("verify", agent("check", {prompt:result("scan.missing")}))]});`,
   });
@@ -43,7 +43,7 @@ Deno.test("lint tool reports workflow errors", async () => {
 });
 
 Deno.test("run tool prompt guidelines require complete JavaScript source", () => {
-  const tool = newRunTool(undefined, undefined);
+  const tool = createRunTool(undefined, undefined);
   const guidelines = tool.promptGuidelines().join("\n");
   const params = JSON.stringify(tool.parameters());
   for (const want of ["JavaScript", "Markdown code fences", "timeoutSeconds"]) {
@@ -55,7 +55,7 @@ Deno.test("run tool prompt guidelines require complete JavaScript source", () =>
 });
 
 Deno.test("run tool execution timeout", () => {
-  const tool = newRunTool(undefined, undefined);
+  const tool = createRunTool(undefined, undefined);
 
   assert(!tool.executionTimeout({}).provided);
   const ninety = tool.executionTimeout({ timeoutSeconds: 90 });
@@ -68,12 +68,12 @@ Deno.test("run tool execution timeout", () => {
 });
 
 Deno.test("cancel tool cancels active run", async () => {
-  const active = newActiveRegistry();
+  const active = createActiveRegistry();
   let canceled = false;
   active.register("run-1", () => {
     canceled = true;
   });
-  const result = await newCancelTool(active).execute({}, { id: "run-1" });
+  const result = await createCancelTool(active).execute({}, { id: "run-1" });
   assert(canceled, "expected active run cancel function to be called");
   const parsed = JSON.parse(result.text) as { status: string };
   assertEquals(parsed.status, statusCanceled);
@@ -81,7 +81,8 @@ Deno.test("cancel tool cancels active run", async () => {
 
 Deno.test("cancel tool rejects inactive run", async () => {
   await assertRejects(
-    () => newCancelTool(newActiveRegistry()).execute({}, { id: "missing" }),
+    () =>
+      createCancelTool(createActiveRegistry()).execute({}, { id: "missing" }),
   );
 });
 

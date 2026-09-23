@@ -2,7 +2,7 @@
 // Durable admission identity for one original or retry submission. Only a
 // digest of the transport key is persisted.
 
-import { isNoRows, RuntimeSubmissionDAO, type Tx } from "../dao/mod.ts";
+import { RuntimeSubmissionDAO, type Tx } from "../dao/mod.ts";
 import { generateID } from "./entry.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 
@@ -89,12 +89,7 @@ export function reserveRuntimeSubmissionTx(
   if (scope === "") throw new Error("runtime submission scope is required");
   const fingerprint = run.submissionFingerprint.trim();
 
-  let existing: RuntimeSubmission | null = null;
-  try {
-    existing = getRuntimeSubmissionTx(tx, run.sessionId, scope, keyHash);
-  } catch (err) {
-    if (!isNoRows(err)) throw err;
-  }
+  const existing = getRuntimeSubmissionTx(tx, run.sessionId, scope, keyHash);
   if (existing !== null) {
     throw new RuntimeSubmissionError(
       existing,
@@ -121,12 +116,7 @@ export function reserveRuntimeSubmissionTx(
   } catch (err) {
     // A concurrent process can win the unique constraint after our initial
     // lookup. Resolve the durable winner before returning the typed result.
-    let winner: RuntimeSubmission | null = null;
-    try {
-      winner = getRuntimeSubmissionTx(tx, run.sessionId, scope, keyHash);
-    } catch (lookupErr) {
-      if (!isNoRows(lookupErr)) throw err;
-    }
+    const winner = getRuntimeSubmissionTx(tx, run.sessionId, scope, keyHash);
     if (winner !== null) {
       throw new RuntimeSubmissionError(
         winner,
@@ -143,13 +133,14 @@ function getRuntimeSubmissionTx(
   sessionId: string,
   scope: string,
   keyHash: string,
-): RuntimeSubmission {
+): RuntimeSubmission | null {
   const record = new RuntimeSubmissionDAO(null).find(
     tx,
     sessionId,
     scope,
     keyHash,
   );
+  if (record === undefined) return null;
   return {
     id: record.id,
     sessionId: record.sessionId,
@@ -173,25 +164,21 @@ export function getRuntimeSubmission(
     return null;
   }
   const db = openRootDB(sessionDir);
-  try {
-    const record = new RuntimeSubmissionDAO(db.db).find(
-      db.db!,
-      sessionId,
-      scope,
-      keyHash,
-    );
-    return {
-      id: record.id,
-      sessionId: record.sessionId,
-      scope: record.scope,
-      keyHash: record.keyHash,
-      requestFingerprint: record.requestFingerprint,
-      intentId: record.intentId,
-      runId: record.runId,
-      createdAt: parseSessionTimestamp(record.createdAt),
-    };
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = new RuntimeSubmissionDAO(db.db).find(
+    db.db!,
+    sessionId,
+    scope,
+    keyHash,
+  );
+  if (record === undefined) return null;
+  return {
+    id: record.id,
+    sessionId: record.sessionId,
+    scope: record.scope,
+    keyHash: record.keyHash,
+    requestFingerprint: record.requestFingerprint,
+    intentId: record.intentId,
+    runId: record.runId,
+    createdAt: parseSessionTimestamp(record.createdAt),
+  };
 }

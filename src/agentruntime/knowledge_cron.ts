@@ -32,10 +32,10 @@ export function knowledgeBaseCronJobID(knowledgeBaseID: string): string {
 /** Extracts the knowledge base identity from a namespaced cron job ID. */
 export function knowledgeBaseIDFromCronJobID(
   jobID: string,
-): { id: string; ok: boolean } {
-  const ok = jobID.startsWith(KNOWLEDGE_BASE_CRON_JOB_PREFIX);
+): string | undefined {
+  if (!jobID.startsWith(KNOWLEDGE_BASE_CRON_JOB_PREFIX)) return undefined;
   const id = jobID.slice(KNOWLEDGE_BASE_CRON_JOB_PREFIX.length).trim();
-  return { id: ok ? id : "", ok: ok && id !== "" };
+  return id === "" ? undefined : id;
 }
 
 /**
@@ -51,8 +51,8 @@ export async function runKnowledgeBaseCronJob(
   service: KnowledgeBaseService | null,
   jobID: string,
 ): Promise<KnowledgeBaseCronOutcome> {
-  const { id, ok } = knowledgeBaseIDFromCronJobID(jobID);
-  if (!ok) return { handled: false, response: "" };
+  const id = knowledgeBaseIDFromCronJobID(jobID);
+  if (id === undefined) return { handled: false, response: "" };
   if (service === null) {
     throw new KnowledgeBaseServiceMissingError();
   }

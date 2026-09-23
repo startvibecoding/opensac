@@ -1,16 +1,16 @@
 import { assert, assertEquals, assertFalse } from "@std/assert";
-import { MockProvider, newMockProvider } from "../provider/mock.ts";
+import { createMockProvider, MockProvider } from "../provider/mock.ts";
 import type { Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
   type ContentBlock,
+  createAssistantMessage,
+  createSystemInjectedUserMessage,
+  createToolResultMessage,
+  createUserMessage,
   type ImageContent,
   type Message,
   type Model,
-  newAssistantMessage,
-  newSystemInjectedUserMessage,
-  newToolResultMessage,
-  newUserMessage,
   streamDone,
   type StreamEvent,
   streamTextDelta,
@@ -196,7 +196,7 @@ Deno.test("CalculateContextTokens", () => {
 
 Deno.test("ContextUsageFromMessagesNormalizesCacheBreakdown", () => {
   const messages: Message[] = [
-    newUserMessage("current request"),
+    createUserMessage("current request"),
     msg({
       role: "assistant",
       content: "response",
@@ -579,11 +579,11 @@ Deno.test("EstimateTokensThinking", () => {
 Deno.test("CompactDoesNotResendPreviousSummaryAsConversationMessage", async () => {
   const summary = "## Goal\ncarry forward state";
   const messages: Message[] = [
-    newSystemInjectedUserMessage(summary),
-    newUserMessage("old context ".repeat(20)),
-    newAssistantMessage([textBlock("assistant context ".repeat(20))]),
-    newUserMessage("recent question ".repeat(16)),
-    newAssistantMessage([textBlock("recent answer ".repeat(16))]),
+    createSystemInjectedUserMessage(summary),
+    createUserMessage("old context ".repeat(20)),
+    createAssistantMessage([textBlock("assistant context ".repeat(20))]),
+    createUserMessage("recent question ".repeat(16)),
+    createAssistantMessage([textBlock("recent answer ".repeat(16))]),
   ];
   const p = new CompactRecordingProvider([model({
     id: "model1",
@@ -847,7 +847,7 @@ Deno.test("ShouldCompactExact", () => {
 
 Deno.test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
   const mdl = model({ id: "test-model" });
-  const p = newMockProvider("test", [mdl], [{
+  const p = createMockProvider("test", [mdl], [{
     type: streamTextDelta,
     textDelta: "concise tool summary",
   }]);
@@ -859,7 +859,7 @@ Deno.test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
         toolCall: { id: "call-1", name: "read" },
       }],
     }),
-    newToolResultMessage("call-1", "read", "a".repeat(50000), false),
+    createToolResultMessage("call-1", "read", "a".repeat(50000), false),
     msg({
       role: "assistant",
       contents: [{
@@ -867,7 +867,7 @@ Deno.test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
         toolCall: { id: "call-2", name: "grep" },
       }],
     }),
-    newToolResultMessage("call-2", "grep", "b".repeat(50000), false),
+    createToolResultMessage("call-2", "grep", "b".repeat(50000), false),
   ];
   const got = await compressLargeToolResults(
     undefined,
@@ -888,12 +888,12 @@ Deno.test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
 
 Deno.test("CompressLargeToolResultsSkipsSmallResults", async () => {
   const mdl = model({ id: "test-model" });
-  const p: MockProvider = newMockProvider("test", [mdl], [{
+  const p: MockProvider = createMockProvider("test", [mdl], [{
     type: streamTextDelta,
     textDelta: "summary",
   }]);
   const messages: Message[] = [
-    newToolResultMessage("call-1", "read", "small", false),
+    createToolResultMessage("call-1", "read", "small", false),
   ];
   const got = await compressLargeToolResults(
     undefined,
@@ -909,7 +909,7 @@ Deno.test("CompressLargeToolResultsSkipsSmallResults", async () => {
 
 Deno.test("SummarizeToolResultUsesValidStandaloneUserMessage", async () => {
   const p = new CompactRecordingProvider([model({ id: "test-model" })]);
-  const message = newToolResultMessage(
+  const message = createToolResultMessage(
     "call-1",
     "read",
     "important file output",

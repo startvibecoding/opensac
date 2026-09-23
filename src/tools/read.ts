@@ -14,8 +14,8 @@ import {
 } from "../imageproc/mod.ts";
 import { truncateString } from "../util/truncate.ts";
 import {
-  newImageToolResultWithContent,
-  newTextToolResult,
+  createImageToolResultWithContent,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -158,7 +158,7 @@ export class ReadTool implements Tool {
         cropHeight: meta.cropHeight,
       };
       const desc = imageDescription(p, mimeType, result);
-      return newImageToolResultWithContent(desc, image);
+      return createImageToolResultWithContent(desc, image);
     }
 
     let data: Uint8Array;
@@ -184,7 +184,7 @@ export class ReadTool implements Tool {
     }
 
     if (offset >= lines.length) {
-      return newTextToolResult("(end of file)");
+      return createTextToolResult("(end of file)");
     }
     let end = offset + limit;
     if (end > lines.length) end = lines.length;
@@ -206,7 +206,7 @@ export class ReadTool implements Tool {
         `\n... (truncated, total ${lines.length} lines)`;
     }
 
-    return newTextToolResult(sb);
+    return createTextToolResult(sb);
   }
 
   #imageReadPolicy(params: Record<string, unknown>): Policy {

@@ -12,7 +12,6 @@ import {
   ConversationTurnDAO,
   type ConversationTurnRecord,
   ForkDAO,
-  isNoRows,
   SessionDAO,
 } from "../dao/mod.ts";
 import type { DB } from "../db/mod.ts";
@@ -229,18 +228,12 @@ export function forkSession(
 
   // Idempotent retries return the original child even if the source has since
   // started another run. The durable request record is authoritative.
-  try {
-    const existing = forkDao.findRequest(
-      db.db!,
-      requestHash,
-      sourceId,
-    );
+  const existing = forkDao.findRequest(db.db!, requestHash, sourceId);
+  if (existing !== undefined) {
     if (existing.requestFingerprint !== fingerprint) {
       throw new ForkIdempotencyConflictError();
     }
     return forkResultByDB(db, existing.childSessionId);
-  } catch (err) {
-    if (!isNoRows(err)) throw err;
   }
 
   let lease;
@@ -262,8 +255,8 @@ export function forkSession(
     const phase1 = db.runInTx((tx): Phase1 => {
       validateRuntimeLeaseTx(tx, sessionDir, sourceId);
       const txForkDao = new ForkDAO(null);
-      try {
-        const existing = txForkDao.findRequest(tx, requestHash, sourceId);
+      const existing = txForkDao.findRequest(tx, requestHash, sourceId);
+      if (existing !== undefined) {
         if (existing.requestFingerprint !== fingerprint) {
           throw new ForkIdempotencyConflictError();
         }
@@ -271,15 +264,10 @@ export function forkSession(
           kind: "idempotent",
           result: forkResultByIdTx(tx, existing.childSessionId),
         };
-      } catch (err) {
-        if (!isNoRows(err)) throw err;
       }
 
-      try {
-        txForkDao.findSession(tx, sourceId);
-      } catch (err) {
-        if (isNoRows(err)) throw new ForkSessionNotFoundError();
-        throw err;
+      if (txForkDao.findSession(tx, sourceId) === undefined) {
+        throw new ForkSessionNotFoundError();
       }
       if (
         txForkDao.activeRunCount(
@@ -598,13 +586,8 @@ function resolveForkBoundaryTx(
     throw new ForkNoCompletedTurnError();
   }
   if (atSeq <= 0) throw new ForkInvalidBoundaryError();
-  let record;
-  try {
-    record = new ForkDAO(null).entryAtSeq(tx, sessionId, atSeq);
-  } catch (err) {
-    if (isNoRows(err)) throw new ForkInvalidBoundaryError();
-    throw err;
-  }
+  const record = new ForkDAO(null).entryAtSeq(tx, sessionId, atSeq);
+  if (record === undefined) throw new ForkInvalidBoundaryError();
   if (record.type !== entryMessage) throw new ForkUnavailableError();
   let message: MessageEntry;
   try {
@@ -861,12 +844,7 @@ function remapForkData(
 }
 
 function currentEntryIdTx(tx: Tx, sessionId: string): string {
-  try {
-    return new ForkDAO(null).currentEntryId(tx, sessionId);
-  } catch (err) {
-    if (isNoRows(err)) return "";
-    throw err;
-  }
+  return new ForkDAO(null).currentEntryId(tx, sessionId) ?? "";
 }
 
 function titleFromEntries(entries: ForkSourceEntry[]): string {
@@ -900,12 +878,16 @@ function nextForkTitleTx(
 }
 
 function forkResultByIdTx(tx: Tx, childId: string): ForkResult {
-  return forkResultFromRecord(new ForkDAO(null).result(tx, childId));
+  const record = new ForkDAO(null).result(tx, childId);
+  if (record === undefined) throw new Error(`fork child ${childId} not found`);
+  return forkResultFromRecord(record);
 }
 
 function forkResultByDB(db: { db: DB | null }, childId: string): ForkResult {
   if (db.db === null) throw new Error("fork database is not open");
-  return forkResultFromRecord(new ForkDAO(db.db).result(db.db, childId));
+  const record = new ForkDAO(db.db).result(db.db, childId);
+  if (record === undefined) throw new Error(`fork child ${childId} not found`);
+  return forkResultFromRecord(record);
 }
 
 function forkResultFromRecord(

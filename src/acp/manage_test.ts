@@ -1,6 +1,6 @@
 // the application-settings cases of acp_manage_test.go. These exercise the
 // `opensac/manage/*` families ported into src/acp/manage.ts against an
-// in-memory ACP server fixture, mirroring the Go `newManageFixtureServer`.
+// in-memory ACP server fixture, mirroring the Go `createManageFixtureServer`.
 
 import {
   assert,
@@ -28,7 +28,10 @@ import {
   saveMCPConfig,
 } from "../config/mod.ts";
 import type { ProviderConfig, Settings } from "../config/settings.ts";
-import { newManagerWithProjectDirs, projectSkillDirs } from "../skills/mod.ts";
+import {
+  createManagerWithProjectDirs,
+  projectSkillDirs,
+} from "../skills/mod.ts";
 import {
   claimDeliveryOperation,
   createDeliveryPlan,
@@ -52,7 +55,7 @@ class SyncBuffer implements AcpServerSink {
   }
 }
 
-function newManageFixtureServer(sink: SyncBuffer, cwd = ""): AcpServer {
+function createManageFixtureServer(sink: SyncBuffer, cwd = ""): AcpServer {
   const server = new AcpServer();
   server.sink = sink;
   server.cwd = cwd;
@@ -127,7 +130,7 @@ Deno.test("manage env get never returns values", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     writeEnvFile(
       configDir,
       JSON.stringify({ vars: { SECRET_KEY: "shhh", PLAIN: "ok" } }),
@@ -151,7 +154,7 @@ Deno.test("manage env patch set/replace/unset", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     writeEnvFile(
       configDir,
       JSON.stringify({ vars: { KEEP: "old", REMOVE: "gone" } }),
@@ -185,7 +188,7 @@ Deno.test("manage env patch preserves an empty value", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
 
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/env/patch", {
@@ -208,7 +211,7 @@ Deno.test("manage env patch rejects invalid names", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     for (
       const name of ["", "BAD=NAME", "BAD\u0000NAME", "BAD\rNAME", "BAD\nNAME"]
     ) {
@@ -227,7 +230,7 @@ Deno.test("manage env patch rejects duplicates and conflicts", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
 
     assertEquals(
       manageError(
@@ -257,7 +260,7 @@ Deno.test("manage env patch rejects unknown fields", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     assertEquals(
       manageError(
         callManage(server, output, 1, "opensac/manage/env/patch", {
@@ -275,7 +278,7 @@ Deno.test("manage env patch rejects malformed input without writing", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     writeEnvFile(configDir, JSON.stringify({ vars: { KEEP: "old" } }));
     const envPath = path.join(configDir, "env.json");
     const before = Deno.readTextFileSync(envPath);
@@ -313,7 +316,7 @@ Deno.test("manage env get does not leak secret value or length", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     writeEnvFile(
       configDir,
       JSON.stringify({ vars: { SECRET: "longsecretvaluehere" } }),
@@ -332,7 +335,7 @@ Deno.test("manage env patch never echoes the submitted value", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, cwd);
+    const server = createManageFixtureServer(output, cwd);
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/env/patch", {
         set: [{ name: "KEY", value: "supersecret" }],
@@ -369,7 +372,7 @@ Deno.test("manage experts global default and project scope", () => {
   withEnv("OPENSAC_DIR", configDir, () => {
     const workDir = Deno.makeTempDirSync();
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, workDir);
+    const server = createManageFixtureServer(output, workDir);
 
     const created = manageResult(
       callManage(server, output, 1, "opensac/manage/experts/create", {
@@ -431,7 +434,7 @@ Deno.test("manage experts rejects a builtin scope", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, Deno.makeTempDirSync());
+    const server = createManageFixtureServer(output, Deno.makeTempDirSync());
     const { code } = manageError(
       callManage(server, output, 1, "opensac/manage/experts/delete", {
         scope: "builtin",
@@ -448,7 +451,7 @@ Deno.test("manage application get returns the runtime-owned settings view", () =
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, Deno.makeTempDirSync());
+    const server = createManageFixtureServer(output, Deno.makeTempDirSync());
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/application/get", {}),
     );
@@ -467,7 +470,7 @@ Deno.test("manage application patch updates defaults and rejects unknown fields"
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, Deno.makeTempDirSync());
+    const server = createManageFixtureServer(output, Deno.makeTempDirSync());
 
     assertEquals(
       manageError(
@@ -510,7 +513,7 @@ Deno.test("manage router rejects unknown methods", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, Deno.makeTempDirSync());
+    const server = createManageFixtureServer(output, Deno.makeTempDirSync());
 
     assertEquals(
       manageError(
@@ -523,7 +526,7 @@ Deno.test("manage router rejects unknown methods", () => {
 
 Deno.test("initialize advertises the manage env/experts/application features", () => {
   const output = new SyncBuffer();
-  const server = newManageFixtureServer(output);
+  const server = createManageFixtureServer(output);
   server.handleInitialize(
     rpc(1, "initialize", { protocolVersion: 1, clientCapabilities: {} }),
   );
@@ -614,7 +617,7 @@ Deno.test("manage settings get masks provider keys", () => {
     withEnv("ANTHROPIC_API_KEY", "", () => {
       writeManageSettings(configDir);
       const output = new SyncBuffer();
-      const server = newManageFixtureServer(output, configDir);
+      const server = createManageFixtureServer(output, configDir);
       const result = manageResult(
         callManage(server, output, 1, "opensac/manage/settings/get", {}),
       );
@@ -662,7 +665,7 @@ Deno.test("manage settings patch whitelist round trip", () => {
       if (settings.sandbox) settings.sandbox.level = "strict";
     });
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/settings/patch", {
@@ -735,7 +738,7 @@ Deno.test("manage settings patch rejects disallowed and invalid", () => {
   withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const cases: Array<
       { patch: Record<string, unknown>; code: string; field: string }
@@ -813,7 +816,7 @@ Deno.test("manage providers list projects catalog", () => {
   withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/providers/list", {}),
@@ -850,7 +853,7 @@ Deno.test("manage providers config save delete and discover", async () => {
   await withEnvAsync("OPENSAC_DIR", configDir, async () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const initial = manageResult(
       callManage(server, output, 1, "opensac/manage/providers/list", {}),
@@ -998,7 +1001,7 @@ Deno.test("manage providers test structured paths", async () => {
   await withEnvAsync("OPENSAC_DIR", configDir, async () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     assertEquals(
       manageError(
@@ -1081,8 +1084,8 @@ Deno.test("manage skills list/set round trip", () => {
       "project skill",
     );
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, workDir);
-    server.skillsMgr = newManagerWithProjectDirs(
+    const server = createManageFixtureServer(output, workDir);
+    server.skillsMgr = createManagerWithProjectDirs(
       getGlobalSkillsDir(settings),
       projectSkillDirs(workDir),
     );
@@ -1207,7 +1210,7 @@ Deno.test("manage mcp list returns complete local config", () => {
     writeManageSettings(configDir);
     writeManageMCPFile();
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/mcp/list", {}),
@@ -1235,7 +1238,7 @@ Deno.test("manage mcp set replaces and merges", () => {
     writeManageSettings(configDir);
     writeManageMCPFile();
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const result = manageResult(
       callManage(server, output, 1, "opensac/manage/mcp/set", {
@@ -1341,7 +1344,7 @@ Deno.test("manage mcp project scope uses active session work dir", () => {
   withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, workDir);
+    const server = createManageFixtureServer(output, workDir);
     const rt = new ACPSessionRuntime();
     rt.id = "project-session";
     rt.runtime = { workDir } as unknown as ACPSessionRuntime["runtime"];
@@ -1444,7 +1447,7 @@ Deno.test("manage memory round trip and limit", () => {
   withEnv("OPENSAC_DIR", configDir, () => {
     writeManageSettings(configDir);
     const output = new SyncBuffer();
-    const server = newManageFixtureServer(output, configDir);
+    const server = createManageFixtureServer(output, configDir);
 
     const empty = manageResult(
       callManage(server, output, 1, "opensac/manage/memory/get", {}),
@@ -1607,7 +1610,7 @@ function deliveryManageFixture(
     );
   }
   const output = new SyncBuffer();
-  const server = newManageFixtureServer(output, workDir);
+  const server = createManageFixtureServer(output, workDir);
   const settings = defaultSettings();
   settings.sessionDir = sessionDir;
   server.settings = settings;

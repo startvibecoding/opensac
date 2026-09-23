@@ -4,10 +4,10 @@ import {
   endpoint,
 } from "./client_helpers.ts";
 import {
+  createHTTPClient,
   decodeJSON,
   getWithStatus,
   type HttpClient,
-  newHTTPClient,
 } from "./http.ts";
 import type {
   Category,
@@ -44,7 +44,7 @@ export class ClawHubClient implements MarketClient {
 
   constructor(baseURL?: string, client?: HttpClient) {
     this.baseURL = trimRight(baseURL || clawHubDefaultURL, "/");
-    this.httpClient = newHTTPClient(client);
+    this.httpClient = createHTTPClient(client);
   }
 
   market(): MarketInfo {
@@ -392,7 +392,7 @@ export class ClawHubClient implements MarketClient {
 }
 
 /** Builds a ClawHub client. */
-export function newClawHubClient(
+export function createClawHubClient(
   baseURL?: string,
   client?: HttpClient,
 ): ClawHubClient {

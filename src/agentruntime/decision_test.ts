@@ -8,8 +8,8 @@ import {
   DecisionService,
 } from "./decision.ts";
 import {
-  newDecisionRequestRecord,
-  newDecisionResolutionRecord,
+  createDecisionRequestRecord,
+  createDecisionResolutionRecord,
 } from "./decision_record.ts";
 import {
   expiredDecisions,
@@ -24,13 +24,13 @@ Deno.test("DecisionRecord keeps protocol-neutral payload", () => {
     runId: "run-1",
     kind: DECISION_APPROVAL,
   };
-  const record = newDecisionRequestRecord(request, { tool: "bash" });
+  const record = createDecisionRequestRecord(request, { tool: "bash" });
   assertEquals(record.status, "pending");
   assertEquals(record.id, request.id);
   assertEquals(record.kind, request.kind);
   assertEquals((record.payload as Record<string, unknown>)["tool"], "bash");
 
-  const resolved = newDecisionResolutionRecord(request, {
+  const resolved = createDecisionResolutionRecord(request, {
     id: request.id,
     kind: request.kind,
     status: "resolved",

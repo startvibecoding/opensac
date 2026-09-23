@@ -136,7 +136,7 @@ function abortError(signal: AbortSignal): Error {
 }
 
 /** Creates an empty in-memory file lock manager. */
-export function newFileLockManager(): FileLockManager {
+export function createFileLockManager(): FileLockManager {
   return new FileLockManager();
 }
 

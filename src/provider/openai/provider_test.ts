@@ -6,10 +6,10 @@ import { assert, assertEquals } from "@std/assert";
 import {
   cacheInfo,
   type ChatParams,
+  createToolResultMessage,
+  createUserMessage,
   type Message,
   type Model,
-  newToolResultMessage,
-  newUserMessage,
   streamDone,
   streamError,
   type StreamEvent,
@@ -37,13 +37,13 @@ import {
 } from "./provider.ts";
 import {
   chatAndCollect,
+  createMockOpenAIProvider,
   dummyClient,
   errorAfterStream,
   mockClient,
   mustUsage,
-  newMockOpenAIProvider,
 } from "./test_helpers.ts";
-import { newProviderWithModels } from "./provider.ts";
+import { createOpenAIProvider } from "./provider.ts";
 
 function model(id: string, extra: Partial<Model> = {}): Model {
   return {
@@ -70,7 +70,7 @@ function params(overrides: Partial<ChatParams> = {}): ChatParams {
   };
 }
 
-function newAssistantToolCall(contents: Message["contents"]): Message {
+function createAssistantToolCall(contents: Message["contents"]): Message {
   return { role: "assistant", contents, timestamp: new Date() };
 }
 
@@ -81,7 +81,7 @@ Deno.test("OpenAIRetriesEarlyStreamReadError", async () => {
     "read tcp 192.168.1.143:44252-180.76.199.86:443: read: connection reset by peer",
   );
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("mock"),
   ]);
   p.setRetryConfig({ enabled: true, maxRetries: 1, baseDelayMs: 1 });
@@ -96,7 +96,7 @@ Deno.test("OpenAIRetriesEarlyStreamReadError", async () => {
   const events = await chatAndCollect(
     p,
     params({
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   assertEquals(attempts, 2);
@@ -119,7 +119,7 @@ Deno.test("OpenAIRetriesEarlyStreamReadError", async () => {
 
 Deno.test("OpenAIRetriesGeneric4xxResponse", async () => {
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("mock"),
   ]);
   p.setRetryConfig({ enabled: true, maxRetries: 1, baseDelayMs: 1 });
@@ -140,7 +140,7 @@ Deno.test("OpenAIRetriesGeneric4xxResponse", async () => {
   const events = await chatAndCollect(
     p,
     params({
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   assertEquals(attempts, 2);
@@ -161,7 +161,7 @@ Deno.test("OpenAIRetriesGeneric4xxResponse", async () => {
 
 Deno.test("OpenAIPreservesFinal4xxDiagnosticAfterRetries", async () => {
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("mock"),
   ]);
   p.setRetryConfig({ enabled: true, maxRetries: 1, baseDelayMs: 1 });
@@ -175,7 +175,7 @@ Deno.test("OpenAIPreservesFinal4xxDiagnosticAfterRetries", async () => {
   const events = await chatAndCollect(
     p,
     params({
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   assertEquals(attempts, 2);
@@ -195,7 +195,7 @@ Deno.test("OpenAIDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("mock"),
   ]);
   p.setRetryConfig({ enabled: true, maxRetries: 1, baseDelayMs: 1 });
@@ -212,7 +212,7 @@ Deno.test("OpenAIDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   const events = await chatAndCollect(
     p,
     params({
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   assertEquals(attempts, 1);
@@ -276,7 +276,7 @@ Deno.test("ConvertMessagesToolResultIncludesKimiToolName", () => {
   const messages = p.convertMessages(
     params({
       messages: [
-        newAssistantToolCall([{
+        createAssistantToolCall([{
           type: "toolCall",
           toolCall: {
             id: "read:2",
@@ -390,7 +390,7 @@ function countImages(
 
 Deno.test("ConvertMessagesLimitsHistoricalImagesForMoark", () => {
   const input = imageMessages(6);
-  const p = newProviderWithModels("key", "https://api.moark.com/v1", []);
+  const p = createOpenAIProvider("key", "https://api.moark.com/v1", []);
   const got = p.convertMessages(params({ messages: input }), false);
   assertEquals(got.length, input.length);
   assertEquals(countImages(got), 5);
@@ -399,14 +399,14 @@ Deno.test("ConvertMessagesLimitsHistoricalImagesForMoark", () => {
 
 Deno.test("ConvertMessagesDoesNotLimitImagesForOtherGateways", () => {
   const input = imageMessages(6);
-  const p = newProviderWithModels("key", "https://api.example.test/v1", []);
+  const p = createOpenAIProvider("key", "https://api.example.test/v1", []);
   const got = p.convertMessages(params({ messages: input }), false);
   assertEquals(countImages(got), 6);
 });
 
 Deno.test("ConvertMessagesUsesConfiguredImageLimit", () => {
   const input = imageMessages(4);
-  const p = newProviderWithModels("key", "https://api.example.test/v1", []);
+  const p = createOpenAIProvider("key", "https://api.example.test/v1", []);
   p.setMaxImagesPerRequest(2);
   assertEquals(
     countImages(p.convertMessages(params({ messages: input }), false)),
@@ -422,7 +422,7 @@ Deno.test("ConvertMessagesUsesConfiguredImageLimit", () => {
 // ─── headers / requests ──────────────────────────────────────────────────────
 
 Deno.test("OpenAICustomHeaders", async () => {
-  const { provider: p } = newMockOpenAIProvider(
+  const { provider: p } = createMockOpenAIProvider(
     [model("gpt-test")],
     "data: [DONE]\n",
     (req) => {
@@ -438,7 +438,7 @@ Deno.test("OpenAICustomHeaders", async () => {
     p,
     params({
       modelId: "gpt-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
 });
@@ -466,7 +466,7 @@ Deno.test("OpenAIChatParallelToolCallsRequest", async (t) => {
   ];
   for (const tt of tests) {
     await t.step(tt.name, async () => {
-      const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+      const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
         model("chat-test", { compat: tt.compat }),
       ]);
       let body = "";
@@ -476,7 +476,7 @@ Deno.test("OpenAIChatParallelToolCallsRequest", async (t) => {
       });
       const chatParams = params({
         modelId: "chat-test",
-        messages: [newUserMessage("use the tool")],
+        messages: [createUserMessage("use the tool")],
         tools: [{
           name: "read",
           description: "",
@@ -526,12 +526,12 @@ Deno.test("OpenAIChatParsesMultipleToolCalls", async () => {
     toolChunk(1, "", "", `"}`),
     "data: [DONE]",
   ].join("\n") + "\n";
-  const { provider: p } = newMockOpenAIProvider([model("chat-test")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("chat-test")], sse);
   const events = await chatAndCollect(
     p,
     params({
       modelId: "chat-test",
-      messages: [newUserMessage("read both files")],
+      messages: [createUserMessage("read both files")],
     }),
   );
   const calls = events.filter((e) => e.type === streamToolCall).map((e) =>
@@ -621,7 +621,7 @@ Deno.test("IsQwenModel", () => {
 });
 
 Deno.test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("deepseek-test", { reasoning: true }),
   ], "data: [DONE]\n");
   p.baseURL = p.baseURL + "/deepseek";
@@ -634,7 +634,7 @@ Deno.test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
     p,
     params({
       modelId: "deepseek-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingXHigh,
     }),
   );
@@ -644,7 +644,7 @@ Deno.test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
 });
 
 Deno.test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("deepseek-v4-flash", { reasoning: true }),
   ], "data: [DONE]\n");
   p.baseURL = p.baseURL + "/deepseek";
@@ -657,7 +657,7 @@ Deno.test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
     p,
     params({
       modelId: "deepseek-v4-flash",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
     }),
   );
@@ -667,7 +667,7 @@ Deno.test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
 });
 
 Deno.test("OpenAIThinkingFormatFromModelCompat", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("compat-test", {
       reasoning: true,
       compat: { thinkingFormat: "deepseek" },
@@ -682,7 +682,7 @@ Deno.test("OpenAIThinkingFormatFromModelCompat", async () => {
     p,
     params({
       modelId: "compat-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
     }),
   );
@@ -720,7 +720,7 @@ Deno.test("OpenAIThinkingFormatQwen", async (t) => {
   ];
   for (const tc of cases) {
     await t.step(tc.name, async () => {
-      const { provider: p } = newMockOpenAIProvider([
+      const { provider: p } = createMockOpenAIProvider([
         model(tc.modelID, { reasoning: true }),
       ], "data: [DONE]\n");
       let body = "";
@@ -732,7 +732,7 @@ Deno.test("OpenAIThinkingFormatQwen", async (t) => {
         p,
         params({
           modelId: tc.modelID,
-          messages: [newUserMessage("hi")],
+          messages: [createUserMessage("hi")],
           thinkingLevel: tc.level,
         }),
       );
@@ -748,7 +748,7 @@ Deno.test("OpenAIThinkingFormatQwen", async (t) => {
 // ─── max tokens / compat fields ──────────────────────────────────────────────
 
 Deno.test("OpenAIOmitsMaxTokensByDefault", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("gpt-test", { maxTokens: 64000 }),
   ], "data: [DONE]\n");
   let body = "";
@@ -760,7 +760,7 @@ Deno.test("OpenAIOmitsMaxTokensByDefault", async () => {
     p,
     params({
       modelId: "gpt-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
   const raw = JSON.parse(body) as Record<string, unknown>;
@@ -769,7 +769,7 @@ Deno.test("OpenAIOmitsMaxTokensByDefault", async () => {
 });
 
 Deno.test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("gpt-5-mini", { maxTokens: 64000 }),
   ], "data: [DONE]\n");
   let body = "";
@@ -781,7 +781,7 @@ Deno.test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
     p,
     params({
       modelId: "gpt-5-mini",
-      messages: [newUserMessage("summarize")],
+      messages: [createUserMessage("summarize")],
       maxTokens: 2048,
     }),
   );
@@ -791,7 +791,7 @@ Deno.test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
 });
 
 Deno.test("OpenAIModelCompatRequestFields", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("compat-fields", {
       reasoning: true,
       compat: {
@@ -809,7 +809,7 @@ Deno.test("OpenAIModelCompatRequestFields", async () => {
     p,
     params({
       modelId: "compat-fields",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
       maxTokens: 1234,
     }),
@@ -822,7 +822,7 @@ Deno.test("OpenAIModelCompatRequestFields", async () => {
 
 Deno.test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.test/v1", [
+  const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("custom-reasoning-model"),
   ]);
   p.client = mockClient((req) => {
@@ -843,7 +843,7 @@ Deno.test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
     p,
     params({
       modelId: "custom-reasoning-model",
-      messages: [newUserMessage("summarize")],
+      messages: [createUserMessage("summarize")],
       maxTokens: 2048,
     }),
   );
@@ -851,7 +851,7 @@ Deno.test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
 });
 
 Deno.test("OpenAIRequiresReasoningContentOnAssistant", async () => {
-  const { provider: p } = newMockOpenAIProvider([
+  const { provider: p } = createMockOpenAIProvider([
     model("compat-reasoning", {
       compat: { requiresReasoningContentOnAssistant: true },
     }),
@@ -871,7 +871,7 @@ Deno.test("OpenAIRequiresReasoningContentOnAssistant", async () => {
           contents: [{ type: "text", text: "previous answer" }],
           timestamp: new Date(),
         },
-        newUserMessage("continue"),
+        createUserMessage("continue"),
       ],
     }),
   );
@@ -886,11 +886,11 @@ Deno.test("OpenAIRequiresReasoningContentOnAssistant", async () => {
 
 Deno.test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
   const messages: Message[] = [
-    newAssistantToolCall([{
+    createAssistantToolCall([{
       type: "toolCall",
       toolCall: { id: "read:26", name: "read", arguments: { path: "main.go" } },
     }]),
-    newUserMessage("continue"),
+    createUserMessage("continue"),
   ];
   const got = normalizeToolResultSequence(messages);
   assertEquals(got.length, 3);
@@ -904,25 +904,25 @@ Deno.test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
 
 Deno.test("NormalizeToolResultSequenceDoesNotDuplicateResults", () => {
   const messages: Message[] = [
-    newAssistantToolCall([{
+    createAssistantToolCall([{
       type: "toolCall",
       toolCall: { id: "call-1", name: "read" },
     }]),
-    newToolResultMessage("call-1", "read", "ok", false),
+    createToolResultMessage("call-1", "read", "ok", false),
   ];
   assertEquals(normalizeToolResultSequence(messages).length, messages.length);
 });
 
 Deno.test("NormalizeToolResultSequenceOrdersAndFiltersResults", () => {
   const messages: Message[] = [
-    newAssistantToolCall([
+    createAssistantToolCall([
       { type: "toolCall", toolCall: { id: "a", name: "read" } },
       { type: "toolCall", toolCall: { id: "b", name: "grep" } },
     ]),
-    newToolResultMessage("stale", "old", "bad", false),
-    newToolResultMessage("b", "grep", "B", false),
-    newToolResultMessage("b", "grep", "duplicate", false),
-    newToolResultMessage("a", "read", "A", false),
+    createToolResultMessage("stale", "old", "bad", false),
+    createToolResultMessage("b", "grep", "B", false),
+    createToolResultMessage("b", "grep", "duplicate", false),
+    createToolResultMessage("a", "read", "A", false),
   ];
   const got = normalizeToolResultSequence(messages);
   assertEquals(got.length, 3);
@@ -932,13 +932,13 @@ Deno.test("NormalizeToolResultSequenceOrdersAndFiltersResults", () => {
 
 Deno.test("NormalizeToolResultSequenceDropsOrphanedResults", () => {
   const messages: Message[] = [
-    newAssistantToolCall([{
+    createAssistantToolCall([{
       type: "toolCall",
       toolCall: { id: "call-1", name: "read" },
     }]),
-    newToolResultMessage("call-1", "read", "ok", false),
-    newToolResultMessage("read:25", "read", "stale", false),
-    newUserMessage("continue"),
+    createToolResultMessage("call-1", "read", "ok", false),
+    createToolResultMessage("read:25", "read", "stale", false),
+    createUserMessage("continue"),
   ];
   const got = normalizeToolResultSequence(messages);
   assertEquals(got.length, 3);
@@ -946,7 +946,7 @@ Deno.test("NormalizeToolResultSequenceDropsOrphanedResults", () => {
 });
 
 Deno.test("OpenAIRequiresReasoningContentForKimiModels", () => {
-  const p = newProviderWithModels("key", "https://api.test/v1", []);
+  const p = createOpenAIProvider("key", "https://api.test/v1", []);
   assert(p.requiresReasoningContentOnAssistant(model("kimi-k3")));
   assert(p.requiresReasoningContentOnAssistant(model("k3")));
 });
@@ -957,9 +957,9 @@ Deno.test("OpenAICache_CacheHit", async () => {
   const sse = 'data: {"choices":[{"delta":{"content":"Hello"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":5,"total_tokens":1005,"prompt_tokens_details":{"cached_tokens":750}}}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const u = mustUsage(
-    await chatAndCollect(p, params({ messages: [newUserMessage("hi")] })),
+    await chatAndCollect(p, params({ messages: [createUserMessage("hi")] })),
   );
   assertEquals(u.input, 1000);
   assertEquals(u.output, 5);
@@ -971,9 +971,9 @@ Deno.test("OpenAICache_NoCache", async () => {
   const sse = 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":200,"completion_tokens":8,"total_tokens":208}}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const u = mustUsage(
-    await chatAndCollect(p, params({ messages: [newUserMessage("hi")] })),
+    await chatAndCollect(p, params({ messages: [createUserMessage("hi")] })),
   );
   assertEquals(u.input, 200);
   assertEquals(u.cacheRead, 0);
@@ -984,9 +984,9 @@ Deno.test("OpenAICache_100Pct", async () => {
   const sse = 'data: {"choices":[{"delta":{"content":"Full"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":500,"completion_tokens":4,"total_tokens":504,"prompt_tokens_details":{"cached_tokens":500}}}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const u = mustUsage(
-    await chatAndCollect(p, params({ messages: [newUserMessage("hi")] })),
+    await chatAndCollect(p, params({ messages: [createUserMessage("hi")] })),
   );
   assertEquals(u.cacheRead, 500);
   assertEquals(cacheInfo(u), "Cache: 100%");
@@ -997,9 +997,9 @@ Deno.test("OpenAICache_ProxyFirstChunkHasUsage", async () => {
     'data: {"choices":[{"delta":{"content":"Hey"}}],"usage":{"prompt_tokens":800,"completion_tokens":3,"total_tokens":803,"prompt_tokens_details":{"cached_tokens":600}}}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const u = mustUsage(
-    await chatAndCollect(p, params({ messages: [newUserMessage("hi")] })),
+    await chatAndCollect(p, params({ messages: [createUserMessage("hi")] })),
   );
   assertEquals(u.input, 800);
   assertEquals(u.cacheRead, 600);
@@ -1011,9 +1011,9 @@ Deno.test("OpenAICache_ProxyFirstWinsOnConflict", async () => {
     'data: {"choices":[{"delta":{"content":"A"}}],"usage":{"prompt_tokens":1000,"completion_tokens":6,"total_tokens":1006,"prompt_tokens_details":{"cached_tokens":750}}}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":999,"completion_tokens":99,"total_tokens":1098,"prompt_tokens_details":{"cached_tokens":800}}}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const u = mustUsage(
-    await chatAndCollect(p, params({ messages: [newUserMessage("hi")] })),
+    await chatAndCollect(p, params({ messages: [createUserMessage("hi")] })),
   );
   assertEquals(u.input, 1000);
   assertEquals(u.output, 6);
@@ -1026,9 +1026,9 @@ Deno.test("OpenAICache_ProxySplitUsage", async () => {
     'data: {"choices":[{"delta":{"content":"B"}}],"usage":{"prompt_tokens":400,"completion_tokens":7,"total_tokens":407}}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0,"prompt_tokens_details":{"cached_tokens":300}}}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const u = mustUsage(
-    await chatAndCollect(p, params({ messages: [newUserMessage("hi")] })),
+    await chatAndCollect(p, params({ messages: [createUserMessage("hi")] })),
   );
   assertEquals(u.input, 400);
   assertEquals(u.output, 7);
@@ -1042,10 +1042,10 @@ Deno.test("OpenAIToolCall_MissingIDGetsFallback", async () => {
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"type":"function","function":{"arguments":"\\"echo hi\\"}"}}]},"finish_reason":null}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const events = await chatAndCollect(
     p,
-    params({ messages: [newUserMessage("hi")] }),
+    params({ messages: [createUserMessage("hi")] }),
   );
   const got = events.find((e) => e.type === streamToolCall)?.toolCall;
   assert(got !== undefined);
@@ -1059,10 +1059,10 @@ Deno.test("OpenAIToolCall_AcceptsObjectArguments", async () => {
   const sse =
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_write","type":"function","function":{"name":"write","arguments":{"path":"internal/raft/node.go","content":"package raft\\n"}}}]},"finish_reason":"tool_calls"}]}\n' +
     "data: [DONE]\n";
-  const { provider: p } = newMockOpenAIProvider([model("mock")], sse);
+  const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   const events = await chatAndCollect(
     p,
-    params({ messages: [newUserMessage("hi")] }),
+    params({ messages: [createUserMessage("hi")] }),
   );
   const got = events.find((e) => e.type === streamToolCall)?.toolCall;
   assert(got !== undefined);

@@ -4,7 +4,7 @@
 // cannot yet be represented by `Builder`; the Runtime retains all lifecycle
 // ownership.
 
-import { newMemberMailbox } from "../agent/mod.ts";
+import { createMemberMailbox } from "../agent/mod.ts";
 import type { Settings } from "../config/settings.ts";
 import { Center } from "../expert/center.ts";
 import type { Client } from "../mcp/mcp.ts";
@@ -112,7 +112,7 @@ export async function attachSessionResources(
     resourceWorkflows: resources.workflows ?? false,
     resourceBrowser: resources.browser ?? false,
   });
-  runtime.mailbox = newMemberMailbox();
+  runtime.mailbox = createMemberMailbox();
   runtime.expertCenter = new Center(resources.workDir);
   await runtime.rehydrateBoundResources();
   runtime.reloadAdditionalDirectories(manager);

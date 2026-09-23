@@ -8,7 +8,7 @@
 
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { closeDatabases } from "../session/root_db.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission,
   getSessionRun,
@@ -60,7 +60,7 @@ function durableRun(overrides: Partial<DurableRun>): DurableRun {
 }
 
 function initRecoveryTestSession(sessionDir: string, id: string): void {
-  const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+  const manager = createManager(Deno.makeTempDirSync(), sessionDir);
   manager.initWithID(id);
 }
 

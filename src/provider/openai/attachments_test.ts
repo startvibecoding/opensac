@@ -4,11 +4,11 @@ import {
   resolveAttachment,
   resolveAttachmentWithMetadata,
 } from "./attachments.ts";
-import { newProviderWithModels } from "./provider.ts";
+import { createOpenAIProvider } from "./provider.ts";
 import { mockClient } from "./test_helpers.ts";
 
 Deno.test("ResolveAttachmentDownloadsAuthorizedProviderFile", async () => {
-  const p = newProviderWithModels("test-key", "https://api.test/v1", []);
+  const p = createOpenAIProvider("test-key", "https://api.test/v1", []);
   p.client = mockClient((req) => {
     if (req.url !== "https://api.test/v1/files/file_123/content") {
       throw new Error(`unexpected url ${req.url}`);
@@ -36,7 +36,7 @@ Deno.test("ResolveAttachmentDownloadsAuthorizedProviderFile", async () => {
 });
 
 Deno.test("ResolveAttachmentWithMetadataUsesCodeInterpreterContainer", async () => {
-  const p = newProviderWithModels("test-key", "https://api.test/v1", []);
+  const p = createOpenAIProvider("test-key", "https://api.test/v1", []);
   p.client = mockClient((req) => {
     if (
       req.url !==

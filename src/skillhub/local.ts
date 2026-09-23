@@ -115,7 +115,7 @@ export class LocalIndex {
 }
 
 /** Builds a local install index over the global and project skill dirs. */
-export function newLocalIndex(
+export function createLocalIndex(
   globalDir: string,
   projectDirs: string[],
 ): LocalIndex {

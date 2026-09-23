@@ -7,7 +7,7 @@
 // the assistant-message fingerprint uses `node:crypto` SHA-256.
 
 import { createHash } from "node:crypto";
-import { ConversationTurnDAO, isNoRows } from "../dao/mod.ts";
+import { ConversationTurnDAO } from "../dao/mod.ts";
 import type { Tx } from "../dao/mod.ts";
 import type { Message } from "../provider/types.ts";
 import { entryMessage, type MessageEntry } from "./entry.ts";
@@ -147,13 +147,7 @@ export function appendRunAssistantMessageTx(tx: Tx, run: SessionRun): void {
   let entryId = run.assistantEntryId;
   if (entryId === "") entryId = runAssistantEntryID(run.id);
   const dao = new ConversationTurnDAO(null);
-  let existingRecord;
-  try {
-    existingRecord = dao.entry(tx, entryId);
-  } catch (err) {
-    if (!isNoRows(err)) throw err;
-    existingRecord = undefined;
-  }
+  const existingRecord = dao.entry(tx, entryId);
   if (existingRecord !== undefined) {
     if (
       existingRecord.sessionId !== run.sessionId ||

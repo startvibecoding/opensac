@@ -11,7 +11,7 @@
 > anti-fragmentation invariants in `AGENTS.md` and keeps the public `sdk/`
 > surface stable.
 
-- 状态: 基本完成（P0–P4 主体全部落地；仅余 P1-3 `ErrNoRows` → 可选返回一项重构，见 §4）
+- 状态: 主体完成（P0–P4 + P1-3 + §3.4-1 已落地，§3.4-2 主体落地）；真实余项见 §4 末「余项汇总（2026-09-23）」：`session/store.getLatest*` 与 value+error 元组扫尾、语义变体判定、P2-1 ACP teardown、P3 治理余项
 - 范围: `src/`、`sdk/`（不含 `desktop/`、生成物）
 - 前置文档: `docs/proposal/go-to-deno-migration.md`（迁移台账）、`AGENTS.md`（架构不变量）
 
@@ -44,26 +44,26 @@
 
 - 不做全量重写或模块重组（目录布局 `src/<pkg>/mod.ts` 本身就是 Deno 惯用的）；
 - 不追求"去 class 化"或引入新框架/新依赖（校验库等见 §4.8 的可选项）；
-- 不改变 `settings.json`/`serve.json` 字段语义、数据库 schema、ACP/Serve 协议；
+- 不改变 `settings.json` 字段语义、数据库 schema、ACP 协议（serve 已移除，见范围变更记录）；
 - 不为风格而风格——见 §5"有意保留的映射"。
 
 ---
 
 ## 2. 评审方法与量化结果
 
-对 `src/`、`sdk/` 全量扫描（排除 `_test`），主要信号:
+对 `src/`、`sdk/` 全量扫描（排除 `_test`），主要信号（2026-09-23 复查校准）:
 
 | 信号 | 数量 | 说明 |
 | --- | --- | --- |
-| `export function newXxx(...)` | 132 | Go `NewXxx` 构造器命名 |
-| `newXxxWithYyy(...)` 变体 | 33 | Go functional-options / 多构造器模式 |
-| PascalCase 导出（函数+枚举式常量） | 223（P0 前 ~260） | Go 导出大写惯例残留（`Err*` 哨兵另计） |
-| `export const ErrXxx` 哨兵 | 1（仅 `ErrNoRows`，P1-3 范围） | Go `errors.New` 哨兵 + `errors.Is` 身份比较，P1 已清零 17 个 |
-| `): [a, b]` 多返回值（含 comma-ok） | 25（多为坐标类纯多值） | Go 多返回值 / `, ok` 惯用法（session/tools 已清零） |
-| `BoolPtr` / `clone*Ptr` no-op helper | 3+3 个导出（`settings.ts` 与 `openai/wire.ts` 各一套） | Go 指针/值语义残留 |
+| `export function newXxx(...)` | 0 ✅（§3.4-1 已清零，2026-09-23） | Go `NewXxx` 构造器命名；已全部改为 `createXxx` |
+| `newXxxWithYyy(...)` 变体 | 0 ✅（Go 式命名已清零；`createXWithYyy` 语义变体见 §3.4-2） | Go functional-options / 多构造器模式；双入口合并为 §3.4-2 余项 |
+| PascalCase 导出（函数+枚举式常量） | 0 ✅（P4 已清零，2026-09-23 实测） | Go 导出大写惯例残留；188 个常量已批改 SCREAMING_SNAKE（`Err*` 哨兵另计） |
+| `export const ErrXxx` 哨兵 | 0 ✅（P1-3 已清零，2026-09-23） | Go `errors.New` 哨兵 + `errors.Is` 身份比较；P1 类化 17 个，P1-3 移除 `ErrNoRows` 后归零 |
+| `): [a, b]` 多返回值（含 comma-ok） | 37（2026-09-23 实测；comma-ok 仅余 `getLatest*`×5 组，余为坐标/语义多值与 value+error 对） | Go 多返回值 / `, ok` 惯用法；三批已清零 ~35 处，见余项汇总 |
+| `BoolPtr` / `clone*Ptr` no-op helper | 0 ✅（P0 已清零） | Go 指针/值语义残留；`cloneString*` 防共享 helper 按 §5 保留 |
 | `| null` vs `| undefined` | 807 vs 990 | 两套"空"语义混用 |
 | `JSON.parse(...) as T` 无校验解码 | 42（外部输入边界已全部 guard，余为 provider SSE/自有持久化列） | Go `json.Unmarshal` 直译，类型靠断言 |
-| `finally {` | 83 | Go `defer` 的手写展开（13 处 `Symbol.dispose` 已落地，热点 teardown 分层重构为 P2 余项） |
+| `finally {` | 84 | Go `defer` 的手写展开（13 处 `Symbol.dispose` 已落地，热点 teardown 分层重构为 P2 余项） |
 | 自定义 `close(): void` 句柄 | 13 | Go `io.Closer`，可用 `Symbol.dispose` |
 | `export class` vs `export function` | 227 vs 1659 | class 多为"带方法的 struct"直译 |
 | `// Ported from ...go` / `Deviation:` 注释 | 溯源行已清零（539→0），余 `Deviation:` 行为说明 | 指向 Go 源树的注释，P4-c 已清扫 |
@@ -74,6 +74,8 @@
 ---
 
 ## 3. 问题清单: 在 Go 里优雅、在 Deno/TS 里不优雅的地方
+
+> 本节各条“现状”为 2026-09-22 评审快照；已落地项与真实余项以 §4 各阶段勾选及末尾“余项汇总”为准。
 
 ### 3.1 哨兵错误 + `errors.Is` 身份比较（Go `errors.New` 惯用法）
 
@@ -149,8 +151,9 @@ no-op helper 只制造阅读噪音和假安全感。`null`/`undefined` 混用则
 
 ### 3.4 构造函数与导出命名的 Go 拼写
 
-**现状**: `export function newXxx` 154 处（`newManager`、`newStream`、
-`newNode`、`newRenderer` …）+ 33 处 `newXxxWithOptions/newXxxWithYyy` 双入口；
+**现状**: `export function newXxx` 132 处（`newManager`、`newStream`、
+`newNode`、`newRenderer` …）+ 35 处 `newXxxWithOptions/newXxxWithYyy` 变体
+（其中 29 处与同名基础构造器构成双入口）；
 残留 Go 导出大小写: `NewBashToolWithJM`（`src/tools/bash.ts:593`）、
 `IsMaintenanceCronJobID`（`src/agentruntime/maintenance_cron.ts:82`）、
 `BoolPtr`、常量 `ProjectDirName`/`TypeAgent`/`RoleLead` 等 PascalCase 常量
@@ -165,7 +168,7 @@ no-op helper 只制造阅读噪音和假安全感。`null`/`undefined` 混用则
 1. 纯重命名（`newXxx` → `createXxx` 或 class 构造器）是机械改动，可按目录
    分批做；**`sdk/` 公开面不动**。
 2. `newXxx` / `newXxxWithOptions` 合并为 `createXxx(options: XxxOptions = {})`；
-   校验/默认值在函数内完成。优先收敛 sandbox（6 个双入口）、skills、tsm。
+   校验/默认值在函数内完成。优先收敛 sandbox（4 个双入口）、skills、tsm。
 3. `NewBashToolWithJM`、`IsMaintenanceCronJobID`、`BoolPtr` 及 PascalCase 常量
    统一改名（附带 grep 确认无协议/持久化字符串依赖——`TypeAgent` 等是持久化
    字面量的话只改绑定名不改值）。
@@ -368,7 +371,7 @@ P0 发现的后续项（归入 P1/P4）:
   `manage_knowledge_bases.ts` 的本地包装函数同理收敛为 `handleKnowledgeBaseCronJob`。
 - 验证: `deno task lint && deno task check && deno task test`（相关模块聚焦测试）。
 
-### P1 — 错误模型与返回值形状 ✅ 已完成（2026-09-22，P1-3 除外）
+### P1 — 错误模型与返回值形状 ✅ 已完成（2026-09-23，含 P1-3）
 1. ✅ 统一错误分类（§3.1-3）: 新建 `src/util/errors.ts` 唯一实现
    `isAbortError`/`isTimeoutError`（按 name 严格判定）与 `isAbortLike`/`isTimeoutLike`
    （retry 用宽判定，含 message/cause 链），替换 `db/db.ts`、`provider/retry.ts`、
@@ -389,17 +392,15 @@ P0 发现的后续项（归入 P1/P4）:
 
 验证: `deno task test` 1851 passed、`test:architecture` 8 passed、check/lint/fmt 干净。
 
-P1 遗留（唯一剩余重构）:
-- **P1-3 `ErrNoRows` → DAO 可选返回**（本轮评估后未启动，避免半拆状态）。
-  量级: 生产侧 ~137 处引用 / 37 文件（含 ~55 个 try/catch 控制流块、70 处
-  `queryOne`/`execReturning` 调用、7 个模块包装 `isNoRows*`），测试侧仅 2 处。
-  执行配方（建议独立一轮完成）:
-  1. `queryOne` 并入 `queryOptional`（不再抛），`execReturning` 返回 `T | undefined`，
-     `recovery.ts`/`cron.ts`/`esm.ts` 的 `if (changed === 0) throw ErrNoRows` 改返回可选；
-  2. 逐文件把 `catch (err) { if (isNoRows(err)) … }` 三形态（吞掉赋 undefined /
-     return 默认值 / 转抛业务错）改为 undefined 判断，用 `deno check` 引导；
-  3. 删除 `ErrNoRows`/`isNoRows` 与 7 个包装，清理 `bindings.ts` 的消息映射；
-  4. 回归: `deno task test` + `test:architecture`。
+P1-3 完成记录（2026-09-23）:
+- **P1-3 `ErrNoRows` → DAO 可选返回 ✅ 已完成**（按原配方独立一轮）:
+  `queryOne` 并入 `queryOptional`（不再抛），`execReturning` 返回 `T | undefined`，
+  `esm.ts`/`recovery.ts`/`cron.ts` 的 `if (changed === 0) throw ErrNoRows` 改返回
+  `boolean`，`bindings.ts` 的 Go 消息映射删除；生产侧 ~137 处引用 / 37 文件的
+  三形态 try/catch 全部改为可选返回判断（无法成立的 INSERT/UPDATE 后读回改为
+  显式 guard 抛描述性错误），7 个 `isNoRows*` 包装与 `ErrNoRows`/`isNoRows`
+  全部删除（grep 归零）。回归: `deno task test` 1876 passed、
+  `test:architecture` 8 passed、check/lint/fmt 干净。
 - 其余域仍有 17 行 `ok: boolean`（`update/semver` 4、`memory` 2、`browser` 2 等）与
   25 个多返回值元组（含 `manager.get(): [Agent, boolean]`），按同一选型表在后续扫尾。
 - 验证: 每模块行为回归 + `deno task test:architecture`。
@@ -418,7 +419,7 @@ P1 遗留（唯一剩余重构）:
    全量 drain 契约，`@std/async` `pooledMap` 不能同时满足），理由已写入模块注释；
    `CountedMutex` 逐点审计后仅保留 `runtime_lock`/`identity_lock` 两个真实跨 await
    会合点；`EventChannel` 保持 AsyncIterable 投影（无界取舍已在注释记录，
-   补契约测试为余项）。
+   ✅ 契约测试已补: `src/agent/event_channel_test.ts`，2026-09-23）。
 
 验证: `deno task test` 1851 passed、`test:architecture` 8 passed、check/lint/fmt 干净。
 
@@ -472,6 +473,54 @@ P1 遗留（唯一剩余重构）:
   （`src/agentruntime`/`src/dao`），不新增第二条路径；`test:architecture` 随批。
 - **冲突面风险**: 命名/机械替换类改动避开大 PR 并行期，按目录原子合入。
 
+### 余项汇总（2026-09-23 复查校准）
+
+P0–P4 主体落地后的真实剩余工作（状态行以此为准）:
+
+- ✅ **P1-3 已完成**（2026-09-23）: `ErrNoRows`/`isNoRows` 与 7 个包装删除、
+  DAO 可选返回、`bindings.ts` Go 消息映射清理，详见 P1-3 完成记录；
+- ✅ **§3.4-1 `newXxx` → `createXxx` 已完成**（2026-09-23，例外全部清零）: 全部
+  机械重命名（231 文件；含 2 个 Go 式方法 `newToolRegistry`/`newSessionExecution`），
+  `sdk/` 8 个公开工厂按约定保留。撞名家族已随 §3.4-2 合并定名:
+  `newProvider` 家族 → `createAnthropicProvider`/`createOpenAIProvider`/
+  `createGoogleProvider*`；`newAgent` 家族 → `createAgent`/`createAgentWithLoopConfig`
+  （`agent/factory.ts` 的自由 `createAgent` 转为模块私有 `createAgentFromFactory`）。
+  `newSession()`（TUI 对话动作方法）与 `newText`/`newId` 等局部变量名属正常
+  命名，不在范围内。
+- **§3.4-2 双入口合并**（多轮完成中，最近 2026-09-23: sandbox 4 对 +
+  `decision_record`/`bash`/`session_store`/`scheduler`/`knowledgebase`×2/
+  provider-factory/agent-factory/http-client×2 共 9 对已合并为单入口（尾部
+  默认参数形态）；knowledgebase 的 settings/factory 默认用引用前参的默认式
+  保持三形态语义，调用点零改动。同轮完成 Gemini/Vertex 6 变体合并
+  （`createGeminiProvider`/`createVertexProvider`，AndProxy 调用点已改序，
+  无显式 opts 时保留旧的流客户端回退语义）与
+  `createToolResultMessageWithContents` 并入 `createToolResultMessage`
+  （contents 尾参，调用点已改序）。同轮完成 `newProvider` 家族：
+  anthropic/openai 各 5 变体链并入 `createAnthropicProvider`/`createOpenAIProvider`，
+  google 低层定名 `createGoogleProvider`/`createGoogleProviderWithHTTPClient`，
+  register 的配置构造器改名 `anthropicProviderFromConfig`/`openaiProviderFromConfig`；
+  `createXProviderWithHTTPClient`×3 保留为注入 client 的测试缝隙变体。
+  `newAgent` 家族已定名（`createAgent`/`createAgentWithLoopConfig`，2026-09-23）；
+  以下经评估为语义变体/需单独设计，待后续判定：
+  `*WithTurn`×2、`createImageToolResultWithContent`（入参编码不同）、
+  `createRunToolWithActive`（active 语义不同）、`createRegistryWithConfig`（配置
+  装配需设计）、`createManagerWithProjectDirs`（skills 构造形状不同））；
+- **P2-1 余项**: ACP Run 生命周期 teardown 闭包分层重构（行为敏感，刻画测试先行）；
+- **P3 余项**: 慢查询热点分片让出 + 离线扫描进 `Deno.Worker`（§3.7-2/3）、
+  provider SSE 解码 guard（已接受的残差，另行评估）、RE2 完全隔离
+  （受限 Worker + 超时，防御纵深之外的根治）；
+- **comma-ok 扫尾**（进行中；2026-09-23 三批已清零 ~35 处: agent/manager
+  冗余 ok 元组 11、semver/memory/browser/runner/agent_support 等 22、
+  `executionBinding` + `replaceLargestToolResultForContext` 3）: 余最后一组
+  `session/store` 的 `getLatest*(): [Entry, boolean]` ×5（接口 + 实现 +
+  私有 helper，19 处调用点，且 agent/session 两侧同名接口形态不一，需逐层
+  转换）；另有 value+error 元组（`[T | null, Error | null]` 等 4 处）需按
+  §3.1 抛错化。保留项（非 comma-ok）: `ok: boolean` 结构字段（doctor/esm/
+  platform 报告字段）、坐标类 `cursorPos()`/`image_coordinates`、多值
+  `getHistoryState()`/`requestTokenBudget()`/`consumeANSISeq()`/`think_split` 等；
+- ✅ **P2-3 余项已完成**（2026-09-23）: `EventChannel` 契约测试
+  `src/agent/event_channel_test.ts`（FIFO/无界缓冲/close 语义/AsyncIterable）。
+
 ---
 
 ## 5. 有意保留的映射（不要"优化"掉）
@@ -494,13 +543,13 @@ P1 遗留（唯一剩余重构）:
 ## 6. 验收标准
 
 1. 量化目标（可 grep 度量，完成后复查）:
-   - `export const ErrXxx` 哨兵: 18 → 0 ✅ 除 `ErrNoRows`（P1-3 范围）；
-   - comma-ok / 多返回值元组: 28 → 仅保留坐标类纯多值返回（如 `cursorPos(): [number, number]`）✅ session/tools 已达成，其余域 P2/P4 扫尾；
+   - `export const ErrXxx` 哨兵: 18 → 0 ✅（含 P1-3 的 `ErrNoRows`，2026-09-23 清零）；
+   - comma-ok / 多返回值元组: ✅ session/tools/agent-manager 与第二批（semver/memory/browser/runner/agent_support 等）已达成，comma-ok 仅余 `session/store.getLatest*` 一组；value+error 元组与保留项见 §4 余项汇总；
    - no-op 指针克隆 helper: 6 → 0 ✅（P0 已达成）；
    - `JSON.parse(...) as`: 边界 lie-cast → 0 ✅（MCP wire + config 族已 guard；余 42 处为 provider SSE/自有列）；
    - `using`/`Symbol.dispose` 在生命周期热点路径落地 ✅ 13 处句柄已具备；ACP Run teardown 分层重构为 P2 余项；
    - 用户可见文本中 "nil" Go 词 → 0 ✅（P0 已达成）；
-   - PascalCase 导出常量词汇 → 0 ✅（188 个已批改为 SCREAMING_SNAKE，仅余 `ErrNoRows` 随 P1-3 消亡）。
+   - PascalCase 导出常量词汇 → 0 ✅（188 个已批改为 SCREAMING_SNAKE，`ErrNoRows` 已随 P1-3 消亡）。
 2. 行为不变: 全量 `deno task test`、`deno task test:architecture`、
    `deno task check`、`deno lint` 通过；TUI/CLI/ACP 跨入口契约测试覆盖触及面。
 3. 长任务可靠性不回退: 心跳续租、流式输出在慢查询压力下不被饿死（P3 加基线）。
@@ -514,7 +563,8 @@ P1 遗留（唯一剩余重构）:
 grep -rn --include='*.ts' -E "export const Err[A-Z]" src | grep -v _test
 grep -rn --include='*.ts' -E "export function new[A-Z]" src sdk | grep -v _test
 grep -rn --include='*.ts' -E "ok: boolean|): \[[a-z]" src | grep -v _test
-grep -rn --include='*.ts' -E "BoolPtr|clone\w*Ptr|cloneString" src
+grep -rn --include='*.ts' -E "BoolPtr|clone\w*Ptr" src        # 应为 0
+grep -rn --include='*.ts' -E "cloneString" src             # §5 有意保留，预期非零
 grep -rn --include='*.ts' -E "JSON\.parse\([^)]*\) as " src | grep -v _test
 grep -rn --include='*.ts' -E "\bnil\b" src | grep -v _test
 grep -rn --include='*.ts' -E "Ported from|Deviation:" src sdk | wc -l

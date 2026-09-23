@@ -39,18 +39,16 @@ export {
 } from "./hosted_tools.ts";
 export {
   applyHeaders,
+  createHttpClient,
+  createStreamHttpClient,
   type HttpClient,
   type HTTPClientOptions,
-  newHttpClient,
-  newHttpClientWithOptions,
-  newStreamHttpClient,
-  newStreamHttpClientWithOptions,
   streamConnectTimeoutMs,
   streamResponseHeaderTimeoutMs,
 } from "./http_client.ts";
 export {
+  createIdleTimeoutStream,
   isStreamTimeoutError,
-  newIdleTimeoutStream,
   streamIdleTimeoutMs,
   StreamTimeoutError,
 } from "./idle_timeout.ts";
@@ -60,7 +58,7 @@ export {
   mapPointToOriginal,
   mapRectToOriginal,
 } from "./image_coordinates.ts";
-export { MockProvider, newMockProvider } from "./mock.ts";
+export { createMockProvider, MockProvider } from "./mock.ts";
 export { type Provider } from "./provider.ts";
 export {
   createProvider,

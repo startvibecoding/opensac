@@ -19,9 +19,9 @@ import {
 import { getKnowledgeBase } from "../session/mod.ts";
 import { truncateKnowledgeText } from "./knowledge_context.ts";
 import {
+  createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
   type KnowledgeBaseService,
-  newKnowledgeBaseService,
 } from "./knowledgebase.ts";
 
 export const knowledgeMCPToolName = "search_knowledge_base";
@@ -63,7 +63,7 @@ export class KnowledgeMCPHandler implements ServerHandler {
     sessionDir: string,
     knowledgeBaseIDs: string[],
   ): KnowledgeMCPHandler {
-    const service = newKnowledgeBaseService(
+    const service = createKnowledgeBaseService(
       sessionDir,
       defaultKnowledgeBaseIndexPolicy(),
     );

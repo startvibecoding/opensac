@@ -34,15 +34,12 @@ import {
   setVerbose,
 } from "../config/mod.ts";
 import { validateProvider } from "../doctor/doctor.ts";
-import {
-  createWithOptions,
-  parseQualifiedModel,
-} from "../provider/factory/mod.ts";
+import { create, parseQualifiedModel } from "../provider/factory/mod.ts";
 import { normalizeThinkingLevel } from "../provider/types.ts";
-import { Level, newManagerWithOptions } from "../sandbox/sandbox.ts";
+import { createManager, Level } from "../sandbox/sandbox.ts";
 import {
+  createAgentManager,
   loadContextResources,
-  newAgentManager,
   RecoveryCoordinator,
   SessionRuntime,
   SOURCE_ACP,
@@ -54,7 +51,6 @@ import { getSessionDir } from "../config/mod.ts";
 import { current as appversionCurrent } from "../version/version.ts";
 import { debugLogf } from "../provider/debug.ts";
 import { startDebugServer } from "../debugendpoints/debugendpoints.ts";
-import { isNoRowsAttachment } from "../dao/mod.ts";
 import { encodeBase64 } from "@std/encoding/base64";
 import { acpStructuredRPCError } from "./projection.ts";
 import type { ACPRPCRequest } from "./wire.ts";
@@ -341,7 +337,7 @@ async function runACPInner(
     model: import("../provider/types.ts").Model;
   };
   try {
-    primary = createWithOptions(settings, providerName, modelID, {
+    primary = create(settings, providerName, modelID, {
       builtinAnthropicCacheControl: enabled,
       requireModel: true,
     });
@@ -360,7 +356,7 @@ async function runACPInner(
   for (const name of Object.keys(settings.providers ?? {})) {
     if (name.toLowerCase() === srv.providerName.toLowerCase()) continue;
     try {
-      const candidate = createWithOptions(settings, name, "", {
+      const candidate = create(settings, name, "", {
         builtinAnthropicCacheControl: enabled,
         requireModel: true,
       });
@@ -375,7 +371,7 @@ async function runACPInner(
     opts.thinking || settings.defaultThinkingLevel || "",
   );
 
-  const sbMgr = newManagerWithOptions(
+  const sbMgr = createManager(
     cwd,
     sandboxSettingsOptions(
       settings.sandbox ?? {
@@ -433,7 +429,7 @@ async function runACPInner(
     opts.multiAgent === true || opts.delegate === true ||
     opts.workflows === true
   ) {
-    srv.agentMgr = newAgentManager({
+    srv.agentMgr = createAgentManager({
       runtime: srv.runtime,
       provider: primary.provider,
       model: primary.model,
@@ -683,7 +679,7 @@ export function handleAttachmentFetch(
       const message = error instanceof Error ? error.message : String(error);
       let code = "attachment_unavailable";
       let publicMessage = `open attachment ${attachmentID}: ${message}`;
-      if (isNoRowsAttachment(error) || message.includes("not found")) {
+      if (message.includes("not found")) {
         code = "attachment_not_found";
         publicMessage =
           `attachment ${attachmentID} is not available for session ${sessionID}`;

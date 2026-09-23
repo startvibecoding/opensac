@@ -69,6 +69,6 @@ export class EventRouter {
 }
 
 /** Creates a new event router. */
-export function newEventRouter(): EventRouter {
+export function createEventRouter(): EventRouter {
   return new EventRouter();
 }

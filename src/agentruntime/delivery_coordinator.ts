@@ -257,7 +257,7 @@ export class DeliveryCoordinator {
   }
 }
 
-export function newDeliveryCoordinator(
+export function createDeliveryCoordinator(
   sessionDir: string,
   owner: string,
 ): DeliveryCoordinator {

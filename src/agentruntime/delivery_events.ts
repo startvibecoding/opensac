@@ -29,7 +29,7 @@ export function deliveryPendingData(
   return data;
 }
 
-export function newDeliveryPendingEvent(
+export function createDeliveryPendingEvent(
   sessionId: string,
   runId: string,
   source: string,

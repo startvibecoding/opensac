@@ -5,7 +5,7 @@
 // tests (the DAO/DB rule governs production code). `time.Time` maps to `Date`.
 
 import { assert, assertEquals } from "@std/assert";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission,
   acquireMutation,
@@ -115,7 +115,7 @@ function baseSessionRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 function initSession(sessionDir: string, id: string): void {
-  const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+  const manager = createManager(Deno.makeTempDirSync(), sessionDir);
   manager.initWithID(id);
 }
 

@@ -747,21 +747,15 @@ export class Scheduler {
   }
 }
 
-/** Constructs a new cron scheduler with an optional Runtime job handler. */
-export function newScheduler(
+/**
+ * Constructs a new cron scheduler with an optional Runtime job handler. A
+ * `sessionDir` lets scheduled runs attach to existing sessions.
+ */
+export function createScheduler(
   store: CronStore,
   manager: AgentManager | null,
   intervalMs: number,
-): Scheduler {
-  return new Scheduler(store, manager, intervalMs);
-}
-
-/** Constructs a scheduler that can attach scheduled runs to existing sessions. */
-export function newSchedulerWithSessionDir(
-  store: CronStore,
-  manager: AgentManager | null,
-  intervalMs: number,
-  sessionDir: string,
+  sessionDir = "",
   handler: JobHandler | null = null,
 ): Scheduler {
   return new Scheduler(store, manager, intervalMs, sessionDir, handler);

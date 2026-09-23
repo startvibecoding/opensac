@@ -9,12 +9,12 @@ import {
   resolveProviderHeaders,
   type Settings,
 } from "../../config/mod.ts";
-import { newProviderWithModelsAndOptions as newAnthropicProvider } from "../anthropic/provider.ts";
+import { createAnthropicProvider } from "../anthropic/provider.ts";
 import {
-  newGeminiProviderWithModelsAndOptions,
-  newVertexProviderWithModelsAndOptions,
+  createGeminiProvider,
+  createVertexProvider,
 } from "../google/provider.ts";
-import { newProviderWithModelsAndOptions as newOpenAIProvider } from "../openai/provider.ts";
+import { createOpenAIProvider } from "../openai/provider.ts";
 import type { Provider } from "../provider.ts";
 import type { HTTPClientOptions } from "../http_client.ts";
 import type { RetryConfig } from "../retry.ts";
@@ -38,21 +38,15 @@ export interface CreateResult {
   model: Model;
 }
 
-/** Creates a provider and model from settings without changing the schema. */
+/**
+ * Creates a provider and model from settings without changing the schema
+ * (runtime-only `opts` may be supplied).
+ */
 export function create(
   settings: Settings,
   providerName: string,
   modelID: string,
-): CreateResult {
-  return createWithOptions(settings, providerName, modelID, {});
-}
-
-/** Creates a provider and model from settings with runtime-only options. */
-export function createWithOptions(
-  settings: Settings,
-  providerName: string,
-  modelID: string,
-  opts: Options,
+  opts: Options = {},
 ): CreateResult {
   if (providerName === "") {
     providerName = settings.defaultProvider ?? "";
@@ -82,7 +76,7 @@ export function createWithOptions(
   let p: Provider;
   switch (resolved.api) {
     case "anthropic-messages": {
-      const ap = newAnthropicProvider(
+      const ap = createAnthropicProvider(
         apiKey,
         resolved.baseUrl,
         models,
@@ -104,7 +98,12 @@ export function createWithOptions(
     case "openai":
     case "openai-responses":
     case "responses": {
-      const op = newOpenAIProvider(apiKey, resolved.baseUrl, models, httpOpts);
+      const op = createOpenAIProvider(
+        apiKey,
+        resolved.baseUrl,
+        models,
+        httpOpts,
+      );
       op.setMaxImagesPerRequest(pc.maxImagesPerRequest ?? 0);
       if (resolved.thinkingFormat !== "") {
         op.setThinkingFormat(resolved.thinkingFormat);
@@ -126,7 +125,7 @@ export function createWithOptions(
       break;
     }
     case "google-gemini": {
-      const gp = newGeminiProviderWithModelsAndOptions(
+      const gp = createGeminiProvider(
         apiKey,
         resolved.baseUrl,
         models,
@@ -137,7 +136,7 @@ export function createWithOptions(
       break;
     }
     case "google-vertex": {
-      const gp = newVertexProviderWithModelsAndOptions(
+      const gp = createVertexProvider(
         apiKey,
         resolved.baseUrl,
         models,
@@ -190,7 +189,7 @@ export function createWithOptions(
 /**
  * Returns the model list a factory-created provider would expose for
  * providerName. It applies the same settings resolution as
- * createWithOptions, so every surface that lists models shares one canonical
+ * create, so every surface that lists models shares one canonical
  * catalog logic.
  */
 export function resolvedModels(

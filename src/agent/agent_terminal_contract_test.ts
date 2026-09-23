@@ -15,13 +15,13 @@ import {
   streamUsage,
 } from "../provider/types.ts";
 import { MockProvider } from "../provider/mock.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
-import { newRegistry } from "../tools/tool.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
+import { createRegistry } from "../tools/tool.ts";
 import type { Tool, ToolContext, ToolResult } from "../tools/tool.ts";
 import {
   type Agent,
   type AgentLoopConfig,
-  newAgentWithLoopConfig,
+  createAgentWithLoopConfig,
 } from "./agent.ts";
 import {
   type Event,
@@ -56,7 +56,7 @@ function terminalModel(): Model {
   };
 }
 
-function newTerminalContractAgent(
+function createTerminalContractAgent(
   responses: StreamEvent[],
   maxIterations: number,
 ): Agent {
@@ -69,9 +69,9 @@ function newTerminalContractAgent(
     toolExecutionMode: "sequential",
     maxIterations,
   };
-  return newAgentWithLoopConfig(
+  return createAgentWithLoopConfig(
     cfg,
-    newRegistry(Deno.makeTempDirSync(), newNoneSandbox()),
+    createRegistry(Deno.makeTempDirSync(), createNoneSandbox()),
   );
 }
 
@@ -107,7 +107,7 @@ function requireSingleRunFinished(events: Event[]): Event {
 }
 
 Deno.test("run finished success on normal completion", async () => {
-  const agent = newTerminalContractAgent([
+  const agent = createTerminalContractAgent([
     { type: streamStart },
     { type: streamTextDelta, textDelta: "hello" },
     { type: streamUsage, usage: { input: 5, output: 2 } as Usage },
@@ -123,7 +123,7 @@ Deno.test("run finished success on normal completion", async () => {
 });
 
 Deno.test("run finished failed on stream error", async () => {
-  const agent = newTerminalContractAgent([
+  const agent = createTerminalContractAgent([
     { type: streamStart },
     {
       type: streamError,
@@ -138,7 +138,7 @@ Deno.test("run finished failed on stream error", async () => {
 });
 
 Deno.test("run projects provider retry metadata", async () => {
-  const agent = newTerminalContractAgent([
+  const agent = createTerminalContractAgent([
     { type: streamStart },
     {
       type: streamRetry,
@@ -186,7 +186,7 @@ Deno.test("run projects provider retry metadata", async () => {
 });
 
 Deno.test("run finished incomplete on max iterations", async () => {
-  const agent = newTerminalContractAgent([
+  const agent = createTerminalContractAgent([
     { type: streamStart },
     {
       type: streamToolCall,
@@ -241,9 +241,9 @@ Deno.test("run finished canceled on abort", async () => {
     },
     { type: streamDone, stopReason: "tool_use" },
   ]);
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.register(new BlockingTool());
-  const agent = newAgentWithLoopConfig({
+  const agent = createAgentWithLoopConfig({
     provider,
     model: provider.models()[0],
     mode: "yolo",

@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryAll } from "./database.ts";
+import { execChanges, queryAll } from "./database.ts";
 
 export interface ESMGuidanceRecord {
   id: string;
@@ -73,8 +73,4 @@ export class ESMGuidanceDAO {
     if (this.db === null) throw new Error("esm guidance database is not open");
     return this.db;
   }
-}
-
-export function isNoRowsGuidance(err: unknown): boolean {
-  return err === ErrNoRows;
 }

@@ -24,14 +24,7 @@ export interface DecisionRecord {
   expiresAt?: Date;
 }
 
-export function newDecisionRequestRecord(
-  request: DecisionRequest,
-  payload: unknown,
-): DecisionRecord {
-  return newDecisionRequestRecordWithDeadline(request, payload, undefined);
-}
-
-export function newDecisionRequestRecordWithDeadline(
+export function createDecisionRequestRecord(
   request: DecisionRequest,
   payload: unknown,
   expiresAt?: Date,
@@ -48,7 +41,7 @@ export function newDecisionRequestRecordWithDeadline(
   };
 }
 
-export function newDecisionResolutionRecord(
+export function createDecisionResolutionRecord(
   request: DecisionRequest,
   resolution: DecisionResolution,
   payload: unknown,

@@ -113,7 +113,7 @@ export class JobManager {
 }
 
 /** Creates a new job manager. */
-export function newJobManager(): JobManager {
+export function createJobManager(): JobManager {
   return new JobManager();
 }
 

@@ -8,7 +8,7 @@
 import { assert } from "@std/assert";
 import type { BeforeToolExecuteContext } from "../agent/mod.ts";
 import type { ToolCallBlock } from "../provider/types.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import { acquireExecutionAdmission } from "../session/mod.ts";
 import { closeDatabases, openRootDB } from "../session/root_db.ts";
 import {
@@ -71,7 +71,7 @@ function hookInput(runId: string): BeforeToolExecuteContext {
 Deno.test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fence-" });
   try {
-    const manager = newManager(
+    const manager = createManager(
       Deno.makeTempDirSync({ prefix: "opensac-fence-work-" }),
       sessionDir,
     );
@@ -170,7 +170,7 @@ Deno.test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
 Deno.test("beforeToolExecuteFenceAllowsNonSideEffectingAndUnboundRuns", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fence-" });
   try {
-    const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithID("fence-idle");
     const hook = beforeToolExecuteForRuntime({
       id: "fence-idle",

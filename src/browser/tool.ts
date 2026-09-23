@@ -17,8 +17,8 @@ import {
 } from "../imageproc/mod.ts";
 import type { ImageContent } from "../provider/types.ts";
 import {
-  newImageToolResultWithContent,
-  newTextToolResult,
+  createImageToolResultWithContent,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -37,7 +37,7 @@ const defaultViewportHeight = 1080;
 /** Registers the browser tool on a registry. */
 export function registerTool(registry: Registry | undefined): void {
   if (!registry) return;
-  registry.register(newTool(registry));
+  registry.register(createTool(registry));
 }
 
 /** Removes the browser tool from a registry. */
@@ -103,7 +103,7 @@ export class BrowserTool implements Tool {
         this.#client.close();
         this.#client = undefined;
       }
-      return newTextToolResult("browser closed");
+      return createTextToolResult("browser closed");
     }
 
     const c = await this.#ensureClient(params, signal);
@@ -129,13 +129,13 @@ export class BrowserTool implements Tool {
       }
       case "back":
         await c.back(signal);
-        return newTextToolResult("went back");
+        return createTextToolResult("went back");
       case "forward":
         await c.forward(signal);
-        return newTextToolResult("went forward");
+        return createTextToolResult("went forward");
       case "reload":
         await c.reload(signal);
-        return newTextToolResult("reloaded");
+        return createTextToolResult("reloaded");
       case "snapshot": {
         const s = await c.snapshot({
           selector: stringParam(params, "selector"),
@@ -144,56 +144,56 @@ export class BrowserTool implements Tool {
           depth: intParam(params, "depth"),
           urls: boolParam(params, "urls"),
         }, signal);
-        return newTextToolResult(s);
+        return createTextToolResult(s);
       }
       case "click":
         await c.click(requireString(params, "selector"), signal);
-        return newTextToolResult("clicked");
+        return createTextToolResult("clicked");
       case "dblclick":
         await c.doubleClick(requireString(params, "selector"), signal);
-        return newTextToolResult("double-clicked");
+        return createTextToolResult("double-clicked");
       case "hover":
         await c.hover(requireString(params, "selector"), signal);
-        return newTextToolResult("hovered");
+        return createTextToolResult("hovered");
       case "focus":
         await c.focus(requireString(params, "selector"), signal);
-        return newTextToolResult("focused");
+        return createTextToolResult("focused");
       case "fill":
         await c.fill(
           requireString(params, "selector"),
           requireString(params, "value"),
           signal,
         );
-        return newTextToolResult("filled");
+        return createTextToolResult("filled");
       case "type":
         await c.type(
           requireString(params, "selector"),
           requireString(params, "text"),
           signal,
         );
-        return newTextToolResult("typed");
+        return createTextToolResult("typed");
       case "press":
         await c.press(requireString(params, "key"), signal);
-        return newTextToolResult("pressed");
+        return createTextToolResult("pressed");
       case "scroll": {
         const x = floatParamOK(params, "x");
-        if (x.ok) {
-          const y = floatParamOK(params, "y");
+        if (x !== undefined) {
+          const y = floatParamOK(params, "y") ?? 0;
           await c.scrollAt(
-            x.value,
-            y.value,
+            x,
+            y,
             floatParam(params, "deltaX"),
             floatParam(params, "deltaY"),
             signal,
           );
-          return newTextToolResult("scrolled at");
+          return createTextToolResult("scrolled at");
         }
         await c.scroll(
           floatParam(params, "deltaX"),
           floatParam(params, "deltaY"),
           signal,
         );
-        return newTextToolResult("scrolled");
+        return createTextToolResult("scrolled");
       }
       case "click_at":
         await c.clickAt(
@@ -201,21 +201,21 @@ export class BrowserTool implements Tool {
           floatParam(params, "y"),
           signal,
         );
-        return newTextToolResult("clicked at");
+        return createTextToolResult("clicked at");
       case "dblclick_at":
         await c.doubleClickAt(
           floatParam(params, "x"),
           floatParam(params, "y"),
           signal,
         );
-        return newTextToolResult("double-clicked at");
+        return createTextToolResult("double-clicked at");
       case "move_mouse":
         await c.moveMouse(
           floatParam(params, "x"),
           floatParam(params, "y"),
           signal,
         );
-        return newTextToolResult("moved mouse");
+        return createTextToolResult("moved mouse");
       case "drag":
         await c.drag(
           floatParam(params, "startX"),
@@ -225,23 +225,23 @@ export class BrowserTool implements Tool {
           intParam(params, "steps"),
           signal,
         );
-        return newTextToolResult("dragged");
+        return createTextToolResult("dragged");
       case "set_cookie":
         await c.setCookie(cookieFromParams(params), signal);
-        return newTextToolResult("cookie set");
+        return createTextToolResult("cookie set");
       case "check":
         await c.check(requireString(params, "selector"), signal);
-        return newTextToolResult("checked");
+        return createTextToolResult("checked");
       case "uncheck":
         await c.uncheck(requireString(params, "selector"), signal);
-        return newTextToolResult("unchecked");
+        return createTextToolResult("unchecked");
       case "select":
         await c.select(
           requireString(params, "selector"),
           requireString(params, "value"),
           signal,
         );
-        return newTextToolResult("selected");
+        return createTextToolResult("selected");
       case "get_text":
         return valueResult(
           await c.getText(requireString(params, "selector"), signal),
@@ -287,16 +287,16 @@ export class BrowserTool implements Tool {
         );
       case "wait_ms":
         await c.waitMs(intParam(params, "ms"), signal);
-        return newTextToolResult("waited");
+        return createTextToolResult("waited");
       case "wait_for_selector":
         await c.waitForSelector(requireString(params, "selector"), signal);
-        return newTextToolResult("selector appeared");
+        return createTextToolResult("selector appeared");
       case "wait_for_text":
         await c.waitForText(requireString(params, "text"), signal);
-        return newTextToolResult("text appeared");
+        return createTextToolResult("text appeared");
       case "wait_for_url":
         await c.waitForUrl(requireString(params, "url"), signal);
-        return newTextToolResult("url matched");
+        return createTextToolResult("url matched");
       case "screenshot":
         return await this.#screenshot(c, params, signal);
       case "set_viewport":
@@ -305,7 +305,7 @@ export class BrowserTool implements Tool {
           intParam(params, "height"),
           signal,
         );
-        return newTextToolResult("viewport set");
+        return createTextToolResult("viewport set");
       case "set_geolocation":
         await c.setGeolocation(
           floatParam(params, "latitude"),
@@ -313,23 +313,23 @@ export class BrowserTool implements Tool {
           floatParam(params, "accuracy"),
           signal,
         );
-        return newTextToolResult("geolocation set");
+        return createTextToolResult("geolocation set");
       case "set_offline":
         await c.setOffline(boolParam(params, "offline"), signal);
-        return newTextToolResult("offline state set");
+        return createTextToolResult("offline state set");
       case "set_headers":
         await c.setHeaders(stringMapParam(params, "headers"), signal);
-        return newTextToolResult("headers set");
+        return createTextToolResult("headers set");
       case "cookies_get":
         return valueResult(await c.getCookies(signal));
       case "cookies_clear":
         await c.clearCookies(signal);
-        return newTextToolResult("cookies cleared");
+        return createTextToolResult("cookies cleared");
       case "tab_new":
         return valueResult(await c.newTab(stringParam(params, "url"), signal));
       case "tab_close":
         await c.closeTab(requireString(params, "targetId"), signal);
-        return newTextToolResult("tab closed");
+        return createTextToolResult("tab closed");
       default:
         throw new Error(`unknown browser action: ${action}`);
     }
@@ -371,7 +371,7 @@ export class BrowserTool implements Tool {
       const dir = resolved.slice(0, resolved.lastIndexOf("/"));
       if (dir) Deno.mkdirSync(dir, { recursive: true });
       Deno.writeFileSync(resolved, data);
-      return newTextToolResult(`screenshot saved: ${resolved}`);
+      return createTextToolResult(`screenshot saved: ${resolved}`);
     }
     return await this.#screenshotToolResult(data, params);
   }
@@ -412,7 +412,7 @@ export class BrowserTool implements Tool {
       detail: result.meta.detail,
       scale: result.meta.scale,
     };
-    return newImageToolResultWithContent(
+    return createImageToolResultWithContent(
       browserScreenshotDescription(result),
       image,
     );
@@ -431,7 +431,7 @@ export class BrowserTool implements Tool {
 }
 
 /** Creates a new browser tool. */
-export function newTool(registry: Registry | undefined): BrowserTool {
+export function createTool(registry: Registry | undefined): BrowserTool {
   return new BrowserTool(registry);
 }
 
@@ -474,16 +474,16 @@ async function pageSummary(
   } catch {
     // ignore
   }
-  return newTextToolResult(`${prefix}\nTitle: ${title}\nURL: ${url}`.trim());
+  return createTextToolResult(`${prefix}\nTitle: ${title}\nURL: ${url}`.trim());
 }
 
 function valueResult(v: unknown): ToolResult {
-  if (typeof v === "string") return newTextToolResult(v);
-  if (typeof v === "boolean") return newTextToolResult(String(v));
+  if (typeof v === "string") return createTextToolResult(v);
+  if (typeof v === "boolean") return createTextToolResult(String(v));
   try {
-    return newTextToolResult(JSON.stringify(v, null, 2));
+    return createTextToolResult(JSON.stringify(v, null, 2));
   } catch {
-    return newTextToolResult(String(v));
+    return createTextToolResult(String(v));
   }
 }
 
@@ -499,16 +499,16 @@ function stringParam(params: Record<string, unknown>, key: string): string {
 }
 
 function boolParam(params: Record<string, unknown>, key: string): boolean {
-  return boolParamOK(params, key).value;
+  return boolParamOK(params, key) ?? false;
 }
 
 function boolParamOK(
   params: Record<string, unknown>,
   key: string,
-): { value: boolean; ok: boolean } {
+): boolean | undefined {
   const v = params[key];
-  if (typeof v === "boolean") return { value: v, ok: true };
-  return { value: false, ok: false };
+  if (typeof v === "boolean") return v;
+  return undefined;
 }
 
 function intParam(params: Record<string, unknown>, key: string): number {
@@ -529,20 +529,20 @@ function intParamOK(
 }
 
 function floatParam(params: Record<string, unknown>, key: string): number {
-  return floatParamOK(params, key).value;
+  return floatParamOK(params, key) ?? 0;
 }
 
 function floatParamOK(
   params: Record<string, unknown>,
   key: string,
-): { value: number; ok: boolean } {
+): number | undefined {
   const v = params[key];
-  if (typeof v === "number") return { value: v, ok: true };
+  if (typeof v === "number") return v;
   if (typeof v === "string") {
     const n = Number.parseFloat(v);
-    if (!Number.isNaN(n)) return { value: n, ok: true };
+    if (!Number.isNaN(n)) return n;
   }
-  return { value: 0, ok: false };
+  return undefined;
 }
 
 function stringMapParam(
@@ -629,7 +629,7 @@ export function clientOptions(params: Record<string, unknown>): Options {
   }
   opts.launch!.executablePath = opts.executablePath;
   const headless = boolParamOK(params, "headless");
-  if (headless.ok) opts.launch!.headless = headless.value;
+  if (headless !== undefined) opts.launch!.headless = headless;
   return opts;
 }
 

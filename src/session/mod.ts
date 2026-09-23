@@ -170,6 +170,8 @@ export {
   countAll,
   countWithMessages,
   createBound,
+  createManager,
+  createSubAgentManager,
   deleteSession,
   deleteSessionWithMutation,
   encodePath,
@@ -183,8 +185,6 @@ export {
   type ListOption,
   type ListOptions,
   Manager,
-  newManager,
-  newSubAgentManager,
   openByID,
   openByIDExact,
   openByPathOrID,
@@ -227,7 +227,7 @@ export {
   type SessionMetadata,
   setSessionMetadata,
 } from "./projects.ts";
-export { IdentityLocks, newIdentityLocks } from "./identity_lock.ts";
+export { createIdentityLocks, IdentityLocks } from "./identity_lock.ts";
 export {
   applyCompactionEntry,
   applySequencedCompactionEntry,
@@ -280,8 +280,8 @@ export {
 } from "./session_events.ts";
 export {
   CountedMutex,
+  createLockRegistry,
   LockRegistry,
-  newLockRegistry,
 } from "./lock_registry.ts";
 export { ensureCurrentSchema } from "./schema.ts";
 export { normalizedRunJSON } from "./run_json.ts";

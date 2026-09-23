@@ -21,7 +21,6 @@ import * as path from "@std/path";
 import {
   BindingDAO,
   type Database,
-  isNoRows,
   SessionDAO,
   StatsDAO,
   type Tx,
@@ -1095,16 +1094,11 @@ export class Manager {
 
     this.withDB((db) => {
       const dao = new SessionDAO(db.db);
-      let record;
-      try {
-        record = dao.header(this.tableSession(), sessionID);
-      } catch (err) {
-        if (isNoRows(err)) {
-          throw new Error(
-            `session ${JSON.stringify(sessionID)} not registered in DB`,
-          );
-        }
-        throw err;
+      const record = dao.header(this.tableSession(), sessionID);
+      if (record === undefined) {
+        throw new Error(
+          `session ${JSON.stringify(sessionID)} not registered in DB`,
+        );
       }
 
       const ts = parseSessionTimestamp(record.timestamp);
@@ -1192,7 +1186,7 @@ function isUniqueSessionIDError(err: unknown, table: string): boolean {
 }
 
 /** Creates a new session manager for a new session. */
-export function newManager(cwd: string, sessionDir = ""): Manager {
+export function createManager(cwd: string, sessionDir = ""): Manager {
   const m = new Manager();
   m.cwd = cwd;
   m.sessionDir = sessionDir === "" ? platformSessionDir() : sessionDir;
@@ -1203,8 +1197,8 @@ export function newManager(cwd: string, sessionDir = ""): Manager {
  * Creates a session manager whose records are stored separately from
  * user-continuable sessions.
  */
-export function newSubAgentManager(cwd: string, sessionDir = ""): Manager {
-  const m = newManager(cwd, sessionDir);
+export function createSubAgentManager(cwd: string, sessionDir = ""): Manager {
+  const m = createManager(cwd, sessionDir);
   m.subAgent = true;
   return m;
 }
@@ -1224,7 +1218,7 @@ export function continueRecent(cwd: string, sessionDir = ""): Manager {
     sessions.sort((a, b) => b.modTime.getTime() - a.modTime.getTime());
     return Manager.open(sessions[0].path);
   }
-  const m = newManager(cwd, dir);
+  const m = createManager(cwd, dir);
   m.init();
   return m;
 }
@@ -1259,16 +1253,12 @@ export function openByID(
 
   const db = cachedDB(dbPath);
   const dao = new SessionDAO(db.db);
-  try {
-    const exactID = dao.findExact("sessions", sessionID);
-    try {
-      const row = dao.header("sessions", exactID);
-      if (row.cwd === cwd) return openSessionFromDB(exactID, dir);
-    } catch {
-      // fall through to prefix matching
+  const exactID = dao.findExact("sessions", sessionID);
+  if (exactID !== undefined) {
+    const row = dao.header("sessions", exactID);
+    if (row !== undefined && row.cwd === cwd) {
+      return openSessionFromDB(exactID, dir);
     }
-  } catch {
-    // no exact match
   }
 
   const matches = dao.prefixIds("sessions", cwd, sessionID);
@@ -1325,7 +1315,7 @@ export function createBound(
   channelId: string,
 ): Manager {
   validateBinding(channelType, channelId);
-  const m = newManager(workDir, sessionDir);
+  const m = createManager(workDir, sessionDir);
   m.initWithBinding(channelType, channelId);
   return m;
 }
@@ -1406,13 +1396,11 @@ function openSessionFromDB(sessionID: string, dir: string): Manager {
   const dao = new SessionDAO(db.db);
   let timestampStr = "";
   try {
-    timestampStr = dao.timestamp("sessions", sessionID);
+    timestampStr = dao.timestamp("sessions", sessionID) ?? "";
   } catch (err) {
-    if (!isNoRows(err)) {
-      console.debug(
-        `session open ${JSON.stringify(sessionID)} read timestamp: ${err}`,
-      );
-    }
+    console.debug(
+      `session open ${JSON.stringify(sessionID)} read timestamp: ${err}`,
+    );
   }
 
   if (timestampStr !== "") {

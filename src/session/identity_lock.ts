@@ -33,6 +33,6 @@ export class IdentityLocks {
 }
 
 /** Creates a new identity-lock registry. */
-export function newIdentityLocks(): IdentityLocks {
+export function createIdentityLocks(): IdentityLocks {
   return new IdentityLocks();
 }

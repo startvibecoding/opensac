@@ -2,12 +2,12 @@
 // file itself (the name does not match Deno's test discovery patterns).
 
 import type { Model } from "../provider/types.ts";
-import { MockProvider, newMockProvider } from "../provider/mock.ts";
+import { createMockProvider, MockProvider } from "../provider/mock.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { Level, Manager as SandboxManager } from "../sandbox/sandbox.ts";
-import { newManager } from "../sandbox/sandbox.ts";
-import { AgentFactory, newAgentFactory } from "./factory.ts";
-import { AgentManager, newAgentManager } from "./manager.ts";
+import { createManager } from "../sandbox/sandbox.ts";
+import { AgentFactory, createAgentFactory } from "./factory.ts";
+import { AgentManager, createAgentManager } from "./manager.ts";
 import type { CompactionSettings } from "../context/compaction.ts";
 import { streamDone, type StreamEvent, streamStart } from "../provider/mod.ts";
 import type { MemberDef } from "./memberdef.ts";
@@ -56,13 +56,13 @@ export function doneStream(): StreamEvent[] {
  * Builds the standard test factory/manager pair: a mock provider, a None-level
  * sandbox, and an isolated session directory.
  */
-export function newTestFactoryAndManager(): [AgentFactory, AgentManager] {
-  const mockProvider: MockProvider = newMockProvider(
+export function createTestFactoryAndManager(): [AgentFactory, AgentManager] {
+  const mockProvider: MockProvider = createMockProvider(
     "mock",
     [testModel("model1", "Model 1")],
     doneStream(),
   );
-  const sandboxMgr: SandboxManager = newManager(
+  const sandboxMgr: SandboxManager = createManager(
     Deno.makeTempDirSync({ prefix: "opensac-agent-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
@@ -71,7 +71,7 @@ export function newTestFactoryAndManager(): [AgentFactory, AgentManager] {
     prefix: "opensac-agent-sessions-",
   });
 
-  const factory = newAgentFactory(
+  const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],
     settings,
@@ -82,5 +82,5 @@ export function newTestFactoryAndManager(): [AgentFactory, AgentManager] {
     emptyCompaction(),
     undefined,
   );
-  return [factory, newAgentManager(factory)];
+  return [factory, createAgentManager(factory)];
 }

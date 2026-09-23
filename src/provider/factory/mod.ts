@@ -9,7 +9,6 @@ export {
   convertModelConfigs,
   create,
   type CreateResult,
-  createWithOptions,
   type Options,
   parseQualifiedModel,
   providerSortPriority,

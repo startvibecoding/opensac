@@ -7,7 +7,6 @@
 
 import {
   ConversationTurnDAO,
-  isNoRows,
   RecoveryDAO,
   type RecoveryRecord,
   RunDAO,
@@ -95,7 +94,11 @@ export function beginSessionRunRecovery(
       updatedAt: now,
       completedAt: null,
     });
-    return readSessionRunRecoveryTx(tx, runId);
+    const recovery = readSessionRunRecoveryTx(tx, runId);
+    if (recovery === undefined) {
+      throw new Error(`session recovery record not found: ${runId}`);
+    }
+    return recovery;
   });
 }
 
@@ -285,24 +288,20 @@ export function convergeSessionRunRecovery(
     }
 
     const completed = secondsOf(terminalEvent.timestamp);
-    try {
-      new RecoveryDAO(null).update(
-        tx,
-        run.id,
-        run.sessionId,
-        "completed",
-        "",
-        null,
-        completed,
-        completed,
+    const updated = new RecoveryDAO(null).update(
+      tx,
+      run.id,
+      run.sessionId,
+      "completed",
+      "",
+      null,
+      completed,
+      completed,
+    );
+    if (!updated) {
+      throw new Error(
+        `session recovery record not found: ${run.id}`,
       );
-    } catch (err) {
-      if (isNoRows(err)) {
-        throw new Error(
-          `session recovery record not found: ${run.id}`,
-        );
-      }
-      throw err;
     }
   });
 }
@@ -344,20 +343,15 @@ export function getSessionRunRecovery(
 ): SessionRunRecovery | null {
   if (runId.trim() === "") throw new Error("run ID is required");
   const db = openRootDB(sessionDir);
-  try {
-    return readSessionRunRecoveryTx(db.db!, runId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  return readSessionRunRecoveryTx(db.db!, runId) ?? null;
 }
 
 export function readSessionRunRecoveryTx(
   tx: Tx,
   runId: string,
-): SessionRunRecovery {
+): SessionRunRecovery | undefined {
   const record = new RecoveryDAO(null).find(tx, runId);
-  return recoveryFromRecord(record);
+  return record === undefined ? undefined : recoveryFromRecord(record);
 }
 
 function recoveryFromRecord(record: RecoveryRecord): SessionRunRecovery {

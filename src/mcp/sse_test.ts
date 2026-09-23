@@ -3,8 +3,8 @@
 // `Deno.serve` response backed by a manually-driven `ReadableStream`.
 
 import { assert, assertEquals } from "@std/assert";
-import { newNoneSandbox } from "../sandbox/mod.ts";
-import { newRegistry, type Tool } from "../tools/mod.ts";
+import { createNoneSandbox } from "../sandbox/mod.ts";
+import { createRegistry, type Tool } from "../tools/mod.ts";
 import type { RPCRequest } from "./rpc.ts";
 import { closeClients, connectServers } from "./mcp.ts";
 
@@ -119,7 +119,7 @@ Deno.test("MCP server SSE call flow", async () => {
     }
   });
 
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.registerDefaults();
   let clients;
   try {
@@ -197,7 +197,7 @@ Deno.test("MCP server SSE notification callback", async () => {
     }
   });
 
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.registerDefaults();
   let clients;
   try {

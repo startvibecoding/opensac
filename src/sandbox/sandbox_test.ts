@@ -2,12 +2,12 @@
 
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
+  createManager,
+  createNoneSandbox,
   formatSandboxInfo,
   Level,
   levelString,
   Manager,
-  newManager,
-  newNoneSandbox,
   parseLevel,
 } from "./mod.ts";
 
@@ -25,15 +25,15 @@ Deno.test("parseLevel", () => {
   assertThrows(() => parseLevel("invalid"));
 });
 
-Deno.test("newNoneSandbox", () => {
-  const sb = newNoneSandbox();
+Deno.test("createNoneSandbox", () => {
+  const sb = createNoneSandbox();
   assertEquals(sb.name(), "none");
   assertEquals(sb.level(), Level.None);
   assert(sb.isAvailable());
 });
 
 Deno.test("noneSandbox wrapCommand uses platform shell args", () => {
-  const sb = newNoneSandbox();
+  const sb = createNoneSandbox();
 
   const bash = sb.wrapCommand(undefined, "/bin/bash", "echo hello", {
     workDir: "/tmp",
@@ -54,9 +54,9 @@ Deno.test("noneSandbox wrapCommand uses platform shell args", () => {
   ]);
 });
 
-Deno.test("newManager and default active level", () => {
+Deno.test("createManager and default active level", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const m = newManager(project);
+  const m = createManager(project);
   // Default active sandbox is direct execution.
   assertEquals(m.getActive().level(), Level.None);
   m.setLevel(Level.None);
@@ -65,7 +65,7 @@ Deno.test("newManager and default active level", () => {
 
 Deno.test("manager getForLevel", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const m = newManager(project);
+  const m = createManager(project);
   assertEquals(m.getForLevel(Level.None).level(), Level.None);
   assertThrows(() => m.getForLevel(99 as Level));
 });
@@ -94,6 +94,6 @@ Deno.test("manager with invalid policy still allows none", () => {
 });
 
 Deno.test("formatSandboxInfo", () => {
-  assert(formatSandboxInfo(newNoneSandbox()).includes("No sandbox"));
+  assert(formatSandboxInfo(createNoneSandbox()).includes("No sandbox"));
   assert(formatSandboxInfo(undefined).includes("No sandbox"));
 });

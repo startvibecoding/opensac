@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryAll, queryOne } from "./database.ts";
+import { execChanges, queryAll, queryOptional } from "./database.ts";
 
 /**
  * Persistence representation of one supervised objective. JSON and timestamp
@@ -44,12 +44,12 @@ const columns = `session_id AS sessionId, esm_id AS esmId, objective, status,
 export class ESMDAO {
   constructor(private readonly db: DB | null) {}
 
-  get(sessionId: string): ESMObjectiveRecord {
+  get(sessionId: string): ESMObjectiveRecord | undefined {
     return this.getFrom(this.requireDb(), sessionId);
   }
 
-  getFrom(executor: DB, sessionId: string): ESMObjectiveRecord {
-    return queryOne<ESMObjectiveRecord>(
+  getFrom(executor: DB, sessionId: string): ESMObjectiveRecord | undefined {
+    return queryOptional<ESMObjectiveRecord>(
       executor,
       `SELECT ${columns} FROM session_esm_objectives WHERE session_id = ? LIMIT 1`,
       [sessionId],
@@ -73,7 +73,7 @@ export class ESMDAO {
     );
   }
 
-  update(executor: DB, record: ESMObjectiveRecord | null): void {
+  update(executor: DB, record: ESMObjectiveRecord | null): boolean {
     if (record === null || record.sessionId === "") {
       throw new Error("esm objective record is invalid");
     }
@@ -91,7 +91,7 @@ export class ESMDAO {
        WHERE session_id = ?`,
       params,
     );
-    if (changed === 0) throw ErrNoRows;
+    return changed !== 0;
   }
 
   delete(executor: DB, sessionId: string): void {

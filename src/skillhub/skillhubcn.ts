@@ -5,7 +5,7 @@ import {
   filterSkills,
 } from "./client_helpers.ts";
 import { parseTags, parseVersion } from "./clawhub.ts";
-import { getJSON, type HttpClient, newHTTPClient } from "./http.ts";
+import { createHTTPClient, getJSON, type HttpClient } from "./http.ts";
 import type {
   Category,
   DownloadResult,
@@ -33,7 +33,7 @@ export class SkillHubClient implements MarketClient {
   constructor(baseURL?: string, client?: HttpClient) {
     this.baseURL = trimRight(baseURL || skillHubDefaultURL, "/");
     this.downloadURL = skillHubDownloadBaseURL;
-    this.httpClient = newHTTPClient(client);
+    this.httpClient = createHTTPClient(client);
   }
 
   market(): MarketInfo {
@@ -266,7 +266,7 @@ export class SkillHubClient implements MarketClient {
 }
 
 /** Builds a SkillHub.cn client. */
-export function newSkillHubClient(
+export function createSkillHubClient(
   baseURL?: string,
   client?: HttpClient,
 ): SkillHubClient {

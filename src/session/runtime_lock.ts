@@ -13,13 +13,9 @@
 //   the process alive on its own.
 
 import * as path from "@std/path";
-import {
-  isNoRows,
-  RuntimeLeaseDAO,
-  type RuntimeLeaseRecord,
-} from "../dao/mod.ts";
+import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
 import { BUSY_TIMEOUT_MS } from "../db/mod.ts";
-import { CountedMutex, newLockRegistry } from "./lock_registry.ts";
+import { CountedMutex, createLockRegistry } from "./lock_registry.ts";
 import { openRootDB, rootDBPath } from "./root_db.ts";
 import { nonTerminalSessionRunStatuses } from "./run_status.ts";
 import { runtimeOwnerID } from "./runtime_identity.ts";
@@ -91,8 +87,8 @@ const runtimeLeasePurposeRecovery = "recovery";
 const runtimeLeasePurposeMutation = "mutation";
 const runtimeLeasePurposeFork = "fork";
 
-const runtimeLocks = newLockRegistry();
-const sessionDataLocks = newLockRegistry();
+const runtimeLocks = createLockRegistry();
+const sessionDataLocks = createLockRegistry();
 
 const activeRuntimeLeases = new Map<string, RuntimeLease>();
 
@@ -211,7 +207,7 @@ export function runtimeLeaseLost(
   return lease?.lost.signal;
 }
 
-function newLeaseTokenHash(): string {
+function createLeaseTokenHash(): string {
   // Go stores sha256(token); the token itself is never reused, so the fenced
   // identity only needs an opaque, unpredictable-per-acquisition value.
   try {
@@ -267,16 +263,11 @@ function acquireRuntimeLeaseWithOptions(
     }
     const expires = now + runtimeLeaseTTLSecs;
     const ownerID = runtimeOwnerID();
-    const tokenHash = newLeaseTokenHash();
+    const tokenHash = createLeaseTokenHash();
     const purpose = options.purpose;
     let epoch = 1;
 
-    let current: RuntimeLeaseRecord | null = null;
-    try {
-      current = dao.find(tx, sessionId);
-    } catch (err) {
-      if (!isNoRows(err)) throw err;
-    }
+    const current: RuntimeLeaseRecord | null = dao.find(tx, sessionId) ?? null;
     if (
       current !== null && current.state === "active" && current.expiresAt > now
     ) {
@@ -662,13 +653,8 @@ export function validateRuntimeLeaseTx(
   sessionId: string,
 ): void {
   const dao = new RuntimeLeaseDAO(null);
-  let record: RuntimeLeaseRecord;
-  try {
-    record = dao.find(tx, sessionId);
-  } catch (err) {
-    if (isNoRows(err)) return;
-    throw err;
-  }
+  const record = dao.find(tx, sessionId);
+  if (record === undefined) return;
   const lease = activeRuntimeLeases.get(runtimeLockKey(sessionDir, sessionId));
   // Ownership is proven by the fenced identity (state/owner/epoch/token), not
   // by wall-clock freshness.
@@ -697,19 +683,14 @@ export function validateRuntimeLeaseBindingTx(
   validateRuntimeLeaseTx(tx, sessionDir, sessionId);
   const binding = currentRuntimeLeaseBinding(sessionDir, sessionId);
   if (binding === null) throw new RuntimeLeaseLostError(sessionId);
-  let record: RuntimeLeaseRecord;
-  try {
-    record = new RuntimeLeaseDAO(null).binding(
-      tx,
-      sessionId,
-      binding.ownerInstanceId,
-      binding.epoch,
-      binding.tokenHash,
-    );
-  } catch (err) {
-    if (isNoRows(err)) throw new RuntimeLeaseLostError(sessionId);
-    throw err;
-  }
+  const record = new RuntimeLeaseDAO(null).binding(
+    tx,
+    sessionId,
+    binding.ownerInstanceId,
+    binding.epoch,
+    binding.tokenHash,
+  );
+  if (record === undefined) throw new RuntimeLeaseLostError(sessionId);
   if (
     (record.purpose as RuntimeLeasePurpose) !== purpose ||
     binding.purpose !== purpose
@@ -737,13 +718,8 @@ export function validateRuntimeLease(
   db.runInTx((tx) => {
     validateRuntimeLeaseBindingTx(tx, sessionDir, sessionId, runId, purpose);
     const dao = new RuntimeLeaseDAO(null);
-    let status: string;
-    try {
-      status = dao.runStatus(tx, runId, sessionId);
-    } catch (err) {
-      if (isNoRows(err)) throw new RuntimeLeaseRunMismatchError(runId);
-      throw err;
-    }
+    const status = dao.runStatus(tx, runId, sessionId);
+    if (status === undefined) throw new RuntimeLeaseRunMismatchError(runId);
     if (isTerminalSessionRunStatus(status)) {
       throw new RuntimeLeaseLostError(sessionId);
     }

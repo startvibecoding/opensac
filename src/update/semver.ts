@@ -26,10 +26,10 @@ function isIdentChar(code: number): boolean {
   );
 }
 
-function parseIntPrefix(v: string): { num: string; rest: string; ok: boolean } {
-  if (v === "") return { num: "", rest: "", ok: false };
+function parseIntPrefix(v: string): { num: string; rest: string } | undefined {
+  if (v === "") return undefined;
   const c0 = v.charCodeAt(0);
-  if (c0 < 0x30 || c0 > 0x39) return { num: "", rest: "", ok: false };
+  if (c0 < 0x30 || c0 > 0x39) return undefined;
   let i = 1;
   while (i < v.length) {
     const c = v.charCodeAt(i);
@@ -37,57 +37,57 @@ function parseIntPrefix(v: string): { num: string; rest: string; ok: boolean } {
     i++;
   }
   if (v.charCodeAt(0) === 0x30 && i !== 1) {
-    return { num: "", rest: "", ok: false };
+    return undefined;
   }
-  return { num: v.slice(0, i), rest: v.slice(i), ok: true };
+  return { num: v.slice(0, i), rest: v.slice(i) };
 }
 
 function parsePrerelease(
   v: string,
-): { pre: string; rest: string; ok: boolean } {
+): { pre: string; rest: string } | undefined {
   if (v === "" || v.charCodeAt(0) !== 0x2d /* - */) {
-    return { pre: "", rest: "", ok: false };
+    return undefined;
   }
   let i = 1;
   let start = 1;
   while (i < v.length && v.charCodeAt(i) !== 0x2b /* + */) {
     const c = v.charCodeAt(i);
     if (!isIdentChar(c) && c !== 0x2e /* . */) {
-      return { pre: "", rest: "", ok: false };
+      return undefined;
     }
     if (c === 0x2e) {
       if (start === i || isBadNum(v.slice(start, i))) {
-        return { pre: "", rest: "", ok: false };
+        return undefined;
       }
       start = i + 1;
     }
     i++;
   }
   if (start === i || isBadNum(v.slice(start, i))) {
-    return { pre: "", rest: "", ok: false };
+    return undefined;
   }
-  return { pre: v.slice(0, i), rest: v.slice(i), ok: true };
+  return { pre: v.slice(0, i), rest: v.slice(i) };
 }
 
-function parseBuild(v: string): { build: string; rest: string; ok: boolean } {
+function parseBuild(v: string): { build: string; rest: string } | undefined {
   if (v === "" || v.charCodeAt(0) !== 0x2b /* + */) {
-    return { build: "", rest: "", ok: false };
+    return undefined;
   }
   let i = 1;
   let start = 1;
   while (i < v.length) {
     const c = v.charCodeAt(i);
     if (!isIdentChar(c) && c !== 0x2e /* . */) {
-      return { build: "", rest: "", ok: false };
+      return undefined;
     }
     if (c === 0x2e) {
-      if (start === i) return { build: "", rest: "", ok: false };
+      if (start === i) return undefined;
       start = i + 1;
     }
     i++;
   }
-  if (start === i) return { build: "", rest: "", ok: false };
-  return { build: v.slice(0, i), rest: v.slice(i), ok: true };
+  if (start === i) return undefined;
+  return { build: v.slice(0, i), rest: v.slice(i) };
 }
 
 function isBadNum(v: string): boolean {
@@ -110,21 +110,13 @@ function isNum(v: string): boolean {
   return i === v.length;
 }
 
-function parse(v: string): { parsed: Parsed; ok: boolean } {
-  const empty: Parsed = {
-    major: "",
-    minor: "",
-    patch: "",
-    short: "",
-    prerelease: "",
-    build: "",
-  };
+function parse(v: string): Parsed | undefined {
   if (v === "" || v.charCodeAt(0) !== 0x76 /* v */) {
-    return { parsed: empty, ok: false };
+    return undefined;
   }
   let rest = v.slice(1);
   const major = parseIntPrefix(rest);
-  if (!major.ok) return { parsed: empty, ok: false };
+  if (major === undefined) return undefined;
   rest = major.rest;
 
   let minor = "0";
@@ -133,17 +125,17 @@ function parse(v: string): { parsed: Parsed; ok: boolean } {
 
   if (rest !== "") {
     if (rest.charCodeAt(0) !== 0x2e /* . */) {
-      return { parsed: empty, ok: false };
+      return undefined;
     }
     const minorRes = parseIntPrefix(rest.slice(1));
-    if (!minorRes.ok) return { parsed: empty, ok: false };
+    if (minorRes === undefined) return undefined;
     minor = minorRes.num;
     rest = minorRes.rest;
 
     if (rest !== "") {
-      if (rest.charCodeAt(0) !== 0x2e) return { parsed: empty, ok: false };
+      if (rest.charCodeAt(0) !== 0x2e) return undefined;
       const patchRes = parseIntPrefix(rest.slice(1));
-      if (!patchRes.ok) return { parsed: empty, ok: false };
+      if (patchRes === undefined) return undefined;
       patch = patchRes.num;
       rest = patchRes.rest;
       short = "";
@@ -156,27 +148,24 @@ function parse(v: string): { parsed: Parsed; ok: boolean } {
   let build = "";
   if (rest.length > 0 && rest.charCodeAt(0) === 0x2d /* - */) {
     const pre = parsePrerelease(rest);
-    if (!pre.ok) return { parsed: empty, ok: false };
+    if (pre === undefined) return undefined;
     prerelease = pre.pre;
     rest = pre.rest;
   }
   if (rest.length > 0 && rest.charCodeAt(0) === 0x2b /* + */) {
     const b = parseBuild(rest);
-    if (!b.ok) return { parsed: empty, ok: false };
+    if (b === undefined) return undefined;
     build = b.build;
     rest = b.rest;
   }
-  if (rest !== "") return { parsed: empty, ok: false };
+  if (rest !== "") return undefined;
 
-  return {
-    parsed: { major: major.num, minor, patch, short, prerelease, build },
-    ok: true,
-  };
+  return { major: major.num, minor, patch, short, prerelease, build };
 }
 
 /** Reports whether v is a valid semantic version string. */
 export function isValid(v: string): boolean {
-  return parse(v).ok;
+  return parse(v) !== undefined;
 }
 
 /**
@@ -185,8 +174,8 @@ export function isValid(v: string): boolean {
  * semantic version is the empty string.
  */
 export function canonical(v: string): string {
-  const { parsed, ok } = parse(v);
-  if (!ok) return "";
+  const parsed = parse(v);
+  if (parsed === undefined) return "";
   if (parsed.build !== "") {
     return v.slice(0, v.length - parsed.build.length);
   }
@@ -248,11 +237,11 @@ function comparePrerelease(x0: string, y0: string): number {
 export function compare(v: string, w: string): number {
   const pv = parse(v);
   const pw = parse(w);
-  if (!pv.ok && !pw.ok) return 0;
-  if (!pv.ok) return -1;
-  if (!pw.ok) return 1;
-  const a = pv.parsed;
-  const b = pw.parsed;
+  if (pv === undefined && pw === undefined) return 0;
+  if (pv === undefined) return -1;
+  if (pw === undefined) return 1;
+  const a = pv;
+  const b = pw;
   let c = compareInt(a.major, b.major);
   if (c !== 0) return c;
   c = compareInt(a.minor, b.minor);

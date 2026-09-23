@@ -70,8 +70,8 @@ export class MemoryCache {
   }
 }
 
-/** Builds a fresh cache with the given TTL, mirroring newMemoryCache. */
-export function newMemoryCache(ttlMs: number): MemoryCache {
+/** Builds a fresh cache with the given TTL, mirroring createMemoryCache. */
+export function createMemoryCache(ttlMs: number): MemoryCache {
   return new MemoryCache(ttlMs);
 }
 

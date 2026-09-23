@@ -1,11 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import {
-  execChanges,
-  inList,
-  isNoRows,
-  queryAll,
-  queryOne,
-} from "./database.ts";
+import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
 import type { EntryRecord } from "./conversation_turn.ts";
 import type { SessionRunEventRecord } from "./run.ts";
 
@@ -199,17 +193,12 @@ export class SessionDAO {
     sessionId: string,
     excludedType: string,
   ): string {
-    try {
-      return queryOne<{ id: string }>(
-        executor,
-        `SELECT id FROM ${table} WHERE session_id = ? AND type != ?
-         ORDER BY seq DESC LIMIT 1`,
-        [sessionId, excludedType],
-      ).id;
-    } catch (err) {
-      if (isNoRows(err)) return "";
-      throw err;
-    }
+    return queryOptional<{ id: string }>(
+      executor,
+      `SELECT id FROM ${table} WHERE session_id = ? AND type != ?
+       ORDER BY seq DESC LIMIT 1`,
+      [sessionId, excludedType],
+    )?.id ?? "";
   }
 
   insertEntry(
@@ -251,19 +240,19 @@ export class SessionDAO {
 
   count(filter: SessionListFilter): number {
     const { where, params } = sessionListWhere(filter);
-    return queryOne<{ n: number }>(
+    return queryOptional<{ n: number }>(
       this.requireDb(),
       `SELECT COUNT(*) AS n FROM sessions AS s${where}`,
       params,
-    ).n;
+    )?.n ?? 0;
   }
 
-  findExact(table: string, id: string): string {
-    return queryOne<{ id: string }>(
+  findExact(table: string, id: string): string | undefined {
+    return queryOptional<{ id: string }>(
       this.requireDb(),
       `SELECT id FROM ${table} WHERE id = ? LIMIT 1`,
       [id],
-    ).id;
+    )?.id;
   }
 
   prefixIds(table: string, cwd: string, prefix: string): string[] {
@@ -274,16 +263,16 @@ export class SessionDAO {
     ).map((row) => row.id);
   }
 
-  timestamp(table: string, id: string): string {
-    return queryOne<{ timestamp: string }>(
+  timestamp(table: string, id: string): string | undefined {
+    return queryOptional<{ timestamp: string }>(
       this.requireDb(),
       `SELECT timestamp FROM ${table} WHERE id = ? LIMIT 1`,
       [id],
-    ).timestamp;
+    )?.timestamp;
   }
 
-  header(table: string, id: string): SessionRecord {
-    const row = queryOne<Record<string, unknown>>(
+  header(table: string, id: string): SessionRecord | undefined {
+    const row = queryOptional<Record<string, unknown>>(
       this.requireDb(),
       `SELECT cwd, timestamp, parent_session AS parentSession, version,
               channel_type AS channelType, channel_id AS channelId,
@@ -292,6 +281,7 @@ export class SessionDAO {
        FROM ${table} WHERE id = ? LIMIT 1`,
       [id],
     );
+    if (row === undefined) return undefined;
     return {
       id: "",
       cwd: String(row.cwd),
@@ -376,8 +366,8 @@ export class SessionDAO {
     );
   }
 
-  capability(sessionId: string): SessionCapabilityRecord {
-    return queryOne<SessionCapabilityRecord>(
+  capability(sessionId: string): SessionCapabilityRecord | undefined {
+    return queryOptional<SessionCapabilityRecord>(
       this.requireDb(),
       `SELECT ${capabilityColumns} FROM session_capabilities
        WHERE session_id = ? LIMIT 1`,
@@ -420,11 +410,11 @@ export class SessionDAO {
   }
 
   maxRunEventSeq(runId: string): number {
-    return queryOne<{ seq: number }>(
+    return queryOptional<{ seq: number }>(
       this.requireDb(),
       `SELECT COALESCE(MAX(seq), 0) AS seq FROM session_run_events WHERE run_id = ?`,
       [runId],
-    ).seq;
+    )?.seq ?? 0;
   }
 
   insertCapabilityEvent(
@@ -563,10 +553,6 @@ export class SessionDAO {
     if (this.db === null) throw new Error("session database is not open");
     return this.db;
   }
-}
-
-export function isNoRowsSession(err: unknown): boolean {
-  return isNoRows(err);
 }
 
 function nullableSessionString(value: string): string | null {

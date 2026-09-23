@@ -3,14 +3,14 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   contextWithIterationBudget,
+  createIterationBudget,
   DEFAULT_ITERATION_BUDGET_WALL_CLOCK,
   iterationBudgetFromContext,
   type IterationBudgetPolicy,
   iterationBudgetPolicyEnabled,
-  newIterationBudget,
   normalizeIterationBudgetPolicy,
 } from "./iteration_budget.ts";
-import { newRunContext } from "./run_context.ts";
+import { createRunContext } from "./run_context.ts";
 
 const defaultRenewFactor = 0.5;
 const defaultMaxRenewals = 2;
@@ -41,7 +41,7 @@ Deno.test("iteration budget policy normalize", () => {
 });
 
 Deno.test("iteration budget request clamp", () => {
-  const b = newIterationBudget(
+  const b = createIterationBudget(
     policy({
       soft: 10,
       hard: 20,
@@ -74,7 +74,7 @@ Deno.test("iteration budget request clamp", () => {
 });
 
 Deno.test("iteration budget can renew", () => {
-  const b = newIterationBudget(
+  const b = createIterationBudget(
     policy({
       soft: 10,
       hard: 20,
@@ -93,7 +93,7 @@ Deno.test("iteration budget can renew", () => {
   b.request(0, "second");
   assert(!b.canRenew());
 
-  const capped = newIterationBudget(
+  const capped = createIterationBudget(
     policy({
       soft: 10,
       hard: 15,
@@ -111,8 +111,8 @@ Deno.test("iteration budget can renew", () => {
 });
 
 Deno.test("iteration budget context round trip", () => {
-  assertEquals(iterationBudgetFromContext(newRunContext()), undefined);
-  const b = newIterationBudget(policy({ soft: 4, hard: 8 }), 4);
-  const ctx = contextWithIterationBudget(newRunContext(), b);
+  assertEquals(iterationBudgetFromContext(createRunContext()), undefined);
+  const b = createIterationBudget(policy({ soft: 4, hard: 8 }), 4);
+  const ctx = contextWithIterationBudget(createRunContext(), b);
   assertEquals(iterationBudgetFromContext(ctx), b);
 });

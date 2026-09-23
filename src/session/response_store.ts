@@ -9,7 +9,6 @@
 // BLOB columns), and `time.Time` maps to `Date`.
 
 import {
-  isNoRows,
   ResponseDAO,
   type ResponseItemRecord,
   type ResponseRunRecord,
@@ -433,13 +432,8 @@ export function getResponseTurn(
   if (sessionId === "" || localTurnId === "") {
     throw new Error("session ID and local turn ID are required");
   }
-  let record: ResponseTurnRecord;
-  try {
-    record = reader(sessionDir).findTurn(sessionId, localTurnId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = reader(sessionDir).findTurn(sessionId, localTurnId);
+  if (record === undefined) return null;
   return responseTurnFromRecord(record);
 }
 
@@ -657,6 +651,7 @@ export function claimToolExecutionRecord(
       createdAt: iso(createdAt),
       completedAt: null,
     });
+    if (result === undefined) return;
     claimed = toolExecutionFromRecord(result.stored);
     created = result.created > 0;
   });
@@ -747,13 +742,8 @@ export function reclaimInterruptedToolExecution(
   }
   let reclaimed = false;
   writeRootDatabase(sessionDir, (tx) => {
-    let record: DAOToolExecutionRecord;
-    try {
-      record = new ResponseDAO(null).findTool(tx, executionKey);
-    } catch (err) {
-      if (isNoRows(err)) return;
-      throw err;
-    }
+    const record = new ResponseDAO(null).findTool(tx, executionKey);
+    if (record === undefined) return;
     validateRuntimeLeaseTx(tx, sessionDir, record.sessionId);
     const state = record.executionState;
     const sideEffecting = record.sideEffecting;
@@ -933,13 +923,8 @@ export function getResponseRun(
   if (sessionId === "" || localRunId === "") {
     throw new Error("session ID and local run ID are required");
   }
-  let record: ResponseRunRecord;
-  try {
-    record = reader(sessionDir).getRun(sessionId, localRunId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = reader(sessionDir).getRun(sessionId, localRunId);
+  if (record === undefined) return null;
   return responseRunFromRecord(record);
 }
 
@@ -968,13 +953,8 @@ export function getResponseSessionState(
   sessionId: string,
 ): ResponseSessionState | null {
   if (sessionId === "") throw new Error("session ID is required");
-  let record: ResponseSessionStateRecord;
-  try {
-    record = reader(sessionDir).getSessionState(sessionId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = reader(sessionDir).getSessionState(sessionId);
+  if (record === undefined) return null;
   return responseSessionStateFromRecord(record);
 }
 

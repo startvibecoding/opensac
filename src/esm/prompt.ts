@@ -5,19 +5,19 @@
 // instructions.
 
 import {
+  createSystemInjectedUserMessage,
   type Message,
-  newSystemInjectedUserMessage,
 } from "../provider/types.ts";
 import { blockedAuditLimit, type Objective } from "./state.ts";
 
 /** Injects current ESM instructions into a run without changing the frozen system prompt. */
 export function steeringMessage(obj: Objective | null): Message {
-  return newSystemInjectedUserMessage(steeringPrompt(obj));
+  return createSystemInjectedUserMessage(steeringPrompt(obj));
 }
 
 /** Used when the TUI starts an idle continuation run. */
 export function continuationMessage(obj: Objective | null): Message {
-  return newSystemInjectedUserMessage(continuationPrompt(obj));
+  return createSystemInjectedUserMessage(continuationPrompt(obj));
 }
 
 export function steeringPrompt(obj: Objective | null): string {

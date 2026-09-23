@@ -123,7 +123,7 @@ export class BaseProvider {
 }
 
 /** Creates a new BaseProvider. */
-export function newBaseProvider(
+export function createBaseProvider(
   name: string,
   models: AgentModel[],
 ): BaseProvider {

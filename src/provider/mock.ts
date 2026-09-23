@@ -75,7 +75,7 @@ export class MockProvider implements Provider {
 }
 
 /** Creates a new MockProvider. */
-export function newMockProvider(
+export function createMockProvider(
   name: string,
   models: Model[],
   responses: StreamEvent[],

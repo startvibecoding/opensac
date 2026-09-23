@@ -1,5 +1,5 @@
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -76,7 +76,7 @@ export class SubAgentWaitTool implements Tool {
 
     const mailbox = this.#manager.mailbox;
     if (mailbox === undefined) {
-      return newSubAgentWaitResult(
+      return createSubAgentWaitResult(
         "no member mailbox is bound to this session",
         false,
         null,
@@ -95,12 +95,16 @@ export class SubAgentWaitTool implements Tool {
     if (timedOut) {
       message = "Wait timed out.";
     }
-    return newSubAgentWaitResult(message, timedOut, mailbox.pendingSummary());
+    return createSubAgentWaitResult(
+      message,
+      timedOut,
+      mailbox.pendingSummary(),
+    );
   }
 }
 
 /** Creates the subagent_wait tool. */
-export function newSubAgentWaitTool(manager: SubAgentWaitManager): Tool {
+export function createSubAgentWaitTool(manager: SubAgentWaitManager): Tool {
   return new SubAgentWaitTool(manager);
 }
 
@@ -138,7 +142,7 @@ interface SubAgentWaitPending {
  * payload; a pending member question carries its question ID so the lead can
  * answer it with subagent_answer even when it only inspects this projection.
  */
-export function newSubAgentWaitResult(
+export function createSubAgentWaitResult(
   message: string,
   timedOut: boolean,
   pending: MemberCompletion[] | null,
@@ -160,9 +164,9 @@ export function newSubAgentWaitResult(
     });
   }
   try {
-    return newTextToolResult(JSON.stringify(payload));
+    return createTextToolResult(JSON.stringify(payload));
   } catch {
-    return newTextToolResult(
+    return createTextToolResult(
       `{"message":${JSON.stringify(message)},"timed_out":${timedOut}}`,
     );
   }

@@ -5,16 +5,13 @@
 
 export {
   Database,
-  ErrNoRows,
   execChanges,
   execReturning,
   type Executor,
   inList,
-  isNoRows,
   nullable,
   type Param,
   queryAll,
-  queryOne,
   queryOptional,
   type Row,
   sqlBool,
@@ -27,7 +24,6 @@ export {
   AttachmentDAO,
   type AttachmentRecord,
   type AttachmentStorageReference,
-  isNoRowsAttachment,
 } from "./attachments.ts";
 
 export {
@@ -57,11 +53,7 @@ export {
 
 export { ESMDAO, type ESMObjectiveRecord } from "./esm.ts";
 
-export {
-  ESMGuidanceDAO,
-  type ESMGuidanceRecord,
-  isNoRowsGuidance,
-} from "./esm_guidance.ts";
+export { ESMGuidanceDAO, type ESMGuidanceRecord } from "./esm_guidance.ts";
 
 export {
   ForkDAO,
@@ -76,7 +68,6 @@ export {
   InputResourceDAO,
   type InputResourceEventRecord,
   type InputResourceRecord,
-  isNoRowsInput,
 } from "./input_resources.ts";
 
 export {
@@ -108,7 +99,6 @@ export {
 } from "./recovery.ts";
 
 export {
-  isNoRowsResponse,
   ResponseDAO,
   type ResponseItemRecord,
   type ResponseReplayItemRecord,
@@ -120,14 +110,12 @@ export {
 
 export {
   type ExecutionIntentRecord,
-  isNoRowsRun,
   RunDAO,
   type SessionRunEventRecord,
   type SessionRunRecord,
 } from "./run.ts";
 
 export {
-  isNoRows as isNoRowsRuntimeSubmission,
   RuntimeSubmissionDAO,
   type RuntimeSubmissionRecord,
 } from "./runtime_submission.ts";
@@ -135,7 +123,6 @@ export {
 export { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "./runtime_lease.ts";
 
 export {
-  isNoRowsSession,
   type SessionCapabilityEventRecord,
   type SessionCapabilityRecord,
   SessionDAO,

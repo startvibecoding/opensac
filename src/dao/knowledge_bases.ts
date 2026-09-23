@@ -1,11 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import {
-  execChanges,
-  inList,
-  isNoRows,
-  queryAll,
-  queryOne,
-} from "./database.ts";
+import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
 
 /** Durable Desktop-managed configuration for one directory-backed base. */
 export interface KnowledgeBaseRecord {
@@ -145,8 +139,8 @@ export class KnowledgeBaseDAO {
     );
   }
 
-  findBase(id: string): KnowledgeBaseRecord {
-    return queryOne<KnowledgeBaseRecord>(
+  findBase(id: string): KnowledgeBaseRecord | undefined {
+    return queryOptional<KnowledgeBaseRecord>(
       this.requireDb(),
       `SELECT ${baseColumns} FROM knowledge_bases WHERE id = ? LIMIT 1`,
       [id],
@@ -155,11 +149,11 @@ export class KnowledgeBaseDAO {
 
   /** Reports whether this database still contains the former shared tables. */
   hasStorage(): boolean {
-    return queryOne<{ n: number }>(
+    return queryOptional<{ n: number }>(
       this.requireDb(),
       `SELECT COUNT(*) AS n FROM sqlite_master
        WHERE type = 'table' AND name = 'knowledge_bases'`,
-    ).n !== 0;
+    )?.n !== 0;
   }
 
   insertBase(executor: DB, record: KnowledgeBaseRecord): void {
@@ -417,8 +411,8 @@ export class KnowledgeBaseDAO {
     );
   }
 
-  findSnapshot(id: string): KnowledgeSnapshotRecord {
-    return queryOne<KnowledgeSnapshotRecord>(
+  findSnapshot(id: string): KnowledgeSnapshotRecord | undefined {
+    return queryOptional<KnowledgeSnapshotRecord>(
       this.requireDb(),
       `SELECT ${snapshotColumns} FROM knowledge_index_snapshots WHERE id = ? LIMIT 1`,
       [id],
@@ -538,36 +532,29 @@ export class KnowledgeBaseDAO {
   /**
    * Reads the active completed graph for a base through one caller-owned
    * transaction. `indexed` is false when the base exists but has no completed
-   * active snapshot; `ErrNoRows` means the base does not exist.
+   * active snapshot; `undefined` means the base does not exist.
    */
   activeGraphProjection(
     executor: DB,
     baseId: string,
     query: string,
     limit: number,
-  ): { projection: KnowledgeGraphProjection; indexed: boolean } {
-    const base = queryOne<KnowledgeBaseRecord>(
+  ): { projection: KnowledgeGraphProjection; indexed: boolean } | undefined {
+    const base = queryOptional<KnowledgeBaseRecord>(
       executor,
       `SELECT ${baseColumns} FROM knowledge_bases WHERE id = ? LIMIT 1`,
       [baseId],
     );
+    if (base === undefined) return undefined;
     if (base.activeSnapshotId.trim() === "") {
       return { projection: emptyProjection(base), indexed: false };
     }
-    let snapshot: KnowledgeSnapshotRecord;
-    try {
-      snapshot = queryOne<KnowledgeSnapshotRecord>(
-        executor,
-        `SELECT ${snapshotColumns} FROM knowledge_index_snapshots WHERE id = ? LIMIT 1`,
-        [base.activeSnapshotId],
-      );
-    } catch (err) {
-      if (isNoRows(err)) {
-        return { projection: emptyProjection(base), indexed: false };
-      }
-      throw err;
-    }
-    if (snapshot.status !== "completed") {
+    const snapshot = queryOptional<KnowledgeSnapshotRecord>(
+      executor,
+      `SELECT ${snapshotColumns} FROM knowledge_index_snapshots WHERE id = ? LIMIT 1`,
+      [base.activeSnapshotId],
+    );
+    if (snapshot === undefined || snapshot.status !== "completed") {
       return { projection: emptyProjection(base), indexed: false };
     }
     const projection: KnowledgeGraphProjection = {

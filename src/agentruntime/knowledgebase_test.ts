@@ -22,9 +22,9 @@ import {
 } from "../session/mod.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { closeDatabases } from "../session/root_db.ts";
-import { newManager } from "../session/manager.ts";
-import { newRegistry } from "../tools/tool.ts";
-import { newMockProvider } from "../provider/mock.ts";
+import { createManager } from "../session/manager.ts";
+import { createRegistry } from "../tools/tool.ts";
+import { createMockProvider } from "../provider/mock.ts";
 import type { Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
@@ -44,11 +44,10 @@ import { attachSessionResources } from "./attach.ts";
 import { RUN_STATE_COMPLETED } from "./run_state.ts";
 import { MODE_YOLO, SOURCE_ACP } from "./source.ts";
 import {
+  createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
   type KnowledgeBaseProviderFactory,
   makeKnowledgeCapsule,
-  newKnowledgeBaseService,
-  newKnowledgeBaseServiceWithProviderFactory,
   prepareKnowledgeContext,
 } from "./knowledgebase.ts";
 
@@ -93,7 +92,7 @@ Deno.test("knowledge base indexer stores queryable graph snapshot", async () => 
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     root,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -143,7 +142,7 @@ Deno.test("prepare knowledge context builds bounded cited reference", async () =
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -189,7 +188,7 @@ Deno.test("knowledge base indexer ignores symlink and build output", async () =>
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     root,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -291,7 +290,7 @@ Deno.test("knowledge indexer clones unchanged file graph when another file chang
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -328,7 +327,7 @@ Deno.test("knowledge base query matches chinese evidence", async () => {
     schedule: "manual",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     root,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -361,7 +360,7 @@ Deno.test("knowledge base service set settings refreshes indexer factory", () =>
       model: { id: "indexer-model", name: "Indexer model" } as unknown as Model,
     };
   };
-  const service = newKnowledgeBaseServiceWithProviderFactory(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
     { sessionDir, defaultModel: "first" } as Settings,
@@ -495,7 +494,7 @@ Deno.test(
     });
     const settings = defaultSettings();
     settings.sessionDir = sessionDir;
-    const service = newKnowledgeBaseServiceWithProviderFactory(
+    const service = createKnowledgeBaseService(
       sessionDir,
       defaultKnowledgeBaseIndexPolicy(),
       settings,
@@ -573,7 +572,7 @@ Deno.test(
       "# Runtime\n\nThe runtime owns durable Runs and controls graph evidence.\n",
     );
     const model = testModel("librarian-model", "Librarian model");
-    const mock = newMockProvider("librarian", [model], [
+    const mock = createMockProvider("librarian", [model], [
       { type: streamStart },
       {
         type: streamTextDelta,
@@ -592,7 +591,7 @@ Deno.test(
       schedule: "manual",
       enabled: true,
     });
-    const service = newKnowledgeBaseService(
+    const service = createKnowledgeBaseService(
       sessionDir,
       defaultKnowledgeBaseIndexPolicy(),
     );
@@ -600,7 +599,7 @@ Deno.test(
     const graph = service.query(undefined, base.id, "who owns durable run", 6);
 
     const callerWorkDir = tempDir();
-    const callerManager = newManager(callerWorkDir, sessionDir);
+    const callerManager = createManager(callerWorkDir, sessionDir);
     callerManager.init();
     const caller = await attachSessionResources({
       id: callerManager.getHeader()!.id,
@@ -608,7 +607,7 @@ Deno.test(
       entrySource: SOURCE_ACP,
       workDir: callerWorkDir,
       manager: callerManager,
-      registry: newRegistry(callerWorkDir, undefined),
+      registry: createRegistry(callerWorkDir, undefined),
       providers: { librarian: mock },
       settings: { ...defaultSettings(), sessionDir },
     });

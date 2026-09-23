@@ -10,7 +10,7 @@
 // compare them with `===` (Go's `errors.Is`).
 
 import type { DB } from "../db/mod.ts";
-import { ESMDAO, type ESMObjectiveRecord, isNoRows } from "../dao/mod.ts";
+import { ESMDAO, type ESMObjectiveRecord } from "../dao/mod.ts";
 import {
   consumeESMGuidance,
   type ESMGuidance,
@@ -693,21 +693,17 @@ export class Store {
   }
 }
 
-// Reads the objective for `sessionID` through the DAO, mapping the DAO
-// "no rows" sentinel to EsmObjectiveNotFoundError.
+// Reads the objective for `sessionID` through the DAO; a missing row maps to
+// EsmObjectiveNotFoundError in objectiveFromRecord.
 function getObjective(executor: DB, sessionID: string): Objective {
-  let record: ESMObjectiveRecord;
-  try {
-    record = new ESMDAO(null).getFrom(executor, sessionID);
-  } catch (err) {
-    if (isNoRows(err)) throw new EsmObjectiveNotFoundError();
-    throw err;
-  }
+  const record = new ESMDAO(null).getFrom(executor, sessionID);
   return objectiveFromRecord(record);
 }
 
-function objectiveFromRecord(record: ESMObjectiveRecord | null): Objective {
-  if (record === null) throw new EsmObjectiveNotFoundError();
+function objectiveFromRecord(
+  record: ESMObjectiveRecord | null | undefined,
+): Objective {
+  if (record == null) throw new EsmObjectiveNotFoundError();
   let remaining: string[];
   try {
     remaining = JSON.parse(record.remainingWork) as string[];

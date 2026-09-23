@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryOne } from "./database.ts";
+import { execChanges, queryOptional } from "./database.ts";
 
 export interface RuntimeSubmissionRecord {
   id: string;
@@ -24,8 +24,8 @@ export class RuntimeSubmissionDAO {
     sessionId: string,
     scope: string,
     keyHash: string,
-  ): RuntimeSubmissionRecord {
-    return queryOne<RuntimeSubmissionRecord>(
+  ): RuntimeSubmissionRecord | undefined {
+    return queryOptional<RuntimeSubmissionRecord>(
       executor,
       `SELECT ${columns} FROM runtime_submissions
        WHERE session_id = ? AND scope = ? AND key_hash = ? LIMIT 1`,
@@ -51,8 +51,4 @@ export class RuntimeSubmissionDAO {
       ],
     );
   }
-}
-
-export function isNoRows(err: unknown): boolean {
-  return err === ErrNoRows;
 }

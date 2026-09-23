@@ -75,7 +75,7 @@ export function replayDeliveriesFromRunEvents(
   return replayDeliveries(persisted);
 }
 
-export function newDeliveryReconciledEvent(
+export function createDeliveryReconciledEvent(
   sessionId: string,
   runId: string,
   source: string,

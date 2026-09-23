@@ -21,7 +21,7 @@ import {
 import type { AttachmentService } from "./input.ts";
 import { detectAttachmentMediaType } from "./media_type.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -316,7 +316,7 @@ export class PublishArtifactTool implements Tool {
       kind,
       ctx.signal,
     );
-    return newTextToolResult(
+    return createTextToolResult(
       `Published generated ${record.kind} ${
         JSON.stringify(record.filename)
       } as attachment ${record.id}.`,
@@ -325,7 +325,7 @@ export class PublishArtifactTool implements Tool {
 }
 
 /** Creates the Runtime-owned `publish_artifact` tool for one collector. */
-export function newPublishArtifactTool(
+export function createPublishArtifactTool(
   collector: ArtifactCollector,
 ): PublishArtifactTool {
   return new PublishArtifactTool(collector);

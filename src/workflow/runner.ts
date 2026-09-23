@@ -435,38 +435,32 @@ export class WorkflowRuntime {
     return resolveJsValue(this, signal, value);
   }
 
-  lookupResult(baseKey: string, instanceKey: string): [AgentResult, boolean] {
+  lookupResult(baseKey: string, instanceKey: string): AgentResult | undefined {
     if (instanceKey !== "") {
-      return this.resultByStorageKey(
-        resultStorageKey(baseKey, instanceKey),
-      );
+      return this.resultByStorageKey(resultStorageKey(baseKey, instanceKey));
     }
-    const direct = this.resultByStorageKey(baseKey);
-    if (direct[1]) return direct;
-    return this.latestResultForBase(baseKey);
+    return this.resultByStorageKey(baseKey) ??
+      this.latestResultForBase(baseKey);
   }
 
-  resultByStorageKey(key: string): [AgentResult, boolean] {
-    const result = this.state.results?.[key];
-    return result === undefined ? [emptyResult(), false] : [result, true];
+  resultByStorageKey(key: string): AgentResult | undefined {
+    return this.state.results?.[key];
   }
 
-  latestResultForBase(baseKey: string): [AgentResult, boolean] {
-    let latest = emptyResult();
-    let found = false;
+  latestResultForBase(baseKey: string): AgentResult | undefined {
+    let latest: AgentResult | undefined;
     for (const result of Object.values(this.state.results ?? {})) {
       if (!resultMatchesBase(result, baseKey)) continue;
       if (
-        !found ||
+        latest === undefined ||
         result.startedAt.getTime() > latest.startedAt.getTime() ||
         (result.finishedAt?.getTime() ?? 0) >
           (latest.finishedAt?.getTime() ?? 0)
       ) {
         latest = result;
-        found = true;
       }
     }
-    return [latest, found];
+    return latest;
   }
 
   resultsText(query: string): string {
@@ -493,10 +487,6 @@ export class WorkflowRuntime {
     this.state.updatedAt = now;
     this.emitProgressLocked({ status: statusRunning, message: msg });
   }
-}
-
-function emptyResult(): AgentResult {
-  return { key: "", name: "", status: "", startedAt: new Date(0) };
 }
 
 /** Resolves a deferred workflow expression or nested value. */
@@ -542,8 +532,8 @@ async function resolveExpr(
   switch (expr.expr) {
     case "result": {
       const s = await str(0);
-      const [r, ok] = rt.lookupResult(s, "");
-      if (!ok) {
+      const r = rt.lookupResult(s, "");
+      if (r === undefined) {
         throw new Error(`workflow result ${JSON.stringify(s)} not found`);
       }
       return r.result ?? "";
@@ -553,8 +543,8 @@ async function resolveExpr(
       const k = await str(1);
       const keyError = validateInstanceKey(k);
       if (keyError !== null) throw new Error(keyError);
-      const [r, ok] = rt.lookupResult(s, k);
-      if (!ok) {
+      const r = rt.lookupResult(s, k);
+      if (r === undefined) {
         throw new Error(
           `workflow result ${JSON.stringify(s)} with key ${
             JSON.stringify(k)
@@ -565,8 +555,8 @@ async function resolveExpr(
     }
     case "resultLatest": {
       const s = await str(0);
-      const [r, ok] = rt.latestResultForBase(s);
-      if (!ok) {
+      const r = rt.latestResultForBase(s);
+      if (r === undefined) {
         throw new Error(`workflow result ${JSON.stringify(s)} not found`);
       }
       return r.result ?? "";

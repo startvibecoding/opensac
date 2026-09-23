@@ -1,8 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import {
+  createRoleIncompleteError,
   EsmDeadlineExceededError,
   longTaskMaxIterations,
-  newRoleIncompleteError,
   recoveryObserverTimeout,
   roleAudit,
   roleContext,
@@ -128,7 +128,7 @@ Deno.test("Supervisor incomplete role recovers and keeps objective active", asyn
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter();
-    adapter.roleErr = newRoleIncompleteError(roleWorker, "max_iterations");
+    adapter.roleErr = createRoleIncompleteError(roleWorker, "max_iterations");
     const { objective: obj, error } = await new Supervisor({ store, adapter })
       .run(sessionID, "run-incomplete", Deno.makeTempDirSync(), "yolo");
     assertEquals(error, null);

@@ -71,7 +71,7 @@ export class ExternalToolAdapter implements Tool {
 }
 
 /** Wraps a public ExternalTool as an internal tools.Tool. */
-export function newExternalToolAdapter(t: ExternalTool): Tool {
+export function createExternalToolAdapter(t: ExternalTool): Tool {
   return new ExternalToolAdapter(t);
 }
 

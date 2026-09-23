@@ -11,7 +11,7 @@ import { compileGeneratedRegExp } from "../util/regex.ts";
 import { globToRegex } from "./globset.ts";
 import { IgnoreStack } from "./ignore.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -125,9 +125,9 @@ export class FindTool implements Tool {
 
     results.sort();
     if (results.length === 0) {
-      return newTextToolResult("(no files found)");
+      return createTextToolResult("(no files found)");
     }
-    return newTextToolResult(results.join("\n"));
+    return createTextToolResult(results.join("\n"));
   }
 }
 

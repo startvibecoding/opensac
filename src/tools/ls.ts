@@ -1,5 +1,5 @@
 import type { Registry, Tool, ToolContext, ToolResult } from "./tool.ts";
-import { newTextToolResult } from "./tool.ts";
+import { createTextToolResult } from "./tool.ts";
 
 /** Lists directory contents. */
 export class LsTool implements Tool {
@@ -83,9 +83,9 @@ export class LsTool implements Tool {
     }
 
     if (sb === "") {
-      return newTextToolResult("(empty directory)");
+      return createTextToolResult("(empty directory)");
     }
-    return newTextToolResult(sb);
+    return createTextToolResult(sb);
   }
 }
 

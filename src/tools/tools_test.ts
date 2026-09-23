@@ -10,6 +10,8 @@ import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
   BashTool,
   buildFileDiff,
+  createRegistry,
+  createRegistryWithConfig,
   FileLockManager,
   FindTool,
   GlobSet,
@@ -20,8 +22,6 @@ import {
   JobsTool,
   KillTool,
   LsTool,
-  newRegistry,
-  newRegistryWithConfig,
   PlanTool,
   QuestionTool,
   ReadTool,
@@ -32,10 +32,10 @@ import {
   writeFileAtomic,
   WriteTool,
 } from "./mod.ts";
-import { newJobManager } from "./jobmanager.ts";
+import { createJobManager } from "./jobmanager.ts";
 import { formatGoDuration } from "./jobmanager.ts";
 import { EditTool } from "./edit.ts";
-import { newBashToolWithJobManager } from "./bash.ts";
+import { createBashTool } from "./bash.ts";
 
 function tempDir(): string {
   return Deno.makeTempDirSync();
@@ -68,7 +68,7 @@ Deno.test("operation id context helpers", () => {
 });
 
 Deno.test("NewRegistry and register/get/remove", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   const plan = new PlanTool(r);
   r.register(plan);
   const tool = r.get("plan");
@@ -79,7 +79,7 @@ Deno.test("NewRegistry and register/get/remove", () => {
 });
 
 Deno.test("RegisterDefaults registers the standard tool set", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
   const expected = [
     "read",
@@ -100,13 +100,13 @@ Deno.test("RegisterDefaults registers the standard tool set", () => {
 });
 
 Deno.test("RegisterDefaultsWithPlanTool(false) omits plan", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   r.registerDefaultsWithPlanTool(false);
   assertEquals(r.get("plan"), undefined);
 });
 
 Deno.test("ModeTools filters by mode", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
 
   const planNames = new Set(r.modeTools("plan").map((t) => t.name));
@@ -123,7 +123,7 @@ Deno.test("ModeTools filters by mode", () => {
 });
 
 Deno.test("PlanTool formats and returns a structured plan", async () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   const tool = new PlanTool(r);
   const result = await tool.execute(ctx, {
     title: "Ship feature",
@@ -141,7 +141,7 @@ Deno.test("PlanTool formats and returns a structured plan", async () => {
 });
 
 Deno.test("PlanTool rejects empty steps and bad status", async () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   const tool = new PlanTool(r);
   await expectRejects(() => tool.execute(ctx, { steps: [] }));
   await expectRejects(() =>
@@ -153,7 +153,7 @@ Deno.test("ReadTool reads numbered lines with offset and limit", async () => {
   const dir = tempDir();
   const file = path.join(dir, "a.txt");
   writeText(file, "one\ntwo\nthree\nfour\n");
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new ReadTool(r);
 
   const all = await tool.execute(ctx, { path: "a.txt" });
@@ -175,20 +175,20 @@ Deno.test("ReadTool reads numbered lines with offset and limit", async () => {
 
 Deno.test("ReadTool rejects path escape", async () => {
   const dir = tempDir();
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new ReadTool(r);
   await expectRejects(() => tool.execute(ctx, { path: "../../etc/passwd" }));
 });
 
 Deno.test("ReadTool rejects a missing required path", async () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   const tool = new ReadTool(r);
   await expectRejects(() => tool.execute(ctx, {}));
 });
 
 Deno.test("WriteTool writes and reports a diff", async () => {
   const dir = tempDir();
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new WriteTool(r);
   const result = await tool.execute(ctx, {
     path: "out.txt",
@@ -203,7 +203,7 @@ Deno.test("EditTool applies multiple disjoint edits", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "alpha beta gamma");
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new EditTool(r);
   const result = await tool.execute(ctx, {
     path: "e.txt",
@@ -220,7 +220,7 @@ Deno.test("EditTool rejects non-unique and missing oldText", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "x x");
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new EditTool(r);
   await expectRejects(() =>
     tool.execute(ctx, {
@@ -240,7 +240,7 @@ Deno.test("EditTool rejects overlapping edits", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "abcdef");
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new EditTool(r);
   await expectRejects(() =>
     tool.execute(ctx, {
@@ -264,7 +264,7 @@ Deno.test("InsertTool positions", async () => {
     const dir = tempDir();
     const file = path.join(dir, "file.txt");
     writeText(file, "a\nb\n");
-    const tool = new InsertTool(newRegistry(dir, undefined));
+    const tool = new InsertTool(createRegistry(dir, undefined));
     await tool.execute(ctx, {
       path: "file.txt",
       content: "X",
@@ -278,7 +278,7 @@ Deno.test("InsertTool dedupe and dry run", async () => {
   const dir = tempDir();
   const file = path.join(dir, "file.txt");
   writeText(file, "a\nb\n");
-  const tool = new InsertTool(newRegistry(dir, undefined));
+  const tool = new InsertTool(createRegistry(dir, undefined));
 
   const dedupe = await tool.execute(ctx, {
     path: "file.txt",
@@ -306,7 +306,7 @@ Deno.test("InsertTool rejects match position and out-of-range line", async () =>
   const dir = tempDir();
   const file = path.join(dir, "file.txt");
   writeText(file, "a\n");
-  const tool = new InsertTool(newRegistry(dir, undefined));
+  const tool = new InsertTool(createRegistry(dir, undefined));
 
   await expectRejects(() =>
     tool.execute(ctx, {
@@ -332,7 +332,7 @@ Deno.test("FindTool finds files and respects maxDepth", async () => {
   Deno.mkdirSync(nested);
   writeText(path.join(nested, "nested.go"), "package nested");
 
-  const tool = new FindTool(newRegistry(dir, undefined));
+  const tool = new FindTool(createRegistry(dir, undefined));
   const byTxt = await tool.execute(ctx, { pattern: "*.txt", path: "." });
   assertStringIncludes(byTxt.text, "test.txt");
   assert(!byTxt.text.includes("test.go"));
@@ -358,7 +358,7 @@ Deno.test("GrepTool searches, filters by include and respects gitignore", async 
   writeText(path.join(dir, "kept.go"), "func Kept() {}\n");
   writeText(path.join(dir, "ignored.go"), "func Ignored() {}\n");
 
-  const tool = new GrepTool(newRegistry(dir, undefined));
+  const tool = new GrepTool(createRegistry(dir, undefined));
 
   const include = await tool.execute(ctx, {
     pattern: "Hello",
@@ -382,7 +382,7 @@ Deno.test("GrepTool limits total results and falls back to literal", async () =>
   for (let i = 0; i < 5; i++) {
     writeText(path.join(dir, `file${i}.txt`), "match one\nmatch two\n");
   }
-  const tool = new GrepTool(newRegistry(dir, undefined));
+  const tool = new GrepTool(createRegistry(dir, undefined));
 
   const limited = await tool.execute(ctx, {
     pattern: "match",
@@ -396,7 +396,7 @@ Deno.test("GrepTool limits total results and falls back to literal", async () =>
 
   const literalDir = tempDir();
   writeText(path.join(literalDir, "test.txt"), "Hello");
-  const literalTool = new GrepTool(newRegistry(literalDir, undefined));
+  const literalTool = new GrepTool(createRegistry(literalDir, undefined));
   const literal = await literalTool.execute(ctx, { pattern: "[", path: "." });
   assertStringIncludes(
     literal.text,
@@ -412,7 +412,7 @@ Deno.test("GrepTool skips oversized files instead of buffering them", async () =
     "needle here\n" + "x".repeat(17 * 1024 * 1024),
   );
   writeText(path.join(dir, "small.txt"), "needle here\n");
-  const tool = new GrepTool(newRegistry(dir, undefined));
+  const tool = new GrepTool(createRegistry(dir, undefined));
 
   const result = await tool.execute(ctx, { pattern: "needle", path: "." });
   assertStringIncludes(result.text, "small.txt");
@@ -424,14 +424,17 @@ Deno.test("LsTool lists directory entries", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "a.txt"), "hi");
   Deno.mkdirSync(path.join(dir, "sub"));
-  const tool = new LsTool(newRegistry(dir, undefined));
+  const tool = new LsTool(createRegistry(dir, undefined));
   const result = await tool.execute(ctx, {});
   assertStringIncludes(result.text, "a.txt");
   assertStringIncludes(result.text, "sub/");
 });
 
 Deno.test("BashTool runs a sync command", async () => {
-  const tool = new BashTool(newRegistry("/tmp", undefined), newJobManager());
+  const tool = new BashTool(
+    createRegistry("/tmp", undefined),
+    createJobManager(),
+  );
   const result = await tool.execute(ctx, { command: "echo hello" });
   assertStringIncludes(result.text, "[runtime]\n");
   assertStringIncludes(result.text, "[command]\necho hello");
@@ -441,7 +444,10 @@ Deno.test("BashTool runs a sync command", async () => {
 });
 
 Deno.test("BashTool captures stderr and non-zero exit code", async () => {
-  const tool = new BashTool(newRegistry("/tmp", undefined), newJobManager());
+  const tool = new BashTool(
+    createRegistry("/tmp", undefined),
+    createJobManager(),
+  );
   const stderr = await tool.execute(ctx, { command: "echo problem >&2" });
   assertStringIncludes(stderr.text, "[stdout]\n(no output)");
   assertStringIncludes(stderr.text, "[stderr]\nproblem");
@@ -451,7 +457,10 @@ Deno.test("BashTool captures stderr and non-zero exit code", async () => {
 });
 
 Deno.test("BashTool uses non-interactive auth env", async () => {
-  const tool = new BashTool(newRegistry("/tmp", undefined), newJobManager());
+  const tool = new BashTool(
+    createRegistry("/tmp", undefined),
+    createJobManager(),
+  );
   const result = await tool.execute(ctx, {
     command:
       'printf \'%s:%s:%s:%s\' "$GIT_TERMINAL_PROMPT" "$GIT_ASKPASS" "$SSH_ASKPASS" "$SSH_ASKPASS_REQUIRE"',
@@ -460,9 +469,9 @@ Deno.test("BashTool uses non-interactive auth env", async () => {
 });
 
 Deno.test("BashTool async creates a job that jobs/kill can manage", async () => {
-  const jm = newJobManager();
-  const r = newRegistry("/tmp", undefined);
-  const bash = newBashToolWithJobManager(r, jm);
+  const jm = createJobManager();
+  const r = createRegistry("/tmp", undefined);
+  const bash = createBashTool(r, jm);
   const jobs = new JobsTool(r, bash);
   const kill = new KillTool(r, bash);
 
@@ -485,7 +494,10 @@ Deno.test("BashTool async creates a job that jobs/kill can manage", async () => 
 });
 
 Deno.test("BashTool honors a parent abort signal", async () => {
-  const tool = new BashTool(newRegistry("/tmp", undefined), newJobManager());
+  const tool = new BashTool(
+    createRegistry("/tmp", undefined),
+    createJobManager(),
+  );
   const controller = new AbortController();
   const promise = tool.execute({ signal: controller.signal }, {
     command: "sleep 5",
@@ -497,7 +509,7 @@ Deno.test("BashTool honors a parent abort signal", async () => {
 });
 
 Deno.test("QuestionTool asks via the attached asker", async () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   const tool = new QuestionTool(r);
   const withAsker: ToolContext = {
     questionAsker: {
@@ -642,7 +654,7 @@ Deno.test("EditTool serializes concurrent edits to the same file", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "alpha beta gamma");
-  const r = newRegistry(dir, undefined);
+  const r = createRegistry(dir, undefined);
   const tool = new EditTool(r);
 
   await withDeadline(
@@ -661,13 +673,13 @@ Deno.test("EditTool serializes concurrent edits to the same file", async () => {
 });
 
 Deno.test("default registries share a file lock manager", () => {
-  const r1 = newRegistry(tempDir(), undefined);
-  const r2 = newRegistry(tempDir(), undefined);
+  const r1 = createRegistry(tempDir(), undefined);
+  const r2 = createRegistry(tempDir(), undefined);
   assertEquals(r1.fileLocks() === r2.fileLocks(), true);
 });
 
 Deno.test("RegistryResolvePath resolves and rejects escapes", async () => {
-  const r = newRegistry("/home/user/project", undefined);
+  const r = createRegistry("/home/user/project", undefined);
   assertEquals(
     r.resolvePath("src/main.go"),
     "/home/user/project/src/main.go",
@@ -680,10 +692,10 @@ Deno.test("RegistryResolvePath resolves and rejects escapes", async () => {
 });
 
 Deno.test("RegistryConfig registers filtered tools", () => {
-  const all = newRegistryWithConfig({ workDir: "/tmp" });
+  const all = createRegistryWithConfig({ workDir: "/tmp" });
   assert(all.all().length > 0);
 
-  const filtered = newRegistryWithConfig({
+  const filtered = createRegistryWithConfig({
     workDir: "/tmp",
     toolFilter: ["read", "write"],
   });
@@ -694,13 +706,13 @@ Deno.test("RegistryConfig registers filtered tools", () => {
 });
 
 Deno.test("Registry job managers are per-instance", () => {
-  const r1 = newRegistry("/tmp", undefined);
-  const r2 = newRegistry("/tmp", undefined);
+  const r1 = createRegistry("/tmp", undefined);
+  const r2 = createRegistry("/tmp", undefined);
   assert(r1.jobManager() !== r2.jobManager());
 });
 
 Deno.test("tool snippets and guidelines are gathered", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
   const snippets = r.toolSnippets(["read", "write", "bash"]);
   assert(Object.keys(snippets).length >= 3);
@@ -709,7 +721,7 @@ Deno.test("tool snippets and guidelines are gathered", () => {
 });
 
 Deno.test("ToolDefinition exposes name/description/parameters", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   const tool: Tool = new ReadTool(r);
   const def = { name: tool.name(), description: tool.description() };
   assertEquals(def.name, "read");
@@ -718,7 +730,7 @@ Deno.test("ToolDefinition exposes name/description/parameters", () => {
 });
 
 Deno.test("mode tools for plan does not include write/bash", () => {
-  const r = newRegistry("/tmp", undefined);
+  const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
   const planNames = new Set(r.modeTools("plan").map((t) => t.name));
   assert(planNames.has("read"));

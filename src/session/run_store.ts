@@ -9,7 +9,6 @@
 
 import {
   ConversationTurnDAO,
-  isNoRows,
   RunDAO,
   type SessionRunRecord,
 } from "../dao/mod.ts";
@@ -433,6 +432,9 @@ export function finishSessionRunAndConversationTurn(
     );
     if (changed === 0) {
       const record = dao.findRun(tx, run.id);
+      if (record === undefined) {
+        throw new Error(`session run ${run.id} not found`);
+      }
       if (record.status !== run.status) {
         throw new Error(
           `invalid session run transition ${JSON.stringify(record.status)} -> ${
@@ -457,14 +459,8 @@ export function finishSessionRunAndConversationTurn(
     });
     if (turnId !== "") {
       const turnDao = new ConversationTurnDAO(null);
-      let state: { intentId: string; status: string; runId: string } | null =
-        null;
-      try {
-        state = turnDao.state(tx, run.sessionId, turnId);
-      } catch (err) {
-        if (!isNoRows(err)) throw err;
-      }
-      if (state !== null && state.status === "open") {
+      const state = turnDao.state(tx, run.sessionId, turnId);
+      if (state !== undefined && state.status === "open") {
         const parentId = currentLeafTx(tx, run.sessionId);
         const entry: TurnEndEntry = {
           type: entryTurnEnd,
@@ -558,13 +554,8 @@ export function getSessionRun(
   if (runId === "") throw new Error("run ID is required");
   const db = openRootDB(sessionDir);
   const conn = requireConn(db);
-  let record: SessionRunRecord;
-  try {
-    record = new RunDAO(null).findRun(conn, runId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = new RunDAO(null).findRun(conn, runId);
+  if (record === undefined) return null;
   const run = sessionRunFromRecord(record);
   loadInputResourceIDs(db, [run]);
   return run;
@@ -577,16 +568,11 @@ export function getActiveSessionRun(
 ): SessionRun | null {
   if (sessionId === "") return null;
   const db = openRootDB(sessionDir);
-  let record: SessionRunRecord;
-  try {
-    record = new RunDAO(requireConn(db)).activeRun(
-      sessionId,
-      nonTerminalSessionRunStatuses(),
-    );
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = new RunDAO(requireConn(db)).activeRun(
+    sessionId,
+    nonTerminalSessionRunStatuses(),
+  );
+  if (record === undefined) return null;
   return getSessionRun(sessionDir, record.id);
 }
 
@@ -663,13 +649,11 @@ export function latestSessionRunForIntent(
     throw new Error("session ID and execution intent ID are required");
   }
   const db = openRootDB(sessionDir);
-  let record: SessionRunRecord;
-  try {
-    record = new RunDAO(requireConn(db)).latestForIntent(sessionId, intentId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = new RunDAO(requireConn(db)).latestForIntent(
+    sessionId,
+    intentId,
+  );
+  if (record === undefined) return null;
   return getSessionRun(sessionDir, record.id);
 }
 
@@ -690,6 +674,9 @@ export function updateSessionRunStatus(
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new RunDAO(null);
     const sessionId = dao.sessionId(tx, runId);
+    if (sessionId === undefined) {
+      throw new Error(`session run ${runId} not found`);
+    }
     validateRuntimeLeaseTx(tx, sessionDir, sessionId);
     const allowed = allowedRunPredecessors(status);
     const changed = dao.updateStatus(
@@ -703,6 +690,9 @@ export function updateSessionRunStatus(
     );
     if (changed === 0) {
       const record = dao.findRun(tx, runId);
+      if (record === undefined) {
+        throw new Error(`session run ${runId} not found`);
+      }
       if (record.status === status) return;
       throw new Error(
         `invalid session run transition ${JSON.stringify(record.status)} -> ${
@@ -728,13 +718,8 @@ export function annotateSessionRunError(
   let applied = false;
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new RunDAO(null);
-    let sessionId: string;
-    try {
-      sessionId = dao.sessionId(tx, runId);
-    } catch (err) {
-      if (isNoRows(err)) return;
-      throw err;
-    }
+    const sessionId = dao.sessionId(tx, runId);
+    if (sessionId === undefined) return;
     validateRuntimeLeaseTx(tx, sessionDir, sessionId);
     const changed = dao.updateErrorIfEmpty(
       tx,
@@ -758,6 +743,9 @@ export function updateSessionRunErrorInfo(
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new RunDAO(null);
     const sessionId = dao.sessionId(tx, runId);
+    if (sessionId === undefined) {
+      throw new Error(`session run ${runId} not found`);
+    }
     validateRuntimeLeaseTx(tx, sessionDir, sessionId);
     dao.updateJson(
       tx,
@@ -779,6 +767,9 @@ export function updateSessionRunProgress(
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new RunDAO(null);
     const sessionId = dao.sessionId(tx, runId);
+    if (sessionId === undefined) {
+      throw new Error(`session run ${runId} not found`);
+    }
     validateRuntimeLeaseTx(tx, sessionDir, sessionId);
     dao.updateJson(
       tx,
@@ -804,6 +795,9 @@ export function updateSessionRunUsage(
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new RunDAO(null);
     const sessionId = dao.sessionId(tx, runId);
+    if (sessionId === undefined) {
+      throw new Error(`session run ${runId} not found`);
+    }
     validateRuntimeLeaseTx(tx, sessionDir, sessionId);
     const now = new Date().toISOString();
     dao.updateJson(tx, runId, "usage_json", normalizedRunJSON(usage), now);

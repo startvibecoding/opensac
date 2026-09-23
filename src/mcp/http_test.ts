@@ -2,8 +2,8 @@
 // `net/http/httptest` maps to `Deno.serve` on an ephemeral localhost port.
 
 import { assert, assertEquals } from "@std/assert";
-import { newNoneSandbox } from "../sandbox/mod.ts";
-import { newRegistry, type Tool } from "../tools/mod.ts";
+import { createNoneSandbox } from "../sandbox/mod.ts";
+import { createRegistry, type Tool } from "../tools/mod.ts";
 import type { RPCRequest } from "./rpc.ts";
 import { type Callbacks, Client, closeClients, connectServers } from "./mcp.ts";
 
@@ -99,7 +99,7 @@ Deno.test("connect MCPServers HTTP registers and executes", async () => {
     }
   });
 
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.registerDefaults();
 
   const callbacks: Callbacks = {
@@ -171,7 +171,7 @@ Deno.test("MCP HTTP session id header round trip", async () => {
     return Response.json(ok(req.id, { tools: [] }), { headers });
   });
 
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.registerDefaults();
   let clients;
   try {
@@ -283,7 +283,7 @@ Deno.test("connect MCP servers returns resource discovery error", async () => {
         return ok(req.id, {});
     }
   });
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   try {
     let threw = false;
     try {

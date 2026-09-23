@@ -17,7 +17,7 @@ import {
 } from "../imageproc/mod.ts";
 import type { ContentBlock, ImageContent } from "../provider/types.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   operationIDFromContext,
   type Registry,
   type Tool,
@@ -1015,14 +1015,14 @@ export async function connectServers(
         );
       }
       seenServers.add(trimmedName);
-      const client = await newMCPClient(ctx, cfg, callbacks);
+      const client = await createMCPClient(ctx, cfg, callbacks);
       // Bind the image policy lazily through the registry method value.
       client.imagePolicy = (mode) => registry.imagePolicy(mode);
       clients.push(client);
       const toolInfos = await client.listTools(ctx);
       for (const info of toolInfos) {
         if ((info.name ?? "").trim() === "") continue;
-        const tool = newMCPTool(client, info, registeredToolNames);
+        const tool = createMCPTool(client, info, registeredToolNames);
         registeredToolNames.add(tool.name());
         registry.register(tool);
       }
@@ -1039,7 +1039,7 @@ export async function connectServers(
       }
       for (const info of resourceInfos) {
         if ((info.uri ?? "").trim() === "") continue;
-        const tool = newMCPResourceTool(client, info, registeredToolNames);
+        const tool = createMCPResourceTool(client, info, registeredToolNames);
         registeredToolNames.add(tool.name());
         registry.register(tool);
       }
@@ -1056,7 +1056,7 @@ export async function connectServers(
       }
       for (const info of promptInfos) {
         if ((info.name ?? "").trim() === "") continue;
-        const tool = newMCPPromptTool(client, info, registeredToolNames);
+        const tool = createMCPPromptTool(client, info, registeredToolNames);
         registeredToolNames.add(tool.name());
         registry.register(tool);
       }
@@ -1078,7 +1078,7 @@ export function closeClients(clients: Client[]): void {
   for (const client of clients) client.close();
 }
 
-async function newMCPClient(
+async function createMCPClient(
   ctx: AbortSignal,
   cfg: ServerConfig,
   callbacks: Callbacks,
@@ -1090,11 +1090,11 @@ async function newMCPClient(
   if (transport === "") transport = "stdio";
   switch (transport) {
     case "stdio":
-      return await newMCPStdioClient(ctx, cfg, callbacks);
+      return await createMCPStdioClient(ctx, cfg, callbacks);
     case "http":
-      return await newMCPHTTPClient(ctx, cfg, false, callbacks);
+      return await createMCPHTTPClient(ctx, cfg, false, callbacks);
     case "sse":
-      return await newMCPHTTPClient(ctx, cfg, true, callbacks);
+      return await createMCPHTTPClient(ctx, cfg, true, callbacks);
     default:
       throw new Error(
         `unsupported MCP transport ${JSON.stringify(cfg.type)} for server ${
@@ -1104,7 +1104,7 @@ async function newMCPClient(
   }
 }
 
-async function newMCPStdioClient(
+async function createMCPStdioClient(
   ctx: AbortSignal,
   cfg: ServerConfig,
   callbacks: Callbacks,
@@ -1274,7 +1274,7 @@ function extname(p: string): string {
   return dot > 0 ? base.slice(dot) : "";
 }
 
-async function newMCPHTTPClient(
+async function createMCPHTTPClient(
   ctx: AbortSignal,
   cfg: ServerConfig,
   legacySSE: boolean,
@@ -1423,7 +1423,7 @@ class MCPTool implements Tool {
     const { text, contents } = await this.client.projectMCPContent(
       result.content ?? [],
     );
-    if (contents === undefined) return newTextToolResult(text);
+    if (contents === undefined) return createTextToolResult(text);
     return { text, contents };
   }
 }
@@ -1483,7 +1483,7 @@ class MCPResourceTool implements Tool {
     const { text, contents } = await this.client.projectMCPContent(
       out.contents ?? [],
     );
-    if (contents === undefined) return newTextToolResult(text);
+    if (contents === undefined) return createTextToolResult(text);
     return { text, contents };
   }
 }
@@ -1540,11 +1540,11 @@ class MCPPromptTool implements Tool {
       if (content.trim() === "") continue;
       parts.push(`[${msg.role}]\n${content}`);
     }
-    return newTextToolResult(parts.join("\n\n"));
+    return createTextToolResult(parts.join("\n\n"));
   }
 }
 
-function newMCPTool(
+function createMCPTool(
   client: Client,
   info: MCPToolInfo,
   existing: Set<string>,
@@ -1554,7 +1554,7 @@ function newMCPTool(
   return new MCPTool(client, info, uniqueToolName(base, existing));
 }
 
-function newMCPResourceTool(
+function createMCPResourceTool(
   client: Client,
   info: MCPResourceInfo,
   existing: Set<string>,
@@ -1568,7 +1568,7 @@ function newMCPResourceTool(
   return new MCPResourceTool(client, info, uniqueToolName(base, existing));
 }
 
-function newMCPPromptTool(
+function createMCPPromptTool(
   client: Client,
   info: MCPPromptInfo,
   existing: Set<string>,

@@ -1,5 +1,5 @@
 import type { HttpClient } from "./http_client.ts";
-import { applyHeaders, newHttpClientWithOptions } from "./http_client.ts";
+import { applyHeaders, createHttpClient } from "./http_client.ts";
 
 /** Bounds a single model-discovery request. */
 export const defaultDiscoverTimeoutMs = 30_000;
@@ -147,7 +147,7 @@ export async function discoverModels(
   const timeout = (opts.timeoutMs ?? 0) <= 0
     ? defaultDiscoverTimeoutMs
     : opts.timeoutMs as number;
-  const client = newHttpClientWithOptions(timeout, {
+  const client = createHttpClient(timeout, {
     proxyUrl: opts.httpProxy,
     forceHTTP11: opts.forceHTTP11,
   });

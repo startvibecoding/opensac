@@ -777,7 +777,10 @@ export class Renderer {
 }
 
 /** Creates a Renderer with the given theme and terminal width. */
-export function newRenderer(theme: Theme | undefined, width: number): Renderer {
+export function createRenderer(
+  theme: Theme | undefined,
+  width: number,
+): Renderer {
   return new Renderer(theme, width);
 }
 

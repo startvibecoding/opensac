@@ -7,7 +7,10 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
-import { newAssistantMessage, newUserMessage } from "../provider/types.ts";
+import {
+  createAssistantMessage,
+  createUserMessage,
+} from "../provider/types.ts";
 import {
   appendTurnEntryTx,
   createExecutionIntentAndSessionRunEventWithTurn,
@@ -50,7 +53,7 @@ function makeSession(sessionDir: string, id: string): void {
 function appendMessage(
   sessionDir: string,
   sessionId: string,
-  message: ReturnType<typeof newUserMessage>,
+  message: ReturnType<typeof createUserMessage>,
 ): string {
   const db = openRootDB(sessionDir);
   let id = "";
@@ -117,11 +120,11 @@ Deno.test("fork session and message boundary", () => {
   try {
     makeSession(sessionDir, "source");
     startTurn(sessionDir, "source", "turn-1");
-    appendMessage(sessionDir, "source", newUserMessage("hello"));
+    appendMessage(sessionDir, "source", createUserMessage("hello"));
     const assistantId = appendMessage(
       sessionDir,
       "source",
-      newAssistantMessage([{ type: "text", text: "world" }]),
+      createAssistantMessage([{ type: "text", text: "world" }]),
     );
     endConversationTurn(
       sessionDir,
@@ -305,11 +308,15 @@ Deno.test("fork uses a legacy completed run boundary", () => {
       userEntryId: "",
       assistantEntryId: "",
     });
-    appendMessage(sessionDir, "legacy-fork", newUserMessage("legacy question"));
+    appendMessage(
+      sessionDir,
+      "legacy-fork",
+      createUserMessage("legacy question"),
+    );
     const assistantId = appendMessage(
       sessionDir,
       "legacy-fork",
-      newAssistantMessage([{ type: "text", text: "legacy answer" }]),
+      createAssistantMessage([{ type: "text", text: "legacy answer" }]),
     );
     const finished = new Date(Date.now() + 1000);
     updateSessionRunStatus(

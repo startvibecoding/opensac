@@ -6,8 +6,8 @@ import { assert, assertEquals } from "@std/assert";
 import { encodeBase64 } from "@std/encoding/base64";
 import { Image } from "imagescript";
 import * as path from "@std/path";
-import { newNoneSandbox } from "../sandbox/mod.ts";
-import { newRegistry, type Tool } from "../tools/mod.ts";
+import { createNoneSandbox } from "../sandbox/mod.ts";
+import { createRegistry, type Tool } from "../tools/mod.ts";
 import {
   type Callbacks,
   closeClients,
@@ -75,7 +75,7 @@ done
 `;
   writeExecutable(commandPath, fixture);
 
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.registerDefaults();
   const sep = ":";
   const clients = await connectServers(
@@ -141,7 +141,7 @@ done
 `;
   writeExecutable(commandPath, fixture);
 
-  const registry = newRegistry(Deno.makeTempDirSync(), newNoneSandbox());
+  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
   registry.registerDefaults();
   const clients = await connectServers(
     new AbortController().signal,

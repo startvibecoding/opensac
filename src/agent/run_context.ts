@@ -35,7 +35,7 @@ export interface RunContext {
 }
 
 /** Creates an empty run context, optionally seeded with a signal. */
-export function newRunContext(signal?: AbortSignal): RunContext {
+export function createRunContext(signal?: AbortSignal): RunContext {
   return { signal };
 }
 

@@ -12,8 +12,8 @@ import {
   writeFileAtomicWithMode,
 } from "./io_helpers.ts";
 import {
+  createInsertToolResult,
   type InsertResult,
-  newInsertToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -209,7 +209,7 @@ export class InsertTool implements Tool {
             offset: 0,
             deduped: true,
           };
-          return newInsertToolResult(
+          return createInsertToolResult(
             `Content already exists; no changes made to ${p}`,
             null,
             result,
@@ -246,7 +246,7 @@ export class InsertTool implements Tool {
         deduped: false,
       };
       if (dryRun) {
-        return newInsertToolResult(
+        return createInsertToolResult(
           `Would insert ${inserted.length} bytes into ${p}\n${
             formatFileDiffSummary(diff)
           }`,
@@ -272,7 +272,7 @@ export class InsertTool implements Tool {
       } catch (err) {
         throw new Error(`atomic write failed: ${messageOf(err)}`);
       }
-      return newInsertToolResult(
+      return createInsertToolResult(
         `Inserted ${inserted.length} bytes into ${p}\n${
           formatFileDiffSummary(diff)
         }`,
@@ -337,7 +337,7 @@ export class InsertTool implements Tool {
         deduped: false,
       };
       if (dry) {
-        return newInsertToolResult(
+        return createInsertToolResult(
           `Would insert ${inserted.length} bytes into ${p} (large file; diff omitted)`,
           null,
           result,
@@ -348,7 +348,7 @@ export class InsertTool implements Tool {
       } catch (err) {
         throw new Error(`atomic write failed: ${messageOf(err)}`);
       }
-      return newInsertToolResult(
+      return createInsertToolResult(
         `Inserted ${inserted.length} bytes into ${p} (large file; diff omitted)`,
         null,
         result,

@@ -7,7 +7,7 @@
 // synchronous), and `tx.Rollback` maps to `Database.runInTx`.
 
 import type { Tx } from "../dao/mod.ts";
-import { ConversationTurnDAO, isNoRows } from "../dao/mod.ts";
+import { ConversationTurnDAO } from "../dao/mod.ts";
 import { entrySession, entryTurnEnd, entryTurnStart } from "./entry.ts";
 import type { TurnEndEntry, TurnStartEntry } from "./entry.ts";
 import { generateID } from "./entry.ts";
@@ -115,15 +115,9 @@ export function startConversationTurnTx(
   turn = { ...turn, kind, status: "open" };
 
   const dao = new ConversationTurnDAO(null);
-  let existing = true;
-  let state: { intentId: string; status: string; runId: string };
-  try {
-    state = dao.state(tx, turn.sessionId, turn.id);
-  } catch (err) {
-    if (!isNoRows(err)) throw err;
-    existing = false;
-    state = { intentId: "", status: "", runId: "" };
-  }
+  const fetched = dao.state(tx, turn.sessionId, turn.id);
+  const existing = fetched !== undefined;
+  const state = fetched ?? { intentId: "", status: "", runId: "" };
   if (existing) {
     if (
       state.intentId !== "" && turn.intentId !== "" &&
@@ -205,13 +199,8 @@ export function endConversationTurn(
   db.runInTx((tx) => {
     validateRuntimeLeaseTx(tx, sessionDir, sessionId);
     const dao = new ConversationTurnDAO(null);
-    let state: { intentId: string; status: string; runId: string };
-    try {
-      state = dao.state(tx, sessionId, turnId);
-    } catch (err) {
-      if (isNoRows(err)) throw new ConversationTurnNotOpenError(turnId);
-      throw err;
-    }
+    const state = dao.state(tx, sessionId, turnId);
+    if (state === undefined) throw new ConversationTurnNotOpenError(turnId);
     if (state.status !== "open") {
       // Closing an already-closed turn is idempotent; no new turn/end entry.
       return;

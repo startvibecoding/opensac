@@ -156,6 +156,6 @@ function reviveRunState(raw: Record<string, unknown>): RunState {
 }
 
 /** Creates a file-backed workflow store rooted at `dir`. */
-export function newFileStore(dir: string): FileStore {
+export function createFileStore(dir: string): FileStore {
   return new FileStore(dir);
 }

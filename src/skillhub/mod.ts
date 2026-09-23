@@ -4,8 +4,8 @@ export {
   cloneCategories,
   cloneSearchPage,
   cloneSkillDetail,
+  createMemoryCache,
   MemoryCache,
-  newMemoryCache,
 } from "./cache.ts";
 export {
   boundedLimit,
@@ -19,9 +19,9 @@ export {
   clawHubDefaultURL,
   clawHubItemSummary,
   clawSkillRef,
+  createClawHubClient,
   maxClawContentBytes,
   maxClawJSONBytes,
-  newClawHubClient,
   parseClawAmbiguity,
   parseClawHubDetail,
   parseClawHubItem,
@@ -33,6 +33,7 @@ export {
 } from "./clawhub.ts";
 export { clientsForSettings, httpClientWithToken } from "./factory.ts";
 export {
+  createHTTPClient,
   decodeJSON,
   defaultHttpClient,
   defaultMaxJSONBytes,
@@ -42,7 +43,6 @@ export {
   getJSON,
   getWithStatus,
   type HttpClient,
-  newHTTPClient,
   statusText,
 } from "./http.ts";
 export {
@@ -60,6 +60,7 @@ export {
   type ZipWriteEntry,
 } from "./install.ts";
 export {
+  createLocalIndex,
   hasSkillFile,
   installedKey,
   type InstallMetadata,
@@ -67,13 +68,12 @@ export {
   localInstalledKey,
   MetadataError,
   metadataFileName,
-  newLocalIndex,
   readMetadata,
   versionsDiffer,
 } from "./local.ts";
 export { Service } from "./service.ts";
 export {
-  newSkillHubClient,
+  createSkillHubClient,
   parseSkillHubItem,
   SkillHubClient,
   skillHubDefaultURL,

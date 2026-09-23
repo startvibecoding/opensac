@@ -4,7 +4,10 @@
 // interface contract the agent and TUI layers rely on.
 
 import { assert, assertEquals, assertNotEquals } from "@std/assert";
-import { newAssistantMessage, newUserMessage } from "../provider/types.ts";
+import {
+  createAssistantMessage,
+  createUserMessage,
+} from "../provider/types.ts";
 import { MemoryStore } from "./store.ts";
 import { currentVersion } from "./store.ts";
 import { entrySession } from "./entry.ts";
@@ -31,10 +34,10 @@ Deno.test("MemoryStore initWithID keeps or generates the id", () => {
 Deno.test("MemoryStore appends build a linked replay branch", () => {
   const store = new MemoryStore();
   store.initWithID("s-1");
-  const first = store.appendMessage(newUserMessage("hello"));
+  const first = store.appendMessage(createUserMessage("hello"));
   assertEquals(store.getLeafID(), first);
   const second = store.appendMessage(
-    newAssistantMessage([{ type: "text", text: "hi" }]),
+    createAssistantMessage([{ type: "text", text: "hi" }]),
   );
   assertEquals(store.getLeafID(), second);
   const state = store.getReplayState();
@@ -47,8 +50,8 @@ Deno.test("MemoryStore appends build a linked replay branch", () => {
 Deno.test("MemoryStore replays a compaction summary", () => {
   const store = new MemoryStore();
   store.initWithID("s-1");
-  store.appendMessage(newUserMessage("dropped"));
-  const kept = store.appendMessage(newUserMessage("kept"));
+  store.appendMessage(createUserMessage("dropped"));
+  const kept = store.appendMessage(createUserMessage("kept"));
   store.appendCompaction("summary", kept, 100);
   const state = store.getReplayState();
   assertEquals(state.messages.length, 2);

@@ -1,6 +1,6 @@
 // case of acp_manage_test.go. These exercise the `opensac/manage/skillhub/*`
 // family ported into src/acp/manage_skillhub.ts against an in-memory ACP server
-// fixture, mirroring the Go `newManageFixtureServer`.
+// fixture, mirroring the Go `createManageFixtureServer`.
 
 import { assert, assertEquals, assertStrictEquals } from "@std/assert";
 import * as path from "@std/path";
@@ -30,7 +30,7 @@ class SyncBuffer implements AcpServerSink {
   }
 }
 
-function newManageFixtureServer(sink: SyncBuffer, cwd = ""): AcpServer {
+function createManageFixtureServer(sink: SyncBuffer, cwd = ""): AcpServer {
   const server = new AcpServer();
   server.sink = sink;
   server.cwd = cwd;
@@ -136,7 +136,7 @@ Deno.test("manage skillhub get is token-free", () => {
     ];
     saveGlobalSettings(settings);
     const output = new SyncBuffer();
-    const srv = newManageFixtureServer(output, configDir);
+    const srv = createManageFixtureServer(output, configDir);
 
     const result = manageResult(
       callManage(srv, output, 1, "opensac/manage/skillhub/get", {}),
@@ -174,7 +174,7 @@ Deno.test("manage skillhub patch round trip", () => {
     }];
     saveGlobalSettings(settings);
     const output = new SyncBuffer();
-    const srv = newManageFixtureServer(output, configDir);
+    const srv = createManageFixtureServer(output, configDir);
 
     const patch = {
       defaultMarket: "clawhub.ai",
@@ -228,7 +228,7 @@ Deno.test("manage skillhub patch clears token", () => {
     }];
     saveGlobalSettings(settings);
     const output = new SyncBuffer();
-    const srv = newManageFixtureServer(output, configDir);
+    const srv = createManageFixtureServer(output, configDir);
 
     const patch = {
       markets: [{
@@ -300,7 +300,7 @@ Deno.test("manage skillhub patch validation", () => {
     withEnv("OPENSAC_DIR", configDir, () => {
       saveGlobalSettings(defaultSettings());
       const output = new SyncBuffer();
-      const srv = newManageFixtureServer(output, configDir);
+      const srv = createManageFixtureServer(output, configDir);
       const message = callManage(
         srv,
         output,
@@ -354,7 +354,7 @@ Deno.test("manage skillhub preserves unknown fields", () => {
       }),
     );
     const output = new SyncBuffer();
-    const srv = newManageFixtureServer(output, configDir);
+    const srv = createManageFixtureServer(output, configDir);
     const patch = {
       markets: [{
         id: "skillhub.cn",
@@ -397,7 +397,7 @@ Deno.test("manage skillhub catalog projects runtime-owned targets", () => {
     settings.skillHub!.defaultInstallScope = "project";
     saveGlobalSettings(settings);
     const output = new SyncBuffer();
-    const srv = newManageFixtureServer(output, workDir);
+    const srv = createManageFixtureServer(output, workDir);
     const rt = new ACPSessionRuntime();
     rt.id = "catalog-session";
     rt.runtime = new SessionRuntime({ workDir });

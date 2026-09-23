@@ -1,5 +1,5 @@
 import {
-  newPlanToolResult,
+  createPlanToolResult,
   type PlanStep,
   type Registry,
   type TaskPlan,
@@ -115,7 +115,7 @@ export class PlanTool implements Tool {
       plan.steps.push(step);
     }
 
-    return newPlanToolResult(formatTaskPlan(plan), plan);
+    return createPlanToolResult(formatTaskPlan(plan), plan);
   }
 }
 

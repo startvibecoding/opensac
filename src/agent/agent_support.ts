@@ -273,21 +273,22 @@ export function isOutputTruncationReason(reason: string): boolean {
 }
 
 /** Returns the plain text of a message when it is replayable as text. */
-export function replayTextContent(message: Message): [string, boolean] {
+export function replayTextContent(message: Message): string | undefined {
   if ((message.contents?.length ?? 0) === 0) {
-    return [message.content ?? "", true];
+    return message.content ?? "";
   }
   const parts: string[] = [];
   for (const content of message.contents!) {
     if (content.type !== "text") {
-      return ["", false];
+      return undefined;
     }
     parts.push(content.text ?? "");
   }
   if (parts.length === 0) {
-    return [message.content ?? "", (message.content ?? "") !== ""];
+    const text = message.content ?? "";
+    return text !== "" ? text : undefined;
   }
-  return [parts.join("\n"), true];
+  return parts.join("\n");
 }
 
 /** Resolves the provider name used for usage statistics. */
@@ -339,17 +340,17 @@ export function toolExecutionResultSummary(
  */
 export function parseToolExecutionResultSummary(
   raw: unknown,
-): [string, boolean] {
+): { content: string; isError: boolean } {
   const fallback =
     "A prior tool execution completed; its result is available in the session transcript.";
   if (raw === null || raw === undefined || typeof raw !== "object") {
-    return [fallback, false];
+    return { content: fallback, isError: false };
   }
   const value = raw as { content?: unknown; isError?: unknown };
   if (typeof value.content !== "string" || value.content === "") {
-    return [fallback, false];
+    return { content: fallback, isError: false };
   }
-  return [value.content, value.isError === true];
+  return { content: value.content, isError: value.isError === true };
 }
 
 const defaultToolExecutionTimeoutMS = 5 * 60 * 1000;
@@ -463,10 +464,9 @@ function fmtFracDigits(v: number, prec: number): { int: number; frac: string } {
 export function imageGenerationToolDefinition(
   settings: Settings | undefined,
   providerName: string,
-): [ToolDefinition, boolean] {
-  const empty: ToolDefinition = { name: "", description: "" };
+): ToolDefinition | undefined {
   if (settings === undefined) {
-    return [empty, false];
+    return undefined;
   }
   let name = providerName;
   if (name === "") name = settings.defaultProvider ?? "";
@@ -474,22 +474,19 @@ export function imageGenerationToolDefinition(
   let pc = getProviderConfig(settings, name);
   if (pc === undefined) pc = defaultProviderConfig(name);
   if (pc === undefined) {
-    return [empty, false];
+    return undefined;
   }
   const resolved = resolveAdapterConfig(pc);
   if (resolved.api !== "responses" && resolved.api !== "openai-responses") {
-    return [empty, false];
+    return undefined;
   }
-  return [
-    {
-      name: hostedToolImageGeneration,
-      description: "",
-      kind: "hosted",
-      provider: name,
-      providerType: resolved.api,
-    },
-    true,
-  ];
+  return {
+    name: hostedToolImageGeneration,
+    description: "",
+    kind: "hosted",
+    provider: name,
+    providerType: resolved.api,
+  };
 }
 
 /**
@@ -498,10 +495,9 @@ export function imageGenerationToolDefinition(
  */
 export function configuredWebSearchToolDefinition(
   settings: Settings | undefined,
-): [ToolDefinition, boolean] {
-  const empty: ToolDefinition = { name: "", description: "" };
+): ToolDefinition | undefined {
   if (settings === undefined || !isWebSearchEnabled(settings)) {
-    return [empty, false];
+    return undefined;
   }
   const cfg = settings.webSearch ?? {};
   let providerName = cfg.provider ?? "";
@@ -535,17 +531,14 @@ export function configuredWebSearchToolDefinition(
       break;
   }
 
-  return [
-    {
-      name: hostedToolWebSearch,
-      description: "",
-      kind: "hosted",
-      provider: providerName,
-      providerType,
-      model: cfg.model,
-    },
-    true,
-  ];
+  return {
+    name: hostedToolWebSearch,
+    description: "",
+    kind: "hosted",
+    provider: providerName,
+    providerType,
+    model: cfg.model,
+  };
 }
 
 /**
@@ -555,22 +548,18 @@ export function configuredWebSearchToolDefinition(
  */
 export function openAIResponsesWebSearchToolDefinition(
   p: Provider | undefined,
-): [ToolDefinition, boolean] {
-  const empty: ToolDefinition = { name: "", description: "" };
+): ToolDefinition | undefined {
   if (
     p === undefined ||
     (p.api() !== "responses" && p.api() !== "openai-responses")
   ) {
-    return [empty, false];
+    return undefined;
   }
-  return [
-    {
-      name: hostedToolOpenAIResponsesWebSearch,
-      description: "",
-      kind: "hosted",
-      provider: p.name(),
-      providerType: p.api(),
-    },
-    true,
-  ];
+  return {
+    name: hostedToolOpenAIResponsesWebSearch,
+    description: "",
+    kind: "hosted",
+    provider: p.name(),
+    providerType: p.api(),
+  };
 }

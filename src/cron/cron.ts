@@ -44,7 +44,7 @@ export interface DueJobClaimer {
 let fallbackCronCounter = 0;
 
 /** Generates a random cron job ID, falling back to a timestamped counter. */
-export function newCronID(): string {
+export function createCronID(): string {
   const bytes = new Uint8Array(16);
   try {
     crypto.getRandomValues(bytes);

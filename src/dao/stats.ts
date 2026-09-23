@@ -1,5 +1,10 @@
 import type { DB } from "../db/mod.ts";
-import { execChanges, type Param, queryAll, queryOne } from "./database.ts";
+import {
+  execChanges,
+  type Param,
+  queryAll,
+  queryOptional,
+} from "./database.ts";
 
 /**
  * Optional predicates shared by all stats queries. Timestamps are stored as
@@ -78,7 +83,7 @@ export class StatsDAO {
 
   summary(filter: StatsFilter): StatsSummaryRecord {
     const { where, params } = statsWhere(filter);
-    return queryOne<StatsSummaryRecord>(
+    return queryOptional<StatsSummaryRecord>(
       this.requireDb(),
       `SELECT COUNT(*) AS totalRequests,
               CAST(COALESCE(SUM(input_tokens), 0) AS INTEGER) AS inputTokens,
@@ -86,7 +91,7 @@ export class StatsDAO {
               CAST(COALESCE(SUM(total_tokens), 0) AS INTEGER) AS totalTokens
        FROM request_stats${where}`,
       params,
-    );
+    ) ?? { totalRequests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
   }
 
   timeSeries(filter: StatsFilter, groupBy: string): StatsAggregateRecord[] {
@@ -143,11 +148,11 @@ export class StatsDAO {
   ): { records: StatsRecord[]; total: number } {
     const db = this.requireDb();
     const { where, params } = statsWhere(filter);
-    const total = queryOne<{ n: number }>(
+    const total = queryOptional<{ n: number }>(
       db,
       `SELECT COUNT(*) AS n FROM request_stats${where}`,
       params,
-    ).n;
+    )?.n ?? 0;
     const records = queryAll<StatsRecord>(
       db,
       `SELECT id, timestamp, session_id AS sessionId, provider, protocol, model,

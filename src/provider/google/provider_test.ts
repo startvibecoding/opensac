@@ -8,11 +8,11 @@ import type { HttpClient } from "../http_client.ts";
 import {
   type ChatParams,
   type ContentBlock,
+  createAssistantMessage,
+  createToolResultMessage,
+  createUserMessage,
   type Model,
   type ModelPricing,
-  newAssistantMessage,
-  newToolResultMessage,
-  newUserMessage,
   streamDone,
   streamError,
   type StreamEvent,
@@ -29,10 +29,9 @@ import {
 import {
   apiKindGemini,
   apiKindVertex,
-  newGeminiProviderWithModels,
-  newGeminiProviderWithModelsAndProxy,
-  newProviderWithHTTPClient,
-  newVertexProviderWithModels,
+  createGeminiProvider,
+  createGoogleProviderWithHTTPClient,
+  createVertexProvider,
   type Provider,
   vertexAPIKeyBaseURL,
 } from "./provider.ts";
@@ -122,7 +121,7 @@ function mockClient(
   };
 }
 
-function newMockGoogleProvider(
+function createMockGoogleProvider(
   p: Provider,
   sse: string,
   bodies?: CapturedRequest[],
@@ -153,7 +152,7 @@ async function captureBody(
 
 function abortParams(): ChatParams {
   return {
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
     systemPrompt: "",
     thinkingLevel: "off",
     maxTokens: 0,
@@ -172,7 +171,7 @@ Deno.test("GoogleRetriesEarlyStreamReadError", async () => {
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
   let attempts = 0;
-  const p = newGeminiProviderWithModels(
+  const p = createGeminiProvider(
     "fake-key",
     "https://generativelanguage.googleapis.com/v1beta/models",
     [m("mock")],
@@ -192,7 +191,7 @@ Deno.test("GoogleRetriesEarlyStreamReadError", async () => {
   const events = await chatAndCollect(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
   assertEquals(attempts, 2);
   let retryEvent: StreamEvent | undefined;
@@ -216,7 +215,7 @@ Deno.test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
   let attempts = 0;
-  const p = newGeminiProviderWithModels(
+  const p = createGeminiProvider(
     "fake-key",
     "https://generativelanguage.googleapis.com/v1beta/models",
     [m("mock")],
@@ -239,7 +238,7 @@ Deno.test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   const events = await chatAndCollect(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
   assertEquals(attempts, 1);
   let sawText = false;
@@ -258,11 +257,11 @@ Deno.test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
 });
 
 Deno.test("GoogleProviderHTTPProxy", () => {
-  const p = newGeminiProviderWithModelsAndProxy(
+  const p = createGeminiProvider(
     "fake-key",
     "https://generativelanguage.googleapis.com/v1beta/models",
-    "http://127.0.0.1:7890",
     [m("m1")],
+    { proxyUrl: "http://127.0.0.1:7890" },
   );
   try {
     assertEquals(p.client.proxyUrl, "http://127.0.0.1:7890");
@@ -296,7 +295,7 @@ Deno.test("ResolveAPIKeyShellCommandRequiresOptIn", () => {
 // ─── convertMessages ─────────────────────────────────────────────────────────
 
 function bareProvider(): Provider {
-  return newProviderWithHTTPClient(
+  return createGoogleProviderWithHTTPClient(
     "google-gemini",
     apiKindGemini,
     "",
@@ -333,7 +332,7 @@ Deno.test("ConvertMessagesGroupsConsecutiveToolResults", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [
-      newAssistantMessage([
+      createAssistantMessage([
         {
           type: "toolCall",
           toolCall: {
@@ -347,9 +346,9 @@ Deno.test("ConvertMessagesGroupsConsecutiveToolResults", () => {
           toolCall: { id: "call_2", name: "bash", arguments: { cmd: "pwd" } },
         },
       ]),
-      newToolResultMessage("call_1", "read", "file content", false),
-      newToolResultMessage("call_2", "bash", "workdir", false),
-      newUserMessage("next"),
+      createToolResultMessage("call_1", "read", "file content", false),
+      createToolResultMessage("call_2", "bash", "workdir", false),
+      createUserMessage("next"),
     ],
   } as ChatParams);
   assertEquals(contents.length, 3);
@@ -368,7 +367,7 @@ Deno.test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [
-      newAssistantMessage([
+      createAssistantMessage([
         {
           type: "toolCall",
           toolCall: { id: "call-1", name: "lookup", arguments: { key: "a" } },
@@ -378,8 +377,8 @@ Deno.test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
           toolCall: { id: "call-2", name: "lookup", arguments: { key: "b" } },
         },
       ]),
-      newToolResultMessage("call-1", "lookup", "value", false),
-      newToolResultMessage("call-2", "lookup", "value", false),
+      createToolResultMessage("call-1", "lookup", "value", false),
+      createToolResultMessage("call-2", "lookup", "value", false),
     ],
   } as ChatParams);
   assertEquals(contents[0].parts[0].functionCall?.id, "call-1");
@@ -389,11 +388,11 @@ Deno.test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
 
   const fallback = p.convertMessages({
     messages: [
-      newAssistantMessage([{
+      createAssistantMessage([{
         type: "toolCall",
         toolCall: { id: "google_toolcall_9", name: "lookup", arguments: {} },
       }]),
-      newToolResultMessage("google_toolcall_9", "lookup", "value", false),
+      createToolResultMessage("google_toolcall_9", "lookup", "value", false),
     ],
   } as ChatParams);
   assert(!fallback[0].parts[0].functionCall?.id);
@@ -404,7 +403,7 @@ Deno.test("GoogleAssistantToolCallIncludesThoughtSignature", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [
-      newAssistantMessage([
+      createAssistantMessage([
         { type: "thinking", thinking: "thinking", signature: "think-sig" },
         {
           type: "toolCall",
@@ -440,7 +439,7 @@ Deno.test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
     const tc of [
       {
         name: "gemini",
-        p: newGeminiProviderWithModels(
+        p: createGeminiProvider(
           "fake-key",
           "https://generativelanguage.googleapis.com/v1beta/models",
           [m("mock")],
@@ -448,7 +447,7 @@ Deno.test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
       },
       {
         name: "vertex",
-        p: newVertexProviderWithModels(
+        p: createVertexProvider(
           "fake-key",
           "https://aiplatform.googleapis.com/v1/publishers/google/models",
           [m("mock")],
@@ -456,13 +455,13 @@ Deno.test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
       },
     ]
   ) {
-    const p = newMockGoogleProvider(tc.p, sse);
+    const p = createMockGoogleProvider(tc.p, sse);
     const calls: ToolCallBlock[] = [];
     for (
       const event of await chatAndCollect(p, {
         ...abortParams(),
         modelId: "mock",
-        messages: [newUserMessage("hi")],
+        messages: [createUserMessage("hi")],
       })
     ) {
       if (event.type === streamToolCall && event.toolCall !== undefined) {
@@ -481,8 +480,8 @@ Deno.test("GoogleStreamTextThinkToolCallAndUsage", async () => {
   const sse =
     'data: {"candidates":[{"content":{"parts":[{"text":"thinking","thought":true,"thoughtSignature":"sig-1"},{"text":"Hello "}]}}]}\n' +
     'data: {"candidates":[{"content":{"parts":[{"thoughtSignature":"tool-sig","functionCall":{"name":"read","args":{"path":"main.go"}}}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"thoughtsTokenCount":2,"cachedContentTokenCount":7,"totalTokenCount":17}}\n';
-  const p = newMockGoogleProvider(
-    newGeminiProviderWithModels(
+  const p = createMockGoogleProvider(
+    createGeminiProvider(
       "fake-key",
       "https://generativelanguage.googleapis.com/v1beta/models",
       [m("gemini-test")],
@@ -499,7 +498,7 @@ Deno.test("GoogleStreamTextThinkToolCallAndUsage", async () => {
     const ev of await chatAndCollect(p, {
       ...abortParams(),
       modelId: "gemini-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     })
   ) {
     switch (ev.type) {
@@ -543,8 +542,8 @@ Deno.test("GoogleStreamTextThinkToolCallAndUsage", async () => {
 
 Deno.test("GoogleCustomHeaders", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockGoogleProvider(
-    newGeminiProviderWithModels(
+  const p = createMockGoogleProvider(
+    createGeminiProvider(
       "fake-key",
       "https://generativelanguage.googleapis.com/v1beta/models",
       [m("gemini-test")],
@@ -563,14 +562,14 @@ Deno.test("GoogleCustomHeaders", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "gemini-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
 });
 
 Deno.test("GoogleGeminiRequest", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockGoogleProvider(
-    newGeminiProviderWithModels(
+  const p = createMockGoogleProvider(
+    createGeminiProvider(
       "fake-key",
       "https://generativelanguage.googleapis.com/v1beta/models",
       [m("gemini-test", {
@@ -593,7 +592,7 @@ Deno.test("GoogleGeminiRequest", async () => {
     ...abortParams(),
     modelId: "gemini-test",
     systemPrompt: "system",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
     tools: [{
       name: "read",
       description: "Read file",
@@ -635,8 +634,8 @@ Deno.test("GoogleGeminiRequest", async () => {
 
 Deno.test("GoogleGeminiOmitsMaxOutputTokensByDefault", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockGoogleProvider(
-    newGeminiProviderWithModels(
+  const p = createMockGoogleProvider(
+    createGeminiProvider(
       "fake-key",
       "https://generativelanguage.googleapis.com/v1beta/models",
       [m("gemini-test", { maxTokens: 65536 })],
@@ -647,7 +646,7 @@ Deno.test("GoogleGeminiOmitsMaxOutputTokensByDefault", async () => {
   const req = await captureBody(p, {
     ...abortParams(),
     modelId: "gemini-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   }, bodies);
   const gc = req.generationConfig as Record<string, unknown>;
   assert(gc !== undefined && typeof gc === "object");
@@ -663,8 +662,8 @@ Deno.test("GoogleImageMediaResolution", async () => {
   ];
   for (const tt of tests) {
     const bodies: CapturedRequest[] = [];
-    const p = newMockGoogleProvider(
-      newGeminiProviderWithModels(
+    const p = createMockGoogleProvider(
+      createGeminiProvider(
         "fake-key",
         "https://generativelanguage.googleapis.com/v1beta/models",
         [m("gemini-test")],
@@ -694,25 +693,25 @@ Deno.test("GoogleImageMediaResolution", async () => {
 
 Deno.test("GoogleRequestCachedContent", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newGeminiProviderWithModels(
+  const p = createGeminiProvider(
     "fake-key",
     "https://generativelanguage.googleapis.com/v1beta/models",
     [m("gemini-test")],
   );
   p.setCachedContent("cachedContents/test-cache");
-  newMockGoogleProvider(p, "data: {}\n", bodies);
+  createMockGoogleProvider(p, "data: {}\n", bodies);
   const req = await captureBody(p, {
     ...abortParams(),
     modelId: "gemini-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   }, bodies);
   assertEquals(req.cachedContent, "cachedContents/test-cache");
 });
 
 Deno.test("GoogleVertexAPIKeyHeaderAndEndpoint", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockGoogleProvider(
-    newVertexProviderWithModels(
+  const p = createMockGoogleProvider(
+    createVertexProvider(
       "fake-key",
       "https://aiplatform.googleapis.com/v1/projects/test/locations/global/publishers/google/models",
       [m("gemini-test")],
@@ -731,14 +730,14 @@ Deno.test("GoogleVertexAPIKeyHeaderAndEndpoint", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "gemini-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
 });
 
 Deno.test("GoogleVertexOAuthAuthorizationHeader", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockGoogleProvider(
-    newVertexProviderWithModels(
+  const p = createMockGoogleProvider(
+    createVertexProvider(
       "ya29.fake-token",
       "https://aiplatform.googleapis.com/v1/projects/test/locations/global/publishers/google/models",
       [m("gemini-test")],
@@ -759,15 +758,15 @@ Deno.test("GoogleVertexOAuthAuthorizationHeader", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "gemini-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
   assert(bodies.length === 1);
 });
 
 Deno.test("GoogleDisableSamplingParamsCompat", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockGoogleProvider(
-    newGeminiProviderWithModels(
+  const p = createMockGoogleProvider(
+    createGeminiProvider(
       "fake-key",
       "https://generativelanguage.googleapis.com/v1beta/models",
       [m("gemini-test", { compat: { disableSamplingParams: true } })],
@@ -778,7 +777,7 @@ Deno.test("GoogleDisableSamplingParamsCompat", async () => {
   const req = await captureBody(p, {
     ...abortParams(),
     modelId: "gemini-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
     temperature: 0.2,
     topP: 0.9,
   }, bodies);

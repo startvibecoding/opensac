@@ -4,12 +4,12 @@
 
 import { assert, assertThrows } from "@std/assert";
 import * as path from "@std/path";
-import { Level, newMacSandbox, newMacSandboxWithOptions } from "./mod.ts";
+import { createMacSandbox, Level } from "./mod.ts";
 
 Deno.test("mac sandbox profile uses options", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const denied = path.join(project, "secret");
-  const sb = newMacSandboxWithOptions(project, Level.Standard, {
+  const sb = createMacSandbox(project, Level.Standard, {
     allowNetwork: true,
     allowedRead: ["/opt/tool"],
     allowedWrite: ["/tmp/work"],
@@ -24,7 +24,7 @@ Deno.test("mac sandbox profile uses options", () => {
 
 Deno.test("mac sandbox cleans up command profile", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
-  const sb = newMacSandbox(project, Level.Standard);
+  const sb = createMacSandbox(project, Level.Standard);
   const spec = sb.wrapCommand(undefined, "/bin/sh", "true", {
     workDir: project,
   });

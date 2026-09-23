@@ -72,7 +72,7 @@ export interface Frontmatter {
 }
 
 /** Returns a zero-value Frontmatter with the given fallback name. */
-export function newFrontmatter(name: string): Frontmatter {
+export function createFrontmatter(name: string): Frontmatter {
   return {
     name,
     description: "",

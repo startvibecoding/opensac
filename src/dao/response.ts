@@ -1,11 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import {
-  ErrNoRows,
-  execChanges,
-  inList,
-  queryAll,
-  queryOne,
-} from "./database.ts";
+import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
 
 type Blob = Uint8Array | null;
 
@@ -143,8 +137,8 @@ export class ResponseDAO {
     executor: DB,
     sessionId: string,
     localRunId: string,
-  ): ResponseRunRecord {
-    return queryOne<ResponseRunRecord>(
+  ): ResponseRunRecord | undefined {
+    return queryOptional<ResponseRunRecord>(
       executor,
       `SELECT ${runColumns} FROM response_runs
        WHERE session_id = ?
@@ -181,8 +175,8 @@ export class ResponseDAO {
     );
   }
 
-  findRun(executor: DB, id: number): ResponseRunRecord {
-    return queryOne<ResponseRunRecord>(
+  findRun(executor: DB, id: number): ResponseRunRecord | undefined {
+    return queryOptional<ResponseRunRecord>(
       executor,
       `SELECT ${runColumns} FROM response_runs WHERE id = ? LIMIT 1`,
       [id],
@@ -213,8 +207,11 @@ export class ResponseDAO {
     );
   }
 
-  findTurn(sessionId: string, localTurnId: string): ResponseTurnRecord {
-    return queryOne<ResponseTurnRecord>(
+  findTurn(
+    sessionId: string,
+    localTurnId: string,
+  ): ResponseTurnRecord | undefined {
+    return queryOptional<ResponseTurnRecord>(
       this.requireDb(),
       `SELECT ${turnColumns} FROM response_turns
        WHERE session_id = ? AND local_turn_id = ? LIMIT 1`,
@@ -285,7 +282,7 @@ export class ResponseDAO {
   claimTool(
     executor: DB,
     record: ToolExecutionRecord,
-  ): { stored: ToolExecutionRecord; created: number } {
+  ): { stored: ToolExecutionRecord; created: number } | undefined {
     const created = execChanges(
       executor,
       `INSERT INTO tool_execution_records
@@ -298,11 +295,15 @@ export class ResponseDAO {
       bindTool(record),
     );
     const stored = this.findTool(executor, record.executionKey);
+    if (stored === undefined) return undefined;
     return { stored, created };
   }
 
-  findTool(executor: DB, executionKey: string): ToolExecutionRecord {
-    return queryOne<ToolExecutionRecord>(
+  findTool(
+    executor: DB,
+    executionKey: string,
+  ): ToolExecutionRecord | undefined {
+    return queryOptional<ToolExecutionRecord>(
       executor,
       `SELECT ${toolColumns} FROM tool_execution_records
        WHERE execution_key = ? LIMIT 1`,
@@ -435,8 +436,8 @@ export class ResponseDAO {
     );
   }
 
-  getRun(sessionId: string, localRunId: string): ResponseRunRecord {
-    return queryOne<ResponseRunRecord>(
+  getRun(sessionId: string, localRunId: string): ResponseRunRecord | undefined {
+    return queryOptional<ResponseRunRecord>(
       this.requireDb(),
       `SELECT ${runColumns} FROM response_runs
        WHERE session_id = ? AND local_run_id = ? LIMIT 1`,
@@ -453,8 +454,8 @@ export class ResponseDAO {
     );
   }
 
-  getSessionState(sessionId: string): ResponseSessionStateRecord {
-    return queryOne<ResponseSessionStateRecord>(
+  getSessionState(sessionId: string): ResponseSessionStateRecord | undefined {
+    return queryOptional<ResponseSessionStateRecord>(
       this.requireDb(),
       `SELECT ${stateColumns} FROM response_session_state
        WHERE session_id = ? LIMIT 1`,
@@ -516,10 +517,6 @@ export class ResponseDAO {
     if (this.db === null) throw new Error("response database is not open");
     return this.db;
   }
-}
-
-export function isNoRowsResponse(err: unknown): boolean {
-  return err === ErrNoRows;
 }
 
 // Mirrors bun's `nullzero` primary-key behavior: an unset (0) integer key is

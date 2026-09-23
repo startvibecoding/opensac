@@ -3,7 +3,7 @@
 // objective renderer shared by TUI and tools.
 
 import type { Tool, ToolContext, ToolResult } from "../tools/mod.ts";
-import { newTextToolResult } from "../tools/mod.ts";
+import { createTextToolResult } from "../tools/mod.ts";
 import {
   blockedAuditLimit,
   type Objective,
@@ -19,7 +19,7 @@ export type SessionIDFunc = () => string;
 export type RunIDFunc = () => string;
 
 /** Returns the model-facing ESM state query tool. */
-export function newGetTool(
+export function createGetTool(
   store: Store | null,
   sessionID: SessionIDFunc,
 ): Tool {
@@ -27,7 +27,7 @@ export function newGetTool(
 }
 
 /** Returns the model-facing ESM status update tool. */
-export function newUpdateTool(
+export function createUpdateTool(
   store: Store | null,
   sessionID: SessionIDFunc,
   runID?: RunIDFunc,
@@ -65,7 +65,7 @@ class GetTool implements Tool {
 
   execute(_ctx: ToolContext, _params: Record<string, unknown>): ToolResult {
     if (this.store === null || this.sessionID() === "") {
-      return newTextToolResult(
+      return createTextToolResult(
         "No ESM objective is available for this session.",
       );
     }
@@ -74,13 +74,13 @@ class GetTool implements Tool {
       obj = this.store.get(this.sessionID());
     } catch (err) {
       if (err instanceof EsmObjectiveNotFoundError) {
-        return newTextToolResult(
+        return createTextToolResult(
           "No ESM objective is available for this session.",
         );
       }
       throw err;
     }
-    return newTextToolResult(formatObjective(obj));
+    return createTextToolResult(formatObjective(obj));
   }
 }
 
@@ -143,24 +143,24 @@ class UpdateTool implements Tool {
     );
     switch (obj.status) {
       case statusCompleteCandidate:
-        return newTextToolResult(
+        return createTextToolResult(
           "ESM completion candidate recorded. An independent audit must pass before the objective is marked complete.",
         );
       case statusComplete:
-        return newTextToolResult(
+        return createTextToolResult(
           "ESM objective marked complete. Report the verification evidence and final state to the user.",
         );
       case statusBlocked:
-        return newTextToolResult(
+        return createTextToolResult(
           `ESM objective marked blocked after ${blockedAuditLimit} matching blocker reports.`,
         );
       default:
         if (status === statusBlocked) {
-          return newTextToolResult(
+          return createTextToolResult(
             `Blocked audit recorded (${obj.blockedCount}/${blockedAuditLimit}). ESM remains active until the same blocker repeats in ${blockedAuditLimit} consecutive agent runs.`,
           );
         }
-        return newTextToolResult(formatObjective(obj));
+        return createTextToolResult(formatObjective(obj));
     }
   }
 }

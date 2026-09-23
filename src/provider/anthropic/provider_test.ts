@@ -9,12 +9,11 @@ import {
   cacheInfo,
   type ChatParams,
   type ContentBlock,
+  createAssistantMessage,
+  createToolResultMessage,
+  createUserMessage,
   type Model,
   type ModelPricing,
-  newAssistantMessage,
-  newToolResultMessage,
-  newToolResultMessageWithContents,
-  newUserMessage,
   streamDone,
   streamError,
   type StreamEvent,
@@ -30,11 +29,9 @@ import {
   type Usage,
 } from "../types.ts";
 import {
+  createAnthropicProvider,
+  createAnthropicProviderWithHTTPClient,
   mergeToolCallInput,
-  newProvider,
-  newProviderWithHTTPClient,
-  newProviderWithModels,
-  newProviderWithModelsAndProxy,
   type Provider,
 } from "./provider.ts";
 import { resolveAnthropicModels } from "./register.ts";
@@ -108,7 +105,7 @@ interface CapturedRequest {
   body: string;
 }
 
-function newMockAnthropicProvider(
+function createMockAnthropicProvider(
   models: Model[],
   sse: string,
   bodies?: CapturedRequest[],
@@ -127,7 +124,7 @@ function newMockAnthropicProvider(
     },
     close() {},
   };
-  return newProviderWithHTTPClient(
+  return createAnthropicProviderWithHTTPClient(
     "fake-key",
     "https://api.anthropic.com",
     models,
@@ -162,7 +159,7 @@ async function captureBody(
 }
 
 const abortParams = (): ChatParams => ({
-  messages: [newUserMessage("hi")],
+  messages: [createUserMessage("hi")],
   systemPrompt: "",
   thinkingLevel: "off",
   maxTokens: 0,
@@ -177,7 +174,7 @@ Deno.test("AnthropicRetriesEarlyStreamReadError", async () => {
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.anthropic.com", [
+  const p = createAnthropicProvider("fake-key", "https://api.anthropic.com", [
     m("mock"),
   ]);
   p.setRetryConfig({ enabled: true, maxRetries: 1, baseDelayMs: 1 });
@@ -196,7 +193,7 @@ Deno.test("AnthropicRetriesEarlyStreamReadError", async () => {
 
   const events = await chatAndCollect(p, {
     ...abortParams(),
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
   assertEquals(attempts, 2);
   let retryEvent: StreamEvent | undefined;
@@ -220,7 +217,7 @@ Deno.test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => 
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
   let attempts = 0;
-  const p = newProviderWithModels("fake-key", "https://api.anthropic.com", [
+  const p = createAnthropicProvider("fake-key", "https://api.anthropic.com", [
     m("mock"),
   ]);
   p.setRetryConfig({ enabled: true, maxRetries: 1, baseDelayMs: 1 });
@@ -240,7 +237,7 @@ Deno.test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => 
 
   const events = await chatAndCollect(p, {
     ...abortParams(),
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
   assertEquals(attempts, 1);
   let sawText = false;
@@ -259,11 +256,11 @@ Deno.test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => 
 });
 
 Deno.test("AnthropicProviderHTTPProxy", () => {
-  const p = newProviderWithModelsAndProxy(
+  const p = createAnthropicProvider(
     "fake-key",
     "https://api.anthropic.com",
-    "http://127.0.0.1:7890",
     [m("m1")],
+    { proxyUrl: "http://127.0.0.1:7890" },
   );
   try {
     assertEquals(p.client.proxyUrl, "http://127.0.0.1:7890");
@@ -282,7 +279,7 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   }];
 
   let bodies: CapturedRequest[] = [];
-  let p = newMockAnthropicProvider(
+  let p = createMockAnthropicProvider(
     [m("mock")],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -290,7 +287,7 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   let req = await captureBody(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("use the tools")],
+    messages: [createUserMessage("use the tools")],
     tools,
   }, bodies);
   let choice = req.tool_choice as Record<string, unknown> | undefined;
@@ -299,7 +296,7 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   assertEquals(choice!.disable_parallel_tool_use, false);
 
   bodies = [];
-  p = newMockAnthropicProvider(
+  p = createMockAnthropicProvider(
     [m("mock")],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -307,7 +304,7 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   req = await captureBody(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("use the tool")],
+    messages: [createUserMessage("use the tool")],
     tools,
     responseOptions: { parallelTools: false },
   }, bodies);
@@ -316,7 +313,7 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   assertEquals(choice!.disable_parallel_tool_use, true);
 
   bodies = [];
-  p = newMockAnthropicProvider(
+  p = createMockAnthropicProvider(
     [m("mock", { compat: { supportsParallelToolCalls: false } })],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -324,13 +321,13 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   req = await captureBody(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("use the tool")],
+    messages: [createUserMessage("use the tool")],
     tools,
   }, bodies);
   assertEquals(req.tool_choice, undefined);
 
   bodies = [];
-  p = newMockAnthropicProvider(
+  p = createMockAnthropicProvider(
     [m("mock", { compat: { supportsParallelToolCalls: false } })],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -338,14 +335,14 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   req = await captureBody(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("use the tool")],
+    messages: [createUserMessage("use the tool")],
     tools,
     responseOptions: { parallelTools: true },
   }, bodies);
   assertEquals(req.tool_choice, undefined);
 
   bodies = [];
-  p = newMockAnthropicProvider(
+  p = createMockAnthropicProvider(
     [m("mock", {
       compat: { supportsParallelToolCalls: true, supportsToolChoice: false },
     })],
@@ -355,7 +352,7 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   req = await captureBody(p, {
     ...abortParams(),
     modelId: "mock",
-    messages: [newUserMessage("use the tool")],
+    messages: [createUserMessage("use the tool")],
     tools,
   }, bodies);
   assertEquals(req.tool_choice, undefined);
@@ -374,13 +371,13 @@ Deno.test("AnthropicStreamMultipleToolCallsWithInitialInput", async () => {
     'data: {"type":"content_block_stop","index":1}',
     'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
   ].join("\n") + "\n";
-  const p = newMockAnthropicProvider([m("mock")], sse);
+  const p = createMockAnthropicProvider([m("mock")], sse);
   const calls: ToolCallBlock[] = [];
   for (
     const event of await chatAndCollect(p, {
       ...abortParams(),
       modelId: "mock",
-      messages: [newUserMessage("read both")],
+      messages: [createUserMessage("read both")],
     })
   ) {
     if (event.type === streamToolCall && event.toolCall !== undefined) {
@@ -396,7 +393,7 @@ Deno.test("AnthropicStreamMultipleToolCallsWithInitialInput", async () => {
 
 Deno.test("AnthropicCustomHeaders", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockAnthropicProvider(
+  const p = createMockAnthropicProvider(
     [m("claude-test")],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -412,14 +409,14 @@ Deno.test("AnthropicCustomHeaders", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "claude-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
 });
 
 // ─── convertMessages / cache_control ─────────────────────────────────────────
 
 Deno.test("ConvertMessagesPreservesCacheControlOnSingleTextBlock", () => {
-  const p = newProvider("fake-key", "https://api.anthropic.com");
+  const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   p.setCacheControlEnabled(boolPtr(true));
   const msgs = p.convertMessages({
     messages: [{
@@ -440,7 +437,7 @@ Deno.test("ConvertMessagesPreservesCacheControlOnSingleTextBlock", () => {
 });
 
 Deno.test("ConvertMessagesOmitsCacheControlWhenDisabled", () => {
-  const p = newProvider("fake-key", "https://api.anthropic.com");
+  const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   p.setCacheControlEnabled(boolPtr(false));
   const msgs = p.convertMessages({
     messages: [{
@@ -458,7 +455,7 @@ Deno.test("ConvertMessagesOmitsCacheControlWhenDisabled", () => {
 
 Deno.test("ChatRequestPreservesCacheControlOnSingleTextBlock", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockAnthropicProvider(
+  const p = createMockAnthropicProvider(
     [m("claude-test")],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -488,7 +485,7 @@ Deno.test("ChatRequestPreservesCacheControlOnSingleTextBlock", async () => {
 
 Deno.test("ChatRequestUsesExplicitMaxTokens", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockAnthropicProvider(
+  const p = createMockAnthropicProvider(
     [m("claude-test")],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -496,7 +493,7 @@ Deno.test("ChatRequestUsesExplicitMaxTokens", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "claude-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
     maxTokens: 4096,
   });
   const req = JSON.parse(bodies[0].body) as Record<string, unknown>;
@@ -505,7 +502,7 @@ Deno.test("ChatRequestUsesExplicitMaxTokens", async () => {
 
 Deno.test("ChatRequestExplicitZeroMaxTokensFallsBackToDefault", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockAnthropicProvider(
+  const p = createMockAnthropicProvider(
     [m("claude-test", { maxTokens: 0, maxTokensSet: true })],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -513,7 +510,7 @@ Deno.test("ChatRequestExplicitZeroMaxTokensFallsBackToDefault", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "claude-test",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
   });
   const req = JSON.parse(bodies[0].body) as Record<string, unknown>;
   assertEquals(req.max_tokens, 16384);
@@ -521,7 +518,7 @@ Deno.test("ChatRequestExplicitZeroMaxTokensFallsBackToDefault", async () => {
 
 Deno.test("ChatRequestHostedWebSearchTool", async () => {
   const bodies: CapturedRequest[] = [];
-  const p = newMockAnthropicProvider(
+  const p = createMockAnthropicProvider(
     [m("claude-test")],
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -529,7 +526,7 @@ Deno.test("ChatRequestHostedWebSearchTool", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "claude-test",
-    messages: [newUserMessage("search the web")],
+    messages: [createUserMessage("search the web")],
     tools: [{
       name: "web_search",
       description: "",
@@ -546,9 +543,9 @@ Deno.test("ChatRequestHostedWebSearchTool", async () => {
 });
 
 Deno.test("ConvertMessagesAnthropicToolResultEmptyContentFallback", () => {
-  const p = newProvider("fake-key", "https://api.anthropic.com");
+  const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   const msgs = p.convertMessages({
-    messages: [newToolResultMessage("toolu_1", "bash", "", false)],
+    messages: [createToolResultMessage("toolu_1", "bash", "", false)],
   } as ChatParams);
   assertEquals(msgs.length, 1);
   assertEquals(msgs[0].role, "user");
@@ -561,22 +558,22 @@ Deno.test("ConvertMessagesAnthropicToolResultEmptyContentFallback", () => {
 });
 
 Deno.test("ConvertMessagesAnthropicGroupsConsecutiveToolResults", () => {
-  const p = newProvider("fake-key", "https://api.anthropic.com");
+  const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   const contents: ContentBlock[] = [
     { type: "text", text: "second" },
     { type: "image", image: { mimeType: "image/png", data: "abc123" } },
   ];
   const msgs = p.convertMessages({
     messages: [
-      newToolResultMessage("toolu_1", "read", "first", false),
-      newToolResultMessageWithContents(
+      createToolResultMessage("toolu_1", "read", "first", false),
+      createToolResultMessage(
         "toolu_2",
         "screenshot",
         "image result",
-        contents,
         false,
+        contents,
       ),
-      newAssistantMessage([{ type: "text", text: "done" }]),
+      createAssistantMessage([{ type: "text", text: "done" }]),
     ],
   } as ChatParams);
   assertEquals(msgs.length, 2);
@@ -602,7 +599,7 @@ async function captureThinking(
   params: Partial<ChatParams>,
 ): Promise<Record<string, unknown>> {
   const bodies: CapturedRequest[] = [];
-  const p = newMockAnthropicProvider(
+  const p = createMockAnthropicProvider(
     models,
     'data: {"type":"message_stop"}\n',
     bodies,
@@ -618,7 +615,7 @@ Deno.test("AnthropicThinkingFormatDeepSeek", async () => {
     "deepseek",
     {
       modelId: "deepseek-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingXHigh,
     },
   );
@@ -634,7 +631,7 @@ Deno.test("AnthropicThinkingFormatDeepSeekHigh", async () => {
     "deepseek",
     {
       modelId: "deepseek-v4-pro",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
     },
   );
@@ -648,7 +645,7 @@ Deno.test("AnthropicThinkingOmittedForNonReasoningModel", async () => {
     "",
     {
       modelId: "claude-opus-test",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingMedium,
     },
   );
@@ -662,7 +659,7 @@ Deno.test("AnthropicThinkingAdaptiveForOpus47", async () => {
     "",
     {
       modelId: "claude-opus-4-7",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingHigh,
     },
   );
@@ -681,7 +678,7 @@ Deno.test("AnthropicThinkingAdaptiveFromModelCompat", async () => {
     "",
     {
       modelId: "custom-adaptive",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingMedium,
     },
   );
@@ -692,11 +689,11 @@ Deno.test("AnthropicThinkingAdaptiveFromModelCompat", async () => {
 // ─── usage / cache accounting ────────────────────────────────────────────────
 
 async function usageFor(sse: string): Promise<Usage> {
-  const p = newMockAnthropicProvider([m("mock")], sse);
+  const p = createMockAnthropicProvider([m("mock")], sse);
   return mustUsage(
     await chatAndCollect(p, {
       ...abortParams(),
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
     }),
   );
 }
@@ -799,7 +796,7 @@ Deno.test("AnthropicThinkingDropsSamplingParams", async () => {
     "",
     {
       modelId: "mock",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: thinkingMedium,
       temperature: 0.7,
       topP: 0.9,
@@ -816,7 +813,7 @@ Deno.test("AnthropicDisableSamplingParamsCompat", async () => {
     "",
     {
       modelId: "mock",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: "off",
       temperature: 0.7,
       topP: 0.9,
@@ -830,7 +827,7 @@ Deno.test("AnthropicDisableSamplingParamsCompat", async () => {
 Deno.test("AnthropicSamplingParamsDroppedByDefault", async () => {
   const req = await captureThinking([m("mock")], "", {
     modelId: "mock",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
     thinkingLevel: "off",
     temperature: 0.7,
     topP: 0.9,
@@ -845,7 +842,7 @@ Deno.test("AnthropicSamplingParamsPassThrough", async () => {
     "",
     {
       modelId: "mock",
-      messages: [newUserMessage("hi")],
+      messages: [createUserMessage("hi")],
       thinkingLevel: "off",
       temperature: 0.7,
       topP: 0.9,

@@ -1,7 +1,7 @@
 // (pure cases).
 
 import { assertEquals } from "@std/assert";
-import { type MemberDef, newMemberDefRegistry } from "./memberdef.ts";
+import { createMemberDefRegistry, type MemberDef } from "./memberdef.ts";
 
 function def(id: string, displayName = ""): MemberDef {
   return {
@@ -18,7 +18,7 @@ function def(id: string, displayName = ""): MemberDef {
   };
 }
 
-Deno.test("newMemberDefRegistry order and lookup", () => {
+Deno.test("createMemberDefRegistry order and lookup", () => {
   const defs = [
     def("lead", "交付总监"),
     null,
@@ -26,7 +26,7 @@ Deno.test("newMemberDefRegistry order and lookup", () => {
     def("engineer", "工程师"),
     def("lead", "duplicate-ignored"),
   ];
-  const r = newMemberDefRegistry(defs);
+  const r = createMemberDefRegistry(defs);
 
   assertEquals(r.ids(), ["lead", "engineer"]);
 
@@ -39,8 +39,8 @@ Deno.test("newMemberDefRegistry order and lookup", () => {
   assertEquals(r.ids(), ["lead", "engineer"]);
 });
 
-Deno.test("newMemberDefRegistry empty", () => {
-  const r = newMemberDefRegistry([]);
+Deno.test("createMemberDefRegistry empty", () => {
+  const r = createMemberDefRegistry([]);
   assertEquals(r.ids().length, 0);
   assertEquals(r.get("any"), undefined);
 });

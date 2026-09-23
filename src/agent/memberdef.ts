@@ -51,7 +51,7 @@ export class MemberDefRegistry {
 }
 
 /** Creates a MemberDefRegistry from defs, preserving insertion order. */
-export function newMemberDefRegistry(
+export function createMemberDefRegistry(
   defs: (MemberDef | null | undefined)[],
 ): MemberDefRegistry {
   return new MemberDefRegistry(defs);

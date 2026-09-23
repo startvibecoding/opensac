@@ -1,6 +1,6 @@
 import {
+  createSystemInjectedUserMessage,
   type Message,
-  newSystemInjectedUserMessage,
 } from "../provider/types.ts";
 
 // Member completion statuses carried by MemberCompletion.status.
@@ -32,7 +32,7 @@ export interface MemberCompletion {
 }
 
 /** Creates a MemberCompletion with empty defaults. */
-export function newMemberCompletion(): MemberCompletion {
+export function createMemberCompletion(): MemberCompletion {
   return {
     kind: "",
     memberId: "",
@@ -87,7 +87,7 @@ export class MemberMailbox {
     this.activityPending = false;
     if (pending.length === 0) return null;
     return pending.map((c) =>
-      newSystemInjectedUserMessage(formatMemberItem(c))
+      createSystemInjectedUserMessage(formatMemberItem(c))
     );
   }
 
@@ -148,7 +148,7 @@ export class MemberMailbox {
 }
 
 /** Creates an empty mailbox. */
-export function newMemberMailbox(): MemberMailbox {
+export function createMemberMailbox(): MemberMailbox {
   return new MemberMailbox();
 }
 

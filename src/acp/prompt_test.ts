@@ -22,7 +22,7 @@ import {
   streamStart,
   streamTextDelta,
 } from "../provider/types.ts";
-import { newMockProvider } from "../provider/mock.ts";
+import { createMockProvider } from "../provider/mock.ts";
 import type { Provider } from "../provider/provider.ts";
 import { ESMStore } from "../esm/mod.ts";
 import { testModel } from "../agent/agent_testutil.ts";
@@ -85,7 +85,7 @@ interface Fixture {
   workDir: string;
 }
 
-function newFixture(): Fixture {
+function createFixture(): Fixture {
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-prompt-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
@@ -104,7 +104,7 @@ function bindMockProvider(
   responses: StreamEvent[],
 ): { provider: Provider; model: Model } {
   const model = testModel("mock-model", "Mock", "mock");
-  const provider = newMockProvider("mock", [model], responses);
+  const provider = createMockProvider("mock", [model], responses);
   server.p = provider;
   server.m = model;
   server.providerName = "mock";
@@ -169,7 +169,7 @@ Deno.test("esm steering absent without settings or session id", () => {
 });
 
 Deno.test("requestQuestion resolves a selected option", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   const pending = server.requestQuestion(
     undefined,
     "sess-q",
@@ -188,7 +188,7 @@ Deno.test("requestQuestion resolves a selected option", async () => {
 });
 
 Deno.test("requestQuestion returns empty for a non-option answer", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   const pending = server.requestQuestion(
     undefined,
     "sess-q",
@@ -209,7 +209,7 @@ Deno.test("requestQuestion returns empty for a non-option answer", async () => {
 });
 
 Deno.test("$/cancel_request releases a pending question as cancelled", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   const pending = server.requestQuestion(
     undefined,
     "sess-q",
@@ -228,7 +228,7 @@ Deno.test("$/cancel_request releases a pending question as cancelled", async () 
 });
 
 Deno.test("requestQuestion is cancelled by an aborted run", async () => {
-  const { server } = newFixture();
+  const { server } = createFixture();
   const controller = new AbortController();
   const pending = server.requestQuestion(
     controller.signal,
@@ -242,7 +242,7 @@ Deno.test("requestQuestion is cancelled by an aborted run", async () => {
 });
 
 Deno.test("requestPermission resolves the allow-once option", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   const pending = server.requestPermissionContext(
     undefined,
     "sess-p",
@@ -264,7 +264,7 @@ Deno.test("requestPermission resolves the allow-once option", async () => {
 });
 
 Deno.test("requestPermission denies a rejection or timeout", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   const rejected = server.requestPermissionContext(
     undefined,
     "sess-p",
@@ -297,7 +297,7 @@ Deno.test("requestPermission denies a rejection or timeout", async () => {
 });
 
 Deno.test("handlePrompt rejects malformed params and unknown sessions", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   await server.handlePrompt(rpc(1, "session/prompt", "not-an-object"));
   const invalid = responseOf(sink.toString())!;
   assertEquals((invalid.error as Record<string, unknown>).code, -32602);
@@ -318,7 +318,7 @@ Deno.test("handlePrompt rejects malformed params and unknown sessions", async ()
 });
 
 Deno.test("handlePrompt rejects an empty prompt", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   bindMockProvider(server, [
     { type: streamStart },
     { type: streamDone, stopReason: "stop" },
@@ -337,7 +337,7 @@ Deno.test("handlePrompt rejects an empty prompt", async () => {
 });
 
 Deno.test("handlePrompt streams a completed turn and cleans up", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   bindMockProvider(server, [
     { type: streamStart },
     { type: streamTextDelta, textDelta: "hello world" },
@@ -377,7 +377,7 @@ Deno.test("handlePrompt streams a completed turn and cleans up", async () => {
 });
 
 Deno.test("handlePrompt rejects a second concurrent prompt", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   bindMockProvider(server, [
     { type: streamStart },
     { type: streamTextDelta, textDelta: "slow" },
@@ -407,7 +407,7 @@ Deno.test("handlePrompt rejects a second concurrent prompt", async () => {
 });
 
 Deno.test("handlePrompt projects a missing-terminal stream as failed", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   // A provider that closes its stream without any terminal event.
   bindMockProvider(server, [{ type: streamStart }]);
   const sessionId = await openSession(server, sink, workDir);

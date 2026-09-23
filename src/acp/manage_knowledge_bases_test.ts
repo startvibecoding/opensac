@@ -24,7 +24,7 @@ import {
   type KnowledgeBase,
   updateKnowledgeBase,
 } from "../session/knowledge_bases.ts";
-import { newSQLiteCronStore } from "../cron/sqlite_store.ts";
+import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import { KNOWLEDGE_BASE_CRON_JOB_PREFIX } from "../agentruntime/knowledge_cron.ts";
 import {
   defaultSettings,
@@ -200,7 +200,7 @@ Deno.test("knowledge base schedule syncs create, update and delete on cron store
     },
   );
 
-  const store = newSQLiteCronStore(sessionDir);
+  const store = createSQLiteCronStore(sessionDir);
   syncKnowledgeBaseScheduleWithStore(store, base);
   const jobID = KNOWLEDGE_BASE_CRON_JOB_PREFIX + base.id;
   const job = store.get(jobID);

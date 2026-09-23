@@ -3,7 +3,7 @@
 // port carries it on the `ToolContext`. The `AskQuestion` method is async.
 
 import {
-  newTextToolResult,
+  createTextToolResult,
   questionAskerFromContext,
   type Registry,
   type Tool,
@@ -120,6 +120,6 @@ export class QuestionTool implements Tool {
       throw new Error("no answer received (user may have aborted)");
     }
 
-    return newTextToolResult(`User answered: ${answer}\n`);
+    return createTextToolResult(`User answered: ${answer}\n`);
   }
 }

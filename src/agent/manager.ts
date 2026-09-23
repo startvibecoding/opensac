@@ -27,9 +27,9 @@ import {
   validateSubAgentPolicy,
 } from "./subagent_support.ts";
 import {
+  createMemberCompletion,
   MEMBER_ITEM_QUESTION,
   MEMBER_STATUS_QUESTION,
-  newMemberCompletion,
 } from "./mailbox.ts";
 
 /** Captures scheduling state for an agent managed by AgentManager. */
@@ -120,7 +120,7 @@ export class AgentManager {
     question: string,
     options: string[],
   ): void {
-    const completion = newMemberCompletion();
+    const completion = createMemberCompletion();
     completion.kind = MEMBER_ITEM_QUESTION;
     completion.memberId = memberID;
     completion.displayName = displayName;
@@ -298,9 +298,8 @@ export class AgentManager {
   }
 
   /** Returns an agent by ID. */
-  get(id: AgentID): [AgentAdapter | undefined, boolean] {
-    const a = this.agents.get(id);
-    return [a, a !== undefined];
+  get(id: AgentID): AgentAdapter | undefined {
+    return this.agents.get(id);
   }
 
   /** Stops and removes an agent and all its children. Throws when not found. */
@@ -528,9 +527,8 @@ export class AgentManager {
   }
 
   /** Returns a copy of the tracked status for an agent. */
-  status(id: AgentID): [ManagedAgentStatus | undefined, boolean] {
-    const st = this.statuses.get(id);
-    return [st, st !== undefined];
+  status(id: AgentID): ManagedAgentStatus | undefined {
+    return this.statuses.get(id);
   }
 
   /** Returns a sorted copy of all tracked agent statuses. */
@@ -570,9 +568,8 @@ export class AgentManager {
     return this.children.get(id) ?? [];
   }
 
-  parent(id: AgentID): [AgentID | undefined, boolean] {
-    const pid = this.parentOf.get(id);
-    return [pid, pid !== undefined];
+  parent(id: AgentID): AgentID | undefined {
+    return this.parentOf.get(id);
   }
 
   /** Returns the number of active agents. */
@@ -594,7 +591,7 @@ export class AgentManager {
 }
 
 /** Creates a new agent manager. */
-export function newAgentManager(factory: AgentFactory): AgentManager {
+export function createAgentManager(factory: AgentFactory): AgentManager {
   return new AgentManager(factory);
 }
 

@@ -2,7 +2,7 @@
 // Runtime-owned input resource lifecycle events. Transport references are
 // intentionally absent; the events are the canonical lifecycle projection.
 
-import { InputResourceDAO, isNoRows, type Tx } from "../dao/mod.ts";
+import { InputResourceDAO, type Tx } from "../dao/mod.ts";
 import { writeRootDatabase } from "./database.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 
@@ -134,18 +134,13 @@ export function bindInputResourcesToRunTx(
     if (resourceId === "" || seen.has(resourceId)) continue;
     seen.add(resourceId);
 
-    let ownerRunId: string;
-    let status: string;
-    try {
-      ({ runId: ownerRunId, status } = dao.ownerRun(tx, resourceId, sessionId));
-    } catch (err) {
-      if (isNoRows(err)) {
-        throw new Error(
-          `input resource ${resourceId} does not belong to session`,
-        );
-      }
-      throw err;
+    const owner = dao.ownerRun(tx, resourceId, sessionId);
+    if (owner === undefined) {
+      throw new Error(
+        `input resource ${resourceId} does not belong to session`,
+      );
     }
+    const { runId: ownerRunId, status } = owner;
     if (status === "missing" || status === "deleted") {
       throw new Error(
         `input resource ${resourceId} is not attachable (status ${status})`,
@@ -168,13 +163,7 @@ export function bindInputResourcesToRunTx(
 
     // Retries reuse the original immutable input resource. There is no need to
     // overwrite its canonical owner just to represent another attempt.
-    let ownerIntentId: string;
-    try {
-      ownerIntentId = dao.ownerIntent(tx, ownerRunId, sessionId);
-    } catch (err) {
-      if (isNoRows(err)) ownerIntentId = "";
-      else throw err;
-    }
+    const ownerIntentId = dao.ownerIntent(tx, ownerRunId, sessionId) ?? "";
     if (intentId === "" || ownerIntentId !== intentId) {
       throw new Error(
         `input resource ${resourceId} is already attached to another Run`,

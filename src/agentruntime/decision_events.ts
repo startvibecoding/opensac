@@ -16,9 +16,9 @@ import type { SessionRunEvent } from "../session/session_events.ts";
 import { listSessionRunEvents } from "../session/session_events.ts";
 import type { DecisionRequest, DecisionResolution } from "./decision.ts";
 import {
+  createDecisionRequestRecord,
+  createDecisionResolutionRecord,
   type DecisionRecord,
-  newDecisionRequestRecordWithDeadline,
-  newDecisionResolutionRecord,
   reviveDecisionRecordDates,
 } from "./decision_record.ts";
 import { type RunEvent, type RunEventSink } from "./run_event.ts";
@@ -66,7 +66,7 @@ export function decisionEventFields(
  * becomes a request record carrying the optional deadline, any other status a
  * resolution record.
  */
-export function newDecisionRecord(
+export function createDecisionRecord(
   request: DecisionRequest,
   status: string,
   value: string,
@@ -74,9 +74,9 @@ export function newDecisionRecord(
   expiresAt?: Date,
 ): DecisionRecord {
   if (status === DECISION_STATUS_PENDING) {
-    return newDecisionRequestRecordWithDeadline(request, payload, expiresAt);
+    return createDecisionRequestRecord(request, payload, expiresAt);
   }
-  return newDecisionResolutionRecord(
+  return createDecisionResolutionRecord(
     request,
     {
       id: request.id,
@@ -102,7 +102,7 @@ export interface DecisionTransition {
 
 /** Builds the canonical durable run event for a transition. */
 export function buildDecisionEvent(t: DecisionTransition): RunEvent {
-  const record = newDecisionRecord(
+  const record = createDecisionRecord(
     t.request,
     t.status,
     t.value ?? "",

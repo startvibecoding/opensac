@@ -52,14 +52,14 @@ export function bashCommand(input: ToolRowInput): string {
 }
 
 /** The [exit_code] section of the result, if present (Go bashExitCode). */
-function bashExitCode(input: ToolRowInput): [number, boolean] {
+function bashExitCode(input: ToolRowInput): number | undefined {
   for (const content of [input.fullContent, input.summary]) {
     const v = toolSectionValue(content, "[exit_code]");
     if (v === "") continue;
     const code = Number.parseInt(v.trim(), 10);
-    if (!Number.isNaN(code)) return [code, true];
+    if (!Number.isNaN(code)) return code;
   }
-  return [0, false];
+  return undefined;
 }
 
 /** Value on the line immediately following a `[section]` marker. */
@@ -98,8 +98,8 @@ function bashStatus(tr: Translator, input: ToolRowInput): string {
   ) {
     return tr.text("tool.command.failed");
   }
-  const [exitCode, ok] = bashExitCode(input);
-  if (ok) {
+  const exitCode = bashExitCode(input);
+  if (exitCode !== undefined) {
     if (exitCode === 0) return tr.text("tool.command.succeeded");
     return tr.text("tool.command.failed_exit", exitCode);
   }

@@ -1,8 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import {
+  createResponsesNormalizer,
   decodeResponsesOutputItem,
   decodeResponsesSSE,
-  newResponsesNormalizer,
   responsesArgumentsText,
   type ResponsesSSEFrame,
   safeResponsesAttachmentURL,
@@ -57,7 +57,7 @@ Deno.test("DecodeResponsesSSEAcceptsLineDelimitedGatewayEvents", async () => {
 
 Deno.test("ResponsesProtocolFixtures", async (t) => {
   await t.step("custom tool SSE", async () => {
-    const n = newResponsesNormalizer();
+    const n = createResponsesNormalizer();
     const err = await decodeResponsesSSE(
       readResponsesFixture("custom_tool_call.sse"),
       (frame) => {
@@ -77,7 +77,7 @@ Deno.test("ResponsesProtocolFixtures", async (t) => {
     const rawItems = JSON.parse(
       readResponsesFixture("hosted_items.json"),
     ) as unknown[];
-    const n = newResponsesNormalizer();
+    const n = createResponsesNormalizer();
     for (let index = 0; index < rawItems.length; index++) {
       const item = decodeResponsesOutputItem(
         JSON.stringify(rawItems[index]),
@@ -99,7 +99,7 @@ Deno.test("ResponsesProtocolFixtures", async (t) => {
       `{"id":"msg_1","type":"message","status":"completed","content":[{"type":"output_text","text":"see source","annotations":[{"type":"url_citation","title":"Source","start_index":4,"end_index":10}]}]}`;
     const item = decodeResponsesOutputItem(raw, 0);
     assert(item !== undefined);
-    const n = newResponsesNormalizer();
+    const n = createResponsesNormalizer();
     n.response.items = [item!];
     const attachments = n.attachments();
     assertEquals(attachments.length, 1);
@@ -111,7 +111,7 @@ Deno.test("ResponsesProtocolFixtures", async (t) => {
   await t.step("computer use rejected", () => {
     const raw = readResponsesFixture("computer_use_item.json");
     const event = JSON.parse(raw) as ResponsesSSEEvent;
-    const n = newResponsesNormalizer();
+    const n = createResponsesNormalizer();
     assertEquals(n.apply(event, raw), undefined);
     const err = n.unsupportedError();
     assert(err !== undefined);
@@ -121,7 +121,7 @@ Deno.test("ResponsesProtocolFixtures", async (t) => {
   });
 
   await t.step("incomplete terminal", async () => {
-    const n = newResponsesNormalizer();
+    const n = createResponsesNormalizer();
     const err = await decodeResponsesSSE(
       readResponsesFixture("incomplete_terminal.sse"),
       (frame) => {
@@ -141,7 +141,7 @@ Deno.test("ResponsesProtocolFixtures", async (t) => {
 });
 
 Deno.test("ResponsesNormalizerInterleavesFunctionArgumentsByItemIdentity", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   const events: ResponsesSSEEvent[] = [
     {
       type: "response.output_item.added",
@@ -223,7 +223,7 @@ Deno.test("ResponsesNormalizerInterleavesFunctionArgumentsByItemIdentity", () =>
 });
 
 Deno.test("ResponsesNormalizerMergesIDlessCompletedOutput", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   const added: ResponsesSSEEvent = {
     type: "response.output_item.added",
     output_index: 1,
@@ -252,7 +252,7 @@ Deno.test("ResponsesNormalizerMergesIDlessCompletedOutput", () => {
 });
 
 Deno.test("ResponsesNormalizerCollectsCustomToolInput", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   const events: ResponsesSSEEvent[] = [
     {
       type: "response.output_item.added",
@@ -292,7 +292,7 @@ Deno.test("ResponsesNormalizerCollectsCustomToolInput", () => {
 });
 
 Deno.test("ResponsesNormalizerPreservesUnknownItemWithSanitizedCanonicalJSON", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   const event: ResponsesSSEEvent = {
     type: "response.output_item.done",
     output_index: 3,
@@ -309,7 +309,7 @@ Deno.test("ResponsesNormalizerPreservesUnknownItemWithSanitizedCanonicalJSON", (
 });
 
 Deno.test("ResponsesNormalizerRecordsUnknownEventType", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   assertEquals(
     n.apply(
       { type: "response.future_event" },
@@ -331,7 +331,7 @@ Deno.test("ResponsesNormalizerRecordsUnknownEventType", () => {
 });
 
 Deno.test("ResponsesNormalizerRejectsComputerUseItem", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   const event: ResponsesSSEEvent = {
     type: "response.output_item.done",
     output_index: 0,
@@ -350,7 +350,7 @@ Deno.test("ResponsesNormalizerRejectsComputerUseItem", () => {
 });
 
 Deno.test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
-  const n = newResponsesNormalizer();
+  const n = createResponsesNormalizer();
   const events: Array<{ event: ResponsesSSEEvent; raw: string }> = [
     {
       event: {

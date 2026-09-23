@@ -6,7 +6,7 @@
 // lands with backlog #26.
 
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -162,7 +162,7 @@ export class CronTool implements Tool {
     // Runtime-owned maintenance jobs are host housekeeping, not user automations.
     jobs = userVisibleJobs(jobs);
     if (jobs.length === 0) {
-      return newTextToolResult("No cron jobs configured.");
+      return createTextToolResult("No cron jobs configured.");
     }
 
     let out = `Cron jobs (${jobs.length}):\n\n`;
@@ -185,7 +185,7 @@ export class CronTool implements Tool {
       }
       out += "\n";
     }
-    return newTextToolResult(out);
+    return createTextToolResult(out);
   }
 
   private executeCreate(
@@ -232,7 +232,7 @@ export class CronTool implements Tool {
 
     const kind = isOneShot ? "one-shot" : "periodic";
     const nextInfo = nextRun ? `\n  Next run: ${nextRun.toISOString()}` : "";
-    return newTextToolResult(
+    return createTextToolResult(
       `✅ Cron job created (${kind}):\n  ID: ${job.id}\n  Name: ${job.name}\n  Schedule: ${
         scheduleStr(job.schedule ?? "", isOneShot)
       }\n  Mode: ${job.mode}${nextInfo}\n  Prompt: ${
@@ -254,7 +254,7 @@ export class CronTool implements Tool {
       throw new Error(`update cron job: ${errorMessage(err)}`);
     }
     const action = enabled ? "enabled" : "disabled";
-    return newTextToolResult(`✅ Cron job ${job.id} ${action}: ${job.name}`);
+    return createTextToolResult(`✅ Cron job ${job.id} ${action}: ${job.name}`);
   }
 
   private executeRemove(id: string, name: string): ToolResult {
@@ -265,7 +265,7 @@ export class CronTool implements Tool {
     } catch (err) {
       throw new Error(`delete cron job: ${errorMessage(err)}`);
     }
-    return newTextToolResult(`🗑 Cron job removed: ${job.id} (${jobName})`);
+    return createTextToolResult(`🗑 Cron job removed: ${job.id} (${jobName})`);
   }
 
   private executeRun(id: string, name: string): ToolResult {
@@ -284,7 +284,7 @@ export class CronTool implements Tool {
     } catch (err) {
       throw new Error(`update cron job: ${errorMessage(err)}`);
     }
-    return newTextToolResult(
+    return createTextToolResult(
       `▶ Cron job ${job.id} triggered: ${job.name} (will run on next scheduler tick)`,
     );
   }
@@ -323,7 +323,7 @@ export class CronTool implements Tool {
 }
 
 /** Creates a cron management tool. */
-export function newCronTool(
+export function createCronTool(
   store: CronStore,
   scheduler: CronScheduler | null = null,
 ): CronTool {

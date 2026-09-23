@@ -3,7 +3,7 @@
 // policy snapshots are opaque to session storage; the shared Runtime owns their
 // interpretation.
 
-import { isNoRows, RunDAO } from "../dao/mod.ts";
+import { RunDAO } from "../dao/mod.ts";
 import { generateID } from "./entry.ts";
 import {
   type ConversationTurn,
@@ -255,13 +255,8 @@ export function getExecutionIntent(
 ): ExecutionIntent | null {
   if (intentId === "") throw new Error("execution intent ID is required");
   const db = openRootDB(sessionDir);
-  let record;
-  try {
-    record = new RunDAO(db.db).findIntent(intentId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = new RunDAO(db.db).findIntent(intentId);
+  if (record === undefined) return null;
   return {
     id: record.id,
     sessionId: record.sessionId,

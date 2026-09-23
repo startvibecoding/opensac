@@ -6,7 +6,6 @@
 
 import * as path from "@std/path";
 import {
-  isNoRows,
   KnowledgeBaseDAO,
   type KnowledgeBaseRecord,
   type KnowledgeChunkRecord,
@@ -188,7 +187,7 @@ export function listKnowledgeBases(sessionDir: string): KnowledgeBase[] {
         record = new KnowledgeBaseDAO(db.db).findBase(id);
       });
     } catch (err) {
-      if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) continue;
+      if (err instanceof KnowledgeBaseNotFoundError) continue;
       throw err;
     }
     if (record === undefined) continue;
@@ -212,14 +211,9 @@ export function getKnowledgeBase(
   if (id === "") throw new KnowledgeBaseNotFoundError();
   migrateLegacyKnowledgeBaseStorage(sessionDir);
   let record: KnowledgeBaseRecord | undefined;
-  try {
-    queryKnowledgeBaseDatabase(sessionDir, id, (db) => {
-      record = new KnowledgeBaseDAO(db.db).findBase(id);
-    });
-  } catch (err) {
-    if (isNoRows(err)) throw new KnowledgeBaseNotFoundError();
-    throw err;
-  }
+  queryKnowledgeBaseDatabase(sessionDir, id, (db) => {
+    record = new KnowledgeBaseDAO(db.db).findBase(id);
+  });
   if (record === undefined) throw new KnowledgeBaseNotFoundError();
   return knowledgeBaseFromRecord(record);
 }
@@ -276,14 +270,9 @@ export function getKnowledgeSnapshot(
   const bases = listKnowledgeBaseDatabaseIDs(sessionDir);
   for (const base of bases) {
     let record: KnowledgeSnapshotRecord | undefined;
-    try {
-      queryKnowledgeBaseDatabase(sessionDir, base, (db) => {
-        record = new KnowledgeBaseDAO(db.db).findSnapshot(id);
-      });
-    } catch (err) {
-      if (isNoRows(err)) continue;
-      throw err;
-    }
+    queryKnowledgeBaseDatabase(sessionDir, base, (db) => {
+      record = new KnowledgeBaseDAO(db.db).findSnapshot(id);
+    });
     if (record === undefined) continue;
     return knowledgeSnapshotFromRecord(record);
   }
@@ -354,14 +343,10 @@ export function reuseKnowledgeSnapshotIfFilesMatch(
     queryKnowledgeBaseDatabase(sessionDir, baseID, (db) => {
       const store = new KnowledgeBaseDAO(db.db);
       const baseRecord = store.findBase(baseID);
+      if (baseRecord === undefined) return;
       if (baseRecord.activeSnapshotId.trim() === "") return;
-      let snapshotRecord: KnowledgeSnapshotRecord;
-      try {
-        snapshotRecord = store.findSnapshot(baseRecord.activeSnapshotId);
-      } catch (err) {
-        if (isNoRows(err)) return;
-        throw err;
-      }
+      const snapshotRecord = store.findSnapshot(baseRecord.activeSnapshotId);
+      if (snapshotRecord === undefined) return;
       const snapshot = knowledgeSnapshotFromRecord(snapshotRecord);
       if (
         snapshot.status !== "completed" ||
@@ -375,7 +360,7 @@ export function reuseKnowledgeSnapshotIfFilesMatch(
       reusable = true;
     });
   } catch (err) {
-    if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) {
+    if (err instanceof KnowledgeBaseNotFoundError) {
       return { snapshot: emptySnapshot(), reusable: false };
     }
     throw err;
@@ -454,14 +439,10 @@ export function prepareKnowledgeGraphReusePlan(
     queryKnowledgeBaseDatabase(sessionDir, baseID, (db) => {
       const store = new KnowledgeBaseDAO(db.db);
       const base = store.findBase(baseID);
+      if (base === undefined) return;
       if (base.activeSnapshotId.trim() === "") return;
-      let snapshot: KnowledgeSnapshotRecord;
-      try {
-        snapshot = store.findSnapshot(base.activeSnapshotId);
-      } catch (err) {
-        if (isNoRows(err)) return;
-        throw err;
-      }
+      const snapshot = store.findSnapshot(base.activeSnapshotId);
+      if (snapshot === undefined) return;
       if (
         snapshot.status !== "completed" ||
         snapshot.schemaVersion !== KNOWLEDGE_GRAPH_SCHEMA_VERSION
@@ -485,7 +466,7 @@ export function prepareKnowledgeGraphReusePlan(
       );
     });
   } catch (err) {
-    if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) {
+    if (err instanceof KnowledgeBaseNotFoundError) {
       return { sourceSnapshotId: "", files: new Map() };
     }
     throw err;
@@ -726,8 +707,10 @@ export function queryKnowledgeGraph(
   };
   try {
     readKnowledgeBaseDatabase(sessionDir, baseID, (tx) => {
-      const { projection, indexed } = new KnowledgeBaseDAO(tx)
+      const active = new KnowledgeBaseDAO(tx)
         .activeGraphProjection(tx, baseID, query, limit);
+      if (active === undefined) throw new KnowledgeBaseNotFoundError();
+      const { projection, indexed } = active;
       if (!indexed) throw new KnowledgeBaseUnindexedError();
       result.knowledgeBase = knowledgeBaseFromRecord(projection.base);
       result.snapshot = knowledgeSnapshotFromRecord(projection.snapshot);
@@ -736,7 +719,7 @@ export function queryKnowledgeGraph(
       result.edges = knowledgeEdgesFromRecords(projection.edges);
     });
   } catch (err) {
-    if (isNoRows(err) || err instanceof KnowledgeBaseNotFoundError) {
+    if (err instanceof KnowledgeBaseNotFoundError) {
       throw new KnowledgeBaseNotFoundError();
     }
     throw err;

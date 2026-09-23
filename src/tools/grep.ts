@@ -13,7 +13,7 @@ import { compileUserRegExp } from "../util/regex.ts";
 import { GlobSet } from "./globset.ts";
 import { IgnoreStack } from "./ignore.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -188,12 +188,12 @@ export class GrepTool implements Tool {
       : "";
     if (lines.length === 0) {
       if (literalFallback) {
-        return newTextToolResult(
+        return createTextToolResult(
           "(invalid regex; fell back to literal search)\n(no matches found)" +
             skippedNote,
         );
       }
-      return newTextToolResult("(no matches found)" + skippedNote);
+      return createTextToolResult("(no matches found)" + skippedNote);
     }
 
     let output = lines.join("\n");
@@ -209,7 +209,7 @@ export class GrepTool implements Tool {
     }
     output += skippedNote;
 
-    return newTextToolResult(output);
+    return createTextToolResult(output);
   }
 }
 

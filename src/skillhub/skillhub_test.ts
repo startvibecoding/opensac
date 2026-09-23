@@ -5,7 +5,7 @@ import {
   assertStringIncludes,
 } from "@std/assert";
 import * as path from "@std/path";
-import { newClawHubClient } from "./clawhub.ts";
+import { createClawHubClient } from "./clawhub.ts";
 import {
   installSkill,
   InvalidArchiveError,
@@ -14,7 +14,7 @@ import {
 } from "./install.ts";
 import { LocalIndex, readMetadata } from "./local.ts";
 import { Service } from "./service.ts";
-import { newSkillHubClient } from "./skillhubcn.ts";
+import { createSkillHubClient } from "./skillhubcn.ts";
 import {
   emptyDetail,
   fakeHttpClient,
@@ -42,7 +42,7 @@ Deno.test("SkillHubSearchAndUserSkills", async () => {
         return jsonResponse("not found", 404, "Not Found");
     }
   });
-  const market = newSkillHubClient("https://api.test", client);
+  const market = createSkillHubClient("https://api.test", client);
   const page = await market.search(undefined, { query: "go", limit: 10 });
   assertEquals(page.items.length, 1);
   assertEquals(page.items[0].market, "skillhub.cn");
@@ -63,7 +63,7 @@ Deno.test("SkillHubDetailAcceptsCurrentVersionTagsAndStatsShape", async () => {
       `{"latestVersion":{"version":"1.0.0","createdAt":1774758863165},"owner":{"displayName":"claudiodrusus","handle":"claudiodrusus"},"skill":{"slug":"skill-1","displayName":"Skill 1","summary":"Generate QR codes","tags":{"latest":"1.0.0"},"stats":{"downloads":1238,"installs":43,"stars":2}}}`,
     )
   );
-  const detail = await newSkillHubClient("https://api.test", client).detail(
+  const detail = await createSkillHubClient("https://api.test", client).detail(
     undefined,
     { market: "skillhub.cn", id: "skill-1" },
   );
@@ -85,7 +85,7 @@ Deno.test("ClawHubSearchUsesCursorAndNormalizes", async () => {
       `{"items":[{"id":"openclaw/git","name":"Git","summary":"git helpers","latestVersion":"2.0.0","owner":"openclaw","updatedAt":"2026-07-14T10:00:00Z"}],"nextCursor":"later"}`,
     );
   });
-  const page = await newClawHubClient("https://api.test", client).search(
+  const page = await createClawHubClient("https://api.test", client).search(
     undefined,
     { limit: 10, cursor: "next", author: "openclaw" },
   );
@@ -104,7 +104,7 @@ Deno.test("ClawHubFullTextSearchUsesSearchEndpointAndOwnerRef", async () => {
       `{"results":[{"slug":"photo","displayName":"Photo","summary":"Imaging","downloads":1266,"updatedAt":1778491780967,"ownerHandle":"agistack","owner":{"displayName":"AGIstack"}}]}`,
     );
   });
-  const page = await newClawHubClient("https://api.test", client).search(
+  const page = await createClawHubClient("https://api.test", client).search(
     undefined,
     { query: "photo", limit: 3 },
   );
@@ -121,7 +121,7 @@ Deno.test("ClawHubDetailAcceptsRootObject", async () => {
       `{"id":"openclaw/git","name":"Git","version":"1.0.0","author":"openclaw"}`,
     );
   });
-  const detail = await newClawHubClient("https://api.test", client).detail(
+  const detail = await createClawHubClient("https://api.test", client).detail(
     undefined,
     { market: "clawhub.ai", id: "openclaw/git" },
   );
@@ -135,7 +135,7 @@ Deno.test("ClawHubDetailAcceptsSlugEnvelope", async () => {
       `{"skill":{"slug":"drivethru-operations","displayName":"Drivethru Operations","summary":"Operations","updatedAt":1784072685483},"latestVersion":{"version":"0.1.0"},"owner":{"displayName":"zmtucker"},"moderation":{"verdict":"clean"}}`,
     )
   );
-  const detail = await newClawHubClient("https://api.test", client).detail(
+  const detail = await createClawHubClient("https://api.test", client).detail(
     undefined,
     { market: "clawhub.ai", id: "drivethru-operations" },
   );
@@ -154,7 +154,7 @@ Deno.test("ClawHubOwnerRefUsesOwnerQueryForDetail", async () => {
       `{"skill":{"slug":"photo","displayName":"Photo","summary":"Imaging"},"owner":{"displayName":"AGIstack"}}`,
     );
   });
-  const detail = await newClawHubClient("https://api.test", client).detail(
+  const detail = await createClawHubClient("https://api.test", client).detail(
     undefined,
     { market: "clawhub.ai", id: "@agistack/photo" },
   );
@@ -384,7 +384,7 @@ Deno.test("SkillHubBrowseSendsDownloadSortAndParsesCertification", async () => {
       `{"code":0,"data":{"total":1,"skills":[{"slug":"mail","name":"Mail","source":"enterprise","downloads":26129,"publisher":{"name":"QQ Mail","verified":true,"certifiedName":"Tencent"}}]}}`,
     );
   });
-  const page = await newSkillHubClient("https://api.test", client).search(
+  const page = await createSkillHubClient("https://api.test", client).search(
     undefined,
     {
       limit: 10,
@@ -408,7 +408,7 @@ Deno.test("SkillHubCategories", async () => {
       `{"items":[{"key":"dev-programming","name":"开发编程","nameEn":"Development"}]}`,
     );
   });
-  const categories = await newSkillHubClient("https://api.test", client)
+  const categories = await createSkillHubClient("https://api.test", client)
     .categories(undefined);
   assertEquals(categories.length, 1);
   assertEquals(categories[0].key, "dev-programming");
@@ -420,7 +420,7 @@ Deno.test("ClawHubCurrentListShapeParsesDownloadsAndVersion", async () => {
       `{"items":[{"slug":"tool","displayName":"Tool","tags":{"latest":"1.2.0"},"stats":{"downloads":1562,"installs":6,"stars":3},"latestVersion":{"version":"1.2.0"},"updatedAt":1784072685483}]}`,
     )
   );
-  const page = await newClawHubClient("https://api.test", client).search(
+  const page = await createClawHubClient("https://api.test", client).search(
     undefined,
     { limit: 10 },
   );

@@ -9,7 +9,7 @@
 // orchestration (service, background index jobs, cron routing, and the
 // graph-capsule input resolver), the Runtime-owned Agent-construction
 // boundary (the Manager-bound source resolver, the tool-execution ownership
-// fence, and `newAgentManager`), and the `SessionRuntime`/`Builder` resource
+// fence, and `createAgentManager`), and the `SessionRuntime`/`Builder` resource
 // assembly (context/skills/sandbox/tools/MCP, the Runtime-owned input path,
 // expert orchestration, the artifact collector, and coordinated shutdown).
 // See docs/proposal/go-to-deno-migration.md backlog #26.

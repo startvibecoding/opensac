@@ -5,7 +5,7 @@
 // renderer, exposed through a streaming facade. Used by the TUI to render
 // streaming assistant Markdown.
 
-export { computeIDs, newNode, Node, NodeType } from "./node.ts";
+export { computeIDs, createNode, Node, NodeType } from "./node.ts";
 export {
   defaultOption,
   parse,
@@ -14,9 +14,9 @@ export {
 } from "./parser.ts";
 export {
   autoTheme,
+  createRenderer,
   defaultTheme,
   lightTheme,
-  newRenderer,
   render,
   Renderer,
   stripANSI,
@@ -25,7 +25,7 @@ export {
   wrapANSI,
 } from "./renderer.ts";
 export {
-  newStream,
+  createStream,
   render as gsmRender,
   renderWithStreamOption,
   Stream,

@@ -13,9 +13,9 @@ import type {
   ToolDefinition,
 } from "../provider/types.ts";
 import {
-  newAssistantMessage,
-  newToolResultMessage,
-  newUserMessage,
+  createAssistantMessage,
+  createToolResultMessage,
+  createUserMessage,
 } from "../provider/types.ts";
 import type { Provider } from "../provider/provider.ts";
 import {
@@ -42,7 +42,7 @@ import {
 } from "./agent_context.ts";
 
 function userMessage(text: string, systemInjected = false): Message {
-  const msg = newUserMessage(text);
+  const msg = createUserMessage(text);
   if (systemInjected) msg.systemInjected = true;
   return msg;
 }
@@ -52,7 +52,7 @@ function assistantText(text: string): Message {
 }
 
 function toolCallMessage(id: string, name: string): Message {
-  return newAssistantMessage([{
+  return createAssistantMessage([{
     type: "toolCall",
     toolCall: { id, name, arguments: {} },
   }]);
@@ -72,7 +72,7 @@ Deno.test("selectCacheMarkers", () => {
     { name: "single message", messages: [userMessage("Hello")], want: [-1, 0] },
     {
       name: "two messages",
-      messages: [userMessage("Hello"), newAssistantMessage([])],
+      messages: [userMessage("Hello"), createAssistantMessage([])],
       want: [0, 1],
     },
     {
@@ -80,7 +80,7 @@ Deno.test("selectCacheMarkers", () => {
       messages: [
         userMessage("Hello", true),
         userMessage("Message 1"),
-        newAssistantMessage([]),
+        createAssistantMessage([]),
       ],
       want: [1, 2],
     },
@@ -89,9 +89,9 @@ Deno.test("selectCacheMarkers", () => {
       messages: [
         userMessage("Session context", true),
         userMessage("Message 1"),
-        newAssistantMessage([]),
+        createAssistantMessage([]),
         userMessage("Message 2"),
-        newAssistantMessage([]),
+        createAssistantMessage([]),
       ],
       want: [3, 4],
     },
@@ -140,7 +140,7 @@ Deno.test("applyCacheMarkers", () => {
       name: "apply to content blocks",
       messages: [
         userMessage("Hello"),
-        newAssistantMessage([{ type: "text", text: "Response" }]),
+        createAssistantMessage([{ type: "text", text: "Response" }]),
       ],
       markers: [0, 1],
       wantCC: [true, true],
@@ -178,10 +178,10 @@ Deno.test("system injected messages are skipped by cache markers", () => {
   const messages = [
     userMessage("Session context", true),
     userMessage("Message 1"),
-    newAssistantMessage([]),
+    createAssistantMessage([]),
     userMessage("Compression summary", true),
     userMessage("Message 2"),
-    newAssistantMessage([]),
+    createAssistantMessage([]),
   ];
   const markers = selectCacheMarkers(messages);
   assertEquals(markers, [4, 5]);
@@ -202,7 +202,7 @@ Deno.test("repairDanglingToolCalls", async (t) => {
   await t.step("no tool calls returns input unchanged", () => {
     const msgs = [
       userMessage("hi"),
-      newAssistantMessage([{ type: "text", text: "hello" }]),
+      createAssistantMessage([{ type: "text", text: "hello" }]),
     ];
     const out = repairDanglingToolCalls(msgs);
     assertEquals(out.length, msgs.length);
@@ -212,8 +212,8 @@ Deno.test("repairDanglingToolCalls", async (t) => {
     const msgs = [
       userMessage("hi"),
       toolCallMessage("call_1", "bash"),
-      newToolResultMessage("call_1", "bash", "ok", false),
-      newAssistantMessage([{ type: "text", text: "done" }]),
+      createToolResultMessage("call_1", "bash", "ok", false),
+      createAssistantMessage([{ type: "text", text: "done" }]),
     ];
     const out = repairDanglingToolCalls(msgs);
     assertEquals(out.length, msgs.length);
@@ -240,7 +240,7 @@ Deno.test("repairDanglingToolCalls", async (t) => {
   });
 
   await t.step("result recorded later is moved adjacent", () => {
-    const late = newToolResultMessage(
+    const late = createToolResultMessage(
       "bash:0",
       "bash",
       "interrupted output",
@@ -261,7 +261,7 @@ Deno.test("repairDanglingToolCalls", async (t) => {
   });
 
   await t.step("multiple tool calls with partial results", () => {
-    const assistant = newAssistantMessage([
+    const assistant = createAssistantMessage([
       {
         type: "toolCall",
         toolCall: { id: "call_1", name: "bash", arguments: {} },
@@ -274,7 +274,7 @@ Deno.test("repairDanglingToolCalls", async (t) => {
     const msgs = [
       userMessage("hi"),
       assistant,
-      newToolResultMessage("call_1", "bash", "ok", false),
+      createToolResultMessage("call_1", "bash", "ok", false),
     ];
     const out = repairDanglingToolCalls(msgs);
     assertEquals(out.length, 4);
@@ -387,7 +387,7 @@ Deno.test("estimateChatRequestTokens grows with input", () => {
 
 Deno.test("estimateGuardRequestTokens floors tool-result token counts", () => {
   const repeated = "a".repeat(400);
-  const msg = newToolResultMessage("c", "bash", repeated, false);
+  const msg = createToolResultMessage("c", "bash", repeated, false);
   const guard = estimateGuardRequestTokens("sys", [msg], [], null);
   const plain = estimateChatRequestTokens("sys", [msg], [], null);
   assertEquals(guard >= plain, true);
@@ -400,7 +400,7 @@ Deno.test("estimateProviderUsage / completeProviderUsage", () => {
     "sys",
     [userMessage("hi")],
     [],
-    newAssistantMessage([{ type: "text", text: "hello" }]),
+    createAssistantMessage([{ type: "text", text: "hello" }]),
     null,
   );
   assertEquals(estimated.totalTokens, estimated.input + estimated.output);
@@ -471,16 +471,16 @@ Deno.test("lastUserTurnIndex finds the newest real user message", () => {
   assertEquals(
     lastUserTurnIndex([
       userMessage("a"),
-      newAssistantMessage([]),
+      createAssistantMessage([]),
       userMessage("injected", true),
-      newAssistantMessage([]),
+      createAssistantMessage([]),
     ]),
     0,
   );
   assertEquals(
     lastUserTurnIndex([
       userMessage("a", true),
-      newAssistantMessage([]),
+      createAssistantMessage([]),
       userMessage("b"),
     ]),
     2,
@@ -488,7 +488,7 @@ Deno.test("lastUserTurnIndex finds the newest real user message", () => {
 });
 
 Deno.test("isContextGuardToolResult / contextGuardToolResult", () => {
-  const plain = newToolResultMessage("c", "bash", "ok", false);
+  const plain = createToolResultMessage("c", "bash", "ok", false);
   assertEquals(isContextGuardToolResult(plain), false);
   const guard = contextGuardToolResult(plain, 100, 50, 1000, 200);
   assertEquals(guard.isError, true);

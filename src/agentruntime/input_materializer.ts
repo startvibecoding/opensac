@@ -16,7 +16,6 @@ import {
   type Database,
   InputResourceDAO,
   type InputResourceRecord,
-  isNoRowsInput,
 } from "../dao/mod.ts";
 import type { DB } from "../db/mod.ts";
 import { generateID } from "../session/entry.ts";
@@ -222,11 +221,8 @@ export class InputMaterializer {
     }
     const itemKey = this.itemKey(ingress);
     if (itemKey !== "") {
-      try {
-        return this.getByItemKey(sessionId, itemKey);
-      } catch (err) {
-        if (!isNoRowsInput(err)) throw err;
-      }
+      const existing = this.findByItemKey(sessionId, itemKey);
+      if (existing !== undefined) return existing;
     }
 
     const maxBytes = ingress.kind === ATTACHMENT_IMAGE
@@ -402,11 +398,8 @@ export class InputMaterializer {
     } catch (err) {
       removeResource();
       if (itemKey !== "") {
-        try {
-          return this.getByItemKey(sessionId, itemKey);
-        } catch {
-          // fall through to the original persistence error
-        }
+        const existing = this.findByItemKey(sessionId, itemKey);
+        if (existing !== undefined) return existing;
       }
       throw new Error(`persist input resource: ${err}`);
     }
@@ -443,6 +436,9 @@ export class InputMaterializer {
         sessionId,
         resourceId,
       );
+      if (record === undefined) {
+        throw new Error(`input resource ${resourceId} not found`);
+      }
       relativePath = record.relativePath;
       const runId = record.runId;
       const status = record.status;
@@ -528,7 +524,7 @@ export class InputMaterializer {
             sessionId,
             record.id,
           );
-          const created = new Date(createdAt);
+          const created = new Date(createdAt ?? "");
           if (
             !Number.isNaN(created.getTime()) &&
             at.getTime() - created.getTime() >= this.policy.draftMaxAge
@@ -572,13 +568,16 @@ export class InputMaterializer {
         sessionId,
         resourceId,
       );
-      record = mapInputResource(stored);
+      if (stored !== undefined) record = mapInputResource(stored);
     });
     if (record === null) throw new Error("input resource not found");
     return record;
   }
 
-  private getByItemKey(sessionId: string, itemKey: string): InputResource {
+  private findByItemKey(
+    sessionId: string,
+    itemKey: string,
+  ): InputResource | undefined {
     let record: InputResource | null = null;
     queryRootDatabase(this.sessionDir, (db) => {
       const conn = requireConn(db);
@@ -586,10 +585,9 @@ export class InputMaterializer {
         sessionId,
         itemKey,
       );
-      record = mapInputResource(stored);
+      if (stored !== undefined) record = mapInputResource(stored);
     });
-    if (record === null) throw new Error("input resource not found");
-    return record;
+    return record ?? undefined;
   }
 
   private async inputRoot(): Promise<string> {

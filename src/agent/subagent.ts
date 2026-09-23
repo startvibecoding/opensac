@@ -23,7 +23,7 @@ import {
   type TaskStatus,
 } from "../../sdk/agent/mod.ts";
 import type { Registry, Tool, ToolContext, ToolResult } from "../tools/tool.ts";
-import { newTextToolResult } from "../tools/tool.ts";
+import { createTextToolResult } from "../tools/tool.ts";
 import type { AgentAdapter } from "./bridge.ts";
 import {
   type Event,
@@ -51,6 +51,7 @@ import {
 import { goDurationString } from "./agent_support.ts";
 import type { AgentManager } from "./manager.ts";
 import {
+  createMemberCompletion,
   MEMBER_ITEM_QUESTION,
   MEMBER_STATUS_CANCELED,
   MEMBER_STATUS_DONE,
@@ -59,7 +60,6 @@ import {
   MEMBER_STATUS_QUESTION,
   type MemberCompletion,
   type MemberMailbox,
-  newMemberCompletion,
 } from "./mailbox.ts";
 import type { MemberDef } from "./memberdef.ts";
 import type { RunContext } from "./run_context.ts";
@@ -312,7 +312,7 @@ function childRunSignal(
 
 /** Reads the parent run context from a tool context, when present. */
 function parentContextFor(ctx: ToolContext): RunContext | undefined {
-  const [parentRunCtx] = parentRunContextFromToolContext(ctx);
+  const parentRunCtx = parentRunContextFromToolContext(ctx);
   return parentRunCtx;
 }
 
@@ -437,7 +437,7 @@ export class SubAgentSpawnTool implements Tool {
       memberDef = def;
     }
 
-    const [parentMode] = parentModeFromToolContext(ctx);
+    const parentMode = parentModeFromToolContext(ctx);
     const requestedMode = stringParam(params, "mode");
     let mode = requestedMode;
     if (memberDef !== undefined) {
@@ -494,8 +494,8 @@ export class SubAgentSpawnTool implements Tool {
       memberRole = memberDef.role;
     }
 
-    const [parentId] = agentIDFromToolContext(ctx);
-    const [sink] = eventSinkFromToolContext(ctx);
+    const parentId = agentIDFromToolContext(ctx);
+    const sink = eventSinkFromToolContext(ctx);
 
     const policy = defaultSubAgentPolicy();
     const run = childRunSignal(parentContextFor(ctx), policy.timeoutPerAgentMs);
@@ -588,8 +588,8 @@ export class SubAgentSpawnTool implements Tool {
           }
         }
         if (run.signal.aborted) {
-          const [st, ok] = this.manager.status(a.id());
-          if (!ok || st === undefined || !isTerminalManagedState(st.state)) {
+          const st = this.manager.status(a.id());
+          if (st === undefined || !isTerminalManagedState(st.state)) {
             const runErr = normalizeSubAgentRunError(
               a.id(),
               run.timedOut(),
@@ -609,7 +609,7 @@ export class SubAgentSpawnTool implements Tool {
       }
     })();
 
-    return newTextToolResult(JSON.stringify({
+    return createTextToolResult(JSON.stringify({
       handle: a.id(),
       status: "running",
       timeout: goDurationString(policy.timeoutPerAgentMs),
@@ -772,7 +772,7 @@ export class DelegateSubAgentTool implements Tool {
 
       let mode = stringParam(params, "mode");
       if (mode === "") {
-        const [parentMode] = parentModeFromToolContext(ctx);
+        const parentMode = parentModeFromToolContext(ctx);
         if (parentMode !== undefined && parentMode !== "") mode = parentMode;
       }
       const workDir = stringParam(params, "work_dir");
@@ -782,8 +782,8 @@ export class DelegateSubAgentTool implements Tool {
       const extra = stringParam(params, "system_prompt_extra");
       const toolFilter = stringArrayParam(params, "tools");
 
-      const [parentId] = agentIDFromToolContext(ctx);
-      const [sink] = eventSinkFromToolContext(ctx);
+      const parentId = agentIDFromToolContext(ctx);
+      const sink = eventSinkFromToolContext(ctx);
       const policy = defaultSubAgentPolicy();
       const run = childRunSignal(
         parentContextFor(ctx),
@@ -910,7 +910,7 @@ export class DelegateSubAgentTool implements Tool {
         result["status"] = "canceled";
         if (response !== "") result["partial_result"] = response;
       }
-      return newTextToolResult(JSON.stringify(result));
+      return createTextToolResult(JSON.stringify(result));
     } finally {
       this.busy = false;
     }
@@ -957,9 +957,9 @@ export class SubAgentStatusTool implements Tool {
     const handle = stringParam(params, "handle");
     if (handle === "") throw new Error("handle is required");
 
-    const [st, statusOK] = this.manager.status(handle);
-    const [a, agentOK] = this.manager.get(handle);
-    if (!statusOK && !agentOK) {
+    const st = this.manager.status(handle);
+    const a = this.manager.get(handle);
+    if (st === undefined && a === undefined) {
       throw new Error(`sub-agent ${JSON.stringify(handle)} not found`);
     }
 
@@ -967,8 +967,8 @@ export class SubAgentStatusTool implements Tool {
     if (status === "") status = "unknown";
     let lastResponse = st?.result ?? "";
     let messageCount = 0;
-    if (agentOK && a !== undefined) messageCount = a.getMessages().length;
-    if (lastResponse === "" && agentOK && a !== undefined) {
+    if (a !== undefined) messageCount = a.getMessages().length;
+    if (lastResponse === "" && a !== undefined) {
       lastResponse = lastAssistantResponse(a);
     }
 
@@ -982,7 +982,7 @@ export class SubAgentStatusTool implements Tool {
     if (st?.updatedAt !== undefined) {
       result["updated_at"] = st.updatedAt.toISOString();
     }
-    return newTextToolResult(JSON.stringify(result));
+    return createTextToolResult(JSON.stringify(result));
   }
 }
 
@@ -1029,8 +1029,8 @@ export class SubAgentSendTool implements Tool {
     if (handle === "" || message === "") {
       throw new Error("handle and message are required");
     }
-    const [a, ok] = this.manager.get(handle);
-    if (!ok || a === undefined) {
+    const a = this.manager.get(handle);
+    if (a === undefined) {
       throw new Error(`sub-agent ${JSON.stringify(handle)} not found`);
     }
 
@@ -1039,7 +1039,7 @@ export class SubAgentSendTool implements Tool {
     this.manager.markRunning(a.id());
     this.manager.setCancel(a.id(), run.cancel);
 
-    const [sink] = eventSinkFromToolContext(ctx);
+    const sink = eventSinkFromToolContext(ctx);
     void (async () => {
       try {
         for await (const e of a.run(message, run.signal)) {
@@ -1098,8 +1098,8 @@ export class SubAgentSendTool implements Tool {
           }
         }
         if (run.signal.aborted) {
-          const [st, ok] = this.manager.status(a.id());
-          if (!ok || st === undefined || !isTerminalManagedState(st.state)) {
+          const st = this.manager.status(a.id());
+          if (st === undefined || !isTerminalManagedState(st.state)) {
             this.manager.markError(
               a.id(),
               normalizeSubAgentRunError(
@@ -1117,7 +1117,7 @@ export class SubAgentSendTool implements Tool {
       }
     })();
 
-    return newTextToolResult(
+    return createTextToolResult(
       `{"handle":${JSON.stringify(handle)},"status":"message_sent"}`,
     );
   }
@@ -1182,8 +1182,8 @@ export class SubAgentAnswerTool implements Tool {
     ) {
       throw new Error("handle, question_id and answer are required");
     }
-    const [target, ok] = this.manager.get(handle);
-    if (!ok || target === undefined) {
+    const target = this.manager.get(handle);
+    if (target === undefined) {
       throw new Error(`sub-agent ${JSON.stringify(handle)} not found`);
     }
     if (!target.deliverQuestionAnswer(questionID, answer)) {
@@ -1191,7 +1191,7 @@ export class SubAgentAnswerTool implements Tool {
         `question ${questionID} is not pending on ${handle}: it was already answered, expired, or never belonged to that member`,
       );
     }
-    return newTextToolResult(`Answered ${handle}'s question ${questionID}.`);
+    return createTextToolResult(`Answered ${handle}'s question ${questionID}.`);
   }
 }
 
@@ -1239,7 +1239,7 @@ export class SubAgentDestroyTool implements Tool {
     } catch (err) {
       throw new Error(`destroy sub-agent: ${(err as Error).message}`);
     }
-    return newTextToolResult(
+    return createTextToolResult(
       `{"handle":${JSON.stringify(handle)},"status":"destroyed"}`,
     );
   }
@@ -1271,7 +1271,7 @@ export class memberNotifier {
   notify(status: string, payload: string): void {
     if (this.mailbox === undefined || this.notified) return;
     this.notified = true;
-    const completion: MemberCompletion = newMemberCompletion();
+    const completion: MemberCompletion = createMemberCompletion();
     completion.memberId = this.memberID;
     completion.displayName = this.displayName;
     completion.status = status;

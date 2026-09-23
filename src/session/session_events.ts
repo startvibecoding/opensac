@@ -129,6 +129,7 @@ export function loadSessionCapabilities(
   } catch {
     return null;
   }
+  if (record === undefined) return null;
   return {
     sessionId: record.sessionId,
     mode: record.mode,

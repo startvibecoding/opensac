@@ -22,7 +22,7 @@ export class StreamTimeoutError extends Error {
  * fails after delivering data surfaces the buffered data first, matching the
  * Go ReadCloser wrapper used by the providers.
  */
-export function newIdleTimeoutStream(
+export function createIdleTimeoutStream(
   body: ReadableStream<Uint8Array> | null,
   idleMs: number,
 ): ReadableStream<Uint8Array> | null {

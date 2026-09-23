@@ -21,13 +21,13 @@ import {
   type BeforeToolExecuteContext,
   compactionSettingsFromConfig,
   composeFollowUps,
+  createAgentWithLoopConfig,
+  createExtendBudgetTool,
+  createMemberMailbox,
   emptyIterationBudgetPolicy,
   type IterationBudgetPolicy,
   iterationBudgetPolicyEnabled,
   type MemberMailbox,
-  newAgentWithLoopConfig,
-  newExtendBudgetTool,
-  newMemberMailbox,
   resolveMaxTokens,
   type ToolCallBlockResult,
   type ToolCallResult,
@@ -59,8 +59,8 @@ import { loadConfiguredServers } from "../mcp/config.ts";
 import type { Model, ThinkingLevel } from "../provider/types.ts";
 import {
   type Attachment,
+  createUserMessage,
   type Message,
-  newUserMessage,
 } from "../provider/types.ts";
 import {
   type AttachmentMetadataResolver,
@@ -76,9 +76,9 @@ import {
 import type { RunContext } from "../agent/run_context.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
+  createManager,
   Level,
   type Manager as SandboxManager,
-  newManagerWithOptions,
   type Options as SandboxOptions,
 } from "../sandbox/sandbox.ts";
 import type { SandboxSettings } from "../config/settings.ts";
@@ -89,13 +89,13 @@ import {
 } from "../session/session_events.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import {
+  createManagerWithProjectDirs,
   type Manager as SkillsManager,
-  newManagerWithProjectDirs,
   projectSkillDirs,
 } from "../skills/mod.ts";
 import { ImageGenerationTool } from "../tools/image_generation.ts";
 import { SkillRefTool } from "../tools/skill_ref.ts";
-import { newRegistry, type Registry } from "../tools/tool.ts";
+import { createRegistry, type Registry } from "../tools/tool.ts";
 import {
   ensureProjectSkill,
   skillName as WorkflowSkillName,
@@ -120,18 +120,18 @@ import {
   type SessionAttachment,
 } from "./attachment.ts";
 import { formatKnowledgeCapsules } from "./knowledge_context.ts";
-import { ArtifactCollector, newPublishArtifactTool } from "./artifact.ts";
+import { ArtifactCollector, createPublishArtifactTool } from "./artifact.ts";
 import type { DecisionService } from "./decision.ts";
 import type { ExecutionRuntime } from "./execution.ts";
 import {
   composeSteering,
+  createExpertBinding,
   type ExpertBinding,
   expertConfigOption,
   ExpertSwitchRequiresForkError,
   expertSwitchRequiresForkMessage,
   inspectExpert as inspectExpertImpl,
   listExperts as listExpertsImpl,
-  newExpertBinding,
   type PreparedExpertResources,
   projectExpertBuild,
   resolveBoundExpertBundle,
@@ -420,12 +420,12 @@ export class SessionRuntime {
       entrySource = this.entrySource;
     }
     const resolved = resolveManagerSource(manager, { requested: entrySource });
-    const inputs = newInputMaterializer(
+    const inputs = createInputMaterializer(
       manager.getSessionDir(),
       header.cwd,
       defaultInputPolicy(),
     );
-    const attachments = newAttachmentService(
+    const attachments = createAttachmentService(
       manager.getSessionDir(),
       defaultAttachmentPolicy(),
     );
@@ -972,7 +972,7 @@ export class SessionRuntime {
         } is invalid: ${bundle.invalidReason}`,
       );
     }
-    this.expert = newExpertBinding(bundle);
+    this.expert = createExpertBinding(bundle);
   }
 
   /**
@@ -1046,7 +1046,7 @@ export class SessionRuntime {
     const workflows = this.resourceWorkflows;
     const browserEnabled = this.resourceBrowser;
     const prepared: PreparedExpertResources = {
-      binding: bundle !== null ? newExpertBinding(bundle) : null,
+      binding: bundle !== null ? createExpertBinding(bundle) : null,
       skillsMgr: null,
       extraContext: "",
       ruleContent: "",
@@ -1132,7 +1132,7 @@ export class SessionRuntime {
     const extraContext = resources.extraContext;
     const activeContext = activeSkillsContext(skillsMgr, opts.activeSkills);
     const binding = expertBundle !== null
-      ? newExpertBinding(expertBundle)
+      ? createExpertBinding(expertBundle)
       : null;
     if (this.closed) {
       throw new Error("agent runtime is closed");
@@ -1345,7 +1345,7 @@ export class SessionRuntime {
         if (text !== "") text += "\n\n";
         text += knowledge;
       }
-      return newUserMessage(text);
+      return createUserMessage(text);
     }
     const inputs = this.inputs;
     const sessionID = this.id;
@@ -1362,7 +1362,7 @@ export class SessionRuntime {
     if (knowledge !== "") {
       text += `\n\n${knowledge}`;
     }
-    return newUserMessage(text);
+    return createUserMessage(text);
   }
 
   /**
@@ -1471,8 +1471,8 @@ export class SessionRuntime {
         "artifact runtime is not bound to a session and registry",
       );
     }
-    const collector: ArtifactCollector = newArtifactCollector(this, runID);
-    registry.register(newPublishArtifactTool(collector));
+    const collector: ArtifactCollector = createArtifactCollector(this, runID);
+    registry.register(createPublishArtifactTool(collector));
     return collector;
   }
 
@@ -1682,7 +1682,7 @@ export class SessionRuntime {
         opts.maxIterations ?? 0,
       );
       if (iterationBudgetPolicyEnabled(budgetPolicy)) {
-        registry.register(newExtendBudgetTool());
+        registry.register(createExtendBudgetTool());
       }
     }
     const cfg: AgentLoopConfig = {
@@ -1732,7 +1732,7 @@ export class SessionRuntime {
       getFollowUpMessages: followUpMessages,
       forcedMode: policy.forcedMode(),
     };
-    const agent = newAgentWithLoopConfig(cfg, registry);
+    const agent = createAgentWithLoopConfig(cfg, registry);
     // Opt-in history hydration: adapters that replay history themselves
     // (ACP and other callers of loadHistoryState after the build) must keep the
     // default off, or the replayed turns would be loaded twice.
@@ -1927,12 +1927,12 @@ export class Builder {
       expertBundle,
     );
     const skillsMgr = resources.skillsMgr;
-    const sandboxMgr = newManagerWithOptions(
+    const sandboxMgr = createManager(
       opts.workDir,
       sandboxOptionsFromSettings(settings.sandbox),
     );
     sandboxMgr.setLevel(this.sandboxLevel);
-    const registry = newRegistry(opts.workDir, sandboxMgr.getActive());
+    const registry = createRegistry(opts.workDir, sandboxMgr.getActive());
     registry.registerDefaultsWithPlanTool(isPlanToolEnabled(settings));
     if (isImageGenerationEnabled(settings)) {
       registry.register(new ImageGenerationTool(settings));
@@ -1949,12 +1949,12 @@ export class Builder {
     let inputs: InputMaterializer | null = null;
     let attachments: AttachmentService | null = null;
     if (opts.manager !== undefined) {
-      inputs = newInputMaterializer(
+      inputs = createInputMaterializer(
         opts.manager.getSessionDir(),
         opts.workDir,
         defaultInputPolicy(),
       );
-      attachments = newAttachmentService(
+      attachments = createAttachmentService(
         opts.manager.getSessionDir(),
         defaultAttachmentPolicy(),
       );
@@ -1978,7 +1978,7 @@ export class Builder {
       resourceWorkflows: opts.workflows,
       resourceBrowser: opts.browser,
     });
-    runtime.mailbox = newMemberMailbox();
+    runtime.mailbox = createMemberMailbox();
     runtime.expertCenter = new Center(opts.workDir);
     runtime.refreshExpertBinding();
     runtime.applyRegistryHooks(opts.registryHooks ?? []);
@@ -2031,7 +2031,7 @@ export async function loadContextResourcesWithExpert(
   ) {
     projectDirs = [expertBundle.skillsDir, ...projectDirs];
   }
-  const skillsMgr = newManagerWithProjectDirs(
+  const skillsMgr = createManagerWithProjectDirs(
     getGlobalSkillsDir(settings),
     projectDirs,
   );
@@ -2104,14 +2104,14 @@ export function subAgentToolsEnabled(
 
 // --- Internal helpers -------------------------------------------------------
 
-function newAttachmentService(
+function createAttachmentService(
   sessionDir: string,
   policy: ReturnType<typeof defaultAttachmentPolicy>,
 ): AttachmentService {
   return new AttachmentService(sessionDir, policy);
 }
 
-function newInputMaterializer(
+function createInputMaterializer(
   sessionDir: string,
   workDir: string,
   policy: ReturnType<typeof defaultInputPolicy>,
@@ -2119,7 +2119,7 @@ function newInputMaterializer(
   return new InputMaterializer(sessionDir, workDir, policy);
 }
 
-function newArtifactCollector(
+function createArtifactCollector(
   runtime: SessionRuntime,
   runID: string,
 ): ArtifactCollector {

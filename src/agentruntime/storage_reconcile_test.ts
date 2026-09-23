@@ -12,7 +12,7 @@ import {
   reconcileArtifactStorage,
   reconcileArtifactStorageOpportunistic,
 } from "./storage_reconcile.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import { closeDatabases, rootDBPath } from "../session/root_db.ts";
 
 const artifactReconcileGraceMs = 24 * 60 * 60 * 1000;
@@ -24,7 +24,7 @@ function inputTestSession(): {
 } {
   const root = Deno.makeTempDirSync({ prefix: "opensac-reconcile-" });
   const workDir = Deno.makeTempDirSync({ prefix: "opensac-reconcile-work-" });
-  const manager = newManager(workDir, root);
+  const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
 }

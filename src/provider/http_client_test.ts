@@ -4,10 +4,10 @@
 // normalized proxy URL and HTTP/1.1 flag on the client and asserts on those.
 
 import { assert, assertEquals } from "@std/assert";
-import { newHttpClient, newHttpClientWithOptions } from "./mod.ts";
+import { createHttpClient } from "./mod.ts";
 
 Deno.test("NewHTTPClientDefaultProxy", () => {
-  const client = newHttpClient(1000, "");
+  const client = createHttpClient(1000);
   try {
     assertEquals(client.proxyUrl, undefined);
   } finally {
@@ -16,7 +16,9 @@ Deno.test("NewHTTPClientDefaultProxy", () => {
 });
 
 Deno.test("NewHTTPClientExplicitProxy", () => {
-  const client = newHttpClient(1000, " http://127.0.0.1:7890 ");
+  const client = createHttpClient(1000, {
+    proxyUrl: " http://127.0.0.1:7890 ",
+  });
   try {
     assertEquals(client.proxyUrl, "http://127.0.0.1:7890");
   } finally {
@@ -29,7 +31,7 @@ Deno.test("NewHTTPClientRejectsInvalidProxy", () => {
     assert(
       (() => {
         try {
-          newHttpClient(1000, proxyURL).close();
+          createHttpClient(1000, { proxyUrl: proxyURL }).close();
           return false;
         } catch {
           return true;
@@ -41,7 +43,7 @@ Deno.test("NewHTTPClientRejectsInvalidProxy", () => {
 });
 
 Deno.test("NewHTTPClientForceHTTP11", () => {
-  const client = newHttpClientWithOptions(1000, { forceHTTP11: true });
+  const client = createHttpClient(1000, { forceHTTP11: true });
   try {
     assertEquals(client.forceHTTP11, true);
   } finally {

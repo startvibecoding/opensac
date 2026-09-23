@@ -1,4 +1,4 @@
-import { type Frontmatter, newFrontmatter } from "./expert.ts";
+import { createFrontmatter, type Frontmatter } from "./expert.ts";
 
 /** Opens and closes a frontmatter block. */
 const frontmatterDelimiter = "---";
@@ -26,7 +26,7 @@ export function parseFrontmatter(
   if (lines.length === 0 || lines[0].trim() !== frontmatterDelimiter) {
     // No frontmatter: the whole file is the prompt.
     return {
-      frontmatter: newFrontmatter(fallbackName),
+      frontmatter: createFrontmatter(fallbackName),
       prompt: lines.join("\n").trim(),
     };
   }
@@ -42,7 +42,7 @@ export function parseFrontmatter(
       "unclosed frontmatter: missing terminating --- line",
     );
   }
-  const fm = newFrontmatter(fallbackName);
+  const fm = createFrontmatter(fallbackName);
   parseFrontmatterFields(lines.slice(1, end), fm);
   if (fm.name.trim() === "") {
     fm.name = fallbackName;

@@ -2,15 +2,15 @@
 // Persists cron jobs in the shared sessions.db database. Query construction
 // lives in dao.CronDAO; this type only maps persistence records to the cron
 // domain model. Deviations from Go: `time.Time` maps to `Date` with `null` for
-// Go's zero time (stored as an empty string), and DAO errors are detected with
-// the shared `isNoRowsRun` helper.
+// Go's zero time (stored as an empty string), and missing rows map to the
+// store's not-found error.
 
-import { CronDAO, type CronJobRecord, isNoRowsRun } from "../dao/mod.ts";
+import { CronDAO, type CronJobRecord } from "../dao/mod.ts";
 import { openBunDatabase, rootDatabasePath } from "../session/database.ts";
 import {
+  createCronID,
   type CronJob,
   type CronStore,
-  newCronID,
   runningLeaseTimeoutMs,
 } from "./cron.ts";
 
@@ -34,17 +34,14 @@ export class SQLiteCronStore implements CronStore {
   }
 
   get(id: string): CronJob {
-    try {
-      return cronJobFromRecord(this.#dao().get(id));
-    } catch (err) {
-      if (isNoRowsRun(err)) throw notFound(id);
-      throw err;
-    }
+    const record = this.#dao().get(id);
+    if (record === undefined) throw notFound(id);
+    return cronJobFromRecord(record);
   }
 
   create(job: CronJob): CronJob {
     const record = cronJobRecord(job);
-    if (record.id === "") record.id = newCronID();
+    if (record.id === "") record.id = createCronID();
     if (record.createdAt === "") record.createdAt = formatCronTime(new Date());
     try {
       this.#dao().create(record);
@@ -56,21 +53,23 @@ export class SQLiteCronStore implements CronStore {
 
   update(job: CronJob): void {
     const record = cronJobRecord(job);
+    let updated: boolean;
     try {
-      this.#dao().update(record);
+      updated = this.#dao().update(record);
     } catch (err) {
-      if (isNoRowsRun(err)) throw notFound(record.id);
       throw new Error(`update cron job "${record.id}": ${errorMessage(err)}`);
     }
+    if (!updated) throw notFound(record.id);
   }
 
   delete(id: string): void {
+    let deleted: boolean;
     try {
-      this.#dao().delete(id);
+      deleted = this.#dao().delete(id);
     } catch (err) {
-      if (isNoRowsRun(err)) throw notFound(id);
       throw new Error(`delete cron job "${id}": ${errorMessage(err)}`);
     }
+    if (!deleted) throw notFound(id);
   }
 
   /**
@@ -87,7 +86,7 @@ export class SQLiteCronStore implements CronStore {
 }
 
 /** Creates a SQLite-backed cron store rooted at `sessionDir`. */
-export function newSQLiteCronStore(sessionDir: string): SQLiteCronStore {
+export function createSQLiteCronStore(sessionDir: string): SQLiteCronStore {
   return new SQLiteCronStore(sessionDir);
 }
 

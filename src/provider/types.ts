@@ -110,14 +110,14 @@ export interface Message {
 }
 
 /** Creates a simple user text message. */
-export function newUserMessage(text: string): Message {
+export function createUserMessage(text: string): Message {
   return { role: "user", content: text, timestamp: new Date() };
 }
 
 /**
  * Creates a system-injected user message (skipped by cache markers).
  */
-export function newSystemInjectedUserMessage(text: string): Message {
+export function createSystemInjectedUserMessage(text: string): Message {
   return {
     role: "user",
     content: text,
@@ -127,37 +127,21 @@ export function newSystemInjectedUserMessage(text: string): Message {
 }
 
 /** Creates an assistant message with content blocks. */
-export function newAssistantMessage(contents: ContentBlock[]): Message {
+export function createAssistantMessage(contents: ContentBlock[]): Message {
   return { role: "assistant", contents, timestamp: new Date() };
 }
 
 /** Creates a tool result message. */
-export function newToolResultMessage(
-  toolCallId: string,
-  toolName: string,
-  content: string,
-  isError: boolean,
-): Message {
-  return {
-    role: "toolResult",
-    content,
-    toolCallId,
-    toolName,
-    isError,
-    timestamp: new Date(),
-  };
-}
-
 /**
- * Creates a tool result message with rich content blocks.
- * If contents is undefined or empty, it falls back to using the text parameter.
+ * Creates a tool result message. Rich content blocks may be supplied; when
+ * `contents` is null or empty only the text is used.
  */
-export function newToolResultMessageWithContents(
+export function createToolResultMessage(
   toolCallId: string,
   toolName: string,
   text: string,
-  contents: ContentBlock[] | null,
   isError: boolean,
+  contents: ContentBlock[] | null = null,
 ): Message {
   const msg: Message = {
     role: "toolResult",
@@ -168,7 +152,7 @@ export function newToolResultMessageWithContents(
   };
   if (contents !== null && contents.length > 0) {
     msg.contents = contents;
-    // Also set Content for backward compatibility (display/logging)
+    // Also set content for backward compatibility (display/logging).
     msg.content = text;
   } else {
     msg.content = text;
@@ -343,7 +327,7 @@ export interface Cost {
 }
 
 /** Returns a zero-valued Cost. */
-export function newCost(): Cost {
+export function createCost(): Cost {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
 }
 

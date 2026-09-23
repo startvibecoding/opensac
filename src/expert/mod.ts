@@ -3,12 +3,12 @@
 export {
   type AgentDef,
   type Bundle,
+  createFrontmatter,
   expertSchemaVersion,
   type Frontmatter,
   type LocalizedText,
   type Manifest,
   type MemberMeta,
-  newFrontmatter,
   roleLead,
   roleMember,
   sourceBuiltin,

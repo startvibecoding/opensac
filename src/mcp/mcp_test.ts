@@ -12,7 +12,7 @@ import {
   sanitizeToolName,
   uniqueToolName,
 } from "./mcp.ts";
-import { newRegistry } from "../tools/mod.ts";
+import { createRegistry } from "../tools/mod.ts";
 
 function streamFrom(text: string): ReadableStream<Uint8Array> {
   return new Blob([text]).stream();
@@ -127,7 +127,7 @@ Deno.test("isMCPMethodNotFound", () => {
 });
 
 Deno.test("MCP SSE rejects invalid message URL", async () => {
-  const registry = newRegistry(Deno.makeTempDirSync(), undefined);
+  const registry = createRegistry(Deno.makeTempDirSync(), undefined);
   let threw = false;
   try {
     await connectServers(

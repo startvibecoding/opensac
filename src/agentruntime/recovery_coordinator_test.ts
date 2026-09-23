@@ -6,7 +6,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { closeDatabases } from "../session/root_db.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import { getSessionRun, getSessionRunRecovery } from "../session/mod.ts";
 import { acquireExecutionAdmission } from "../session/runtime_lock.ts";
 import { type DurableRun, RecoveryCoordinator, RunStore } from "./mod.ts";
@@ -43,7 +43,7 @@ function durableRun(overrides: Partial<DurableRun>): DurableRun {
 }
 
 function initSession(sessionDir: string, id: string): void {
-  newManager(Deno.makeTempDirSync(), sessionDir).initWithID(id);
+  createManager(Deno.makeTempDirSync(), sessionDir).initWithID(id);
 }
 
 function delay(ms: number): Promise<void> {

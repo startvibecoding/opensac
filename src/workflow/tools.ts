@@ -23,13 +23,13 @@ import {
 import type { AgentManager } from "../agent/manager.ts";
 import { forwardChildAgentEvent } from "../agent/subagent.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
   type ToolResult,
 } from "../tools/tool.ts";
-import { type ActiveRegistry, newActiveRegistry } from "./active.ts";
+import { type ActiveRegistry, createActiveRegistry } from "./active.ts";
 import { AgentHost } from "./agent_host.ts";
 import { lintEvalTimeoutMs } from "./js.ts";
 import { Runner } from "./runner.ts";
@@ -118,7 +118,7 @@ export async function lintWorkflowSourceWithin(
   const host = new LintHost();
   const runner = new Runner({
     host,
-    active: newActiveRegistry(),
+    active: createActiveRegistry(),
     concurrency: 100,
     evalTimeoutMs,
   });
@@ -214,7 +214,7 @@ export class LintTool implements Tool {
     source = source.trim();
     if (source === "") throw new Error("source is required");
     const result = await lintWorkflowSource(source);
-    return newTextToolResult(JSON.stringify(result));
+    return createTextToolResult(JSON.stringify(result));
   }
 }
 
@@ -231,7 +231,7 @@ export class RunTool implements Tool {
   ) {
     this.#manager = manager;
     this.#store = store;
-    this.#active = active ?? newActiveRegistry();
+    this.#active = active ?? createActiveRegistry();
   }
 
   name(): string {
@@ -300,10 +300,10 @@ export class RunTool implements Tool {
     source = source.trim();
     if (source === "") throw new Error("source is required");
 
-    const [parentId] = agentIDFromToolContext(ctx);
-    const [parentSink] = eventSinkFromToolContext(ctx);
-    const [parentRunCtx] = parentRunContextFromToolContext(ctx);
-    const [parentMode] = parentModeFromToolContext(ctx);
+    const parentId = agentIDFromToolContext(ctx);
+    const parentSink = eventSinkFromToolContext(ctx);
+    const parentRunCtx = parentRunContextFromToolContext(ctx);
+    const parentMode = parentModeFromToolContext(ctx);
 
     const host = new AgentHost();
     host.manager = this.#manager;
@@ -406,10 +406,10 @@ export class StatusTool implements Tool {
     id = id.trim();
     if (id === "") {
       const runs = await this.#store.list();
-      return newTextToolResult(JSON.stringify(runs));
+      return createTextToolResult(JSON.stringify(runs));
     }
     const state = await this.#store.load(id);
-    return newTextToolResult(JSON.stringify(state));
+    return createTextToolResult(JSON.stringify(state));
   }
 }
 
@@ -460,7 +460,7 @@ export class CancelTool implements Tool {
       if (!this.#active.cancel(id)) {
         throw new Error(`workflow run ${JSON.stringify(id)} is not active`);
       }
-      return newTextToolResult(
+      return createTextToolResult(
         JSON.stringify({ id, status: statusCanceled }),
       );
     });
@@ -468,12 +468,12 @@ export class CancelTool implements Tool {
 }
 
 /** Constructs the lint tool. */
-export function newLintTool(): LintTool {
+export function createLintTool(): LintTool {
   return new LintTool();
 }
 
 /** Constructs the run tool. */
-export function newRunTool(
+export function createRunTool(
   manager?: AgentManager,
   store?: Store,
   active?: ActiveRegistry,
@@ -482,22 +482,22 @@ export function newRunTool(
 }
 
 /** Constructs the run tool with an explicit active registry. */
-export function newRunToolWithActive(
+export function createRunToolWithActive(
   manager?: AgentManager,
   store?: Store,
   active?: ActiveRegistry,
 ): RunTool {
-  return new RunTool(manager, store, active ?? newActiveRegistry());
+  return new RunTool(manager, store, active ?? createActiveRegistry());
 }
 
 /** Constructs the status tool. */
-export function newStatusTool(store: Store): StatusTool {
+export function createStatusTool(store: Store): StatusTool {
   return new StatusTool(store);
 }
 
 /** Constructs the cancel tool. */
-export function newCancelTool(active?: ActiveRegistry): CancelTool {
-  return new CancelTool(active ?? newActiveRegistry());
+export function createCancelTool(active?: ActiveRegistry): CancelTool {
+  return new CancelTool(active ?? createActiveRegistry());
 }
 
 /**
@@ -517,18 +517,18 @@ export function registerWorkflowTools(
 ): void {
   if (registry === undefined || registry === null) return;
   const store = opts.store ?? defaultStore();
-  const active = opts.active ?? newActiveRegistry();
-  registry.register(newLintTool());
+  const active = opts.active ?? createActiveRegistry();
+  registry.register(createLintTool());
   if (opts.manager !== undefined && opts.manager !== null) {
-    registry.register(newRunToolWithActive(opts.manager, store, active));
+    registry.register(createRunToolWithActive(opts.manager, store, active));
   }
-  registry.register(newStatusTool(store));
-  registry.register(newCancelTool(active));
+  registry.register(createStatusTool(store));
+  registry.register(createCancelTool(active));
 }
 
 /** Serializes a completed workflow run into the `workflow_run` tool result. */
 export function runToolResult(state: RunState): ToolResult {
-  return newTextToolResult(JSON.stringify({
+  return createTextToolResult(JSON.stringify({
     id: state.id,
     name: state.name,
     status: state.status,

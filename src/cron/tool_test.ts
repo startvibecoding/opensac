@@ -1,14 +1,11 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { CronJob } from "./cron.ts";
-import {
-  newSessionScopedStore,
-  newSessionScopedStoreWithWorkDir,
-} from "./session_store.ts";
-import { newSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
-import { newCronTool } from "./tool.ts";
+import { createSessionScopedStore } from "./session_store.ts";
+import { createSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
+import { createCronTool } from "./tool.ts";
 
-function newStore(): SQLiteCronStore {
-  return newSQLiteCronStore(
+function createStore(): SQLiteCronStore {
+  return createSQLiteCronStore(
     Deno.makeTempDirSync({ prefix: "opensac-cron-tool-" }),
   );
 }
@@ -18,8 +15,8 @@ function create(store: SQLiteCronStore, job: CronJob): CronJob {
 }
 
 Deno.test("CronToolCreateOneShot", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   const result = tool.execute({}, {
     action: "create",
@@ -36,8 +33,8 @@ Deno.test("CronToolCreateOneShot", () => {
 });
 
 Deno.test("CronToolCreatePeriodic", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   const result = tool.execute({}, {
     action: "create",
@@ -58,8 +55,8 @@ Deno.test("CronToolCreatePeriodic", () => {
 });
 
 Deno.test("CronToolCreateDefaultOneShot", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   tool.execute({}, {
     action: "create",
@@ -73,8 +70,8 @@ Deno.test("CronToolCreateDefaultOneShot", () => {
 });
 
 Deno.test("CronToolList", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   // Empty list
   let result = tool.execute({}, { action: "list" });
@@ -87,8 +84,8 @@ Deno.test("CronToolList", () => {
 });
 
 Deno.test("CronToolEnableDisable", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   const job = create(store, { name: "test", prompt: "test", enabled: true });
 
@@ -100,8 +97,8 @@ Deno.test("CronToolEnableDisable", () => {
 });
 
 Deno.test("CronToolRunReenablesDisabledJob", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
   const job = create(store, {
     id: "manual",
     name: "manual",
@@ -122,8 +119,8 @@ Deno.test("CronToolRunReenablesDisabledJob", () => {
 });
 
 Deno.test("CronToolRemove", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   const job = create(store, { name: "test", prompt: "test", enabled: true });
 
@@ -132,14 +129,14 @@ Deno.test("CronToolRemove", () => {
 });
 
 Deno.test("CronToolSessionScopedCreateAndDeleteByName", () => {
-  const base = newStore();
-  const current = newSessionScopedStoreWithWorkDir(
+  const base = createStore();
+  const current = createSessionScopedStore(
     base,
     "session-a",
     "/tmp/session-a",
   );
-  const other = newSessionScopedStore(base, "session-b");
-  const tool = newCronTool(current);
+  const other = createSessionScopedStore(base, "session-b");
+  const tool = createCronTool(current);
 
   other.create({ name: "other", prompt: "other", enabled: true });
   tool.execute({}, {
@@ -163,8 +160,8 @@ Deno.test("CronToolSessionScopedCreateAndDeleteByName", () => {
 });
 
 Deno.test("CronToolMissingParams", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
 
   assertThrows(
     () => tool.execute({}, { action: "create", prompt: "test" }),
@@ -187,7 +184,7 @@ Deno.test("CronToolMissingParams", () => {
 });
 
 Deno.test("CronToolUnknownAction", () => {
-  const store = newStore();
-  const tool = newCronTool(store);
+  const store = createStore();
+  const tool = createCronTool(store);
   assertThrows(() => tool.execute({}, { action: "invalid" }));
 });

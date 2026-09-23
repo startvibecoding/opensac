@@ -107,7 +107,7 @@ export class WinSandbox implements Sandbox {
 }
 
 /** Creates a new Windows sandbox. */
-export function newWinSandbox(projectDir: string, level: Level): WinSandbox {
+export function createWinSandbox(projectDir: string, level: Level): WinSandbox {
   return new WinSandbox(projectDir, level);
 }
 

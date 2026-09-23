@@ -36,7 +36,10 @@ import {
 } from "../types.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
 import { applyHeaders } from "../http_client.ts";
-import { newIdleTimeoutStream, streamIdleTimeoutMs } from "../idle_timeout.ts";
+import {
+  createIdleTimeoutStream,
+  streamIdleTimeoutMs,
+} from "../idle_timeout.ts";
 import {
   formatRetryMessage,
   isRetryable,
@@ -363,7 +366,7 @@ export async function* chatResponses(
       return;
     }
 
-    const streamBody = newIdleTimeoutStream(resp.body, streamIdleTimeoutMs);
+    const streamBody = createIdleTimeoutStream(resp.body, streamIdleTimeoutMs);
     const state = { visibleOutput: false };
     let streamErr: Error | undefined;
     let sawError = false;

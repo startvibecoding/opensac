@@ -14,7 +14,7 @@
 import { createHash } from "node:crypto";
 import type { KnowledgeBase } from "../session/mod.ts";
 import {
-  newManager,
+  createManager,
   openByIDExact,
   SessionIDExistsError,
 } from "../session/mod.ts";
@@ -64,7 +64,7 @@ export function openKnowledgeLibrarianSession(
   } catch {
     // Not found: fall through to creation.
   }
-  const manager = newManager(base.rootDir, sessionDir);
+  const manager = createManager(base.rootDir, sessionDir);
   try {
     manager.initWithID(id);
     return manager;

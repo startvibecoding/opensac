@@ -53,6 +53,7 @@ import {
   truncateKnowledgeText,
 } from "./knowledge_context.ts";
 import {
+  createKnowledgeIndexJob,
   KNOWLEDGE_INDEX_PHASE_COMMITTING,
   KNOWLEDGE_INDEX_PHASE_ENRICHING,
   KNOWLEDGE_INDEX_PHASE_INDEXING,
@@ -60,7 +61,6 @@ import {
   knowledgeBaseDisabledError,
   KnowledgeIndexJob,
   type KnowledgeIndexProgress,
-  newKnowledgeIndexJob,
 } from "./knowledge_index_job.ts";
 import {
   appendVerifiedCoMentionEdges,
@@ -99,8 +99,8 @@ import type { InputSubmission } from "./input_materializer.ts";
 import type { SessionRuntime } from "./session_runtime.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
-import { newRegistryWithConfig } from "../tools/tool.ts";
-import { newUserMessage } from "../provider/types.ts";
+import { createRegistryWithConfig } from "../tools/tool.ts";
+import { createUserMessage } from "../provider/types.ts";
 import {
   EVENT_ERROR,
   EVENT_RUN_FINISHED,
@@ -677,7 +677,7 @@ export class KnowledgeBaseService {
     if (!base.enabled) throw knowledgeBaseDisabledError(base.id);
     const existing = this.indexJobs.get(knowledgeBaseID);
     if (existing !== undefined && !existing.finished) return existing;
-    const job = newKnowledgeIndexJob();
+    const job = createKnowledgeIndexJob();
     this.indexJobs.set(knowledgeBaseID, job);
     void (async () => {
       try {
@@ -761,7 +761,7 @@ export class KnowledgeBaseService {
     ) {
       throw new Error("knowledge indexer execution session is unavailable");
     }
-    const registry = newRegistryWithConfig({
+    const registry = createRegistryWithConfig({
       workDir: base.rootDir,
       toolFilter: ["read", "ls", "grep", "find"],
     });
@@ -898,7 +898,7 @@ export class KnowledgeBaseService {
     }
     const manager = openKnowledgeLibrarianSession(this.sessionDirValue, base);
     const sessionID = manager.getHeader()?.id ?? "";
-    const registry = newRegistryWithConfig({
+    const registry = createRegistryWithConfig({
       workDir: base.rootDir,
       toolFilter: ["read", "ls", "grep", "find"],
     });
@@ -927,7 +927,7 @@ export class KnowledgeBaseService {
         runtime.setExecution(execution);
         const startedAt = new Date();
         const prompt = librarianPrompt(graph, question);
-        const userMessage = newUserMessage(prompt);
+        const userMessage = createUserMessage(prompt);
         const data = {
           knowledgeBaseId: base.id,
           snapshotId: graph.snapshot.id,
@@ -1063,39 +1063,18 @@ export class KnowledgeBaseService {
   }
 }
 
-/** Creates the deterministic service without the configured Indexer role. */
-export function newKnowledgeBaseService(
+/**
+ * Creates the service. Without `settings` it runs the deterministic scan only;
+ * supplying `settings` and a provider factory enables the configured Indexer
+ * Agent role on top of it (tests may pass their own factory).
+ */
+export function createKnowledgeBaseService(
   sessionDir: string,
   policy: KnowledgeBaseIndexPolicy,
-): KnowledgeBaseService {
-  return newKnowledgeBaseServiceWithProviderFactory(
-    sessionDir,
-    policy,
-    null,
-    null,
-  );
-}
-
-/** Enables the configured Indexer Agent role on top of the deterministic scan. */
-export function newKnowledgeBaseServiceWithSettings(
-  sessionDir: string,
-  policy: KnowledgeBaseIndexPolicy,
-  settings: Settings,
-): KnowledgeBaseService {
-  return newKnowledgeBaseServiceWithProviderFactory(
-    sessionDir,
-    policy,
-    settings,
-    defaultKnowledgeProviderFactory,
-  );
-}
-
-/** The testable constructor for Runtime-owned provider selection. */
-export function newKnowledgeBaseServiceWithProviderFactory(
-  sessionDir: string,
-  policy: KnowledgeBaseIndexPolicy,
-  settings: Settings | null,
-  factory: KnowledgeBaseProviderFactory | null,
+  settings: Settings | null = null,
+  factory: KnowledgeBaseProviderFactory | null = settings
+    ? defaultKnowledgeProviderFactory
+    : null,
 ): KnowledgeBaseService {
   if (sessionDir.trim() === "") {
     throw new Error("knowledge base session directory is required");
@@ -1125,7 +1104,7 @@ export function prepareKnowledgeContext(
       `at most ${maxKnowledgeBaseReferences} knowledge bases may be referenced by one request`,
     );
   }
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -1278,7 +1257,7 @@ export async function withKnowledgeContext(
   if (manager === undefined || sessionDir.trim() === "") {
     throw new Error("knowledge base session directory is unavailable");
   }
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );

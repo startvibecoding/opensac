@@ -5,17 +5,17 @@
 // same thread must lose exactly as a racing goroutine would.
 
 import { assert, assertEquals, assertThrows } from "@std/assert";
-import { newCronID, runningLeaseTimeoutMs } from "./cron.ts";
-import { newSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
+import { createCronID, runningLeaseTimeoutMs } from "./cron.ts";
+import { createSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
 
-function newStore(): SQLiteCronStore {
-  return newSQLiteCronStore(
+function createStore(): SQLiteCronStore {
+  return createSQLiteCronStore(
     Deno.makeTempDirSync({ prefix: "opensac-cron-store-" }),
   );
 }
 
 Deno.test("SQLiteCronStoreCreate", () => {
-  const store = newStore();
+  const store = createStore();
   const job = store.create({
     name: "test job",
     prompt: "do something",
@@ -29,7 +29,7 @@ Deno.test("SQLiteCronStoreCreate", () => {
 });
 
 Deno.test("SQLiteCronStoreCreateDuplicate", () => {
-  const store = newStore();
+  const store = createStore();
   store.create({ id: "j1", name: "first" });
   assertThrows(
     () => store.create({ id: "j1", name: "duplicate" }),
@@ -43,7 +43,7 @@ Deno.test("NewCronIDUnique", () => {
   const count = 500;
   const seen = new Set<string>();
   for (let i = 0; i < count; i++) {
-    const id = newCronID();
+    const id = createCronID();
     assert(!seen.has(id), `duplicate id: ${id}`);
     seen.add(id);
   }
@@ -51,7 +51,7 @@ Deno.test("NewCronIDUnique", () => {
 });
 
 Deno.test("SQLiteCronStoreList", () => {
-  const store = newStore();
+  const store = createStore();
   store.create({ name: "job1" });
   store.create({ name: "job2" });
   store.create({ name: "job3" });
@@ -59,19 +59,19 @@ Deno.test("SQLiteCronStoreList", () => {
 });
 
 Deno.test("SQLiteCronStoreGet", () => {
-  const store = newStore();
+  const store = createStore();
   const created = store.create({ id: "j1", name: "test" });
   const got = store.get("j1");
   assertEquals(got.name, created.name);
 });
 
 Deno.test("SQLiteCronStoreGetNotFound", () => {
-  const store = newStore();
+  const store = createStore();
   assertThrows(() => store.get("nonexistent"));
 });
 
 Deno.test("SQLiteCronStoreUpdate", () => {
-  const store = newStore();
+  const store = createStore();
   store.create({ id: "j1", name: "original" });
   const job = store.get("j1");
   job.name = "updated";
@@ -83,24 +83,24 @@ Deno.test("SQLiteCronStoreUpdate", () => {
 });
 
 Deno.test("SQLiteCronStoreUpdateNotFound", () => {
-  const store = newStore();
+  const store = createStore();
   assertThrows(() => store.update({ id: "nonexistent" }));
 });
 
 Deno.test("SQLiteCronStoreDelete", () => {
-  const store = newStore();
+  const store = createStore();
   store.create({ id: "j1", name: "to delete" });
   store.delete("j1");
   assertThrows(() => store.get("j1"));
 });
 
 Deno.test("SQLiteCronStoreDeleteNotFound", () => {
-  const store = newStore();
+  const store = createStore();
   assertThrows(() => store.delete("nonexistent"));
 });
 
 Deno.test("SQLiteCronStoreClaimDueIsAtomic", () => {
-  const store = newStore();
+  const store = createStore();
   store.create({ id: "due", name: "due", enabled: true });
 
   const first = store.claimDue("due", new Date());
@@ -110,7 +110,7 @@ Deno.test("SQLiteCronStoreClaimDueIsAtomic", () => {
 });
 
 Deno.test("SQLiteCronStoreClaimDueHonorsFutureNextRun", () => {
-  const store = newStore();
+  const store = createStore();
   const future = new Date(Date.now() + 3_600_000);
   store.create({
     id: "future",
@@ -122,7 +122,7 @@ Deno.test("SQLiteCronStoreClaimDueHonorsFutureNextRun", () => {
 });
 
 Deno.test("SQLiteCronStoreClaimDueReclaimsStaleRunning", () => {
-  const store = newStore();
+  const store = createStore();
   const old = new Date(Date.now() - runningLeaseTimeoutMs - 60_000);
   store.create({
     id: "stale",
@@ -139,10 +139,10 @@ Deno.test("SQLiteCronStoreClaimDueReclaimsStaleRunning", () => {
 
 Deno.test("SQLiteCronStorePersistence", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-cron-persist-" });
-  const store1 = newSQLiteCronStore(dir);
+  const store1 = createSQLiteCronStore(dir);
   store1.create({ id: "j1", name: "persistent", prompt: "test" });
 
-  const store2 = newSQLiteCronStore(dir);
+  const store2 = createSQLiteCronStore(dir);
   const got = store2.get("j1");
   assertEquals(got.name, "persistent");
 });

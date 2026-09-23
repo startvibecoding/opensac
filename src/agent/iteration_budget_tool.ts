@@ -1,5 +1,5 @@
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -75,17 +75,17 @@ export class ExtendBudgetTool implements Tool {
     }
     const { granted, remaining, renewals } = budget.request(additional, reason);
     if (granted <= 0) {
-      return newTextToolResult(
+      return createTextToolResult(
         `Iteration budget is already at its hard ceiling (${budget.hardValue()}). ${remaining} turns remain; finish the task or summarize progress.`,
       );
     }
-    return newTextToolResult(
+    return createTextToolResult(
       `Granted ${granted} additional turns. Effective limit is now ${budget.limitValue()} (${budget.hardValue()} hard), ${remaining} turns remaining, ${renewals} renewal(s) used.`,
     );
   }
 }
 
 /** Creates the extend_budget tool. */
-export function newExtendBudgetTool(): ExtendBudgetTool {
+export function createExtendBudgetTool(): ExtendBudgetTool {
   return new ExtendBudgetTool();
 }

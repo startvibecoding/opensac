@@ -7,11 +7,14 @@ import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
 import {
   applyHeaders,
+  createStreamHttpClient,
   type HttpClient,
   type HTTPClientOptions,
-  newStreamHttpClientWithOptions,
 } from "../http_client.ts";
-import { newIdleTimeoutStream, streamIdleTimeoutMs } from "../idle_timeout.ts";
+import {
+  createIdleTimeoutStream,
+  streamIdleTimeoutMs,
+} from "../idle_timeout.ts";
 import type { Provider as ProviderInterface } from "../provider.ts";
 import {
   formatRetryMessage,
@@ -350,7 +353,10 @@ export class Provider extends BaseProvider implements ProviderInterface {
         return;
       }
 
-      const streamBody = newIdleTimeoutStream(resp.body, streamIdleTimeoutMs);
+      const streamBody = createIdleTimeoutStream(
+        resp.body,
+        streamIdleTimeoutMs,
+      );
       const state = { visibleOutput: false };
       let streamErr: unknown = undefined;
       try {
@@ -910,119 +916,77 @@ const geminiDefaultBaseURL =
 const vertexDefaultBaseURL =
   "https://aiplatform.googleapis.com/v1/publishers/google/models";
 
-export function newGeminiProvider(apiKey: string, baseURL: string): Provider {
-  return newGeminiProviderWithModels(
-    apiKey,
-    baseURL,
-    defaultModels("google-gemini"),
-  );
-}
-
-export function newGeminiProviderWithModels(
+/**
+ * Creates a Google Gemini provider. Without explicit transport options a
+ * failed client construction falls back to a plain streaming client; explicit
+ * options keep the original failure.
+ */
+export function createGeminiProvider(
   apiKey: string,
   baseURL: string,
-  models: Model[],
+  models: Model[] = defaultModels("google-gemini"),
+  opts: HTTPClientOptions | undefined = undefined,
 ): Provider {
   try {
-    return newGeminiProviderWithModelsAndProxy(apiKey, baseURL, "", models);
-  } catch {
-    return newProviderWithHTTPClient(
+    return createGoogleProvider(
       "google-gemini",
       apiKindGemini,
       apiKey,
       baseURL,
       geminiDefaultBaseURL,
       models,
-      newStreamHttpClientWithOptions({}),
+      opts ?? {},
+    );
+  } catch (err) {
+    if (opts !== undefined) throw err;
+    return createGoogleProviderWithHTTPClient(
+      "google-gemini",
+      apiKindGemini,
+      apiKey,
+      baseURL,
+      geminiDefaultBaseURL,
+      models,
+      createStreamHttpClient({}),
     );
   }
 }
 
-export function newGeminiProviderWithModelsAndProxy(
+/**
+ * Creates a Google Vertex provider. Without explicit transport options a
+ * failed client construction falls back to a plain streaming client; explicit
+ * options keep the original failure.
+ */
+export function createVertexProvider(
   apiKey: string,
   baseURL: string,
-  proxyURL: string,
-  models: Model[],
-): Provider {
-  return newGeminiProviderWithModelsAndOptions(apiKey, baseURL, models, {
-    proxyUrl: proxyURL,
-  });
-}
-
-export function newGeminiProviderWithModelsAndOptions(
-  apiKey: string,
-  baseURL: string,
-  models: Model[],
-  opts: HTTPClientOptions,
-): Provider {
-  return newProvider(
-    "google-gemini",
-    apiKindGemini,
-    apiKey,
-    baseURL,
-    geminiDefaultBaseURL,
-    models,
-    opts,
-  );
-}
-
-export function newVertexProvider(apiKey: string, baseURL: string): Provider {
-  return newVertexProviderWithModels(
-    apiKey,
-    baseURL,
-    defaultModels("google-vertex"),
-  );
-}
-
-export function newVertexProviderWithModels(
-  apiKey: string,
-  baseURL: string,
-  models: Model[],
+  models: Model[] = defaultModels("google-vertex"),
+  opts: HTTPClientOptions | undefined = undefined,
 ): Provider {
   try {
-    return newVertexProviderWithModelsAndProxy(apiKey, baseURL, "", models);
-  } catch {
-    return newProviderWithHTTPClient(
+    return createGoogleProvider(
       "google-vertex",
       apiKindVertex,
       apiKey,
       baseURL,
       vertexDefaultBaseURL,
       models,
-      newStreamHttpClientWithOptions({}),
+      opts ?? {},
+    );
+  } catch (err) {
+    if (opts !== undefined) throw err;
+    return createGoogleProviderWithHTTPClient(
+      "google-vertex",
+      apiKindVertex,
+      apiKey,
+      baseURL,
+      vertexDefaultBaseURL,
+      models,
+      createStreamHttpClient({}),
     );
   }
 }
 
-export function newVertexProviderWithModelsAndProxy(
-  apiKey: string,
-  baseURL: string,
-  proxyURL: string,
-  models: Model[],
-): Provider {
-  return newVertexProviderWithModelsAndOptions(apiKey, baseURL, models, {
-    proxyUrl: proxyURL,
-  });
-}
-
-export function newVertexProviderWithModelsAndOptions(
-  apiKey: string,
-  baseURL: string,
-  models: Model[],
-  opts: HTTPClientOptions,
-): Provider {
-  return newProvider(
-    "google-vertex",
-    apiKindVertex,
-    apiKey,
-    baseURL,
-    vertexDefaultBaseURL,
-    models,
-    opts,
-  );
-}
-
-function newProvider(
+function createGoogleProvider(
   name: string,
   kind: APIKind,
   apiKey: string,
@@ -1033,12 +997,12 @@ function newProvider(
 ): Provider {
   let client: HttpClient;
   try {
-    client = newStreamHttpClientWithOptions(opts);
+    client = createStreamHttpClient(opts);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`configure http proxy: ${msg}`);
   }
-  return newProviderWithHTTPClient(
+  return createGoogleProviderWithHTTPClient(
     name,
     kind,
     apiKey,
@@ -1053,7 +1017,7 @@ function newProvider(
  * Creates a provider bound to the given HTTP client. Mirrors the unexported Go
  * helper and serves as the TS test seam.
  */
-export function newProviderWithHTTPClient(
+export function createGoogleProviderWithHTTPClient(
   name: string,
   kind: APIKind,
   apiKey: string,

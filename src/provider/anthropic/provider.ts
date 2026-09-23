@@ -12,11 +12,14 @@ import { debugCompleteResponse, debugJSON } from "../debug.ts";
 import { hostedToolType } from "../hosted_tools.ts";
 import {
   applyHeaders,
+  createStreamHttpClient,
   type HttpClient,
   type HTTPClientOptions,
-  newStreamHttpClientWithOptions,
 } from "../http_client.ts";
-import { newIdleTimeoutStream, streamIdleTimeoutMs } from "../idle_timeout.ts";
+import {
+  createIdleTimeoutStream,
+  streamIdleTimeoutMs,
+} from "../idle_timeout.ts";
 import type { Provider as ProviderInterface } from "../provider.ts";
 import {
   formatRetryMessage,
@@ -462,7 +465,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
         return;
       }
 
-      const streamBody = newIdleTimeoutStream(
+      const streamBody = createIdleTimeoutStream(
         resp.body,
         streamIdleTimeoutMs,
       );
@@ -1188,64 +1191,49 @@ export function defaultModels(): Model[] {
 }
 
 /** Creates a new Anthropic provider with default models. */
-export function newProvider(apiKey: string, baseURL: string): Provider {
-  return newProviderWithModels(apiKey, baseURL, defaultModels());
-}
-
-/** Creates a new Anthropic provider with custom models. */
-export function newProviderWithModels(
+/**
+ * Creates an Anthropic provider. Without explicit transport options a failed
+ * client construction falls back to a bare streaming client (Go parity);
+ * explicit options keep the wrapped failure.
+ */
+export function createAnthropicProvider(
   apiKey: string,
   baseURL: string,
-  models: Model[],
+  models: Model[] = defaultModels(),
+  opts: HTTPClientOptions | undefined = undefined,
 ): Provider {
   try {
-    return newProviderWithModelsAndProxy(apiKey, baseURL, "", models);
-  } catch {
-    // Mirror the Go fallback: fall back to a bare client when the default
-    // stream client cannot be constructed.
-    return newProviderWithHTTPClient(
+    let client: HttpClient;
+    try {
+      client = createStreamHttpClient(opts ?? {});
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`configure http proxy: ${msg}`);
+    }
+    return createAnthropicProviderWithHTTPClient(
       apiKey,
       baseURL,
       models,
-      newStreamHttpClientWithOptions({}),
+      client,
+    );
+  } catch (err) {
+    if (opts !== undefined) throw err;
+    // Mirror the Go fallback: fall back to a bare client when the default
+    // stream client cannot be constructed.
+    return createAnthropicProviderWithHTTPClient(
+      apiKey,
+      baseURL,
+      models,
+      createStreamHttpClient({}),
     );
   }
-}
-
-/** Creates an Anthropic provider configured with an HTTP proxy. */
-export function newProviderWithModelsAndProxy(
-  apiKey: string,
-  baseURL: string,
-  proxyURL: string,
-  models: Model[],
-): Provider {
-  return newProviderWithModelsAndOptions(apiKey, baseURL, models, {
-    proxyUrl: proxyURL,
-  });
-}
-
-/** Creates an Anthropic provider with explicit HTTP transport options. */
-export function newProviderWithModelsAndOptions(
-  apiKey: string,
-  baseURL: string,
-  models: Model[],
-  opts: HTTPClientOptions,
-): Provider {
-  let client: HttpClient;
-  try {
-    client = newStreamHttpClientWithOptions(opts);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`configure http proxy: ${msg}`);
-  }
-  return newProviderWithHTTPClient(apiKey, baseURL, models, client);
 }
 
 /**
  * Creates a provider bound to the given HTTP client. Mirrors the unexported Go
  * helper and serves as the TS test seam.
  */
-export function newProviderWithHTTPClient(
+export function createAnthropicProviderWithHTTPClient(
   apiKey: string,
   baseURL: string,
   models: Model[],

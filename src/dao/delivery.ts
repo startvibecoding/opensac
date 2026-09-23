@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { execChanges, inList, queryAll, queryOne } from "./database.ts";
+import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
 
 export interface DeliveryIntentRecord {
   id: string;
@@ -124,8 +124,8 @@ export class DeliveryDAO {
     runId: string,
     platform: string,
     targetId: string,
-  ): DeliveryIntentRecord {
-    return queryOne<DeliveryIntentRecord>(
+  ): DeliveryIntentRecord | undefined {
+    return queryOptional<DeliveryIntentRecord>(
       executor,
       `SELECT ${intentColumns} FROM delivery_intents
        WHERE run_id = ? AND platform = ? AND target_id = ? LIMIT 1`,
@@ -133,8 +133,8 @@ export class DeliveryDAO {
     );
   }
 
-  findIntent(executor: DB, intentId: string): DeliveryIntentRecord {
-    return queryOne<DeliveryIntentRecord>(
+  findIntent(executor: DB, intentId: string): DeliveryIntentRecord | undefined {
+    return queryOptional<DeliveryIntentRecord>(
       executor,
       `SELECT ${intentColumns} FROM delivery_intents WHERE id = ? LIMIT 1`,
       [intentId],
@@ -160,8 +160,8 @@ export class DeliveryDAO {
     executor: DB,
     intentId: string,
     key: string,
-  ): DeliveryOperationRecord {
-    return queryOne<DeliveryOperationRecord>(
+  ): DeliveryOperationRecord | undefined {
+    return queryOptional<DeliveryOperationRecord>(
       executor,
       `SELECT ${operationColumns} FROM delivery_operations
        WHERE intent_id = ? AND operation_key = ? LIMIT 1`,
@@ -181,8 +181,8 @@ export class DeliveryDAO {
   dependencyStatus(
     executor: DB,
     operationId: string,
-  ): { intentStatus: string; dependsOn: string } {
-    return queryOne<{ intentStatus: string; dependsOn: string }>(
+  ): { intentStatus: string; dependsOn: string } | undefined {
+    return queryOptional<{ intentStatus: string; dependsOn: string }>(
       executor,
       `SELECT i.status AS intentStatus, COALESCE(o.depends_on, '') AS dependsOn
        FROM delivery_operations AS o
@@ -216,8 +216,11 @@ export class DeliveryDAO {
     );
   }
 
-  findOperation(executor: DB, operationId: string): DeliveryOperationRecord {
-    return queryOne<DeliveryOperationRecord>(
+  findOperation(
+    executor: DB,
+    operationId: string,
+  ): DeliveryOperationRecord | undefined {
+    return queryOptional<DeliveryOperationRecord>(
       executor,
       `SELECT ${operationColumns} FROM delivery_operations WHERE id = ? LIMIT 1`,
       [operationId],
@@ -259,8 +262,11 @@ export class DeliveryDAO {
     );
   }
 
-  currentResult(executor: DB, operationId: string): DeliveryOperationRecord {
-    return queryOne<DeliveryOperationRecord>(
+  currentResult(
+    executor: DB,
+    operationId: string,
+  ): DeliveryOperationRecord | undefined {
+    return queryOptional<DeliveryOperationRecord>(
       executor,
       `SELECT status, provider_asset_id AS providerAssetId,
               provider_message_id AS providerMessageId,
@@ -415,19 +421,19 @@ export class DeliveryDAO {
     ).map((row) => row.id);
   }
 
-  intentId(executor: DB, operationId: string): string {
-    return queryOne<{ intentId: string }>(
+  intentId(executor: DB, operationId: string): string | undefined {
+    return queryOptional<{ intentId: string }>(
       executor,
       `SELECT intent_id AS intentId FROM delivery_operations WHERE id = ? LIMIT 1`,
       [operationId],
-    ).intentId;
+    )?.intentId;
   }
 
   aggregate(
     executor: DB,
     intentId: string,
   ): { total: number; terminal: number; failed: number; uncertain: number } {
-    const row = queryOne<Record<string, unknown>>(
+    const row = queryOptional<Record<string, unknown>>(
       executor,
       `SELECT COUNT(*) AS total,
         SUM(CASE WHEN status IN ('uploaded','delivered','unsupported') THEN 1 ELSE 0 END) AS terminal,
@@ -435,7 +441,7 @@ export class DeliveryDAO {
         SUM(CASE WHEN status = 'uncertain' THEN 1 ELSE 0 END) AS uncertain
        FROM delivery_operations WHERE intent_id = ?`,
       [intentId],
-    );
+    ) ?? {};
     return {
       total: Number(row.total ?? 0),
       terminal: Number(row.terminal ?? 0),

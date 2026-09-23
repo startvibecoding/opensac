@@ -42,7 +42,7 @@ export class ToolLaunchOrder {
 }
 
 /** Creates a null-safe ToolLaunchOrder; a non-positive count yields null. */
-export function newToolLaunchOrder(calls: number): ToolLaunchOrder | null {
+export function createToolLaunchOrder(calls: number): ToolLaunchOrder | null {
   if (calls <= 0) return null;
   return new ToolLaunchOrder(calls);
 }

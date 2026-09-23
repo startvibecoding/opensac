@@ -2,8 +2,8 @@ import { assertEquals } from "@std/assert";
 import { Generator, maxTitleRunes, normalizeTitle } from "./title.ts";
 import {
   type ChatParams,
+  createUserMessage,
   type Model,
-  newUserMessage,
   type Provider,
   streamError,
   type StreamEvent,
@@ -56,7 +56,7 @@ Deno.test("GeneratorUsesCommonProviderInterfaceAndNormalizes", async () => {
     provider: p,
     model: { id: "model" } as Model,
   })
-    .generate([newUserMessage("请修复登录")]);
+    .generate([createUserMessage("请修复登录")]);
   assertEquals(name, "修复登录问题 并补充测试");
   assertEquals(p.params?.modelId, "model");
   assertEquals(p.params?.messages.length, 2);
@@ -70,7 +70,7 @@ Deno.test("GeneratorFallsBackWhenProviderFails", async () => {
     provider: p,
     model: { id: "model" } as Model,
   })
-    .generate([newUserMessage("hi")]);
+    .generate([createUserMessage("hi")]);
   assertEquals(name, "hi");
 });
 

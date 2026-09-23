@@ -1,11 +1,11 @@
 import { assert } from "@std/assert";
-import { newLockRegistry } from "./lock_registry.ts";
+import { createLockRegistry } from "./lock_registry.ts";
 
 // Pins the M4 fix: per-key mutexes must be removed once no caller references
 // them, so long-running processes do not accumulate one mutex per historical
 // key. Mutual exclusion must still hold across an eviction boundary.
 Deno.test("LockRegistryEvictsUnreferencedEntries", async () => {
-  const registry = newLockRegistry();
+  const registry = createLockRegistry();
 
   const lock = registry.acquire("k");
   assert(registry.has("k"), "entry missing after acquire");
@@ -23,7 +23,7 @@ Deno.test("LockRegistryEvictsUnreferencedEntries", async () => {
 // Proves an entry survives while any reference remains, so two concurrent
 // holders never operate on different mutexes for the same key.
 Deno.test("LockRegistryKeepsEntryWhileReferenced", async () => {
-  const registry = newLockRegistry();
+  const registry = createLockRegistry();
 
   const first = registry.acquire("k");
   const second = registry.acquire("k");

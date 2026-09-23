@@ -1,6 +1,6 @@
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -80,6 +80,6 @@ export class SkillRefTool implements Tool {
       );
     }
 
-    return newTextToolResult(content);
+    return createTextToolResult(content);
   }
 }

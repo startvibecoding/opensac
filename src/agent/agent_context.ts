@@ -11,10 +11,10 @@
 
 import {
   type ContentBlock,
+  createCost,
+  createToolResultMessage,
   type ImageContent,
   type Message,
-  newCost,
-  newToolResultMessage,
   type ToolDefinition,
   type Usage,
 } from "../provider/types.ts";
@@ -203,7 +203,7 @@ export function estimateProviderUsage(
     cacheRead: 0,
     cacheWrite: 0,
     totalTokens: input + output,
-    cost: newCost(),
+    cost: createCost(),
   };
 }
 
@@ -224,7 +224,7 @@ export function completeProviderUsage(
     cacheRead: 0,
     cacheWrite: 0,
     totalTokens: 0,
-    cost: newCost(),
+    cost: createCost(),
   };
   if (usage.input <= 0) {
     if (usage.totalTokens > 0 && usage.output > 0) {
@@ -355,7 +355,7 @@ export function repairDanglingToolCalls(messages: Message[]): Message[] {
         }
       }
       out.push(
-        newToolResultMessage(
+        createToolResultMessage(
           id,
           name,
           "[Interrupted] Tool execution was aborted before a result was recorded.",

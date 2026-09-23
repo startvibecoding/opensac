@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryAll, queryOne } from "./database.ts";
+import { execChanges, queryAll, queryOptional } from "./database.ts";
 
 export interface RecoveryRecord {
   runId: string;
@@ -67,8 +67,8 @@ export class RecoveryDAO {
     );
   }
 
-  find(executor: DB, runId: string): RecoveryRecord {
-    return queryOne<RecoveryRecord>(
+  find(executor: DB, runId: string): RecoveryRecord | undefined {
+    return queryOptional<RecoveryRecord>(
       executor,
       `SELECT ${columns} FROM session_run_recoveries WHERE run_id = ? LIMIT 1`,
       [runId],
@@ -84,7 +84,7 @@ export class RecoveryDAO {
     nextRetryAt: number | null,
     updatedAt: number | null,
     completedAt: number | null,
-  ): void {
+  ): boolean {
     const changes = execChanges(
       executor,
       `UPDATE session_run_recoveries
@@ -92,7 +92,7 @@ export class RecoveryDAO {
        WHERE run_id = ? AND session_id = ?`,
       [state, lastError, nextRetryAt, updatedAt, completedAt, runId, sessionId],
     );
-    if (changes === 0) throw ErrNoRows;
+    return changes !== 0;
   }
 
   listOpenTurns(executor: DB, sessionId: string): OpenTurnRecord[] {

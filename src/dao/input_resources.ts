@@ -1,5 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import { ErrNoRows, execChanges, queryAll, queryOne } from "./database.ts";
+import { execChanges, queryAll, queryOptional } from "./database.ts";
 
 export interface InputResourceRecord {
   id: string;
@@ -58,8 +58,8 @@ export class InputResourceDAO {
     executor: DB,
     sessionId: string,
     resourceId: string,
-  ): InputResourceRecord {
-    return queryOne<InputResourceRecord>(
+  ): InputResourceRecord | undefined {
+    return queryOptional<InputResourceRecord>(
       executor,
       `SELECT ${resourceColumns} FROM input_resources
        WHERE session_id = ? AND id = ? LIMIT 1`,
@@ -67,8 +67,11 @@ export class InputResourceDAO {
     );
   }
 
-  findByItemKey(sessionId: string, itemKey: string): InputResourceRecord {
-    return queryOne<InputResourceRecord>(
+  findByItemKey(
+    sessionId: string,
+    itemKey: string,
+  ): InputResourceRecord | undefined {
+    return queryOptional<InputResourceRecord>(
       this.requireDb(),
       `SELECT ${resourceColumns} FROM input_resources
        WHERE session_id = ? AND item_key = ? LIMIT 1`,
@@ -121,13 +124,17 @@ export class InputResourceDAO {
     );
   }
 
-  createdAt(executor: DB, sessionId: string, resourceId: string): string {
-    return queryOne<{ createdAt: string }>(
+  createdAt(
+    executor: DB,
+    sessionId: string,
+    resourceId: string,
+  ): string | undefined {
+    return queryOptional<{ createdAt: string }>(
       executor,
       `SELECT created_at AS createdAt FROM input_resources
        WHERE id = ? AND session_id = ? LIMIT 1`,
       [resourceId, sessionId],
-    ).createdAt;
+    )?.createdAt;
   }
 
   appendEvent(executor: DB, record: InputResourceEventRecord): void {
@@ -163,18 +170,23 @@ export class InputResourceDAO {
     executor: DB,
     resourceId: string,
     sessionId: string,
-  ): { runId: string; status: string } {
+  ): { runId: string; status: string } | undefined {
     const record = this.find(executor, sessionId, resourceId);
+    if (record === undefined) return undefined;
     return { runId: record.runId, status: record.status };
   }
 
-  ownerIntent(executor: DB, ownerRunId: string, sessionId: string): string {
-    return queryOne<{ intentId: string }>(
+  ownerIntent(
+    executor: DB,
+    ownerRunId: string,
+    sessionId: string,
+  ): string | undefined {
+    return queryOptional<{ intentId: string }>(
       executor,
       `SELECT intent_id AS intentId FROM session_runs
        WHERE id = ? AND session_id = ? LIMIT 1`,
       [ownerRunId, sessionId],
-    ).intentId;
+    )?.intentId;
   }
 
   private requireDb(): DB {
@@ -183,10 +195,6 @@ export class InputResourceDAO {
     }
     return this.db;
   }
-}
-
-export function isNoRowsInput(err: unknown): boolean {
-  return err === ErrNoRows;
 }
 
 function bindResource(r: InputResourceRecord): (string | number | null)[] {

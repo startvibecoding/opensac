@@ -39,7 +39,7 @@ export class Stream {
 }
 
 /** Creates a new streaming renderer. */
-export function newStream(width: number, theme?: Theme): Stream {
+export function createStream(width: number, theme?: Theme): Stream {
   return new Stream(width, theme);
 }
 

@@ -5,7 +5,7 @@ import type {
   ExternalTool,
   ExternalToolPromptInfo,
 } from "../../sdk/agent/external_tool.ts";
-import { newExternalToolAdapter } from "./external_tool_adapter.ts";
+import { createExternalToolAdapter } from "./external_tool_adapter.ts";
 
 function encode(value: unknown): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(value));
@@ -18,7 +18,7 @@ Deno.test("external adapter maps name/description and snippet fallback", () => {
     parameters: () => encode({ type: "object", properties: {} }),
     execute: () => Promise.resolve({ text: "ok" }),
   };
-  const adapted = newExternalToolAdapter(tool);
+  const adapted = createExternalToolAdapter(tool);
   assertEquals(adapted.name(), "host_tool");
   assertEquals(adapted.description(), "does host things");
   assertEquals(adapted.promptSnippet(), "does host things");
@@ -34,7 +34,7 @@ Deno.test("external adapter honors prompt info interface", () => {
     promptSnippet: () => "short",
     promptGuidelines: () => ["one", "two"],
   };
-  const adapted = newExternalToolAdapter(tool);
+  const adapted = createExternalToolAdapter(tool);
   assertEquals(adapted.promptSnippet(), "short");
   assertEquals(adapted.promptGuidelines(), ["one", "two"]);
 });
@@ -46,7 +46,7 @@ Deno.test("external adapter defaults empty parameters", () => {
     parameters: () => new Uint8Array(),
     execute: () => Promise.resolve({ text: "" }),
   };
-  const adapted = newExternalToolAdapter(tool);
+  const adapted = createExternalToolAdapter(tool);
   assertEquals(adapted.parameters(), { type: "object", properties: {} });
 });
 
@@ -58,7 +58,7 @@ Deno.test("external adapter maps results and errors", async () => {
     execute: () => Promise.resolve({ text: "hello" }),
   };
   const req = { signal: undefined };
-  assertEquals(await newExternalToolAdapter(ok).execute(req, {}), {
+  assertEquals(await createExternalToolAdapter(ok).execute(req, {}), {
     text: "hello",
   });
 
@@ -70,7 +70,7 @@ Deno.test("external adapter maps results and errors", async () => {
   };
   await assertRejects(
     async () => {
-      await newExternalToolAdapter(failing).execute(req, {});
+      await createExternalToolAdapter(failing).execute(req, {});
     },
     Error,
     "tool reported an error",
@@ -93,7 +93,7 @@ Deno.test("external adapter maps image contents", async () => {
         ],
       }),
   };
-  const result = await newExternalToolAdapter(tool).execute(
+  const result = await createExternalToolAdapter(tool).execute(
     { signal: undefined },
     {},
   );

@@ -15,9 +15,9 @@ import type { Settings } from "../config/settings.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
 import {
+  createAssistantMessage,
+  createUserMessage,
   type Model,
-  newAssistantMessage,
-  newUserMessage,
 } from "../provider/types.ts";
 import type { Provider } from "../provider/provider.ts";
 
@@ -82,7 +82,7 @@ interface Fixture {
   workDir: string;
 }
 
-function newFixture(): Fixture {
+function createFixture(): Fixture {
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-open-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
@@ -105,9 +105,9 @@ function makeSession(sessionDir: string, workDir: string, id: string): string {
 function completeTurn(sessionDir: string, workDir: string, id: string): void {
   const mgr = createSession({ workDir, sessionDir, id });
   mgr.startConversationTurn("turn-1", "intent-1", "run-1");
-  mgr.appendMessage(newUserMessage("hello"));
+  mgr.appendMessage(createUserMessage("hello"));
   mgr.appendMessage(
-    newAssistantMessage([{ type: "text", text: "world" }]),
+    createAssistantMessage([{ type: "text", text: "world" }]),
   );
   mgr.endConversationTurn("turn-1", "completed", "stop");
 }
@@ -135,7 +135,7 @@ function fakeProvider(): { provider: Provider; model: Model } {
 }
 
 Deno.test("session/new creates a runtime and projects modes", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   await server.handleNewSession(rpc(1, "session/new", { cwd: workDir }));
   const result = responseOf(sink.toString()).result as Record<string, unknown>;
   const sessionId = result.sessionId as string;
@@ -155,7 +155,7 @@ Deno.test("session/new creates a runtime and projects modes", async () => {
 });
 
 Deno.test("session/new requires a cwd", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   await server.handleNewSession(rpc(1, "session/new", {}));
   const err = errorOf(responseOf(sink.toString()));
   assertEquals(err.code, -32602);
@@ -163,7 +163,7 @@ Deno.test("session/new requires a cwd", async () => {
 });
 
 Deno.test("session/new rejects a relative cwd", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   await server.handleNewSession(
     rpc(1, "session/new", { cwd: "relative/path" }),
   );
@@ -173,7 +173,7 @@ Deno.test("session/new rejects a relative cwd", async () => {
 });
 
 Deno.test("session/new requires initialized settings", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   server.settings = null;
   await server.handleNewSession(rpc(1, "session/new", { cwd: "/tmp" }));
   const err = errorOf(responseOf(sink.toString()));
@@ -181,7 +181,7 @@ Deno.test("session/new requires initialized settings", async () => {
 });
 
 Deno.test("session/load opens a persisted session and omits empty history", async () => {
-  const { server, sink, sessionDir, workDir } = newFixture();
+  const { server, sink, sessionDir, workDir } = createFixture();
   const id = makeSession(sessionDir, workDir, "sess-load");
   await server.handleLoadSession(
     rpc(1, "session/load", { sessionId: id, cwd: workDir }),
@@ -193,7 +193,7 @@ Deno.test("session/load opens a persisted session and omits empty history", asyn
 });
 
 Deno.test("session/load rejects an open session with a foreign cwd", async () => {
-  const { server, sink, workDir, root } = newFixture();
+  const { server, sink, workDir, root } = createFixture();
   await server.handleNewSession(rpc(1, "session/new", { cwd: workDir }));
   const opened = responseOf(sink.toString()).result as Record<string, unknown>;
   const id = opened.sessionId as string;
@@ -209,14 +209,14 @@ Deno.test("session/load rejects an open session with a foreign cwd", async () =>
 });
 
 Deno.test("session/load rejects a missing sessionId", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   await server.handleLoadSession(rpc(1, "session/load", { cwd: workDir }));
   const err = errorOf(responseOf(sink.toString()));
   assertEquals(err.code, -32000);
 });
 
 Deno.test("session/resume returns the retained parent binding", async () => {
-  const { server, sink, sessionDir, workDir } = newFixture();
+  const { server, sink, sessionDir, workDir } = createFixture();
   const id = makeSession(sessionDir, workDir, "sess-resume");
   await server.handleResumeSession(
     rpc(1, "session/resume", { sessionId: id, cwd: workDir }),
@@ -227,7 +227,7 @@ Deno.test("session/resume returns the retained parent binding", async () => {
 });
 
 Deno.test("session/fork persists a child and reports the parent", async () => {
-  const { server, sink, sessionDir, workDir } = newFixture();
+  const { server, sink, sessionDir, workDir } = createFixture();
   completeTurn(sessionDir, workDir, "sess-parent");
   await server.handleForkSession(
     rpc("fork-1", "session/fork", {
@@ -243,7 +243,7 @@ Deno.test("session/fork persists a child and reports the parent", async () => {
 });
 
 Deno.test("session/fork requires a sessionId", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   await server.handleForkSession(rpc(1, "session/fork", {}));
   const err = errorOf(responseOf(sink.toString()));
   assertEquals(err.code, -32602);
@@ -251,7 +251,7 @@ Deno.test("session/fork requires a sessionId", async () => {
 });
 
 Deno.test("session/fork rejects a cwd that differs from the parent", async () => {
-  const { server, sink, sessionDir, workDir, root } = newFixture();
+  const { server, sink, sessionDir, workDir, root } = createFixture();
   const parent = makeSession(sessionDir, workDir, "sess-parent2");
   const other = path.join(root, "other2");
   Deno.mkdirSync(other, { recursive: true });
@@ -264,7 +264,7 @@ Deno.test("session/fork rejects a cwd that differs from the parent", async () =>
 });
 
 Deno.test("session/set_mode validates its arguments and session", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   await server.handleSetMode(rpc(1, "session/set_mode", {}));
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
   sink.reset();
@@ -278,7 +278,7 @@ Deno.test("session/set_mode validates its arguments and session", async () => {
 });
 
 Deno.test("session/set_mode updates an open session", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   await server.handleNewSession(rpc(1, "session/new", { cwd: workDir }));
   const opened = responseOf(sink.toString()).result as Record<string, unknown>;
   const id = opened.sessionId as string;
@@ -304,7 +304,7 @@ Deno.test("session/set_mode updates an open session", async () => {
 });
 
 Deno.test("session/set_config_option requires fields and a known session", async () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   await server.handleSetConfigOption(rpc(1, "session/set_config_option", {}));
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
   sink.reset();
@@ -319,7 +319,7 @@ Deno.test("session/set_config_option requires fields and a known session", async
 });
 
 Deno.test("session/set_config_option rejects a non-boolean capability value", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   await server.handleNewSession(rpc(1, "session/new", { cwd: workDir }));
   const opened = responseOf(sink.toString()).result as Record<string, unknown>;
   const id = opened.sessionId as string;
@@ -337,7 +337,7 @@ Deno.test("session/set_config_option rejects a non-boolean capability value", as
 });
 
 Deno.test("session/set_config_option accepts a boolean capability value", async () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   await server.handleNewSession(rpc(1, "session/new", { cwd: workDir }));
   const opened = responseOf(sink.toString()).result as Record<string, unknown>;
   const id = opened.sessionId as string;
@@ -358,7 +358,7 @@ Deno.test("session/set_config_option accepts a boolean capability value", async 
 });
 
 Deno.test("opensac/session/draft-config-options returns empty without a provider", () => {
-  const { server, sink, workDir } = newFixture();
+  const { server, sink, workDir } = createFixture();
   server.handleDraftConfigOptions(
     rpc(1, "opensac/session/draft-config-options", { cwd: workDir }),
   );
@@ -367,7 +367,7 @@ Deno.test("opensac/session/draft-config-options returns empty without a provider
 });
 
 Deno.test("opensac/session/draft-config-options requires a cwd", () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   server.handleDraftConfigOptions(
     rpc(1, "opensac/session/draft-config-options", {}),
   );
@@ -375,7 +375,7 @@ Deno.test("opensac/session/draft-config-options requires a cwd", () => {
 });
 
 Deno.test("available commands include /systeminit and every skill", () => {
-  const { server } = newFixture();
+  const { server } = createFixture();
   const manager = {
     list: () => [
       { name: "alpha", description: "first" },
@@ -390,7 +390,7 @@ Deno.test("available commands include /systeminit and every skill", () => {
 });
 
 Deno.test("notifyAvailableCommandsFor emits a session/update", () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   const manager = {
     list: () => [{ name: "alpha", description: "first" }],
   } as unknown as SkillsManager;
@@ -409,13 +409,13 @@ Deno.test("notifyAvailableCommandsFor emits a session/update", () => {
 });
 
 Deno.test("notifyAvailableCommandsFor is silent without a skills manager", () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   server.notifyAvailableCommandsFor("sess-1", null);
   assertEquals(sink.toString(), "");
 });
 
 Deno.test("activateSkillPrompt ignores a missing runtime or unknown skill", async () => {
-  const { server } = newFixture();
+  const { server } = createFixture();
   const empty = server.sessionRuntime("missing");
   if (empty !== null) {
     assertEquals(await server.activateSkillPrompt(empty, "/skill:x"), false);
@@ -428,7 +428,7 @@ Deno.test("activateSkillPrompt ignores a missing runtime or unknown skill", asyn
 });
 
 Deno.test("MCP notifications project an additive tool-call update", () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   server.handleMCPNotification(
     "sess-1",
     "demo server",
@@ -455,7 +455,7 @@ Deno.test("MCP notifications project an additive tool-call update", () => {
 });
 
 Deno.test("MCP notifications are deduplicated per server", () => {
-  const { server, sink } = newFixture();
+  const { server, sink } = createFixture();
   server.handleMCPNotification("sess-1", "demo", "notifications/message", {});
   sink.reset();
   server.handleMCPNotification("sess-1", "demo", "notifications/message", {});
@@ -471,7 +471,7 @@ Deno.test("MCP notifications are deduplicated per server", () => {
 });
 
 Deno.test("MCP sampling rejects an unknown session", async () => {
-  const { server } = newFixture();
+  const { server } = createFixture();
   const outcome = await server.handleMCPSamplingCreateMessage(
     new AbortController().signal,
     "missing",

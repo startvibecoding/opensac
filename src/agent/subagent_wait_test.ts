@@ -9,13 +9,13 @@ import {
 } from "@std/assert";
 import type { ToolResult } from "../tools/tool.ts";
 import {
+  createMemberMailbox,
   MEMBER_STATUS_DONE,
   MemberMailbox,
-  newMemberMailbox,
 } from "./mailbox.ts";
 import type { MemberCompletion } from "./mailbox.ts";
 import {
-  newSubAgentWaitTool,
+  createSubAgentWaitTool,
   resolveSubAgentWaitTimeoutMS,
   subAgentWaitDefaultTimeoutMS,
   subAgentWaitMaxTimeoutMS,
@@ -50,7 +50,7 @@ function parse(t: ToolResult): WaitParsed {
 }
 
 Deno.test("subagent_wait tool metadata", () => {
-  const tool = newSubAgentWaitTool({});
+  const tool = createSubAgentWaitTool({});
   assertEquals(tool.name(), "subagent_wait");
   assert(tool.description() !== "");
   assert(tool.promptSnippet() !== "");
@@ -91,7 +91,7 @@ Deno.test("resolveSubAgentWaitTimeoutMS clamps", () => {
 });
 
 Deno.test("subagent_wait nil mailbox", async () => {
-  const tool = newSubAgentWaitTool({});
+  const tool = createSubAgentWaitTool({});
   const result = await tool.execute({}, {});
   const parsed = parse(result);
   assertEquals(parsed.message, "no member mailbox is bound to this session");
@@ -101,7 +101,7 @@ Deno.test("subagent_wait nil mailbox", async () => {
 });
 
 Deno.test("subagent_wait pending summary excludes payload", async () => {
-  const mbox: MemberMailbox = newMemberMailbox();
+  const mbox: MemberMailbox = createMemberMailbox();
   mbox.enqueue(completion({
     memberId: "engineer",
     displayName: "工程师",
@@ -109,7 +109,7 @@ Deno.test("subagent_wait pending summary excludes payload", async () => {
     payload: "SECRET-PAYLOAD-CONTENT",
   }));
 
-  const tool = newSubAgentWaitTool({ mailbox: mbox });
+  const tool = createSubAgentWaitTool({ mailbox: mbox });
   const start = Date.now();
   const result = await tool.execute({}, {});
   assert(
@@ -130,7 +130,7 @@ Deno.test("subagent_wait pending summary excludes payload", async () => {
 });
 
 Deno.test("subagent_wait returns on activity", async () => {
-  const mbox = newMemberMailbox();
+  const mbox = createMemberMailbox();
   setTimeout(() => {
     mbox.enqueue(completion({
       memberId: "qa",
@@ -139,7 +139,7 @@ Deno.test("subagent_wait returns on activity", async () => {
     }));
   }, 30);
 
-  const tool = newSubAgentWaitTool({ mailbox: mbox });
+  const tool = createSubAgentWaitTool({ mailbox: mbox });
   const result = await tool.execute({}, { timeout_ms: 10000 });
   const parsed = parse(result);
   assertEquals(parsed.message, "Wait completed.");
@@ -150,8 +150,8 @@ Deno.test("subagent_wait returns on activity", async () => {
 });
 
 Deno.test("subagent_wait timeout", async () => {
-  const mbox = newMemberMailbox();
-  const tool = newSubAgentWaitTool({ mailbox: mbox });
+  const mbox = createMemberMailbox();
+  const tool = createSubAgentWaitTool({ mailbox: mbox });
   const start = Date.now();
   // timeout_ms below the minimum must be clamped up to 2500ms.
   const result = await tool.execute({}, { timeout_ms: 1 });
@@ -167,10 +167,10 @@ Deno.test("subagent_wait timeout", async () => {
 });
 
 Deno.test("subagent_wait context canceled", async () => {
-  const mbox = newMemberMailbox();
+  const mbox = createMemberMailbox();
   const controller = new AbortController();
   controller.abort();
-  const tool = newSubAgentWaitTool({ mailbox: mbox });
+  const tool = createSubAgentWaitTool({ mailbox: mbox });
   await assertRejects(
     async () => await tool.execute({ signal: controller.signal }, {}),
     Error,

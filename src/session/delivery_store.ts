@@ -7,7 +7,7 @@
 // synchronous), `json.RawMessage` maps to decoded `unknown` (serialized on
 // write), and `time.Time` maps to `Date` (millisecond leases use epoch millis).
 
-import { DeliveryDAO, isNoRows } from "../dao/mod.ts";
+import { DeliveryDAO } from "../dao/mod.ts";
 import type { Database, DeliveryFailureRecord } from "../dao/mod.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 import { writeRootDatabase } from "./database.ts";
@@ -194,6 +194,11 @@ export function createDeliveryPlanTx(
       intent.platform,
       intent.targetId,
     );
+    if (existingRecord === undefined) {
+      throw new Error(
+        "delivery intent insert conflicted without an existing row",
+      );
+    }
     const existing = deliveryIntentFromRecord(existingRecord);
     if (
       existing.id !== intent.id ||
@@ -312,6 +317,13 @@ export function createDeliveryPlanTx(
         intent.id,
         operation.operationKey,
       );
+      if (existingRecord === undefined) {
+        throw new Error(
+          `delivery operation ${
+            JSON.stringify(operation.operationKey)
+          } conflicts with existing projection`,
+        );
+      }
       if (
         existingRecord.id !== operation.id ||
         stringValue(existingRecord.artifactId) !== operation.artifactId ||
@@ -339,13 +351,8 @@ export function getDeliveryPlan(
   const db = openRootDB(sessionDir);
   const conn = requireConn(db);
   const dao = new DeliveryDAO(null);
-  let record;
-  try {
-    record = dao.findIntent(conn, intentId);
-  } catch (err) {
-    if (isNoRows(err)) return null;
-    throw err;
-  }
+  const record = dao.findIntent(conn, intentId);
+  if (record === undefined) return null;
   const plan: DeliveryPlan = {
     intent: deliveryIntentFromRecord(record),
     operations: [],
@@ -380,13 +387,9 @@ export function claimDeliveryOperation(
   let operation: DeliveryOperation | null = null;
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new DeliveryDAO(null);
-    let intentStatus: string;
-    try {
-      ({ intentStatus } = dao.dependencyStatus(tx, operationId));
-    } catch (err) {
-      if (isNoRows(err)) throw new DeliveryOperationAbsentError();
-      throw err;
-    }
+    const dependency = dao.dependencyStatus(tx, operationId);
+    if (dependency === undefined) throw new DeliveryOperationAbsentError();
+    const intentStatus = dependency.intentStatus;
     if (
       intentStatus === "delivered" || intentStatus === "failed" ||
       intentStatus === "cancelled"
@@ -398,6 +401,7 @@ export function claimDeliveryOperation(
     const result = dao.claim(tx, operationId, owner, nowMillis, leaseMillis);
     if (result !== 1) throw new DeliveryOperationBusyError();
     const loadedRecord = dao.findOperation(tx, operationId);
+    if (loadedRecord === undefined) throw new DeliveryOperationAbsentError();
     operation = deliveryOperationFromRecord(loadedRecord);
   });
   if (operation === null) throw new DeliveryOperationAbsentError();
@@ -456,13 +460,8 @@ export function updateDeliveryOperation(
       refreshDeliveryIntentStatusTx(tx, operationId, updatedAt);
       return;
     }
-    let currentRecord;
-    try {
-      currentRecord = dao.currentResult(tx, operationId);
-    } catch (err) {
-      if (isNoRows(err)) throw new DeliveryOperationAbsentError();
-      throw err;
-    }
+    const currentRecord = dao.currentResult(tx, operationId);
+    if (currentRecord === undefined) throw new DeliveryOperationAbsentError();
     if (
       currentRecord.status === status &&
       (status === "uploaded" || status === "delivered" ||
@@ -579,6 +578,9 @@ export function reopenFailedDeliveryOperation(
     if (changed !== 1) return;
     reopened = true;
     const intentId = dao.intentId(tx, operationId);
+    if (intentId === undefined) {
+      throw new Error(`delivery operation ${operationId} not found`);
+    }
     // Operations that were terminalized only because this dependency failed
     // must get another chance, otherwise a reopened caption would still be
     // followed by a permanently failed attachment.
@@ -679,13 +681,8 @@ export function getDeliveryOperation(
 ): DeliveryOperation | null {
   const db = openRootDB(sessionDir);
   const conn = requireConn(db);
-  let record;
-  try {
-    record = new DeliveryDAO(null).findOperation(conn, operationId);
-  } catch (err) {
-    if (isNoRows(err)) throw new DeliveryOperationAbsentError();
-    throw err;
-  }
+  const record = new DeliveryDAO(null).findOperation(conn, operationId);
+  if (record === undefined) throw new DeliveryOperationAbsentError();
   return deliveryOperationFromRecord(record);
 }
 
@@ -699,6 +696,9 @@ function refreshDeliveryIntentStatusTx(
     tx as Parameters<DeliveryDAO["intentId"]>[0],
     operationId,
   );
+  if (intentId === undefined) {
+    throw new Error(`delivery operation ${operationId} not found`);
+  }
   refreshDeliveryIntentStatusByIdTx(tx, intentId, now);
 }
 

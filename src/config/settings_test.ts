@@ -179,6 +179,7 @@ Deno.test("getProviderConfig and getModelConfig", () => {
 Deno.test("moark/gitee model maxTokens table", () => {
   const s = defaultSettings();
   const want: Record<string, number> = {
+    "auto": 0,
     "glm-5.1": 131072,
     "qwen3.5-flash": 65536,
     "qwen3.6-flash": 65536,
@@ -189,6 +190,7 @@ Deno.test("moark/gitee model maxTokens table", () => {
     "qwen3.8-max": 0,
     "qwen3.8-max-0902": 131072,
     "qwen3.8-27b": 0,
+    "qwen3.8-omni-flash": 131072,
     "glm-5.3": 131072,
     "glm-5.3-flash": 131072,
     "ernie-5.0-thinking": 65536,
@@ -228,6 +230,53 @@ Deno.test("gitee/moark qwen3.8-27b defaults", () => {
     assertEquals(model.maxTokens, undefined);
     assert(!modelMaxTokensWasSet(model));
   }
+});
+
+Deno.test("gitee/moark qwen3.8-omni-flash defaults", () => {
+  const s = defaultSettings();
+  for (const providerName of ["gitee", "moark"]) {
+    const model = getModelConfig(s, providerName, "qwen3.8-omni-flash");
+    assert(model, `${providerName} missing qwen3.8-omni-flash`);
+    assert(model.reasoning && model.contextWindow === 1000000);
+    assertEquals(model.input, ["text", "image", "audio", "video"]);
+    assertEquals(model.maxTokens, 131072);
+  }
+});
+
+Deno.test("xiaomi mimo-v2.6, bai channel, and model ordering", () => {
+  const s = defaultSettings();
+  assertEquals(
+    s.providers!["xiaomi"].models.map((m) => m.id),
+    [
+      "mimo-v2.5",
+      "mimo-v2.5-pro",
+      "mimo-v2.5-pro-ultraspeed",
+      "mimo-v2.6-pro",
+      "mimo-v2.6-flash",
+    ],
+  );
+  for (const id of ["mimo-v2.6-pro", "mimo-v2.6-flash"]) {
+    const model = getModelConfig(s, "xiaomi", id);
+    assert(model, `xiaomi missing ${id}`);
+    assert(model.reasoning && model.contextWindow === 1048576);
+    assertEquals(model.maxTokens, 131072);
+    assertEquals(model.input, ["text", "image"]);
+  }
+
+  const bai = s.providers!["bai"];
+  assert(bai, "missing provider bai");
+  assertEquals(bai.vendor, "bai");
+  assertEquals(bai.baseUrl, "https://api.b.ai/v1");
+  assertEquals(bai.api, "openai-chat");
+  assertEquals(bai.models[0].id, "minimax-m3");
+
+  const agentPlan = s.providers!["volcengine-agentplan"].models.map((m) =>
+    m.id
+  );
+  assertEquals(
+    agentPlan[agentPlan.indexOf("deepseek-v4-flash") + 1],
+    "deepseek-v4.1-flash",
+  );
 });
 
 Deno.test("volcengine plan models use shared maxTokens", () => {

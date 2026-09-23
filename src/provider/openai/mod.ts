@@ -54,11 +54,12 @@ export {
 } from "./responses.ts";
 export {
   archiveBackgroundResponse,
-  newResponsesRunManager,
+  createResponsesRunManager,
   ResponsesRunManager,
 } from "./responses_runtime.ts";
 export {
   canonicalResponsesJSON,
+  createResponsesNormalizer,
   decodeResponsesOutputItem,
   decodeResponsesSSE,
   errResponsesAbort,
@@ -68,7 +69,6 @@ export {
   isSensitiveResponsesKey,
   isUnsupportedResponsesItemType,
   limitResponsesMetadata,
-  newResponsesNormalizer,
   type ProviderToolCall,
   redactResponsesValue,
   responsesArgumentsRaw,
@@ -120,6 +120,8 @@ export {
   validateStrictResponsesSchema,
 } from "./responses_config.ts";
 export {
+  createOpenAIProvider,
+  createOpenAIProviderWithHTTPClient,
   deepseekReasoningEffort,
   defaultModels,
   doubaoSeedReasoningEffort,
@@ -129,11 +131,6 @@ export {
   kimiReasoningEffort,
   maxTokensField,
   mergeOpenAIUsage,
-  newProvider,
-  newProviderWithHTTPClient,
-  newProviderWithModels,
-  newProviderWithModelsAndOptions,
-  newProviderWithModelsAndProxy,
   normalizeToolResultSequence,
   type OpenAIChatRequest,
   type OpenAIDelta,

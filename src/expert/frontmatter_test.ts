@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { type Frontmatter, newFrontmatter } from "./expert.ts";
+import { createFrontmatter, type Frontmatter } from "./expert.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
 
 interface Case {
@@ -12,7 +12,7 @@ interface Case {
 }
 
 function fm(overrides: Partial<Frontmatter> = {}): Frontmatter {
-  return { ...newFrontmatter(""), ...overrides };
+  return { ...createFrontmatter(""), ...overrides };
 }
 
 Deno.test("parseFrontmatter", () => {

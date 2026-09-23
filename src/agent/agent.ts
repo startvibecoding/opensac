@@ -30,9 +30,9 @@ import {
   calculateCost,
   type ChatParams,
   type ContentBlock,
+  createSystemInjectedUserMessage,
   type Message,
   type Model,
-  newSystemInjectedUserMessage,
   type ThinkingLevel,
   type ToolCallBlock,
   type ToolDefinition,
@@ -104,17 +104,16 @@ import {
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
   contextWithSignal,
+  createRunContext,
   type EventSink,
-  newRunContext,
   type RunContext,
 } from "./run_context.ts";
 import {
   classifyTurn,
+  createAssistantMessage,
+  createToolResultMessage,
+  createUserMessage,
   formatUsage,
-  newAssistantMessage,
-  newToolResultMessage,
-  newToolResultMessageWithContents,
-  newUserMessage,
   normalizeThinkingLevel,
   type ResponseArchive,
   type ResponseStateFailureClass,
@@ -184,11 +183,11 @@ import {
 import {
   contextWithOperationID,
   contextWithQuestionAsker,
-  newRegistry,
+  createRegistry,
   type Tool,
 } from "../tools/tool.ts";
 import type { FileDiff, QuestionAsker, TaskPlan } from "../tools/mod.ts";
-import { newNoneSandbox } from "../sandbox/none.ts";
+import { createNoneSandbox } from "../sandbox/none.ts";
 import { contextWithGitAccess, gitAccessRequired } from "../sandbox/git.ts";
 import { Level } from "../sandbox/sandbox.ts";
 import { bashCommandArg } from "./agent_approval.ts";
@@ -220,15 +219,15 @@ import {
 } from "./agent_context.ts";
 import {
   contextWithIterationBudget,
+  createIterationBudget,
   ITERATION_BUDGET_TOOL_NAME,
   type IterationBudget,
   iterationBudgetFromContext,
   iterationBudgetPolicyEnabled,
-  newIterationBudget,
   normalizeIterationBudgetPolicy,
 } from "./iteration_budget.ts";
 import { boundedParallel } from "./parallel.ts";
-import { newToolLaunchOrder, type ToolLaunchHandle } from "./tool_launch.ts";
+import { createToolLaunchOrder, type ToolLaunchHandle } from "./tool_launch.ts";
 import { EventChannel } from "./event_channel.ts";
 
 // --- Run-scoped context helpers -------------------------------------------
@@ -243,12 +242,11 @@ export function contextWithAgentID(
   return { ...(ctx ?? {}), agentID: id };
 }
 
-/** Extracts the agent ID, or `[undefined, false]`. */
+/** Extracts the agent ID, or `undefined`. */
 export function agentIDFromContext(
   ctx: RunContext | undefined,
-): [AgentID | undefined, boolean] {
-  const id = ctx?.agentID;
-  return [id, id !== undefined];
+): AgentID | undefined {
+  return ctx?.agentID;
 }
 
 /** Returns a copy of ctx carrying the event channel push function. */
@@ -259,12 +257,11 @@ export function contextWithEventChan(
   return { ...(ctx ?? {}), eventSink: ch };
 }
 
-/** Extracts the event-channel push function, or `[undefined, false]`. */
+/** Extracts the event-channel push function, or `undefined`. */
 export function eventChanFromContext(
   ctx: RunContext | undefined,
-): [((ev: Event) => boolean) | undefined, boolean] {
-  const ch = ctx?.eventSink;
-  return [ch, ch !== undefined];
+): ((ev: Event) => boolean) | undefined {
+  return ctx?.eventSink;
 }
 
 /** Returns a copy of ctx carrying the parent agent run context. */
@@ -275,12 +272,11 @@ export function contextWithParentRunContext(
   return { ...(ctx ?? {}), parentRunContext: parent };
 }
 
-/** Extracts the parent agent run context, or `[undefined, false]`. */
+/** Extracts the parent agent run context, or `undefined`. */
 export function parentRunContextFromContext(
   ctx: RunContext | undefined,
-): [RunContext | undefined, boolean] {
-  const parent = ctx?.parentRunContext;
-  return [parent, parent !== undefined];
+): RunContext | undefined {
+  return ctx?.parentRunContext;
 }
 
 /** Returns a copy of ctx carrying the parent agent's execution mode. */
@@ -291,12 +287,11 @@ export function contextWithParentMode(
   return { ...(ctx ?? {}), parentMode: mode };
 }
 
-/** Extracts the parent agent's execution mode, or `[undefined, false]`. */
+/** Extracts the parent agent's execution mode, or `undefined`. */
 export function parentModeFromContext(
   ctx: RunContext | undefined,
-): [string | undefined, boolean] {
-  const mode = ctx?.parentMode;
-  return [mode, mode !== undefined];
+): string | undefined {
+  return ctx?.parentMode;
 }
 
 // --- Loop support types ----------------------------------------------------
@@ -336,34 +331,30 @@ interface ResponsesStateSnapshot {
 /**
  * Tool-context accessors carrying the parent agent run identity into a tool
  * body. Each extracts one explicit `ToolContext` field the loop fills in before
- * executing a tool, or `[undefined, false]` when absent.
+ * executing a tool, or `undefined` when absent.
  */
 export function agentIDFromToolContext(
   ctx: ToolContext | undefined,
-): [AgentID | undefined, boolean] {
-  const id = ctx?.agentID;
-  return [id, id !== undefined];
+): AgentID | undefined {
+  return ctx?.agentID;
 }
 
 export function eventSinkFromToolContext(
   ctx: ToolContext | undefined,
-): [EventSink | undefined, boolean] {
-  const sink = ctx?.eventSink;
-  return [sink, sink !== undefined];
+): EventSink | undefined {
+  return ctx?.eventSink;
 }
 
 export function parentRunContextFromToolContext(
   ctx: ToolContext | undefined,
-): [RunContext | undefined, boolean] {
-  const parent = ctx?.parentRunContext;
-  return [parent, parent !== undefined];
+): RunContext | undefined {
+  return ctx?.parentRunContext;
 }
 
 export function parentModeFromToolContext(
   ctx: ToolContext | undefined,
-): [string | undefined, boolean] {
-  const mode = ctx?.parentMode;
-  return [mode, mode !== undefined];
+): string | undefined {
+  return ctx?.parentMode;
 }
 
 /** The provider Responses state-mode surface, when implemented. */
@@ -654,7 +645,7 @@ export class Agent {
   droppedEvents = 0;
 
   /**
-   * Prefer `newAgent`/`newAgentWithLoopConfig`, which build the frozen prompt.
+   * Prefer `createAgent`/`createAgentWithLoopConfig`, which build the frozen prompt.
    * The public constructor is retained for subclasses/tests and mirrors the Go
    * struct literal.
    */
@@ -723,13 +714,14 @@ export class Agent {
       return;
     }
     let toolDefs = registry.modeTools(this.config.mode ?? "");
-    const [webSearch, hasWebSearch] = configuredWebSearchToolDefinition(
-      this.config.settings,
+    const webSearch = configuredWebSearchToolDefinition(this.config.settings);
+    if (webSearch !== undefined) toolDefs = [...toolDefs, webSearch];
+    const responsesSearch = openAIResponsesWebSearchToolDefinition(
+      this.config.provider,
     );
-    if (hasWebSearch) toolDefs = [...toolDefs, webSearch];
-    const [responsesSearch, hasResponsesSearch] =
-      openAIResponsesWebSearchToolDefinition(this.config.provider);
-    if (hasResponsesSearch) toolDefs = [...toolDefs, responsesSearch];
+    if (responsesSearch !== undefined) {
+      toolDefs = [...toolDefs, responsesSearch];
+    }
 
     const toolNames: string[] = [];
     for (const t of toolDefs) {
@@ -918,7 +910,7 @@ export class Agent {
 - Working directory: ${this.#registry?.getWorkDir() ?? ""}
 - Mode: ${this.config.mode ?? ""}
 `;
-    return newSystemInjectedUserMessage(context);
+    return createSystemInjectedUserMessage(context);
   }
 
   /** Returns the output-token reserve used by the request token budget. */
@@ -970,7 +962,7 @@ export class Agent {
     budgetTokens: number,
     contextWindow: number,
     reserveTokens: number,
-  ): [string, boolean] {
+  ): string | undefined {
     const estimator = resolveTokenEstimator(
       this.config.compactionSettings ??
         { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
@@ -987,7 +979,7 @@ export class Agent {
         bestTokens = tokens;
       }
     }
-    if (bestIndex < 0) return ["", false];
+    if (bestIndex < 0) return undefined;
 
     const original = this.#messages[bestIndex];
     this.#messages[bestIndex] = contextGuardToolResult(
@@ -1002,7 +994,7 @@ export class Agent {
     } else {
       this.#context.messages = this.#messages;
     }
-    return [original.toolName ?? "", true];
+    return original.toolName ?? "";
   }
 
   /**
@@ -1335,7 +1327,7 @@ export class Agent {
     options: string[],
     explanation: string,
   ): Promise<string> {
-    const [ch] = eventChanFromContext(ctx);
+    const ch = eventChanFromContext(ctx);
     if (ch === undefined) return "";
     return await this.requestQuestion(ctx, ch, question, options, explanation);
   }
@@ -1472,7 +1464,7 @@ export class Agent {
 
   /** Processes a user message and streams events back. */
   run(userMsg: string, abort?: AbortSignal): AsyncIterable<Event> {
-    return this.runWithUserMessage(newUserMessage(userMsg), abort);
+    return this.runWithUserMessage(createUserMessage(userMsg), abort);
   }
 
   /** Processes an already-built user message and streams events back. */
@@ -1481,7 +1473,7 @@ export class Agent {
     abort?: AbortSignal,
   ): AsyncIterable<Event> {
     const channel = new EventChannel();
-    const ctx = newRunContext(abort);
+    const ctx = createRunContext(abort);
     void this.#runUserMessageTask(ctx, msg, channel);
     return channel;
   }
@@ -1492,7 +1484,7 @@ export class Agent {
     abort?: AbortSignal,
   ): AsyncIterable<Event> {
     const channel = new EventChannel();
-    const ctx = newRunContext(abort);
+    const ctx = createRunContext(abort);
     void this.#runMessagesTask(ctx, messages, channel);
     return channel;
   }
@@ -1503,7 +1495,7 @@ export class Agent {
    */
   runWithLoadedHistory(abort?: AbortSignal): AsyncIterable<Event> {
     const channel = new EventChannel();
-    const ctx = newRunContext(abort);
+    const ctx = createRunContext(abort);
     void this.#runLoadedHistoryTask(ctx, channel);
     return channel;
   }
@@ -1780,10 +1772,10 @@ export class Agent {
     maxTokens: number,
   ): Promise<string> {
     const workDir = workDirForAgent(this);
-    const registry = newRegistry(workDir, newNoneSandbox());
+    const registry = createRegistry(workDir, createNoneSandbox());
     let model = this.config.model;
     if (model !== undefined) model = { ...model, contextWindow: 0 };
-    const child = newAgentWithLoopConfig({
+    const child = createAgentWithLoopConfig({
       provider: this.config.provider,
       vendor: this.config.vendor,
       model,
@@ -2031,13 +2023,13 @@ export class Agent {
         estimator,
       );
       if (estimatedTokens <= budgetTokens) return [messages, null];
-      const [toolName, replaced] = this.replaceLargestToolResultForContext(
+      const toolName = this.replaceLargestToolResultForContext(
         estimatedTokens,
         budgetTokens,
         contextWindow,
         reserveTokens,
       );
-      if (!replaced) {
+      if (toolName === undefined) {
         return [
           null,
           new Error(
@@ -2133,7 +2125,7 @@ export class Agent {
           result.firstKeptIndex < msgIds.length
         ? msgIds[result.firstKeptIndex]
         : "";
-      const summaryMsg = newSystemInjectedUserMessage(result.summary);
+      const summaryMsg = createSystemInjectedUserMessage(result.summary);
       const keptMessages = cloneMessagesWithoutUsage(
         msgs.slice(result.firstKeptIndex),
       );
@@ -2395,8 +2387,8 @@ export class Agent {
       for (const block of partialContents) {
         state.recoveryAssistantContents.push(cloneContentBlock(block));
       }
-      const partial = newAssistantMessage(partialContents);
-      const recovery = newSystemInjectedUserMessage(
+      const partial = createAssistantMessage(partialContents);
+      const recovery = createSystemInjectedUserMessage(
         buildStreamRecoveryMessage(textContent),
       );
       this.#messages = [...this.#messages, partial, recovery];
@@ -2490,7 +2482,7 @@ export class Agent {
     const kept = cloneMessagesWithoutUsage(msgs.slice(cut));
     const note =
       `[Context recovery] The provider rejected the request for exceeding the context window and automatic summarization failed, so ${cut} older messages were dropped without a summary to recover. Earlier context is no longer available.`;
-    const newMessages = [newSystemInjectedUserMessage(note), ...kept];
+    const newMessages = [createSystemInjectedUserMessage(note), ...kept];
     const newIds: string[] = [""];
     if (cut < msgIds.length) newIds.push(...msgIds.slice(cut));
     this.#messages = newMessages;
@@ -2614,8 +2606,10 @@ export class Agent {
         }
         turnIndex++;
       } else if (message.role === "toolResult") {
-        const [output, ok] = replayTextContent(message);
-        if (!ok || (message.toolCallId ?? "") === "") return [];
+        const output = replayTextContent(message);
+        if (output === undefined || (message.toolCallId ?? "") === "") {
+          return [];
+        }
         const raw = {
           type: "function_call_output",
           call_id: message.toolCallId,
@@ -2624,8 +2618,8 @@ export class Agent {
         if (JSON.stringify(raw).length > maxNativeReplayItemBytes) return [];
         items.push(raw);
       } else {
-        const [text, ok] = replayTextContent(message);
-        if (!ok) return [];
+        const text = replayTextContent(message);
+        if (text === undefined) return [];
         let role = message.role;
         if (role === "") role = "user";
         const raw = {
@@ -2832,7 +2826,7 @@ export class Agent {
     localTurnId: string,
     ch: EventSink,
   ): Promise<Message[]> {
-    const order = newToolLaunchOrder(toolCalls.length);
+    const order = createToolLaunchOrder(toolCalls.length);
     const indexes = toolCalls.map((_, i) => i);
     return await boundedParallel(
       this.maxToolConcurrency(),
@@ -2879,12 +2873,12 @@ export class Agent {
       contents: ContentBlock[] | undefined,
       isError: boolean,
     ): Message => {
-      const message = newToolResultMessageWithContents(
+      const message = createToolResultMessage(
         tc.id,
         tc.name,
         content,
-        contents ?? null,
         isError,
+        contents ?? null,
       );
       message.toolKind = tc.kind;
       return message;
@@ -3343,10 +3337,10 @@ export class Agent {
     }
     if (created) return [stored, null, null];
     if (stored.executionState === "completed") {
-      const [content, isError] = parseToolExecutionResultSummary(
+      const { content, isError } = parseToolExecutionResultSummary(
         stored.resultSummary,
       );
-      const message = newToolResultMessage(tc.id, tc.name, content, isError);
+      const message = createToolResultMessage(tc.id, tc.name, content, isError);
       message.toolKind = tc.kind;
       return [null, message, null];
     }
@@ -3383,7 +3377,7 @@ export class Agent {
       messageText +=
         " This side effect has no verified external idempotency guarantee, so exactly-once execution cannot be promised.";
     }
-    const message = newToolResultMessage(tc.id, tc.name, messageText, true);
+    const message = createToolResultMessage(tc.id, tc.name, messageText, true);
     message.toolKind = tc.kind;
     return [null, message, null];
   }
@@ -3418,7 +3412,10 @@ export class Agent {
         policy,
         this.config.maxIterations ?? 0,
       );
-      budget = newIterationBudget(normalized, this.config.maxIterations ?? 0);
+      budget = createIterationBudget(
+        normalized,
+        this.config.maxIterations ?? 0,
+      );
       runCtx = contextWithIterationBudget(runCtx, budget) ?? runCtx;
       wallClock = normalized.maxWallClock;
     }
@@ -3915,12 +3912,12 @@ export class Agent {
               if (textContent !== "") {
                 partialContents.push({ type: "text", text: textContent });
               }
-              const partial = newAssistantMessage(partialContents);
+              const partial = createAssistantMessage(partialContents);
               this.#messages = [...this.#messages, partial];
               this.#messageIds = [...this.#messageIds, ""];
               this.#context.messages = [...this.#context.messages, partial];
             }
-            const recovery = newSystemInjectedUserMessage(
+            const recovery = createSystemInjectedUserMessage(
               buildOutputRecoveryMessage(textContent),
             );
             this.#messages = [...this.#messages, recovery];
@@ -4005,7 +4002,7 @@ export class Agent {
         for (const tc of toolCalls) {
           contents.push({ type: "toolCall", toolCall: tc });
         }
-        const assistantMsg = newAssistantMessage(contents);
+        const assistantMsg = createAssistantMessage(contents);
         let persistedAssistantMsg = assistantMsg;
         if (state.recoveryAssistantContents.length > 0) {
           persistedAssistantMsg = {
@@ -4225,7 +4222,7 @@ export class Agent {
         }
         if (state.toolArgumentNotices.length > 0) {
           const recoveryText = state.toolArgumentNotices.join("\n");
-          const notice = newSystemInjectedUserMessage(
+          const notice = createSystemInjectedUserMessage(
             "[System] Tool-call recovery notice:\n" + recoveryText,
           );
           this.sendEvent(ch, { type: EVENT_MESSAGE_START, message: notice });
@@ -4257,7 +4254,7 @@ export class Agent {
           if (!warningIssued) threshold = maxConsecutiveNoText;
           if (consecutiveNoText >= threshold) {
             if (!warningIssued) {
-              const warningMsg = newUserMessage(
+              const warningMsg = createUserMessage(
                 `[System] You have been making tool calls for ${consecutiveNoText} consecutive turns without any text response. Please explain what you are doing and whether you are stuck. If you are making progress, briefly describe your current task and continue. If you are truly stuck, please stop and explain the issue.`,
               );
               this.sendEvent(ch, {
@@ -4378,7 +4375,7 @@ export class Agent {
               });
               if (budget !== undefined) {
                 this.injectTransientMessage(
-                  newSystemInjectedUserMessage(warnMsg),
+                  createSystemInjectedUserMessage(warnMsg),
                 );
               }
             }
@@ -4513,7 +4510,7 @@ export function configureRegistryImageHint(
 }
 
 /** Creates a new agent with default loop configuration. */
-export function newAgent(
+export function createAgent(
   cfg: Config,
   registry: Registry | undefined,
 ): Agent {
@@ -4540,7 +4537,7 @@ export function newAgent(
 }
 
 /** Creates a new agent with custom loop configuration. */
-export function newAgentWithLoopConfig(
+export function createAgentWithLoopConfig(
   cfg: AgentLoopConfig,
   registry: Registry | undefined,
 ): Agent {

@@ -121,7 +121,7 @@ export class KnowledgeIndexJob {
   }
 }
 
-export function newKnowledgeIndexJob(): KnowledgeIndexJob {
+export function createKnowledgeIndexJob(): KnowledgeIndexJob {
   return new KnowledgeIndexJob(emptyKnowledgeSnapshot(), {
     running: true,
     filesTotal: 0,

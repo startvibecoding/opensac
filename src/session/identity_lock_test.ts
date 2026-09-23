@@ -2,10 +2,10 @@
 // serialization and eviction for one channel identity).
 
 import { assertEquals } from "@std/assert";
-import { newIdentityLocks } from "./identity_lock.ts";
+import { createIdentityLocks } from "./identity_lock.ts";
 
 Deno.test("IdentityLocksSerializesOneIdentity", async () => {
-  const locks = newIdentityLocks();
+  const locks = createIdentityLocks();
   let active = 0;
   let maxActive = 0;
   const task = async () => {
@@ -22,7 +22,7 @@ Deno.test("IdentityLocksSerializesOneIdentity", async () => {
 });
 
 Deno.test("IdentityLocksAllowDistinctIdentitiesConcurrently", async () => {
-  const locks = newIdentityLocks();
+  const locks = createIdentityLocks();
   let active = 0;
   let maxActive = 0;
   const task = async (id: string) => {

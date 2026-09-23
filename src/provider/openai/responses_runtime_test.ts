@@ -11,8 +11,8 @@ import { closeAll } from "../../db/mod.ts";
 import { getResponseTurn } from "../../session/mod.ts";
 import { type ResponseRun } from "../../session/mod.ts";
 import type { ChatParams, Model } from "../types.ts";
-import { newUserMessage } from "../types.ts";
-import { newProviderWithModels } from "./provider.ts";
+import { createUserMessage } from "../types.ts";
+import { createOpenAIProvider } from "./provider.ts";
 // Side-effect import: registers the OpenAI provider factories.
 import "./register.ts";
 import { archiveBackgroundResponse } from "./responses_runtime.ts";
@@ -58,7 +58,7 @@ Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {
   let cancelReceived = false;
   const sessionDir = tempDir();
   try {
-    const p = newProviderWithModels("test-key", "https://api.test/v1", [
+    const p = createOpenAIProvider("test-key", "https://api.test/v1", [
       model("mock"),
     ]);
     p.client = mockClient((req: MockRequest) => {
@@ -81,7 +81,7 @@ Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {
       }
       return new Response("", { status: 404 });
     });
-    const manager = p.newResponsesRunManager(sessionDir);
+    const manager = p.createResponsesRunManager(sessionDir);
     const sessionId = "session-runtime-1";
 
     const run = await manager.start(
@@ -89,7 +89,7 @@ Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {
       "turn-1",
       params({
         modelId: "mock",
-        messages: [newUserMessage("run in background")],
+        messages: [createUserMessage("run in background")],
       }),
     );
     assertEquals(run.responseId, "resp-1");
@@ -102,7 +102,7 @@ Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {
     const second = await manager.start(
       sessionId,
       "turn-2",
-      params({ modelId: "mock", messages: [newUserMessage("cancel me")] }),
+      params({ modelId: "mock", messages: [createUserMessage("cancel me")] }),
     );
     await manager.cancel(sessionId, second.localRunId);
     assert(cancelReceived);
@@ -134,7 +134,7 @@ Deno.test("ResponsesRunManagerStartUsesConfiguredRetryAndIdempotency", async () 
     try {
       let attempts = 0;
       let idempotencyKey = "";
-      const p = newProviderWithModels("test-key", "https://api.test/v1", [
+      const p = createOpenAIProvider("test-key", "https://api.test/v1", [
         model("mock"),
       ]);
       p.setHeaders({ "Idempotency-Key": "configured-value-must-not-win" });
@@ -159,14 +159,14 @@ Deno.test("ResponsesRunManagerStartUsesConfiguredRetryAndIdempotency", async () 
         return jsonResponse({ error: "temporarily unavailable" }, 503);
       });
 
-      const manager = p.newResponsesRunManager(sessionDir);
+      const manager = p.createResponsesRunManager(sessionDir);
       let error: Error | null = null;
       let run: ResponseRun | null = null;
       try {
         run = await manager.start(
           sessionId,
           `turn-retry-${tc.name}`,
-          params({ modelId: "mock", messages: [newUserMessage("retry")] }),
+          params({ modelId: "mock", messages: [createUserMessage("retry")] }),
         );
       } catch (err) {
         error = err as Error;

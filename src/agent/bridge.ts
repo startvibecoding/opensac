@@ -1066,7 +1066,7 @@ export class AgentAdapter implements PublicAgent, PublicQuestionHandler {
 }
 
 /** Creates an adapter that wraps an internal Agent. */
-export function newAgentAdapter(a: Agent): AgentAdapter {
+export function createAgentAdapter(a: Agent): AgentAdapter {
   return new AgentAdapter(a);
 }
 

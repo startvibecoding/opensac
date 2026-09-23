@@ -210,7 +210,7 @@ function rightmost(n: Node): Node {
 }
 
 /** Creates a new AST node of the given type. */
-export function newNode(t: NodeType): Node {
+export function createNode(t: NodeType): Node {
   return new Node(t);
 }
 

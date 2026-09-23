@@ -1,11 +1,10 @@
 import type { DB } from "../db/mod.ts";
 import {
-  ErrNoRows,
   execChanges,
   inList,
   type Param,
   queryAll,
-  queryOne,
+  queryOptional,
 } from "./database.ts";
 
 export interface ExecutionIntentRecord {
@@ -92,8 +91,8 @@ export class RunDAO {
     );
   }
 
-  findIntent(intentId: string): ExecutionIntentRecord {
-    return queryOne<ExecutionIntentRecord>(
+  findIntent(intentId: string): ExecutionIntentRecord | undefined {
+    return queryOptional<ExecutionIntentRecord>(
       this.requireDb(),
       `SELECT ${intentColumns} FROM session_execution_intents WHERE id = ? LIMIT 1`,
       [intentId],
@@ -155,8 +154,8 @@ export class RunDAO {
     );
   }
 
-  findRun(executor: DB, runId: string): SessionRunRecord {
-    return queryOne<SessionRunRecord>(
+  findRun(executor: DB, runId: string): SessionRunRecord | undefined {
+    return queryOptional<SessionRunRecord>(
       executor,
       `SELECT ${runColumns} FROM session_runs WHERE id = ? LIMIT 1`,
       [runId],
@@ -200,9 +199,12 @@ export class RunDAO {
     return result;
   }
 
-  activeRun(sessionId: string, statuses: string[]): SessionRunRecord {
+  activeRun(
+    sessionId: string,
+    statuses: string[],
+  ): SessionRunRecord | undefined {
     const { sql, params } = inList(statuses);
-    return queryOne<SessionRunRecord>(
+    return queryOptional<SessionRunRecord>(
       this.requireDb(),
       `SELECT ${runColumns} FROM session_runs
        WHERE session_id = ? AND status IN (${sql})
@@ -244,16 +246,19 @@ export class RunDAO {
   }
 
   nextAttempt(sessionId: string, intentId: string): number {
-    return queryOne<{ attempt: number }>(
+    return queryOptional<{ attempt: number }>(
       this.requireDb(),
       `SELECT COALESCE(MAX(attempt), 0) + 1 AS attempt FROM session_runs
        WHERE session_id = ? AND intent_id = ?`,
       [sessionId, intentId],
-    ).attempt;
+    )?.attempt ?? 1;
   }
 
-  latestForIntent(sessionId: string, intentId: string): SessionRunRecord {
-    return queryOne<SessionRunRecord>(
+  latestForIntent(
+    sessionId: string,
+    intentId: string,
+  ): SessionRunRecord | undefined {
+    return queryOptional<SessionRunRecord>(
       this.requireDb(),
       `SELECT ${runColumns} FROM session_runs
        WHERE session_id = ? AND intent_id = ?
@@ -262,12 +267,12 @@ export class RunDAO {
     );
   }
 
-  sessionId(executor: DB, runId: string): string {
-    return queryOne<{ sessionId: string }>(
+  sessionId(executor: DB, runId: string): string | undefined {
+    return queryOptional<{ sessionId: string }>(
       executor,
       `SELECT session_id AS sessionId FROM session_runs WHERE id = ? LIMIT 1`,
       [runId],
-    ).sessionId;
+    )?.sessionId;
   }
 
   updateStatus(
@@ -334,10 +339,6 @@ export class RunDAO {
     if (this.db === null) throw new Error("run database is not open");
     return this.db;
   }
-}
-
-export function isNoRowsRun(err: unknown): boolean {
-  return err === ErrNoRows;
 }
 
 function bindRun(r: SessionRunRecord): (string | number | null)[] {

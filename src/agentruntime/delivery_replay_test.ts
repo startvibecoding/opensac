@@ -2,11 +2,11 @@
 
 import { assertEquals } from "@std/assert";
 import {
+  createDeliveryPendingEvent,
   deliveryPendingData,
-  newDeliveryPendingEvent,
 } from "./delivery_events.ts";
 import {
-  newDeliveryReconciledEvent,
+  createDeliveryReconciledEvent,
   replayDeliveries,
   replayDeliveriesFromRunEvents,
 } from "./delivery_replay.ts";
@@ -62,7 +62,7 @@ Deno.test("delivery pending data and events round trip", () => {
   assertEquals(data.channelDeliveryPending, true);
   assertEquals(data.extraKey, "extra-value");
 
-  const finished = newDeliveryPendingEvent(
+  const finished = createDeliveryPendingEvent(
     "s",
     "run-1",
     "tui",
@@ -71,7 +71,7 @@ Deno.test("delivery pending data and events round trip", () => {
     "yolo",
     data,
   );
-  const reconciled = newDeliveryReconciledEvent("s", "run-1", "tui", {});
+  const reconciled = createDeliveryReconciledEvent("s", "run-1", "tui", {});
   const pending = replayDeliveriesFromRunEvents([finished, reconciled]);
   assertEquals(pending.size, 0);
 });

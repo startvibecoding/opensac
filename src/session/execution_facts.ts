@@ -2,14 +2,7 @@
 // Deviation: `context.Context` is dropped (the DAO layer is synchronous) and
 // `time.Time` maps to `Date`.
 
-import {
-  isNoRows,
-  ResponseDAO,
-  RunDAO,
-  RuntimeLeaseDAO,
-  type RuntimeLeaseRecord,
-  type Tx,
-} from "../dao/mod.ts";
+import { ResponseDAO, RunDAO, RuntimeLeaseDAO, type Tx } from "../dao/mod.ts";
 import { openRootDB } from "./root_db.ts";
 import { type ResponseRun, responseRunFromRecord } from "./response_store.ts";
 import {
@@ -100,34 +93,12 @@ export function readSessionExecutionFacts(
     }
     if (facts.activeRuns.length === 1) {
       const activeRunId = facts.activeRuns[0].id;
-      try {
-        facts.recovery = readSessionRunRecoveryTx(tx, activeRunId);
-      } catch (err) {
-        if (!isNoRows(err)) {
-          throw new Error(
-            `read session run recovery: ${(err as Error).message}`,
-          );
-        }
-      }
-      try {
-        facts.remoteRun = readLinkedResponseRunTx(tx, trimmed, activeRunId);
-      } catch (err) {
-        if (!isNoRows(err)) {
-          throw new Error(`read linked remote run: ${(err as Error).message}`);
-        }
-      }
+      facts.recovery = readSessionRunRecoveryTx(tx, activeRunId) ?? null;
+      facts.remoteRun = readLinkedResponseRunTx(tx, trimmed, activeRunId) ??
+        null;
     }
 
-    let record: RuntimeLeaseRecord | undefined;
-    try {
-      record = leaseDAO.find(tx, trimmed);
-    } catch (err) {
-      if (!isNoRows(err)) {
-        throw new Error(
-          `read session runtime lease: ${(err as Error).message}`,
-        );
-      }
-    }
+    const record = leaseDAO.find(tx, trimmed);
     if (record !== undefined) {
       facts.lease = {
         sessionId: record.sessionId,
@@ -154,7 +125,7 @@ function readLinkedResponseRunTx(
   tx: Tx,
   sessionId: string,
   runId: string,
-): ResponseRun {
+): ResponseRun | undefined {
   const record = new ResponseDAO(null).linkedRun(tx, sessionId, runId);
-  return responseRunFromRecord(record);
+  return record === undefined ? undefined : responseRunFromRecord(record);
 }

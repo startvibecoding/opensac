@@ -12,7 +12,7 @@ import {
 } from "./attachment.ts";
 import { AttachmentService } from "./input.ts";
 import { writeRootDatabase } from "../session/database.ts";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
 
 function inputTestSession(): {
@@ -22,7 +22,7 @@ function inputTestSession(): {
 } {
   const root = Deno.makeTempDirSync({ prefix: "opensac-input-" });
   const workDir = Deno.makeTempDirSync({ prefix: "opensac-work-" });
-  const manager = newManager(workDir, root);
+  const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
 }

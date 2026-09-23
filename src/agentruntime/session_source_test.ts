@@ -4,7 +4,7 @@
 // integration cases; these cover the precedence and conflict rules directly.
 
 import { assertEquals, assertThrows } from "@std/assert";
-import { newManager } from "../session/manager.ts";
+import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import {
   resolveManagerPolicy,
@@ -15,7 +15,7 @@ import { SOURCE_TUI, SOURCE_WE_CHAT, SourceConflictError } from "./source.ts";
 Deno.test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
-    const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     const resolved = resolveManagerSource(manager, { requested: SOURCE_TUI });
     assertEquals(resolved.source, SOURCE_WE_CHAT);
@@ -34,7 +34,7 @@ Deno.test("resolveManagerSourceFallsBackToRequestWithoutManager", () => {
 Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
-    const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     assertThrows(
       () => resolveManagerSource(manager, { current: SOURCE_TUI }),
@@ -48,7 +48,7 @@ Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
 Deno.test("resolveManagerPolicyAppliesForcedChannelMode", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
-    const manager = newManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     const result = resolveManagerPolicy(
       manager,

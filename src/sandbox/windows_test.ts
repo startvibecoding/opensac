@@ -2,10 +2,10 @@
 // so these cover the ported behaviour directly).
 
 import { assert, assertEquals } from "@std/assert";
-import { Level, newWinSandbox } from "./mod.ts";
+import { createWinSandbox, Level } from "./mod.ts";
 
 Deno.test("win sandbox reports unavailable", () => {
-  const sb = newWinSandbox(Deno.cwd(), Level.Standard);
+  const sb = createWinSandbox(Deno.cwd(), Level.Standard);
   assertEquals(sb.name(), "windows-sandbox");
   assertEquals(sb.level(), Level.Standard);
   assert(!sb.isAvailable());
@@ -13,7 +13,7 @@ Deno.test("win sandbox reports unavailable", () => {
 });
 
 Deno.test("win sandbox wrapCommand shell selection", () => {
-  const sb = newWinSandbox(Deno.cwd(), Level.Standard);
+  const sb = createWinSandbox(Deno.cwd(), Level.Standard);
 
   const cmd = sb.wrapCommand(undefined, "", "echo hello", {});
   assertEquals(cmd.program, "cmd.exe");
@@ -24,7 +24,7 @@ Deno.test("win sandbox wrapCommand shell selection", () => {
 });
 
 Deno.test("win sandbox buildEnv filters and overlays", () => {
-  const sb = newWinSandbox(Deno.cwd(), Level.Standard);
+  const sb = createWinSandbox(Deno.cwd(), Level.Standard);
   Deno.env.set("OPENSAC_SANDBOX_LEAK", "1");
   try {
     const env = sb.buildEnv({});

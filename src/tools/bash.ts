@@ -22,10 +22,10 @@ import {
 } from "../sandbox/mod.ts";
 import { truncateString } from "../util/truncate.ts";
 import type { JobManager } from "./jobmanager.ts";
-import { newJobManager } from "./jobmanager.ts";
+import { createJobManager } from "./jobmanager.ts";
 import {
+  createTextToolResult,
   type ExecutionTimeoutProvider,
-  newTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -378,7 +378,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
         `\n... (truncated ${result.length - prefix.length} bytes)`;
     }
 
-    return newTextToolResult(result);
+    return createTextToolResult(result);
   }
 
   #runAsync(
@@ -443,7 +443,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
       job.markDone(stdoutBuf.bytes(), stderrBuf.bytes(), err);
     })();
 
-    return newTextToolResult(
+    return createTextToolResult(
       `[runtime]\n${runtimeLabel}\n[command]\n${command}\nUse 'jobs' tool to check status or 'kill' to stop.`,
     );
   }
@@ -582,15 +582,10 @@ export function isValidShell(p: string): boolean {
   }
 }
 
-/** Creates a new bash tool with a fresh JobManager. */
-export function newBashTool(r: Registry): BashTool {
-  return new BashTool(r, newJobManager());
-}
-
-/** Creates a new bash tool with an existing JobManager. */
-export function newBashToolWithJobManager(
+/** Creates a new bash tool (a fresh JobManager unless one is supplied). */
+export function createBashTool(
   r: Registry,
-  jm: JobManager,
+  jm: JobManager = createJobManager(),
 ): BashTool {
   return new BashTool(r, jm);
 }

@@ -9,18 +9,18 @@ import { assert, assertEquals } from "@std/assert";
 import type { Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
+  createSystemInjectedUserMessage,
   type Model,
-  newSystemInjectedUserMessage,
   streamDone,
   streamError,
   type StreamEvent,
   streamStart,
   streamTextDelta,
 } from "../provider/types.ts";
-import { newRegistry } from "../tools/tool.ts";
-import { type Agent, newAgentWithLoopConfig } from "./agent.ts";
+import { createRegistry } from "../tools/tool.ts";
+import { type Agent, createAgentWithLoopConfig } from "./agent.ts";
 import { composeFollowUps } from "./followup.ts";
-import { newMemberMailbox } from "./mailbox.ts";
+import { createMemberMailbox } from "./mailbox.ts";
 import {
   type Event,
   EVENT_ERROR,
@@ -110,13 +110,13 @@ Deno.test("loop reports truncated output as incomplete", async () => {
     { type: streamTextDelta, textDelta: "partial answer that was cut off" },
     { type: streamDone, stopReason: "length" },
   ]]);
-  const agent: Agent = newAgentWithLoopConfig({
+  const agent: Agent = createAgentWithLoopConfig({
     id: "truncated",
     provider,
     model: provider.models()[0],
     mode: "yolo",
     maxTokensUserSet: true,
-  }, newRegistry(Deno.makeTempDirSync(), undefined));
+  }, createRegistry(Deno.makeTempDirSync(), undefined));
 
   const { status, reason } = await collectTerminal(
     agent.run("write a very long answer"),
@@ -140,7 +140,7 @@ Deno.test("loop marks a recovered turn a success", async () => {
     ],
   ]);
   let drains = 0;
-  const agent = newAgentWithLoopConfig({
+  const agent = createAgentWithLoopConfig({
     id: "lead",
     provider,
     model: provider.models()[0],
@@ -149,11 +149,13 @@ Deno.test("loop marks a recovered turn a success", async () => {
     getFollowUpMessages: () => {
       drains++;
       if (drains === 1) {
-        return [newSystemInjectedUserMessage("[MEMBER_COMPLETION] finished")];
+        return [
+          createSystemInjectedUserMessage("[MEMBER_COMPLETION] finished"),
+        ];
       }
       return [];
     },
-  }, newRegistry(Deno.makeTempDirSync(), undefined));
+  }, createRegistry(Deno.makeTempDirSync(), undefined));
 
   const { status, reason, errorEvent } = await collectTerminal(
     agent.run("start"),
@@ -170,17 +172,17 @@ Deno.test("run cancelled during member wait terminalizes as canceled", async () 
     { type: streamTextDelta, textDelta: "lead turn" },
     { type: streamDone, stopReason: "stop" },
   ]]);
-  const mailbox = newMemberMailbox();
+  const mailbox = createMemberMailbox();
   mailbox.setRunningPredicate(() => true);
   const followUps = composeFollowUps(mailbox, undefined);
   const controller = new AbortController();
-  const agent = newAgentWithLoopConfig({
+  const agent = createAgentWithLoopConfig({
     id: "lead",
     provider,
     model: provider.models()[0],
     mode: "yolo",
     getFollowUpMessages: (ctx) => followUps?.(ctx.signal) ?? null,
-  }, newRegistry(Deno.makeTempDirSync(), undefined));
+  }, createRegistry(Deno.makeTempDirSync(), undefined));
 
   setTimeout(() => controller.abort(), 200);
   const { status, reason } = await collectTerminal(

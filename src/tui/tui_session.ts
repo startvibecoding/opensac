@@ -7,13 +7,13 @@
 // Runtime, config, session, and protocol modules (Builder, ExecutionRuntime,
 // DecisionService, DAO-backed session listing, allow/settings persistence).
 
-import { createWithOptions } from "../provider/factory/factory.ts";
+import { create } from "../provider/factory/factory.ts";
 import {
   Builder,
   type SessionRuntime,
 } from "../agentruntime/session_runtime.ts";
 import { resolveUnattendedMode, SOURCE_TUI } from "../agentruntime/source.ts";
-import { newAgentManager } from "../agentruntime/agent_manager.ts";
+import { createAgentManager } from "../agentruntime/agent_manager.ts";
 import type { AgentManager } from "../agent/manager.ts";
 import { canAutoRun, Supervisor } from "../esm/mod.ts";
 import { TuiESMRuntimeAdapter } from "./esm_tui_adapter.ts";
@@ -156,7 +156,7 @@ export class TUISession implements CommandHost {
     this.#settings = settings;
     this.#workDir = options.workDir;
     this.#multiAgent = options.multiAgent ?? false;
-    const created = createWithOptions(
+    const created = create(
       settings,
       options.provider,
       options.model,
@@ -253,7 +253,7 @@ export class TUISession implements CommandHost {
     if (provider === null || model === null || settings === null) {
       throw new Error("agent manager runtime is unavailable");
     }
-    this.#agentManager = newAgentManager({
+    this.#agentManager = createAgentManager({
       runtime,
       provider,
       model,
@@ -1466,7 +1466,7 @@ export class TUISession implements CommandHost {
 
   /** Binds a provider/model pair chosen in a dialog to the live session. */
   applyModelBinding(providerName: string, modelID: string): void {
-    const created = createWithOptions(
+    const created = create(
       this.#settings,
       providerName,
       modelID,
@@ -1483,7 +1483,7 @@ export class TUISession implements CommandHost {
   reloadSettings(): void {
     const fresh = loadSettingsWithMeta().settings;
     this.#settings = fresh;
-    const created = createWithOptions(
+    const created = create(
       fresh,
       this.#providerName,
       this.#model.id,
@@ -1497,7 +1497,7 @@ export class TUISession implements CommandHost {
 
   /** Rebuilds the provider/model binding from settings. */
   reloadModel(): void {
-    const created = createWithOptions(
+    const created = create(
       this.#settings,
       this.#providerName,
       this.#model.id,

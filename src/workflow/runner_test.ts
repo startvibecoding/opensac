@@ -7,7 +7,7 @@ import {
   assertStringIncludes,
 } from "@std/assert";
 import { Runner } from "./runner.ts";
-import { FileStore, newFileStore } from "./store.ts";
+import { createFileStore, FileStore } from "./store.ts";
 import {
   abortError,
   type AgentResult,
@@ -186,7 +186,7 @@ Deno.test("parallel aggregates failures and cancels siblings", async () => {
 Deno.test("file store persists loads and lists workflow state", async () => {
   const dir = await Deno.makeTempDir();
   try {
-    const store = newFileStore(dir);
+    const store = createFileStore(dir);
     const started = new Date(Date.UTC(2026, 7, 7, 12, 0, 0, 0));
     const state = {
       id: "run-1",

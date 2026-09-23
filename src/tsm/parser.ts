@@ -1,4 +1,4 @@
-import { computeIDs, newNode, Node, NodeType } from "./node.ts";
+import { computeIDs, createNode, Node, NodeType } from "./node.ts";
 
 // ── Preprocessor (LaTeX) ────────────────────────────────────────────────────
 
@@ -79,12 +79,12 @@ function rewriteSpeculativeEmphasis(doc: Node): void {
     if (idx < 0) return;
     const newNodes: Node[] = [];
     if (prefix !== "") {
-      const pn = newNode(NodeType.Text);
+      const pn = createNode(NodeType.Text);
       pn.text = prefix;
       newNodes.push(pn);
     }
-    const sn = newNode(NodeType.Strong);
-    const inn = newNode(NodeType.Text);
+    const sn = createNode(NodeType.Strong);
+    const inn = createNode(NodeType.Text);
     inn.text = inner;
     sn.append(inn);
     newNodes.push(sn);
@@ -107,12 +107,12 @@ function rewriteSpeculativeEmphasis(doc: Node): void {
     if (idx < 0) return;
     const newNodes: Node[] = [];
     if (prefix !== "") {
-      const pn = newNode(NodeType.Text);
+      const pn = createNode(NodeType.Text);
       pn.text = prefix;
       newNodes.push(pn);
     }
-    const en = newNode(NodeType.Emphasis);
-    const inn = newNode(NodeType.Text);
+    const en = createNode(NodeType.Emphasis);
+    const inn = createNode(NodeType.Text);
     inn.text = inner;
     en.append(inn);
     newNodes.push(en);
@@ -196,7 +196,7 @@ export function parse(src: string, opt: ParseOption): Node {
 
 function parseDocument(lines: string[]): Node {
   const bp = new BlockParser(lines);
-  const doc = newNode(NodeType.Document);
+  const doc = createNode(NodeType.Document);
   bp.parseBlocks(doc);
   return doc;
 }
@@ -245,7 +245,7 @@ class BlockParser {
       return;
     }
     if (isThematicBreak(trimmed)) {
-      parent.append(newNode(NodeType.ThematicBreak));
+      parent.append(createNode(NodeType.ThematicBreak));
       this.pos++;
       return;
     }
@@ -297,7 +297,7 @@ class BlockParser {
     text = trimRightCutset(text, "# ");
     text = trimRightCutset(text, " ");
 
-    const node = newNode(NodeType.Heading);
+    const node = createNode(NodeType.Heading);
     node.level = i;
     parseInline(node, text);
     return { node, consumed: 1 };
@@ -338,7 +338,7 @@ class BlockParser {
       this.pos++;
     }
 
-    const node = newNode(NodeType.FencedCodeBlock);
+    const node = createNode(NodeType.FencedCodeBlock);
     node.language = lang;
     node.code = codeLines.join("\n");
     parent.append(node);
@@ -373,13 +373,13 @@ class BlockParser {
       this.pos++;
     }
     if (codeLines.length === 0) return;
-    const node = newNode(NodeType.IndentedCodeBlock);
+    const node = createNode(NodeType.IndentedCodeBlock);
     node.code = codeLines.join("\n");
     parent.append(node);
   }
 
   private parseBlockquote(parent: Node, depth: number): void {
-    const node = newNode(NodeType.Blockquote);
+    const node = createNode(NodeType.Blockquote);
     node.quoteLevel = depth;
 
     const innerLines: string[] = [];
@@ -410,7 +410,7 @@ class BlockParser {
   }
 
   private parseUnorderedList(parent: Node): void {
-    const node = newNode(NodeType.UnorderedList);
+    const node = createNode(NodeType.UnorderedList);
     node.ordered = false;
 
     while (this.pos < this.#lines.length) {
@@ -430,7 +430,7 @@ class BlockParser {
         if (node.children.length > 0) {
           const lastItem = node.children[node.children.length - 1];
           const contText = trimLeftSpaces(line);
-          const contNode = newNode(NodeType.Text);
+          const contNode = createNode(NodeType.Text);
           contNode.text = "\n" + contText;
           lastItem.append(contNode);
           this.pos++;
@@ -441,7 +441,7 @@ class BlockParser {
       const markerLen = 1;
       let content = trimmed.slice(markerLen);
       if (content.length > 0 && content[0] === " ") content = content.slice(1);
-      const listItem = newNode(NodeType.ListItem);
+      const listItem = createNode(NodeType.ListItem);
 
       if (content.startsWith("[ ] ")) {
         listItem.checked = false;
@@ -453,7 +453,7 @@ class BlockParser {
         content = content.slice(4);
       }
 
-      const para = newNode(NodeType.Paragraph);
+      const para = createNode(NodeType.Paragraph);
       parseInline(para, content);
       listItem.append(para);
 
@@ -470,7 +470,7 @@ class BlockParser {
   }
 
   private parseOrderedList(parent: Node): void {
-    const node = newNode(NodeType.OrderedList);
+    const node = createNode(NodeType.OrderedList);
     node.ordered = true;
     let first = true;
 
@@ -491,7 +491,7 @@ class BlockParser {
         if (node.children.length > 0) {
           const lastItem = node.children[node.children.length - 1];
           const contText = trimLeftSpaces(line);
-          const contNode = newNode(NodeType.Text);
+          const contNode = createNode(NodeType.Text);
           contNode.text = "\n" + contText;
           lastItem.append(contNode);
           this.pos++;
@@ -505,7 +505,7 @@ class BlockParser {
         node.startNum = num;
         first = false;
       }
-      const listItem = newNode(NodeType.ListItem);
+      const listItem = createNode(NodeType.ListItem);
 
       if (content.startsWith("[ ] ")) {
         listItem.checked = false;
@@ -517,7 +517,7 @@ class BlockParser {
         content = content.slice(4);
       }
 
-      const para = newNode(NodeType.Paragraph);
+      const para = createNode(NodeType.Paragraph);
       parseInline(para, content);
       listItem.append(para);
 
@@ -534,7 +534,7 @@ class BlockParser {
   }
 
   private parseTable(parent: Node): void {
-    const node = newNode(NodeType.Table);
+    const node = createNode(NodeType.Table);
 
     const headerCells = parseTableRow(this.#lines[this.pos]);
     this.pos++;
@@ -559,10 +559,10 @@ class BlockParser {
       this.pos++;
     }
 
-    const headerNode = newNode(NodeType.TableRow);
+    const headerNode = createNode(NodeType.TableRow);
     headerNode.isTableHeader = true;
     for (const cell of headerCells) {
-      const cellNode = newNode(NodeType.TableCell);
+      const cellNode = createNode(NodeType.TableCell);
       cellNode.isTableHeader = true;
       parseInline(cellNode, cell);
       headerNode.append(cellNode);
@@ -570,9 +570,9 @@ class BlockParser {
     node.append(headerNode);
 
     for (const row of rows) {
-      const rowNode = newNode(NodeType.TableRow);
+      const rowNode = createNode(NodeType.TableRow);
       for (const cell of row) {
-        const cellNode = newNode(NodeType.TableCell);
+        const cellNode = createNode(NodeType.TableCell);
         parseInline(cellNode, cell);
         rowNode.append(cellNode);
       }
@@ -604,7 +604,7 @@ class BlockParser {
       this.pos++;
     }
     if (lines.length === 0) return;
-    const node = newNode(NodeType.Paragraph);
+    const node = createNode(NodeType.Paragraph);
     parseInline(node, lines.join("\n"));
     parent.append(node);
   }
@@ -757,7 +757,7 @@ class InlineParser {
           if (this.pos + 1 < this.#text.length) {
             const next = this.#text[this.pos + 1];
             if (next === "\n") {
-              parent.append(newNode(NodeType.HardBreak));
+              parent.append(createNode(NodeType.HardBreak));
               this.pos += 2;
             } else {
               this.emitText(parent, next);
@@ -773,10 +773,10 @@ class InlineParser {
             this.#text[this.pos - 1] === " "
           ) {
             removeTrailingSpaces(parent);
-            parent.append(newNode(NodeType.HardBreak));
+            parent.append(createNode(NodeType.HardBreak));
             this.pos++;
           } else {
-            parent.append(newNode(NodeType.SoftBreak));
+            parent.append(createNode(NodeType.SoftBreak));
             this.pos++;
           }
           break;
@@ -793,7 +793,7 @@ class InlineParser {
             this.pos++;
           }
           if (this.pos > start) {
-            const node = newNode(NodeType.Text);
+            const node = createNode(NodeType.Text);
             node.text = this.#text.slice(start, this.pos);
             parent.append(node);
           }
@@ -803,7 +803,7 @@ class InlineParser {
   }
 
   emitText(parent: Node, text: string): void {
-    const node = newNode(NodeType.Text);
+    const node = createNode(NodeType.Text);
     node.text = text;
     parent.append(node);
     this.pos += text.length;
@@ -832,7 +832,7 @@ class InlineParser {
           ) {
             code = code.slice(1, -1);
           }
-          const node = newNode(NodeType.CodeSpan);
+          const node = createNode(NodeType.CodeSpan);
           node.text = code;
           parent.append(node);
           this.pos = endPos;
@@ -856,7 +856,7 @@ class InlineParser {
     }
     if (count > 2) {
       this.pos = start + 1;
-      const node = newNode(NodeType.Text);
+      const node = createNode(NodeType.Text);
       node.text = delim;
       parent.append(node);
       return;
@@ -879,8 +879,8 @@ class InlineParser {
           const innerText = this.#text.slice(this.pos, endStart);
           if (innerText !== "") {
             const node = count === 2
-              ? newNode(NodeType.Strong)
-              : newNode(NodeType.Emphasis);
+              ? createNode(NodeType.Strong)
+              : createNode(NodeType.Emphasis);
             parseInline(node, innerText);
             parent.append(node);
           }
@@ -893,7 +893,7 @@ class InlineParser {
       }
     }
     if (!found) {
-      const node = newNode(NodeType.Text);
+      const node = createNode(NodeType.Text);
       node.text = delimStr;
       parent.append(node);
     }
@@ -903,13 +903,13 @@ class InlineParser {
     this.pos += 2;
     const idx = this.#text.indexOf("~~", this.pos);
     if (idx < 0) {
-      const node = newNode(NodeType.Text);
+      const node = createNode(NodeType.Text);
       node.text = "~~";
       parent.append(node);
       return;
     }
     const innerText = this.#text.slice(this.pos, idx);
-    const node = newNode(NodeType.Strikethrough);
+    const node = createNode(NodeType.Strikethrough);
     parseInline(node, innerText);
     parent.append(node);
     this.pos = idx + 2;
@@ -939,7 +939,7 @@ class InlineParser {
         title = url.slice(spaceIdx + 2, url.length - 1);
         url = url.slice(0, spaceIdx);
       }
-      const node = newNode(NodeType.Link);
+      const node = createNode(NodeType.Link);
       node.url = url;
       node.title = title;
       parseInline(node, this.#text.slice(innerStart, closeBracket));
@@ -985,10 +985,10 @@ class InlineParser {
         title = url.slice(spaceIdx + 2, url.length - 1);
         url = url.slice(0, spaceIdx);
       }
-      const node = newNode(NodeType.Image);
+      const node = createNode(NodeType.Image);
       node.url = url;
       node.title = title;
-      const altNode = newNode(NodeType.Text);
+      const altNode = createNode(NodeType.Text);
       altNode.text = this.#text.slice(innerStart, closeBracket);
       node.append(altNode);
       parent.append(node);
@@ -1004,7 +1004,7 @@ class InlineParser {
     if (end < 0) return false;
     const inner = this.#text.slice(this.pos + 1, end);
     if (isURL(inner) || isEmail(inner)) {
-      const node = newNode(NodeType.Autolink);
+      const node = createNode(NodeType.Autolink);
       node.url = inner;
       node.text = inner;
       parent.append(node);

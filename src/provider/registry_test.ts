@@ -1,10 +1,10 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import type { ProviderConfig } from "../config/mod.ts";
 import {
+  createMockProvider,
   createProvider,
   globalProviderRegistry,
   listProviders,
-  newMockProvider,
   type Provider,
   ProviderRegistry,
   register,
@@ -22,7 +22,7 @@ Deno.test("ProviderRegistryRegisterAndCreate", () => {
   r.register(
     "test",
     (_cfg) =>
-      newMockProvider("test", [{ id: "m1", name: "Model 1" } as never], []),
+      createMockProvider("test", [{ id: "m1", name: "Model 1" } as never], []),
   );
   assert(r.has("test"));
   assert(!r.has("nonexistent"));
@@ -107,7 +107,7 @@ function withRegistry(r: ProviderRegistry, fn: () => void): void {
 
 Deno.test("ResolveProviderExplicitVendor", () => {
   const r = new ProviderRegistry();
-  r.register("myvendor", (_cfg) => newMockProvider("myvendor", [], []));
+  r.register("myvendor", (_cfg) => createMockProvider("myvendor", [], []));
   withRegistry(r, () => {
     const p = resolveProvider(cfg({ vendor: "myvendor", api: "openai-chat" }));
     assertEquals(p.name(), "myvendor");
@@ -116,11 +116,11 @@ Deno.test("ResolveProviderExplicitVendor", () => {
 
 Deno.test("ResolveProviderAutoDetect", () => {
   const r = new ProviderRegistry();
-  r.register("deepseek", () => newMockProvider("deepseek", [], []));
-  r.register("openai-chat", () => newMockProvider("openai-chat", [], []));
+  r.register("deepseek", () => createMockProvider("deepseek", [], []));
+  r.register("openai-chat", () => createMockProvider("openai-chat", [], []));
   r.register(
     "anthropic-messages",
-    () => newMockProvider("anthropic-messages", [], []),
+    () => createMockProvider("anthropic-messages", [], []),
   );
   withRegistry(r, () => {
     const p = resolveProvider(
@@ -141,7 +141,7 @@ Deno.test("ResolveProviderFallback", () => {
       "google-vertex",
     ]
   ) {
-    r.register(name, () => newMockProvider(name, [], []));
+    r.register(name, () => createMockProvider(name, [], []));
   }
   withRegistry(r, () => {
     assertEquals(
@@ -191,7 +191,7 @@ Deno.test("ResolveProviderUnregisteredVendorUsesAPI", () => {
       "google-vertex",
     ]
   ) {
-    r.register(name, () => newMockProvider(name, [], []));
+    r.register(name, () => createMockProvider(name, [], []));
   }
   withRegistry(r, () => {
     const cases: Array<[string, string]> = [
@@ -210,10 +210,10 @@ Deno.test("ResolveProviderUnregisteredVendorUsesAPI", () => {
 
 Deno.test("ResolveProviderVendorPriorityOverAPIFallback", () => {
   const r = new ProviderRegistry();
-  r.register("openai", () => newMockProvider("openai", [], []));
+  r.register("openai", () => createMockProvider("openai", [], []));
   r.register(
     "openai-responses",
-    () => newMockProvider("openai-responses", [], []),
+    () => createMockProvider("openai-responses", [], []),
   );
   withRegistry(r, () => {
     const p = resolveProvider(
@@ -225,8 +225,14 @@ Deno.test("ResolveProviderVendorPriorityOverAPIFallback", () => {
 
 Deno.test("ResolveProviderGoogleFallback", () => {
   const r = new ProviderRegistry();
-  r.register("google-gemini", () => newMockProvider("google-gemini", [], []));
-  r.register("google-vertex", () => newMockProvider("google-vertex", [], []));
+  r.register(
+    "google-gemini",
+    () => createMockProvider("google-gemini", [], []),
+  );
+  r.register(
+    "google-vertex",
+    () => createMockProvider("google-vertex", [], []),
+  );
   withRegistry(r, () => {
     assertEquals(
       resolveProvider(
@@ -253,7 +259,7 @@ Deno.test("GlobalRegistry", () => {
   const orig = globalProviderRegistry();
   setGlobalProviderRegistry(new ProviderRegistry());
   try {
-    register("global_test", () => newMockProvider("global_test", [], []));
+    register("global_test", () => createMockProvider("global_test", [], []));
     assert(listProviders().includes("global_test"));
     assertEquals(createProvider("global_test", cfg({})).name(), "global_test");
   } finally {

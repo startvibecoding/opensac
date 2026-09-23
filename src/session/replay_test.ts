@@ -11,7 +11,7 @@ import {
   entryMessage,
   type MessageEntry,
 } from "./entry.ts";
-import { newCost, newUserMessage } from "../provider/types.ts";
+import { createCost, createUserMessage } from "../provider/types.ts";
 import type { Message } from "../provider/types.ts";
 import {
   buildReplayState,
@@ -36,8 +36,8 @@ function messageEntry(
 
 Deno.test("buildReplayState returns messages with entry IDs", () => {
   const entries = [
-    messageEntry("e1", null, newUserMessage("hello")),
-    messageEntry("e2", "e1", newUserMessage("world")),
+    messageEntry("e1", null, createUserMessage("hello")),
+    messageEntry("e2", "e1", createUserMessage("world")),
   ];
   const state = buildReplayState(entries);
   assertEquals(state.messages.length, 2);
@@ -65,7 +65,7 @@ Deno.test("content override replaces message but preserves the target entry ID",
     timestamp: new Date(),
   };
   const entries = [
-    messageEntry("e1", null, newUserMessage("look")),
+    messageEntry("e1", null, createUserMessage("look")),
     messageEntry("e2", "e1", original),
     {
       type: entryContentOverride,
@@ -88,8 +88,8 @@ Deno.test("content override replaces message but preserves the target entry ID",
 
 Deno.test("compaction with empty first-kept entry collapses to the summary", () => {
   const entries = [
-    messageEntry("e1", null, newUserMessage("a")),
-    messageEntry("e2", "e1", newUserMessage("b")),
+    messageEntry("e1", null, createUserMessage("a")),
+    messageEntry("e2", "e1", createUserMessage("b")),
     {
       type: entryCompaction,
       id: "c1",
@@ -108,19 +108,19 @@ Deno.test("compaction with empty first-kept entry collapses to the summary", () 
 });
 
 Deno.test("compaction keeps the tail after first-kept and drops usage", () => {
-  const used = newUserMessage("kept");
+  const used = createUserMessage("kept");
   used.usage = {
     input: 5,
     output: 1,
     cacheRead: 0,
     cacheWrite: 0,
     totalTokens: 6,
-    cost: newCost(),
+    cost: createCost(),
   };
   const entries = [
-    messageEntry("e1", null, newUserMessage("dropped")),
+    messageEntry("e1", null, createUserMessage("dropped")),
     messageEntry("e2", "e1", used),
-    messageEntry("e3", "e2", newUserMessage("tail")),
+    messageEntry("e3", "e2", createUserMessage("tail")),
     {
       type: entryCompaction,
       id: "c1",
@@ -142,7 +142,7 @@ Deno.test("compaction keeps the tail after first-kept and drops usage", () => {
 
 Deno.test("compaction with a missing first-kept entry keeps the full history", () => {
   const entries = [
-    messageEntry("e1", null, newUserMessage("a")),
+    messageEntry("e1", null, createUserMessage("a")),
     {
       type: entryCompaction,
       id: "c1",
@@ -166,7 +166,7 @@ Deno.test("compaction with a missing first-kept entry keeps the full history", (
 });
 
 Deno.test("replay isolates cloned messages from stored entries", () => {
-  const stored = newUserMessage("hello");
+  const stored = createUserMessage("hello");
   stored.contents = [{ type: "text", text: "hello" }];
   const state = buildReplayState([messageEntry("e1", null, stored)]);
   state.messages[0].contents![0].text = "mutated";
@@ -184,7 +184,7 @@ Deno.test("latestCompactionLocked returns the newest compaction entry", () => {
       firstKeptEntryId: "",
       tokensBefore: 1,
     },
-    messageEntry("e1", null, newUserMessage("x")),
+    messageEntry("e1", null, createUserMessage("x")),
     {
       type: entryCompaction,
       id: "c2",
@@ -205,9 +205,9 @@ Deno.test("latestCompactionLocked returns the newest compaction entry", () => {
 
 Deno.test("lastSummarizedEntryIDLocked resolves the boundary message", () => {
   const entries = [
-    messageEntry("e1", null, newUserMessage("a")),
-    messageEntry("e2", "e1", newUserMessage("b")),
-    messageEntry("e3", "e2", newUserMessage("c")),
+    messageEntry("e1", null, createUserMessage("a")),
+    messageEntry("e2", "e1", createUserMessage("b")),
+    messageEntry("e3", "e2", createUserMessage("c")),
   ];
   // The entry immediately before the first kept boundary is the last one a
   // compaction folded into its summary.

@@ -7,12 +7,12 @@ import {
 } from "@std/assert";
 import type { Message, ToolCallBlock } from "../provider/types.ts";
 import type { Settings } from "../config/settings.ts";
-import { newMockProvider } from "../provider/mock.ts";
+import { createMockProvider } from "../provider/mock.ts";
 import { hostedToolOpenAIResponsesWebSearch } from "../provider/mod.ts";
 import {
-  newAssistantMessage,
-  newToolResultMessage,
-  newUserMessage,
+  createAssistantMessage,
+  createToolResultMessage,
+  createUserMessage,
 } from "../provider/types.ts";
 import type { Tool } from "../tools/mod.ts";
 import type { ToolContext } from "../tools/mod.ts";
@@ -69,7 +69,7 @@ Deno.test("cloneAgentContext handles null and copies tools", () => {
   assertEquals(cloneAgentContext(null), null);
   const ctx = {
     systemPrompt: "sys",
-    messages: [newUserMessage("hi")],
+    messages: [createUserMessage("hi")],
     tools: [{ name: "bash", description: "run" }],
   };
   const cloned = cloneAgentContext(ctx)!;
@@ -169,24 +169,24 @@ Deno.test("isOutputTruncationReason", () => {
 });
 
 Deno.test("replayTextContent", () => {
-  assertEquals(replayTextContent(newUserMessage("hi")), ["hi", true]);
+  assertEquals(replayTextContent(createUserMessage("hi")), "hi");
   assertEquals(
     replayTextContent(
-      newAssistantMessage([{ type: "text", text: "a" }, {
+      createAssistantMessage([{ type: "text", text: "a" }, {
         type: "text",
         text: "b",
       }]),
     ),
-    ["a\nb", true],
+    "a\nb",
   );
   assertEquals(
     replayTextContent(
-      newAssistantMessage([{
+      createAssistantMessage([{
         type: "toolCall",
         toolCall: { id: "1", name: "x" },
       }]),
     ),
-    ["", false],
+    undefined,
   );
 });
 
@@ -230,14 +230,17 @@ Deno.test("isReadOnlyToolName / isSideEffectingToolName", () => {
 
 Deno.test("toolExecutionResultSummary round-trips", () => {
   const summary = toolExecutionResultSummary("done", true);
-  assertEquals(parseToolExecutionResultSummary(summary), ["done", true]);
+  assertEquals(parseToolExecutionResultSummary(summary), {
+    content: "done",
+    isError: true,
+  });
   assertEquals(
-    parseToolExecutionResultSummary({ content: "", isError: false })[0]
+    parseToolExecutionResultSummary({ content: "", isError: false }).content
       .startsWith("A prior tool execution"),
     true,
   );
   assertEquals(
-    parseToolExecutionResultSummary(null)[0].startsWith(
+    parseToolExecutionResultSummary(null).content.startsWith(
       "A prior tool execution",
     ),
     true,
@@ -274,8 +277,8 @@ Deno.test("toolExecutionContext honors overrides and cancellation", async () => 
   cancel();
 });
 
-Deno.test("newToolResultMessage is cloneable by the support helpers", () => {
-  const msg = newToolResultMessage("c", "bash", "ok", false);
+Deno.test("createToolResultMessage is cloneable by the support helpers", () => {
+  const msg = createToolResultMessage("c", "bash", "ok", false);
   const [cloned] = cloneMessages([msg]);
   assertNotStrictEquals(cloned, msg);
   assertEquals(cloned.content, "ok");
@@ -286,11 +289,10 @@ Deno.test("ImageGenerationToolDefinitionUsesConfiguredResponsesProvider", () => 
     defaultProvider: "openai",
     providers: { openai: { models: [], api: "openai-responses" } },
   };
-  const [def, ok] = imageGenerationToolDefinition(settings, "openai");
-  assertStrictEquals(ok, true);
-  assertEquals(def.name, "image_generation");
-  assertEquals(def.kind, "hosted");
-  assertEquals(def.providerType, "openai-responses");
+  const def = imageGenerationToolDefinition(settings, "openai");
+  assertStrictEquals(def?.name, "image_generation");
+  assertStrictEquals(def?.kind, "hosted");
+  assertStrictEquals(def?.providerType, "openai-responses");
 });
 
 Deno.test("ConfiguredWebSearchToolDefinitionCarriesModelMetadata", () => {
@@ -302,12 +304,11 @@ Deno.test("ConfiguredWebSearchToolDefinitionCarriesModelMetadata", () => {
       model: "claude-sonnet-4-20250514",
     },
   };
-  const [def, ok] = configuredWebSearchToolDefinition(settings);
-  assertStrictEquals(ok, true);
-  assertEquals(def.name, "web_search");
-  assertEquals(def.provider, "anthropic");
-  assertEquals(def.providerType, "anthropic-messages");
-  assertEquals(def.model, "claude-sonnet-4-20250514");
+  const def = configuredWebSearchToolDefinition(settings);
+  assertStrictEquals(def?.name, "web_search");
+  assertEquals(def?.provider, "anthropic");
+  assertEquals(def?.providerType, "anthropic-messages");
+  assertEquals(def?.model, "claude-sonnet-4-20250514");
 });
 
 Deno.test("ConfiguredWebSearchToolDefinitionResolvesProviderReference", () => {
@@ -326,17 +327,16 @@ Deno.test("ConfiguredWebSearchToolDefinitionResolvesProviderReference", () => {
       },
     },
   };
-  const [def, ok] = configuredWebSearchToolDefinition(settings);
-  assertStrictEquals(ok, true);
-  assertEquals(def.provider, "gpt");
-  assertEquals(def.providerType, "openai-responses");
+  const def = configuredWebSearchToolDefinition(settings);
+  assertStrictEquals(def?.name, "web_search");
+  assertEquals(def?.provider, "gpt");
+  assertEquals(def?.providerType, "openai-responses");
 });
 
 Deno.test("OpenAIResponsesWebSearchToolDefinition", () => {
-  const p = newMockProvider("gpt", [], []);
+  const p = createMockProvider("gpt", [], []);
   p.setAPI("openai-responses");
-  const [def, ok] = openAIResponsesWebSearchToolDefinition(p);
-  assertStrictEquals(ok, true);
-  assertEquals(def.name, hostedToolOpenAIResponsesWebSearch);
-  assertEquals(def.providerType, "openai-responses");
+  const def = openAIResponsesWebSearchToolDefinition(p);
+  assertStrictEquals(def?.name, hostedToolOpenAIResponsesWebSearch);
+  assertEquals(def?.providerType, "openai-responses");
 });

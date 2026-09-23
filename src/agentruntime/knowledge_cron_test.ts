@@ -1,8 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { createKnowledgeBase, getKnowledgeBase } from "../session/mod.ts";
 import {
+  createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
-  newKnowledgeBaseService,
 } from "./knowledgebase.ts";
 import {
   knowledgeBaseCronJobID,
@@ -12,7 +12,7 @@ import {
 
 Deno.test("run knowledge base cron job routes namespaced jobs only", async () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );
@@ -67,15 +67,15 @@ Deno.test("run knowledge base cron job indexes through canonical background path
     schedule: "daily",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );
 
   const jobID = knowledgeBaseCronJobID(base.id);
   const parsed = knowledgeBaseIDFromCronJobID(jobID);
-  assert(parsed.ok === true);
-  assertEquals(parsed.id, base.id);
+  assert(parsed !== undefined);
+  assertEquals(parsed, base.id);
 
   const outcome = await runKnowledgeBaseCronJob(undefined, service, jobID);
   assert(outcome.handled === true);
@@ -103,7 +103,7 @@ Deno.test("run knowledge base cron job honors context cancellation", async () =>
     schedule: "daily",
     enabled: true,
   });
-  const service = newKnowledgeBaseService(
+  const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
   );

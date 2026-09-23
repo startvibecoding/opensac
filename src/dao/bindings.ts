@@ -1,13 +1,6 @@
 import type { DB } from "../db/mod.ts";
 import { runInTx } from "../db/mod.ts";
-import {
-  ErrNoRows,
-  execChanges,
-  isNoRows,
-  queryAll,
-  queryOne,
-  queryOptional,
-} from "./database.ts";
+import { execChanges, queryAll, queryOptional } from "./database.ts";
 
 export interface BindingRecord {
   sessionId: string;
@@ -46,7 +39,7 @@ export class BindingDAO {
 
   setChannelTools(sessionId: string, tools: ChannelToolRecord[]): void {
     runInTx(this.requireDb(), (tx) => {
-      const session = queryOne<Record<string, unknown>>(
+      const session = queryOptional<Record<string, unknown>>(
         tx,
         `SELECT id FROM sessions WHERE id = ? LIMIT 1`,
         [sessionId],
@@ -86,19 +79,13 @@ export class BindingDAO {
   }
 
   channelToolGeneration(sessionId: string): number {
-    let row: Record<string, unknown>;
-    try {
-      row = queryOne<Record<string, unknown>>(
-        this.requireDb(),
-        `SELECT generation FROM session_channel_tool_generations
-         WHERE session_id = ? LIMIT 1`,
-        [sessionId],
-      );
-    } catch (err) {
-      if (isNoRows(err)) return 0;
-      throw err;
-    }
-    return Number(row.generation);
+    const row = queryOptional<Record<string, unknown>>(
+      this.requireDb(),
+      `SELECT generation FROM session_channel_tool_generations
+       WHERE session_id = ? LIMIT 1`,
+      [sessionId],
+    );
+    return row === undefined ? 0 : Number(row.generation);
   }
 
   list(): BindingRecord[] {
@@ -111,8 +98,8 @@ export class BindingDAO {
     );
   }
 
-  find(channelType: string, channelId: string): BindingRecord {
-    return queryOne<BindingRecord>(
+  find(channelType: string, channelId: string): BindingRecord | undefined {
+    return queryOptional<BindingRecord>(
       this.requireDb(),
       `SELECT id AS sessionId, channel_type AS channelType, channel_id AS channelId
        FROM sessions WHERE channel_type = ? AND channel_id = ? LIMIT 1`,
@@ -120,8 +107,8 @@ export class BindingDAO {
     );
   }
 
-  findBySession(sessionId: string): BindingRecord {
-    return queryOne<BindingRecord>(
+  findBySession(sessionId: string): BindingRecord | undefined {
+    return queryOptional<BindingRecord>(
       this.requireDb(),
       `SELECT id AS sessionId, channel_type AS channelType, channel_id AS channelId
        FROM sessions
@@ -133,19 +120,19 @@ export class BindingDAO {
 
   bind(sessionId: string, channelType: string, channelId: string): void {
     runInTx(this.requireDb(), (tx) => {
-      let current: BindingRecord;
+      let current: BindingRecord | undefined;
       try {
-        current = queryOne<BindingRecord>(
+        current = queryOptional<BindingRecord>(
           tx,
           `SELECT id AS sessionId, channel_type AS channelType, channel_id AS channelId
            FROM sessions WHERE id = ? LIMIT 1`,
           [sessionId],
         );
       } catch (err) {
-        if (isNoRows(err)) {
-          throw new Error(`session "${sessionId}" not found`);
-        }
         throw new Error(`read session binding: ${message(err)}`);
+      }
+      if (current === undefined) {
+        throw new Error(`session "${sessionId}" not found`);
       }
       if (current.channelType !== "local" || current.channelId !== "") {
         throw new Error(
@@ -185,9 +172,9 @@ export class BindingDAO {
     toSessionId: string,
   ): void {
     runInTx(this.requireDb(), (tx) => {
-      let source: BindingRecord;
+      let source: BindingRecord | undefined;
       try {
-        source = queryOne<BindingRecord>(
+        source = queryOptional<BindingRecord>(
           tx,
           `SELECT id AS sessionId, channel_type AS channelType, channel_id AS channelId
            FROM sessions WHERE id = ? LIMIT 1`,
@@ -196,6 +183,9 @@ export class BindingDAO {
       } catch (err) {
         throw new Error(`read source binding: ${message(err)}`);
       }
+      if (source === undefined) {
+        throw new Error(`source session "${fromSessionId}" not found`);
+      }
       if (
         source.channelType !== channelType || source.channelId !== channelId
       ) {
@@ -203,9 +193,9 @@ export class BindingDAO {
           `source session is not bound to ${channelType}/${channelId}`,
         );
       }
-      let target: BindingRecord;
+      let target: BindingRecord | undefined;
       try {
-        target = queryOne<BindingRecord>(
+        target = queryOptional<BindingRecord>(
           tx,
           `SELECT id AS sessionId, channel_type AS channelType, channel_id AS channelId
            FROM sessions WHERE id = ? LIMIT 1`,
@@ -213,6 +203,9 @@ export class BindingDAO {
         );
       } catch (err) {
         throw new Error(`read target session: ${message(err)}`);
+      }
+      if (target === undefined) {
+        throw new Error(`target session "${toSessionId}" not found`);
       }
       if (target.channelType !== "local" || target.channelId !== "") {
         throw new Error("target session is already bound");
@@ -240,12 +233,15 @@ export class BindingDAO {
     timestamp: string,
   ): void {
     runInTx(this.requireDb(), (tx) => {
-      const current = queryOne<BindingRecord>(
+      const current = queryOptional<BindingRecord>(
         tx,
         `SELECT id AS sessionId, channel_type AS channelType, channel_id AS channelId
          FROM sessions WHERE id = ? LIMIT 1`,
         [oldSessionId],
       );
+      if (current === undefined) {
+        throw new Error(`session "${oldSessionId}" not found`);
+      }
       if (
         current.channelType !== channelType || current.channelId !== channelId
       ) {
@@ -279,6 +275,5 @@ function nowRFC3339Nano(): string {
 }
 
 function message(err: unknown): string {
-  if (err === ErrNoRows) return "sql: no rows in result set";
   return err instanceof Error ? err.message : String(err);
 }

@@ -642,7 +642,7 @@ export class ResponsesNormalizer {
   }
 }
 
-export function newResponsesNormalizer(): ResponsesNormalizer {
+export function createResponsesNormalizer(): ResponsesNormalizer {
   return new ResponsesNormalizer();
 }
 

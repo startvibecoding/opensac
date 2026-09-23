@@ -1,6 +1,6 @@
 import type { BashTool } from "./bash.ts";
 import {
-  newTextToolResult,
+  createTextToolResult,
   type Registry,
   type Tool,
   type ToolContext,
@@ -62,7 +62,7 @@ export class KillTool implements Tool {
     }
 
     if (job.isDone()) {
-      return newTextToolResult(`Job ${id} already finished.`);
+      return createTextToolResult(`Job ${id} already finished.`);
     }
 
     try {
@@ -71,7 +71,7 @@ export class KillTool implements Tool {
       throw new Error(`failed to kill job ${id}: ${messageOf(err)}`);
     }
 
-    return newTextToolResult(
+    return createTextToolResult(
       `Sent kill signal to job ${id} (PID: ${job.pid}).`,
     );
   }

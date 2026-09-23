@@ -31,9 +31,9 @@ import {
   type TaskStatus,
 } from "../agent/events.ts";
 import {
+  createRoleIncompleteError,
   EvidenceTracker,
   finalAssistantResponse,
-  newRoleIncompleteError,
   roleContext,
   type RoleRequest,
   type RoleResult,
@@ -154,7 +154,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
           case eventRunFinished:
             completed = true;
             if (ev.status === taskIncomplete) {
-              runErr = newRoleIncompleteError(
+              runErr = createRoleIncompleteError(
                 req.role,
                 ev.stopReason ?? "",
                 ev.error,

@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { newClawHubClient } from "./clawhub.ts";
+import { createClawHubClient } from "./clawhub.ts";
 import { clientsForSettings } from "./factory.ts";
 import { jsonResponse, startServer } from "./test_helpers.ts";
 
@@ -33,7 +33,7 @@ Deno.test("ClawHubFileContentFixture", async () => {
     return jsonResponse(`{"content":"# Fixture Skill"}`);
   });
   try {
-    const content = await newClawHubClient(server.url).fileContent(
+    const content = await createClawHubClient(server.url).fileContent(
       undefined,
       { market: "clawhub.ai", id: "org/demo" },
       "1.0.0",

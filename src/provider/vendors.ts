@@ -7,8 +7,9 @@
 import { registerVendorAgnes } from "./vendor_agnes.ts";
 import { registerVendorAmazonBedrock } from "./vendor_amazon_bedrock.ts";
 import { registerVendorAmdRadeon } from "./vendor_amd_radeon.ts";
-import { registerVendorAnthropic } from "./vendor_anthropic.ts";
 import { registerVendorAntLing } from "./vendor_ant_ling.ts";
+import { registerVendorAnthropic } from "./vendor_anthropic.ts";
+import { registerVendorBai } from "./vendor_bai.ts";
 import { registerVendorBailian } from "./vendor_bailian.ts";
 import { registerVendorCerebras } from "./vendor_cerebras.ts";
 import { registerVendorCloudflareAiGateway } from "./vendor_cloudflare_ai_gateway.ts";
@@ -57,8 +58,9 @@ export function registerBuiltinVendors(): void {
   registerVendorAgnes();
   registerVendorAmazonBedrock();
   registerVendorAmdRadeon();
-  registerVendorAnthropic();
   registerVendorAntLing();
+  registerVendorAnthropic();
+  registerVendorBai();
   registerVendorBailian();
   registerVendorCerebras();
   registerVendorCloudflareAiGateway();

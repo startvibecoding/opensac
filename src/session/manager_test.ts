@@ -9,10 +9,10 @@ import * as path from "@std/path";
 import { closeAll } from "../db/mod.ts";
 import {
   type ContentBlock,
+  createAssistantMessage,
+  createToolResultMessage,
+  createUserMessage,
   type Message,
-  newAssistantMessage,
-  newToolResultMessage,
-  newUserMessage,
 } from "../provider/types.ts";
 import {
   acquireExecutionAdmission,
@@ -29,14 +29,14 @@ import {
   countAll,
   countWithMessages,
   createBound,
+  createManager,
+  createSubAgentManager,
   deleteSession,
   encodePath,
   listAll,
   listAllDetailed,
   listForDir,
   listForDirDetailed,
-  newManager,
-  newSubAgentManager,
   openByID,
   openByIDExact,
   openByPathOrID,
@@ -80,11 +80,11 @@ Deno.test("session manager: new", () => {
   const dir = Deno.makeTempDirSync();
   try {
     const sessionDir = path.join(dir, "sessions");
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     assertEquals(m.cwd, "/tmp/test");
     assertEquals(m.sessionDir, sessionDir);
 
-    const defaulted = newManager("/tmp/test", "");
+    const defaulted = createManager("/tmp/test", "");
     assert(defaulted.sessionDir !== "");
   } finally {
     Deno.removeSync(dir, { recursive: true });
@@ -93,7 +93,7 @@ Deno.test("session manager: new", () => {
 
 Deno.test("session manager: init", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
     const header = m.getHeader();
     assert(header !== null);
@@ -106,11 +106,11 @@ Deno.test("session manager: init", () => {
 
 Deno.test("session manager: init with duplicate ID does not merge entries", () => {
   withTempDir((_dir, sessionDir) => {
-    const first = newManager(Deno.makeTempDirSync(), sessionDir);
+    const first = createManager(Deno.makeTempDirSync(), sessionDir);
     first.initWithID("duplicate-session");
-    first.appendMessage(newUserMessage("first conversation"));
+    first.appendMessage(createUserMessage("first conversation"));
 
-    const second = newManager(Deno.makeTempDirSync(), sessionDir);
+    const second = createManager(Deno.makeTempDirSync(), sessionDir);
     assertThrows(
       () => second.initWithID("duplicate-session"),
       SessionIDExistsError,
@@ -123,12 +123,14 @@ Deno.test("session manager: init with duplicate ID does not merge entries", () =
 
 Deno.test("session manager: append message", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    const id = m.appendMessage(newUserMessage("Hello"));
+    const id = m.appendMessage(createUserMessage("Hello"));
     assert(id !== "");
     assertEquals(m.entries.length, 1);
-    const id2 = m.appendMessage(newAssistantMessage([textBlock("Hi there")]));
+    const id2 = m.appendMessage(
+      createAssistantMessage([textBlock("Hi there")]),
+    );
     assert(id2 !== "");
     assertEquals(m.entries.length, 2);
   });
@@ -136,8 +138,8 @@ Deno.test("session manager: append message", () => {
 
 Deno.test("session manager: append message auto-initializes", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
-    const id = m.appendMessage(newUserMessage("Hello"));
+    const m = createManager("/tmp/test", sessionDir);
+    const id = m.appendMessage(createUserMessage("Hello"));
     assert(id !== "");
     assert(m.getHeader() !== null);
     assert(m.getFile() !== "");
@@ -147,7 +149,7 @@ Deno.test("session manager: append message auto-initializes", () => {
 
 Deno.test("session manager: append model / thinking / compaction / session info", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
     assert(m.appendModelChange("anthropic", "claude-sonnet-4") !== "");
     assert(m.appendThinkingLevelChange("high") !== "");
@@ -162,13 +164,13 @@ Deno.test("session manager: append model / thinking / compaction / session info"
 
 Deno.test("session manager: compaction metadata chain", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    m.appendMessage(newUserMessage("old user"));
+    m.appendMessage(createUserMessage("old user"));
     const oldAssistantID = m.appendMessage(
-      newAssistantMessage([textBlock("old assistant")]),
+      createAssistantMessage([textBlock("old assistant")]),
     );
-    const recentUserID = m.appendMessage(newUserMessage("recent user"));
+    const recentUserID = m.appendMessage(createUserMessage("recent user"));
 
     const firstID = m.appendCompaction("summary one", recentUserID, 100);
     const first = m.getLatestCompaction()!;
@@ -177,7 +179,7 @@ Deno.test("session manager: compaction metadata chain", () => {
     assertEquals(first.previousCompactionId ?? "", "");
     assertEquals(first.lastSummarizedEntryId, oldAssistantID);
 
-    const nextUserID = m.appendMessage(newUserMessage("next user"));
+    const nextUserID = m.appendMessage(createUserMessage("next user"));
     const secondID = m.appendCompaction("summary two", nextUserID, 200);
     const second = m.getLatestCompaction()!;
     assertEquals(second.id, secondID);
@@ -189,11 +191,11 @@ Deno.test("session manager: compaction metadata chain", () => {
 
 Deno.test("session manager: header / leaf / file", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
     assertEquals(m.getHeader()!.cwd, "/tmp/test");
     assertEquals(m.getLeafID(), null);
-    m.appendMessage(newUserMessage("Hello"));
+    m.appendMessage(createUserMessage("Hello"));
     assert(m.getLeafID() !== null);
     assert(m.getFile() !== "");
   });
@@ -201,12 +203,12 @@ Deno.test("session manager: header / leaf / file", () => {
 
 Deno.test("session manager: get messages applies compaction", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    const id1 = m.appendMessage(newUserMessage("old user"));
-    m.appendMessage(newAssistantMessage([textBlock("old assistant")]));
-    m.appendMessage(newUserMessage("recent user"));
-    m.appendMessage(newAssistantMessage([textBlock("recent assistant")]));
+    const id1 = m.appendMessage(createUserMessage("old user"));
+    m.appendMessage(createAssistantMessage([textBlock("old assistant")]));
+    m.appendMessage(createUserMessage("recent user"));
+    m.appendMessage(createAssistantMessage([textBlock("recent assistant")]));
     m.appendCompaction("## Goal\ncompacted", id1, 100);
 
     const messages = m.getMessages();
@@ -225,10 +227,10 @@ Deno.test("session manager: get messages applies compaction", () => {
 
 Deno.test("session manager: summary-only compaction", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    m.appendMessage(newUserMessage("old user"));
-    m.appendMessage(newAssistantMessage([textBlock("old assistant")]));
+    m.appendMessage(createUserMessage("old user"));
+    m.appendMessage(createAssistantMessage([textBlock("old assistant")]));
     m.appendCompaction("## Goal\nsummary only", "", 100);
     const messages = m.getMessages();
     assertEquals(messages.length, 1);
@@ -241,12 +243,12 @@ Deno.test("session manager: summary-only compaction", () => {
 
 Deno.test("session manager: compaction clears stale usage", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    m.appendMessage(newUserMessage("old user"));
-    m.appendMessage(newAssistantMessage([textBlock("old assistant")]));
-    const recentUserID = m.appendMessage(newUserMessage("recent user"));
-    const recentAssistant = newAssistantMessage([
+    m.appendMessage(createUserMessage("old user"));
+    m.appendMessage(createAssistantMessage([textBlock("old assistant")]));
+    const recentUserID = m.appendMessage(createUserMessage("recent user"));
+    const recentAssistant = createAssistantMessage([
       textBlock("recent assistant"),
     ]);
     recentAssistant.usage = {
@@ -267,15 +269,15 @@ Deno.test("session manager: compaction clears stale usage", () => {
 
 Deno.test("session manager: multiple compactions", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    m.appendMessage(newUserMessage("old user"));
-    m.appendMessage(newAssistantMessage([textBlock("old assistant")]));
-    const recentUserID = m.appendMessage(newUserMessage("recent user"));
-    m.appendMessage(newAssistantMessage([textBlock("recent assistant")]));
+    m.appendMessage(createUserMessage("old user"));
+    m.appendMessage(createAssistantMessage([textBlock("old assistant")]));
+    const recentUserID = m.appendMessage(createUserMessage("recent user"));
+    m.appendMessage(createAssistantMessage([textBlock("recent assistant")]));
     m.appendCompaction("## Goal\nsummary one", recentUserID, 100);
-    const nextUserID = m.appendMessage(newUserMessage("next user"));
-    m.appendMessage(newAssistantMessage([textBlock("next assistant")]));
+    const nextUserID = m.appendMessage(createUserMessage("next user"));
+    m.appendMessage(createAssistantMessage([textBlock("next assistant")]));
     m.appendCompaction("## Goal\nsummary two", nextUserID, 80);
 
     const messages = m.getMessages();
@@ -288,9 +290,9 @@ Deno.test("session manager: multiple compactions", () => {
 
 Deno.test("session manager: open round trip", () => {
   withTempDir((_dir, sessionDir) => {
-    const m1 = newManager("/tmp/test", sessionDir);
+    const m1 = createManager("/tmp/test", sessionDir);
     m1.init();
-    m1.appendMessage(newUserMessage("Hello"));
+    m1.appendMessage(createUserMessage("Hello"));
     const m2 = openSession(m1.getFile());
     assertEquals(m2.getHeader()!.cwd, "/tmp/test");
     assertEquals(m2.entries.length, 1);
@@ -303,9 +305,9 @@ Deno.test("session manager: open non-existent file fails", () => {
 
 Deno.test("session manager: list for dir", () => {
   withTempDir((_dir, sessionDir) => {
-    newManager("/tmp/test1", sessionDir).init();
-    newManager("/tmp/test1", sessionDir).init();
-    newManager("/tmp/test2", sessionDir).init();
+    createManager("/tmp/test1", sessionDir).init();
+    createManager("/tmp/test1", sessionDir).init();
+    createManager("/tmp/test2", sessionDir).init();
     assertEquals(listForDir("/tmp/test1", sessionDir).length, 2);
     assertEquals(listForDir("/tmp/test2", sessionDir).length, 1);
     assertEquals(listForDir("/tmp/nonexistent", sessionDir).length, 0);
@@ -314,11 +316,11 @@ Deno.test("session manager: list for dir", () => {
 
 Deno.test("session manager: sub-agent sessions excluded from main lists", () => {
   withTempDir((_dir, sessionDir) => {
-    const main = newManager("/tmp/test", sessionDir);
+    const main = createManager("/tmp/test", sessionDir);
     main.initWithID("main-session");
-    const child = newSubAgentManager("/tmp/test", sessionDir);
+    const child = createSubAgentManager("/tmp/test", sessionDir);
     child.initWithID("sub-session");
-    child.appendMessage(newUserMessage("sub-agent work"));
+    child.appendMessage(createUserMessage("sub-agent work"));
 
     const sessions = listForDir("/tmp/test", sessionDir);
     assertEquals(sessions.length, 1);
@@ -344,7 +346,7 @@ Deno.test("session manager: sub-agent sessions excluded from main lists", () => 
 
 Deno.test("session manager: continue recent", () => {
   withTempDir((_dir, sessionDir) => {
-    const m1 = newManager("/tmp/test", sessionDir);
+    const m1 = createManager("/tmp/test", sessionDir);
     m1.init();
     const m2 = continueRecent("/tmp/test", sessionDir);
     assertEquals(m2.getFile(), m1.getFile());
@@ -357,13 +359,13 @@ Deno.test("session manager: continue recent creates a new session", () => {
     assert(m.getFile() !== "");
     assert(m.getHeader() !== null);
     assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
-    m.appendMessage(newUserMessage("Hello"));
+    m.appendMessage(createUserMessage("Hello"));
   });
 });
 
 Deno.test("session manager: open by path or id", () => {
   withTempDir((_dir, sessionDir) => {
-    const m1 = newManager("/tmp/test", sessionDir);
+    const m1 = createManager("/tmp/test", sessionDir);
     m1.initWithID("session-test-id");
     assertEquals(
       openByPathOrID("/tmp/test", sessionDir, m1.getFile()).getFile(),
@@ -384,7 +386,7 @@ Deno.test("session manager: open by path or id", () => {
 Deno.test("session manager: open by path or id rejects ambiguous prefix", () => {
   withTempDir((_dir, sessionDir) => {
     for (const id of ["abcdef01", "abcdef02"]) {
-      newManager("/tmp/test", sessionDir).initWithID(id);
+      createManager("/tmp/test", sessionDir).initWithID(id);
     }
     const err = assertThrows(
       () => openByPathOrID("/tmp/test", sessionDir, "abc"),
@@ -395,7 +397,7 @@ Deno.test("session manager: open by path or id rejects ambiguous prefix", () => 
 
 Deno.test("session manager: open by ID recreates missing handle", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.initWithID("custom-session-123");
     const reopened = openByID("/tmp/test", sessionDir, "custom-session-123");
     assertEquals(reopened.getHeader()!.id, "custom-session-123");
@@ -405,7 +407,7 @@ Deno.test("session manager: open by ID recreates missing handle", () => {
 
 Deno.test("session manager: open by ID exact ignores cwd", () => {
   withTempDir((_dir, sessionDir) => {
-    newManager("/tmp/test-a", sessionDir).initWithID("exact-session");
+    createManager("/tmp/test-a", sessionDir).initWithID("exact-session");
     const reopened = openByIDExact(sessionDir, "exact-session");
     assertEquals(reopened.getHeader()!.id, "exact-session");
     assertEquals(reopened.getHeader()!.cwd, "/tmp/test-a");
@@ -427,9 +429,9 @@ Deno.test("session manager: load rejects session not registered in DB", () => {
 
 Deno.test("session manager: append maintains parent chain", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    const firstID = m.appendMessage(newUserMessage("first"));
+    const firstID = m.appendMessage(createUserMessage("first"));
     const secondID = m.appendModelChange("openai", "model");
     assertEquals(m.entries.length, 2);
     const second = m.entries[1];
@@ -440,13 +442,13 @@ Deno.test("session manager: append maintains parent chain", () => {
 
 Deno.test("session manager: append messages persists batch in order", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    const seedID = m.appendMessage(newUserMessage("seed"));
+    const seedID = m.appendMessage(createUserMessage("seed"));
     const ids = m.appendMessages([
-      newUserMessage("tool result one"),
-      newAssistantMessage([textBlock("interim")]),
-      newUserMessage("tool result two"),
+      createUserMessage("tool result one"),
+      createAssistantMessage([textBlock("interim")]),
+      createUserMessage("tool result two"),
     ]);
     assertEquals(ids.length, 3);
     assertEquals(m.entries.length, 4);
@@ -470,7 +472,7 @@ Deno.test("session manager: append messages persists batch in order", () => {
 
 Deno.test("session manager: empty batch is a no-op", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/batch-empty", sessionDir);
+    const m = createManager("/tmp/batch-empty", sessionDir);
     m.initWithID("batch-empty-session");
     assertEquals(m.appendMessages([]), []);
     assertEquals(m.entries.length, 0);
@@ -479,15 +481,15 @@ Deno.test("session manager: empty batch is a no-op", () => {
 
 Deno.test("session manager: stale batch is rejected without persistence", () => {
   withTempDir((_dir, sessionDir) => {
-    const first = newManager("/tmp/batch-stale", sessionDir);
+    const first = createManager("/tmp/batch-stale", sessionDir);
     first.initWithID("batch-stale-session");
     const second = openSession(first.getFile());
-    first.appendMessage(newUserMessage("first writer"));
+    first.appendMessage(createUserMessage("first writer"));
     assertThrows(
       () =>
         second.appendMessages([
-          newUserMessage("stale one"),
-          newUserMessage("stale two"),
+          createUserMessage("stale one"),
+          createUserMessage("stale two"),
         ]),
       SessionModifiedError,
     );
@@ -505,11 +507,11 @@ Deno.test("session manager: stale batch is rejected without persistence", () => 
 
 Deno.test("session manager: large batches are chunked with an unbroken chain", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/batch-cap", sessionDir);
+    const m = createManager("/tmp/batch-cap", sessionDir);
     m.initWithID("batch-cap-session");
     const total = 64 * 2 + 5;
     const msgs: Message[] = [];
-    for (let i = 0; i < total; i++) msgs.push(newUserMessage(`result ${i}`));
+    for (let i = 0; i < total; i++) msgs.push(createUserMessage(`result ${i}`));
     const ids = m.appendMessages(msgs);
     assertEquals(ids.length, total);
     assertEquals(m.entries.length, total);
@@ -524,11 +526,11 @@ Deno.test("session manager: large batches are chunked with an unbroken chain", (
 
 Deno.test("session manager: sub-agent batch uses separate tables", () => {
   withTempDir((_dir, sessionDir) => {
-    const child = newSubAgentManager("/tmp/batch-sub", sessionDir);
+    const child = createSubAgentManager("/tmp/batch-sub", sessionDir);
     child.initWithID("batch-sub-session");
     const ids = child.appendMessages([
-      newUserMessage("sub one"),
-      newUserMessage("sub two"),
+      createUserMessage("sub one"),
+      createUserMessage("sub two"),
     ]);
     assertEquals(ids.length, 2);
     assertEquals(
@@ -545,23 +547,23 @@ Deno.test("session manager: sub-agent batch uses separate tables", () => {
 
 Deno.test("session manager: concurrent managers reject stale writer and reload recovers", () => {
   withTempDir((_dir, sessionDir) => {
-    const first = newManager("/tmp/reload", sessionDir);
+    const first = createManager("/tmp/reload", sessionDir);
     first.initWithID("reload-session");
     const second = openSession(first.getFile());
-    first.appendMessage(newUserMessage("first writer"));
+    first.appendMessage(createUserMessage("first writer"));
     assertThrows(
-      () => second.appendMessage(newUserMessage("stale writer")),
+      () => second.appendMessage(createUserMessage("stale writer")),
       SessionModifiedError,
     );
     second.reload();
-    assert(second.appendMessage(newUserMessage("second writer")) !== "");
+    assert(second.appendMessage(createUserMessage("second writer")) !== "");
   });
 });
 
 Deno.test("session manager: session info listing", () => {
   withTempDir((_dir, sessionDir) => {
-    newManager("/tmp/test", sessionDir).init();
-    newManager("/tmp/test", sessionDir).init();
+    createManager("/tmp/test", sessionDir).init();
+    createManager("/tmp/test", sessionDir).init();
     const sessions = listForDir("/tmp/test", sessionDir);
     assertEquals(sessions.length, 2);
     for (const s of sessions) {
@@ -573,7 +575,7 @@ Deno.test("session manager: session info listing", () => {
 
 Deno.test("session manager: delete session", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
     assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
     deleteSession(m.getFile(), sessionDir);
@@ -589,7 +591,7 @@ Deno.test("session manager: delete non-existent session is idempotent", () => {
 
 Deno.test("session manager: delete refuses an execution owner", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager(Deno.makeTempDirSync(), sessionDir);
+    const m = createManager(Deno.makeTempDirSync(), sessionDir);
     m.init();
     const guard = acquireExecutionAdmission(sessionDir, m.getHeader()!.id);
     try {
@@ -616,7 +618,7 @@ Deno.test("session manager: delete rejects path outside session dir", () => {
 
 Deno.test("session manager: delete rejects shared DB", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
     const sharedDB = path.join(sessionDir, "sessions.db");
     assert(Deno.statSync(sharedDB));
@@ -626,11 +628,11 @@ Deno.test("session manager: delete rejects shared DB", () => {
 
 Deno.test("session manager: list for dir detailed", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
-    m.appendMessage(newUserMessage("Hello world"));
-    m.appendMessage(newAssistantMessage([textBlock("Hi there")]));
-    m.appendMessage(newUserMessage("Another message"));
+    m.appendMessage(createUserMessage("Hello world"));
+    m.appendMessage(createAssistantMessage([textBlock("Hi there")]));
+    m.appendMessage(createUserMessage("Another message"));
     const details = listForDirDetailed("/tmp/test", sessionDir);
     assertEquals(details.length, 1);
     assertEquals(details[0].messageCount, 3);
@@ -642,12 +644,12 @@ Deno.test("session manager: list for dir detailed", () => {
 
 Deno.test("session manager: list all detailed across work dirs with search and count", () => {
   withTempDir((_dir, sessionDir) => {
-    const a = newManager("/tmp/alpha", sessionDir);
+    const a = createManager("/tmp/alpha", sessionDir);
     a.init();
     a.appendSessionInfo("Alpha session");
-    const b = newManager("/tmp/beta", sessionDir);
+    const b = createManager("/tmp/beta", sessionDir);
     b.init();
-    b.appendMessage(newUserMessage("beta message"));
+    b.appendMessage(createUserMessage("beta message"));
 
     assertEquals(listAll(sessionDir).length, 2);
     assertEquals(countAll(sessionDir), 2);
@@ -682,10 +684,10 @@ Deno.test("session manager: open by path or id rejects empty value", () => {
 
 Deno.test("session manager: full round trip", () => {
   withTempDir((_dir, sessionDir) => {
-    const m1 = newManager("/tmp/test", sessionDir);
+    const m1 = createManager("/tmp/test", sessionDir);
     m1.init();
-    m1.appendMessage(newUserMessage("Hello"));
-    m1.appendMessage(newAssistantMessage([textBlock("Hi")]));
+    m1.appendMessage(createUserMessage("Hello"));
+    m1.appendMessage(createAssistantMessage([textBlock("Hi")]));
     m1.appendModelChange("anthropic", "claude-sonnet-4");
     m1.appendThinkingLevelChange("high");
     m1.appendCompaction("Summary", "", 1000);
@@ -702,10 +704,10 @@ Deno.test("session manager: full round trip", () => {
 
 Deno.test("session manager: entries survive reopen durably", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/test", sessionDir);
+    const m = createManager("/tmp/test", sessionDir);
     m.init();
     for (let i = 0; i < 5; i++) {
-      m.appendMessage(newUserMessage(`message ${i}`));
+      m.appendMessage(createUserMessage(`message ${i}`));
     }
     const reopened = openSession(m.getFile());
     const loaded = reopened.getMessages();
@@ -717,7 +719,7 @@ Deno.test("session manager: entries survive reopen durably", () => {
 Deno.test("session manager: additional directories replay preserves leaf", () => {
   const dir = Deno.makeTempDirSync();
   try {
-    const m = newManager(Deno.makeTempDirSync(), dir);
+    const m = createManager(Deno.makeTempDirSync(), dir);
     m.initWithID("session-directories");
     m.appendModelChange("provider", "model");
     assert(m.getLeafID() !== null);
@@ -735,7 +737,7 @@ Deno.test("session manager: additional directories replay preserves leaf", () =>
 });
 
 function imageToolResultMessage(): Message {
-  const msg = newToolResultMessage(
+  const msg = createToolResultMessage(
     "call-1",
     "read",
     "[Image file: /tmp/x.png, 4x4, 10B, mode: auto]",
@@ -752,9 +754,9 @@ function imageToolResultMessage(): Message {
 
 Deno.test("session manager: content override replaces message on replay", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager(Deno.makeTempDirSync(), sessionDir);
+    const m = createManager(Deno.makeTempDirSync(), sessionDir);
     m.init();
-    m.appendMessage(newUserMessage("look at this"));
+    m.appendMessage(createUserMessage("look at this"));
     const target = imageToolResultMessage();
     const targetID = m.appendMessage(target);
 
@@ -796,17 +798,17 @@ Deno.test("session manager: content override replaces message on replay", () => 
 
 Deno.test("session manager: content override rejects unknown target", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager(Deno.makeTempDirSync(), sessionDir);
+    const m = createManager(Deno.makeTempDirSync(), sessionDir);
     m.init();
     assertThrows(() =>
-      m.appendContentOverride("missing", newUserMessage("x"), "reason", "")
+      m.appendContentOverride("missing", createUserMessage("x"), "reason", "")
     );
   });
 });
 
 Deno.test("session manager: expert binding persists across reload", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/expert", sessionDir);
+    const m = createManager("/tmp/expert", sessionDir);
     m.initWithID("expert-session");
     assertEquals(m.getExpertId(), "");
     m.setExpertBinding("software-company");
@@ -820,7 +822,7 @@ Deno.test("session manager: expert binding persists across reload", () => {
 
 Deno.test("session manager: set work dir persists to the sessions row", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = newManager("/tmp/old", sessionDir);
+    const m = createManager("/tmp/old", sessionDir);
     m.initWithID("workdir-session");
     assertThrows(() => m.setWorkDir("relative/path"));
     m.setWorkDir("/tmp/new");
@@ -851,7 +853,7 @@ Deno.test("session manager: channel binding rotate and create", () => {
     const old = openByIDExact(sessionDir, oldID);
     assertEquals(old.getHeader()!.channelType, "local");
 
-    const m = newManager("/tmp/chan", sessionDir);
+    const m = createManager("/tmp/chan", sessionDir);
     m.init();
     m.setSessionBinding("feishu", "chat-1");
     assertEquals(m.getHeader()!.channelType, "feishu");

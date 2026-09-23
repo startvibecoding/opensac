@@ -187,22 +187,22 @@ export class RunStore {
   executionBinding(
     sessionId: string,
     runId: string,
-  ): { binding: RuntimeLeaseBinding | null; ok: boolean } {
+  ): RuntimeLeaseBinding | null {
     if (this.sessionDir.trim() === "") {
-      return { binding: null, ok: false };
+      return null;
     }
     const binding = currentRuntimeLeaseBinding(this.sessionDir, sessionId);
     if (binding !== null) {
       if (binding.purpose !== "execution" || binding.runId !== runId) {
         throw new RuntimeLeaseRunMismatchError(runId);
       }
-      return { binding, ok: true };
+      return binding;
     }
     const facts = readSessionExecutionFacts(this.sessionDir, sessionId);
     if (facts.lease !== null) {
       throw new RuntimeLeaseLostError(sessionId);
     }
-    return { binding: null, ok: false };
+    return null;
   }
 
   /**

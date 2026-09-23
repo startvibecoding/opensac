@@ -15,8 +15,8 @@ import { EventChannel } from "./event_channel.ts";
 import { EVENT_TOOL_APPROVAL_REQUEST } from "./events.ts";
 import type { Event } from "./events.ts";
 import type { EventSink } from "./agent.ts";
-import { newAgent } from "./agent.ts";
-import { newRunContext } from "./run_context.ts";
+import { createAgent } from "./agent.ts";
+import { createRunContext } from "./run_context.ts";
 
 function sinkFor(channel: EventChannel): EventSink {
   return (ev: Event) => channel.push(ev);
@@ -33,10 +33,10 @@ async function waitApprovalId(channel: EventChannel): Promise<string> {
 }
 
 Deno.test("requestQuestion resolves to empty on context cancel", async () => {
-  const a = newAgent({ id: "agent-question", mode: "plan" }, undefined);
+  const a = createAgent({ id: "agent-question", mode: "plan" }, undefined);
   const chapter = new EventChannel();
   const controller = new AbortController();
-  const ctx = newRunContext(controller.signal);
+  const ctx = createRunContext(controller.signal);
   const pending = a.requestQuestion(ctx, sinkFor(chapter), "pick one", [
     "a",
     "b",
@@ -57,7 +57,7 @@ Deno.test("requestQuestion resolves to empty on context cancel", async () => {
 });
 
 Deno.test("requestQuestion still answers", async () => {
-  const a = newAgent({ id: "agent-question", mode: "plan" }, undefined);
+  const a = createAgent({ id: "agent-question", mode: "plan" }, undefined);
   const chapter = new EventChannel();
   const responder = (async () => {
     const result = await chapter.next();
@@ -66,7 +66,7 @@ Deno.test("requestQuestion still answers", async () => {
     a.handleQuestionResponse(result.value.questionId ?? "", "option a");
   })();
   const answer = await a.requestQuestion(
-    newRunContext(),
+    createRunContext(),
     sinkFor(chapter),
     "pick one",
     ["a", "b"],
@@ -77,20 +77,20 @@ Deno.test("requestQuestion still answers", async () => {
 });
 
 Deno.test("requestToolApproval IDs are unique across agents", async () => {
-  const lead = newAgent({ id: "agent-lead", mode: "agent" }, undefined);
-  const child = newAgent({ id: "agent-child", mode: "agent" }, undefined);
+  const lead = createAgent({ id: "agent-lead", mode: "agent" }, undefined);
+  const child = createAgent({ id: "agent-child", mode: "agent" }, undefined);
   const leadCh = new EventChannel();
   const childCh = new EventChannel();
 
   const leadPending = lead.requestToolApproval(
-    newRunContext(),
+    createRunContext(),
     sinkFor(leadCh),
     "call-1",
     "bash",
     { command: "ls" },
   );
   const childPending = child.requestToolApproval(
-    newRunContext(),
+    createRunContext(),
     sinkFor(childCh),
     "call-2",
     "bash",
@@ -110,10 +110,10 @@ Deno.test("requestToolApproval IDs are unique across agents", async () => {
 });
 
 Deno.test("requestToolApproval resolves false on context cancel", async () => {
-  const a = newAgent({ id: "agent-cancel", mode: "agent" }, undefined);
+  const a = createAgent({ id: "agent-cancel", mode: "agent" }, undefined);
   const chapter = new EventChannel();
   const controller = new AbortController();
-  const ctx = newRunContext(controller.signal);
+  const ctx = createRunContext(controller.signal);
   const pending = a.requestToolApproval(
     ctx,
     sinkFor(chapter),
@@ -134,14 +134,14 @@ Deno.test("request events do not park without a consumer when canceled", async (
   const controller = new AbortController();
   controller.abort();
 
-  const approvalAgent = newAgent(
+  const approvalAgent = createAgent(
     { id: "agent-approval-send", mode: "agent" },
     undefined,
   );
-  approvalAgent.setRunContext(newRunContext(controller.signal));
+  approvalAgent.setRunContext(createRunContext(controller.signal));
   let approvalDelivered = 0;
   const approved = await approvalAgent.requestToolApproval(
-    newRunContext(controller.signal),
+    createRunContext(controller.signal),
     () => {
       approvalDelivered += 1;
       return true;
@@ -153,14 +153,14 @@ Deno.test("request events do not park without a consumer when canceled", async (
   assertEquals(approved, false);
   assertEquals(approvalDelivered, 0, "cancelled run must not deliver approval");
 
-  const questionAgent = newAgent(
+  const questionAgent = createAgent(
     { id: "agent-question-send", mode: "agent" },
     undefined,
   );
-  questionAgent.setRunContext(newRunContext(controller.signal));
+  questionAgent.setRunContext(createRunContext(controller.signal));
   let questionDelivered = 0;
   const answer = await questionAgent.requestQuestion(
-    newRunContext(controller.signal),
+    createRunContext(controller.signal),
     () => {
       questionDelivered += 1;
       return true;
@@ -178,11 +178,11 @@ Deno.test("request events do not park without a consumer when canceled", async (
 });
 
 Deno.test("sendEvent stops when run context is done", () => {
-  const a = newAgent({ id: "send-event", mode: "yolo" }, undefined);
+  const a = createAgent({ id: "send-event", mode: "yolo" }, undefined);
   const chapter = new EventChannel();
   const controller = new AbortController();
   controller.abort();
-  a.setRunContext(newRunContext(controller.signal));
+  a.setRunContext(createRunContext(controller.signal));
 
   let delivered = 0;
   const accepted = a.sendEvent(() => {
@@ -193,7 +193,7 @@ Deno.test("sendEvent stops when run context is done", () => {
   assertEquals(delivered, 0);
 
   // A live run delivers.
-  a.setRunContext(newRunContext());
+  a.setRunContext(createRunContext());
   const acceptedLive = a.sendEvent(sinkFor(chapter), {
     type: 7,
     textDelta: "live",
@@ -203,43 +203,43 @@ Deno.test("sendEvent stops when run context is done", () => {
 });
 
 Deno.test("sendEvent counts dropped events", () => {
-  const a = newAgent({ id: "send-drop", mode: "yolo" }, undefined);
+  const a = createAgent({ id: "send-drop", mode: "yolo" }, undefined);
   const controller = new AbortController();
   controller.abort();
-  a.setRunContext(newRunContext(controller.signal));
+  a.setRunContext(createRunContext(controller.signal));
   for (let i = 0; i < 3; i++) {
     assertEquals(a.sendEvent(() => true, { type: 7 }), false);
   }
   assertEquals(a.droppedEvents, 3);
 
   // A new run resets the counter.
-  a.setRunContext(newRunContext());
+  a.setRunContext(createRunContext());
   assertEquals(a.droppedEvents, 0);
 });
 
 Deno.test("sendEvent does not require any message lock", () => {
-  const a = newAgent({ id: "send-lock", mode: "yolo" }, undefined);
-  a.setRunContext(newRunContext());
+  const a = createAgent({ id: "send-lock", mode: "yolo" }, undefined);
+  a.setRunContext(createRunContext());
   assertEquals(a.sendEvent(() => true, { type: 4 }), true);
 });
 
 Deno.test("needsApproval method reads the agent's mode and rules", () => {
   const confirm: ApprovalSettings = { confirmBeforeWrite: true };
-  const agentMode = newAgent(
+  const agentMode = createAgent(
     { id: "approval-method", mode: "agent", settings: { approval: confirm } },
     undefined,
   );
   assert(agentMode.needsApproval("write", { path: "README.md" }));
   assert(!agentMode.needsApproval("read", { path: "README.md" }));
 
-  const yoloMode = newAgent(
+  const yoloMode = createAgent(
     { id: "approval-yolo", mode: "yolo", settings: { approval: confirm } },
     undefined,
   );
   assert(!yoloMode.needsApproval("write", { path: "README.md" }));
 
   const allow: AllowConfig = { autoEdit: true };
-  const allowed = newAgent(
+  const allowed = createAgent(
     {
       id: "approval-allow",
       mode: "agent",

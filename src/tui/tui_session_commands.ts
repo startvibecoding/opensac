@@ -21,10 +21,10 @@ import {
 } from "../config/settings.ts";
 import { loadAllow } from "../config/allow.ts";
 import { EVENT_TEXT_DELTA } from "../agent/events.ts";
-import { newSQLiteCronStore } from "../cron/sqlite_store.ts";
+import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import type { CronStore } from "../cron/cron.ts";
 import { ATTACHMENT_IMAGE } from "../agentruntime/attachment.ts";
-import { newRegistry } from "../tools/tool.ts";
+import { createRegistry } from "../tools/tool.ts";
 import { Agent } from "../agent/agent.ts";
 import { prompt as systemInitPrompt } from "../systeminit/systeminit.ts";
 import { openFile } from "../platform/platform.ts";
@@ -230,7 +230,7 @@ export class TuiSessionCommands {
   #cron(): CronStore | undefined {
     if (this.#cronStore === undefined) {
       try {
-        this.#cronStore = newSQLiteCronStore(
+        this.#cronStore = createSQLiteCronStore(
           this.#session.manager.getSessionDir(),
         );
       } catch {
@@ -483,7 +483,7 @@ export class TuiSessionCommands {
       return { message: tr.text("btw.already_running"), error: true };
     }
     const runtime = this.#session.runtime;
-    const registry = newRegistry(
+    const registry = createRegistry(
       runtime.workDir,
       runtime.sandboxMgr?.getActive(),
     );

@@ -152,10 +152,10 @@ export class Store {
     }
 
     const replaced = replaceInSection(content, section, oldText, newText);
-    if (!replaced.ok) {
+    if (replaced === undefined) {
       throw new Error(`text not found in section '${section}'`);
     }
-    this.#writeFile(p, replaced.content);
+    this.#writeFile(p, replaced);
   }
 
   /** Removes a line from a section. */
@@ -211,21 +211,16 @@ export function replaceInSection(
   section: string,
   oldText: string,
   newText: string,
-): { content: string; ok: boolean } {
+): string | undefined {
   const bounds = sectionBounds(content, section);
-  if (!bounds.ok) {
-    return { content, ok: false };
-  }
+  if (bounds === undefined) return undefined;
   const { start, end } = bounds;
   let segment = content.slice(start, end);
   if (!segment.includes(oldText)) {
-    return { content, ok: false };
+    return undefined;
   }
   segment = segment.replace(oldText, newText); // replace first occurrence
-  return {
-    content: content.slice(0, start) + segment + content.slice(end),
-    ok: true,
-  };
+  return content.slice(0, start) + segment + content.slice(end);
 }
 
 export function deleteFromSection(
@@ -234,7 +229,7 @@ export function deleteFromSection(
   entry: string,
 ): { content: string; found: boolean } {
   const bounds = sectionBounds(content, section);
-  if (!bounds.ok) {
+  if (bounds === undefined) {
     return { content, found: false };
   }
   const { start, end } = bounds;
@@ -269,24 +264,24 @@ function trimPrefix(s: string, prefix: string): string {
 export function sectionBounds(
   content: string,
   section: string,
-): { start: number; end: number; ok: boolean } {
+): { start: number; end: number } | undefined {
   const header = "## " + section;
   const idx = content.indexOf(header);
   if (idx < 0) {
-    return { start: 0, end: 0, ok: false };
+    return undefined;
   }
   const afterHeader = content.slice(idx + header.length);
   const nlIdx = afterHeader.indexOf("\n");
   if (nlIdx < 0) {
-    return { start: content.length, end: content.length, ok: true };
+    return { start: content.length, end: content.length };
   }
   const start = idx + header.length + nlIdx + 1;
   const rest = content.slice(start);
   const nextSection = rest.indexOf("\n## ");
   if (nextSection >= 0) {
-    return { start, end: start + nextSection, ok: true };
+    return { start, end: start + nextSection };
   }
-  return { start, end: content.length, ok: true };
+  return { start, end: content.length };
 }
 
 /** Extracts content under a ## heading. */

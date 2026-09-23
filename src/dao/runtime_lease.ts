@@ -1,11 +1,5 @@
 import type { DB } from "../db/mod.ts";
-import {
-  execChanges,
-  inList,
-  queryAll,
-  queryOne,
-  queryOptional,
-} from "./database.ts";
+import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
 
 export interface RuntimeLeaseRecord {
   sessionId: string;
@@ -34,10 +28,10 @@ export class RuntimeLeaseDAO {
 
   now(executor: DB): number {
     return Number(
-      queryOne<{ now: number }>(
+      queryOptional<{ now: number }>(
         executor,
         `SELECT CAST(strftime('%s','now') AS INTEGER) AS now`,
-      ).now,
+      )?.now ?? 0,
     );
   }
 
@@ -50,8 +44,8 @@ export class RuntimeLeaseDAO {
     return row !== undefined;
   }
 
-  find(executor: DB, sessionId: string): RuntimeLeaseRecord {
-    return queryOne<RuntimeLeaseRecord>(
+  find(executor: DB, sessionId: string): RuntimeLeaseRecord | undefined {
+    return queryOptional<RuntimeLeaseRecord>(
       executor,
       `SELECT ${columns} FROM session_runtime_leases WHERE session_id = ? LIMIT 1`,
       [sessionId],
@@ -230,8 +224,8 @@ export class RuntimeLeaseDAO {
     ownerId: string,
     epoch: number,
     tokenHash: string,
-  ): RuntimeLeaseRecord {
-    return queryOne<RuntimeLeaseRecord>(
+  ): RuntimeLeaseRecord | undefined {
+    return queryOptional<RuntimeLeaseRecord>(
       executor,
       `SELECT ${columns} FROM session_runtime_leases
        WHERE session_id = ? AND owner_instance_id = ? AND epoch = ?
@@ -240,12 +234,16 @@ export class RuntimeLeaseDAO {
     );
   }
 
-  runStatus(executor: DB, runId: string, sessionId: string): string {
-    return queryOne<{ status: string }>(
+  runStatus(
+    executor: DB,
+    runId: string,
+    sessionId: string,
+  ): string | undefined {
+    return queryOptional<{ status: string }>(
       executor,
       `SELECT status FROM session_runs WHERE id = ? AND session_id = ? LIMIT 1`,
       [runId, sessionId],
-    ).status;
+    )?.status;
   }
 
   private requireDb(): DB {
