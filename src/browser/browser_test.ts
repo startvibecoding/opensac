@@ -2,7 +2,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { Image } from "imagescript";
-import { createManagerWithProjectDirs } from "../skills/mod.ts";
+import { createManager } from "../skills/mod.ts";
 import { createRegistry } from "../tools/tool.ts";
 import {
   clientOptions,
@@ -31,7 +31,7 @@ async function testPng(width: number, height: number): Promise<Uint8Array> {
 }
 
 Deno.test("built-in browser skill is discoverable", () => {
-  const manager = createManagerWithProjectDirs("", []);
+  const manager = createManager("", []);
   manager.load();
   const skill = manager.get(SKILL_NAME);
   assert(skill);

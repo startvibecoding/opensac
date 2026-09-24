@@ -432,8 +432,7 @@ export class Manager {
 
   /** Returns the newest compaction entry in the current session. */
   getLatestCompaction(): CompactionEntry | null {
-    const [entry, ok] = latestCompactionLocked(this.entries);
-    return ok ? entry : null;
+    return latestCompactionLocked(this.entries);
   }
 
   /** Returns the newest model binding in the session. */

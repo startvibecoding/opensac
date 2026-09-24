@@ -281,7 +281,6 @@ async function runACPInner(
     getSessionDir(settings),
     {},
   );
-  await recoveryCoordinator.start(recoveryAbort.signal);
   const stopRecovery = () => {
     recoveryAbort.abort();
     void recoveryCoordinator.stop();
@@ -321,8 +320,11 @@ async function runACPInner(
   );
   const stopDatabaseWatch = watchDatabaseRebuilds(null);
 
-  // LIFO: cron scheduler stops before session runtimes so in-flight job runs
-  // cancel first; recovery coordinator and watches unwind last.
+  // Cleanup order: cron scheduler stops before session runtimes so in-flight
+  // job runs cancel first; recovery coordinator and watches unwind last. The
+  // try/finally below is the single owner of this teardown and runs it on
+  // every exit path: provider failure, setup failure, dispatch failure, and
+  // clean EOF.
   const cleanup = async () => {
     stopManageCron(srv);
     await srv.shutdownAllSessionRuntimes();
@@ -331,132 +333,136 @@ async function runACPInner(
     stopRecovery();
   };
 
-  const enabled = true;
-  let primary: {
-    provider: Provider;
-    model: import("../provider/types.ts").Model;
-  };
   try {
-    primary = create(settings, providerName, modelID, {
-      builtinAnthropicCacheControl: enabled,
-      requireModel: true,
-    });
-  } catch (error) {
-    await cleanup();
-    throw classifyACPStartupError(error);
-  }
-  srv.p = primary.provider;
-  srv.providerName = providerName !== ""
-    ? providerName
-    : (settings.defaultProvider ?? "");
-  srv.m = primary.model;
-  srv.providers = { [srv.providerName]: primary.provider };
+    await recoveryCoordinator.start(recoveryAbort.signal);
 
-  // Build the provider catalog once; unusable providers are omitted.
-  for (const name of Object.keys(settings.providers ?? {})) {
-    if (name.toLowerCase() === srv.providerName.toLowerCase()) continue;
+    const enabled = true;
+    let primary: {
+      provider: Provider;
+      model: import("../provider/types.ts").Model;
+    };
     try {
-      const candidate = create(settings, name, "", {
+      primary = create(settings, providerName, modelID, {
         builtinAnthropicCacheControl: enabled,
         requireModel: true,
       });
-      srv.providers[name] = candidate.provider;
     } catch (error) {
-      debugLogf(`ACP provider %s unavailable: %v`, name, error);
+      throw classifyACPStartupError(error);
     }
-  }
+    srv.p = primary.provider;
+    srv.providerName = providerName !== ""
+      ? providerName
+      : (settings.defaultProvider ?? "");
+    srv.m = primary.model;
+    srv.providers = { [srv.providerName]: primary.provider };
 
-  srv.mode = opts.mode || settings.defaultMode || "yolo";
-  srv.thinkingLevel = normalizeThinkingLevel(
-    opts.thinking || settings.defaultThinkingLevel || "",
-  );
+    // Build the provider catalog once; unusable providers are omitted.
+    for (const name of Object.keys(settings.providers ?? {})) {
+      if (name.toLowerCase() === srv.providerName.toLowerCase()) continue;
+      try {
+        const candidate = create(settings, name, "", {
+          builtinAnthropicCacheControl: enabled,
+          requireModel: true,
+        });
+        srv.providers[name] = candidate.provider;
+      } catch (error) {
+        debugLogf(`ACP provider %s unavailable: %v`, name, error);
+      }
+    }
 
-  const sbMgr = createManager(
-    cwd,
-    sandboxSettingsOptions(
-      settings.sandbox ?? {
-        enabled: false,
-        level: "",
-        allowNetwork: false,
-      },
-    ),
-  );
-  const sandboxEnabled = opts.sandbox === true ||
-    (settings.sandbox?.enabled ?? false);
-  if (!sandboxEnabled) {
-    sbMgr.setLevel(Level.None);
-  } else {
-    const level = settings.sandbox?.level === "strict"
-      ? Level.Strict
-      : Level.Standard;
-    sbMgr.setLevel(level);
-    const fallback = sbMgr.fallbackError();
-    if (fallback !== undefined) {
-      Deno.stderr.writeSync(
-        new TextEncoder().encode(
-          `Warning: sandbox unavailable; using direct execution: ${
-            fallback instanceof Error ? fallback.message : fallback
-          }\n`,
-        ),
+    srv.mode = opts.mode || settings.defaultMode || "yolo";
+    srv.thinkingLevel = normalizeThinkingLevel(
+      opts.thinking || settings.defaultThinkingLevel || "",
+    );
+
+    const sbMgr = createManager(
+      cwd,
+      sandboxSettingsOptions(
+        settings.sandbox ?? {
+          enabled: false,
+          level: "",
+          allowNetwork: false,
+        },
+      ),
+    );
+    const sandboxEnabled = opts.sandbox === true ||
+      (settings.sandbox?.enabled ?? false);
+    if (!sandboxEnabled) {
+      sbMgr.setLevel(Level.None);
+    } else {
+      const level = settings.sandbox?.level === "strict"
+        ? Level.Strict
+        : Level.Standard;
+      sbMgr.setLevel(level);
+      const fallback = sbMgr.fallbackError();
+      if (fallback !== undefined) {
+        Deno.stderr.writeSync(
+          new TextEncoder().encode(
+            `Warning: sandbox unavailable; using direct execution: ${
+              fallback instanceof Error ? fallback.message : fallback
+            }\n`,
+          ),
+        );
+      }
+    }
+    srv.sbMgr = sbMgr;
+
+    const resources = await loadContextResources(
+      settings,
+      cwd,
+      opts.workflows === true,
+      opts.browser === true,
+    );
+    srv.skillsMgr = resources.skillsMgr;
+    srv.extraContext = resources.extraContext;
+    srv.ruleContent = resources.ruleContent;
+
+    srv.runtime = new SessionRuntime({
+      source: SOURCE_ACP,
+      entrySource: SOURCE_ACP,
+      workDir: cwd,
+      sandboxMgr: sbMgr,
+      skillsMgr: resources.skillsMgr,
+      extraContext: srv.extraContext,
+      ruleContent: srv.ruleContent,
+      providers: srv.providers,
+      artifactEnabled: srv.artifact,
+    });
+
+    if (
+      opts.multiAgent === true || opts.delegate === true ||
+      opts.workflows === true
+    ) {
+      srv.agentMgr = createAgentManager({
+        runtime: srv.runtime,
+        provider: primary.provider,
+        model: primary.model,
+        settings,
+        providerName: srv.providerName,
+        allow: srv.allow,
+        multiAgentEnabled: true,
+        delegateEnabled: opts.delegate === true,
+        workflowsEnabled: opts.workflows === true,
+      });
+    }
+
+    // Resume persisted knowledge-base schedules; a setup failure must not block
+    // the ACP transport.
+    try {
+      ensureManageCronForRun(srv);
+    } catch (error) {
+      console.error(
+        `[acp] start management cron runtime: ${
+          error instanceof Error ? error.message : error
+        }`,
       );
     }
+
+    await dispatchLoop(srv);
+    return srv.acpInitialized();
+  } finally {
+    await cleanup();
   }
-  srv.sbMgr = sbMgr;
-
-  const resources = await loadContextResources(
-    settings,
-    cwd,
-    opts.workflows === true,
-    opts.browser === true,
-  );
-  srv.skillsMgr = resources.skillsMgr;
-  srv.extraContext = resources.extraContext;
-  srv.ruleContent = resources.ruleContent;
-
-  srv.runtime = new SessionRuntime({
-    source: SOURCE_ACP,
-    entrySource: SOURCE_ACP,
-    workDir: cwd,
-    sandboxMgr: sbMgr,
-    skillsMgr: resources.skillsMgr,
-    extraContext: srv.extraContext,
-    ruleContent: srv.ruleContent,
-    providers: srv.providers,
-    artifactEnabled: srv.artifact,
-  });
-
-  if (
-    opts.multiAgent === true || opts.delegate === true ||
-    opts.workflows === true
-  ) {
-    srv.agentMgr = createAgentManager({
-      runtime: srv.runtime,
-      provider: primary.provider,
-      model: primary.model,
-      settings,
-      providerName: srv.providerName,
-      allow: srv.allow,
-      multiAgentEnabled: true,
-      delegateEnabled: opts.delegate === true,
-      workflowsEnabled: opts.workflows === true,
-    });
-  }
-
-  // Resume persisted knowledge-base schedules; a setup failure must not block
-  // the ACP transport.
-  try {
-    ensureManageCronForRun(srv);
-  } catch (error) {
-    console.error(
-      `[acp] start management cron runtime: ${
-        error instanceof Error ? error.message : error
-      }`,
-    );
-  }
-
-  await dispatchLoop(srv);
-  await cleanup();
-  return srv.acpInitialized();
 }
 
 /** Lazily starts the management cron runtime. */

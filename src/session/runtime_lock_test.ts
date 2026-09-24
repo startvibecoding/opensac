@@ -18,6 +18,7 @@ import {
   LeaseHeartbeatScheduler,
   leaseHeartbeatSchedulers,
   runtimeHeartbeatTiming,
+  RuntimeLeaseGuard,
   RuntimeLeaseLostError,
   RuntimeLeaseRunMismatchError,
   RuntimeSessionNotFoundError,
@@ -468,3 +469,27 @@ Deno.test("a slow renew batch never overlaps the next tick", async () => {
     closeAll();
   }
 });
+
+Deno.test(
+  "runtime lease guard releases the process-local lock when the durable release throws",
+  () => {
+    let unlocked = false;
+    const lease = {
+      release(): void {
+        throw new Error("durable lease release failed");
+      },
+    } as unknown as ConstructorParameters<typeof RuntimeLeaseGuard>[0];
+    const guard = new RuntimeLeaseGuard(lease, () => {
+      unlocked = true;
+    });
+    assertThrows(
+      () => guard.release(),
+      Error,
+      "durable lease release failed",
+    );
+    assert(
+      unlocked,
+      "the process-local lock must be freed even when the durable release fails",
+    );
+  },
+);

@@ -612,6 +612,25 @@ export function workDirForAgent(a: Agent | undefined): string {
   return a?.registry()?.getWorkDir() ?? "";
 }
 
+/** Result of the image admission gate applied to one tool result. */
+export interface GatedToolResult {
+  content: string;
+  contents: ContentBlock[] | undefined;
+  isError: boolean;
+  /** Set when image content was rejected for a text-only model. */
+  error: Error | undefined;
+}
+
+/**
+ * Outcome of the durable idempotency claim taken immediately before tool
+ * execution: a record to execute, a completed result to reuse, or a skipped
+ * claim when no durable boundary applies. Claim *failures* throw.
+ */
+export type ToolExecutionClaim =
+  | { kind: "skipped" }
+  | { kind: "claimed"; record: ToolExecutionRecord }
+  | { kind: "reused"; message: Message };
+
 export class Agent {
   #id: AgentID;
   #parentId: AgentID;
@@ -1409,16 +1428,16 @@ export class Agent {
     content: string,
     contents: ContentBlock[],
     isError: boolean,
-  ): [string, ContentBlock[] | undefined, boolean, Error | undefined] {
+  ): GatedToolResult {
     if (this.supportsImages() || !containsImageContent(contents)) {
-      return [content, contents, isError, undefined];
+      return { content, contents, isError, error: undefined };
     }
-    return [
-      unsupportedImageToolResultMessage,
-      undefined,
-      true,
-      new Error(unsupportedImageToolResultMessage),
-    ];
+    return {
+      content: unsupportedImageToolResultMessage,
+      contents: undefined,
+      isError: true,
+      error: new Error(unsupportedImageToolResultMessage),
+    };
   }
 
   /**
@@ -2001,15 +2020,17 @@ export class Agent {
 
   /**
    * Builds and guards the request message list, omitting oversized tool results
-   * until the estimated request fits the input budget.
+   * until the estimated request fits the input budget. Throws when the request
+   * still exceeds the budget after the guard has omitted every compactable
+   * tool result.
    */
   prepareRequestMessages(
     sessionContextMsg: Message,
     ch: EventSink,
-  ): [Message[] | null, Error | null] {
+  ): Message[] {
     const [budgetTokens, reserveTokens, contextWindow, ok] = this
       .requestTokenBudget();
-    if (!ok) return [this.buildRequestMessages(sessionContextMsg), null];
+    if (!ok) return this.buildRequestMessages(sessionContextMsg);
     const estimator = resolveTokenEstimator(
       this.config.compactionSettings ?? emptyCompactionSettings,
       this.config.model ?? null,
@@ -2022,7 +2043,7 @@ export class Agent {
         this.#frozenToolDefs,
         estimator,
       );
-      if (estimatedTokens <= budgetTokens) return [messages, null];
+      if (estimatedTokens <= budgetTokens) return messages;
       const toolName = this.replaceLargestToolResultForContext(
         estimatedTokens,
         budgetTokens,
@@ -2030,12 +2051,9 @@ export class Agent {
         reserveTokens,
       );
       if (toolName === undefined) {
-        return [
-          null,
-          new Error(
-            `estimated request tokens ${estimatedTokens} exceed input budget ${budgetTokens} for context window ${contextWindow} (reserved output: ${reserveTokens}). Narrow the request or reduce context before retrying`,
-          ),
-        ];
+        throw new Error(
+          `estimated request tokens ${estimatedTokens} exceed input budget ${budgetTokens} for context window ${contextWindow} (reserved output: ${reserveTokens}). Narrow the request or reduce context before retrying`,
+        );
       }
       this.sendEvent(ch, {
         type: EVENT_STATUS,
@@ -2044,12 +2062,9 @@ export class Agent {
         } output; asking model to retry with a narrower scope.`,
       });
     }
-    return [
-      null,
-      new Error(
-        "estimated request still exceeds context after omitting oversized tool outputs",
-      ),
-    ];
+    throw new Error(
+      "estimated request still exceeds context after omitting oversized tool outputs",
+    );
   }
 
   /** Compacts context when forced or when the automatic threshold is crossed. */
@@ -3066,14 +3081,18 @@ export class Agent {
         if (toolCtx.signal !== undefined) {
           contextWithGitAccess(toolCtx.signal, gitAccessApproved);
         }
-        const [claimed, reused, claimErr] = this
-          .claimToolExecutionWithRecovery(
+        let claim: ToolExecutionClaim = { kind: "skipped" };
+        try {
+          claim = this.claimToolExecutionWithRecovery(
             localTurnId,
             tc,
             params,
             allowReadOnlyRecovery,
           );
-        if (claimErr !== null) {
+        } catch (thrown) {
+          const claimErr = thrown instanceof Error
+            ? thrown
+            : new Error(String(thrown));
           const errMsg = `record tool execution: ${claimErr.message}`;
           this.sendEvent(ch, {
             type: EVENT_TOOL_EXECUTION_END,
@@ -3084,20 +3103,20 @@ export class Agent {
           });
           return toolResult(errMsg, undefined, true);
         }
-        if (reused !== null) {
-          const reusedResult: Message = { ...reused };
+        if (claim.kind === "reused") {
+          const reusedResult: Message = { ...claim.message };
           let reusedErr: Error | undefined;
           if (reusedResult.contents !== undefined) {
-            const [rc, rct, rie, rierr] = this.gateToolResultImages(
+            const gated = this.gateToolResultImages(
               reusedResult.content ?? "",
               reusedResult.contents,
               reusedResult.isError === true,
             );
-            reusedResult.content = rc;
-            reusedResult.contents = rct;
-            reusedResult.isError = rie;
-            reusedErr = rierr;
-            if (rierr !== undefined) reusedResult.toolKind = tc.kind;
+            reusedResult.content = gated.content;
+            reusedResult.contents = gated.contents;
+            reusedResult.isError = gated.isError;
+            reusedErr = gated.error;
+            if (gated.error !== undefined) reusedResult.toolKind = tc.kind;
           }
           const executionState = reusedResult.isError === true
             ? "interrupted"
@@ -3121,6 +3140,7 @@ export class Agent {
           });
           return reusedResult;
         }
+        const claimed = claim.kind === "claimed" ? claim.record : null;
         if (claimed !== null) {
           toolCtx = contextWithOperationID(toolCtx, claimed.executionKey);
         }
@@ -3194,12 +3214,15 @@ export class Agent {
             resultPlan = undefined;
           }
         }
-        const [gatedContent, gatedContents, gatedError, imageErr] = this
-          .gateToolResultImages(resultContent, resultContents ?? [], isError);
-        resultContent = gatedContent;
-        resultContents = gatedContents;
-        isError = gatedError;
-        if (imageErr !== undefined) err = imageErr;
+        const gated = this.gateToolResultImages(
+          resultContent,
+          resultContents ?? [],
+          isError,
+        );
+        resultContent = gated.content;
+        resultContents = gated.contents;
+        isError = gated.isError;
+        if (gated.error !== undefined) err = gated.error;
         if (claimed !== null && this.config.session !== undefined) {
           try {
             updateToolExecutionRecord(this.config.session.getSessionDir(), {
@@ -3278,29 +3301,30 @@ export class Agent {
     return this.requestToolApproval(ctx, ch, toolCallId, toolName, args);
   }
 
-  /** Establishes the durable idempotency boundary immediately before execution. */
+  /** Establishes the durable idempotency boundary immediately before execution.
+   * Throws when the durable claim cannot be established or repaired. */
   claimToolExecutionWithRecovery(
     localTurnId: string,
     tc: ToolCallBlock,
     params: Record<string, unknown>,
     allowReadOnlyRecovery: boolean,
-  ): [ToolExecutionRecord | null, Message | null, Error | null] {
+  ): ToolExecutionClaim {
     const session = this.config.session;
     const provider = this.config.provider;
     if (
       session === undefined || provider === undefined || localTurnId === "" ||
       tc.id === ""
     ) {
-      return [null, null, null];
+      return { kind: "skipped" };
     }
-    if (tc.name === "plan") return [null, null, null];
+    if (tc.name === "plan") return { kind: "skipped" };
     const header = session.getHeader();
-    if (header === null || header.id === "") return [null, null, null];
+    if (header === null || header.id === "") return { kind: "skipped" };
     let normalizedArgs: string;
     try {
       normalizedArgs = JSON.stringify(params);
     } catch (e) {
-      return [null, null, new Error(`normalize tool arguments: ${e}`)];
+      throw new Error(`normalize tool arguments: ${e}`);
     }
     const argsHash = createHash("sha256").update(normalizedArgs).digest("hex");
     const keyInput = header.id + "\u0000" + localTurnId + "\u0000" + tc.id +
@@ -3333,16 +3357,16 @@ export class Agent {
       stored = claimed.record;
       created = claimed.created;
     } catch (err) {
-      return [null, null, err instanceof Error ? err : new Error(String(err))];
+      throw err instanceof Error ? err : new Error(String(err));
     }
-    if (created) return [stored, null, null];
+    if (created) return { kind: "claimed", record: stored };
     if (stored.executionState === "completed") {
       const { content, isError } = parseToolExecutionResultSummary(
         stored.resultSummary,
       );
       const message = createToolResultMessage(tc.id, tc.name, content, isError);
       message.toolKind = tc.kind;
-      return [null, message, null];
+      return { kind: "reused", message };
     }
     const canRecover = allowReadOnlyRecovery &&
       ((isReadOnlyToolName(tc.name) && !stored.sideEffecting) ||
@@ -3355,11 +3379,7 @@ export class Agent {
           stored.executionKey,
         );
       } catch (err) {
-        return [
-          null,
-          null,
-          err instanceof Error ? err : new Error(String(err)),
-        ];
+        throw err instanceof Error ? err : new Error(String(err));
       }
       if (reclaimed) {
         stored = {
@@ -3368,7 +3388,7 @@ export class Agent {
           resultSummary: null,
           completedAt: null,
         };
-        return [stored, null, null];
+        return { kind: "claimed", record: stored };
       }
     }
     let messageText =
@@ -3379,7 +3399,7 @@ export class Agent {
     }
     const message = createToolResultMessage(tc.id, tc.name, messageText, true);
     message.toolKind = tc.kind;
-    return [null, message, null];
+    return { kind: "reused", message };
   }
 
   // --- Core loop -----------------------------------------------------------
@@ -3516,12 +3536,13 @@ export class Agent {
         await this.compactIfNeeded(runCtx, ch);
 
         const sessionContextMsg = this.buildSessionContextMessage();
-        const [allMessages, reqErr] = this.prepareRequestMessages(
-          sessionContextMsg,
-          ch,
-        );
-        if (reqErr !== null || allMessages === null) {
-          const err = reqErr ?? new Error("failed to build request messages");
+        let allMessages: Message[];
+        try {
+          allMessages = this.prepareRequestMessages(sessionContextMsg, ch);
+        } catch (thrown) {
+          const err = thrown instanceof Error
+            ? thrown
+            : new Error(String(thrown));
           if (await this.tryRecoverContextOverflow(runCtx, ch, state, err)) {
             continue;
           }
@@ -3667,7 +3688,15 @@ export class Agent {
                   toolCallIds.add(toolCall.id);
                   const hadEmptyArgs = typeof toolCall.arguments === "string" &&
                     toolCall.arguments.length === 0;
-                  const [args, argErr] = normalizeToolCallArguments(toolCall);
+                  let args: Record<string, unknown> | null = null;
+                  let argErr: Error | null = null;
+                  try {
+                    args = normalizeToolCallArguments(toolCall);
+                  } catch (thrown) {
+                    argErr = thrown instanceof Error
+                      ? thrown
+                      : new Error(String(thrown));
+                  }
                   if (hadEmptyArgs && argErr === null) {
                     state.toolArgumentNotices.push(
                       `Tool ${
@@ -4463,9 +4492,9 @@ export class Agent {
       ch({ type: EVENT_ERROR, error: maxErr, stopReason: "max_iterations" });
       ch(this.agentEndEvent());
     } finally {
-      // Go's `defer cancelRun()`: the loop-owned run context is cancelled when
-      // the loop returns, so spawned children whose runs derive from it are
-      // cancelled with the parent run instead of leaking past its end.
+      // The loop-owned run context is cancelled when the loop returns, so
+      // spawned children whose runs derive from it are cancelled with the
+      // parent run instead of leaking past its end.
       if (!runAbort.signal.aborted) {
         runAbort.abort(new DOMException("context canceled", "AbortError"));
       }

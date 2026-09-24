@@ -3,7 +3,17 @@
 // Request/Response API; `http.Server` maps to `Deno.serve`.
 
 import { dashboardHTML, opensacPNG, opensacSmallICO } from "./assets.ts";
+import {
+  createStatsQueryExecutor,
+  type StatsQueryExecutor,
+} from "./query_offload.ts";
 import { DB, type Query } from "./stats.ts";
+
+/** Options for {@link Server}. */
+export interface ServerOptions {
+  /** Query executor (tests inject the inline executor or a fake). */
+  executor?: StatsQueryExecutor;
+}
 
 /** Builds a Query from URL query parameters. */
 export function parseQueryParams(values: URLSearchParams): Query {
@@ -51,12 +61,14 @@ function parseDateOnly(value: string): Date | null {
 
 /** The HTTP server for the stats dashboard. */
 export class Server {
-  #db: DB;
+  #executor: StatsQueryExecutor;
   #addr: string;
   #httpServer: Deno.HttpServer | null = null;
 
-  constructor(db: DB, addr: string) {
-    this.#db = db;
+  constructor(db: DB, addr: string, options: ServerOptions = {}) {
+    // By default queries run in an offline-scan worker so a slow aggregate
+    // cannot stall the event loop (the TUI serves this server in-process).
+    this.#executor = options.executor ?? createStatsQueryExecutor(db);
     this.#addr = addr;
   }
 
@@ -66,7 +78,7 @@ export class Server {
   }
 
   /** Handles one dashboard request. Exposed for in-process tests. */
-  handle(req: Request): Response {
+  async handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const p = url.pathname;
     if (p === "/") {
@@ -89,23 +101,23 @@ export class Server {
       return new Response(opensacPNG() as unknown as BodyInit, { headers: h });
     }
     if (p === "/api/summary") {
-      return this.#json(() =>
-        this.#db.summary(parseQueryParams(url.searchParams))
+      return await this.#json(() =>
+        this.#executor.summary(parseQueryParams(url.searchParams))
       );
     }
     if (p === "/api/timeseries") {
-      return this.#json(() =>
-        this.#db.timeSeries(parseQueryParams(url.searchParams))
+      return await this.#json(() =>
+        this.#executor.timeSeries(parseQueryParams(url.searchParams))
       );
     }
     if (p === "/api/by-provider") {
-      return this.#json(() =>
-        this.#db.byProvider(parseQueryParams(url.searchParams))
+      return await this.#json(() =>
+        this.#executor.byProvider(parseQueryParams(url.searchParams))
       );
     }
     if (p === "/api/by-model") {
-      return this.#json(() =>
-        this.#db.byModel(parseQueryParams(url.searchParams))
+      return await this.#json(() =>
+        this.#executor.byModel(parseQueryParams(url.searchParams))
       );
     }
     if (p === "/api/recent") {
@@ -122,14 +134,16 @@ export class Server {
         const n = Number.parseInt(psStr, 10);
         if (!isNaN(n) && n > 0) pageSize = n;
       }
-      return this.#json(() => this.#db.recentFiltered(q, page, pageSize));
+      return await this.#json(() =>
+        this.#executor.recentFiltered(q, page, pageSize)
+      );
     }
     return new Response("404 page not found\n", { status: 404 });
   }
 
-  #json(fn: () => unknown): Response {
+  async #json(fn: () => Promise<unknown>): Promise<Response> {
     try {
-      const data = fn();
+      const data = await fn();
       return new Response(JSON.stringify(data), {
         headers: { "Content-Type": "application/json" },
       });
@@ -151,8 +165,9 @@ export class Server {
     );
   }
 
-  /** Gracefully stops the HTTP server. */
+  /** Gracefully stops the HTTP server and releases the query executor. */
   async shutdown(): Promise<void> {
+    this.#executor.close();
     if (this.#httpServer) {
       const srv = this.#httpServer;
       this.#httpServer = null;
@@ -162,8 +177,11 @@ export class Server {
 
   /** Resolves when the HTTP server terminates. */
   finished(): Promise<void> {
-    if (this.#httpServer === null) return Promise.resolve();
-    return this.#httpServer.finished;
+    if (this.#httpServer === null) {
+      this.#executor.close();
+      return Promise.resolve();
+    }
+    return this.#httpServer.finished.finally(() => this.#executor.close());
   }
 
   /** The bound address, available after {@link start}. */

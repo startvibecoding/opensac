@@ -481,15 +481,6 @@ export function createRunTool(
   return new RunTool(manager, store, active);
 }
 
-/** Constructs the run tool with an explicit active registry. */
-export function createRunToolWithActive(
-  manager?: AgentManager,
-  store?: Store,
-  active?: ActiveRegistry,
-): RunTool {
-  return new RunTool(manager, store, active ?? createActiveRegistry());
-}
-
 /** Constructs the status tool. */
 export function createStatusTool(store: Store): StatusTool {
   return new StatusTool(store);
@@ -520,7 +511,7 @@ export function registerWorkflowTools(
   const active = opts.active ?? createActiveRegistry();
   registry.register(createLintTool());
   if (opts.manager !== undefined && opts.manager !== null) {
-    registry.register(createRunToolWithActive(opts.manager, store, active));
+    registry.register(createRunTool(opts.manager, store, active));
   }
   registry.register(createStatusTool(store));
   registry.register(createCancelTool(active));

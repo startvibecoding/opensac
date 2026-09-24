@@ -89,7 +89,7 @@ import {
 } from "../session/session_events.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import {
-  createManagerWithProjectDirs,
+  createManager as createSkillsManager,
   type Manager as SkillsManager,
   projectSkillDirs,
 } from "../skills/mod.ts";
@@ -2031,7 +2031,7 @@ export async function loadContextResourcesWithExpert(
   ) {
     projectDirs = [expertBundle.skillsDir, ...projectDirs];
   }
-  const skillsMgr = createManagerWithProjectDirs(
+  const skillsMgr = createSkillsManager(
     getGlobalSkillsDir(settings),
     projectDirs,
   );

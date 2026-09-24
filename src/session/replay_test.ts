@@ -195,12 +195,10 @@ Deno.test("latestCompactionLocked returns the newest compaction entry", () => {
       tokensBefore: 2,
     },
   ];
-  const [entry, ok] = latestCompactionLocked(entries);
-  assert(ok);
+  const entry = latestCompactionLocked(entries);
+  assert(entry !== null);
   assertEquals(entry.id, "c2");
-  const [empty, missing] = latestCompactionLocked([]);
-  assertEquals(missing, false);
-  assertEquals(empty.id, "");
+  assertEquals(latestCompactionLocked([]), null);
 });
 
 Deno.test("lastSummarizedEntryIDLocked resolves the boundary message", () => {

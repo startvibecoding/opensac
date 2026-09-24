@@ -4,7 +4,7 @@ import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
 import {
   builtinFS,
-  createManagerWithProjectDirs,
+  createManager,
   createProjectSkillsDir,
   expertCreaterSkillName,
   extractDescription,
@@ -62,7 +62,7 @@ Deno.test("projectSkillDirs includes agents skills", () => {
 });
 
 Deno.test("load discovers built-in skills", () => {
-  const m = createManagerWithProjectDirs("", []);
+  const m = createManager("", []);
   m.load();
   assert(m.get(expertCreaterSkillName));
   assertEquals(m.listBySource("builtin").length >= 2, true);
@@ -79,7 +79,7 @@ Deno.test("loadFromDir loads skill and its references", () => {
       "references/a.md": "REF A",
     },
   );
-  const m = createManagerWithProjectDirs("", [dir]);
+  const m = createManager("", [dir]);
   m.load();
   const s = m.get("alpha")!;
   assert(s);
@@ -96,7 +96,7 @@ Deno.test("project dirs precedence overrides same name", () => {
   const projDir = path.join(tmp, "proj");
   writeSkill(globalDir, "dup", "# Global\n");
   writeSkill(projDir, "dup", "# Project\n");
-  const m = createManagerWithProjectDirs(globalDir, [projDir]);
+  const m = createManager(globalDir, [projDir]);
   m.load();
   assertEquals(m.get("dup")!.content.includes("Project"), true);
 });
@@ -106,7 +106,7 @@ Deno.test("get/list/listBySource/names", () => {
   const dir = path.join(tmp, "skills");
   writeSkill(dir, "b", "# B\n");
   writeSkill(dir, "a", "# A\n");
-  const m = createManagerWithProjectDirs("", [dir]);
+  const m = createManager("", [dir]);
   m.load();
   assertEquals(m.names().includes("a"), true);
   assertEquals(m.names().includes("b"), true);
@@ -188,7 +188,7 @@ Deno.test("buildSkillContext with references", () => {
   writeSkill(dir, "lazy", "# L\n\n- [doc](references/doc.md)\n", {
     "references/doc.md": "DOC",
   });
-  const m = createManagerWithProjectDirs("", [dir]);
+  const m = createManager("", [dir]);
   m.load();
 
   const ctx = m.buildSkillContext("withrefs");
@@ -205,7 +205,7 @@ Deno.test("loadReference direct file and path escape", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(dir, "d", "# D\n", { "references/extra.md": "EXTRA" });
-  const m = createManagerWithProjectDirs("", [dir]);
+  const m = createManager("", [dir]);
   m.load();
   assertEquals(m.loadReference("d", "references/extra.md"), "EXTRA");
   assertEquals(m.loadReference("d", "../../etc/passwd"), undefined);
@@ -213,7 +213,7 @@ Deno.test("loadReference direct file and path escape", () => {
 });
 
 Deno.test("buildAllSkillsContext includes built-ins", () => {
-  const m = createManagerWithProjectDirs("", []);
+  const m = createManager("", []);
   m.load();
   const ctx = m.buildAllSkillsContext();
   assert(ctx.includes("Available Skills"));
@@ -240,7 +240,7 @@ Deno.test("load applies global disabled skills", () => {
       path.join(configDir, "settings.json"),
       JSON.stringify({ skills: { disabled: ["drop"] } }),
     );
-    const m = createManagerWithProjectDirs("", [dir]);
+    const m = createManager("", [dir]);
     m.load();
     assert(m.get("keep"));
     assertEquals(m.get("drop"), undefined);

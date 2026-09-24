@@ -28,10 +28,7 @@ import {
   saveMCPConfig,
 } from "../config/mod.ts";
 import type { ProviderConfig, Settings } from "../config/settings.ts";
-import {
-  createManagerWithProjectDirs,
-  projectSkillDirs,
-} from "../skills/mod.ts";
+import { createManager, projectSkillDirs } from "../skills/mod.ts";
 import {
   claimDeliveryOperation,
   createDeliveryPlan,
@@ -1085,7 +1082,7 @@ Deno.test("manage skills list/set round trip", () => {
     );
     const output = new SyncBuffer();
     const server = createManageFixtureServer(output, workDir);
-    server.skillsMgr = createManagerWithProjectDirs(
+    server.skillsMgr = createManager(
       getGlobalSkillsDir(settings),
       projectSkillDirs(workDir),
     );

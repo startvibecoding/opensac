@@ -11,7 +11,7 @@
 > anti-fragmentation invariants in `AGENTS.md` and keeps the public `sdk/`
 > surface stable.
 
-- 状态: 主体完成（P0–P4 + P1-3 + §3.4-1 已落地，§3.4-2 主体落地）；真实余项见 §4 末「余项汇总（2026-09-23）」：`session/store.getLatest*` 与 value+error 元组扫尾、语义变体判定、P2-1 ACP teardown、P3 治理余项
+- 状态: 主体完成（P0–P4 + P1-3 + §3.4-1/§3.4-2 + comma-ok/value+error 扫尾 + P2-1 ACP teardown + P3 治理余项已落地，2026-09-24 收尾轮）；唯一接受残差见 §4 末「余项汇总（2026-09-24）」：provider SSE 解码 guard（另行评估）
 - 范围: `src/`、`sdk/`（不含 `desktop/`、生成物）
 - 前置文档: `docs/proposal/go-to-deno-migration.md`（迁移台账）、`AGENTS.md`（架构不变量）
 
@@ -59,11 +59,11 @@
 | `newXxxWithYyy(...)` 变体 | 0 ✅（Go 式命名已清零；`createXWithYyy` 语义变体见 §3.4-2） | Go functional-options / 多构造器模式；双入口合并为 §3.4-2 余项 |
 | PascalCase 导出（函数+枚举式常量） | 0 ✅（P4 已清零，2026-09-23 实测） | Go 导出大写惯例残留；188 个常量已批改 SCREAMING_SNAKE（`Err*` 哨兵另计） |
 | `export const ErrXxx` 哨兵 | 0 ✅（P1-3 已清零，2026-09-23） | Go `errors.New` 哨兵 + `errors.Is` 身份比较；P1 类化 17 个，P1-3 移除 `ErrNoRows` 后归零 |
-| `): [a, b]` 多返回值（含 comma-ok） | 37（2026-09-23 实测；comma-ok 仅余 `getLatest*`×5 组，余为坐标/语义多值与 value+error 对） | Go 多返回值 / `, ok` 惯用法；三批已清零 ~35 处，见余项汇总 |
+| `): [a, b]` 多返回值（含 comma-ok、value+error） | 17（2026-09-24 实测；comma-ok 与 value+error 均已清零，余为坐标/语义多值保留项） | Go 多返回值 / `, ok` 惯用法；四批累计清零 ~55 处，见余项汇总 |
 | `BoolPtr` / `clone*Ptr` no-op helper | 0 ✅（P0 已清零） | Go 指针/值语义残留；`cloneString*` 防共享 helper 按 §5 保留 |
 | `| null` vs `| undefined` | 807 vs 990 | 两套"空"语义混用 |
 | `JSON.parse(...) as T` 无校验解码 | 42（外部输入边界已全部 guard，余为 provider SSE/自有持久化列） | Go `json.Unmarshal` 直译，类型靠断言 |
-| `finally {` | 84 | Go `defer` 的手写展开（13 处 `Symbol.dispose` 已落地，热点 teardown 分层重构为 P2 余项） |
+| `finally {` | 88（2026-09-24 实测，非测试代码） | Go `defer` 的手写展开；13 处 `Symbol.dispose` 已落地，热点 teardown 已分层重构 ✅（P2-1） |
 | 自定义 `close(): void` 句柄 | 13 | Go `io.Closer`，可用 `Symbol.dispose` |
 | `export class` vs `export function` | 227 vs 1659 | class 多为"带方法的 struct"直译 |
 | `// Ported from ...go` / `Deviation:` 注释 | 溯源行已清零（539→0），余 `Deviation:` 行为说明 | 指向 Go 源树的注释，P4-c 已清扫 |
@@ -408,7 +408,7 @@ P1-3 完成记录（2026-09-23）:
 ### P2 — 生命周期与并发惯用化 ✅ 主体完成（2026-09-22）
 1. ✅ `Symbol.dispose`（§3.6-1）: 全部 13 个 `close(): void` 句柄补
    `[Symbol.dispose]()`（与幂等 `close()` 共存），`HttpClient` 接口加可选成员；
-   余项: ACP Run 生命周期的 teardown 闭包分层重构（行为敏感，需刻画测试先行）；
+   余项已清: ACP Run teardown 分层重构 ✅（P2-1，2026-09-24，见 §4 余项汇总）；
 2. ✅ 值袋摊平（§3.5）: `RunContext`/`ToolContext` 的 symbol 值袋删除，改为显式
    类型字段（`agentID`/`eventSink`/`parentRunContext`/`parentMode`/`iterationBudget`），
    `contextKey`/`contextWithValue`/`toolContextWithValue` 机制整体移除，
@@ -439,6 +439,25 @@ P1-3 完成记录（2026-09-23）:
    SQL（截断 200 字符，参数化语句无字面量），汇总进 `sqliteStatsSnapshot`
    （`/debug/vars` 可见）；4 个确定性测试。
    余项: 用基线数据定位真实热点后做分片让出 + 离线扫描进 Worker（§3.7-2/3）。
+   ✅ 已完成（2026-09-24 收尾轮）: 基线探针实测定位热点——DAO 查询均
+   <50ms（50k 行内 8–38ms），真正热点是**无界离线扫描**: stats 聚合
+   124–258ms@200k 行（`request_stats` 无界增长）与 grep 单文件 16MB 同步行
+   循环；token 估算 cold 首轮 263ms 是一次性分词器装载（warm 后 0.5ms，
+   LRU memo 已治理），判定为非热点、无需 Worker 化。
+   治理落地: ①离线扫描进 Worker（§3.7-2）: 新建 `src/stats/stats_call.ts`
+   （共享 dispatch，两种执行位共用同一 `stats.DB`/`StatsDAO` 查询实现）+
+   `src/stats/stats_worker.ts`（模块 Worker，`openReadOnlyStandalone` 离线
+   只读连接）+ `src/stats/query_offload.ts`（host runner: 传输级故障
+   spawn/crash/timeout → 回退进程内，查询错误照常冒泡；`StatsQueryError`
+   判别两种失败面）；`Server.handle` 改 async + executor 生命周期收进
+   `shutdown`/`finished`；build 任务补 `--include src/stats/stats_worker.ts`；
+   ②分片让出（§3.7-2）: grep 行循环改批量匹配（每块一次 worker 请求即一个
+   事件循环让出点，512 行/块，16MB 单文件不再独家占线程）。
+   判定记录: `serializeConversation`/估算热循环 warm 后 O(map 查找)，
+   无需治理；compaction 扫描在 LRU memo 生效后非热点。
+   验证: 8 个确定性测试（worker↔inline 结果一致、spawn 失败/超时回退、
+   查询错误不回退、close 幂等）+ 编译产物 smoke（worker 在 `deno compile`
+   二进制内直连协议跑通，不走回退面）；
 2. ✅ 正则加固（§3.8 RE2→JS 回溯）: 新建 `src/util/regex.ts`，按威胁模型分两个入口:
    `compileUserRegExp`（grep 的用户原始模式: 512 字符限额 + 嵌套无界量词检测，
    拦截 `(a+)+` 族灾难性回溯形状，逃逸/字符类不受误伤）与 `compileGeneratedRegExp`
@@ -446,6 +465,16 @@ P1-3 完成记录（2026-09-23）:
    grep 的既有"无效正则→字面量回退"契约顺带覆盖不安全形状，描述文案已同步；
    新增 6 个确定性测试（合法/超额/evil 形状/逃逸/语法错误/生成源）。
    余项: 形状检测是防御纵深而非证明，彻底隔离需受限 Worker + 超时（后续）；
+   ✅ RE2 完全隔离已完成（2026-09-24 收尾轮）: 新建
+   `src/util/regex_match.ts` + `src/util/regex_worker.js`（文本内联 +
+   data: URL 受限 Worker，与 `js.ts` 同模式，编译产物可用），
+   `UserRegExpMatcher` 每次请求带墙钟预算（默认 5s，可注入），超时即
+   terminate worker 并抛 `RegExpMatchTimeoutError`——穿过形状检测的灾难模式
+   （`(a|a)+$` 族，红证据: 32 字符行直接挂死事件循环）从挂死变为有界超时；
+   grep 集成: 超时 → 全量重扫为字面量（两模式结果不混）+ 独立提示文案，
+   `GrepToolOptions.matchTimeoutMs` 注入缝供测试；保留项: find/globset 的
+   glob 生成源只跑 `compileGeneratedRegExp`（有界输入路径字符串，非用户
+   原始模式），判定不入 Worker。8 个 matcher 测试 + 3 个 grep 集成测试；
 3. ✅ `debugpprof` 决策: 保留为本地调试端点（`/debug/vars` SQLite 竞争指标有真实
    用途），模块去 Go 化: `src/debugpprof/pprof.ts` → `src/debugendpoints/debugendpoints.ts`，
    `newHandler`→`createDebugHandler`、`startForDebug`→`startDebugServer`，日志文案去
@@ -473,7 +502,7 @@ P1-3 完成记录（2026-09-23）:
   （`src/agentruntime`/`src/dao`），不新增第二条路径；`test:architecture` 随批。
 - **冲突面风险**: 命名/机械替换类改动避开大 PR 并行期，按目录原子合入。
 
-### 余项汇总（2026-09-23 复查校准）
+### 余项汇总（2026-09-24 复查校准）
 
 P0–P4 主体落地后的真实剩余工作（状态行以此为准）:
 
@@ -500,24 +529,75 @@ P0–P4 主体落地后的真实剩余工作（状态行以此为准）:
   google 低层定名 `createGoogleProvider`/`createGoogleProviderWithHTTPClient`，
   register 的配置构造器改名 `anthropicProviderFromConfig`/`openaiProviderFromConfig`；
   `createXProviderWithHTTPClient`×3 保留为注入 client 的测试缝隙变体。
-  `newAgent` 家族已定名（`createAgent`/`createAgentWithLoopConfig`，2026-09-23）；
-  以下经评估为语义变体/需单独设计，待后续判定：
-  `*WithTurn`×2、`createImageToolResultWithContent`（入参编码不同）、
-  `createRunToolWithActive`（active 语义不同）、`createRegistryWithConfig`（配置
-  装配需设计）、`createManagerWithProjectDirs`（skills 构造形状不同））；
-- **P2-1 余项**: ACP Run 生命周期 teardown 闭包分层重构（行为敏感，刻画测试先行）；
-- **P3 余项**: 慢查询热点分片让出 + 离线扫描进 `Deno.Worker`（§3.7-2/3）、
-  provider SSE 解码 guard（已接受的残差，另行评估）、RE2 完全隔离
-  （受限 Worker + 超时，防御纵深之外的根治）；
-- **comma-ok 扫尾**（进行中；2026-09-23 三批已清零 ~35 处: agent/manager
-  冗余 ok 元组 11、semver/memory/browser/runner/agent_support 等 22、
-  `executionBinding` + `replaceLargestToolResultForContext` 3）: 余最后一组
-  `session/store` 的 `getLatest*(): [Entry, boolean]` ×5（接口 + 实现 +
-  私有 helper，19 处调用点，且 agent/session 两侧同名接口形态不一，需逐层
-  转换）；另有 value+error 元组（`[T | null, Error | null]` 等 4 处）需按
-  §3.1 抛错化。保留项（非 comma-ok）: `ok: boolean` 结构字段（doctor/esm/
-  platform 报告字段）、坐标类 `cursorPos()`/`image_coordinates`、多值
-  `getHistoryState()`/`requestTokenBudget()`/`consumeANSISeq()`/`think_split` 等；
+  `newAgent` 家族已定名（`createAgent`/`createAgentWithLoopConfig`，2026-09-23）。
+  余下 5 个待判定变体已于 2026-09-24 收尾轮全部判定/落地:
+  `*WithTurn`×2 合并（`turn?` 尾参，`createSessionRunAndEvent`/
+  `createExecutionIntentAndSessionRunEvent` 单入口，WithTurn 导出删除）；
+  `createImageToolResultWithContent` 改回 `createImageToolResult(text, image)`
+  （旧 `mimeType`/`base64` 入参变体零调用，属死双入口直接删除）；
+  `createRunToolWithActive` 并入 `createRunTool`（构造器本就 `active ??
+  createActiveRegistry()`，两入口行为完全等价）；
+  `createManagerWithProjectDirs` 改回 `createManager(globalDir, projectDirs)`
+  （变参版 `createManager(globalDir, projectDir, ...rest)` 零调用已删；
+  `session_runtime.ts` 内与 sandbox 同名，用导入别名 `createSkillsManager` 消歧）；
+  `createRegistryWithConfig` 判定保留（与 bare `createRegistry` 是两个操作——
+  前者构造+注册默认/过滤工具且需传 skillsMgr/imageHint，后者裸构造不注册，
+  非 Go functional-options 残留；余 5 个 `createXxxWithYyy` 导出 = 3 个 provider
+  `WithHTTPClient` 测试缝隙 + `createAgentWithLoopConfig` + 它，均有记录理由）；
+- ✅ **P2-1 ACP teardown 已完成**（2026-09-24 收尾轮，刻画测试先行）:
+  新增 8 例测试（红→绿）——`prompt_test` 4 例: 终态投影顺序+admission 释放、
+  失败 Run 终态化+释放、cancel 钩子抛错、终态投影写失败；`run_test` 3 例:
+  EOF / transport 写失败 / 启动扫描失败三条退出路径的 Runtime host 释放
+  （观察口为新增诊断导出 `recoveryCoordinatorCount`，对齐既有
+  `runtimeLeaseBusListening` 先例）；`runtime_lock_test` 1 例: durable release
+  抛错时进程本地锁必释放。落地内容:
+  1. `handlePrompt` Run teardown 改分层 `try/finally`（`src/acp/server.ts`）:
+     每步独立 try/catch 隔离（`cancel()`/终态投影两处原为裸调用），外层 catch
+     兜底保证 detached IIFE 不产生 unhandled rejection，`runtimeRelease()`
+     收进内层 `finally` 必达——admission 租约不再可能被中途抛出泄漏；
+  2. `runACPInner` 的 `cleanup` 收编为单一 `try/finally` 所有权
+     （`src/acp/run.ts`）: provider 失败 / setup 失败 / dispatch 失败 /
+     正常 EOF 四条退出路径统一过 finally；`recoveryCoordinator.start` 移入
+     try 内（启动扫描失败也不再泄 coordinator）；provider-catch 内显式
+     `await cleanup()` 删除（双入口收敛为单入口）；
+  3. `RuntimeLeaseGuard.release` 的进程本地 unlock 改 `finally` 必达
+     （`src/session/runtime_lock.ts`）: durable 写失败不再卡死 `CountedMutex`；
+  4. Go-defer 注释清零: `agent.ts` "Go's `defer cancelRun()`" 与 run.ts
+     "LIFO:" 两处改写为 TS 语境的意图/顺序说明，`grep "LIFO\|Go's \`defer"`
+     → 0。判定记录: `using` 不适用于跨 await 的 teardown（admission 释放必须
+     晚于终态持久化），按 §3.6-1 选分层 `try/finally`；`execution.ts` /
+     `session_lifecycle.ts` 终检为单层 `try/finally` 释放、无闭包 teardown，
+     无需改动。
+  验证: `deno task test` 1884 passed / 0 failed、architecture 8/8、
+  check/lint/fmt 干净（2026-09-24）；
+- ✅ **P3 治理余项已完成**（2026-09-24 收尾轮）:
+  慢查询基线探针实测定位热点（DAO 查询 <50ms；真热点 = stats 聚合
+  124–258ms@200k 行 + grep 16MB 同步行循环；估算 cold 成本为一次性装载、
+  非热点），离线扫描进 `Deno.Worker`（stats 查询 executor: 共享
+  `stats_call.ts` dispatch + 模块 worker `stats_worker.ts` + host 回退，
+  `Server` 改 async 接线，build 补 `--include`，编译产物 smoke 通过）、
+  分片让出（grep 批量匹配每块一让出点）、RE2 完全隔离（受限 worker +
+  超时，`(a|a)+$` 族从挂死变有界超时 + 字面量回退）；
+  唯一接受残差: provider SSE 解码 guard（供应商协议面，另行评估）；
+- ✅ **comma-ok + value+error 扫尾已完成**（2026-09-24 收尾轮）:
+  `session/store.getLatest*` ×5 改 `T | null`（接口+`MemoryStore`+私有
+  `latestByType`+`latestCompactionLocked`，`emptyCompactionEntry` 零值伪造
+  删除；`Manager` 侧本就是 `| null`，两侧同名接口形态就此统一，调用点
+  `memory_store_test`/`replay_test` 同步改断言）；value+error 元组 4 处清零:
+  `prepareRequestMessages` 返回 `Message[]` 失败抛错（loop 调用点 try/catch
+  后接既有 `tryRecoverContextOverflow`/terminal 路径）；
+  `claimToolExecutionWithRecovery` 改判别式联合 `ToolExecutionClaim`
+  （`skipped|claimed|reused`，失败抛错，调用点 catch 后保持原 tool-error 事件）；
+  `normalizeToolCallArguments` 返回 `Record | null`、非法 JSON 先保留
+  `invalidArguments` 再抛（对齐 `JSON.parse` 语义；两处调用点 catch 后构建
+  notice，行为不变）；`gateToolResultImages` 改对象返回 `GatedToolResult`
+  （`{content, contents, isError, error?}`，消灭 4 元组）。保留项（非 comma-ok，
+  形态已复查）: `ok: boolean` 结构字段 3 处（doctor/esm/platform 报告字段）、
+  坐标类 `cursorPos()`/`image_coordinates`/`splitEnvVar`/`hunkRanges`、多值
+  `getHistoryState()`/`requestTokenBudget()`/`consumeANSISeq()`/`think_split`/
+  `selectCacheMarkers`/`error_info` 等，共 17 处元组返回；
+  验证: `deno task test` 1876 passed / 0 failed、architecture 8/8、
+  check/lint/fmt 干净（2026-09-24）；
 - ✅ **P2-3 余项已完成**（2026-09-23）: `EventChannel` 契约测试
   `src/agent/event_channel_test.ts`（FIFO/无界缓冲/close 语义/AsyncIterable）。
 
@@ -544,15 +624,19 @@ P0–P4 主体落地后的真实剩余工作（状态行以此为准）:
 
 1. 量化目标（可 grep 度量，完成后复查）:
    - `export const ErrXxx` 哨兵: 18 → 0 ✅（含 P1-3 的 `ErrNoRows`，2026-09-23 清零）；
-   - comma-ok / 多返回值元组: ✅ session/tools/agent-manager 与第二批（semver/memory/browser/runner/agent_support 等）已达成，comma-ok 仅余 `session/store.getLatest*` 一组；value+error 元组与保留项见 §4 余项汇总；
+   - comma-ok / value+error 元组: → 0 ✅（2026-09-24 清零；`getLatest*`×5 改
+     `T | null`，value+error 4 处抛错化/对象化；余 17 处元组为坐标/语义多值
+     保留项与 `ok: boolean` 报告字段 3 处，见 §4 余项汇总）；
    - no-op 指针克隆 helper: 6 → 0 ✅（P0 已达成）；
    - `JSON.parse(...) as`: 边界 lie-cast → 0 ✅（MCP wire + config 族已 guard；余 42 处为 provider SSE/自有列）；
-   - `using`/`Symbol.dispose` 在生命周期热点路径落地 ✅ 13 处句柄已具备；ACP Run teardown 分层重构为 P2 余项；
+   - `using`/`Symbol.dispose` 在生命周期热点路径落地 ✅ 13 处句柄已具备；ACP Run teardown 分层重构 ✅（P2-1，2026-09-24；跨 await 的 admission 释放按 §3.6-1 选分层 `try/finally`，非 `using`）；
    - 用户可见文本中 "nil" Go 词 → 0 ✅（P0 已达成）；
    - PascalCase 导出常量词汇 → 0 ✅（188 个已批改为 SCREAMING_SNAKE，`ErrNoRows` 已随 P1-3 消亡）。
 2. 行为不变: 全量 `deno task test`、`deno task test:architecture`、
    `deno task check`、`deno lint` 通过；TUI/CLI/ACP 跨入口契约测试覆盖触及面。
-3. 长任务可靠性不回退: 心跳续租、流式输出在慢查询压力下不被饿死（P3 加基线）。
+3. 长任务可靠性不回退: 心跳续租、流式输出在慢查询压力下不被饿死
+   ✅（2026-09-24: stats 离线扫描进 Worker + grep 分片让出，慢扫描不再
+   占住事件循环；基线探针 + 8 个 offload 测试锁定）；
 4. 文档同步: 本文件随各阶段勾选更新；用户可见变更同步 `docs/en`、`docs/zh`。
 
 ---
@@ -567,8 +651,12 @@ grep -rn --include='*.ts' -E "BoolPtr|clone\w*Ptr" src        # 应为 0
 grep -rn --include='*.ts' -E "cloneString" src             # §5 有意保留，预期非零
 grep -rn --include='*.ts' -E "JSON\.parse\([^)]*\) as " src | grep -v _test
 grep -rn --include='*.ts' -E "\bnil\b" src | grep -v _test
+grep -rn --include='*.ts' -E "\): \[[^]]*Error \| (null|undefined)" src | grep -v _test  # value+error 应为 0
+grep -rn --include='*.ts' -E "export function create\w*With[A-Z]" src sdk | grep -v _test  # 余 5 个均有记录理由
 grep -rn --include='*.ts' -E "Ported from|Deviation:" src sdk | wc -l
 grep -rn --include='*.ts' -E "\[Symbol\.(async)?Dispose\]" src | wc -l
+grep -rn --include='*.ts' -E "LIFO:|Go's `defer" src | grep -v _test   # 应为 0（P2-1 已清）
+grep -rn "new Worker(" src --include='*.ts' | grep -v _test   # Worker 入口仅 workflow/js、util/regex_match、stats/query_offload
 ```
 
 ## 附录 B: 典型案例对照
@@ -580,7 +668,7 @@ grep -rn --include='*.ts' -E "\[Symbol\.(async)?Dispose\]" src | wc -l
 | `src/tools/tool.ts:61` | `values: Map<symbol, unknown>` 值袋 | 显式可选字段（`budget?: IterationBudget`） |
 | `src/session/runtime_lock.ts:1052` | `[release, ok]` 元组 | `guard: { release(): void } \| null` |
 | `src/config/settings.ts:279` | `BoolPtr`/`cloneBoolPtr` no-op | 删除 |
-| `src/acp/server.ts`（Run 生命周期编排） | 可变状态 + teardown 闭包模拟 `defer` | 分层 `try/finally` + `using` |
+| `src/acp/server.ts`（Run 生命周期编排） | 分层 `try/finally` ✅（P2-1 取代可变状态 + teardown 闭包模拟 `defer`） | 分层 `try/finally` + `using` |
 | `src/agent/parallel.ts:17` | 手写 worker 池 | `@std/async` `pooledMap` |
 | `src/stats/stats.ts:224` | 手写 RFC3339Nano | `d.toISOString()` |
 | `src/provider/types.ts:315` | `formatUsage` 返回 `"nil"` | `"none"`/`"(none)"` 等 TS 语境文案 |

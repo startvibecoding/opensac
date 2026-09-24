@@ -202,12 +202,23 @@ function unregisterRecoveryCoordinator(c: RecoveryCoordinator): void {
   if (entries.size === 0) recoveryCoordinators.delete(identity);
 }
 
-/** Wakes every coordinator registered for a canonical Session database. */
+/** Wakes every recovery coordinator registered for a canonical Session database. */
 export function wakeRecoveryCoordinators(sessionDir: string): void {
   const identity = recoveryDatabaseIdentity(sessionDir);
   const entries = recoveryCoordinators.get(identity);
   if (entries === undefined) return;
   for (const coordinator of [...entries]) coordinator.wake();
+}
+
+/**
+ * Reports how many recovery coordinators are currently registered for one
+ * canonical Session database. A Runtime host that completed its teardown
+ * reports 0; a still-registered coordinator means an exit path skipped the
+ * recovery stop.
+ */
+export function recoveryCoordinatorCount(sessionDir: string): number {
+  const identity = recoveryDatabaseIdentity(sessionDir);
+  return recoveryCoordinators.get(identity)?.size ?? 0;
 }
 
 function recoveryDatabaseIdentity(sessionDir: string): string {

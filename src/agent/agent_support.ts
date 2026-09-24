@@ -116,44 +116,46 @@ function cloneArguments(args: unknown): unknown {
 
 /**
  * normalizeToolCallArguments decodes a tool call's argument payload into a
- * plain object. When the payload is not valid JSON it is preserved in
- * `invalidArguments` and replaced with an empty object, matching the Go
- * normalization. Returns `[args, error]`; `args` is null when there is nothing
- * to decode.
+ * plain object, or returns `null` when there is nothing to decode. When the
+ * payload is not valid JSON it is preserved in `invalidArguments`, replaced
+ * with an empty object, and the decode failure is thrown (matching
+ * `JSON.parse` semantics); callers that treat malformed model output as a
+ * business branch catch it to build a notice.
  */
 export function normalizeToolCallArguments(
   tc: ToolCallBlock | null | undefined,
-): [Record<string, unknown> | null, Error | null] {
+): Record<string, unknown> | null {
   if (
     tc === null || tc === undefined || tc.arguments === null ||
     tc.arguments === undefined
   ) {
-    return [null, null];
+    return null;
   }
   if (typeof tc.arguments === "string") {
     if (tc.arguments.length === 0) {
-      return [null, null];
+      return null;
     }
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(tc.arguments);
-      if (
-        parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ) {
-        return [parsed as Record<string, unknown>, null];
-      }
-      return [null, null];
+      parsed = JSON.parse(tc.arguments);
     } catch (err) {
       if ((tc.invalidArguments ?? "") === "") {
         tc.invalidArguments = tc.arguments;
       }
       tc.arguments = {};
-      return [null, err instanceof Error ? err : new Error(String(err))];
+      throw err instanceof Error ? err : new Error(String(err));
     }
+    if (
+      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+    ) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
   }
   if (typeof tc.arguments === "object" && !Array.isArray(tc.arguments)) {
-    return [tc.arguments as Record<string, unknown>, null];
+    return tc.arguments as Record<string, unknown>;
   }
-  return [null, null];
+  return null;
 }
 
 let toolCallFallbackCounter = 0;
@@ -191,10 +193,15 @@ export function normalizeMessage(msg: Message): [Message, string[]] {
       const call = { ...cloned.toolCall };
       const emptyBefore = typeof call.arguments === "string" &&
         call.arguments.length === 0;
-      const [_args, err] = normalizeToolCallArguments(call);
-      if (emptyBefore || err !== null) {
+      let argErr: Error | null = null;
+      try {
+        normalizeToolCallArguments(call);
+      } catch (thrown) {
+        argErr = thrown instanceof Error ? thrown : new Error(String(thrown));
+      }
+      if (emptyBefore || argErr !== null) {
         let notice = `tool ${JSON.stringify(call.name)}`;
-        notice += err !== null
+        notice += argErr !== null
           ? ": invalid JSON arguments"
           : ": empty arguments";
         notices.push(notice);

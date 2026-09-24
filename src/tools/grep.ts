@@ -10,6 +10,11 @@
 
 import * as path from "@std/path";
 import { compileUserRegExp } from "../util/regex.ts";
+import {
+  createUserRegExpMatcher,
+  RegExpMatchTimeoutError,
+  type UserRegExpMatcher,
+} from "../util/regex_match.ts";
 import { GlobSet } from "./globset.ts";
 import { IgnoreStack } from "./ignore.ts";
 import {
@@ -24,12 +29,20 @@ const maxGrepOutputBytes = 200000;
 /** Files larger than this are skipped: the scan buffers whole files. */
 const maxGrepFileBytes = 16 * 1024 * 1024;
 
+/** Options for {@link GrepTool}. */
+export interface GrepToolOptions {
+  /** Wall-clock budget for one worker match request (tests use small values). */
+  matchTimeoutMs?: number;
+}
+
 /** Searches file contents using regex patterns. */
 export class GrepTool implements Tool {
   #registry: Registry;
+  #matchTimeoutMs: number | undefined;
 
-  constructor(r: Registry) {
+  constructor(r: Registry, options: GrepToolOptions = {}) {
     this.#registry = r;
+    this.#matchTimeoutMs = options.matchTimeoutMs;
   }
 
   name(): string {
@@ -108,17 +121,28 @@ export class GrepTool implements Tool {
     const rv = params["maxResults"];
     if (typeof rv === "number" && rv > 0) maxResults = Math.trunc(rv);
 
-    let matcher: RegExp;
-    let literalFallback = false;
+    let matcher: UserRegExpMatcher;
+    let fallbackNote: string | null = null;
     try {
-      matcher = compileUserRegExp(pattern);
+      compileUserRegExp(pattern);
+      matcher = createUserRegExpMatcher(pattern, "", {
+        timeoutMs: this.#matchTimeoutMs,
+      });
     } catch {
+      // Literal fallback: an escaped literal has no quantifiers, so matching it
+      // cannot backtrack. It runs in the same bounded worker for one uniform
+      // code path (and one chunked yield cadence) across both modes.
+      let literalSource: string;
       try {
-        matcher = new RegExp(escapeRegExp(pattern));
-        literalFallback = true;
+        literalSource = escapeRegExp(pattern);
+        new RegExp(literalSource);
       } catch (err) {
         throw new Error(`grep search failed: ${messageOf(err)}`);
       }
+      fallbackNote = "(invalid regex; fell back to literal search)";
+      matcher = createUserRegExpMatcher(literalSource, "", {
+        timeoutMs: this.#matchTimeoutMs,
+      });
     }
 
     let includeGlob: GlobSet | null = null;
@@ -137,71 +161,49 @@ export class GrepTool implements Tool {
       throw new Error(`grep search failed: ${messageOf(err)}`);
     }
 
-    const lines: string[] = [];
-    let bytesUsed = 0;
-    let count = 0;
-    let truncated = false;
-    let skipped = 0;
-    for (const file of files) {
-      let size: number;
-      try {
-        size = (await Deno.stat(file.path)).size;
-      } catch {
-        continue;
-      }
-      if (size > maxGrepFileBytes) {
-        skipped++;
-        continue;
-      }
-      let data: Uint8Array;
-      try {
-        data = await Deno.readFile(file.path);
-      } catch {
-        continue;
-      }
-      if (isBinary(data)) continue;
-      const text = new TextDecoder().decode(data);
-      const fileLines = text.split("\n");
-      for (let i = 0; i < fileLines.length; i++) {
-        const line = fileLines[i].replace(/\r$/, "");
-        if (!matcher.test(line)) continue;
-        if (maxResults > 0 && count >= maxResults) {
-          truncated = true;
-          break;
-        }
-        const out = `${file.path}:${i + 1}:${line}`;
-        if (bytesUsed + out.length > maxGrepOutputBytes) {
-          truncated = true;
-          break;
-        }
-        lines.push(out);
-        bytesUsed += out.length;
-        count++;
-      }
-      if (truncated) break;
+    let scan: GrepScan;
+    try {
+      scan = await scanGrepFiles(
+        files,
+        (lines) => matcher.match(lines),
+        maxResults,
+      );
+    } catch (err) {
+      if (!(err instanceof RegExpMatchTimeoutError)) throw err;
+      // A pattern that survived the shape screen still timed out in the
+      // bounded worker: that is the "unsafe regex" half of the tool contract,
+      // so restart the whole scan as a literal search (results from the two
+      // modes must never mix).
+      fallbackNote = "(regex matching timed out; fell back to literal search)";
+      matcher.close();
+      matcher = createUserRegExpMatcher(escapeRegExp(pattern), "", {
+        timeoutMs: this.#matchTimeoutMs,
+      });
+      scan = await scanGrepFiles(
+        files,
+        (lines) => matcher.match(lines),
+        maxResults,
+      );
+    } finally {
+      matcher.close();
     }
 
-    const skippedNote = skipped > 0
-      ? `\n... (skipped ${skipped} files over ${
+    const skippedNote = scan.skipped > 0
+      ? `\n... (skipped ${scan.skipped} files over ${
         Math.floor(maxGrepFileBytes / (1024 * 1024))
       }MB)`
       : "";
-    if (lines.length === 0) {
-      if (literalFallback) {
-        return createTextToolResult(
-          "(invalid regex; fell back to literal search)\n(no matches found)" +
-            skippedNote,
-        );
-      }
-      return createTextToolResult("(no matches found)" + skippedNote);
+    if (scan.lines.length === 0) {
+      const empty = "(no matches found)" + skippedNote;
+      return createTextToolResult(
+        fallbackNote === null ? empty : `${fallbackNote}\n${empty}`,
+      );
     }
 
-    let output = lines.join("\n");
-    if (literalFallback) {
-      output = "(invalid regex; fell back to literal search)\n" + output;
-    }
-    if (truncated) {
-      if (maxResults > 0 && count >= maxResults) {
+    let output = scan.lines.join("\n");
+    if (fallbackNote !== null) output = `${fallbackNote}\n` + output;
+    if (scan.truncated) {
+      if (maxResults > 0 && scan.count >= maxResults) {
         output += `\n... (truncated, showing first ${maxResults} results)`;
       } else {
         output += `\n... (truncated at ${maxGrepOutputBytes} bytes)`;
@@ -211,6 +213,65 @@ export class GrepTool implements Tool {
 
     return createTextToolResult(output);
   }
+}
+
+interface GrepScan {
+  lines: string[];
+  count: number;
+  truncated: boolean;
+  skipped: number;
+}
+
+/**
+ * Runs the per-file content scan. Matching happens in batches so the worker
+ * request cadence doubles as the event-loop yield cadence: a 16MB file can no
+ * longer monopolize the thread the way the old per-line loop did.
+ */
+async function scanGrepFiles(
+  files: GrepFile[],
+  matchLines: (lines: string[]) => Promise<number[]>,
+  maxResults: number,
+): Promise<GrepScan> {
+  const scan: GrepScan = { lines: [], count: 0, truncated: false, skipped: 0 };
+  let bytesUsed = 0;
+  for (const file of files) {
+    let size: number;
+    try {
+      size = (await Deno.stat(file.path)).size;
+    } catch {
+      continue;
+    }
+    if (size > maxGrepFileBytes) {
+      scan.skipped++;
+      continue;
+    }
+    let data: Uint8Array;
+    try {
+      data = await Deno.readFile(file.path);
+    } catch {
+      continue;
+    }
+    if (isBinary(data)) continue;
+    const text = new TextDecoder().decode(data);
+    const fileLines = text.split("\n").map((line) => line.replace(/\r$/, ""));
+    const matched = await matchLines(fileLines);
+    for (const i of matched) {
+      if (maxResults > 0 && scan.count >= maxResults) {
+        scan.truncated = true;
+        break;
+      }
+      const out = `${file.path}:${i + 1}:${fileLines[i]}`;
+      if (bytesUsed + out.length > maxGrepOutputBytes) {
+        scan.truncated = true;
+        break;
+      }
+      scan.lines.push(out);
+      bytesUsed += out.length;
+      scan.count++;
+    }
+    if (scan.truncated) break;
+  }
+  return scan;
 }
 
 interface GrepFile {

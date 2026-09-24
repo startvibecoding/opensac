@@ -4,7 +4,6 @@ export { builtinFS, createBuiltinFS } from "./builtin.ts";
 export { builtinFiles } from "./builtin_content.ts";
 export {
   createManager,
-  createManagerWithProjectDirs,
   createProjectSkillsDir,
   expertCreaterSkillName,
   extractDescription,

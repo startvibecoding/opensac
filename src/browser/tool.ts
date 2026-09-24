@@ -17,7 +17,7 @@ import {
 } from "../imageproc/mod.ts";
 import type { ImageContent } from "../provider/types.ts";
 import {
-  createImageToolResultWithContent,
+  createImageToolResult,
   createTextToolResult,
   type Registry,
   type Tool,
@@ -412,7 +412,7 @@ export class BrowserTool implements Tool {
       detail: result.meta.detail,
       scale: result.meta.scale,
     };
-    return createImageToolResultWithContent(
+    return createImageToolResult(
       browserScreenshotDescription(result),
       image,
     );

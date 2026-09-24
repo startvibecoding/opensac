@@ -322,7 +322,6 @@ export {
   annotateSessionRunError,
   createSessionRun,
   createSessionRunAndEvent,
-  createSessionRunAndEventWithTurn,
   finishSessionRunAndConversationTurn,
   getActiveSessionRun,
   getSessionRun,
@@ -357,7 +356,6 @@ export {
 export {
   createExecutionIntentAndSessionRun,
   createExecutionIntentAndSessionRunEvent,
-  createExecutionIntentAndSessionRunEventWithTurn,
   type ExecutionIntent,
   getExecutionIntent,
   saveExecutionIntent,

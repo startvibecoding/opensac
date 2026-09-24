@@ -4,6 +4,7 @@ import {
   assertEquals,
   assertNotStrictEquals,
   assertStrictEquals,
+  assertThrows,
 } from "@std/assert";
 import type { Message, ToolCallBlock } from "../provider/types.ts";
 import type { Settings } from "../config/settings.ts";
@@ -79,34 +80,38 @@ Deno.test("cloneAgentContext handles null and copies tools", () => {
 });
 
 Deno.test("normalizeToolCallArguments decodes and preserves invalid input", () => {
-  const [none, noneErr] = normalizeToolCallArguments(undefined);
-  assertEquals(none, null);
-  assertEquals(noneErr, null);
-
-  const [obj, objErr] = normalizeToolCallArguments({
-    id: "c",
-    name: "bash",
-    arguments: { command: "ls" },
-  });
-  assertEquals(objErr, null);
-  assertEquals(obj?.command, "ls");
-
-  const [parsed, parsedErr] = normalizeToolCallArguments({
-    id: "c",
-    name: "bash",
-    arguments: '{"command":"ls"}',
-  });
-  assertEquals(parsedErr, null);
-  assertEquals(parsed?.command, "ls");
+  assertEquals(normalizeToolCallArguments(undefined), null);
+  assertEquals(normalizeToolCallArguments(null), null);
+  assertEquals(
+    normalizeToolCallArguments({
+      id: "c",
+      name: "bash",
+      arguments: { command: "ls" },
+    })?.command,
+    "ls",
+  );
+  assertEquals(
+    normalizeToolCallArguments({
+      id: "c",
+      name: "bash",
+      arguments: '{"command":"ls"}',
+    })?.command,
+    "ls",
+  );
+  assertEquals(
+    normalizeToolCallArguments({ id: "c", name: "bash", arguments: "" }),
+    null,
+  );
 
   const tc: ToolCallBlock = {
     id: "c",
     name: "bash",
     arguments: "{not json",
   };
-  const [bad, badErr] = normalizeToolCallArguments(tc);
-  assertEquals(bad, null);
-  assertEquals(badErr !== null, true);
+  assertThrows(
+    () => normalizeToolCallArguments(tc),
+    Error,
+  );
   assertEquals(tc.invalidArguments, "{not json");
   assertEquals(tc.arguments, {});
 });

@@ -8,7 +8,7 @@ import { assertEquals, assertThrows } from "@std/assert";
 import { closeAll } from "../db/mod.ts";
 import {
   createExecutionIntentAndSessionRun,
-  createExecutionIntentAndSessionRunEventWithTurn,
+  createExecutionIntentAndSessionRunEvent,
   type ExecutionIntent,
   getExecutionIntent,
   getSessionRun,
@@ -134,7 +134,7 @@ Deno.test("execution intent atomically admits run, event, and turn", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     const now = new Date();
-    const eventId = createExecutionIntentAndSessionRunEventWithTurn(
+    const eventId = createExecutionIntentAndSessionRunEvent(
       sessionDir,
       baseIntent({
         id: "intent-atomic",

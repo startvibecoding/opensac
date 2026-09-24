@@ -10,7 +10,7 @@ import { createAssistantMessage } from "../provider/types.ts";
 import {
   annotateSessionRunError,
   createSessionRun,
-  createSessionRunAndEventWithTurn,
+  createSessionRunAndEvent,
   getSessionRun,
   listSessionRuns,
   nextSessionRunAttempt,
@@ -181,7 +181,7 @@ Deno.test("finish session run and conversation turn commits assistant idempotent
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
-    createSessionRunAndEventWithTurn(
+    createSessionRunAndEvent(
       sessionDir,
       baseRun({
         id: "run-assistant",
@@ -344,7 +344,7 @@ Deno.test("finish session run commits when turn already closed", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
-    createSessionRunAndEventWithTurn(
+    createSessionRunAndEvent(
       sessionDir,
       baseRun({
         id: "run-closed-turn",
@@ -446,7 +446,7 @@ Deno.test("finish session run rolls back invalid delivery plan", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
-    createSessionRunAndEventWithTurn(
+    createSessionRunAndEvent(
       sessionDir,
       baseRun({
         id: "run-rollback",

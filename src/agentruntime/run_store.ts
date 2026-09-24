@@ -24,10 +24,8 @@ import type { ConversationTurn, ExecutionIntent } from "../session/mod.ts";
 import {
   createExecutionIntentAndSessionRun,
   createExecutionIntentAndSessionRunEvent,
-  createExecutionIntentAndSessionRunEventWithTurn,
   createSessionRun,
   createSessionRunAndEvent,
-  createSessionRunAndEventWithTurn,
   endConversationTurn,
   finishSessionRunAndConversationTurn,
   getExecutionIntent,
@@ -347,7 +345,7 @@ export class RunStore {
     }
     if (run.status === "") run.status = "running";
     if (run.intentId === "") run.intentId = intent.id;
-    return createExecutionIntentAndSessionRunEventWithTurn(
+    return createExecutionIntentAndSessionRunEvent(
       this.sessionDir,
       intent,
       durableRunToSessionRun(run),
@@ -387,7 +385,7 @@ export class RunStore {
       throw new Error("durable run ID and session ID are required");
     }
     if (run.status === "") run.status = "running";
-    return createSessionRunAndEventWithTurn(
+    return createSessionRunAndEvent(
       this.sessionDir,
       durableRunToSessionRun(run),
       sessionRunEventFromRuntime(event),

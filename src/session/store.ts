@@ -63,16 +63,16 @@ export interface Store {
   getReplayState(): ReplayState;
   /** Returns the current leaf entry ID, or null when empty. */
   getLeafID(): string | null;
-  /** Returns the most recent compaction entry, or `[zero, false]`. */
-  getLatestCompaction(): [CompactionEntry, boolean];
-  /** Returns the most recent persisted model binding. */
-  getLatestModelChange(): [ModelChangeEntry, boolean];
-  /** Returns the most recent persisted session mode. */
-  getLatestModeChange(): [ModeChangeEntry, boolean];
-  /** Returns the most recent persisted thinking level. */
-  getLatestThinkingLevelChange(): [ThinkingLevelChangeEntry, boolean];
-  /** Returns the most recent persisted additional-directories set. */
-  getLatestAdditionalDirectories(): [AdditionalDirectoriesEntry, boolean];
+  /** Returns the most recent compaction entry, or `null`. */
+  getLatestCompaction(): CompactionEntry | null;
+  /** Returns the most recent persisted model binding, or `null`. */
+  getLatestModelChange(): ModelChangeEntry | null;
+  /** Returns the most recent persisted session mode, or `null`. */
+  getLatestModeChange(): ModeChangeEntry | null;
+  /** Returns the most recent persisted thinking level, or `null`. */
+  getLatestThinkingLevelChange(): ThinkingLevelChangeEntry | null;
+  /** Returns the most recent persisted additional-directories set, or `null`. */
+  getLatestAdditionalDirectories(): AdditionalDirectoriesEntry | null;
   /** Returns the session file path (handle file for SQLite). */
   getFile(): string;
   /** Returns the session header with metadata. */
@@ -225,28 +225,28 @@ export class MemoryStore implements Store {
     return this.#leafID;
   }
 
-  getLatestCompaction(): [CompactionEntry, boolean] {
+  getLatestCompaction(): CompactionEntry | null {
     return latestCompactionLocked(this.#entries);
   }
 
-  getLatestModelChange(): [ModelChangeEntry, boolean] {
+  getLatestModelChange(): ModelChangeEntry | null {
     return this.latestByType<ModelChangeEntry>(entryModelChange);
   }
 
-  getLatestModeChange(): [ModeChangeEntry, boolean] {
+  getLatestModeChange(): ModeChangeEntry | null {
     return this.latestByType<ModeChangeEntry>(entryModeChange);
   }
 
-  getLatestThinkingLevelChange(): [ThinkingLevelChangeEntry, boolean] {
+  getLatestThinkingLevelChange(): ThinkingLevelChangeEntry | null {
     return this.latestByType<ThinkingLevelChangeEntry>(entryThinkingChange);
   }
 
-  getLatestAdditionalDirectories(): [AdditionalDirectoriesEntry, boolean] {
-    const [entry, ok] = this.latestByType<AdditionalDirectoriesEntry>(
+  getLatestAdditionalDirectories(): AdditionalDirectoriesEntry | null {
+    const entry = this.latestByType<AdditionalDirectoriesEntry>(
       entryAdditionalDirectories,
     );
-    if (!ok) return [entry, false];
-    return [{ ...entry, directories: [...entry.directories] }, true];
+    if (entry === null) return null;
+    return { ...entry, directories: [...entry.directories] };
   }
 
   getFile(): string {
@@ -257,12 +257,12 @@ export class MemoryStore implements Store {
     return this.#header;
   }
 
-  private latestByType<T>(type: string): [T, false] | [T, true] {
+  private latestByType<T>(type: string): T | null {
     for (let i = this.#entries.length - 1; i >= 0; i--) {
       if (this.#entries[i].type === type) {
-        return [this.#entries[i] as unknown as T, true];
+        return this.#entries[i] as unknown as T;
       }
     }
-    return [undefined as unknown as T, false];
+    return null;
   }
 }

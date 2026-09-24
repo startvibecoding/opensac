@@ -831,12 +831,20 @@ export class RuntimeLeaseGuard {
     this.#unlock = unlock;
   }
 
-  /** Relinquishes the durable lease and then the process-local mutex. */
+  /**
+   * Relinquishes the durable lease and then the process-local mutex. The
+   * mutex release runs in a finally so a durable write failure cannot wedge
+   * the session's process-local lock; that failure still propagates to the
+   * caller for logging.
+   */
   release(): void {
     if (this.#released) return;
     this.#released = true;
-    this.#lease?.release();
-    this.#unlock?.();
+    try {
+      this.#lease?.release();
+    } finally {
+      this.#unlock?.();
+    }
   }
 
   /** Returns when the durable lease can no longer be renewed. */

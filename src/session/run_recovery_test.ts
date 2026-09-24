@@ -12,7 +12,7 @@ import {
   acquireRecovery,
   beginSessionRunRecovery,
   convergeSessionRunRecovery,
-  createSessionRunAndEventWithTurn,
+  createSessionRunAndEvent,
   getSessionRun,
   getSessionRunRecovery,
   listConversationTurns,
@@ -181,7 +181,7 @@ Deno.test("converge session run recovery atomically closes run, turn, decisions,
     let runStored = false;
     let decisionStored = false;
     try {
-      createSessionRunAndEventWithTurn(
+      createSessionRunAndEvent(
         sessionDir,
         run,
         {

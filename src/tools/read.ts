@@ -14,7 +14,7 @@ import {
 } from "../imageproc/mod.ts";
 import { truncateString } from "../util/truncate.ts";
 import {
-  createImageToolResultWithContent,
+  createImageToolResult,
   createTextToolResult,
   type Registry,
   type Tool,
@@ -158,7 +158,7 @@ export class ReadTool implements Tool {
         cropHeight: meta.cropHeight,
       };
       const desc = imageDescription(p, mimeType, result);
-      return createImageToolResultWithContent(desc, image);
+      return createImageToolResult(desc, image);
     }
 
     let data: Uint8Array;

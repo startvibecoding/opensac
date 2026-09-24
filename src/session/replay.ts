@@ -279,28 +279,16 @@ export function applySequencedCompactionEntry(
 }
 
 /** A zero-valued compaction entry, mirroring Go's zero struct result. */
-function emptyCompactionEntry(): CompactionEntry {
-  return {
-    type: entryCompaction,
-    id: "",
-    parentId: null,
-    timestamp: new Date(),
-    summary: "",
-    firstKeptEntryId: "",
-    tokensBefore: 0,
-  };
-}
-
-/** Returns the newest compaction entry, or `[zero, false]` when none exists. */
+/** Returns the newest compaction entry, or `null` when none exists. */
 export function latestCompactionLocked(
   entries: readonly unknown[],
-): [CompactionEntry, false] | [CompactionEntry, true] {
+): CompactionEntry | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     if (entryTypeOf(entries[i]) === entryCompaction) {
-      return [entries[i] as unknown as CompactionEntry, true];
+      return entries[i] as unknown as CompactionEntry;
     }
   }
-  return [emptyCompactionEntry(), false];
+  return null;
 }
 
 /**

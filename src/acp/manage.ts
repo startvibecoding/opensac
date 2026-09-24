@@ -87,7 +87,7 @@ import {
   reopenFailedDeliveryOperation,
 } from "../session/mod.ts";
 import {
-  createManagerWithProjectDirs,
+  createManager,
   Manager as SkillsManager,
   projectSkillDirs,
 } from "../skills/mod.ts";
@@ -2523,7 +2523,7 @@ function manageSkillsManager(
     throw new Error("cwd must be an absolute path");
   }
   const settings = manageSettings();
-  const manager = createManagerWithProjectDirs(
+  const manager = createManager(
     getGlobalSkillsDir(settings),
     projectSkillDirs(cwd),
   );

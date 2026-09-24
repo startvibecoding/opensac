@@ -5,7 +5,7 @@
 // structured errors. Full provider/startup assembly is covered by the
 // subprocess integration tests that land with the `acp` CLI command (#38).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { AcpServer, type AcpServerSink } from "./server.ts";
 import { ACPLineReader } from "./wire.ts";
 import {
@@ -15,6 +15,7 @@ import {
   runACP,
 } from "./run.ts";
 import { defaultSettings, saveGlobalSettings } from "../config/mod.ts";
+import { recoveryCoordinatorCount } from "../agentruntime/recovery_coordinator.ts";
 import * as path from "@std/path";
 
 class SyncBuffer implements AcpServerSink {
@@ -38,6 +39,57 @@ function lineReader(lines: string[]): ACPLineReader {
 
 function jsonLine(value: unknown): string {
   return JSON.stringify(value) + "\n";
+}
+
+/** Polls until `predicate` holds, or fails after the deadline. */
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+  what: string,
+  timeoutMs = 5000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (await predicate()) return;
+    if (Date.now() > deadline) {
+      throw new Error(`timed out waiting for ${what}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/**
+ * Saves an isolated OPENSAC_DIR settings home for one `runACP` call and
+ * returns its session directory plus an env restore callback.
+ */
+function configureAcpTestHome(
+  options: { sessionDirAsFile?: boolean } = {},
+): { sessionDir: string; restore: () => void } {
+  const configDir = Deno.makeTempDirSync({ prefix: "opensac-acp-home-" });
+  const previousDir = Deno.env.get("OPENSAC_DIR");
+  Deno.env.set("OPENSAC_DIR", configDir);
+  const sessionDir = path.join(configDir, "sessions");
+  if (options.sessionDirAsFile === true) {
+    // A regular file blocks the recovery coordinator's startup scan.
+    Deno.writeFileSync(sessionDir, new Uint8Array());
+  } else {
+    Deno.mkdirSync(sessionDir, { recursive: true });
+  }
+  const settings = defaultSettings();
+  settings.sessionDir = sessionDir;
+  const providers = { ...(settings.providers ?? {}) };
+  providers["deepseek-openai"] = {
+    ...(providers["deepseek-openai"] ?? {}),
+    apiKey: "test-key",
+  };
+  settings.providers = providers;
+  saveGlobalSettings(settings);
+  return {
+    sessionDir,
+    restore: () => {
+      if (previousDir === undefined) Deno.env.delete("OPENSAC_DIR");
+      else Deno.env.set("OPENSAC_DIR", previousDir);
+    },
+  };
 }
 
 Deno.test("resolveACPModelSelection applies qualified override and fails closed", () => {
@@ -318,3 +370,67 @@ Deno.test("runACP reads EOF immediately with a configured-but-unused provider pa
   void path.join(configDir, "unused");
   assert(typeof runACP === "function");
 });
+
+Deno.test("runACP releases the Runtime host on a clean EOF exit", async () => {
+  const home = configureAcpTestHome();
+  try {
+    const sink = new SyncBuffer();
+    await runACP({}, { reader: lineReader([]), sink });
+    // EOF without initialize writes nothing.
+    assertEquals(sink.toString(), "");
+    // cleanup stopped the recovery coordinator for this session database
+    // (the stop settles asynchronously, so poll for it).
+    await waitUntil(
+      () => recoveryCoordinatorCount(home.sessionDir) === 0,
+      "recovery coordinator stopped after EOF",
+    );
+  } finally {
+    home.restore();
+  }
+});
+
+Deno.test(
+  "runACP releases the Runtime host when a transport write fails",
+  async () => {
+    const home = configureAcpTestHome();
+    try {
+      const sink = {
+        write(): void {
+          throw new Error("injected transport failure");
+        },
+      };
+      const reader = lineReader([
+        jsonLine({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+      ]);
+      await assertRejects(
+        () => runACP({}, { reader, sink }),
+        Error,
+        "injected transport failure",
+      );
+      await waitUntil(
+        () => recoveryCoordinatorCount(home.sessionDir) === 0,
+        "recovery coordinator stopped after the dispatch failure",
+      );
+    } finally {
+      home.restore();
+    }
+  },
+);
+
+Deno.test(
+  "runACP releases the Runtime host when the startup scan fails",
+  async () => {
+    const home = configureAcpTestHome({ sessionDirAsFile: true });
+    try {
+      const sink = new SyncBuffer();
+      const reader = lineReader([]);
+      await assertRejects(() => runACP({}, { reader, sink }));
+      await waitUntil(
+        () => recoveryCoordinatorCount(home.sessionDir) === 0,
+        "recovery coordinator stopped after the startup failure",
+      );
+    } finally {
+      home.restore();
+    }
+  },
+);

@@ -5418,83 +5418,117 @@ export class AcpServer {
           }
           this.writeResponse(req.idRaw, { stopReason }, null);
         } finally {
+          // Layered teardown: each step is isolated so a failing projection or
+          // cancellation cannot skip the durable terminal transition or the
+          // admission release; the release runs in the innermost finally so
+          // the shared runtime lease can never outlive this prompt run.
           try {
-            if (registeredAgentMgr !== null && rt.agent !== null) {
-              registeredAgentMgr.finish(rt.agent.id(), runErr ?? undefined);
-            }
-          } catch (error) {
-            console.error(
-              `[acp] finish agent manager ${runID}: ${errorMessage(error)}`,
-            );
-          }
-          if (rt.promptID === promptKey) {
-            rt.cancel = null;
-            rt.promptID = "";
-            rt.runID = "";
-            rt.messageID = "";
-            rt.thoughtMessageID = "";
-            rt.userMessageID = "";
-            rt.activeModel = null;
-            rt.activeMode = "";
-            rt.activeThinking = "";
-          }
-          if (rt.closed) {
             try {
-              rt.closeResources();
+              if (registeredAgentMgr !== null && rt.agent !== null) {
+                registeredAgentMgr.finish(rt.agent.id(), runErr ?? undefined);
+              }
             } catch (error) {
               console.error(
-                `[acp] close session ${rt.id}: ${errorMessage(error)}`,
+                `[acp] finish agent manager ${runID}: ${errorMessage(error)}`,
+              );
+            }
+            if (rt.promptID === promptKey) {
+              rt.cancel = null;
+              rt.promptID = "";
+              rt.runID = "";
+              rt.messageID = "";
+              rt.thoughtMessageID = "";
+              rt.userMessageID = "";
+              rt.activeModel = null;
+              rt.activeMode = "";
+              rt.activeThinking = "";
+            }
+            if (rt.closed) {
+              try {
+                rt.closeResources();
+              } catch (error) {
+                console.error(
+                  `[acp] close session ${rt.id}: ${errorMessage(error)}`,
+                );
+              }
+            }
+            try {
+              cancel();
+            } catch (error) {
+              console.error(
+                `[acp] cancel run ${runID}: ${errorMessage(error)}`,
+              );
+            }
+            let state: RunState = RUN_STATE_COMPLETED;
+            if (isTimeoutError(runErr)) {
+              state = RUN_STATE_TIMED_OUT;
+            } else if (stopReason === "cancelled" || isAbortError(runErr)) {
+              state = RUN_STATE_CANCELLED;
+            } else if (runErr !== null) {
+              state = RUN_STATE_FAILED;
+            }
+            let message = "";
+            let data: unknown;
+            if (runErr !== null) {
+              const info = acpFailureInfo(runErr, terminalInfo, PHASE_MODEL);
+              message = displayErrorMessage(info);
+              data = { error: message, errorInfo: info };
+            }
+            try {
+              await execution.finishDurableWithRetry(
+                undefined,
+                runID,
+                state,
+                message,
+                makeRunEvent({
+                  sessionId: rt.id,
+                  runId: runID,
+                  eventType: "finished",
+                  source: runSource,
+                  status: state,
+                  model: sessionModel.id,
+                  mode: effectiveMode,
+                  timestamp: new Date(),
+                  data,
+                }),
+              );
+            } catch (error) {
+              console.error(
+                `[acp] finish durable run ${runID}: ${errorMessage(error)}`,
+              );
+            }
+            try {
+              this.notifyRunStatus(rt.id, runID, acpRunStatus(state));
+            } catch (error) {
+              console.error(
+                `[acp] project terminal run status ${runID}: ${
+                  errorMessage(error)
+                }`,
+              );
+            }
+            try {
+              artifacts?.close();
+            } catch (error) {
+              console.error(
+                `[acp] close artifacts ${runID}: ${errorMessage(error)}`,
+              );
+            }
+          } catch (error) {
+            // Never let a teardown failure reject the detached prompt task.
+            console.error(
+              `[acp] finalize prompt run ${runID}: ${errorMessage(error)}`,
+            );
+          } finally {
+            try {
+              runtimeRelease();
+            } catch (error) {
+              console.error(
+                `[acp] release prompt admission ${runID}: ${
+                  errorMessage(error)
+                }`,
               );
             }
           }
-          cancel();
-          let state: RunState = RUN_STATE_COMPLETED;
-          if (isTimeoutError(runErr)) {
-            state = RUN_STATE_TIMED_OUT;
-          } else if (stopReason === "cancelled" || isAbortError(runErr)) {
-            state = RUN_STATE_CANCELLED;
-          } else if (runErr !== null) {
-            state = RUN_STATE_FAILED;
-          }
-          let message = "";
-          let data: unknown;
-          if (runErr !== null) {
-            const info = acpFailureInfo(runErr, terminalInfo, PHASE_MODEL);
-            message = displayErrorMessage(info);
-            data = { error: message, errorInfo: info };
-          }
-          try {
-            await execution.finishDurableWithRetry(
-              undefined,
-              runID,
-              state,
-              message,
-              makeRunEvent({
-                sessionId: rt.id,
-                runId: runID,
-                eventType: "finished",
-                source: runSource,
-                status: state,
-                model: sessionModel.id,
-                mode: effectiveMode,
-                timestamp: new Date(),
-                data,
-              }),
-            );
-          } catch (error) {
-            console.error(
-              `[acp] finish durable run ${runID}: ${errorMessage(error)}`,
-            );
-          }
-          this.notifyRunStatus(rt.id, runID, acpRunStatus(state));
-          try {
-            artifacts?.close();
-          } catch (error) {
-            console.error(
-              `[acp] close artifacts ${runID}: ${errorMessage(error)}`,
-            );
-          }
-          runtimeRelease();
         }
       })();
     } finally {

@@ -45,7 +45,6 @@ export {
   contextWithQuestionAsker,
   createDiffToolResult,
   createImageToolResult,
-  createImageToolResultWithContent,
   createInsertToolResult,
   createPlanToolResult,
   createRegistry,

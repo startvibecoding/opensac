@@ -93,40 +93,21 @@ export function createExecutionIntentAndSessionRun(
 
 /**
  * Atomically admits an immutable intent, its Run row, and (when supplied) the
- * canonical started event.
+ * canonical started event and conversation turn boundary.
  */
 export function createExecutionIntentAndSessionRunEvent(
   sessionDir: string,
   intent: ExecutionIntent,
   run: SessionRun,
   event: SessionRunEvent,
+  turn?: ConversationTurn,
 ): string {
   return createExecutionIntentAndSessionRunEventInternal(
     sessionDir,
     intent,
     run,
     event,
-    null,
-  );
-}
-
-/**
- * Atomically admits an immutable intent, its Run/event, and the conversation
- * turn boundary.
- */
-export function createExecutionIntentAndSessionRunEventWithTurn(
-  sessionDir: string,
-  intent: ExecutionIntent,
-  run: SessionRun,
-  event: SessionRunEvent,
-  turn: ConversationTurn,
-): string {
-  return createExecutionIntentAndSessionRunEventInternal(
-    sessionDir,
-    intent,
-    run,
-    event,
-    turn,
+    turn ?? null,
   );
 }
 

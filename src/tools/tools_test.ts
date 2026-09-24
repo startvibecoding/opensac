@@ -766,3 +766,61 @@ Deno.test("formatGoDuration matches Go duration strings", () => {
   assertEquals(formatGoDuration(90000), "1m30s");
   assertEquals(formatGoDuration(3600000), "1h0m0s");
 });
+
+Deno.test("GrepTool falls back to literal when a match request times out", async () => {
+  const dir = tempDir();
+  // `(a|a)+$` passes the shape screen but backtracks exponentially against
+  // the 40-char line below; the bounded worker turns the hang into a timeout.
+  writeText(path.join(dir, "evil.txt"), "a".repeat(40) + "!\n");
+  writeText(path.join(dir, "plain.txt"), "target line\n");
+  const tool = new GrepTool(createRegistry(dir, undefined), {
+    matchTimeoutMs: 100,
+  });
+  const result = await tool.execute(ctx, { pattern: "(a|a)+$", path: "." });
+  assertStringIncludes(
+    result.text,
+    "(regex matching timed out; fell back to literal search)",
+  );
+  // The restart runs the whole scan literally, so results never mix modes.
+  assert(!result.text.includes("evil.txt:"));
+});
+
+Deno.test("GrepTool literal fallback keeps finding literal matches after timeout", async () => {
+  const dir = tempDir();
+  writeText(path.join(dir, "a.txt"), "(a|a)+$ is here\n");
+  writeText(path.join(dir, "b.txt"), "a".repeat(40) + "!\n");
+  const tool = new GrepTool(createRegistry(dir, undefined), {
+    matchTimeoutMs: 100,
+  });
+  const result = await tool.execute(ctx, { pattern: "(a|a)+$", path: "." });
+  assertStringIncludes(
+    result.text,
+    "(regex matching timed out; fell back to literal search)",
+  );
+  assertStringIncludes(result.text, "(a|a)+$ is here");
+});
+
+Deno.test("GrepTool matches across chunk boundaries in order", async () => {
+  const dir = tempDir();
+  const lines: string[] = [];
+  for (let i = 0; i < 1300; i++) {
+    lines.push(i % 7 === 0 ? `hit ${i}` : `miss ${i}`);
+  }
+  writeText(path.join(dir, "big.txt"), lines.join("\n"));
+  const tool = new GrepTool(createRegistry(dir, undefined), {
+    matchTimeoutMs: 5000,
+  });
+  const result = await tool.execute(ctx, {
+    pattern: "^hit ",
+    path: ".",
+    maxResults: 10000,
+  });
+  const found = result.text.split("\n").filter((l) => l.includes(":hit "));
+  const expected = lines
+    .map((l, i) => (l.startsWith("hit ") ? i + 1 : -1))
+    .filter((i) => i > 0);
+  assertEquals(found.length, expected.length);
+  // Ordering must follow the file exactly across worker chunks.
+  const gotLines = found.map((l) => Number(l.split(":")[1]));
+  assertEquals(gotLines, expected);
+});

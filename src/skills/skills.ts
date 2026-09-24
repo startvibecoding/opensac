@@ -382,17 +382,8 @@ export class Manager {
   }
 }
 
-/** Creates a new skills manager. */
+/** Creates a new skills manager from an explicit project directory list. */
 export function createManager(
-  globalDir: string,
-  projectDir: string,
-  ...additionalProjectDirs: string[]
-): Manager {
-  return new Manager(globalDir, [projectDir, ...additionalProjectDirs]);
-}
-
-/** Creates a new skills manager with explicit project directories. */
-export function createManagerWithProjectDirs(
   globalDir: string,
   projectDirs: string[],
 ): Manager {

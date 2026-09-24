@@ -216,15 +216,11 @@ Deno.test("supportsImages reflects model input capabilities", () => {
 
 Deno.test("gateToolResultImages rejects images for text-only models", () => {
   const a = createAgentWithLoopConfig({ model: model(["text"]) }, undefined);
-  const [content, gated, isError, err] = a.gateToolResultImages(
-    "image output",
-    [imageBlock()],
-    false,
-  );
-  assert(err !== undefined);
-  assertEquals(isError, true);
-  assertEquals(gated, undefined);
-  assert(content.includes("does not support image input"));
+  const gated = a.gateToolResultImages("image output", [imageBlock()], false);
+  assert(gated.error !== undefined);
+  assertEquals(gated.isError, true);
+  assertEquals(gated.contents, undefined);
+  assert(gated.content.includes("does not support image input"));
 });
 
 Deno.test("gateToolResultImages passes images through for vision models", () => {
@@ -233,15 +229,11 @@ Deno.test("gateToolResultImages passes images through for vision models", () => 
     undefined,
   );
   const contents = [imageBlock()];
-  const [content, gated, isError, err] = a.gateToolResultImages(
-    "image output",
-    contents,
-    false,
-  );
-  assertEquals(err, undefined);
-  assertEquals(isError, false);
-  assertEquals(gated, contents);
-  assertEquals(content, "image output");
+  const gated = a.gateToolResultImages("image output", contents, false);
+  assertEquals(gated.error, undefined);
+  assertEquals(gated.isError, false);
+  assertEquals(gated.contents, contents);
+  assertEquals(gated.content, "image output");
 });
 
 Deno.test("validateImageRequestBudget rejects over-limit image payloads", () => {

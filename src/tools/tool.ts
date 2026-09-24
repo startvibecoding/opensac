@@ -167,20 +167,8 @@ export function createPlanToolResult(
   return { text, plan };
 }
 
-/** Creates a tool result that includes an image. */
+/** Creates a tool result that includes a fully populated image payload. */
 export function createImageToolResult(
-  text: string,
-  mimeType: string,
-  base64Data: string,
-): ToolResult {
-  return createImageToolResultWithContent(text, {
-    mimeType,
-    data: base64Data,
-  });
-}
-
-/** Creates a tool result with a fully populated image payload. */
-export function createImageToolResultWithContent(
   text: string,
   image: ImageContent,
 ): ToolResult {

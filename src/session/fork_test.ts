@@ -13,7 +13,7 @@ import {
 } from "../provider/types.ts";
 import {
   appendTurnEntryTx,
-  createExecutionIntentAndSessionRunEventWithTurn,
+  createExecutionIntentAndSessionRunEvent,
   createSessionRun,
   currentLeafTx,
   endConversationTurn,
@@ -356,7 +356,7 @@ Deno.test("execution admission atomically starts a conversation turn", () => {
     assert(release !== null, "acquire runtime lease");
     try {
       const started = new Date();
-      createExecutionIntentAndSessionRunEventWithTurn(
+      createExecutionIntentAndSessionRunEvent(
         sessionDir,
         {
           id: "intent-atomic",

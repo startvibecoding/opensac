@@ -58,8 +58,8 @@ Deno.test("MemoryStore replays a compaction summary", () => {
   assertEquals(state.messages[0].content, "summary");
   assert(state.messages[0].systemInjected === true);
   assertEquals(state.messages[1].content, "kept");
-  const [compaction, ok] = store.getLatestCompaction();
-  assert(ok);
+  const compaction = store.getLatestCompaction();
+  assert(compaction !== null);
   assertEquals(compaction.summary, "summary");
   assertEquals(compaction.firstKeptEntryId, kept);
 });
@@ -76,32 +76,33 @@ Deno.test("MemoryStore latest bindings track the newest change", () => {
   store.appendAdditionalDirectories(["/a"]);
   store.appendAdditionalDirectories(["/a", "/b"]);
 
-  const [model, modelOk] = store.getLatestModelChange();
-  assert(modelOk);
+  const model = store.getLatestModelChange();
+  assert(model !== null);
   assertEquals(model.modelId, "m2");
-  const [mode, modeOk] = store.getLatestModeChange();
-  assert(modeOk);
+  const mode = store.getLatestModeChange();
+  assert(mode !== null);
   assertEquals(mode.mode, "yolo");
-  const [thinking, thinkingOk] = store.getLatestThinkingLevelChange();
-  assert(thinkingOk);
+  const thinking = store.getLatestThinkingLevelChange();
+  assert(thinking !== null);
   assertEquals(thinking.thinkingLevel, "high");
-  const [dirs, dirsOk] = store.getLatestAdditionalDirectories();
-  assert(dirsOk);
+  const dirs = store.getLatestAdditionalDirectories();
+  assert(dirs !== null);
   assertEquals(dirs.directories, ["/a", "/b"]);
 
   // The returned directory list must not alias stored state.
   dirs.directories.push("/c");
-  const [again] = store.getLatestAdditionalDirectories();
+  const again = store.getLatestAdditionalDirectories();
+  assert(again !== null);
   assertEquals(again.directories, ["/a", "/b"]);
 });
 
 Deno.test("MemoryStore reports no latest binding on an empty session", () => {
   const store = new MemoryStore();
   store.init();
-  assertEquals(store.getLatestCompaction()[1], false);
-  assertEquals(store.getLatestModelChange()[1], false);
-  assertEquals(store.getLatestModeChange()[1], false);
-  assertEquals(store.getLatestThinkingLevelChange()[1], false);
-  assertEquals(store.getLatestAdditionalDirectories()[1], false);
+  assertEquals(store.getLatestCompaction(), null);
+  assertEquals(store.getLatestModelChange(), null);
+  assertEquals(store.getLatestModeChange(), null);
+  assertEquals(store.getLatestThinkingLevelChange(), null);
+  assertEquals(store.getLatestAdditionalDirectories(), null);
   assertEquals(store.getFile(), "");
 });

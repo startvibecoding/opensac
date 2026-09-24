@@ -23,7 +23,7 @@ import { createAgentManager } from "../agent/manager.ts";
 import type { Event } from "../agent/events.ts";
 import { emptyCompaction } from "../agent/agent_testutil.ts";
 import { AgentHost, workflowAgentID } from "./agent_host.ts";
-import { createRunToolWithActive } from "./tools.ts";
+import { createRunTool } from "./tools.ts";
 import { createActiveRegistry } from "./active.ts";
 import {
   type AgentTask,
@@ -144,7 +144,7 @@ Deno.test("workflow_run tool executes a read-only audit end to end", async () =>
   const manager = buildManager();
   const store = new MemoryStore();
   const active = createActiveRegistry();
-  const tool = createRunToolWithActive(manager, store, active);
+  const tool = createRunTool(manager, store, active);
 
   const result = await tool.execute({}, {
     source:
@@ -168,7 +168,7 @@ Deno.test("workflow_run tool executes a read-only audit end to end", async () =>
 
 Deno.test("workflow_run rejects an empty source", async () => {
   const manager = buildManager();
-  const tool = createRunToolWithActive(
+  const tool = createRunTool(
     manager,
     new MemoryStore(),
     createActiveRegistry(),

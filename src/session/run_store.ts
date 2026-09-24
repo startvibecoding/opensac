@@ -283,29 +283,17 @@ export function createSessionRun(sessionDir: string, input: SessionRun): void {
 }
 
 /**
- * Atomically inserts a new canonical Run and its first event. Retry attempts use
- * this path so a process loss cannot leave a durable attempt without a replay
- * anchor.
+ * Atomically inserts a new canonical Run and its first event, plus (when
+ * supplied) the conversation turn boundary. Retry attempts use this path so a
+ * process loss cannot leave a durable attempt without a replay anchor.
  */
 export function createSessionRunAndEvent(
   sessionDir: string,
   run: SessionRun,
   event: SessionRunEvent,
+  turn?: ConversationTurn,
 ): string {
-  return createSessionRunAndEventInternal(sessionDir, run, event, null);
-}
-
-/**
- * Atomically admits a Run, its first event, and a conversation turn boundary
- * when the Run produces transcript output.
- */
-export function createSessionRunAndEventWithTurn(
-  sessionDir: string,
-  run: SessionRun,
-  event: SessionRunEvent,
-  turn: ConversationTurn,
-): string {
-  return createSessionRunAndEventInternal(sessionDir, run, event, turn);
+  return createSessionRunAndEventInternal(sessionDir, run, event, turn ?? null);
 }
 
 function createSessionRunAndEventInternal(
