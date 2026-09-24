@@ -17,6 +17,14 @@ import {
 } from "../idle_timeout.ts";
 import type { Provider as ProviderInterface } from "../provider.ts";
 import {
+  asJsonRecord,
+  optBoolean,
+  optNumber,
+  optRecord,
+  optString,
+  parseJsonRecord,
+} from "../../util/json.ts";
+import {
   formatRetryMessage,
   isRetryable,
   type RetryConfig,
@@ -146,6 +154,116 @@ interface GoogleResponseError {
   code?: number;
   message?: string;
   status?: string;
+}
+
+// ─── SSE decode guard ──────────────────────────────────────────────────────────
+// The legacy unchecked JSON.parse cast asserted nothing: shape garbage crossed
+// the boundary as typed lies (a candidate without `content` crashed the parts
+// loop mid-stream). These decoders read every field the stream loop consumes
+// through the src/util/json.ts readers, with Go `json.Unmarshal` semantics:
+// required fields zero-fill (`content.parts` degrades to an empty list),
+// optional fields read as `undefined`, malformed entries drop, and unknown
+// part/candidate fields stay invisible to consumers (forward compatible).
+
+/** Decodes one `data:` payload of the Gemini/Vertex event stream. */
+export function decodeGoogleStreamChunk(
+  data: string,
+): GoogleResponse | undefined {
+  const rec = parseJsonRecord(data);
+  if (rec === undefined) return undefined;
+  const chunk: GoogleResponse = {};
+  const error = optRecord(rec, "error");
+  if (error !== undefined) {
+    const decoded: GoogleResponseError = {};
+    const code = optNumber(error, "code");
+    if (code !== undefined) decoded.code = code;
+    const message = optString(error, "message");
+    if (message !== undefined) decoded.message = message;
+    const status = optString(error, "status");
+    if (status !== undefined) decoded.status = status;
+    chunk.error = decoded;
+  }
+  const usageMetadata = optRecord(rec, "usageMetadata");
+  if (usageMetadata !== undefined) {
+    chunk.usageMetadata = decodeGoogleUsageMetadata(usageMetadata);
+  }
+  const candidates = rec["candidates"];
+  if (Array.isArray(candidates)) {
+    const decoded: GoogleCandidate[] = [];
+    for (const raw of candidates) {
+      const candidate = asJsonRecord(raw);
+      if (candidate === undefined) continue; // malformed entry: skip
+      decoded.push(decodeGoogleCandidate(candidate));
+    }
+    chunk.candidates = decoded;
+  }
+  return chunk;
+}
+
+function decodeGoogleCandidate(
+  rec: Record<string, unknown>,
+): GoogleCandidate {
+  const content = optRecord(rec, "content") ?? {};
+  const parts: GooglePart[] = [];
+  const partsRaw = content["parts"];
+  if (Array.isArray(partsRaw)) {
+    for (const raw of partsRaw) {
+      const part = asJsonRecord(raw);
+      if (part === undefined) continue; // malformed entry: skip
+      parts.push(decodeGooglePart(part));
+    }
+  }
+  const decodedContent: GoogleContent = { parts };
+  const role = optString(content, "role");
+  if (role !== undefined) decodedContent.role = role;
+  const candidate: GoogleCandidate = { content: decodedContent };
+  const finishReason = optString(rec, "finishReason");
+  if (finishReason !== undefined) candidate.finishReason = finishReason;
+  return candidate;
+}
+
+function decodeGooglePart(rec: Record<string, unknown>): GooglePart {
+  const part: GooglePart = {};
+  const text = optString(rec, "text");
+  if (text !== undefined) part.text = text;
+  const thought = optBoolean(rec, "thought");
+  if (thought !== undefined) part.thought = thought;
+  const thoughtSignature = optString(rec, "thoughtSignature");
+  if (thoughtSignature !== undefined) part.thoughtSignature = thoughtSignature;
+  const functionCall = optRecord(rec, "functionCall");
+  if (functionCall !== undefined) {
+    const call: GoogleFunctionCall = {
+      name: optString(functionCall, "name") ?? "",
+    };
+    const id = optString(functionCall, "id");
+    if (id !== undefined) call.id = id;
+    if ("args" in functionCall) call.args = functionCall["args"];
+    part.functionCall = call;
+  }
+  return part;
+}
+
+function decodeGoogleUsageMetadata(
+  rec: Record<string, unknown>,
+): GoogleUsageMetadata {
+  const usage: GoogleUsageMetadata = {};
+  const promptTokenCount = optNumber(rec, "promptTokenCount");
+  if (promptTokenCount !== undefined) usage.promptTokenCount = promptTokenCount;
+  const candidatesTokenCount = optNumber(rec, "candidatesTokenCount");
+  if (candidatesTokenCount !== undefined) {
+    usage.candidatesTokenCount = candidatesTokenCount;
+  }
+  const totalTokenCount = optNumber(rec, "totalTokenCount");
+  if (totalTokenCount !== undefined) usage.totalTokenCount = totalTokenCount;
+  const thoughtsTokenCount = optNumber(rec, "thoughtsTokenCount");
+  if (thoughtsTokenCount !== undefined) {
+    usage.thoughtsTokenCount = thoughtsTokenCount;
+  }
+  const cachedContentTokenCount = optNumber(rec, "cachedContentTokenCount");
+  if (cachedContentTokenCount !== undefined) {
+    usage.cachedContentTokenCount = cachedContentTokenCount;
+  }
+  return usage;
 }
 
 // ─── provider ────────────────────────────────────────────────────────────────
@@ -453,12 +571,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
         sawDone = true;
         return false;
       }
-      let chunk: GoogleResponse;
-      try {
-        chunk = JSON.parse(data) as GoogleResponse;
-      } catch {
-        return true;
-      }
+      const chunk = decodeGoogleStreamChunk(data);
+      if (chunk === undefined) return true;
       if (chunk.error !== undefined) {
         pending.push({
           type: streamError,

@@ -22,6 +22,13 @@ import {
 } from "../idle_timeout.ts";
 import type { Provider as ProviderInterface } from "../provider.ts";
 import {
+  asJsonRecord,
+  optNumber,
+  optRecord,
+  optString,
+  parseJsonRecord,
+} from "../../util/json.ts";
+import {
   formatRetryMessage,
   isRetryable,
   type RetryConfig,
@@ -147,7 +154,7 @@ interface AnthropicStreamError {
 }
 
 interface AnthropicDelta {
-  type: string;
+  type?: string;
   text?: string;
   thinking?: string;
   signature?: string;
@@ -162,11 +169,117 @@ interface AnthropicMsg {
   usage?: AnthropicUsage;
 }
 
+// Usage payloads are partial on the wire (proxies and `message_delta` carry
+// only the fields they update), so the fields stay optional and read as
+// `undefined` when absent — exactly the legacy cast behavior.
 interface AnthropicUsage {
-  input_tokens: number;
-  output_tokens: number;
-  cache_creation_input_tokens: number;
-  cache_read_input_tokens: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+// ─── SSE decode guard ──────────────────────────────────────────────────────────
+// The legacy unchecked JSON.parse cast asserted nothing: shape garbage
+// (missing or mistyped fields) crossed the boundary as typed lies and surfaced
+// as runtime errors mid-stream. These decoders read every field the stream
+// loop consumes through the src/util/json.ts readers, with Go `json.Unmarshal`
+// semantics: required fields zero-fill, optional fields read as `undefined`,
+// malformed entries drop, and unknown event types keep passing through the
+// switch default untouched (forward compatible with new Anthropic events).
+
+/** Decodes one `data:` payload of the Anthropic Messages event stream. */
+export function decodeAnthropicStreamEvent(
+  data: string,
+): AnthropicResponse | undefined {
+  const rec = parseJsonRecord(data);
+  if (rec === undefined) return undefined;
+  const type = optString(rec, "type");
+  // Without a string discriminant the switch cannot dispatch, so skip the
+  // payload exactly like an unhandled event type.
+  if (type === undefined) return undefined;
+  const event: AnthropicResponse = { type };
+  const index = optNumber(rec, "index");
+  if (index !== undefined) event.index = index;
+  const delta = optRecord(rec, "delta");
+  if (delta !== undefined) event.delta = decodeAnthropicDelta(delta);
+  const contentBlock = optRecord(rec, "content_block");
+  if (contentBlock !== undefined) {
+    event.content_block = decodeAnthropicContentBlock(contentBlock);
+  }
+  const message = optRecord(rec, "message");
+  if (message !== undefined) event.message = decodeAnthropicMsg(message);
+  const usage = decodeAnthropicUsage(rec["usage"]);
+  if (usage !== undefined) event.usage = usage;
+  const error = optRecord(rec, "error");
+  if (error !== undefined) event.error = decodeAnthropicStreamError(error);
+  return event;
+}
+
+function decodeAnthropicDelta(rec: Record<string, unknown>): AnthropicDelta {
+  const delta: AnthropicDelta = {};
+  const type = optString(rec, "type");
+  if (type !== undefined) delta.type = type;
+  const text = optString(rec, "text");
+  if (text !== undefined) delta.text = text;
+  const thinking = optString(rec, "thinking");
+  if (thinking !== undefined) delta.thinking = thinking;
+  const signature = optString(rec, "signature");
+  if (signature !== undefined) delta.signature = signature;
+  const stopReason = optString(rec, "stop_reason");
+  if (stopReason !== undefined) delta.stop_reason = stopReason;
+  const partialJson = optString(rec, "partial_json");
+  if (partialJson !== undefined) delta.partial_json = partialJson;
+  return delta;
+}
+
+function decodeAnthropicContentBlock(
+  rec: Record<string, unknown>,
+): AnthropicContentBlock {
+  const block: AnthropicContentBlock = { type: optString(rec, "type") ?? "" };
+  const id = optString(rec, "id");
+  if (id !== undefined) block.id = id;
+  const name = optString(rec, "name");
+  if (name !== undefined) block.name = name;
+  const input = asJsonRecord(rec["input"]);
+  if (input !== undefined) block.input = input;
+  return block;
+}
+
+function decodeAnthropicMsg(rec: Record<string, unknown>): AnthropicMsg {
+  const msg: AnthropicMsg = { id: optString(rec, "id") ?? "" };
+  if ("content" in rec) msg.content = rec["content"];
+  const stopReason = optString(rec, "stop_reason");
+  if (stopReason !== undefined) msg.stop_reason = stopReason;
+  const usage = decodeAnthropicUsage(rec["usage"]);
+  if (usage !== undefined) msg.usage = usage;
+  return msg;
+}
+
+function decodeAnthropicUsage(value: unknown): AnthropicUsage | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const usage: AnthropicUsage = {};
+  const inputTokens = optNumber(rec, "input_tokens");
+  if (inputTokens !== undefined) usage.input_tokens = inputTokens;
+  const outputTokens = optNumber(rec, "output_tokens");
+  if (outputTokens !== undefined) usage.output_tokens = outputTokens;
+  const cacheCreation = optNumber(rec, "cache_creation_input_tokens");
+  if (cacheCreation !== undefined) {
+    usage.cache_creation_input_tokens = cacheCreation;
+  }
+  const cacheRead = optNumber(rec, "cache_read_input_tokens");
+  if (cacheRead !== undefined) usage.cache_read_input_tokens = cacheRead;
+  return usage;
+}
+
+function decodeAnthropicStreamError(
+  rec: Record<string, unknown>,
+): AnthropicStreamError {
+  return {
+    type: optString(rec, "type") ?? "",
+    message: optString(rec, "message") ?? "",
+  };
 }
 
 // ─── provider ────────────────────────────────────────────────────────────────
@@ -536,22 +649,18 @@ export class Provider extends BaseProvider implements ProviderInterface {
     const handleLine = (line: string): boolean => {
       if (!line.startsWith("data: ")) return true;
       const data = line.slice("data: ".length);
-      let event: AnthropicResponse;
-      try {
-        event = JSON.parse(data) as AnthropicResponse;
-      } catch {
-        return true;
-      }
+      const event = decodeAnthropicStreamEvent(data);
+      if (event === undefined) return true;
 
       switch (event.type) {
         case "message_start":
           if (event.message?.usage !== undefined) {
             const u = event.message.usage;
             acc.usage = {
-              input: u.input_tokens,
-              output: u.output_tokens,
-              cacheRead: u.cache_read_input_tokens,
-              cacheWrite: u.cache_creation_input_tokens,
+              input: u.input_tokens ?? 0,
+              output: u.output_tokens ?? 0,
+              cacheRead: u.cache_read_input_tokens ?? 0,
+              cacheWrite: u.cache_creation_input_tokens ?? 0,
               totalTokens: 0,
               cost: {
                 input: 0,
@@ -671,19 +780,22 @@ export class Provider extends BaseProvider implements ProviderInterface {
             // message_start. Only update values if they haven't been set yet (to
             // avoid overwriting with partial values).
             const u = event.usage;
-            if (u.output_tokens > 0 && acc.usage.output === 0) {
-              acc.usage.output = u.output_tokens;
+            if ((u.output_tokens ?? 0) > 0 && acc.usage.output === 0) {
+              acc.usage.output = u.output_tokens ?? 0;
             }
-            if (u.input_tokens > 0 && acc.usage.input === 0) {
-              acc.usage.input = u.input_tokens;
-            }
-            if (u.cache_read_input_tokens > 0 && acc.usage.cacheRead === 0) {
-              acc.usage.cacheRead = u.cache_read_input_tokens;
+            if ((u.input_tokens ?? 0) > 0 && acc.usage.input === 0) {
+              acc.usage.input = u.input_tokens ?? 0;
             }
             if (
-              u.cache_creation_input_tokens > 0 && acc.usage.cacheWrite === 0
+              (u.cache_read_input_tokens ?? 0) > 0 && acc.usage.cacheRead === 0
             ) {
-              acc.usage.cacheWrite = u.cache_creation_input_tokens;
+              acc.usage.cacheRead = u.cache_read_input_tokens ?? 0;
+            }
+            if (
+              (u.cache_creation_input_tokens ?? 0) > 0 &&
+              acc.usage.cacheWrite === 0
+            ) {
+              acc.usage.cacheWrite = u.cache_creation_input_tokens ?? 0;
             }
           }
           break;

@@ -4,6 +4,7 @@
 // before redaction.
 
 import { createHash } from "node:crypto";
+import { parseJsonRecord } from "../../util/json.ts";
 import type { Attachment } from "../types.ts";
 import {
   hostedToolDescriptorForType,
@@ -907,11 +908,9 @@ export function decodeResponsesOutputItem(
   let parsed: Record<string, unknown>;
   if (typeof raw === "string") {
     rawText = raw;
-    try {
-      parsed = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      return undefined;
-    }
+    const rec = parseJsonRecord(raw);
+    if (rec === undefined) return undefined;
+    parsed = rec;
   } else {
     try {
       rawText = JSON.stringify(raw);
@@ -976,13 +975,12 @@ export function responsesArgumentsText(raw: unknown): string {
 }
 
 export function responsesEventItemRaw(raw: string): string {
-  try {
-    const envelope = JSON.parse(raw) as Record<string, unknown>;
-    if (envelope["item"] !== undefined && envelope["item"] !== null) {
-      return JSON.stringify(envelope["item"]);
-    }
-  } catch {
-    // fall through
+  const envelope = parseJsonRecord(raw);
+  if (
+    envelope !== undefined && envelope["item"] !== undefined &&
+    envelope["item"] !== null
+  ) {
+    return JSON.stringify(envelope["item"]);
   }
   return raw;
 }

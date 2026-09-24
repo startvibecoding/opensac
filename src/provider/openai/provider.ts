@@ -19,6 +19,13 @@ import {
 } from "../idle_timeout.ts";
 import type { Provider as ProviderInterface } from "../provider.ts";
 import {
+  asJsonRecord,
+  optNumber,
+  optRecord,
+  optString,
+  parseJsonRecord,
+} from "../../util/json.ts";
+import {
   formatRetryMessage,
   isRetryable,
   type RetryConfig,
@@ -646,12 +653,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
             sawDone = true;
             break;
           }
-          let chunk: OpenAIResponse;
-          try {
-            chunk = JSON.parse(data) as OpenAIResponse;
-          } catch {
-            continue;
-          }
+          const chunk = decodeOpenAIStreamChunk(data);
+          if (chunk === undefined) continue;
           for (const event of handleChunk(chunk)) yield event;
         }
         if (sawDone) break;
@@ -667,12 +670,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
       if (!sawDone && buffer.length > 0 && buffer.startsWith("data: ")) {
         const data = buffer.slice("data: ".length);
         if (data !== "[DONE]") {
-          let chunk: OpenAIResponse | undefined;
-          try {
-            chunk = JSON.parse(data) as OpenAIResponse;
-          } catch {
-            chunk = undefined;
-          }
+          const chunk = decodeOpenAIStreamChunk(data);
           if (chunk !== undefined) {
             for (const event of handleChunk(chunk)) yield event;
           }
@@ -1006,6 +1004,129 @@ export interface OpenAIUsageResponse {
   completion_tokens: number;
   total_tokens: number;
   prompt_tokens_details?: { cached_tokens: number } | null;
+}
+
+// ─── SSE decode guard ──────────────────────────────────────────────────────────
+// The legacy unchecked JSON.parse cast asserted nothing: shape garbage crossed
+// the boundary as typed lies and surfaced as runtime errors mid-stream. These
+// decoders read every field the stream loop consumes through the
+// src/util/json.ts readers, with Go `json.Unmarshal` semantics: required
+// fields zero-fill, optional fields read as `undefined`, malformed entries
+// drop, `null`-able fields keep their `null`, and unknown chunk fields stay
+// invisible to consumers (forward compatible with new provider fields).
+
+/** Decodes one `data:` payload of the OpenAI chat-completions stream. */
+export function decodeOpenAIStreamChunk(
+  data: string,
+): OpenAIResponse | undefined {
+  const rec = parseJsonRecord(data);
+  if (rec === undefined) return undefined;
+  const chunk: OpenAIResponse = {};
+  const id = optString(rec, "id");
+  if (id !== undefined) chunk.id = id;
+  const object = optString(rec, "object");
+  if (object !== undefined) chunk.object = object;
+  const created = optNumber(rec, "created");
+  if (created !== undefined) chunk.created = created;
+  const model = optString(rec, "model");
+  if (model !== undefined) chunk.model = model;
+  const usageValue = rec["usage"];
+  if (usageValue === null) chunk.usage = null;
+  else {
+    const usage = decodeOpenAIUsage(usageValue);
+    if (usage !== undefined) chunk.usage = usage;
+  }
+  const choices = rec["choices"];
+  if (Array.isArray(choices)) {
+    const decoded: OpenAIChoice[] = [];
+    for (const raw of choices) {
+      const choice = asJsonRecord(raw);
+      if (choice === undefined) continue; // malformed entry: skip
+      decoded.push(decodeOpenAIChoice(choice));
+    }
+    chunk.choices = decoded;
+  }
+  return chunk;
+}
+
+function decodeOpenAIChoice(rec: Record<string, unknown>): OpenAIChoice {
+  const choice: OpenAIChoice = {};
+  const index = optNumber(rec, "index");
+  if (index !== undefined) choice.index = index;
+  const finishReason = rec["finish_reason"];
+  if (finishReason === null) choice.finish_reason = null;
+  else {
+    const value = optString(rec, "finish_reason");
+    if (value !== undefined) choice.finish_reason = value;
+  }
+  const delta = optRecord(rec, "delta");
+  if (delta !== undefined) choice.delta = decodeOpenAIDelta(delta);
+  return choice;
+}
+
+function decodeOpenAIDelta(rec: Record<string, unknown>): OpenAIDelta {
+  const delta: OpenAIDelta = {};
+  const role = optString(rec, "role");
+  if (role !== undefined) delta.role = role;
+  const content = optString(rec, "content");
+  if (content !== undefined) delta.content = content;
+  const reasoningContent = rec["reasoning_content"];
+  if (reasoningContent === null) delta.reasoning_content = null;
+  else {
+    const value = optString(rec, "reasoning_content");
+    if (value !== undefined) delta.reasoning_content = value;
+  }
+  const toolCalls = rec["tool_calls"];
+  if (Array.isArray(toolCalls)) {
+    const decoded: OpenAIToolCall[] = [];
+    for (const raw of toolCalls) {
+      const call = asJsonRecord(raw);
+      if (call === undefined) continue; // malformed entry: skip
+      decoded.push(decodeOpenAIToolCall(call));
+    }
+    delta.tool_calls = decoded;
+  }
+  return delta;
+}
+
+function decodeOpenAIToolCall(rec: Record<string, unknown>): OpenAIToolCall {
+  const call: OpenAIToolCall = {};
+  const id = optString(rec, "id");
+  if (id !== undefined) call.id = id;
+  const index = optNumber(rec, "index");
+  if (index !== undefined) call.index = index;
+  const type = optString(rec, "type");
+  if (type !== undefined) call.type = type;
+  const fn = optRecord(rec, "function");
+  if (fn !== undefined) {
+    const decoded: { name?: string; arguments?: unknown } = {};
+    const name = optString(fn, "name");
+    if (name !== undefined) decoded.name = name;
+    if ("arguments" in fn) decoded.arguments = fn["arguments"];
+    call.function = decoded;
+  }
+  return call;
+}
+
+function decodeOpenAIUsage(value: unknown): OpenAIUsageResponse | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const usage: OpenAIUsageResponse = {
+    prompt_tokens: optNumber(rec, "prompt_tokens") ?? 0,
+    completion_tokens: optNumber(rec, "completion_tokens") ?? 0,
+    total_tokens: optNumber(rec, "total_tokens") ?? 0,
+  };
+  const detailsValue = rec["prompt_tokens_details"];
+  if (detailsValue === null) usage.prompt_tokens_details = null;
+  else {
+    const details = optRecord(rec, "prompt_tokens_details");
+    if (details !== undefined) {
+      usage.prompt_tokens_details = {
+        cached_tokens: optNumber(details, "cached_tokens") ?? 0,
+      };
+    }
+  }
+  return usage;
 }
 
 /** Applies omitempty semantics for the chat request wire body. */

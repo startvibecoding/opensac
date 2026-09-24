@@ -64,6 +64,16 @@ export function optStringArray(
   return [...v] as string[];
 }
 
+/** Reads a plain-object field, or undefined when absent or not an object. */
+export function optRecord(
+  obj: unknown,
+  key: string,
+): Record<string, unknown> | undefined {
+  const rec = asJsonRecord(obj);
+  if (rec === undefined) return undefined;
+  return asJsonRecord(rec[key]);
+}
+
 /** Reads a string-to-string map field, or undefined when absent or mistyped. */
 export function optStringMap(
   obj: unknown,

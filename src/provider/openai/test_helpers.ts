@@ -3,6 +3,7 @@
 
 import type { HttpClient } from "../http_client.ts";
 import type { ChatParams, Model, StreamEvent } from "../types.ts";
+import { parseJsonRecord } from "../../util/json.ts";
 import { createOpenAIProvider, type Provider } from "./provider.ts";
 
 /** A no-op HTTP client for tests that never issue a request. */
@@ -106,5 +107,5 @@ export function mustUsage(
 
 /** Captures the JSON request body from a mock request. */
 export function decodeBody(req: MockRequest): Record<string, unknown> {
-  return JSON.parse(req.body) as Record<string, unknown>;
+  return parseJsonRecord(req.body) ?? {};
 }

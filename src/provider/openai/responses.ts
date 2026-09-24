@@ -16,6 +16,12 @@ import type {
   Usage,
 } from "../types.ts";
 import {
+  asJsonRecord,
+  optNumber,
+  optRecord,
+  optString,
+} from "../../util/json.ts";
+import {
   samplingParamsDisabled,
   streamDone,
   streamError,
@@ -198,7 +204,7 @@ export interface ResponsesCompletedObject {
   status?: string;
   previous_response_id?: string;
   conversation?: unknown;
-  output?: string[];
+  output?: Array<string | Record<string, unknown>>;
   usage?: ResponsesUsage;
   error?: ResponsesError;
   incomplete_details?: { reason?: string };
@@ -227,6 +233,161 @@ export interface ResponsesInputItem {
   arguments?: string;
   input?: string;
   output?: unknown;
+}
+
+// ─── SSE decode guard ──────────────────────────────────────────────────────────
+// The legacy unchecked JSON.parse cast asserted nothing: shape garbage
+// crossed the boundary as typed lies (a non-object payload threw a TypeError
+// on the `type` fill-in). These decoders read every field the stream parser
+// and the codec normalizer consume through the src/util/json.ts readers, with
+// Go `json.Unmarshal` semantics: required fields zero-fill, optional fields
+// read as `undefined`, malformed entries drop, `null`-able fields keep their
+// `null`, and unknown event types keep passing through the normalizer's
+// unknown-event bookkeeping (forward compatible with new Responses events).
+
+/**
+ * Decodes one parsed payload of the Responses event stream. `type` may come
+ * back empty: the caller fills it from the SSE `event:` frame name, which
+ * some gateways rely on instead of an in-payload `type`.
+ */
+export function decodeResponsesEvent(
+  value: unknown,
+): ResponsesSSEEvent | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const event: ResponsesSSEEvent = { type: optString(rec, "type") ?? "" };
+  const delta = optString(rec, "delta");
+  if (delta !== undefined) event.delta = delta;
+  const text = optString(rec, "text");
+  if (text !== undefined) event.text = text;
+  const refusal = optString(rec, "refusal");
+  if (refusal !== undefined) event.refusal = refusal;
+  if ("arguments" in rec) event.arguments = rec["arguments"];
+  const input = optString(rec, "input");
+  if (input !== undefined) event.input = input;
+  const itemID = optString(rec, "item_id");
+  if (itemID !== undefined) event.item_id = itemID;
+  const callID = optString(rec, "call_id");
+  if (callID !== undefined) event.call_id = callID;
+  const outputIndex = optNumber(rec, "output_index");
+  if (outputIndex !== undefined) event.output_index = outputIndex;
+  const itemValue = rec["item"];
+  if (itemValue === null) event.item = null;
+  else {
+    const item = optRecord(rec, "item");
+    if (item !== undefined) event.item = decodeResponsesEventItem(item);
+  }
+  const responseValue = rec["response"];
+  if (responseValue === null) event.response = null;
+  else {
+    const response = decodeResponsesCompletedObject(responseValue);
+    if (response !== undefined) event.response = response;
+  }
+  const errorValue = rec["error"];
+  if (errorValue === null) event.error = null;
+  else {
+    const error = decodeResponsesError(errorValue);
+    if (error !== undefined) event.error = error;
+  }
+  return event;
+}
+
+/** Decodes the `response.*` completion envelope and background-run results. */
+export function decodeResponsesCompletedObject(
+  value: unknown,
+): ResponsesCompletedObject | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const response: ResponsesCompletedObject = {};
+  const id = optString(rec, "id");
+  if (id !== undefined) response.id = id;
+  const status = optString(rec, "status");
+  if (status !== undefined) response.status = status;
+  const previousResponseID = optString(rec, "previous_response_id");
+  if (previousResponseID !== undefined) {
+    response.previous_response_id = previousResponseID;
+  }
+  if ("conversation" in rec) response.conversation = rec["conversation"];
+  const output = rec["output"];
+  if (Array.isArray(output)) {
+    const items: Array<string | Record<string, unknown>> = [];
+    for (const raw of output) {
+      if (typeof raw === "string") items.push(raw);
+      else {
+        const obj = asJsonRecord(raw);
+        if (obj !== undefined) items.push(obj);
+      }
+    }
+    response.output = items;
+  }
+  const usage = decodeResponsesUsage(rec["usage"]);
+  if (usage !== undefined) response.usage = usage;
+  const error = decodeResponsesError(rec["error"]);
+  if (error !== undefined) response.error = error;
+  const details = optRecord(rec, "incomplete_details");
+  if (details !== undefined) {
+    const incomplete: { reason?: string } = {};
+    const reason = optString(details, "reason");
+    if (reason !== undefined) incomplete.reason = reason;
+    response.incomplete_details = incomplete;
+  }
+  return response;
+}
+
+function decodeResponsesEventItem(
+  rec: Record<string, unknown>,
+): ResponsesOutputItem {
+  const item: ResponsesOutputItem = {};
+  const id = optString(rec, "id");
+  if (id !== undefined) item.id = id;
+  const type = optString(rec, "type");
+  if (type !== undefined) item.type = type;
+  const status = optString(rec, "status");
+  if (status !== undefined) item.status = status;
+  const callID = optString(rec, "call_id");
+  if (callID !== undefined) item.call_id = callID;
+  const name = optString(rec, "name");
+  if (name !== undefined) item.name = name;
+  if ("arguments" in rec) item.arguments = rec["arguments"];
+  const input = optString(rec, "input");
+  if (input !== undefined) item.input = input;
+  return item;
+}
+
+function decodeResponsesUsage(value: unknown): ResponsesUsage | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const usage: ResponsesUsage = {
+    input_tokens: optNumber(rec, "input_tokens") ?? 0,
+    output_tokens: optNumber(rec, "output_tokens") ?? 0,
+    total_tokens: optNumber(rec, "total_tokens") ?? 0,
+  };
+  const inputDetails = optRecord(rec, "input_tokens_details");
+  if (inputDetails !== undefined) {
+    usage.input_tokens_details = {
+      cached_tokens: optNumber(inputDetails, "cached_tokens") ?? 0,
+    };
+  }
+  const outputDetails = optRecord(rec, "output_tokens_details");
+  if (outputDetails !== undefined) {
+    usage.output_tokens_details = {
+      reasoning_tokens: optNumber(outputDetails, "reasoning_tokens") ?? 0,
+    };
+  }
+  return usage;
+}
+
+function decodeResponsesError(value: unknown): ResponsesError | undefined {
+  const rec = asJsonRecord(value);
+  if (rec === undefined) return undefined;
+  const error: ResponsesError = {};
+  const message = optString(rec, "message");
+  if (message !== undefined) error.message = message;
+  const code = optString(rec, "code");
+  if (code !== undefined) error.code = code;
+  const type = optString(rec, "type");
+  if (type !== undefined) error.type = type;
+  return error;
 }
 
 /** Structural view of the openai Provider used by the Responses codec. */
@@ -1074,9 +1235,9 @@ export async function* parseResponsesSSE(
       const data = frame.data.trim();
       if (data === "[DONE]") break;
 
-      let event: ResponsesSSEEvent;
+      let parsed: unknown;
       try {
-        event = JSON.parse(data) as ResponsesSSEEvent;
+        parsed = JSON.parse(data);
       } catch (err) {
         decodeErr = new Error(
           `responses event ${frame.sequence} (${
@@ -1084,6 +1245,13 @@ export async function* parseResponsesSSE(
           }): invalid JSON: ${
             err instanceof Error ? err.message : String(err)
           }`,
+        );
+        break;
+      }
+      const event = decodeResponsesEvent(parsed);
+      if (event === undefined) {
+        decodeErr = new Error(
+          `responses event ${frame.sequence}: invalid event shape`,
         );
         break;
       }

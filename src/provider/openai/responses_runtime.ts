@@ -16,6 +16,7 @@ import type { Provider } from "./provider.ts";
 import {
   buildResponsesRequest,
   convertResponsesUsage,
+  decodeResponsesCompletedObject,
   type ResponsesCompletedObject,
 } from "./responses.ts";
 import {
@@ -373,11 +374,17 @@ export class ResponsesRunManager {
         );
       }
       if (responseBody.length > 0) {
+        let parsed: unknown;
         try {
-          return JSON.parse(responseBody) as ResponsesCompletedObject;
+          parsed = JSON.parse(responseBody);
         } catch {
           throw new Error("decode background response: invalid JSON");
         }
+        const completed = decodeResponsesCompletedObject(parsed);
+        if (completed === undefined) {
+          throw new Error("decode background response: invalid JSON");
+        }
+        return completed;
       }
       return {};
     }

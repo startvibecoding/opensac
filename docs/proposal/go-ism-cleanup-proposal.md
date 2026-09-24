@@ -11,7 +11,7 @@
 > anti-fragmentation invariants in `AGENTS.md` and keeps the public `sdk/`
 > surface stable.
 
-- 状态: 主体完成（P0–P4 + P1-3 + §3.4-1/§3.4-2 + comma-ok/value+error 扫尾 + P2-1 ACP teardown + P3 治理余项已落地，2026-09-24 收尾轮）；唯一接受残差见 §4 末「余项汇总（2026-09-24）」：provider SSE 解码 guard（另行评估）
+- 状态: 主体完成（P0–P4 + P1-3 + §3.4-1/§3.4-2 + comma-ok/value+error 扫尾 + P2-1 ACP teardown + P3 治理余项 + provider SSE 解码 guard 已落地，2026-09-24 收尾轮）；唯一接受残差见 §4 末「余项汇总（2026-09-24）」：自有持久化 JSON 列（自写自读）
 - 范围: `src/`、`sdk/`（不含 `desktop/`、生成物）
 - 前置文档: `docs/proposal/go-to-deno-migration.md`（迁移台账）、`AGENTS.md`（架构不变量）
 
@@ -62,7 +62,7 @@
 | `): [a, b]` 多返回值（含 comma-ok、value+error） | 17（2026-09-24 实测；comma-ok 与 value+error 均已清零，余为坐标/语义多值保留项） | Go 多返回值 / `, ok` 惯用法；四批累计清零 ~55 处，见余项汇总 |
 | `BoolPtr` / `clone*Ptr` no-op helper | 0 ✅（P0 已清零） | Go 指针/值语义残留；`cloneString*` 防共享 helper 按 §5 保留 |
 | `| null` vs `| undefined` | 807 vs 990 | 两套"空"语义混用 |
-| `JSON.parse(...) as T` 无校验解码 | 42（外部输入边界已全部 guard，余为 provider SSE/自有持久化列） | Go `json.Unmarshal` 直译，类型靠断言 |
+| `JSON.parse(...) as T` 无校验解码 | 33（2026-09-24 实测；外部输入边界与 provider SSE 已全部 guard，余为自有持久化 JSON 列） | Go `json.Unmarshal` 直译，类型靠断言 |
 | `finally {` | 88（2026-09-24 实测，非测试代码） | Go `defer` 的手写展开；13 处 `Symbol.dispose` 已落地，热点 teardown 已分层重构 ✅（P2-1） |
 | 自定义 `close(): void` 句柄 | 13 | Go `io.Closer`，可用 `Symbol.dispose` |
 | `export class` vs `export function` | 227 vs 1659 | class 多为"带方法的 struct"直译 |
@@ -431,8 +431,20 @@ P1-3 完成记录（2026-09-23）:
    `allow.json`/`env.json`/`mcp.json` 改字段读取（错型字段→`undefined` 回退默认，
    坏条目跳过）；DAO `mapRow` 评估结论: 已每表集中（`*FromRecord` + 记录接口 +
    `queryOne<T>`，行映射本就内聚在 DAO/session），无需重构；
-   余项（接受的残差）: provider SSE 解码（供应商协议面，另行评估）、
-   自有持久化 JSON 列（自写自读）、`settings.ts` 自带字段级解码无需迁移。
+   余项（接受的残差）: 自有持久化 JSON 列（自写自读）、
+   `settings.ts` 自带字段级解码无需迁移。provider SSE 解码 ✅ 已治
+   （2026-09-24 收尾轮）: 三家 provider 的 SSE 解码改字段读取器解码器
+   （`decodeAnthropicStreamEvent`/`decodeGoogleStreamChunk`/
+   `decodeOpenAIStreamChunk`/`decodeResponsesEvent`+
+   `decodeResponsesCompletedObject`，复用 `src/util/json.ts` 字段读取器，
+   不引 schema 库），wire-presence 保持（真实部分携带的 usage/delta 字段
+   缺失读 `undefined`，消费点 `?? 0` 兼容），错型字段降级 `undefined`、
+   坏条目跳过、未知事件类型/字段宽容（前向兼容），`null` 可空字段保留
+   `null`；非对象 payload 从 TypeError 炸流改为形状错误干净退出；
+   `ResponsesCompletedObject.output` 声明修正为 `Array<string | Record>`
+   （原 `string[]` 与消费点 `decodeResponsesOutputItem` 不符）；
+   10 个确定性测试（合法样本逐字段 parity、坏 JSON、错型字段、未知类型）；
+   验收: `src/provider` 非测试 `JSON.parse as` → 0。
 4. ✅ 同步 DAO 慢查询基线（§3.7-1）: 新建 `src/db/query_stats.ts`，在
    `src/dao/database.ts` 的 5 个统一查询入口计时（`queryAll`/`queryOne`/
    `queryOptional`/`execChanges`/`execReturning`），≥50ms 计入 slow 并保留最慢
@@ -578,7 +590,13 @@ P0–P4 主体落地后的真实剩余工作（状态行以此为准）:
   `Server` 改 async 接线，build 补 `--include`，编译产物 smoke 通过）、
   分片让出（grep 批量匹配每块一让出点）、RE2 完全隔离（受限 worker +
   超时，`(a|a)+$` 族从挂死变有界超时 + 字面量回退）；
-  唯一接受残差: provider SSE 解码 guard（供应商协议面，另行评估）；
+  唯一接受残差: provider SSE 解码 guard ✅ 已治（2026-09-24 收尾轮）:
+  三家 provider 的 SSE 解码改 `src/util/json.ts` 字段读取器解码器（不引
+  schema 库，复用 MCP wire 先例），wire-presence 保持 + 错型降级 + 未知
+  事件/字段宽容（前向兼容），非对象 payload 从 TypeError 炸流改为干净
+  形状错误；`output` 声明修正与消费点对齐；10 个解码测试锁 parity 与
+  边界语义；`src/provider` 非测试 `JSON.parse as` → 0，残差只剩自有
+  持久化 JSON 列（自写自读，33 处）；
 - ✅ **comma-ok + value+error 扫尾已完成**（2026-09-24 收尾轮）:
   `session/store.getLatest*` ×5 改 `T | null`（接口+`MemoryStore`+私有
   `latestByType`+`latestCompactionLocked`，`emptyCompactionEntry` 零值伪造
@@ -657,6 +675,7 @@ grep -rn --include='*.ts' -E "Ported from|Deviation:" src sdk | wc -l
 grep -rn --include='*.ts' -E "\[Symbol\.(async)?Dispose\]" src | wc -l
 grep -rn --include='*.ts' -E "LIFO:|Go's `defer" src | grep -v _test   # 应为 0（P2-1 已清）
 grep -rn "new Worker(" src --include='*.ts' | grep -v _test   # Worker 入口仅 workflow/js、util/regex_match、stats/query_offload
+grep -rn --include='*.ts' -E "JSON\.parse\([^)]*\) as " src/provider | grep -v _test   # 应为 0（provider SSE 已 guard）
 ```
 
 ## 附录 B: 典型案例对照
