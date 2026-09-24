@@ -7,6 +7,7 @@ import { EventEmitter } from "node:events";
 import { render } from "ink";
 import { TuiShell } from "./tui_shell.tsx";
 import { AppController } from "./app_controller.ts";
+import { EVENT_TEXT_DELTA, EVENT_TURN_START } from "../agent/events.ts";
 import { InputState } from "./input_state.ts";
 import { Translator } from "./i18n.ts";
 import type { TUISession } from "./tui_session.ts";
@@ -201,6 +202,76 @@ Deno.test({
     await sleep(60);
     assertEquals(h.submitted, [payload]);
     h.unmount();
+  },
+});
+
+Deno.test({
+  name: "ESM panel is exclusive and closes while output continues",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const translator = new Translator("en");
+    const controller = new AppController(translator, {
+      onMessage: () => {},
+      scheduleRender: () => {},
+    });
+    controller.handleAgentEvent({ type: EVENT_TURN_START });
+    controller.handleAgentEvent({
+      type: EVENT_TEXT_DELTA,
+      textDelta: "LIVE-TRANSCRIPT",
+    });
+    const input = new InputState({ width: 98, translator });
+    const state = { esmOpen: true };
+    const session = {
+      controller,
+      input,
+      translator,
+      header: { version: "t", providerName: "p", modelName: "m", cwd: "/w" },
+      busy: false,
+      mode: "yolo",
+      toolModalOpen: false,
+      planModalOpen: false,
+      get esmPanelOpen() {
+        return state.esmOpen;
+      },
+      esmPanelView: () => "ESM-PANEL-CONTENT",
+      closeESMPanel: () => {
+        state.esmOpen = false;
+      },
+      answerApproval: () => {},
+      answerQuestion: () => {},
+      cancelRun: () => {},
+    } as unknown as TUISession;
+
+    const stdin = new FakeStdin();
+    const stdout = new FakeStdout();
+    const instance = render(
+      React.createElement(TuiShell, {
+        session,
+        controller,
+        version: 0,
+        width: 100,
+        onSubmit: () => {},
+        onExit: () => {},
+      }),
+      {
+        stdin: stdin as unknown as NodeJS.ReadStream,
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        exitOnCtrlC: false,
+        patchConsole: false,
+      },
+    );
+    await sleep(40);
+    assert(stdout.output.includes("ESM-PANEL-CONTENT"), stdout.output);
+    assert(!stdout.output.includes("LIVE-TRANSCRIPT"), stdout.output);
+
+    const closeStart = stdout.output.length;
+    stdin.push("\x05"); // ctrl+e
+    await sleep(40);
+    assertEquals(state.esmOpen, false);
+    const closed = stdout.output.slice(closeStart);
+    assert(closed.includes("LIVE-TRANSCRIPT"), closed);
+    instance.unmount();
   },
 });
 

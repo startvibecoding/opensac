@@ -142,6 +142,8 @@ export function TuiShell({
 
   // Include `version` so React re-renders when the store changes externally.
   void version;
+  const overlayOpen = session.toolModalOpen || session.planModalOpen ||
+    session.esmPanelOpen;
 
   return (
     <Box flexDirection="column">
@@ -150,7 +152,7 @@ export function TuiShell({
         header: session.header,
         width,
         compactMode: session.compactMode,
-        overlayOpen: session.toolModalOpen || session.planModalOpen,
+        overlayOpen,
       }) as ReactElement}
       {session.toolModalOpen && (
         <Box flexDirection="column">

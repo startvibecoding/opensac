@@ -417,6 +417,68 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "overlay freezes new scrollback and hides live activity",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const { c } = controller("lead");
+    const view = (overlayOpen: boolean) =>
+      App({
+        controller: c,
+        header: {
+          version: "test",
+          providerName: "p",
+          modelName: "m",
+          cwd: "/w",
+        },
+        width: 90,
+        overlayOpen,
+      });
+    const stdout = new FakeStdout();
+    const instance = render(view(false), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      exitOnCtrlC: false,
+      patchConsole: false,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
+    c.handleAgentEvent(
+      ev({ type: EVENT_TEXT_DELTA, textDelta: "before overlay" }),
+    );
+    c.handleAgentEvent(ev({ type: EVENT_TURN_END }));
+    instance.rerender(view(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const overlayStart = stdout.output.length;
+
+    c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
+    c.handleAgentEvent(
+      ev({ type: EVENT_TEXT_DELTA, textDelta: "hidden while open" }),
+    );
+    c.handleAgentEvent(ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "live-tool",
+      toolName: "bash",
+      toolArgs: { command: "never-render-behind-overlay" },
+    }));
+    c.handleAgentEvent(ev({ type: EVENT_TURN_END }));
+    instance.rerender(view(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const hidden = stdout.output.slice(overlayStart);
+    assert(!hidden.includes("hidden while open"), hidden);
+    assert(!hidden.includes("never-render-behind-overlay"), hidden);
+
+    const closeStart = stdout.output.length;
+    instance.rerender(view(false));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const closed = stdout.output.slice(closeStart);
+    assert(closed.includes("hidden while open"), closed);
+    instance.unmount();
+  },
+});
+
 Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
   const { c } = controller("lead");
   c.attachRun(runHandle().handle);

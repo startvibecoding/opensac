@@ -13,7 +13,7 @@
 // - Response text with improved formatting
 // - Status indicators and timing
 
-import React from "react";
+import React, { useRef } from "react";
 import type { ReactElement } from "react";
 import { Box, Static, Text } from "ink";
 import {
@@ -49,9 +49,9 @@ export interface AppProps {
   /** Compact mode: single-line tool summaries (Go a.compactMode). */
   compactMode?: boolean;
   /**
-   * A framed modal overlays the conversation: hide the live streaming tail
-   * (it is already rendered inside the modal) so the managed region fits the
-   * terminal and Ink's full-region repaint cannot scroll or flicker.
+   * A framed panel owns the managed region while open: live transcript rows,
+   * activity rows, and new Static admissions are hidden until it closes so
+   * Ink cannot mix panel updates with output above it.
    */
   overlayOpen?: boolean;
 }
@@ -71,27 +71,29 @@ export interface TranscriptRow {
 }
 
 /** The full-screen layout with enhanced TurnCard display. */
-export function App({
-  controller,
-  header,
-  width = 80,
-  label,
-  visibleRows = [],
-  compactMode = false,
-  overlayOpen = false,
-}: AppProps): ReactElement {
-  if (!controller) {
+export function App(props: AppProps): ReactElement {
+  if (!props.controller) {
     // Legacy banner mode (toolchain smoke tests).
     return (
       <Box flexDirection="column">
         <Text color="cyan" bold>
-          {label ?? "OpenSAC"}
+          {props.label ?? "OpenSAC"}
         </Text>
-        {visibleRows.map((row) => <Text key={row.id}>{row.text}</Text>)}
+        {props.visibleRows?.map((row) => <Text key={row.id}>{row.text}</Text>)}
       </Box>
     );
   }
+  return <ControllerApp {...props} controller={props.controller} />;
+}
 
+/** Controller-backed layout with overlay-safe static admission. */
+function ControllerApp({
+  controller,
+  header,
+  width = 80,
+  compactMode = false,
+  overlayOpen = false,
+}: AppProps & { controller: AppController }): ReactElement {
   const store = controller.store;
   // Rows with an index below the active streaming rows are committed; the
   // active assistant/think slot and running tool rows stay in the managed
@@ -130,7 +132,9 @@ export function App({
   // Live per-turn activity timeline (tools + thinking) tracked by the
   // controller from the agent event stream. Running items carry live elapsed
   // timing; completed items keep their status/result until the next turn.
-  const activities = controller.activityManager.buildTimeline();
+  const activities = overlayOpen
+    ? []
+    : controller.activityManager.buildTimeline();
 
   // Ink supports a single <Static>; header lines and committed transcript rows
   // share it, header first.
@@ -151,10 +155,20 @@ export function App({
       }))
     : [];
   const committedAll = [...headerLines, ...committed];
+  const frozenStatic = useRef<TranscriptRow[] | null>(null);
+  if (overlayOpen) {
+    // Keep Ink's append cursor at the value from the frame that opened the
+    // overlay. Rows completed while a panel is open are admitted exactly once
+    // when it closes, instead of being printed into scrollback above the panel.
+    if (frozenStatic.current === null) frozenStatic.current = committedAll;
+  } else {
+    frozenStatic.current = null;
+  }
+  const staticItems = overlayOpen ? frozenStatic.current : committedAll;
 
   return (
     <Box flexDirection="column">
-      <Static items={committedAll}>
+      <Static items={staticItems ?? []}>
         {(row) => renderRow(row, false)}
       </Static>
 
@@ -163,7 +177,7 @@ export function App({
           Rows receive width-4: 1-col left indent (marginLeft) + 3 cols of
           margin slack so a full-width row never touches the terminal edge. */
       }
-      {activities.length > 0 && (
+      {!overlayOpen && activities.length > 0 && (
         <Box flexDirection="column" marginLeft={1} marginBottom={1}>
           {activities.map((activity) => (
             activity.type === "tool"
