@@ -9,6 +9,10 @@ import type { FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
 import type { TaskPlan } from "../tools/tool.ts";
+import {
+  TOOL_EXECUTION_INTERRUPTED,
+  type ToolExecutionState,
+} from "../agent/events.ts";
 
 export type ToolResultStatus = "running" | "completed" | "interrupted";
 
@@ -26,7 +30,7 @@ export interface ToolResultEntry {
   plan?: TaskPlan;
   /** Stable presentation error from the tool execution. */
   toolError: string;
-  executionState: string;
+  executionState: ToolExecutionState | "";
   /** Index in messages where this tool row lives. */
   msgIndex: number;
 }
@@ -40,7 +44,7 @@ export interface ToolResultEvent {
   toolDiff?: FileDiff;
   plan?: TaskPlan;
   toolError?: Error;
-  toolExecutionState?: string;
+  toolExecutionState?: ToolExecutionState;
 }
 
 export interface TranscriptStoreOptions {
@@ -244,7 +248,9 @@ export class TranscriptStore {
       }
       row.toolName = matchedName;
       row.toolArgs = matchedArgs;
-      row.status = "completed";
+      row.status = event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED
+        ? "interrupted"
+        : "completed";
       row.fullContent = event.toolResult ?? "";
       row.diff = event.toolDiff;
       row.plan = event.plan;
@@ -267,7 +273,9 @@ export class TranscriptStore {
       toolCallID: event.toolCallID,
       toolName: matchedName,
       toolArgs: matchedArgs,
-      status: "completed",
+      status: event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED
+        ? "interrupted"
+        : "completed",
       msgIndex: msgIdx,
       fullContent: event.toolResult ?? "",
       diff: event.toolDiff,

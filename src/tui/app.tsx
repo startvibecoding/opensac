@@ -16,6 +16,10 @@
 import React from "react";
 import type { ReactElement } from "react";
 import { Box, Static, Text } from "ink";
+import {
+  TOOL_EXECUTION_FAILED,
+  TOOL_EXECUTION_INTERRUPTED,
+} from "../agent/events.ts";
 import { AppController } from "./app_controller.ts";
 import { renderHeader } from "./header.ts";
 import { displayWidth } from "./formatters.ts";
@@ -281,7 +285,8 @@ function rowTextAt(
       compact,
     );
     const warning = tool.status === "interrupted" || tool.toolError !== "" ||
-      tool.executionState.toLowerCase() === "failed";
+      tool.executionState === TOOL_EXECUTION_FAILED ||
+      tool.executionState === TOOL_EXECUTION_INTERRUPTED;
     return {
       text,
       kind: warning ? "warning" : "tool",

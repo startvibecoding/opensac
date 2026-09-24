@@ -263,6 +263,7 @@ export class AppController {
           event.toolCallId ?? "",
           event.toolResult ?? "",
           event.toolError?.message,
+          event.toolExecutionState,
         );
         this.#cb.scheduleRender();
         return;

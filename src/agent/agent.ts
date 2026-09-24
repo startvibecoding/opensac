@@ -165,6 +165,10 @@ import {
   TASK_INCOMPLETE,
   TASK_SUCCESS,
   type TaskStatus,
+  TOOL_EXECUTION_COMPLETED,
+  TOOL_EXECUTION_FAILED,
+  TOOL_EXECUTION_INTERRUPTED,
+  TOOL_EXECUTION_REUSED,
 } from "./events.ts";
 import { compactWithOptions } from "../context/compaction.ts";
 import { generateID } from "../session/entry.ts";
@@ -2921,6 +2925,7 @@ export class Agent {
             toolName: tc.name,
             toolResult: errMsg,
             toolError: err as Error,
+            toolExecutionState: TOOL_EXECUTION_FAILED,
           });
           return toolResult(errMsg, undefined, true);
         }
@@ -2941,6 +2946,7 @@ export class Agent {
           toolName: tc.name,
           toolResult: errMsg,
           toolError: new Error(errMsg),
+          toolExecutionState: TOOL_EXECUTION_FAILED,
         });
         return toolResult(errMsg, undefined, true);
       }
@@ -2962,6 +2968,7 @@ export class Agent {
           toolName: tc.name,
           toolResult: errMsg,
           toolError: new Error(errMsg),
+          toolExecutionState: TOOL_EXECUTION_FAILED,
         });
         return toolResult(errMsg, undefined, true);
       }
@@ -2974,6 +2981,7 @@ export class Agent {
           toolName: tc.name,
           toolResult: errMsg,
           toolError: new Error(errMsg),
+          toolExecutionState: TOOL_EXECUTION_FAILED,
         });
         return toolResult(errMsg, undefined, true);
       }
@@ -2995,6 +3003,7 @@ export class Agent {
             toolName: tc.name,
             toolResult: reason,
             toolError: new Error(reason),
+            toolExecutionState: TOOL_EXECUTION_INTERRUPTED,
           });
           return toolResult(reason, undefined, true);
         }
@@ -3029,6 +3038,7 @@ export class Agent {
               toolName: tc.name,
               toolResult: reason,
               toolError: new Error(reason),
+              toolExecutionState: TOOL_EXECUTION_INTERRUPTED,
             });
             return toolResult(reason, undefined, true);
           }
@@ -3050,6 +3060,7 @@ export class Agent {
             toolName: tc.name,
             toolResult: reason,
             toolError: new Error(reason),
+            toolExecutionState: TOOL_EXECUTION_INTERRUPTED,
           });
           return toolResult(reason, undefined, true);
         }
@@ -3100,6 +3111,7 @@ export class Agent {
             toolName: tc.name,
             toolResult: errMsg,
             toolError: claimErr,
+            toolExecutionState: TOOL_EXECUTION_FAILED,
           });
           return toolResult(errMsg, undefined, true);
         }
@@ -3119,8 +3131,8 @@ export class Agent {
             if (gated.error !== undefined) reusedResult.toolKind = tc.kind;
           }
           const executionState = reusedResult.isError === true
-            ? "interrupted"
-            : "reused";
+            ? TOOL_EXECUTION_FAILED
+            : TOOL_EXECUTION_REUSED;
           this.sendEvent(ch, {
             type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
@@ -3170,7 +3182,7 @@ export class Agent {
               toolName: tc.name,
               toolResult: reason,
               toolError: new Error(reason),
-              toolExecutionState: "interrupted",
+              toolExecutionState: TOOL_EXECUTION_INTERRUPTED,
             });
             return toolResult(reason, undefined, true);
           }
@@ -3223,6 +3235,9 @@ export class Agent {
         resultContents = gated.contents;
         isError = gated.isError;
         if (gated.error !== undefined) err = gated.error;
+        const terminalState = isError || err !== undefined
+          ? TOOL_EXECUTION_FAILED
+          : TOOL_EXECUTION_COMPLETED;
         if (claimed !== null && this.config.session !== undefined) {
           try {
             updateToolExecutionRecord(this.config.session.getSessionDir(), {
@@ -3255,6 +3270,7 @@ export class Agent {
           toolResult: resultContent,
           toolDiff: resultDiff,
           toolError: err,
+          toolExecutionState: terminalState,
           toolImages: toolResultImages(resultContents ?? []),
         });
         this.sendEvent(ch, {
@@ -3264,6 +3280,7 @@ export class Agent {
           toolResult: resultContent,
           toolDiff: resultDiff,
           toolError: err,
+          toolExecutionState: terminalState,
         });
         return toolResult(resultContent, resultContents, isError);
       } finally {

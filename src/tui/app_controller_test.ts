@@ -14,6 +14,7 @@ import {
   EVENT_TEXT_DELTA,
   EVENT_THINK_DELTA,
   EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
   EVENT_TOOL_RESULT,
   EVENT_TURN_END,
@@ -133,6 +134,39 @@ Deno.test("tool events open and terminalize rows", () => {
     toolResult: "out",
   }));
   assertEquals(c.store.toolResults[0].status, "completed");
+});
+
+Deno.test("tool terminal state distinguishes failed and interrupted results", () => {
+  const { c } = controller("lead");
+  c.handleAgentEvent(ev({
+    type: EVENT_TOOL_EXECUTION_START,
+    toolCallId: "failed-tool",
+    toolName: "read",
+  }));
+  c.handleAgentEvent(ev({
+    type: EVENT_TOOL_EXECUTION_END,
+    toolCallId: "failed-tool",
+    toolName: "read",
+    toolResult: "tool failed",
+    toolExecutionState: "failed",
+  }));
+  assertEquals(c.store.toolResults[0].status, "completed");
+  assertEquals(c.store.toolResults[0].executionState, "failed");
+
+  c.handleAgentEvent(ev({
+    type: EVENT_TOOL_EXECUTION_START,
+    toolCallId: "stopped-tool",
+    toolName: "read",
+  }));
+  c.handleAgentEvent(ev({
+    type: EVENT_TOOL_EXECUTION_END,
+    toolCallId: "stopped-tool",
+    toolName: "read",
+    toolResult: "stopped",
+    toolExecutionState: "interrupted",
+  }));
+  assertEquals(c.store.toolResults[1].status, "interrupted");
+  assertEquals(c.store.toolResults[1].executionState, "interrupted");
 });
 
 Deno.test("tool call event uses the embedded ToolCallBlock id/name", () => {

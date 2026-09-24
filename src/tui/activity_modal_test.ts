@@ -102,6 +102,18 @@ Deno.test("activity store folds deltas, tools, and terminal states", () => {
   assertEquals(store.order, ["a1"]);
 });
 
+Deno.test("activity store honors canonical tool failure without an Error", () => {
+  const store = new AgentActivityStore();
+  store.record({
+    type: EVENT_TOOL_RESULT,
+    agentId: "a1",
+    toolName: "read",
+    toolResult: "failed",
+    toolExecutionState: "failed",
+  });
+  assertEquals(store.get("a1")!.state, "error");
+});
+
 Deno.test("activity store keeps terminal state on late events", () => {
   const store = new AgentActivityStore();
   store.record({ type: EVENT_DONE, agentId: "a1" });

@@ -27,6 +27,8 @@ import {
   EVENT_TOOL_RESULT,
   TASK_CANCELED,
   TASK_FAILED,
+  TOOL_EXECUTION_FAILED,
+  TOOL_EXECUTION_INTERRUPTED,
 } from "../agent/events.ts";
 import { truncateDisplay } from "./formatters.ts";
 import { sprintf } from "./i18n.ts";
@@ -217,6 +219,11 @@ export class AgentActivityStore {
       }
       case EVENT_TOOL_RESULT:
       case EVENT_TOOL_EXECUTION_END: {
+        if (event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED) {
+          act.state = "canceled";
+        } else if (event.toolExecutionState === TOOL_EXECUTION_FAILED) {
+          act.state = "error";
+        }
         let name = event.toolName ?? "";
         if (!name && event.toolCall) name = event.toolCall.name;
         let result = (event.toolResult ?? "").trim();

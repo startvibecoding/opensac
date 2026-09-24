@@ -89,6 +89,18 @@ export function taskStatusIsSuccessful(s: TaskStatus): boolean {
   return s === TASK_SUCCESS;
 }
 
+/** Canonical terminal state for a tool execution projection. */
+export const TOOL_EXECUTION_COMPLETED = "completed" as const;
+export const TOOL_EXECUTION_FAILED = "failed" as const;
+export const TOOL_EXECUTION_INTERRUPTED = "interrupted" as const;
+export const TOOL_EXECUTION_REUSED = "reused" as const;
+
+export type ToolExecutionState =
+  | typeof TOOL_EXECUTION_COMPLETED
+  | typeof TOOL_EXECUTION_FAILED
+  | typeof TOOL_EXECUTION_INTERRUPTED
+  | typeof TOOL_EXECUTION_REUSED;
+
 /** Event represents an event from the agent to the UI. */
 export interface Event {
   type: EventType;
@@ -124,7 +136,7 @@ export interface Event {
   toolResult?: string;
   toolDiff?: FileDiff;
   toolError?: Error;
-  toolExecutionState?: string;
+  toolExecutionState?: ToolExecutionState;
   toolImages?: ToolImage[];
   partialResult?: unknown;
 

@@ -3,6 +3,11 @@
 // Inspired by moark's activity tracking system but adapted for Ink TUI.
 // Manages the activity timeline for each conversation turn.
 
+import {
+  TOOL_EXECUTION_FAILED,
+  TOOL_EXECUTION_INTERRUPTED,
+  type ToolExecutionState,
+} from "../agent/events.ts";
 import type { ActivityItem, ActivityStatus } from "./turn_card.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +102,7 @@ export class ActivityManager {
     id: string,
     result?: string,
     error?: string,
+    executionState?: ToolExecutionState,
   ): void {
     const tool = this.#tools.get(id);
     if (!tool) return;
@@ -104,7 +110,11 @@ export class ActivityManager {
     tool.endTime = Date.now();
     tool.result = result;
     tool.error = error;
-    tool.status = error ? "error" : "completed";
+    tool.status = executionState === TOOL_EXECUTION_INTERRUPTED
+      ? "interrupted"
+      : error || executionState === TOOL_EXECUTION_FAILED
+      ? "error"
+      : "completed";
   }
 
   /**

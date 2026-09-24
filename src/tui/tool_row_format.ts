@@ -9,6 +9,10 @@
 // These are pure string builders; no Ink/React here.
 //
 
+import {
+  TOOL_EXECUTION_FAILED,
+  type ToolExecutionState,
+} from "../agent/events.ts";
 import type { FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import type { Translator } from "./i18n.ts";
@@ -29,7 +33,7 @@ export interface ToolRowInput {
   /** Spinner frame prefixed to the running label on live rows. */
   spinner?: string;
   toolError: string;
-  executionState: string;
+  executionState: ToolExecutionState | "";
 }
 
 // ── argument helpers ────────────────────────────────────────────────────────
@@ -165,6 +169,23 @@ function editedLine(tr: Translator, input: ToolRowInput): string {
   return excerpt === "" ? header : `${header}\n${excerpt}`;
 }
 
+/** Renders a canonical failed result even when the failure has no Error. */
+function failedLine(
+  tr: Translator,
+  input: ToolRowInput,
+  compact: boolean,
+): string {
+  const header = `${toolHeader(input)} ${tr.text("tool.modal.state.error")}`;
+  if (compact) return header;
+
+  const parts: string[] = [];
+  if (input.fullContent !== "") parts.push("---", input.fullContent);
+  if (input.diff?.unified !== undefined && input.diff.unified.trim() !== "") {
+    parts.push(tr.text("tool.modal.diff"), input.diff.unified);
+  }
+  return parts.length === 0 ? header : `${header}\n${parts.join("\n")}`;
+}
+
 /** Edit/write header only: `Edited path (+3 -1)` (Go formatExpandedEditHeader). */
 function editHeader(tr: Translator, input: ToolRowInput): string {
   let p = toolPath(input.toolArgs);
@@ -190,6 +211,12 @@ export function expandedToolRow(
   input: ToolRowInput,
 ): string {
   if (input.status === "running") return runningLine(tr, input);
+  if (
+    input.toolName !== "bash" &&
+    input.executionState === TOOL_EXECUTION_FAILED
+  ) {
+    return failedLine(tr, input, false);
+  }
   if (input.toolName === "plan") return planRow(tr, input, false);
 
   let header: string;
@@ -310,6 +337,12 @@ export function formatToolRow(
 ): string {
   if (input.status === "running") return runningLine(tr, input);
 
+  if (
+    input.toolName !== "bash" &&
+    input.executionState === TOOL_EXECUTION_FAILED
+  ) {
+    return failedLine(tr, input, compact);
+  }
   if (input.toolName === "bash") {
     const header = bashCommandLine(tr, input);
     let summary = input.summary;

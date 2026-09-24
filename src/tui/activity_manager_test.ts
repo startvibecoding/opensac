@@ -43,6 +43,17 @@ Deno.test("ActivityManager marks errored and interrupted tools", () => {
   assertEquals(am.hasRunningActivities(), true);
 });
 
+Deno.test("ActivityManager honors canonical tool state without an Error", () => {
+  const am = new ActivityManager();
+  am.startToolExecution("failed", "read");
+  am.completeToolExecution("failed", "failed", undefined, "failed");
+  am.startToolExecution("stopped", "write");
+  am.completeToolExecution("stopped", "stopped", undefined, "interrupted");
+  const items = am.buildTimeline();
+  assertEquals(items.find((i) => i.id === "failed")?.status, "error");
+  assertEquals(items.find((i) => i.id === "stopped")?.status, "interrupted");
+});
+
 Deno.test("ActivityManager tracks thinking blocks and clears per turn", () => {
   const am = new ActivityManager();
   am.startThinking("turn");

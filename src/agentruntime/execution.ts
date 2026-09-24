@@ -32,6 +32,7 @@ import {
   TASK_CANCELED,
   TASK_INCOMPLETE,
   taskStatusIsSuccessful,
+  TOOL_EXECUTION_INTERRUPTED,
 } from "../agent/events.ts";
 import { readSessionExecutionFacts } from "../session/execution_facts.ts";
 import {
@@ -1898,7 +1899,7 @@ export class ExecutionRuntime {
         this.facts.phase = PHASE_TOOL;
         {
           let effect = toolSideEffectState(ev.toolName ?? "");
-          if (ev.toolExecutionState === "interrupted") {
+          if (ev.toolExecutionState === TOOL_EXECUTION_INTERRUPTED) {
             effect = SIDE_EFFECT_UNKNOWN;
           }
           this.facts.sideEffects = combineSideEffectState(

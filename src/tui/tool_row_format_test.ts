@@ -171,6 +171,18 @@ Deno.test("interrupted non-bash row shows canceled state", () => {
   assertEquals(row, "[write] x canceled");
 });
 
+Deno.test("failed non-bash rows show canonical error state", () => {
+  const row = formatToolRow(
+    tr,
+    input({
+      executionState: "failed",
+      fullContent: "tool output",
+    }),
+    false,
+  );
+  assertEquals(row, "[read] error\n---\ntool output");
+});
+
 Deno.test("compact mode forces a single-line summary", () => {
   const row = formatToolRow(
     tr,
