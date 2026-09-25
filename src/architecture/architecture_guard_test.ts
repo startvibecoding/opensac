@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import {
+  coreBoundaryAllowlist,
   foreignKeyEnforcementPattern,
   importSpecifiers,
   productionViolations,
@@ -15,8 +16,8 @@ function formatViolations(violations: Violation[]): string {
 }
 
 // Prevents adapters from silently reintroducing complete Agent construction or
-// canonical Run persistence. The allowlist is intentionally empty: every entry
-// must be an explicit, documented migration bridge.
+// canonical Run persistence. The Core allowlist is file-specific and remains
+// subject to the same Agent/runtime checks as every other production module.
 Deno.test("production architecture guard", () => {
   const violations = productionViolations(projectRoot);
   assertEquals(
@@ -24,6 +25,100 @@ Deno.test("production architecture guard", () => {
     [],
     `production architecture violations:\n- ${formatViolations(violations)}`,
   );
+});
+
+Deno.test("Core boundary allowlist is narrow and preserves Agent construction guards", () => {
+  const root = Deno.makeTempDirSync();
+  try {
+    const coreDir = join(root, "src/core");
+    Deno.mkdirSync(coreDir, { recursive: true });
+    Deno.writeTextFileSync(
+      join(coreDir, "server.ts"),
+      [
+        'import { Agent } from "../agent/agent.ts";',
+        'export function build() { return new Agent("id", "", {}, {}); }',
+      ].join("\n"),
+    );
+    Deno.writeTextFileSync(
+      join(coreDir, "client.ts"),
+      [
+        'export * from "../agent/agent.ts";',
+        'const name = "agent";',
+        "const mod = await import(`../agent/${name}.ts`);",
+        'import "../esm/runtime_core.ts";',
+        'import "../context/contextfiles.ts";',
+        'import "../ai/example.ts";',
+        'const dynamicName = "agent";',
+        'const concatenated = await import("../agent/" + dynamicName + ".ts");',
+      ].join("\n"),
+    );
+    Deno.writeTextFileSync(
+      join(coreDir, "unreviewed.ts"),
+      "export const value = true;\n",
+    );
+
+    const violations = productionViolations(root);
+    const joined = formatViolations(violations);
+    const clientViolations = violations.filter(
+      (violation) => violation.file === "src/core/client.ts",
+    );
+    assert(
+      clientViolations.some((violation) =>
+        violation.message.includes(
+          "Core foundation imports runtime implementation module",
+        )
+      ),
+    );
+    assert(
+      clientViolations.some((violation) =>
+        violation.message.includes("non-literal dynamic import")
+      ),
+    );
+    for (const specifier of ["../esm/", "../context/", "../ai/"]) {
+      assert(
+        clientViolations.some((violation) =>
+          violation.message.includes(specifier)
+        ),
+        `expected omitted Core dependency ${specifier}`,
+      );
+    }
+    assert(joined.includes("direct new Agent"));
+    assert(joined.includes("explicitly classified"));
+    assert(
+      Object.keys(coreBoundaryAllowlist).every((path) =>
+        path.startsWith("src/core/") && path.endsWith(".ts")
+      ),
+    );
+  } finally {
+    Deno.removeSync(root, { recursive: true });
+  }
+});
+
+Deno.test("Core boundary rejects a concatenated dynamic import independently", () => {
+  const root = Deno.makeTempDirSync();
+  try {
+    const coreDir = join(root, "src/core");
+    Deno.mkdirSync(coreDir, { recursive: true });
+    Deno.writeTextFileSync(
+      join(coreDir, "client.ts"),
+      [
+        'const name = "agent";',
+        'const mod = await import("../agent/" + name + ".ts");',
+      ].join("\n"),
+    );
+
+    const violations = productionViolations(root).filter(
+      (violation) => violation.file === "src/core/client.ts",
+    );
+    assertEquals(
+      violations.filter((violation) =>
+        violation.message.includes("non-literal dynamic import")
+      ).length,
+      1,
+    );
+  } finally {
+    Deno.removeSync(root, { recursive: true });
+  }
 });
 
 Deno.test("string literals ignore comments and template bodies", () => {
@@ -40,12 +135,16 @@ Deno.test("import specifiers read static and dynamic imports", () => {
     'import { createSessionRun } from "../session/run_store.ts";',
     'import type { SQLInputValue } from "node:sqlite";',
     'import "side-effect";',
+    'export * from "../agent/agent.ts";',
+    'export { Runtime } from "../agentruntime/index.ts";',
     'const mod = await import("./dynamic.ts");',
   ].join("\n");
   assertEquals(importSpecifiers(source), [
     "../session/run_store.ts",
     "node:sqlite",
     "side-effect",
+    "../agent/agent.ts",
+    "../agentruntime/index.ts",
     "./dynamic.ts",
   ]);
 });

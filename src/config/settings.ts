@@ -10,6 +10,7 @@ import {
   sessionDir as platformSessionDir,
   skillsDir as platformSkillsDir,
 } from "../platform/platform.ts";
+import { type CoreSettings, defaultCoreConfig } from "../core/config.ts";
 import type { Options as SandboxOptions } from "../sandbox/sandbox.ts";
 import { Level } from "../sandbox/sandbox.ts";
 import { defaultProviderConfigs } from "./provider_defaults.ts";
@@ -241,6 +242,7 @@ export interface Settings {
   defaultModel?: string;
   defaultThinkingLevel?: string;
   defaultMode?: string;
+  core?: CoreSettings;
   authored?: boolean;
   tuilang?: string;
   toolExecution?: ToolExecutionSettings;
@@ -413,6 +415,7 @@ export function defaultSettings(): Settings {
     defaultModel: "deepseek-v4-flash",
     defaultThinkingLevel: "medium",
     defaultMode: "yolo",
+    core: defaultCoreConfig(),
     authored: false,
     tuilang: "auto",
     toolExecution: {
@@ -654,6 +657,15 @@ function jsonToolExecution(t: ToolExecutionSettings): Record<string, unknown> {
   return o;
 }
 
+function jsonCore(c: CoreSettings): Record<string, unknown> {
+  const o: Record<string, unknown> = {};
+  put(o, "host", c.host);
+  put(o, "port", c.port);
+  put(o, "auth", c.auth);
+  put(o, "passwords", c.passwords);
+  return o;
+}
+
 function jsonWebSearch(w: WebSearchSettings): Record<string, unknown> {
   const o: Record<string, unknown> = {};
   put(o, "enabled", w.enabled);
@@ -767,6 +779,7 @@ function jsonSettings(s: Settings): Record<string, unknown> {
   putNonEmpty(o, "defaultModel", s.defaultModel);
   putNonEmpty(o, "defaultThinkingLevel", s.defaultThinkingLevel);
   putNonEmpty(o, "defaultMode", s.defaultMode);
+  if (s.core !== undefined) o.core = jsonCore(s.core);
   putNonEmpty(o, "authored", s.authored);
   putNonEmpty(o, "tuilang", s.tuilang);
   if (
@@ -848,6 +861,7 @@ const SETTINGS_SCALAR_KEYS = new Set([
 
 const SETTINGS_OBJECT_KEYS: Record<string, Set<string>> = {
   toolExecution: new Set(["mode", "maxConcurrency"]),
+  core: new Set(["host", "port", "auth", "passwords"]),
   statusLine: new Set([
     "enabled",
     "type",

@@ -31,6 +31,7 @@ import {
   normalizeSamplingPtr,
   parseSettings,
   projectSettingsPath,
+  resolveCoreConfig,
   resolveKey,
   resolveKeyValue,
   resolveModelConfig,
@@ -150,6 +151,66 @@ Deno.test("defaultSettings", () => {
   assertEquals(s.webSearch!.providerType, "openai-responses");
   assertEquals(s.webSearch!.model, undefined);
   assertEquals(s.retry, { enabled: true, maxRetries: 5, baseDelayMs: 3000 });
+  assertEquals(s.core, {
+    host: "127.0.0.1",
+    port: 4096,
+    auth: false,
+    passwords: [],
+  });
+  assertEquals(resolveCoreConfig(s), {
+    host: "127.0.0.1",
+    port: 4096,
+    auth: false,
+    passwords: [],
+  });
+});
+
+Deno.test("core settings merge field-by-field", () => {
+  const global = parseSettings(defaultSettings(), {
+    core: {
+      host: "0.0.0.0",
+      port: 0,
+      auth: false,
+      passwords: ["global-password"],
+    },
+  });
+  const project = parseSettings(global, {
+    core: {
+      port: 4310,
+      auth: true,
+      passwords: ["project-password"],
+    },
+  });
+
+  assertEquals(project.core, {
+    host: "0.0.0.0",
+    port: 4310,
+    auth: true,
+    passwords: ["project-password"],
+  });
+});
+
+Deno.test("core settings serialize explicit values", () => {
+  const data = marshalSettings({
+    core: {
+      host: "0.0.0.0",
+      port: 0,
+      auth: false,
+      passwords: [],
+    },
+  });
+  assertEquals(JSON.parse(data).core, {
+    host: "0.0.0.0",
+    port: 0,
+    auth: false,
+    passwords: [],
+  });
+  assertEquals(parseSettings({}, data).core, {
+    host: "0.0.0.0",
+    port: 0,
+    auth: false,
+    passwords: [],
+  });
 });
 
 Deno.test("default settings confirmBeforeWrite and plan tool", () => {

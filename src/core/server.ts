@@ -1,0 +1,404 @@
+import { CoreAuth } from "./auth.ts";
+import { assertResolvedCoreConfig } from "./config.ts";
+import {
+  formatCoreHostForUrl,
+  isWildcardCoreHost,
+  localCoreConnectHost,
+} from "./endpoint.ts";
+import {
+  CORE_METHODS,
+  coreError,
+  type CoreHealth,
+  type CoreInfo,
+  coreResult,
+  type CoreRpcMessage,
+  type CoreRpcNotification,
+  type CoreRpcRequest,
+  parseCoreRpcMessage,
+} from "./protocol.ts";
+import type { ResolvedCoreConfig } from "./config.ts";
+
+/** The protocol version implemented by this Core server. */
+export const CORE_PROTOCOL_VERSION = 1 as const;
+
+/** Options for the HTTP-only Core server. */
+export interface CoreServerOptions {
+  config: ResolvedCoreConfig;
+  version: string;
+  protocolVersion: number;
+}
+
+/** A running Core HTTP listener. */
+export interface CoreServerHandle {
+  /** The actual address selected by the operating system. */
+  readonly address: Deno.NetAddr;
+  /** A URL that can be used by local HTTP clients. */
+  readonly url: string;
+  /** Gracefully stops only this HTTP server. Safe to call repeatedly. */
+  stop(): Promise<void>;
+}
+
+/** Metadata for a startup failure that may have left a partial listener live. */
+export interface CoreServerStartFailure {
+  /** True when the command must retain process ownership fail-closed. */
+  readonly listenerMayBeAlive: boolean;
+  /** The shutdown error, when partial-listener cleanup was attempted. */
+  readonly cleanupError?: unknown;
+}
+
+/** Raised when CoreServer cannot prove that a partial listener was stopped. */
+export class CoreServerStartError extends Error
+  implements CoreServerStartFailure {
+  readonly listenerMayBeAlive = true;
+  readonly cleanupError?: unknown;
+
+  constructor(
+    message: string,
+    options?: { cause?: unknown; cleanupError?: unknown },
+  ) {
+    super(
+      message,
+      options?.cause === undefined ? undefined : { cause: options.cause },
+    );
+    this.name = "CoreServerStartError";
+    this.cleanupError = options?.cleanupError;
+  }
+}
+
+/** Recognizes both the built-in and structurally compatible start failures. */
+export function isCoreServerStartFailure(
+  error: unknown,
+): error is CoreServerStartFailure {
+  if (error instanceof CoreServerStartError) return true;
+  if (error === null || typeof error !== "object") return false;
+  const candidate = error as Record<string, unknown>;
+  return candidate.listenerMayBeAlive === true;
+}
+
+const JSON_HEADERS = { "content-type": "application/json" } as const;
+const CORE_FEATURES = Object.values(CORE_METHODS);
+
+/**
+ * The HTTP transport for the Core protocol.
+ *
+ * Discovery, registration, locking, and process cleanup intentionally remain
+ * outside this class. It owns only the Deno HTTP listener and its request
+ * projection.
+ */
+export class CoreServer {
+  readonly #options: CoreServerOptions;
+  #startPromise: Promise<CoreServerHandle> | undefined;
+
+  constructor(options: CoreServerOptions) {
+    this.#options = options;
+  }
+
+  /** Starts the listener, or returns the already-started listener handle. */
+  start(signal?: AbortSignal): Promise<CoreServerHandle> {
+    this.#startPromise ??= this.#start(signal);
+    return this.#startPromise;
+  }
+
+  async #start(signal?: AbortSignal): Promise<CoreServerHandle> {
+    throwIfAborted(signal);
+    const { config } = this.#options;
+    assertResolvedCoreConfig(config);
+    if (config.auth && !config.passwords.some((password) => password !== "")) {
+      throw new Error(
+        "Core authentication requires at least one non-empty password",
+      );
+    }
+
+    let resolveAddress!: (address: Deno.NetAddr) => void;
+    let rejectAddress!: (error: unknown) => void;
+    const addressReady = new Promise<Deno.NetAddr>((resolve, reject) => {
+      resolveAddress = resolve;
+      rejectAddress = reject;
+    });
+
+    let server: Deno.HttpServer;
+    try {
+      server = Deno.serve(
+        {
+          hostname: config.host,
+          port: config.port,
+          onListen: (address) => {
+            try {
+              resolveAddress(asNetAddress(address));
+            } catch (error) {
+              rejectAddress(error);
+            }
+          },
+        },
+        (request) => this.#handleRequest(request),
+      );
+    } catch (error) {
+      // Deno.serve reports bind failures synchronously. There is no listener
+      // to await in that case, so do not leave an unobserved rejected promise.
+      throw error;
+    }
+
+    let shutdownPromise: Promise<void> | undefined;
+    let shutdownFailed = false;
+    let shutdownError: unknown;
+    const shutdownPartialListener = (): Promise<void> => {
+      shutdownPromise ??= (async () => {
+        try {
+          await server.shutdown();
+        } catch (error) {
+          if (!isExpectedShutdownError(error)) {
+            shutdownFailed = true;
+            shutdownError = error;
+            throw error;
+          }
+        }
+        try {
+          await server.finished;
+        } catch (error) {
+          if (!isExpectedShutdownError(error)) {
+            shutdownFailed = true;
+            shutdownError = error;
+            throw error;
+          }
+        }
+      })();
+      return shutdownPromise;
+    };
+
+    let abortListener: (() => void) | undefined;
+    if (signal !== undefined) {
+      abortListener = () => {
+        rejectAddress(abortReason(signal));
+        void shutdownPartialListener().catch(() => undefined);
+      };
+      signal.addEventListener("abort", abortListener, { once: true });
+      if (signal.aborted) abortListener();
+    }
+
+    let address: Deno.NetAddr;
+    try {
+      address = await addressReady;
+    } catch (error) {
+      try {
+        await shutdownPartialListener();
+      } catch (cleanupError) {
+        throw new CoreServerStartError(
+          "Core server startup failed and listener shutdown is uncertain",
+          {
+            cause: error,
+            cleanupError: shutdownError ?? cleanupError,
+          },
+        );
+      }
+      if (shutdownFailed) {
+        throw new CoreServerStartError(
+          "Core server startup failed and listener shutdown is uncertain",
+          { cause: error, cleanupError: shutdownError },
+        );
+      }
+      throw error;
+    } finally {
+      if (abortListener !== undefined && signal !== undefined) {
+        signal.removeEventListener("abort", abortListener);
+      }
+    }
+
+    const handle = new CoreHttpServerHandle(
+      server,
+      address,
+      buildServerUrl(config.host, address.port),
+    );
+    return handle;
+  }
+
+  async #handleRequest(request: Request): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+
+    if (pathname === "/health") {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+      return jsonResponse({ healthy: true });
+    }
+
+    if (pathname !== "/rpc") {
+      return jsonRpcErrorResponse(
+        null,
+        -32601,
+        "Not found",
+        404,
+      );
+    }
+
+    if (!CoreAuth.authenticate(request, this.#options.config)) {
+      return jsonRpcErrorResponse(
+        null,
+        -32001,
+        "authentication required",
+        401,
+        { "www-authenticate": "Bearer" },
+      );
+    }
+
+    if (request.method !== "POST") {
+      return methodNotAllowed(["POST"]);
+    }
+
+    let input: unknown;
+    try {
+      input = await request.json();
+    } catch {
+      return jsonRpcErrorResponse(null, -32700, "Parse error", 400);
+    }
+
+    const message = parseCoreRpcMessage(input);
+    if (message === undefined) {
+      return jsonRpcErrorResponse(null, -32600, "Invalid Request", 400);
+    }
+
+    if (!isRequestOrNotification(message)) {
+      return jsonRpcErrorResponse(null, -32600, "Invalid Request", 400);
+    }
+
+    const response = this.#dispatch(message);
+    if (!("id" in message)) {
+      // JSON-RPC notifications are one-way and must not receive a response
+      // envelope. The method still runs so health/info remain useful to
+      // notification-capable transports.
+      return new Response(null, { status: 204 });
+    }
+    return jsonResponse(response);
+  }
+
+  #dispatch(
+    message: CoreRpcRequest | CoreRpcNotification,
+  ): ReturnType<typeof coreResult> | ReturnType<typeof coreError> | undefined {
+    const { version, protocolVersion } = this.#options;
+    const id = "id" in message ? message.id : null;
+
+    switch (message.method) {
+      case CORE_METHODS.health: {
+        const result: CoreHealth = {
+          healthy: true,
+          version,
+          protocolVersion,
+        };
+        return "id" in message ? coreResult(id, result) : undefined;
+      }
+      case CORE_METHODS.info: {
+        const result: CoreInfo = {
+          version,
+          protocolVersion,
+          coreProtocolVersion: CORE_PROTOCOL_VERSION,
+          features: [...CORE_FEATURES],
+        };
+        return "id" in message ? coreResult(id, result) : undefined;
+      }
+      default:
+        return "id" in message
+          ? coreError(id, -32601, "Method not found")
+          : undefined;
+    }
+  }
+}
+
+class CoreHttpServerHandle implements CoreServerHandle {
+  readonly address: Deno.NetAddr;
+  readonly url: string;
+  readonly #server: Deno.HttpServer;
+  #stopPromise: Promise<void> | undefined;
+
+  constructor(server: Deno.HttpServer, address: Deno.NetAddr, url: string) {
+    this.#server = server;
+    this.address = address;
+    this.url = url;
+  }
+
+  stop(): Promise<void> {
+    this.#stopPromise ??= this.#stop();
+    return this.#stopPromise;
+  }
+
+  async #stop(): Promise<void> {
+    try {
+      await this.#server.shutdown();
+    } catch (error) {
+      if (!isExpectedShutdownError(error)) throw error;
+    }
+
+    try {
+      await this.#server.finished;
+    } catch (error) {
+      if (!isExpectedShutdownError(error)) throw error;
+    }
+  }
+}
+
+function isRequestOrNotification(
+  message: CoreRpcMessage,
+): message is CoreRpcRequest | CoreRpcNotification {
+  return "method" in message;
+}
+
+function asNetAddress(address: Deno.Addr): Deno.NetAddr {
+  if (
+    address.transport !== "tcp" ||
+    typeof address.hostname !== "string" ||
+    typeof address.port !== "number"
+  ) {
+    throw new TypeError("Core server must bind a TCP address");
+  }
+  return address;
+}
+
+function buildServerUrl(hostname: string, port: number): string {
+  const connectHost = isWildcardCoreHost(hostname)
+    ? localCoreConnectHost(hostname)
+    : hostname;
+  return `http://${formatCoreHostForUrl(connectHost)}:${port}`;
+}
+
+function methodNotAllowed(allow: string[]): Response {
+  return jsonRpcErrorResponse(
+    null,
+    -32600,
+    "Method not allowed",
+    405,
+    { allow: allow.join(", ") },
+  );
+}
+
+function jsonRpcErrorResponse(
+  id: string | number | null,
+  code: number,
+  message: string,
+  status: number,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return jsonResponse(coreError(id, code, message), status, extraHeaders);
+}
+
+function jsonResponse(
+  value: unknown,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  const headers = new Headers(JSON_HEADERS);
+  for (const [name, headerValue] of Object.entries(extraHeaders)) {
+    headers.set(name, headerValue);
+  }
+  return new Response(`${JSON.stringify(value)}\n`, { status, headers });
+}
+
+function isExpectedShutdownError(error: unknown): boolean {
+  return error instanceof Deno.errors.BadResource;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortReason(signal);
+}
+
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ??
+    new DOMException("Core server startup aborted", "AbortError");
+}

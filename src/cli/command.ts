@@ -2,9 +2,10 @@
 // `registerRootFlags`, `registerACPFlags`, and the root action dispatch).
 //
 // The Cliffy command tree is thin: it maps flags into `CLIOptions` and calls
-// the shared runtime/doctor/MCP entry points. The entry modes are ACP
-// (`opensac acp`), the interactive TUI (the root action), and CLI print mode
-// (`-P`); serve, channel, and A2A modes are not part of this product.
+// the shared runtime/doctor/Core/MCP entry points. The entry modes are ACP
+// (`opensac acp`), the shared Core host (`opensac core`), the interactive TUI
+// (the root action), and CLI print mode (`-P`); serve, channel, and A2A modes
+// are not part of this product.
 //
 // Cliffy 1.3 invokes an option `action` with a single parsed-options argument
 // (`{ camelCaseFlag: value }`), so every action below reads from that object
@@ -19,6 +20,7 @@ import {
 import { runACP, type RunOptions } from "../acp/run.ts";
 import { isStartupError } from "../acp/support.ts";
 import { executeDoctorCommand } from "./doctor.ts";
+import { runCoreCommand } from "./core.ts";
 import { executeKnowledgeMCPCommand } from "./knowledge_mcp.ts";
 import {
   defaultStatsOptions,
@@ -205,6 +207,17 @@ export function createACPCommand(version: string): Command {
       }
     });
   return cmd;
+}
+
+/** Builds the shared Core lifecycle subcommand. */
+export function createCoreCommand(version = currentVersion()): Command {
+  return new Command()
+    .description("Start the shared OpenSAC Core (not a UI-specific server)")
+    .noExit()
+    .action(async () => {
+      const exitCode = await runCoreCommand({ version });
+      if (exitCode !== 0) Deno.exit(exitCode);
+    });
 }
 
 /** Builds the `doctor` subcommand. */
@@ -475,6 +488,7 @@ export function createRootCommand(version = currentVersion()): Command {
   const anyRoot = root as any;
   anyRoot
     .command("acp", createACPCommand(version))
+    .command("core", createCoreCommand(version))
     .command("doctor", createDoctorCommand(version))
     .command("knowledge-mcp", createKnowledgeMCPCommand())
     .command("stats", createStatsCommand())
