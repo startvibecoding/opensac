@@ -17,6 +17,10 @@ import {
   parseCoreRpcMessage,
 } from "./protocol.ts";
 import type { ResolvedCoreConfig } from "./config.ts";
+import { CoreEventStream } from "./event_stream.ts";
+import { CoreRuntimeDispatcher } from "./dispatcher.ts";
+import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
+import type { CoreRuntimeHost } from "./runtime.ts";
 
 /** The protocol version implemented by this Core server. */
 export const CORE_PROTOCOL_VERSION = 1 as const;
@@ -26,6 +30,10 @@ export interface CoreServerOptions {
   config: ResolvedCoreConfig;
   version: string;
   protocolVersion: number;
+  /** Optional Runtime Host; Core foundation tests may omit it. */
+  runtime?: CoreRuntimeHost;
+  /** Optional shared event transport for the Runtime Host. */
+  events?: CoreEventStream;
 }
 
 /** A running Core HTTP listener. */
@@ -76,7 +84,10 @@ export function isCoreServerStartFailure(
 }
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;
-const CORE_FEATURES = Object.values(CORE_METHODS);
+const CORE_FEATURES = [
+  ...Object.values(CORE_METHODS),
+  ...Object.values(CORE_RUNTIME_METHODS),
+];
 
 /**
  * The HTTP transport for the Core protocol.
@@ -87,10 +98,19 @@ const CORE_FEATURES = Object.values(CORE_METHODS);
  */
 export class CoreServer {
   readonly #options: CoreServerOptions;
+  readonly #events: CoreEventStream;
+  readonly #dispatcher: CoreRuntimeDispatcher | undefined;
   #startPromise: Promise<CoreServerHandle> | undefined;
 
   constructor(options: CoreServerOptions) {
     this.#options = options;
+    this.#events = options.events ?? new CoreEventStream();
+    this.#dispatcher = options.runtime === undefined
+      ? undefined
+      : new CoreRuntimeDispatcher({
+        host: options.runtime,
+        events: this.#events,
+      });
   }
 
   /** Starts the listener, or returns the already-started listener handle. */
@@ -207,6 +227,10 @@ export class CoreServer {
       server,
       address,
       buildServerUrl(config.host, address.port),
+      async () => {
+        await this.#events.close();
+        await this.#options.runtime?.close();
+      },
     );
     return handle;
   }
@@ -219,6 +243,22 @@ export class CoreServer {
         return methodNotAllowed(["GET"]);
       }
       return jsonResponse({ healthy: true });
+    }
+
+    if (pathname === "/events") {
+      if (!CoreAuth.authenticate(request, this.#options.config)) {
+        return jsonRpcErrorResponse(
+          null,
+          -32001,
+          "authentication required",
+          401,
+          { "www-authenticate": "Bearer" },
+        );
+      }
+      if (request.method !== "GET") return methodNotAllowed(["GET"]);
+      const upgraded = Deno.upgradeWebSocket(request);
+      this.#attachEventSocket(upgraded.socket);
+      return upgraded.response;
     }
 
     if (pathname !== "/rpc") {
@@ -260,7 +300,7 @@ export class CoreServer {
       return jsonRpcErrorResponse(null, -32600, "Invalid Request", 400);
     }
 
-    const response = this.#dispatch(message);
+    const response = await this.#dispatch(message, request.signal);
     if (!("id" in message)) {
       // JSON-RPC notifications are one-way and must not receive a response
       // envelope. The method still runs so health/info remain useful to
@@ -270,9 +310,12 @@ export class CoreServer {
     return jsonResponse(response);
   }
 
-  #dispatch(
+  async #dispatch(
     message: CoreRpcRequest | CoreRpcNotification,
-  ): ReturnType<typeof coreResult> | ReturnType<typeof coreError> | undefined {
+    signal: AbortSignal,
+  ): Promise<
+    ReturnType<typeof coreResult> | ReturnType<typeof coreError> | undefined
+  > {
     const { version, protocolVersion } = this.#options;
     const id = "id" in message ? message.id : null;
 
@@ -294,10 +337,68 @@ export class CoreServer {
         };
         return "id" in message ? coreResult(id, result) : undefined;
       }
-      default:
-        return "id" in message
-          ? coreError(id, -32601, "Method not found")
-          : undefined;
+      default: {
+        const dispatcher = this.#dispatcher;
+        if (dispatcher === undefined) {
+          return "id" in message
+            ? coreError(id, -32601, "Method not found")
+            : undefined;
+        }
+        return await dispatcher.dispatch(message, signal);
+      }
+    }
+  }
+
+  #attachEventSocket(socket: WebSocket): void {
+    const send = (value: unknown): void => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(value));
+      }
+    };
+    const stopEvents = this.#events.onEvent((event) => {
+      send({
+        jsonrpc: "2.0",
+        method: "run.event",
+        params: event,
+      });
+    });
+    const stopRequests = this.#events.onRequest((request) => send(request));
+    socket.onmessage = (event) => {
+      void this.#handleEventSocketMessage(event.data, socket);
+    };
+    socket.onclose = () => {
+      stopEvents();
+      stopRequests();
+    };
+  }
+
+  async #handleEventSocketMessage(
+    data: unknown,
+    socket: WebSocket,
+  ): Promise<void> {
+    if (typeof data !== "string") return;
+    let input: unknown;
+    try {
+      input = JSON.parse(data);
+    } catch {
+      socket.send(JSON.stringify(coreError(null, -32700, "Parse error")));
+      return;
+    }
+    const message = parseCoreRpcMessage(input);
+    if (message === undefined) {
+      socket.send(JSON.stringify(coreError(null, -32600, "Invalid Request")));
+      return;
+    }
+    if (!("method" in message) || typeof message.method !== "string") {
+      if ("id" in message) this.#events.respond(message);
+      return;
+    }
+    const response = await this.#dispatch(
+      message,
+      new AbortController().signal,
+    );
+    if (response !== undefined && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(response));
     }
   }
 }
@@ -306,12 +407,19 @@ class CoreHttpServerHandle implements CoreServerHandle {
   readonly address: Deno.NetAddr;
   readonly url: string;
   readonly #server: Deno.HttpServer;
+  readonly #cleanup: () => Promise<void>;
   #stopPromise: Promise<void> | undefined;
 
-  constructor(server: Deno.HttpServer, address: Deno.NetAddr, url: string) {
+  constructor(
+    server: Deno.HttpServer,
+    address: Deno.NetAddr,
+    url: string,
+    cleanup: () => Promise<void>,
+  ) {
     this.#server = server;
     this.address = address;
     this.url = url;
+    this.#cleanup = cleanup;
   }
 
   stop(): Promise<void> {
@@ -331,6 +439,7 @@ class CoreHttpServerHandle implements CoreServerHandle {
     } catch (error) {
       if (!isExpectedShutdownError(error)) throw error;
     }
+    await this.#cleanup();
   }
 }
 

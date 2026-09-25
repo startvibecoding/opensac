@@ -15,6 +15,9 @@
 // See docs/proposal/go-to-deno-migration.md backlog #26.
 
 export * from "./source.ts";
+export * from "./run_handle.ts";
+export * from "./session_executor.ts";
+export * from "./session_run.ts";
 export * from "./session_source.ts";
 export * from "./tool_fence.ts";
 export * from "./agent_manager.ts";

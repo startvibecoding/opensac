@@ -14,12 +14,19 @@ import {
 } from "../agentruntime/session_runtime.ts";
 import { resolveUnattendedMode, SOURCE_TUI } from "../agentruntime/source.ts";
 import { createAgentManager } from "../agentruntime/agent_manager.ts";
+import {
+  createSessionExecutionRuntime,
+  createSessionRunDescriptor,
+} from "../agentruntime/session_run.ts";
 import type { AgentManager } from "../agent/manager.ts";
 import { canAutoRun, Supervisor } from "../esm/mod.ts";
 import { TuiESMRuntimeAdapter } from "./esm_tui_adapter.ts";
 import { ExecutionRuntime } from "../agentruntime/execution.ts";
-import { RunStore } from "../agentruntime/run_store.ts";
-import { SessionRunEventSink } from "../agentruntime/run_event.ts";
+import {
+  fromAgentEvent,
+  SessionExecutor,
+} from "../agentruntime/session_executor.ts";
+import type { RunState } from "../agentruntime/run_state.ts";
 import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
 import {
   DECISION_APPROVAL,
@@ -31,8 +38,7 @@ import {
   type PreparedInput,
   resourceIds,
 } from "../agentruntime/input_materializer.ts";
-import type { ExecutionIntent } from "../session/execution_intent.ts";
-import { generateID, runUserEntryID } from "../session/mod.ts";
+import { generateID } from "../session/mod.ts";
 import { type Manager, type SessionDetail } from "../session/manager.ts";
 import {
   createSession,
@@ -86,7 +92,6 @@ import type { Objective } from "../esm/state.ts";
 import { Store as ESMStore } from "../esm/store.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
 import { displayWidth } from "./formatters.ts";
-import { EVENT_ERROR, TASK_FAILED } from "../agent/events.ts";
 
 export interface TUISessionOptions {
   provider: string;
@@ -837,8 +842,6 @@ export class TUISession implements CommandHost {
     try {
       const startedAt = new Date();
       const runId = `tui_${generateID()}`;
-      const intentId = `intent_${generateID()}`;
-      const turnId = `turn-${intentId}`;
       // Staged clipboard images (prepareInput) join the submission here; plain
       // text goes through the same acceptInput path with no ingresses.
       const preparedInputs = this.#preparedInputs;
@@ -850,84 +853,31 @@ export class TUISession implements CommandHost {
         undefined,
         submission,
       );
-      const requestSnapshot = JSON.stringify({
-        message: text,
-        model: this.#model.id,
-        mode: this.#mode,
-        workDir: this.#workDir,
-      });
-      const digest = new Uint8Array(
-        await crypto.subtle.digest(
-          "SHA-256",
-          new TextEncoder().encode(requestSnapshot),
-        ),
-      );
-      const fingerprint = Array.from(digest)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      const intent: ExecutionIntent = {
-        id: intentId,
+      const descriptor = await createSessionRunDescriptor({
         sessionId,
+        runId,
         source: "tui",
         model: this.#model.id,
         mode: this.#mode,
         workDir: this.#workDir,
-        requestFingerprint: `sha256:${fingerprint}`,
-        request: JSON.parse(requestSnapshot),
-        policy: JSON.parse(JSON.stringify({
-          source: "tui",
-          mode: this.#mode,
-          workDir: this.#workDir,
-          approvalPolicy: "runtime",
-          questionPolicy: "runtime",
-        })),
-        createdAt: startedAt,
-      };
-      const execution = new ExecutionRuntime();
-      execution.setRunStore(new RunStore(this.#manager.getSessionDir()));
-      execution.setEventSink(
-        new SessionRunEventSink(this.#manager.getSessionDir()),
+        text,
+        userMessage,
+        resourceIds: resourceIds(submission),
+        startedAt,
+      });
+      const intentId = descriptor.intent.id;
+      const { turnId } = descriptor;
+      const execution = createSessionExecutionRuntime(
+        this.#manager.getSessionDir(),
       );
       this.#runtime.setExecution(execution);
       this.#currentExecution = execution;
-      execution.beginIntentDurable(undefined, intent, {
-        id: runId,
-        sessionId,
-        intentId,
-        retryOf: "",
-        attempt: 1,
-        workDir: this.#workDir,
-        source: "tui",
-        model: this.#model.id,
-        mode: this.#mode,
-        status: "running",
-        startedAt,
-        finishedAt: null,
-        error: "",
-        errorInfo: {},
-        progress: {},
-        usage: null,
-        contextUsage: null,
-        inputResourceIds: resourceIds(submission),
-        submissionKeyHash: "",
-        submissionScope: "",
-        submissionFingerprint: "",
-        assistantEntryId: "",
-        userEntryId: runUserEntryID(runId),
-        userMessage,
-        conversationTurnId: turnId,
-        conversationTurn: true,
-      }, {
-        sessionId,
-        runId,
-        eventType: "started",
-        source: "tui",
-        status: "running",
-        model: this.#model.id,
-        mode: this.#mode,
-        timestamp: startedAt,
-        data: JSON.stringify({ intentId, attempt: 1 }),
-      });
+      execution.beginIntentDurable(
+        undefined,
+        descriptor.intent,
+        descriptor.run,
+        descriptor.startEvent,
+      );
       const run = new TuiRun({
         execution,
         decisions: this.#decisions,
@@ -955,27 +905,38 @@ export class TUISession implements CommandHost {
       this.controller.setLeadAgentId(agent.id());
       this.#commands.setAgent(agent);
       execution.setAgent(agent);
-      const events = agent.runWithUserMessage(userMessage);
-      try {
-        for await (const event of events) {
-          this.controller.handleAgentEvent(event);
-          if (this.controller.runTerminalHandled) break;
-        }
-      } catch (err) {
-        // A non-terminal rejection (transport error escaping the agent loop,
-        // broken iterator) must not leave the durable run dangling in "running"
-        // with pending decisions: terminalize it canonically as failed.
-        if (!this.controller.runTerminalHandled) {
-          this.controller.handleAgentEvent(
-            {
-              type: EVENT_ERROR,
-              status: TASK_FAILED,
-              error: err instanceof Error ? err : new Error(String(err)),
-            } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
-          );
-        }
-        throw err;
-      }
+      const executor = new SessionExecutor({
+        driver: {
+          admit: async () => {
+            await Promise.resolve();
+            return () => undefined;
+          },
+          createRun: async () => {
+            await Promise.resolve();
+            return {
+              runId,
+              cancel: () => execution.cancel(),
+              events: (async function* () {
+                for await (
+                  const event of agent.runWithUserMessage(userMessage)
+                ) {
+                  yield fromAgentEvent(event);
+                }
+              })(),
+            };
+          },
+          finish: (id, state) =>
+            execution.finishWithState(id, state as RunState),
+        },
+        newId: () => runId,
+        publish: (event) => {
+          if (event.agentEvent !== undefined) {
+            this.controller.handleAgentEvent(event.agentEvent);
+          }
+        },
+      });
+      await executor.prompt(text);
+      await executor.waitForIdle();
     } finally {
       guard.release();
     }

@@ -3,6 +3,7 @@ import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreAuth } from "./auth.ts";
 import { CORE_METHODS } from "./protocol.ts";
 import { CoreServer, type CoreServerHandle } from "./server.ts";
+import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
 
 const TEST_VERSION = "0.1.0-test";
 const TEST_PROTOCOL_VERSION = 7;
@@ -122,7 +123,11 @@ Deno.test("CoreServer serves core.health and core.info without private configura
         version: TEST_VERSION,
         protocolVersion: TEST_PROTOCOL_VERSION,
         coreProtocolVersion: 1,
-        features: [CORE_METHODS.health, CORE_METHODS.info],
+        features: [
+          CORE_METHODS.health,
+          CORE_METHODS.info,
+          ...Object.values(CORE_RUNTIME_METHODS),
+        ],
       },
     });
     const text = JSON.stringify(infoBody);

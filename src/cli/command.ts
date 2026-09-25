@@ -17,7 +17,7 @@ import {
   defaultCLIOptions,
   resolveACPTimeout,
 } from "./options.ts";
-import { runACP, type RunOptions } from "../acp/run.ts";
+import { runACPCore, type RunOptions } from "../acp/run.ts";
 import { isStartupError } from "../acp/support.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 import { runCoreCommand } from "./core.ts";
@@ -200,7 +200,7 @@ export function createACPCommand(version: string): Command {
     )
     .action(async () => {
       try {
-        await runACP(acpRunOptions(flags, version));
+        await runACPCore(acpRunOptions(flags, version));
       } catch (error) {
         if (isStartupError(error)) Deno.exit(1);
         throw error;

@@ -121,6 +121,27 @@ Deno.test("Core boundary rejects a concatenated dynamic import independently", (
   }
 });
 
+Deno.test("Core Runtime Host is the narrow runtime import exception", () => {
+  const root = Deno.makeTempDirSync();
+  try {
+    const coreDir = join(root, "src/core");
+    Deno.mkdirSync(coreDir, { recursive: true });
+    Deno.writeTextFileSync(
+      join(coreDir, "runtime_host.ts"),
+      [
+        'import type { RuntimeSource } from "../agentruntime/source.ts";',
+        "export type Source = RuntimeSource;",
+      ].join("\n"),
+    );
+
+    const violations = productionViolations(root).filter(
+      (violation) => violation.file === "src/core/runtime_host.ts",
+    );
+    assertEquals(violations, []);
+  } finally {
+    Deno.removeSync(root, { recursive: true });
+  }
+});
 Deno.test("string literals ignore comments and template bodies", () => {
   const source = [
     '// "comment_literal"',

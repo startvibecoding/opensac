@@ -7,10 +7,9 @@
 // (`AcpServer`: transport/notification glue, `initialize`/`doctor`, the
 // §4.1–§4.8 additive extensions, the session catalog/lifecycle-mutation
 // handlers, the agent-event projection, and prompt admission/cancellation).
-// `manage.ts` ports the first `opensac/manage/*` slice (shared helpers plus the
-// env/experts/application families). The stdio dispatch loop, the prompt run,
-// MCP sampling, and the remaining `opensac/manage/*` families land in later
-// slices. See docs/proposal/go-to-deno-migration.md backlog #35.
+// The management plane is owned by the shared Core Runtime. ACP only maps
+// front-end-neutral wire methods to Core methods; it does not export the
+// legacy direct management router.
 
 export * from "./protocol.ts";
 export * from "./projection.ts";
@@ -19,7 +18,5 @@ export * from "./input.ts";
 export * from "./wire.ts";
 export * from "./support.ts";
 export * from "./extensions.ts";
-export * from "./manage.ts";
-export * from "./manage_skillhub.ts";
 export * from "./server.ts";
 export * from "./run.ts";

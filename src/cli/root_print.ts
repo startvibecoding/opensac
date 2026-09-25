@@ -23,12 +23,13 @@ import {
 } from "../agent/events.ts";
 import { Builder } from "../agentruntime/session_runtime.ts";
 import { SOURCE_CLI } from "../agentruntime/source.ts";
-import { RunStore } from "../agentruntime/run_store.ts";
 import { ExecutionRuntime } from "../agentruntime/execution.ts";
-import { SessionRunEventSink } from "../agentruntime/run_event.ts";
 import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
-import type { ExecutionIntent } from "../session/execution_intent.ts";
-import { generateID, runUserEntryID } from "../session/mod.ts";
+import {
+  createSessionExecutionRuntime,
+  createSessionRunDescriptor,
+} from "../agentruntime/session_run.ts";
+import { generateID } from "../session/mod.ts";
 import { resourceIds } from "../agentruntime/input_materializer.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
 import {
@@ -141,8 +142,6 @@ export async function runPrintAction(
     release = () => guard.release();
     const startedAt = new Date();
     runId = `cli_${generateID()}`;
-    intentId = `intent_${generateID()}`;
-    turnId = `turn-${intentId}`;
     submission = await runtime.acceptInput(
       undefined,
       runId,
@@ -150,83 +149,35 @@ export async function runPrintAction(
       [],
     );
     userMessage = runtime.buildUserMessage(undefined, submission);
-    const requestSnapshot = JSON.stringify({
-      message: options.prompt,
-      model: created.model.id,
-      mode,
-      workDir,
-    });
-    const policySnapshot = JSON.stringify({
-      source: "cli",
-      mode,
-      workDir,
-      approvalPolicy: "print",
-      questionPolicy: "unattended",
-    });
-    const digest = new Uint8Array(
-      await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(requestSnapshot),
-      ),
-    );
-    const fingerprint = Array.from(digest).map((b) =>
-      b.toString(16).padStart(2, "0")
-    ).join("");
-    const intent: ExecutionIntent = {
-      id: intentId,
-      sessionId,
-      source: "cli",
-      model: created.model.id,
-      mode,
-      workDir,
-      requestFingerprint: `sha256:${fingerprint}`,
-      request: JSON.parse(requestSnapshot),
-      policy: JSON.parse(policySnapshot),
-      createdAt: startedAt,
-    };
-    const startData = JSON.stringify({ intentId, attempt: 1 });
-    execution = new ExecutionRuntime();
-    execution.setRunStore(new RunStore(manager.getSessionDir()));
-    execution.setEventSink(new SessionRunEventSink(manager.getSessionDir()));
-    runtime.setExecution(execution);
-    execution.beginIntentDurable(undefined, intent, {
-      id: runId,
-      sessionId,
-      intentId,
-      retryOf: "",
-      attempt: 1,
-      workDir,
-      source: "cli",
-      model: created.model.id,
-      mode,
-      status: "running",
-      startedAt,
-      finishedAt: null,
-      error: "",
-      errorInfo: {},
-      progress: {},
-      usage: null,
-      contextUsage: null,
-      inputResourceIds: resourceIds(submission),
-      submissionKeyHash: "",
-      submissionScope: "",
-      submissionFingerprint: "",
-      assistantEntryId: "",
-      userEntryId: runUserEntryID(runId),
-      userMessage,
-      conversationTurnId: turnId,
-      conversationTurn: true,
-    }, {
+    const descriptor = await createSessionRunDescriptor({
       sessionId,
       runId,
-      eventType: "started",
       source: "cli",
-      status: "running",
       model: created.model.id,
       mode,
-      timestamp: startedAt,
-      data: startData,
+      workDir,
+      text: options.prompt,
+      userMessage,
+      resourceIds: resourceIds(submission),
+      startedAt,
+      policy: {
+        source: "cli",
+        mode,
+        workDir,
+        approvalPolicy: "print",
+        questionPolicy: "unattended",
+      },
     });
+    intentId = descriptor.intent.id;
+    turnId = descriptor.turnId;
+    execution = createSessionExecutionRuntime(manager.getSessionDir());
+    runtime.setExecution(execution);
+    execution.beginIntentDurable(
+      undefined,
+      descriptor.intent,
+      descriptor.run,
+      descriptor.startEvent,
+    );
   }
 
   const agent = runtime.buildAgent({

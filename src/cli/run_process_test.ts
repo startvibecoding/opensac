@@ -6,6 +6,8 @@
 
 import { assert, assertEquals } from "@std/assert";
 import * as path from "@std/path";
+import { CorePaths } from "../core/paths.ts";
+import { CoreRegistry } from "../core/registry.ts";
 
 const mainTs = path.join(
   path.dirname(path.fromFileUrl(import.meta.url)),
@@ -17,6 +19,23 @@ interface SpawnResult {
   output: string;
   stderr: string;
   code: number | null;
+}
+
+async function stopOwnedCore(configDir: string): Promise<void> {
+  try {
+    const registration = await new CoreRegistry(
+      CorePaths.fromStateDir(configDir),
+    ).read();
+    if (registration !== undefined && registration.pid !== Deno.pid) {
+      try {
+        Deno.kill(registration.pid, "SIGTERM");
+      } catch {
+        // The Core may already have exited.
+      }
+    }
+  } catch {
+    // Startup may fail before registration is published.
+  }
 }
 
 async function runAcp(
@@ -41,6 +60,7 @@ async function runAcp(
     new Response(child.stdout).arrayBuffer(),
     new Response(child.stderr).arrayBuffer(),
   ]);
+  await stopOwnedCore(env.OPENSAC_DIR ?? "");
   return {
     output: new TextDecoder().decode(stdout),
     stderr: new TextDecoder().decode(stderr),
@@ -55,7 +75,10 @@ function writeSettings(
   Deno.mkdirSync(configDir, { recursive: true, mode: 0o700 });
   Deno.writeTextFileSync(
     path.join(configDir, "settings.json"),
-    JSON.stringify(data),
+    JSON.stringify({
+      core: { host: "127.0.0.1", port: 0, auth: false, passwords: [] },
+      ...data,
+    }),
     { mode: 0o600 },
   );
 }
@@ -175,6 +198,50 @@ Deno.test("acp subprocess exits cleanly at EOF after initialize", async () => {
   const ids = messages.map((m) => m["id"]);
   assert(ids.includes(1));
   assert(ids.includes(2));
+  assertEquals(messages.find((message) => message.id === 2)?.error, undefined);
+});
+
+Deno.test("acp subprocess routes project extensions through Core", async () => {
+  const configDir = Deno.makeTempDirSync();
+  const homeDir = Deno.makeTempDirSync();
+  writeSettings(configDir, {
+    defaultProvider: "deepseek",
+    defaultModel: "deepseek-chat",
+    providers: {
+      deepseek: {
+        api: "openai-chat",
+        baseUrl: "http://127.0.0.1:1/v1",
+        apiKey: "test-key",
+        models: [{ id: "deepseek-chat", name: "Test", input: ["text"] }],
+      },
+    },
+  });
+  const lines = [
+    JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }) + "\n",
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "opensac/projects/create",
+      params: { name: "CoreProject" },
+    }) + "\n",
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "opensac/projects/list",
+      params: {},
+    }) + "\n",
+  ];
+  const result = await runAcp(lines, {
+    OPENSAC_DIR: configDir,
+    HOME: homeDir,
+  });
+  const messages: Record<string, any>[] = result.output.trim().split("\n")
+    .filter(Boolean)
+    .map((line: string) => JSON.parse(line));
+  const created = messages.find((message) => message.id === 2);
+  const listed = messages.find((message) => message.id === 3);
+  assertEquals(created?.result?.name, "CoreProject");
+  assertEquals(listed?.result?.projects?.[0]?.name, "CoreProject");
 });
 
 Deno.test("acp subprocess --help is served by cliffy", async () => {

@@ -10,6 +10,7 @@ import { type ResolvedCoreConfig } from "../core/config.ts";
 import { CorePaths } from "../core/paths.ts";
 import { type CoreRegistration, CoreRegistry } from "../core/registry.ts";
 import { CORE_METHODS } from "../core/protocol.ts";
+import type { CoreRuntimeHost } from "../core/runtime.ts";
 import {
   CoreServer,
   type CoreServerHandle,
@@ -235,6 +236,24 @@ Deno.test("runCoreCommand treats a post-registration abort as normal shutdown", 
     } finally {
       signalHandler?.();
       await lifecycle.catch(() => undefined);
+    }
+  });
+});
+
+Deno.test("lazy production Core host exposes the production extension handler", async () => {
+  await withStateDir(async (stateDir) => {
+    let runtime: CoreRuntimeHost | undefined;
+    const handle = await startCoreCommand(options({ stateDir }), {
+      createServer: (serverOptions) => {
+        runtime = serverOptions.runtime;
+        return new CoreServer(serverOptions);
+      },
+    });
+    try {
+      assert(runtime?.extension !== undefined);
+    } finally {
+      await handle.stop();
+      await handle.done;
     }
   });
 });
