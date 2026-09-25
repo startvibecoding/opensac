@@ -3,6 +3,7 @@
 // headers, model add, and draft → config persistence.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
+import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import { AuthDialog } from "./auth_dialog.ts";
 import type { AuthHost, AuthPanel } from "./auth_dialog.ts";
 import {
@@ -10,15 +11,6 @@ import {
   type ProviderConfig,
   type Settings,
 } from "../config/settings.ts";
-
-let confirmed = false;
-
-// Intercept saveGlobalSettingsPatch by re-implementing via the real module is
-// not possible without fs; instead drive confirm() through an isolated config
-// dir (OPENSAC_DIR is the primary config-dir override).
-const tmpHome = Deno.makeTempDirSync();
-const realHome = Deno.env.get("OPENSAC_DIR");
-Deno.env.set("OPENSAC_DIR", tmpHome);
 
 function makeHost(settings: Settings): AuthHost {
   return {
@@ -67,54 +59,63 @@ function dialog(
   return [new AuthDialog(makeHost(settings), panel, initial), panel];
 }
 
-Deno.test("main menu offers existing and custom", () => {
+test("main menu offers existing and custom", () => {
   const [d] = dialog();
   const values = d.page().items.map((i) => i.value);
   assertEquals(values, ["existing", "custom"]);
 });
 
-Deno.test("existing opens the searchable provider list including presets", () => {
-  const [d] = dialog();
-  d.select("existing");
-  const page = d.page();
-  assertEquals(page.search, true);
-  assert(page.items.some((i) => i.value === "provider:openai"));
-});
+test(
+  "existing opens the searchable provider list including presets",
+  () => {
+    const [d] = dialog();
+    d.select("existing");
+    const page = d.page();
+    assertEquals(page.search, true);
+    assert(page.items.some((i) => i.value === "provider:openai"));
+  },
+);
 
-Deno.test("selecting a provider opens its group list with all groups", () => {
-  const [d] = dialog();
-  d.select("existing");
-  d.select("provider:openai");
-  const values = d.page().items.map((i) => i.value);
-  for (
-    const expected of [
-      "api-choice",
-      "credentials",
-      "protocol",
-      "network",
-      "advanced",
-      "headers",
-      "responses",
-      "model-list",
-      "done",
-    ]
-  ) {
-    assert(values.includes(expected), `missing ${expected}`);
-  }
-});
+test(
+  "selecting a provider opens its group list with all groups",
+  () => {
+    const [d] = dialog();
+    d.select("existing");
+    d.select("provider:openai");
+    const values = d.page().items.map((i) => i.value);
+    for (
+      const expected of [
+        "api-choice",
+        "credentials",
+        "protocol",
+        "network",
+        "advanced",
+        "headers",
+        "responses",
+        "model-list",
+        "done",
+      ]
+    ) {
+      assert(values.includes(expected), `missing ${expected}`);
+    }
+  },
+);
 
-Deno.test("custom provider requires an ID and rejects spaces", () => {
-  const [d, panel] = dialog();
-  d.select("custom");
-  assertEquals(panel.inputActive, true);
-  d.submit("bad id");
-  assert(d.page().error !== undefined);
-  d.submit("my-gateway");
-  assertEquals(panel.inputActive, false);
-  assertEquals(d.page().title, "dialog.auth.provider_title(my-gateway)");
-});
+test(
+  "custom provider requires an ID and rejects spaces",
+  () => {
+    const [d, panel] = dialog();
+    d.select("custom");
+    assertEquals(panel.inputActive, true);
+    d.submit("bad id");
+    assert(d.page().error !== undefined);
+    d.submit("my-gateway");
+    assertEquals(panel.inputActive, false);
+    assertEquals(d.page().title, "dialog.auth.provider_title(my-gateway)");
+  },
+);
 
-Deno.test("bool toggle flips forceHTTP11 in the draft", () => {
+test("bool toggle flips forceHTTP11 in the draft", () => {
   const [d] = dialog();
   d.select("existing");
   d.select("provider:openai");
@@ -126,7 +127,7 @@ Deno.test("bool toggle flips forceHTTP11 in the draft", () => {
   assertEquals(row?.description, "auth.value.yes");
 });
 
-Deno.test("tri-state cycles null → true → false → null", () => {
+test("tri-state cycles null → true → false → null", () => {
   const [d] = dialog();
   d.select("existing");
   d.select("provider:openai");
@@ -149,42 +150,48 @@ Deno.test("tri-state cycles null → true → false → null", () => {
   );
 });
 
-Deno.test("adding a custom header prompts for key then value", () => {
-  const [d] = dialog();
-  d.select("existing");
-  d.select("provider:openai");
-  d.select("headers");
-  d.select("header-add");
-  d.submit("X-Team");
-  d.submit("sac");
-  const page = d.page();
-  assert(
-    page.items.some((i) => i.label === "X-Team" && i.description === "sac"),
-  );
-});
+test(
+  "adding a custom header prompts for key then value",
+  () => {
+    const [d] = dialog();
+    d.select("existing");
+    d.select("provider:openai");
+    d.select("headers");
+    d.select("header-add");
+    d.submit("X-Team");
+    d.submit("sac");
+    const page = d.page();
+    assert(
+      page.items.some((i) => i.label === "X-Team" && i.description === "sac"),
+    );
+  },
+);
 
-Deno.test("add model creates a draft editable through model groups", () => {
-  const [d] = dialog();
-  d.select("existing");
-  d.select("provider:openai");
-  d.select("model-list");
-  d.select("model-add");
-  d.submit("gpt-test");
-  const values = d.page().items.map((i) => i.value);
-  for (
-    const expected of [
-      "model-basics",
-      "model-capabilities",
-      "model-sampling",
-      "model-cost",
-      "model-compat",
-    ]
-  ) {
-    assert(values.includes(expected), `missing ${expected}`);
-  }
-});
+test(
+  "add model creates a draft editable through model groups",
+  () => {
+    const [d] = dialog();
+    d.select("existing");
+    d.select("provider:openai");
+    d.select("model-list");
+    d.select("model-add");
+    d.submit("gpt-test");
+    const values = d.page().items.map((i) => i.value);
+    for (
+      const expected of [
+        "model-basics",
+        "model-capabilities",
+        "model-sampling",
+        "model-cost",
+        "model-compat",
+      ]
+    ) {
+      assert(values.includes(expected), `missing ${expected}`);
+    }
+  },
+);
 
-Deno.test("duplicate model ID is rejected", () => {
+test("duplicate model ID is rejected", () => {
   const [d] = dialog();
   d.select("existing");
   d.select("provider:openai");
@@ -197,25 +204,28 @@ Deno.test("duplicate model ID is rejected", () => {
   }
 });
 
-Deno.test("model cost fields appear only after cost is enabled", () => {
-  const [d] = dialog();
-  d.select("existing");
-  d.select("provider:openai");
-  d.select("model-list");
-  d.select("model-add");
-  d.submit("fresh-model");
-  d.select("model-cost");
-  assertEquals(
-    d.page().items.some((i) => i.value === "field:model:costInput"),
-    false,
-  );
-  d.select("field:model:costEnabled");
-  const page = d.page();
-  assert(page.items.some((i) => i.value === "field:model:costInput"));
-  assert(page.items.some((i) => i.value === "field:model:costOutput"));
-});
+test(
+  "model cost fields appear only after cost is enabled",
+  () => {
+    const [d] = dialog();
+    d.select("existing");
+    d.select("provider:openai");
+    d.select("model-list");
+    d.select("model-add");
+    d.submit("fresh-model");
+    d.select("model-cost");
+    assertEquals(
+      d.page().items.some((i) => i.value === "field:model:costInput"),
+      false,
+    );
+    d.select("field:model:costEnabled");
+    const page = d.page();
+    assert(page.items.some((i) => i.value === "field:model:costInput"));
+    assert(page.items.some((i) => i.value === "field:model:costOutput"));
+  },
+);
 
-Deno.test("esc steps back through the stack", () => {
+test("esc steps back through the stack", () => {
   const [d] = dialog();
   d.select("existing");
   d.select("provider:openai");
@@ -223,61 +233,66 @@ Deno.test("esc steps back through the stack", () => {
   assertEquals(d.page().search, true); // back to provider list
 });
 
-Deno.test("confirm persists the provider draft to global settings", async () => {
-  const settings: Settings = {
-    providers: {
-      "my-provider": {
-        api: "openai-chat",
-        apiKey: "sk-old",
-        baseUrl: "https://example.com/v1",
-        models: [],
-      } as ProviderConfig,
-      "other-provider": {
-        api: "openai-chat",
-        apiKey: "sk-other-must-survive",
-        baseUrl: "https://other.example.com/v1",
-        models: [],
-      } as ProviderConfig,
-    },
-  };
-  // The confirm path merges against the on-disk sparse settings (mothx
-  // semantics), so seed the isolated config dir first.
-  Deno.writeTextFileSync(
-    configDir() + "/settings.json",
-    JSON.stringify(settings),
-  );
-  const [d, panel] = dialog(settings, "my-provider");
-  d.select("credentials");
-  d.select("field:provider:apiKey");
-  d.submit("sk-brand-new-value");
-  d.back();
-  d.confirm();
-  assertEquals(panel.closed, true);
+test(
+  "confirm persists the provider draft to global settings",
+  async () => {
+    const settings: Settings = {
+      providers: {
+        "my-provider": {
+          api: "openai-chat",
+          apiKey: "sk-old",
+          baseUrl: "https://example.com/v1",
+          models: [],
+        } as ProviderConfig,
+        "other-provider": {
+          api: "openai-chat",
+          apiKey: "sk-other-must-survive",
+          baseUrl: "https://other.example.com/v1",
+          models: [],
+        } as ProviderConfig,
+      },
+    };
+    // The confirm path merges against the on-disk sparse settings (mothx
+    // semantics), so seed the isolated config dir first.
+    Deno.writeTextFileSync(
+      configDir() + "/settings.json",
+      JSON.stringify(settings),
+    );
+    const [d, panel] = dialog(settings, "my-provider");
+    d.select("credentials");
+    d.select("field:provider:apiKey");
+    d.submit("sk-brand-new-value");
+    d.back();
+    d.confirm();
+    assertEquals(panel.closed, true);
 
-  // Verify the sparse patch landed on disk with the edited key and preserved
-  // untouched provider fields.
-  const { loadGlobalSettingsSparse } = await import(
-    "../config/settings.ts"
-  );
-  const saved = loadGlobalSettingsSparse();
-  const provider = saved.providers?.["my-provider"];
-  assertEquals(provider?.apiKey, "sk-brand-new-value");
-  assertEquals(provider?.baseUrl, "https://example.com/v1");
-  // Editing one provider must not wipe the others.
-  assertEquals(
-    saved.providers?.["other-provider"]?.apiKey,
-    "sk-other-must-survive",
-  );
-  confirmed = true;
-});
+    // Verify the sparse patch landed on disk with the edited key and preserved
+    // untouched provider fields.
+    const { loadGlobalSettingsSparse } = await import(
+      "../config/settings.ts"
+    );
+    const saved = loadGlobalSettingsSparse();
+    const provider = saved.providers?.["my-provider"];
+    assertEquals(provider?.apiKey, "sk-brand-new-value");
+    assertEquals(provider?.baseUrl, "https://example.com/v1");
+    // Editing one provider must not wipe the others.
+    assertEquals(
+      saved.providers?.["other-provider"]?.apiKey,
+      "sk-other-must-survive",
+    );
+  },
+);
 
-Deno.test("initialProvider deep-links straight into the group list", () => {
-  const [d] = dialog({}, "openai");
-  const values = d.page().items.map((i) => i.value);
-  assert(values.includes("credentials"));
-});
+test(
+  "initialProvider deep-links straight into the group list",
+  () => {
+    const [d] = dialog({}, "openai");
+    const values = d.page().items.map((i) => i.value);
+    assert(values.includes("credentials"));
+  },
+);
 
-Deno.test("confirm with no models still closes cleanly", () => {
+test("confirm with no models still closes cleanly", () => {
   const [d, panel] = dialog();
   d.select("custom");
   d.submit("lonely-provider");
@@ -285,15 +300,18 @@ Deno.test("confirm with no models still closes cleanly", () => {
   assertEquals(panel.closed, true);
 });
 
-Deno.test("invalid numeric input shows an error and stays in field", () => {
-  const [d] = dialog({}, "openai");
-  d.select("advanced");
-  d.select("field:provider:maxImagesPerRequest");
-  d.submit("abc");
-  assert(d.page().error !== undefined);
-});
+test(
+  "invalid numeric input shows an error and stays in field",
+  () => {
+    const [d] = dialog({}, "openai");
+    d.select("advanced");
+    d.select("field:provider:maxImagesPerRequest");
+    d.submit("abc");
+    assert(d.page().error !== undefined);
+  },
+);
 
-Deno.test("empty float resets the field to auto", () => {
+test("empty float resets the field to auto", () => {
   const [d] = dialog({}, "openai");
   d.select("model-list");
   const first = d.page().items.find((i) => i.value.startsWith("model:"));
@@ -308,33 +326,29 @@ Deno.test("empty float resets the field to auto", () => {
   assertEquals(row?.description, "auto");
 });
 
-Deno.test("field pages offer a confirm item that steps back one level", () => {
-  const [d, panel] = dialog({}, "openai");
-  d.select("network");
-  assert(
-    d.page().items.some((i) => i.value === "back"),
-    "field page must offer the confirm-return item",
-  );
-  d.select("back");
-  assertEquals(panel.closed, false);
-  assert(
-    d.page().items.some((i) => i.value === "network"),
-    "the confirm item must return to the group list",
-  );
-  // Model field pages share the same affordance.
-  d.select("model-list");
-  const first = d.page().items.find((i) => i.value.startsWith("model:"));
-  assert(first !== undefined);
-  d.select(first.value);
-  d.select("model-basics");
-  assert(d.page().items.some((i) => i.value === "back"));
-  d.select("back");
-  assert(d.page().items.some((i) => i.value === "model-basics"));
-});
-
-Deno.test("cleanup", () => {
-  if (realHome !== undefined) Deno.env.set("OPENSAC_DIR", realHome);
-  else Deno.env.delete("OPENSAC_DIR");
-  Deno.removeSync(tmpHome, { recursive: true });
-  assert(confirmed);
-});
+test(
+  "field pages offer a confirm item that steps back one level",
+  () => {
+    const [d, panel] = dialog({}, "openai");
+    d.select("network");
+    assert(
+      d.page().items.some((i) => i.value === "back"),
+      "field page must offer the confirm-return item",
+    );
+    d.select("back");
+    assertEquals(panel.closed, false);
+    assert(
+      d.page().items.some((i) => i.value === "network"),
+      "the confirm item must return to the group list",
+    );
+    // Model field pages share the same affordance.
+    d.select("model-list");
+    const first = d.page().items.find((i) => i.value.startsWith("model:"));
+    assert(first !== undefined);
+    d.select(first.value);
+    d.select("model-basics");
+    assert(d.page().items.some((i) => i.value === "back"));
+    d.select("back");
+    assert(d.page().items.some((i) => i.value === "model-basics"));
+  },
+);

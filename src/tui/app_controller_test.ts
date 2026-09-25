@@ -21,6 +21,7 @@ import {
   EVENT_TURN_START,
   TASK_CANCELED,
   TASK_FAILED,
+  TOOL_EXECUTION_FAILED,
 } from "../agent/events.ts";
 import { Translator } from "./i18n.ts";
 
@@ -475,6 +476,65 @@ Deno.test({
     await new Promise((resolve) => setTimeout(resolve, 20));
     const closed = stdout.output.slice(closeStart);
     assert(closed.includes("hidden while open"), closed);
+    instance.unmount();
+  },
+});
+
+Deno.test({
+  name: "terminal tool rows remain scrollback-only after overlay close",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const { c } = controller("lead");
+    const view = (overlayOpen: boolean) =>
+      App({
+        controller: c,
+        header: {
+          version: "test",
+          providerName: "p",
+          modelName: "m",
+          cwd: "/w",
+        },
+        width: 90,
+        overlayOpen,
+      });
+    const stdout = new FakeStdout();
+    const instance = render(view(false), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      exitOnCtrlC: false,
+      patchConsole: false,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
+    c.handleAgentEvent(ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "failed-tool",
+      toolName: "bash",
+      toolArgs: { command: "overlay-tool-failure" },
+    }));
+    instance.rerender(view(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    c.handleAgentEvent(ev({
+      type: EVENT_TOOL_EXECUTION_END,
+      toolCallId: "failed-tool",
+      toolName: "bash",
+      toolResult: "failed",
+      toolExecutionState: TOOL_EXECUTION_FAILED,
+    }));
+    instance.rerender(view(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const closeStart = stdout.output.length;
+    instance.rerender(view(false));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const closed = stdout.output.slice(closeStart);
+    assertEquals(
+      closed.match(/overlay-tool-failure/g)?.length ?? 0,
+      1,
+      closed,
+    );
     instance.unmount();
   },
 });

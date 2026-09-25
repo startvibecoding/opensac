@@ -48,6 +48,8 @@ export interface RunHandle {
   registerDecision(id: string, kind: DecisionKind): string | undefined;
   /** Binds the resolver invoked when the human answers. */
   bindDecision(id: string, resolve: (value: string) => void): void;
+  /** Resolves a decision and persists its resolved DecisionRecord. */
+  resolveDecision?(id: string, kind: DecisionKind, value: string): void;
   /** Terminalizes the run with the canonical RunState. */
   finish(state: RunState): void;
   /** Marks the durable run as waiting on an approval (optional). */
@@ -217,6 +219,7 @@ export class AppController {
         this.#thinkBlockOpen = false;
         this.#planByToolCall.clear();
         this.store.beginAssistantSlot();
+        this.#cb.scheduleRender();
         return;
 
       case EVENT_TOOL_CALL:
@@ -232,6 +235,7 @@ export class AppController {
             event.toolArgs,
           );
         }
+        this.#cb.scheduleRender();
         return;
 
       case EVENT_TOOL_EXECUTION_START:
@@ -245,6 +249,7 @@ export class AppController {
           event.toolName ?? "",
           event.toolArgs,
         );
+        this.#cb.scheduleRender();
         return;
 
       case EVENT_TOOL_EXECUTION_END:

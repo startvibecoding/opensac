@@ -450,8 +450,10 @@ export class TuiCommands {
         detail.id,
       );
       await this.#host.bindManager(manager);
+      // A persisted session mode wins; an empty one falls back to the yolo
+      // product default (the Runtime re-resolves source-forced modes).
       this.#host.setMode(
-        this.#host.manager.getHeader()?.cwd === "" ? "yolo" : "yolo",
+        this.#host.manager.getLatestModeChange()?.mode || "yolo",
       );
       this.#host.controller.store.resetTranscriptState();
       this.#host.controller.resetContextUsage();

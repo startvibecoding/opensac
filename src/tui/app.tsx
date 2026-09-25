@@ -129,12 +129,14 @@ function ControllerApp({
     }
   }
 
-  // Live per-turn activity timeline (tools + thinking) tracked by the
-  // controller from the agent event stream. Running items carry live elapsed
-  // timing; completed items keep their status/result until the next turn.
+  // Live per-turn activity timeline (running tools + thinking) tracked by
+  // the controller from the agent event stream. Terminal tool rows belong to
+  // <Static> once complete, so only running items remain in the managed view.
   const activities = overlayOpen
     ? []
-    : controller.activityManager.buildTimeline();
+    : controller.activityManager.buildTimeline().filter((activity) =>
+      activity.type !== "tool" || activity.status === "running"
+    );
 
   // Ink supports a single <Static>; header lines and committed transcript rows
   // share it, header first.
@@ -173,7 +175,7 @@ function ControllerApp({
       </Static>
 
       {
-        /* Live activity timeline (running/completed tools + thinking).
+        /* Live activity timeline (running tools + thinking).
           Rows receive width-4: 1-col left indent (marginLeft) + 3 cols of
           margin slack so a full-width row never touches the terminal edge. */
       }

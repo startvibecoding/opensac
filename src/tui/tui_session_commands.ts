@@ -14,6 +14,7 @@ import {
   defaultProviderConfig,
   defaultProviderConfigsAll,
   getProviderConfig,
+  isProjectDir,
   loadProjectSettingsSparse,
   resolveKey,
   saveGlobalSettingsPatch,
@@ -24,6 +25,7 @@ import { EVENT_TEXT_DELTA } from "../agent/events.ts";
 import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import type { CronStore } from "../cron/cron.ts";
 import { ATTACHMENT_IMAGE } from "../agentruntime/attachment.ts";
+import type { PreparedInput } from "../agentruntime/input_materializer.ts";
 import { createRegistry } from "../tools/tool.ts";
 import { Agent } from "../agent/agent.ts";
 import { prompt as systemInitPrompt } from "../systeminit/systeminit.ts";
@@ -55,6 +57,7 @@ export interface TuiSessionLike {
   currentSessionID(): string;
   setMode(mode: string): void;
   submitPrompt(text: string): Promise<void>;
+  addPreparedInput(prepared: PreparedInput): void;
 }
 
 /** Clipboard images are capped like the Go TUI (20 MiB). */
@@ -427,6 +430,7 @@ export class TuiSessionCommands {
           contentSize: bytes!.length,
         }),
       });
+      this.#session.addPreparedInput(prepared);
       this.#pastedImageCounter++;
       this.#pastedImagePath = path.join(
         this.#session.workDir,
@@ -539,25 +543,6 @@ export class TuiSessionCommands {
       this.#btwActive = false;
     }
   }
-}
-
-/** Reports whether a directory is a project root (has a project marker). */
-function isProjectDir(workDir: string): boolean {
-  try {
-    Deno.statSync(path.join(workDir, ".opensac"));
-    return true;
-  } catch {
-    // Fall through to the generic markers.
-  }
-  for (const marker of [".git", "deno.json", "package.json"]) {
-    try {
-      Deno.statSync(path.join(workDir, marker));
-      return true;
-    } catch {
-      // Keep looking.
-    }
-  }
-  return false;
 }
 
 /** Reads a PNG from the system clipboard; null when none is present. */

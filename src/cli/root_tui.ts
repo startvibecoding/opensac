@@ -45,6 +45,11 @@ function terminalHeight(): number {
   return 40;
 }
 
+/** Redraws the interactive frame only while a run is producing updates. */
+export function refreshWhenBusy(busy: boolean, rerender: () => void): void {
+  if (busy) rerender();
+}
+
 /** Applies one width change to the editor (Go WindowSizeMsg →
  * input.SetWidth). Returns the applied width, or null when unchanged.
  * Exported for tests. */
@@ -121,7 +126,9 @@ export async function runInteractiveAction(
 
   // Periodic refresh while the agent streams (the controller callbacks are
   // intentionally no-ops outside React; React batches on this timer).
-  const refreshTimer = setInterval(rerender, 100);
+  const refreshTimer = setInterval(() => {
+    refreshWhenBusy(session.busy, rerender);
+  }, 100);
   // Cursor blink for the editor input box.
   const blinkTimer = setInterval(() => {
     session.input.editor.blinkCursor();

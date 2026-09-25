@@ -21,7 +21,16 @@ import { ExecutionRuntime } from "../agentruntime/execution.ts";
 import { RunStore } from "../agentruntime/run_store.ts";
 import { SessionRunEventSink } from "../agentruntime/run_event.ts";
 import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
-import { DecisionService } from "../agentruntime/decision.ts";
+import {
+  DECISION_APPROVAL,
+  DECISION_QUESTION,
+  type DecisionKind,
+  DecisionService,
+} from "../agentruntime/decision.ts";
+import {
+  type PreparedInput,
+  resourceIds,
+} from "../agentruntime/input_materializer.ts";
 import type { ExecutionIntent } from "../session/execution_intent.ts";
 import { generateID, runUserEntryID } from "../session/mod.ts";
 import { type Manager, type SessionDetail } from "../session/manager.ts";
@@ -125,6 +134,8 @@ export class TUISession implements CommandHost {
   #currentExecution: ExecutionRuntime | undefined;
   #agent: import("../agent/agent.ts").Agent | undefined;
   #decisions = new DecisionService();
+  /** Runtime-staged clipboard images awaiting the next submission. */
+  #preparedInputs: PreparedInput[] = [];
   #commands: TuiCommands;
   #sessionCommands: TuiSessionCommands;
   #dialog: Dialog | undefined;
@@ -393,6 +404,11 @@ export class TUISession implements CommandHost {
 
   setEditorWidth(width: number): void {
     this.input.setWidth(width);
+  }
+
+  /** Stages one prepared input (clipboard image) for the next submission. */
+  addPreparedInput(prepared: PreparedInput): void {
+    this.#preparedInputs.push(prepared);
   }
 
   // --- CommandHost -----------------------------------------------------------
@@ -752,16 +768,28 @@ export class TUISession implements CommandHost {
   /** Dispatches one submitted line: commands locally, else a prompt run. */
   async handleSubmit(text: string): Promise<void> {
     if (text.startsWith("/")) {
-      const result = await dispatchCommand(text, this);
-      if (result.message !== undefined && result.message !== "") {
-        this.controller.addMessage(
-          result.message,
-          result.error === true ? "error" : "plain",
-        );
+      try {
+        const result = await dispatchCommand(text, this);
+        if (result.message !== undefined && result.message !== "") {
+          this.controller.addMessage(
+            result.message,
+            result.error === true ? "error" : "plain",
+          );
+        }
+      } catch (err) {
+        this.controller.addMessage(errorMessage(err), "error");
       }
       return;
     }
-    await this.submitPrompt(text);
+    try {
+      await this.submitPrompt(text);
+    } catch (err) {
+      // Mid-run rejections are already terminalized and reported through the
+      // canonical EVENT_ERROR path; only failures before the run surfaces here.
+      if (!this.controller.runTerminalHandled) {
+        this.controller.addMessage(errorMessage(err), "error");
+      }
+    }
   }
 
   /** Submits one user message as a durable conversation-turn run. */
@@ -769,6 +797,31 @@ export class TUISession implements CommandHost {
     if (this.#busy || text.trim() === "") return;
     this.#busy = true;
     this.controller.isThinking = true;
+    // A fresh submission owns a fresh terminal slot; handleSubmit relies on it
+    // to decide whether a rejection still needs a user-visible error row.
+    this.controller.runTerminalHandled = false;
+    try {
+      await this.#runPromptTurn(text);
+    } finally {
+      this.#busy = false;
+      this.controller.isThinking = false;
+      // A finished interactive run hands the terminal back to an active ESM
+      // objective (Go finishESMRun continuation), unless the user aborted the
+      // worker during this run.
+      if (this.#esmCancelRequested) {
+        this.#esmCancelRequested = false;
+      } else {
+        this.startESMContinuationIfIdle();
+      }
+    }
+  }
+
+  /**
+   * One durable conversation-turn run: admission, intent/run rows, agent
+   * construction, and event pumping. The admission guard is held (and later
+   * released) for the whole turn, including failures before the event loop.
+   */
+  async #runPromptTurn(text: string): Promise<void> {
     this.controller.addMessage(`> ${text}`, "plain");
     const header = this.#manager.getHeader();
     const sessionId = header?.id ?? "";
@@ -781,157 +834,150 @@ export class TUISession implements CommandHost {
       sessionId,
       {},
     );
-    const startedAt = new Date();
-    const runId = `tui_${generateID()}`;
-    const intentId = `intent_${generateID()}`;
-    const turnId = `turn-${intentId}`;
-    const submission = await this.#runtime.acceptInput(
-      undefined,
-      runId,
-      text,
-      [],
-    );
-    const userMessage: Message = this.#runtime.buildUserMessage(
-      undefined,
-      submission,
-    );
-    const requestSnapshot = JSON.stringify({
-      message: text,
-      model: this.#model.id,
-      mode: this.#mode,
-      workDir: this.#workDir,
-    });
-    const digest = new Uint8Array(
-      await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(requestSnapshot),
-      ),
-    );
-    const fingerprint = Array.from(digest)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    const intent: ExecutionIntent = {
-      id: intentId,
-      sessionId,
-      source: "tui",
-      model: this.#model.id,
-      mode: this.#mode,
-      workDir: this.#workDir,
-      requestFingerprint: `sha256:${fingerprint}`,
-      request: JSON.parse(requestSnapshot),
-      policy: JSON.parse(JSON.stringify({
-        source: "tui",
+    try {
+      const startedAt = new Date();
+      const runId = `tui_${generateID()}`;
+      const intentId = `intent_${generateID()}`;
+      const turnId = `turn-${intentId}`;
+      // Staged clipboard images (prepareInput) join the submission here; plain
+      // text goes through the same acceptInput path with no ingresses.
+      const preparedInputs = this.#preparedInputs;
+      this.#preparedInputs = [];
+      const submission = preparedInputs.length > 0
+        ? this.#runtime.attachPreparedInput(undefined, text, preparedInputs)
+        : await this.#runtime.acceptInput(undefined, runId, text, []);
+      const userMessage: Message = this.#runtime.buildUserMessage(
+        undefined,
+        submission,
+      );
+      const requestSnapshot = JSON.stringify({
+        message: text,
+        model: this.#model.id,
         mode: this.#mode,
         workDir: this.#workDir,
-        approvalPolicy: "runtime",
-        questionPolicy: "runtime",
-      })),
-      createdAt: startedAt,
-    };
-    const execution = new ExecutionRuntime();
-    execution.setRunStore(new RunStore(this.#manager.getSessionDir()));
-    execution.setEventSink(
-      new SessionRunEventSink(this.#manager.getSessionDir()),
-    );
-    this.#runtime.setExecution(execution);
-    this.#currentExecution = execution;
-    execution.beginIntentDurable(undefined, intent, {
-      id: runId,
-      sessionId,
-      intentId,
-      retryOf: "",
-      attempt: 1,
-      workDir: this.#workDir,
-      source: "tui",
-      model: this.#model.id,
-      mode: this.#mode,
-      status: "running",
-      startedAt,
-      finishedAt: null,
-      error: "",
-      errorInfo: {},
-      progress: {},
-      usage: null,
-      contextUsage: null,
-      inputResourceIds: [],
-      submissionKeyHash: "",
-      submissionScope: "",
-      submissionFingerprint: "",
-      assistantEntryId: "",
-      userEntryId: runUserEntryID(runId),
-      userMessage,
-      conversationTurnId: turnId,
-      conversationTurn: true,
-    }, {
-      sessionId,
-      runId,
-      eventType: "started",
-      source: "tui",
-      status: "running",
-      model: this.#model.id,
-      mode: this.#mode,
-      timestamp: startedAt,
-      data: JSON.stringify({ intentId, attempt: 1 }),
-    });
-    const run = new TuiRun({
-      execution,
-      decisions: this.#decisions,
-      runId,
-      sessionId,
-      sessionDir: this.#manager.getSessionDir(),
-      mode: this.#mode,
-      model: this.#model.id,
-    });
-    this.controller.attachRun(run);
-    const agent = this.#runtime.buildAgent({
-      provider: this.#provider,
-      providerName: this.#providerName,
-      model: this.#model,
-      settings: this.#settings,
-      allow: loadAllow(),
-      mode: this.#mode,
-      thinkingLevel: this.#thinking,
-      extraContext: this.#runtime.extraContext,
-      ruleContent: this.#runtime.ruleContent,
-      hydrateHistory: true,
-    });
-    agent.setConversationTurn(turnId, intentId, runId);
-    this.#agent = agent;
-    this.controller.setLeadAgentId(agent.id());
-    this.#commands.setAgent(agent);
-    execution.setAgent(agent);
-    const events = agent.runWithUserMessage(userMessage);
-    try {
-      for await (const event of events) {
-        this.controller.handleAgentEvent(event);
-        if (this.controller.runTerminalHandled) break;
+      });
+      const digest = new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(requestSnapshot),
+        ),
+      );
+      const fingerprint = Array.from(digest)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      const intent: ExecutionIntent = {
+        id: intentId,
+        sessionId,
+        source: "tui",
+        model: this.#model.id,
+        mode: this.#mode,
+        workDir: this.#workDir,
+        requestFingerprint: `sha256:${fingerprint}`,
+        request: JSON.parse(requestSnapshot),
+        policy: JSON.parse(JSON.stringify({
+          source: "tui",
+          mode: this.#mode,
+          workDir: this.#workDir,
+          approvalPolicy: "runtime",
+          questionPolicy: "runtime",
+        })),
+        createdAt: startedAt,
+      };
+      const execution = new ExecutionRuntime();
+      execution.setRunStore(new RunStore(this.#manager.getSessionDir()));
+      execution.setEventSink(
+        new SessionRunEventSink(this.#manager.getSessionDir()),
+      );
+      this.#runtime.setExecution(execution);
+      this.#currentExecution = execution;
+      execution.beginIntentDurable(undefined, intent, {
+        id: runId,
+        sessionId,
+        intentId,
+        retryOf: "",
+        attempt: 1,
+        workDir: this.#workDir,
+        source: "tui",
+        model: this.#model.id,
+        mode: this.#mode,
+        status: "running",
+        startedAt,
+        finishedAt: null,
+        error: "",
+        errorInfo: {},
+        progress: {},
+        usage: null,
+        contextUsage: null,
+        inputResourceIds: resourceIds(submission),
+        submissionKeyHash: "",
+        submissionScope: "",
+        submissionFingerprint: "",
+        assistantEntryId: "",
+        userEntryId: runUserEntryID(runId),
+        userMessage,
+        conversationTurnId: turnId,
+        conversationTurn: true,
+      }, {
+        sessionId,
+        runId,
+        eventType: "started",
+        source: "tui",
+        status: "running",
+        model: this.#model.id,
+        mode: this.#mode,
+        timestamp: startedAt,
+        data: JSON.stringify({ intentId, attempt: 1 }),
+      });
+      const run = new TuiRun({
+        execution,
+        decisions: this.#decisions,
+        runId,
+        sessionId,
+        sessionDir: this.#manager.getSessionDir(),
+        mode: this.#mode,
+        model: this.#model.id,
+      });
+      this.controller.attachRun(run);
+      const agent = this.#runtime.buildAgent({
+        provider: this.#provider,
+        providerName: this.#providerName,
+        model: this.#model,
+        settings: this.#settings,
+        allow: loadAllow(),
+        mode: this.#mode,
+        thinkingLevel: this.#thinking,
+        extraContext: this.#runtime.extraContext,
+        ruleContent: this.#runtime.ruleContent,
+        hydrateHistory: true,
+      });
+      agent.setConversationTurn(turnId, intentId, runId);
+      this.#agent = agent;
+      this.controller.setLeadAgentId(agent.id());
+      this.#commands.setAgent(agent);
+      execution.setAgent(agent);
+      const events = agent.runWithUserMessage(userMessage);
+      try {
+        for await (const event of events) {
+          this.controller.handleAgentEvent(event);
+          if (this.controller.runTerminalHandled) break;
+        }
+      } catch (err) {
+        // A non-terminal rejection (transport error escaping the agent loop,
+        // broken iterator) must not leave the durable run dangling in "running"
+        // with pending decisions: terminalize it canonically as failed.
+        if (!this.controller.runTerminalHandled) {
+          this.controller.handleAgentEvent(
+            {
+              type: EVENT_ERROR,
+              status: TASK_FAILED,
+              error: err instanceof Error ? err : new Error(String(err)),
+            } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
+          );
+        }
+        throw err;
       }
-    } catch (err) {
-      // A non-terminal rejection (transport error escaping the agent loop,
-      // broken iterator) must not leave the durable run dangling in "running"
-      // with pending decisions: terminalize it canonically as failed.
-      if (!this.controller.runTerminalHandled) {
-        this.controller.handleAgentEvent(
-          {
-            type: EVENT_ERROR,
-            status: TASK_FAILED,
-            error: err instanceof Error ? err : new Error(String(err)),
-          } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
-        );
-      }
-      throw err;
     } finally {
-      this.#busy = false;
-      this.controller.isThinking = false;
       guard.release();
-      // A finished interactive run hands the terminal back to an active ESM
-      // objective (Go finishESMRun continuation), unless the user aborted the
-      // worker during this run.
-      if (this.#esmCancelRequested) {
-        this.#esmCancelRequested = false;
-      } else {
-        this.startESMContinuationIfIdle();
-      }
     }
   }
 
@@ -946,21 +992,33 @@ export class TUISession implements CommandHost {
     const shown = this.controller.shownApproval;
     if (!shown) return;
     // Decision routing (resolve → deliver → resume) is owned by the controller,
-    // which bound the resolver when the request arrived. Answering here only
-    // supplies the value so identity/first-response-wins stays canonical.
+    // which bound the resolver when the request arrived. The resolution goes
+    // through the run handle so the resolved DecisionRecord is persisted while
+    // identity/first-response-wins stays canonical.
     try {
-      this.#decisions.resolveWith(
-        {
-          id: shown.approvalID,
-          kind: "approval",
-          status: "resolved",
-          value: approved ? "true" : "false",
-        },
+      this.#resolveDecision(
+        shown.approvalID,
+        DECISION_APPROVAL,
+        approved ? "true" : "false",
       );
     } catch {
       // Already resolved/expired: fall back to clearing the panel below.
       this.controller.resolveApproval(shown.approvalID, approved);
     }
+  }
+
+  /**
+   * Resolves one decision through the attached run (persisting the resolved
+   * DecisionRecord) and falls back to the in-memory DecisionService when no
+   * run is attached.
+   */
+  #resolveDecision(id: string, kind: DecisionKind, value: string): void {
+    const run = this.controller.currentRunHandle();
+    if (run?.resolveDecision !== undefined) {
+      run.resolveDecision(id, kind, value);
+      return;
+    }
+    this.#decisions.resolveWith({ id, kind, status: "resolved", value });
   }
 
   /** Answers the shown question with the chosen option. */
@@ -972,9 +1030,7 @@ export class TUISession implements CommandHost {
     // arrived; this mirrors the approval path.
     const advance = () => this.controller.resolveQuestion(shown.questionID);
     try {
-      this.#decisions.resolveWith(
-        { id: shown.questionID, kind: "question", status: "resolved", value },
-      );
+      this.#resolveDecision(shown.questionID, DECISION_QUESTION, value);
     } catch {
       // Already resolved/expired: still advance the panel.
       advance();
@@ -1520,6 +1576,11 @@ export class TUISession implements CommandHost {
     this.header.modelName = this.#model.id;
     this.header.providerName = this.#providerName;
   }
+}
+
+/** Formats a caught failure for one transcript error row. */
+function errorMessage(err: unknown): string {
+  return `Error: ${err instanceof Error ? err.message : String(err)}`;
 }
 
 /** Re-exported for the shell/tests. */

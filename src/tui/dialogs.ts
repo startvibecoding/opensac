@@ -13,11 +13,7 @@ import {
   defaultProviderConfigsAll,
   getProviderConfig,
   isProjectDir,
-  loadGlobalSettingsSparse,
-  loadProjectSettingsSparse,
-  saveGlobalSettings,
   saveGlobalSettingsPatch,
-  saveProjectSettings,
   saveProjectSettingsPatch,
   type Settings,
 } from "../config/settings.ts";
@@ -213,13 +209,13 @@ export class DefaultModelDialog implements DialogController {
       return;
     }
     try {
-      const sparse = this.#scope === "global"
-        ? loadGlobalSettingsSparse()
-        : loadProjectSettingsSparse();
-      sparse.defaultProvider = this.#providerID;
-      sparse.defaultModel = modelID;
-      if (this.#scope === "global") saveGlobalSettings(sparse);
-      else saveProjectSettings(sparse);
+      // Sparse settings edits go through the patch API (global or project).
+      const updates = {
+        defaultProvider: this.#providerID,
+        defaultModel: modelID,
+      };
+      if (this.#scope === "global") saveGlobalSettingsPatch(updates);
+      else saveProjectSettingsPatch(updates);
     } catch (err) {
       this.#error = tr.text(
         "dialog.default_model.save_failed",

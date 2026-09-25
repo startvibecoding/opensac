@@ -6,6 +6,7 @@
 // touches the developer's real config directory.
 
 import { assert, assertEquals, assertFalse, assertThrows } from "@std/assert";
+import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import type { Model } from "../provider/types.ts";
 import { createMockProvider, type MockProvider } from "../provider/mock.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
@@ -18,11 +19,6 @@ import {
 } from "./manager.ts";
 import { createMemberDefRegistry, MemberDefRegistry } from "./memberdef.ts";
 import { createMemberMailbox } from "./mailbox.ts";
-
-Deno.env.set(
-  "OPENSAC_DIR",
-  Deno.makeTempDirSync({ prefix: "opensac-agent-manager-" }),
-);
 
 function model(id: string, name: string, provider: string): Model {
   return {
@@ -60,20 +56,20 @@ function member(id: string): import("./memberdef.ts").MemberDef {
   };
 }
 
-Deno.test("AgentManagerCreate", () => {
+test("AgentManagerCreate", () => {
   const m = createTestManager();
   const a = m.create({ id: "main" });
   assert(a !== undefined);
   assertEquals(a.id(), "main");
 });
 
-Deno.test("AgentManagerCreateAutoID", () => {
+test("AgentManagerCreateAutoID", () => {
   const m = createTestManager();
   const a = m.create({});
   assert(a.id() !== "");
 });
 
-Deno.test("AgentManagerCreateWithParent", () => {
+test("AgentManagerCreateWithParent", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   const child = m.create({ id: "sub-1", parentId: "main" });
@@ -83,19 +79,19 @@ Deno.test("AgentManagerCreateWithParent", () => {
   assertEquals(pid, "main");
 });
 
-Deno.test("AgentManagerCreateNestedSubAgentRejected", () => {
+test("AgentManagerCreateNestedSubAgentRejected", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
   assertThrows(() => m.create({ id: "sub-sub-1", parentId: "sub-1" }));
 });
 
-Deno.test("AgentManagerCreateMissingParent", () => {
+test("AgentManagerCreateMissingParent", () => {
   const m = createTestManager();
   assertThrows(() => m.create({ id: "orphan", parentId: "nonexistent" }));
 });
 
-Deno.test("AgentManagerGet", () => {
+test("AgentManagerGet", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   const a = m.get("main");
@@ -103,7 +99,7 @@ Deno.test("AgentManagerGet", () => {
   assertEquals(m.get("nonexistent"), undefined);
 });
 
-Deno.test("AgentManagerDestroy", () => {
+test("AgentManagerDestroy", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
@@ -113,7 +109,7 @@ Deno.test("AgentManagerDestroy", () => {
   assertEquals(m.count(), 0);
 });
 
-Deno.test("AgentManagerDestroyChild", () => {
+test("AgentManagerDestroyChild", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
@@ -123,35 +119,38 @@ Deno.test("AgentManagerDestroyChild", () => {
   assertEquals(m.getChildren("main"), ["sub-2"]);
 });
 
-Deno.test("AgentManagerDestroyNotFound", () => {
+test("AgentManagerDestroyNotFound", () => {
   const m = createTestManager();
   assertThrows(() => m.destroy("nonexistent"));
 });
 
-Deno.test("AgentManagerFinishCancelsChildrenAndRetainsStatus", () => {
-  const m = createTestManager();
-  const parent = m.create({ id: "main" });
-  m.create({ id: "sub-1", parentId: "main" });
-  m.markRunning("sub-1");
+test(
+  "AgentManagerFinishCancelsChildrenAndRetainsStatus",
+  () => {
+    const m = createTestManager();
+    const parent = m.create({ id: "main" });
+    m.create({ id: "sub-1", parentId: "main" });
+    m.markRunning("sub-1");
 
-  let cancelled = false;
-  m.setCancel("sub-1", () => {
-    cancelled = true;
-  });
-  m.finish("main", new Error("network error"));
+    let cancelled = false;
+    m.setCancel("sub-1", () => {
+      cancelled = true;
+    });
+    m.finish("main", new Error("network error"));
 
-  assert(cancelled);
-  assertEquals(m.count(), 0);
-  assertEquals(m.status("main"), undefined);
-  const st = m.status("sub-1");
-  assert(st !== undefined);
-  assertEquals(st.state, "error");
-  assertEquals(st.error, "network error");
-  assert(parent instanceof AgentAdapter);
-  assertFalse((parent as AgentAdapter).inner.aborted());
-});
+    assert(cancelled);
+    assertEquals(m.count(), 0);
+    assertEquals(m.status("main"), undefined);
+    const st = m.status("sub-1");
+    assert(st !== undefined);
+    assertEquals(st.state, "error");
+    assertEquals(st.error, "network error");
+    assert(parent instanceof AgentAdapter);
+    assertFalse((parent as AgentAdapter).inner.aborted());
+  },
+);
 
-Deno.test("AgentManagerFinishSuccessKeepsAsyncChildren", () => {
+test("AgentManagerFinishSuccessKeepsAsyncChildren", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   m.create({ id: "sub-1", parentId: "main" });
@@ -171,7 +170,7 @@ Deno.test("AgentManagerFinishSuccessKeepsAsyncChildren", () => {
   assertEquals(st.state, "running");
 });
 
-Deno.test("AgentManagerList", () => {
+test("AgentManagerList", () => {
   const m = createTestManager();
   m.create({ id: "a" });
   m.create({ id: "b" });
@@ -183,18 +182,18 @@ Deno.test("AgentManagerList", () => {
   }
 });
 
-Deno.test("AgentManagerChildrenEmpty", () => {
+test("AgentManagerChildrenEmpty", () => {
   const m = createTestManager();
   m.create({ id: "main" });
   assertEquals(m.getChildren("main"), undefined);
 });
 
-Deno.test("AgentManagerParentNotFound", () => {
+test("AgentManagerParentNotFound", () => {
   const m = createTestManager();
   assertEquals(m.parent("nonexistent"), undefined);
 });
 
-Deno.test("AgentManagerStatusListenerTerminalTransitions", () => {
+test("AgentManagerStatusListenerTerminalTransitions", () => {
   const m = createTestManager();
   const seen: string[] = [];
   m.addStatusListener((st) => {
@@ -208,19 +207,56 @@ Deno.test("AgentManagerStatusListenerTerminalTransitions", () => {
   assertEquals(seen, ["sub-1:done"]);
 });
 
-Deno.test("AgentManagerUpdateRuntimeConfigAffectsFutureAgents", () => {
-  const oldModel = model("old-model", "Old", "old-provider");
-  const oldProvider = createMockProvider("old-provider", [oldModel], []);
-  const newModel = model("new-model", "New", "new-provider");
-  const newProvider = createMockProvider("new-provider", [newModel], []);
-  const settings: Settings = defaultSettings();
-  settings.defaultProvider = "new-provider";
-  settings.defaultModel = "new-model";
+test(
+  "AgentManagerUpdateRuntimeConfigAffectsFutureAgents",
+  () => {
+    const oldModel = model("old-model", "Old", "old-provider");
+    const oldProvider = createMockProvider("old-provider", [oldModel], []);
+    const newModel = model("new-model", "New", "new-provider");
+    const newProvider = createMockProvider("new-provider", [newModel], []);
+    const settings: Settings = defaultSettings();
+    settings.defaultProvider = "new-provider";
+    settings.defaultModel = "new-model";
 
-  const m = createAgentManager(
-    createAgentFactory(
-      oldProvider,
-      oldModel,
+    const m = createAgentManager(
+      createAgentFactory(
+        oldProvider,
+        oldModel,
+        defaultSettings(),
+        undefined,
+        "",
+        "",
+        undefined,
+        emptyCompaction(),
+        undefined,
+      ),
+    );
+    m.updateRuntimeConfig(
+      newProvider,
+      "new-provider",
+      newModel,
+      settings,
+      undefined,
+    );
+
+    const a = m.create({ id: "future" }) as AgentAdapter;
+    const cfg = runtimeConfigOfManagedAgent(a);
+    assert(cfg !== undefined);
+    assertEquals(cfg.provider, newProvider as MockProvider);
+    assertEquals(cfg.model?.id, "new-model");
+    assertEquals(cfg.settings?.defaultProvider, "new-provider");
+    assertEquals(cfg.settings?.defaultModel, "new-model");
+  },
+);
+
+test(
+  "ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering",
+  () => {
+    const m1 = model("m1", "M1", "");
+    const p = createMockProvider("mock", [m1], []);
+    const factory = createAgentFactory(
+      p,
+      m1,
       defaultSettings(),
       undefined,
       "",
@@ -228,81 +264,50 @@ Deno.test("AgentManagerUpdateRuntimeConfigAffectsFutureAgents", () => {
       undefined,
       emptyCompaction(),
       undefined,
-    ),
-  );
-  m.updateRuntimeConfig(
-    newProvider,
-    "new-provider",
-    newModel,
-    settings,
-    undefined,
-  );
+      {
+        multiAgentEnabled: true,
+        delegateEnabled: false,
+        workflowsEnabled: false,
+      },
+    );
+    const manager = createAgentManager(factory);
+    const mailbox = createMemberMailbox();
+    manager.setMemberContext(
+      createMemberDefRegistry([member("engineer")]),
+      mailbox,
+      "team",
+    );
 
-  const a = m.create({ id: "future" }) as AgentAdapter;
-  const cfg = runtimeConfigOfManagedAgent(a);
-  assert(cfg !== undefined);
-  assertEquals(cfg.provider, newProvider as MockProvider);
-  assertEquals(cfg.model?.id, "new-model");
-  assertEquals(cfg.settings?.defaultProvider, "new-provider");
-  assertEquals(cfg.settings?.defaultModel, "new-model");
-});
+    const created = manager.create({
+      id: "esm-worker",
+      multiAgent: true,
+    }) as AgentAdapter;
+    assert(created.inner.registry()?.get("subagent_spawn") !== undefined);
+    assert(created.inner.config.getSteeringMessages !== undefined);
 
-Deno.test("ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering", () => {
-  const m1 = model("m1", "M1", "");
-  const p = createMockProvider("mock", [m1], []);
-  const factory = createAgentFactory(
-    p,
-    m1,
-    defaultSettings(),
-    undefined,
-    "",
-    "",
-    undefined,
-    emptyCompaction(),
-    undefined,
-    {
-      multiAgentEnabled: true,
-      delegateEnabled: false,
-      workflowsEnabled: false,
-    },
-  );
-  const manager = createAgentManager(factory);
-  const mailbox = createMemberMailbox();
-  manager.setMemberContext(
-    createMemberDefRegistry([member("engineer")]),
-    mailbox,
-    "team",
-  );
+    mailbox.enqueue(
+      {
+        kind: "",
+        memberId: "engineer",
+        displayName: "",
+        status: "done",
+        payload: "completed work",
+        questionId: "",
+        options: [],
+      } as import("./mailbox.ts").MemberCompletion,
+    );
+    const messages = created.inner.config.getSteeringMessages?.() ?? [];
+    assertEquals(messages.length, 1);
+    assertEquals(messages[0].systemInjected, true);
 
-  const created = manager.create({
-    id: "esm-worker",
-    multiAgent: true,
-  }) as AgentAdapter;
-  assert(created.inner.registry()?.get("subagent_spawn") !== undefined);
-  assert(created.inner.config.getSteeringMessages !== undefined);
-
-  mailbox.enqueue(
-    {
-      kind: "",
-      memberId: "engineer",
-      displayName: "",
-      status: "done",
-      payload: "completed work",
-      questionId: "",
-      options: [],
-    } as import("./mailbox.ts").MemberCompletion,
-  );
-  const messages = created.inner.config.getSteeringMessages?.() ?? [];
-  assertEquals(messages.length, 1);
-  assertEquals(messages[0].systemInjected, true);
-
-  const critic = manager.create({
-    id: "esm-critic",
-    multiAgent: false,
-    tools: ["read"],
-  }) as AgentAdapter;
-  assert(critic.inner.registry()?.get("subagent_spawn") === undefined);
-});
+    const critic = manager.create({
+      id: "esm-critic",
+      multiAgent: false,
+      tools: ["read"],
+    }) as AgentAdapter;
+    assert(critic.inner.registry()?.get("subagent_spawn") === undefined);
+  },
+);
 
 // Keep the exported helpers referenced for lint parity.
 void MemberDefRegistry;
