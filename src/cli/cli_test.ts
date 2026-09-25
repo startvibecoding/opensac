@@ -120,7 +120,13 @@ Deno.test("doctor command projects JSON and human output", () => {
 Deno.test("root command registers acp doctor and knowledge-mcp", async () => {
   const root = createRootCommand("test-version");
   const help = await root.getHelp();
-  const names: string[] = ["acp", "doctor", "knowledge-mcp", "stats"];
+  const names: string[] = [
+    "acp",
+    "core",
+    "doctor",
+    "knowledge-mcp",
+    "stats",
+  ];
   for (const name of names) {
     assert(help.includes(name), `help must list ${name}`);
   }
@@ -132,6 +138,7 @@ Deno.test("every supported subcommand is wired (no pending placeholders)", async
   for (
     const name of [
       "acp",
+      "core",
       "doctor",
       "knowledge-mcp",
       "stats",

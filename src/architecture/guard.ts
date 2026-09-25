@@ -5,13 +5,14 @@
 // source lines with a small, dependency-free reader. The rules are the same:
 // no direct Agent construction or canonical Run persistence outside
 // `src/agentruntime`, one DB→DAO direction, one decision-envelope owner, no
-// legacy lease/delivery APIs, and the public SDK boundary.
+// legacy lease/delivery APIs, the narrow `src/core` foundation boundary, and
+// the public SDK boundary.
 //
 // The scanner is deliberately source-level so fixtures can be scanned without
 // running `deno info`; the whole-repo tests call the same functions against the
 // real tree.
 
-import { join, relative } from "@std/path";
+import { dirname, join, relative } from "@std/path";
 
 export interface Violation {
   file: string;
@@ -21,6 +22,46 @@ export interface Violation {
 const SKIP_DIRS = new Set([".git", "node_modules", "dist"]);
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts)$/;
 const TEST_FILE = /_test\.(?:ts|tsx|mts|cts)$/;
+
+// The Core foundation is an explicitly reviewed boundary, not a broad
+// exemption from the Agent/runtime rules. Keep this list file-specific: a new
+// Core module must be classified before it can become production code.
+export const coreBoundaryAllowlist: Record<string, string> = {
+  "src/core/auth.ts": "Core HTTP transport authentication",
+  "src/core/client.ts": "Core discovery client and transport lifecycle",
+  "src/core/config.ts": "Core configuration",
+  "src/core/endpoint.ts": "Core endpoint selection and URL validation",
+  "src/core/lock.ts": "Core process lock lifecycle",
+  "src/core/paths.ts": "Core state path configuration",
+  "src/core/protocol.ts": "Core JSON-RPC protocol",
+  "src/core/registry.ts": "Core discovery registration lifecycle",
+  "src/core/server.ts": "Core HTTP transport and listener lifecycle",
+};
+
+const CORE_FORBIDDEN_RUNTIME_ROOTS = [
+  "src/agent",
+  "src/agentruntime",
+  "src/provider",
+  "src/session",
+  "src/tools",
+  "src/mcp",
+  "src/workflow",
+  "src/expert",
+  "src/sandbox",
+  "src/skills",
+  "src/cron",
+  "src/esm",
+  "src/context",
+  "src/ai",
+  "src/db",
+  "src/dao",
+];
+
+// Core production dependencies are deliberately narrower than the repository's
+// runtime dependency graph. The settings type import is the one reviewed
+// configuration boundary; every other local dependency must stay in src/core.
+const CORE_ALLOWED_LOCAL_FILES = new Set(["src/config/settings.ts"]);
+const CORE_ALLOWED_EXTERNAL_PREFIXES = ["@std/", "jsr:", "npm:"];
 
 // Every SQLite spelling that turns foreign key enforcement ON: `foreign_keys(1)`
 // /`(ON)`/`(TRUE)` DSN pragmas and `PRAGMA foreign_keys = 1/ON/TRUE`,
@@ -32,6 +73,8 @@ export const foreignKeyEnforcementPattern =
 
 const STATIC_IMPORT =
   /import\s+(?:type\s+)?(?:[^"'`]*?from\s+)?["']([^"']+)["']/g;
+const STATIC_EXPORT =
+  /export\s+(?:type\s+)?(?:\*(?:\s+as\s+[A-Za-z_$][\w$]*)?|\{[^}]*\})\s+from\s*["']([^"']+)["']/g;
 const DYNAMIC_IMPORT = /import\s*\(\s*["']([^"']+)["']\s*\)/g;
 
 // Direct SQLite handles. The receiver-name check keeps HTTP/URL `query` and
@@ -106,6 +149,50 @@ function isSessionPackage(rel: string): boolean {
   return toSlash(rel).startsWith("src/session/");
 }
 
+export function isCorePath(rel: string): boolean {
+  return toSlash(rel).startsWith("src/core/");
+}
+
+function isCoreBoundaryAllowlisted(rel: string): boolean {
+  return Object.prototype.hasOwnProperty.call(
+    coreBoundaryAllowlist,
+    toSlash(rel),
+  );
+}
+
+function isForbiddenCoreRuntimeImport(
+  rel: string,
+  specifier: string,
+): boolean {
+  const target = resolveImportTarget(rel, specifier);
+  if (target === undefined) return false;
+  return CORE_FORBIDDEN_RUNTIME_ROOTS.some(
+    (root) => target === root || target.startsWith(`${root}/`),
+  );
+}
+
+function isAllowedCoreImport(rel: string, specifier: string): boolean {
+  const target = resolveImportTarget(rel, specifier);
+  if (target !== undefined) {
+    return target.startsWith("src/core/") ||
+      CORE_ALLOWED_LOCAL_FILES.has(target);
+  }
+  return CORE_ALLOWED_EXTERNAL_PREFIXES.some((prefix) =>
+    specifier.startsWith(prefix)
+  );
+}
+
+function resolveImportTarget(
+  rel: string,
+  specifier: string,
+): string | undefined {
+  if (specifier.startsWith(".")) {
+    return toSlash(join(dirname(rel), specifier));
+  }
+  if (specifier.startsWith("src/")) return toSlash(specifier);
+  return undefined;
+}
+
 // The guard implementation itself names every forbidden token (the decision
 // strings, the direct-SQL regexes, the legacy API names), so it owns them and
 // is exempt from its own scans.
@@ -142,8 +229,150 @@ export function walkSourceFiles(root: string): string[] {
 export function importSpecifiers(src: string): string[] {
   const out: string[] = [];
   for (const match of src.matchAll(STATIC_IMPORT)) out.push(match[1]);
+  for (const match of src.matchAll(STATIC_EXPORT)) out.push(match[1]);
   for (const match of src.matchAll(DYNAMIC_IMPORT)) out.push(match[1]);
   return out;
+}
+
+// Finds a non-literal dynamic import without treating an expression that
+// starts with a quoted string as a literal. The previous negative-lookahead
+// regex missed forms such as `import("../agent/" + name + ".ts")` because the
+// expression began with a quote. A small source walk keeps comments and string
+// contents out of the candidate set and accepts only one complete quoted
+// specifier as safe.
+function hasNonLiteralDynamicImport(src: string): boolean {
+  let index = 0;
+  while (index < src.length) {
+    const character = src[index];
+    if (character === "/" && src[index + 1] === "/") {
+      index = skipLineComment(src, index);
+      continue;
+    }
+    if (character === "/" && src[index + 1] === "*") {
+      index = skipBlockComment(src, index);
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      index = skipQuoted(src, index, character);
+      continue;
+    }
+    if (!isIdentifierStart(character)) {
+      index++;
+      continue;
+    }
+
+    const wordStart = index;
+    index++;
+    while (index < src.length && isIdentifierPart(src[index])) index++;
+    if (src.slice(wordStart, index) !== "import") continue;
+
+    const open = skipWhitespaceAndComments(src, index);
+    if (src[open] !== "(") continue;
+    const close = findClosingParenthesis(src, open + 1);
+    if (
+      close === undefined || !isPlainStringLiteral(src.slice(open + 1, close))
+    ) {
+      return true;
+    }
+    index = close + 1;
+  }
+  return false;
+}
+
+function skipLineComment(src: string, start: number): number {
+  const newline = src.indexOf("\n", start + 2);
+  return newline === -1 ? src.length : newline + 1;
+}
+
+function skipBlockComment(src: string, start: number): number {
+  const end = src.indexOf("*/", start + 2);
+  return end === -1 ? src.length : end + 2;
+}
+
+function skipQuoted(src: string, start: number, quote: string): number {
+  let index = start + 1;
+  while (index < src.length) {
+    if (src[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (src[index] === quote) return index + 1;
+    index++;
+  }
+  return src.length;
+}
+
+function skipWhitespaceAndComments(src: string, start: number): number {
+  let index = start;
+  while (index < src.length) {
+    if (/\s/.test(src[index])) {
+      index++;
+      continue;
+    }
+    if (src[index] === "/" && src[index + 1] === "/") {
+      index = skipLineComment(src, index);
+      continue;
+    }
+    if (src[index] === "/" && src[index + 1] === "*") {
+      index = skipBlockComment(src, index);
+      continue;
+    }
+    break;
+  }
+  return index;
+}
+
+function findClosingParenthesis(
+  src: string,
+  start: number,
+): number | undefined {
+  let depth = 1;
+  let index = start;
+  while (index < src.length) {
+    const character = src[index];
+    if (character === "/" && src[index + 1] === "/") {
+      index = skipLineComment(src, index);
+      continue;
+    }
+    if (character === "/" && src[index + 1] === "*") {
+      index = skipBlockComment(src, index);
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      index = skipQuoted(src, index, character);
+      continue;
+    }
+    if (character === "(") depth++;
+    if (character === ")") {
+      depth--;
+      if (depth === 0) return index;
+    }
+    index++;
+  }
+  return undefined;
+}
+
+function isPlainStringLiteral(value: string): boolean {
+  const quote = value[0];
+  if (quote !== '"' && quote !== "'") return false;
+  let index = 1;
+  while (index < value.length) {
+    if (value[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (value[index] === quote) return index === value.length - 1;
+    index++;
+  }
+  return false;
+}
+
+function isIdentifierStart(character: string): boolean {
+  return /[A-Za-z_$]/.test(character);
+}
+
+function isIdentifierPart(character: string): boolean {
+  return /[A-Za-z0-9_$]/.test(character);
 }
 
 // Collect the value of every plain `"..."`/`'...'` string literal while
@@ -213,6 +442,30 @@ function callNames(src: string, names: string[]): string[] {
 function scanFile(rel: string, src: string): Violation[] {
   const violations: Violation[] = [];
   const add = (message: string) => violations.push({ file: rel, message });
+
+  if (isCorePath(rel)) {
+    if (!isCoreBoundaryAllowlisted(rel)) {
+      add(
+        "Core production files must be explicitly classified in the Core protocol/transport/lifecycle/configuration allowlist",
+      );
+    }
+    for (const specifier of importSpecifiers(src)) {
+      if (isForbiddenCoreRuntimeImport(rel, specifier)) {
+        add(
+          `Core foundation imports runtime implementation module ${specifier}; wait for the runtime-host migration design`,
+        );
+      } else if (!isAllowedCoreImport(rel, specifier)) {
+        add(
+          `Core foundation dependency ${specifier} is not in the reviewed Core dependency allowlist`,
+        );
+      }
+    }
+    if (hasNonLiteralDynamicImport(src)) {
+      add(
+        "Core foundation uses a non-literal dynamic import; use a literal module specifier",
+      );
+    }
+  }
 
   if (!isDatabaseOwner(rel) && foreignKeyEnforcementPattern.test(src)) {
     add(

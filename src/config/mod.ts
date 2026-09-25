@@ -83,6 +83,12 @@ export {
   type WebSearchSettings,
 } from "./settings.ts";
 export {
+  type CoreSettings,
+  defaultCoreConfig,
+  resolveCoreConfig,
+  type ResolvedCoreConfig,
+} from "../core/config.ts";
+export {
   applyEnvPatch,
   clearEnv,
   type EnvConfig,
