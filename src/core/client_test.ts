@@ -9,6 +9,7 @@ import {
   coreResult,
 } from "./protocol.ts";
 import { CoreServer, type CoreServerHandle } from "./server.ts";
+import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
 import {
   CoreClient,
   type CoreClientOptions,
@@ -25,7 +26,11 @@ const EXPECTED_INFO: CoreInfo = {
   version: TEST_VERSION,
   protocolVersion: TEST_PROTOCOL_VERSION,
   coreProtocolVersion: 1,
-  features: [CORE_METHODS.health, CORE_METHODS.info],
+  features: [
+    CORE_METHODS.health,
+    CORE_METHODS.info,
+    ...Object.values(CORE_RUNTIME_METHODS),
+  ],
 };
 
 function config(

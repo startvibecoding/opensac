@@ -424,6 +424,7 @@ Deno.test("final review: source launcher grants the child explicit permissions",
       "--allow-write",
       "--allow-net",
       "--allow-env",
+      "--allow-ffi",
       "--allow-sys",
     ]
   ) {

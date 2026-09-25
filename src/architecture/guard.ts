@@ -35,8 +35,27 @@ export const coreBoundaryAllowlist: Record<string, string> = {
   "src/core/paths.ts": "Core state path configuration",
   "src/core/protocol.ts": "Core JSON-RPC protocol",
   "src/core/registry.ts": "Core discovery registration lifecycle",
+  "src/core/runtime.ts": "Core Runtime Host neutral contracts",
+  "src/core/runtime_protocol.ts": "Core Runtime Host JSON-RPC domain schemas",
+  "src/core/runtime_host.ts": "Core Runtime Host implementation boundary",
+  "src/core/dispatcher.ts": "Core Runtime Host domain dispatcher",
+  "src/core/event_stream.ts":
+    "Core Runtime Host event and reverse-request stream",
   "src/core/server.ts": "Core HTTP transport and listener lifecycle",
+  "src/core/main.ts": "Dedicated Core process entrypoint",
 };
+
+const ACP_BRIDGE_FILE = /^src\/acp\/bridge(?:_[^/]+)?\.ts$/;
+const ACP_FORBIDDEN_RUNTIME_ROOTS = [
+  "src/agent",
+  "src/agentruntime",
+  "src/provider",
+  "src/session",
+  "src/tools",
+  "src/mcp",
+  "src/db",
+  "src/dao",
+];
 
 const CORE_FORBIDDEN_RUNTIME_ROOTS = [
   "src/agent",
@@ -58,9 +77,20 @@ const CORE_FORBIDDEN_RUNTIME_ROOTS = [
 ];
 
 // Core production dependencies are deliberately narrower than the repository's
-// runtime dependency graph. The settings type import is the one reviewed
+// runtime dependency graph. The settings and allow-policy files are the reviewed
 // configuration boundary; every other local dependency must stay in src/core.
-const CORE_ALLOWED_LOCAL_FILES = new Set(["src/config/settings.ts"]);
+const CORE_ALLOWED_LOCAL_FILES = new Set([
+  "src/cli/core.ts",
+  "src/config/allow.ts",
+  "src/config/env.ts",
+  "src/config/mcp.ts",
+  "src/config/mod.ts",
+  "src/config/settings.ts",
+  "src/doctor/doctor.ts",
+  "src/skillhub/mod.ts",
+  "src/memory/store.ts",
+  "src/stats/stats.ts",
+]);
 const CORE_ALLOWED_EXTERNAL_PREFIXES = ["@std/", "jsr:", "npm:"];
 
 // Every SQLite spelling that turns foreign key enforcement ON: `foreign_keys(1)`
@@ -149,6 +179,10 @@ function isSessionPackage(rel: string): boolean {
   return toSlash(rel).startsWith("src/session/");
 }
 
+export function isACPBridgePath(rel: string): boolean {
+  return ACP_BRIDGE_FILE.test(toSlash(rel));
+}
+
 export function isCorePath(rel: string): boolean {
   return toSlash(rel).startsWith("src/core/");
 }
@@ -164,6 +198,7 @@ function isForbiddenCoreRuntimeImport(
   rel: string,
   specifier: string,
 ): boolean {
+  if (toSlash(rel) === "src/core/runtime_host.ts") return false;
   const target = resolveImportTarget(rel, specifier);
   if (target === undefined) return false;
   return CORE_FORBIDDEN_RUNTIME_ROOTS.some(
@@ -174,6 +209,13 @@ function isForbiddenCoreRuntimeImport(
 function isAllowedCoreImport(rel: string, specifier: string): boolean {
   const target = resolveImportTarget(rel, specifier);
   if (target !== undefined) {
+    if (toSlash(rel) === "src/core/runtime_host.ts") {
+      return target.startsWith("src/core/") ||
+        CORE_ALLOWED_LOCAL_FILES.has(target) ||
+        CORE_FORBIDDEN_RUNTIME_ROOTS.some(
+          (root) => target === root || target.startsWith(`${root}/`),
+        );
+    }
     return target.startsWith("src/core/") ||
       CORE_ALLOWED_LOCAL_FILES.has(target);
   }
@@ -443,6 +485,19 @@ function scanFile(rel: string, src: string): Violation[] {
   const violations: Violation[] = [];
   const add = (message: string) => violations.push({ file: rel, message });
 
+  if (isACPBridgePath(rel)) {
+    for (const specifier of importSpecifiers(src)) {
+      const target = resolveImportTarget(rel, specifier);
+      if (
+        target !== undefined && ACP_FORBIDDEN_RUNTIME_ROOTS.some(
+          (root) => target === root || target.startsWith(`${root}/`),
+        )
+      ) {
+        add(`ACP bridge imports runtime implementation module ${specifier}`);
+      }
+    }
+  }
+
   if (isCorePath(rel)) {
     if (!isCoreBoundaryAllowlisted(rel)) {
       add(
@@ -615,6 +670,8 @@ export const legacyTestAllowlist: Record<string, string> = {
   // exists that adapter tests can use without the legacy session API.
   "src/acp/manage_test.ts":
     "seeds a completed Run so the Runtime delivery-plan ownership check passes",
+  "src/acp/ownership_test.ts":
+    "contains synthetic source fixtures that intentionally exercise ACP bridge ownership rejection",
 };
 
 function isLegacyTestExempt(rel: string): boolean {

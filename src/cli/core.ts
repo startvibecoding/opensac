@@ -21,6 +21,15 @@ import {
 import { CoreLock, CoreLockBusyError } from "../core/lock.ts";
 import { CorePaths } from "../core/paths.ts";
 import { type CoreRegistration, CoreRegistry } from "../core/registry.ts";
+import { CoreEventStream } from "../core/event_stream.ts";
+import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
+import { createScheduler, type Scheduler } from "../cron/scheduler.ts";
+import {
+  createKnowledgeBaseService,
+  defaultKnowledgeBaseIndexPolicy,
+  type KnowledgeBaseService,
+} from "../agentruntime/knowledgebase.ts";
+import { runKnowledgeBaseCronJob } from "../agentruntime/knowledge_cron.ts";
 import {
   CORE_PROTOCOL_VERSION,
   CoreServer,
@@ -30,6 +39,7 @@ import {
   isCoreServerStartFailure,
 } from "../core/server.ts";
 import { current as currentVersion } from "../version/version.ts";
+import type { CoreRuntimeHost } from "../core/runtime.ts";
 
 /** Options that can override process/environment-derived Core inputs. */
 export interface CoreCommandOptions {
@@ -199,6 +209,190 @@ export type CoreCommandDeps = CoreCommandDependencies;
 const SIGNALS = ["SIGINT", "SIGTERM"] as const;
 type CoreSignal = (typeof SIGNALS)[number];
 
+function createLazyProductionRuntimeHost(
+  settings: Settings,
+  eventSink: (event: import("../core/runtime.ts").CoreRuntimeEvent) => void,
+  reverseRequest: import("../core/runtime.ts").CoreReverseRequest,
+): CoreRuntimeHost {
+  let hostPromise: Promise<CoreRuntimeHost> | undefined;
+  let runtimeHost: CoreRuntimeHost | undefined;
+  let cronScheduler: Scheduler | undefined;
+  let knowledgeService: KnowledgeBaseService | undefined;
+
+  const runCron = async (
+    job: import("../cron/cron.ts").CronJob,
+    signal: AbortSignal,
+  ): Promise<string> => {
+    if (signal.aborted) throw new Error("cron run aborted");
+    const current = runtimeHost ?? await load();
+    const session = job.sessionId
+      ? await current.openSession({ sessionId: job.sessionId })
+      : await current.createSession({
+        workDir: job.workDir ?? Deno.cwd(),
+      });
+    try {
+      const accepted = await current.prompt({
+        sessionId: session.sessionId,
+        text: job.prompt ?? "",
+      });
+      let response = "";
+      for await (
+        const event of current.subscribeRunEvents(
+          session.sessionId,
+          accepted.runId,
+        )
+      ) {
+        if (event.eventType === "text_delta") {
+          const text = event.payload.text;
+          if (typeof text === "string") response += text;
+        }
+      }
+      return response;
+    } finally {
+      if (!job.sessionId) {
+        await current.closeSession({
+          sessionId: session.sessionId,
+        });
+      }
+    }
+  };
+
+  const triggerCron = (id: string, _signal: AbortSignal): void => {
+    if (cronScheduler === undefined) {
+      throw new Error("cron runtime is unavailable");
+    }
+    cronScheduler.runNow(id);
+  };
+
+  const load = (): Promise<CoreRuntimeHost> => {
+    hostPromise ??= import("../core/runtime_host.ts").then(async (module) => {
+      const runtime = await module.createCoreRuntimeHost({
+        source: "core",
+        workDir: Deno.cwd(),
+        settings,
+        providerName: settings.defaultProvider ?? "",
+        modelID: settings.defaultModel ?? "",
+        dependencies: module.createProductionCoreRuntimeDependencies(settings),
+        extension: module.createProductionCoreExtensionHandler(settings, {
+          runCronJob: runCron,
+          triggerCronJob: triggerCron,
+          cronRunning: () => cronScheduler?.isRunning() ?? false,
+          knowledgeServiceFactory: (currentSettings) =>
+            knowledgeService ??= createKnowledgeBaseService(
+              currentSettings.sessionDir ?? "",
+              defaultKnowledgeBaseIndexPolicy(),
+              currentSettings,
+            ),
+          setSessionSkill: async (sessionId, name, active) => {
+            const host = runtimeHost;
+            if (host === undefined) {
+              throw new Error("core runtime host is unavailable");
+            }
+            if (host.setSessionSkill === undefined) {
+              throw new Error("core session skill control is unavailable");
+            }
+            return await host.setSessionSkill({ sessionId, name, active });
+          },
+          getSessionSkillState: async (sessionId) => {
+            const host = runtimeHost;
+            if (host === undefined || host.getSessionSkillState === undefined) {
+              throw new Error("core session skill state is unavailable");
+            }
+            return await host.getSessionSkillState({ sessionId });
+          },
+        }),
+        eventSink,
+        reverseRequest,
+      });
+      runtimeHost = runtime;
+      const store = createSQLiteCronStore(settings.sessionDir ?? "");
+      const scheduler = createScheduler(
+        store,
+        null,
+        30_000,
+        settings.sessionDir ?? "",
+        async (job, signal) => {
+          const jobSignal = signal ?? new AbortController().signal;
+          try {
+            const knowledge = await runKnowledgeBaseCronJob(
+              jobSignal,
+              knowledgeService ??= createKnowledgeBaseService(
+                settings.sessionDir ?? "",
+                defaultKnowledgeBaseIndexPolicy(),
+                settings,
+              ),
+              job.id ?? "",
+            );
+            if (knowledge.handled) {
+              return {
+                handled: true,
+                response: knowledge.response,
+                error: null,
+              };
+            }
+            return {
+              handled: true,
+              response: await runCron(job, jobSignal),
+              error: null,
+            };
+          } catch (error) {
+            return {
+              handled: true,
+              response: "",
+              error: error instanceof Error ? error : new Error(String(error)),
+            };
+          }
+        },
+      );
+      cronScheduler = scheduler;
+      scheduler.start();
+      return runtime;
+    });
+    return hostPromise;
+  };
+  const facade: CoreRuntimeHost = {
+    extension: (method, params, signal) =>
+      load().then((runtime) => {
+        if (runtime.extension === undefined) {
+          throw new Error("Core production extension handler is unavailable");
+        }
+        return runtime.extension(method, params, signal);
+      }),
+    createSession: (input) =>
+      load().then((runtime) => runtime.createSession(input)),
+    openSession: (input) =>
+      load().then((runtime) => runtime.openSession(input)),
+    closeSession: (input) =>
+      load().then((runtime) => runtime.closeSession(input)),
+    history: (input) => load().then((runtime) => runtime.history(input)),
+    prompt: (input) => load().then((runtime) => runtime.prompt(input)),
+    cancelRun: (input) => load().then((runtime) => runtime.cancelRun(input)),
+    getRun: (input) => load().then((runtime) => runtime.getRun(input)),
+    listSessions: () => load().then((runtime) => runtime.listSessions()),
+    setSessionConfig: (input) =>
+      load().then((runtime) => runtime.setSessionConfig(input)),
+    setSessionSkill: (input) =>
+      load().then((runtime) => {
+        if (runtime.setSessionSkill === undefined) {
+          throw new Error("core session skill control is unavailable");
+        }
+        return runtime.setSessionSkill(input);
+      }),
+    subscribeRunEvents: (sessionId, runId, cursor = 0) =>
+      (async function* () {
+        const runtime = await load();
+        yield* runtime.subscribeRunEvents(sessionId, runId, cursor);
+      })(),
+    close: async () => {
+      const scheduler = cronScheduler;
+      cronScheduler = undefined;
+      if (scheduler !== undefined) await scheduler.stop();
+      if (hostPromise !== undefined) await (await hostPromise).close();
+    },
+  };
+  return facade;
+}
+
 /**
  * Starts the shared Core and returns only after its registration is published.
  * All cleanup is owned by the returned handle; callers must await `done` (or
@@ -360,10 +554,17 @@ export async function startCoreCommand(
 
   try {
     throwIfAborted(signal);
+    const events = new CoreEventStream();
     const serverOptions: CoreServerOptions = {
       config: resolvedConfig,
       version,
       protocolVersion,
+      events,
+      runtime: createLazyProductionRuntimeHost(
+        settings,
+        (event) => events.publish(event),
+        (id, method, params) => events.request(id, method, params),
+      ),
     };
 
     try {
@@ -535,7 +736,8 @@ function resolveVersion(
   options: CoreCommandOptions,
   deps: CoreCommandDependencies,
 ): string {
-  const version = options.version ?? deps.version ?? currentVersion();
+  const version = options.version ?? deps.version ??
+    Deno.env.get("OPENSAC_CORE_VERSION") ?? currentVersion();
   if (typeof version !== "string" || version.trim() === "") {
     throw new TypeError("Core command version must be a non-empty string");
   }
@@ -547,7 +749,9 @@ function resolveProtocolVersion(
   deps: CoreCommandDependencies,
 ): number {
   const protocolVersion = options.protocolVersion ?? deps.protocolVersion ??
-    CORE_PROTOCOL_VERSION;
+    Number(
+      Deno.env.get("OPENSAC_CORE_PROTOCOL_VERSION") ?? CORE_PROTOCOL_VERSION,
+    );
   if (
     typeof protocolVersion !== "number" ||
     !Number.isInteger(protocolVersion) ||

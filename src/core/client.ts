@@ -21,6 +21,10 @@ import {
   type CoreRpcErrorResponse,
   type CoreRpcId,
   type CoreRpcMessage,
+  type CoreRpcNotification,
+  type CoreRpcParams,
+  type CoreRpcRequest,
+  type CoreRpcResponse,
   type CoreRpcSuccessResponse,
   parseCoreRpcMessage,
 } from "./protocol.ts";
@@ -290,6 +294,20 @@ interface CoreConnection {
   registration: CoreRegistration;
 }
 
+/** A live WebSocket connection for Core events and reverse requests. */
+export interface CoreEventConnection {
+  readonly connected: boolean;
+  subscribe(sessionId: string, runId: string, cursor?: number): Promise<void>;
+  replay(sessionId: string, runId: string, cursor?: number): Promise<unknown>;
+  onNotification(
+    listener: (notification: CoreRpcNotification) => void,
+  ): () => void;
+  onRequest(listener: (request: CoreRpcRequest) => void): () => void;
+  respond(response: CoreRpcResponse): void;
+  close(): Promise<void>;
+  reconnect(): Promise<void>;
+}
+
 interface InternalDiscoveryOptions {
   requestTimeoutMs: number;
   signal?: AbortSignal;
@@ -352,7 +370,12 @@ export class CoreClient {
       throw new TypeError("CoreClient launcher must be a function");
     }
     this.#launcher = options.launcher ??
-      createDefaultCoreLauncher(this.#paths.stateDir, this.#config.passwords);
+      createDefaultCoreLauncher(
+        this.#paths.stateDir,
+        this.#config.passwords,
+        this.#version,
+        this.#protocolVersion,
+      );
   }
 
   /**
@@ -442,6 +465,155 @@ export class CoreClient {
     );
     if (!outcome.ok) throw outcome.error;
     return outcome.result as T;
+  }
+
+  async connectEvents(signal?: AbortSignal): Promise<CoreEventConnection> {
+    const requestSignal = combineAbortSignals(this.#signal, signal);
+    const connection = await this.#requireConnection(requestSignal);
+    const url = `${
+      connection.url.replace(/^http:/, "ws:").replace(/^https:/, "wss:")
+    }/events`;
+    let socket: WebSocket;
+    const openSocket = async (): Promise<WebSocket> => {
+      const next = new WebSocket(url);
+      await new Promise<void>((resolve, reject) => {
+        const onOpen = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = () => {
+          cleanup();
+          reject(new CoreClientTransportError("Core event WebSocket failed"));
+        };
+        const cleanup = () => {
+          next.removeEventListener("open", onOpen);
+          next.removeEventListener("error", onError);
+        };
+        next.addEventListener("open", onOpen, { once: true });
+        next.addEventListener("error", onError, { once: true });
+      });
+      return next;
+    };
+    socket = await openSocket();
+
+    const pending = new Map<string, {
+      resolve(result: unknown): void;
+      reject(error: unknown): void;
+    }>();
+    const notifications = new Set<
+      (notification: CoreRpcNotification) => void
+    >();
+    const requests = new Set<(request: CoreRpcRequest) => void>();
+    let closed = false;
+    let nextId = 1;
+
+    const send = (message: CoreRpcMessage): void => {
+      if (closed || socket.readyState !== WebSocket.OPEN) {
+        throw new CoreClientTransportError("Core event WebSocket is closed");
+      }
+      socket.send(JSON.stringify(message));
+    };
+    const request = async (
+      method: string,
+      params?: unknown,
+    ): Promise<unknown> => {
+      const id = `event-${nextId++}`;
+      const result = new Promise<unknown>((resolve, reject) => {
+        pending.set(id, { resolve, reject });
+      });
+      send({
+        jsonrpc: "2.0",
+        id,
+        method,
+        ...(params === undefined ? {} : { params: params as CoreRpcParams }),
+      });
+      return await result;
+    };
+
+    socket.onmessage = (event) => {
+      if (typeof event.data !== "string") return;
+      let input: unknown;
+      try {
+        input = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const message = parseCoreRpcMessage(input);
+      if (message === undefined) return;
+      if (!("method" in message)) {
+        const key = JSON.stringify(message.id);
+        const waiter = pending.get(key);
+        if (waiter === undefined) return;
+        pending.delete(key);
+        if ("error" in message && message.error !== undefined) {
+          waiter.reject(new CoreClientRpcError(message.error, message.id));
+        } else {
+          waiter.resolve(message.result);
+        }
+        return;
+      }
+      if (message.id !== undefined && typeof message.method === "string") {
+        for (const listener of requests) listener(message);
+      } else if (typeof message.method === "string") {
+        for (const listener of notifications) listener(message);
+      }
+    };
+
+    const connectionObject: CoreEventConnection = {
+      get connected() {
+        return !closed && socket.readyState === WebSocket.OPEN;
+      },
+      async subscribe(sessionId, runId, cursor = 0) {
+        await request("run.events.subscribe", { sessionId, runId, cursor });
+      },
+      async replay(sessionId, runId, cursor = 0) {
+        return await request("run.events.replay", { sessionId, runId, cursor });
+      },
+      onNotification(listener) {
+        notifications.add(listener);
+        return () => notifications.delete(listener);
+      },
+      onRequest(listener) {
+        requests.add(listener);
+        return () => requests.delete(listener);
+      },
+      respond(response) {
+        send(response);
+      },
+      async close() {
+        await Promise.resolve();
+        if (closed) return;
+        closed = true;
+        for (const waiter of pending.values()) {
+          waiter.reject(
+            new CoreClientTransportError("Core event WebSocket closed"),
+          );
+        }
+        pending.clear();
+        socket.close();
+      },
+      async reconnect() {
+        await connectionObject.close();
+        const next = await openSocket();
+        socket = next;
+        closed = false;
+        socket.onmessage = (event) => {
+          if (typeof event.data !== "string") return;
+          try {
+            const message = parseCoreRpcMessage(JSON.parse(event.data));
+            if (
+              message !== undefined && "method" in message &&
+              message.id === undefined
+            ) {
+              for (const listener of notifications) listener(message);
+            }
+          } catch {
+            // Ignore malformed reconnect frames; the next frame remains usable.
+          }
+        };
+      },
+    };
+    return connectionObject;
   }
 
   /** Calls and validates `core.health` for the current connection. */
@@ -1612,12 +1784,15 @@ const DENO_SOURCE_PERMISSION_ARGS = [
   "--allow-write",
   "--allow-net",
   "--allow-env",
+  "--allow-ffi",
   "--allow-sys",
 ];
 
 function createDefaultCoreLauncher(
   stateDir: string,
   secrets: string[] = [],
+  version = "",
+  protocolVersion = 0,
 ): CoreLauncher {
   return (signal) => {
     if (signal.aborted) {
@@ -1634,6 +1809,10 @@ function createDefaultCoreLauncher(
         env: {
           ...Deno.env.toObject(),
           OPENSAC_DIR: stateDir,
+          ...(version === "" ? {} : { OPENSAC_CORE_VERSION: version }),
+          ...(protocolVersion === 0
+            ? {}
+            : { OPENSAC_CORE_PROTOCOL_VERSION: String(protocolVersion) }),
         },
         stdin: "null",
         stdout: "piped",
@@ -1647,6 +1826,10 @@ function createDefaultCoreLauncher(
       );
     }
 
+    // The Core process is shared and intentionally outlives this client. Do
+    // not let its long-lived status/stdio promises keep an ACP bridge process
+    // alive after EOF.
+    child.unref();
     const output = Promise.all([
       readChildOutput(child.stdout),
       readChildOutput(child.stderr),
@@ -1757,20 +1940,9 @@ export function defaultLauncherArgs(executable: string): string[] {
     executableName.startsWith("deno.");
   if (!isDeno) return ["core"];
 
-  const mainModule = Deno.mainModule;
-  if (mainModule !== undefined && mainModule.startsWith("file://")) {
-    try {
-      const entry = fromFileUrl(new URL(mainModule));
-      if (!entry.endsWith("_test.ts") && !entry.endsWith("_test.mts")) {
-        return [...DENO_SOURCE_PERMISSION_ARGS, entry, "core"];
-      }
-    } catch {
-      // Fall through to the source entry next to this module.
-    }
-  }
   return [
     ...DENO_SOURCE_PERMISSION_ARGS,
-    fromFileUrl(new URL("../main.ts", import.meta.url)),
+    fromFileUrl(new URL("./main.ts", import.meta.url)),
     "core",
   ];
 }

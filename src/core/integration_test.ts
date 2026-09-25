@@ -11,6 +11,7 @@ import {
   type CoreServerOptions,
 } from "./server.ts";
 import { type CoreCommandHandle, startCoreCommand } from "../cli/core.ts";
+import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
 
 const TEST_VERSION = "0.1.0-core-integration-test";
 const TEST_PROTOCOL_VERSION = 23;
@@ -22,7 +23,11 @@ const EXPECTED_INFO: CoreInfo = {
   version: TEST_VERSION,
   protocolVersion: TEST_PROTOCOL_VERSION,
   coreProtocolVersion: CORE_PROTOCOL_VERSION,
-  features: [CORE_METHODS.health, CORE_METHODS.info],
+  features: [
+    CORE_METHODS.health,
+    CORE_METHODS.info,
+    ...Object.values(CORE_RUNTIME_METHODS),
+  ],
 };
 
 // This smoke test covers the infrastructure foundation only. It does not claim
