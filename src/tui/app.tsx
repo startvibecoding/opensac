@@ -19,7 +19,7 @@ import { Box, Static, Text } from "ink";
 import {
   TOOL_EXECUTION_FAILED,
   TOOL_EXECUTION_INTERRUPTED,
-} from "../agent/events.ts";
+} from "../agentruntime/events.ts";
 import { AppController } from "./app_controller.ts";
 import { renderHeader } from "./header.ts";
 import { displayWidth } from "./formatters.ts";

@@ -2,63 +2,28 @@
 // run lifecycle for the root interactive action, plus the CommandHost that the
 // slash-command dispatcher mutates through.
 //
-// The session is the TUI's Runtime projection. It owns no Agent construction,
-// session persistence, or tool registry: every command goes through the shared
-// Runtime, config, session, and protocol modules (Builder, ExecutionRuntime,
-// DecisionService, DAO-backed session listing, allow/settings persistence).
+// The session is the TUI's service projection. It owns no Agent construction,
+// session persistence, provider construction, or tool registry: every command
+// goes through the shared `TUIService` (Core-owned session/run semantics) plus
+// UI-only config helpers (allow rules).
 
-import { create } from "../provider/factory/factory.ts";
+import { isProjectDir, loadAllow } from "../config/mod.ts";
 import {
-  Builder,
-  type SessionRuntime,
-} from "../agentruntime/session_runtime.ts";
-import { resolveUnattendedMode, SOURCE_TUI } from "../agentruntime/source.ts";
-import { createAgentManager } from "../agentruntime/agent_manager.ts";
-import {
-  createSessionExecutionRuntime,
-  createSessionRunDescriptor,
-} from "../agentruntime/session_run.ts";
-import type { AgentManager } from "../agent/manager.ts";
-import { canAutoRun, Supervisor } from "../esm/mod.ts";
-import { TuiESMRuntimeAdapter } from "./esm_tui_adapter.ts";
-import { ExecutionRuntime } from "../agentruntime/execution.ts";
-import {
-  fromAgentEvent,
-  SessionExecutor,
-} from "../agentruntime/session_executor.ts";
-import type { RunState } from "../agentruntime/run_state.ts";
-import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
-import {
-  DECISION_APPROVAL,
-  DECISION_QUESTION,
-  type DecisionKind,
-  DecisionService,
-} from "../agentruntime/decision.ts";
-import {
-  type PreparedInput,
-  resourceIds,
-} from "../agentruntime/input_materializer.ts";
-import { generateID } from "../session/mod.ts";
-import { type Manager, type SessionDetail } from "../session/manager.ts";
-import {
-  createSession,
-  deleteSession as deleteSessionRuntime,
-  openSession,
-} from "../agentruntime/session_lifecycle.ts";
-import {
-  isArtifactEnabled,
-  isProjectDir,
-  loadAllow,
-  loadSettingsWithMeta,
-  sandboxLevelFromSettings,
-  type Settings,
-} from "../config/mod.ts";
-import { listManagerSessions } from "./session_commands.ts";
-import {
-  type Message,
-  normalizeThinkingLevel,
-  type ThinkingLevel,
-} from "../provider/mod.ts";
+  EVENT_QUESTION_REQUEST,
+  EVENT_RUN_FINISHED,
+  EVENT_TOOL_APPROVAL_REQUEST,
+} from "../agentruntime/events.ts";
+import type {
+  TUIDecisionAnswer,
+  TUIDecisionRequest,
+  TUIPreparedInput,
+  TUIService,
+  TUISessionView,
+  TUISettingsView,
+} from "./service.ts";
+import { isDecisionNotFound } from "./service.ts";
+import { coreEventToAgentEvent } from "./run_event_projection.ts";
+import type { CoreRuntimeEvent } from "../core/runtime.ts";
 import { AppController } from "./app_controller.ts";
 import { TuiRun } from "./tui_run.ts";
 import { localTimeZone, Translator } from "./i18n.ts";
@@ -68,7 +33,11 @@ import { renderTaskPlanLines } from "./plan_view.ts";
 import { renderAgentActivity } from "./activity.ts";
 import { expandedToolRow } from "./tool_row_format.ts";
 import { wrapANSI } from "./renderutil.ts";
-import { esmPanelLines, esmPanelWidth } from "./esm_panel.ts";
+import {
+  esmObjectiveFromView,
+  esmPanelLines,
+  esmPanelWidth,
+} from "./esm_panel.ts";
 import {
   type CommandHost,
   type CommandResult,
@@ -89,7 +58,6 @@ import {
 import { Dialog } from "./dialog.ts";
 import type { AppProps } from "./app.tsx";
 import type { Objective } from "../esm/state.ts";
-import { Store as ESMStore } from "../esm/store.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
 import { displayWidth } from "./formatters.ts";
 
@@ -101,10 +69,14 @@ export interface TUISessionOptions {
   workDir: string;
   version: string;
   multiAgent?: boolean;
+  /** Configured TUI language (empty resolves to auto). */
+  tuilang?: string;
 }
 
 /** Resolves the session translator from settings (Go NewApp). */
-export function tuiTranslatorFromSettings(settings: Settings): Translator {
+export function tuiTranslatorFromSettings(settings: {
+  tuilang?: string;
+}): Translator {
   const { translator, valid } = Translator.fromConfig(
     settings.tuilang ?? "",
     () => new Date(),
@@ -126,24 +98,30 @@ export class TUISession implements CommandHost {
   readonly input: InputState;
   readonly header: NonNullable<AppProps["header"]>;
   readonly translator: Translator;
-  #runtime!: SessionRuntime;
-  #manager: Manager;
-  #settings: Settings;
   #providerName: string;
+  #modelID: string;
   #mode: string;
-  #thinking: ThinkingLevel;
-  #provider: import("../provider/mod.ts").Provider;
-  #model: import("../provider/mod.ts").Model;
+  #thinking: string;
   #workDir: string;
   #busy = false;
-  #currentExecution: ExecutionRuntime | undefined;
-  #agent: import("../agent/agent.ts").Agent | undefined;
-  #decisions = new DecisionService();
+  /** The front-end-neutral service owning session/run semantics. */
+  readonly #service: TUIService;
+  /** The Core-owned session view (set once the service session is bound). */
+  #sessionView: TUISessionView | undefined;
+  /** Cached secret-safe settings projection used for dialog rendering. */
+  #settingsView: TUISettingsView | undefined;
+  /** The run currently streaming through the service, if any. */
+  #activeRunID = "";
+  /** Unsubscribe hook for Core-requested human decisions. */
+  #stopDecisions: (() => void) | undefined;
+  #closed = false;
   /** Runtime-staged clipboard images awaiting the next submission. */
-  #preparedInputs: PreparedInput[] = [];
+  #preparedInputs: TUIPreparedInput[] = [];
   #commands: TuiCommands;
   #sessionCommands: TuiSessionCommands;
   #dialog: Dialog | undefined;
+  /** Render hook installed by the shell for asynchronous state changes. */
+  #renderScheduler: () => void = () => {};
   #toolModal: ToolModalState | undefined;
   #planModal: ToolModalState | undefined;
   #esmObjective: Objective | null = null;
@@ -158,44 +136,48 @@ export class TUISession implements CommandHost {
   #compactMode = false;
   #multiAgent: boolean;
   #reloadRequested = false;
-  /** Lazily-built shared AgentManager (delegate tools + ESM roles). */
-  #agentManager: AgentManager | undefined;
-  /** The running ESM continuation worker, if any. */
-  #esmWorker: { cancel: () => void; done: Promise<void> } | undefined;
+  /** The Core ESM continuation run currently consumed, if any. */
+  #esmRunId = "";
+  /** The running ESM event consumer, if any. */
+  #esmConsumer: Promise<void> | undefined;
   /** Set when the user aborted the worker; consumed by the idle restart. */
   #esmCancelRequested = false;
   /** Terminal size for modal/panel layouts (set by the CLI shell). */
   #termWidth = 100;
   #termHeight = 40;
 
-  constructor(options: TUISessionOptions, settings: Settings) {
-    this.#settings = settings;
+  constructor(
+    options: TUISessionOptions,
+    service: TUIService,
+  ) {
+    this.#service = service;
     this.#workDir = options.workDir;
     this.#multiAgent = options.multiAgent ?? false;
-    const created = create(
-      settings,
-      options.provider,
-      options.model,
-      { requireModel: true },
-    );
-    this.#provider = created.provider;
-    this.#providerName = options.provider !== ""
-      ? options.provider
-      : (settings.defaultProvider ?? "");
-    this.#model = created.model;
-    this.#mode = options.mode || settings.defaultMode || "yolo";
-    this.#thinking = normalizeThinkingLevel(
-      options.thinking || settings.defaultThinkingLevel || "",
-    ) as ThinkingLevel;
-    this.translator = tuiTranslatorFromSettings(settings);
+    // Explicit CLI flags win; empty values resolve from the Core-owned
+    // settings projection in start() (the Runtime re-resolves run policy).
+    this.#providerName = options.provider;
+    this.#modelID = options.model;
+    this.#mode = options.mode;
+    this.#thinking = options.thinking;
+    this.translator = tuiTranslatorFromSettings({
+      tuilang: options.tuilang ?? "",
+    });
     this.controller = new AppController(this.translator, {
       onMessage: () => {},
-      scheduleRender: () => {},
+      scheduleRender: () => this.requestRender(),
       deliverApproval: (approvalID, approved) => {
-        this.#agent?.handleApprovalResponse(approvalID, approved);
+        this.#answerDecision({
+          requestId: approvalID,
+          kind: "approval",
+          approved,
+        });
       },
       deliverQuestion: (questionID, answer) => {
-        this.#agent?.handleQuestionResponse(questionID, answer);
+        this.#answerDecision({
+          requestId: questionID,
+          kind: "question",
+          answer,
+        });
       },
     });
     this.input = new InputState({
@@ -203,38 +185,37 @@ export class TUISession implements CommandHost {
       placeholder: "Type a message...",
       translator: this.translator,
     });
-    this.#manager = createSession({ workDir: this.#workDir });
     // Assigned by start(); methods that need it run only after that.
     this.#commands = new TuiCommands(this);
     this.#sessionCommands = new TuiSessionCommands(this);
     this.header = {
       version: options.version,
       providerName: this.#providerName,
-      modelName: this.#model.id,
+      modelName: this.#modelID,
       cwd: this.#workDir,
     };
   }
 
-  /** Builds the shared runtime once (Builder.build: registry/skills/sandbox/MCP). */
+  /** Binds the Core-owned service session and resolves display defaults. */
   async start(): Promise<void> {
-    this.#runtime = await new Builder(
-      this.#settings,
-      sandboxLevelFromSettings(this.#settings),
-    ).build(undefined, {
-      source: SOURCE_TUI,
-      workDir: this.#workDir,
-      workflows: false,
-      browser: false,
-      artifactEnabled: isArtifactEnabled(this.#settings),
-      manager: this.#manager,
-    });
-    this.#runtime.setDecisions(this.#decisions);
-    this.#runtime.configureSession(
-      this.#provider,
-      this.#providerName,
-      this.#model,
-      this.#mode,
-      this.#thinking,
+    const settingsView = await this.#service.settings();
+    this.#settingsView = settingsView;
+    // Display defaults come from the Core-owned effective settings projection;
+    // explicit CLI flags already filled these fields.
+    if (this.#providerName === "") {
+      this.#providerName = settingsView.defaultProvider;
+    }
+    if (this.#modelID === "") this.#modelID = settingsView.defaultModel;
+    if (this.#mode === "") {
+      this.#mode = settingsView.defaultMode !== ""
+        ? settingsView.defaultMode
+        : "yolo";
+    }
+    if (this.#thinking === "") this.#thinking = settingsView.thinkingLevel;
+    this.refreshHeader();
+    await this.createFreshSession();
+    this.#stopDecisions = this.#service.onDecisionRequest((request) =>
+      this.#handleDecisionRequest(request)
     );
   }
 
@@ -256,126 +237,140 @@ export class TUISession implements CommandHost {
     return this.#termHeight;
   }
 
-  /**
-   * Lazily builds the shared AgentManager on the session Runtime. Used by
-   * /delegate, /agent, and the ESM role runner (Go AgentManager access).
-   */
-  ensureAgentManager(): AgentManager {
-    if (this.#agentManager !== undefined) return this.#agentManager;
-    const runtime = this.#runtime;
-    const provider = runtime.provider;
-    const model = runtime.model;
-    const settings = runtime.settingsSnapshot();
-    if (provider === null || model === null || settings === null) {
-      throw new Error("agent manager runtime is unavailable");
-    }
-    this.#agentManager = createAgentManager({
-      runtime,
-      provider,
-      model,
-      settings,
-      delegateEnabled: true,
-      multiAgentEnabled: this.#multiAgent,
-    });
-    return this.#agentManager;
-  }
-
-  /** True when a bound expert team is active (ESM worker policy input). */
-  teamExpertActive(): boolean {
-    return this.#runtime.teamExpertActive();
-  }
-
-  /** The current ESM continuation worker state (test/session introspection). */
+  /** The current ESM continuation consumer state (test/session introspection). */
   get esmWorkerRunning(): boolean {
-    return this.#esmWorker !== undefined;
+    return this.#esmConsumer !== undefined;
+  }
+
+  /** The run ID currently streaming through the service (cancel/replay). */
+  get activeRunID(): string {
+    return this.#activeRunID;
+  }
+
+  /** The Core-owned session identity (empty before `start()`). */
+  get serviceSessionID(): string {
+    return this.#sessionView?.sessionId ?? "";
   }
 
   /**
-   * Starts one ESM continuation worker when idle (Go startESMContinuationIfIdle).
-   * The worker loops through supervisor continuations while the objective can
-   * auto-run, so the first /esm <objective> and every /esm resume actually
-   * launch worker/critic/audit role agents instead of only updating the store.
+   * Starts one Core-owned ESM continuation worker when idle (Go
+   * startESMContinuationIfIdle). The Core loops supervisor continuations while
+   * the objective can auto-run; the TUI consumes the canonical run events.
+   * Resolves once the consumer is attached (never awaits the worker).
    */
-  startESMContinuationIfIdle(): void {
+  async startESMContinuationIfIdle(): Promise<void> {
     this.#esmCancelRequested = false;
-    if (this.#esmWorker !== undefined) return;
+    if (this.#esmConsumer !== undefined) return;
     if (this.#busy || this.controller.isThinking) return;
-    const sessionID = this.currentSessionID();
-    if (sessionID === "") return;
-
-    let store: ESMStore;
+    const sessionId = this.currentSessionID();
+    if (sessionId === "") return;
+    let continuation;
     try {
-      store = new ESMStore(this.#manager.getSessionDir());
-      const objective = store.get(sessionID);
-      if (objective === null || !canAutoRun(objective)) return;
+      continuation = await this.#service.esmContinue({ sessionId });
     } catch {
+      // The continuation is an idle background restart: degrade to idle.
       return;
     }
-
-    let manager: AgentManager;
-    try {
-      manager = this.ensureAgentManager();
-    } catch {
-      return;
-    }
-    const mode = resolveUnattendedMode(this.#mode);
-    const adapter = new TuiESMRuntimeAdapter(
-      manager,
-      this,
-      this.#workDir,
-      mode,
-    );
-    const supervisor = new Supervisor({ store, adapter, events: adapter });
-    const controller = new AbortController();
-    const cancel = (): void => controller.abort();
-    const done = (async () => {
-      try {
-        let runID = `esm_${generateID()}`;
-        for (;;) {
-          const result = await supervisor.run(
-            sessionID,
-            runID,
-            this.#workDir,
-            mode,
-            controller.signal,
-          );
-          if (controller.signal.aborted) return;
-          if (result.error !== undefined && result.error !== null) {
-            const message = result.error instanceof Error
-              ? result.error.message
-              : String(result.error);
-            this.controller.addMessage(
-              `ESM continuation stopped: ${message}`,
-              "error",
-            );
-            return;
-          }
-          let objective: Objective | null = null;
-          try {
-            objective = store.get(sessionID);
-          } catch {
-            return;
-          }
-          if (objective === null || !canAutoRun(objective)) return;
-          runID = `esm_${generateID()}`;
+    if (continuation.runId === "") return;
+    this.#esmRunId = continuation.runId;
+    this.#esmConsumer = this.#consumeEsmEvents(sessionId, continuation.runId)
+      .catch((error) => {
+        this.controller.addMessage(errorMessage(error), "error");
+      })
+      .finally(() => {
+        if (this.#esmRunId === continuation.runId) {
+          this.#esmRunId = "";
+          this.#esmConsumer = undefined;
         }
-      } finally {
-        if (this.#esmWorker?.cancel === cancel) {
-          this.#esmWorker = undefined;
-        }
-      }
-    })();
-    this.#esmWorker = { cancel, done };
+        this.requestRender();
+      });
   }
 
-  /** Aborts the running ESM continuation worker, if any. */
-  abortESMWorker(): void {
-    if (this.#esmWorker === undefined) return;
-    this.#esmWorker.cancel();
-    this.#esmWorker = undefined;
+  /** Aborts the Core-owned ESM continuation worker, if any. */
+  async abortESMWorker(): Promise<void> {
+    if (this.#esmConsumer === undefined && this.#esmRunId === "") return;
     // A user-requested abort must not be immediately undone by the idle
     // restart that follows the current interactive run.
     this.#esmCancelRequested = true;
+    const sessionId = this.currentSessionID();
+    if (sessionId === "") return;
+    try {
+      await this.#service.esmStop({ sessionId });
+    } catch (error) {
+      this.controller.addMessage(errorMessage(error), "error");
+    }
+  }
+
+  /**
+   * Consumes one Core ESM continuation run's canonical events: role activity
+   * projects into the controller, supervisor messages become status rows.
+   */
+  async #consumeEsmEvents(sessionId: string, runId: string): Promise<void> {
+    for await (
+      const event of this.#service.subscribeRunEvents(sessionId, runId)
+    ) {
+      const payload = event.payload ?? {};
+      switch (event.eventType) {
+        case "esm_status": {
+          const text = typeof payload.text === "string" ? payload.text : "";
+          if (text !== "") this.controller.addMessage(text, "status");
+          break;
+        }
+        case "esm_finished": {
+          const status = String(payload.status ?? "completed");
+          const text = typeof payload.text === "string" ? payload.text : "";
+          if (text !== "") {
+            this.controller.addMessage(
+              text,
+              status === "failed" ? "error" : "plain",
+            );
+          }
+          break;
+        }
+        default: {
+          const agentEvent = coreEventToAgentEvent(event);
+          if (agentEvent !== undefined) {
+            const agentId = agentEvent.agentId ?? "";
+            if (agentId !== "") {
+              if (agentEvent.type === EVENT_RUN_FINISHED) {
+                this.clearESMActiveAgent(agentId);
+              } else {
+                this.setESMActiveAgent(agentId);
+              }
+            }
+            this.controller.handleAgentEvent(agentEvent);
+          }
+          break;
+        }
+      }
+      if (event.terminal) break;
+      this.requestRender();
+    }
+  }
+
+  /**
+   * Consumes one service run's canonical events into the controller. The
+   * terminal event is returned unprojected so command callers can read its
+   * status payload (compaction results) without synthesizing run state.
+   */
+  async consumeRunEvents(
+    sessionId: string,
+    runId: string,
+  ): Promise<CoreRuntimeEvent | undefined> {
+    let terminal: CoreRuntimeEvent | undefined;
+    for await (
+      const event of this.#service.subscribeRunEvents(sessionId, runId)
+    ) {
+      if (event.terminal) {
+        terminal = event;
+        break;
+      }
+      const agentEvent = coreEventToAgentEvent(event);
+      if (agentEvent !== undefined) {
+        this.controller.handleAgentEvent(agentEvent);
+      }
+    }
+    return terminal;
   }
 
   get busy(): boolean {
@@ -386,16 +381,28 @@ export class TUISession implements CommandHost {
     return this.#mode;
   }
 
-  /** Pushes the current provider/model/mode/thinking binding into the Runtime. */
-  #configureRuntimeSession(): void {
-    if (this.#runtime === undefined) return;
-    this.#runtime.configureSession(
-      this.#provider,
-      this.#providerName,
-      this.#model,
-      this.#mode,
-      this.#thinking,
-    );
+  /**
+   * Mirrors the current policy binding into the Core-owned session config so
+   * service-run prompts use the same provider/model/mode/thinking values.
+   */
+  #syncSessionConfig(): void {
+    const sessionId = this.#sessionView?.sessionId;
+    if (sessionId === undefined) return;
+    void this.#service
+      .setSessionConfig({
+        sessionId,
+        providerName: this.#providerName,
+        modelID: this.#modelID,
+        mode: this.#mode,
+        thinkingLevel: this.#thinking,
+        capabilities: { multiAgent: this.#multiAgent },
+      })
+      .then((view) => {
+        this.#sessionView = view;
+      })
+      .catch((error) => {
+        this.controller.addMessage(errorMessage(error), "error");
+      });
   }
 
   get reloadRequested(): boolean {
@@ -412,7 +419,7 @@ export class TUISession implements CommandHost {
   }
 
   /** Stages one prepared input (clipboard image) for the next submission. */
-  addPreparedInput(prepared: PreparedInput): void {
+  addPreparedInput(prepared: TUIPreparedInput): void {
     this.#preparedInputs.push(prepared);
   }
 
@@ -423,7 +430,7 @@ export class TUISession implements CommandHost {
   }
 
   get modelID(): string {
-    return this.#model.id;
+    return this.#modelID;
   }
 
   get providerName(): string {
@@ -436,24 +443,31 @@ export class TUISession implements CommandHost {
 
   setMode(mode: string): void {
     this.#mode = mode;
-    this.#configureRuntimeSession();
+    this.#syncSessionConfig();
   }
 
   async setModel(modelID: string): Promise<CommandResult> {
-    await Promise.resolve();
-    const model = this.#provider.getModel(modelID);
+    // Model existence and the model list come from the secret-safe Core
+    // settings projection; the dialog/bridge keeps no private provider catalog.
+    const settings = await this.#service.settings();
+    this.#settingsView = settings;
+    const provider = settings.providers.find((entry) =>
+      entry.name === this.#providerName
+    );
+    const model = provider?.models.find((entry) => entry.id === modelID);
     if (model === undefined) {
       return {
         message: this.translator.text(
           "commands.model.not_found",
           modelID,
-          this.#provider.models().map((m) => m.id).join(", "),
+          (provider?.models ?? []).map((m) => m.id).join(", "),
         ),
         error: true,
       };
     }
-    this.#model = model;
-    this.#configureRuntimeSession();
+    this.#modelID = modelID;
+    this.refreshHeader();
+    this.#syncSessionConfig();
     return {
       message: this.translator.text(
         "commands.model.switched",
@@ -475,12 +489,12 @@ export class TUISession implements CommandHost {
     return await this.#commands.compact();
   }
 
-  listSkills(): string {
-    return this.#commands.listSkills();
+  async listSkills(): Promise<string> {
+    return await this.#commands.listSkills();
   }
 
-  activateSkill(name: string): string {
-    return this.#commands.activateSkill(name);
+  async activateSkill(name: string): Promise<string> {
+    return await this.#commands.activateSkill(name);
   }
 
   listMCPServers(): string {
@@ -491,11 +505,11 @@ export class TUISession implements CommandHost {
     return this.#commands.initMCPConfig(scope, full, force);
   }
 
-  listExperts(): string {
+  listExperts(): Promise<string> {
     return this.#commands.listExperts();
   }
 
-  showExpert(id: string): string {
+  showExpert(id: string): Promise<string> {
     return this.#commands.showExpert(id);
   }
 
@@ -507,8 +521,8 @@ export class TUISession implements CommandHost {
     return await this.#commands.forkSwitchExpert(id);
   }
 
-  listSessions(): string {
-    return this.#commands.listSessions();
+  async listSessions(): Promise<string> {
+    return await this.#commands.listSessions();
   }
 
   async switchSession(id: string): Promise<CommandResult> {
@@ -547,19 +561,19 @@ export class TUISession implements CommandHost {
     return await this.#sessionCommands.handleBTW(cmd);
   }
 
-  listEnv(): string {
+  listEnv(): Promise<string> {
     return this.#commands.listEnv();
   }
 
-  setEnv(key: string, value: string): CommandResult {
+  setEnv(key: string, value: string): Promise<CommandResult> {
     return this.#commands.setEnv(key, value);
   }
 
-  unsetEnv(key: string): CommandResult {
+  unsetEnv(key: string): Promise<CommandResult> {
     return this.#commands.unsetEnv(key);
   }
 
-  clearEnv(): CommandResult {
+  clearEnv(): Promise<CommandResult> {
     return this.#commands.clearEnv();
   }
 
@@ -571,19 +585,19 @@ export class TUISession implements CommandHost {
     return this.#commands.allowAutoEdit(parts);
   }
 
-  delegateMode(arg: string): CommandResult {
+  delegateMode(arg: string): Promise<CommandResult> {
     return this.#commands.delegateMode(arg);
   }
 
-  browserMode(arg: string): CommandResult {
+  browserMode(arg: string): Promise<CommandResult> {
     return this.#commands.browserMode(arg);
   }
 
-  statusLine(parts: string[]): CommandResult {
+  statusLine(parts: string[]): Promise<CommandResult> {
     return this.#commands.statusLine(parts);
   }
 
-  handleRule(parts: string[]): CommandResult {
+  handleRule(parts: string[]): Promise<CommandResult> {
     return this.#commands.handleRule(parts);
   }
 
@@ -595,7 +609,7 @@ export class TUISession implements CommandHost {
     return await this.#commands.listStats(parts);
   }
 
-  listAgents(): string {
+  listAgents(): Promise<string> {
     return this.#commands.listAgents();
   }
 
@@ -621,8 +635,8 @@ export class TUISession implements CommandHost {
     };
   }
 
-  showProviders(): string {
-    return this.#sessionCommands.showProviders();
+  async showProviders(): Promise<string> {
+    return await this.#sessionCommands.showProviders();
   }
 
   // --- Interactive dialogs ---------------------------------------------------
@@ -631,28 +645,41 @@ export class TUISession implements CommandHost {
   get dialogHost(): DialogHost {
     return {
       translator: this.translator,
-      settings: this.#settings,
       workDir: this.#workDir,
       providerName: this.#providerName,
-      modelID: this.#model.id,
+      modelID: this.#modelID,
       allow: loadAllow(),
-      sessionDir: () => this.#manager.getSessionDir(),
       currentSessionID: () => this.currentSessionID(),
+      listModels: (providerName) =>
+        this.#settingsView?.providers.find((entry) =>
+          entry.name === providerName
+        )?.models ?? [],
       applyModel: (providerName, modelID) =>
         this.applyModelBinding(providerName, modelID),
+      loadSettings: (scope) => this.#service.getSettings({ scope }),
+      saveSettings: (scope, updates) =>
+        this.#service.updateSettings({ scope, updates }),
+      validateProviderModel: (providerID, modelID) =>
+        this.#service.validateProviderModel({ providerID, modelID }),
+      listProviders: () => this.#service.listProviders(),
+      loadEnv: () => this.#service.listEnv(),
+      saveEnv: (vars) => this.#service.updateEnv({ vars }).then(() => {}),
       reloadSettings: () => this.reloadSettings(),
+      requestRender: () => this.requestRender(),
       switchSession: async (detail) => {
-        const manager = openSession(this.#manager.getSessionDir(), detail.id);
-        await this.bindManager(manager);
+        // The Core owns session identity: open it there and adopt the view.
+        this.adoptSession(
+          await this.#service.openSession({ sessionId: detail.sessionId }),
+        );
         this.controller.store.resetTranscriptState();
       },
       newSession: async () => {
-        const manager = createSession({ workDir: this.#workDir });
-        await this.bindManager(manager);
+        // The Core mints the persisted identity; no client-side session row.
+        await this.createFreshSession();
         this.controller.store.resetTranscriptState();
       },
       deleteSession: async (id) => {
-        await deleteSessionRuntime(this.#manager.getSessionDir(), id);
+        await this.#service.deleteSession({ sessionId: id });
       },
     };
   }
@@ -681,78 +708,123 @@ export class TUISession implements CommandHost {
     const dialog = this.#dialog;
     if (dialog === undefined || dialog.closed) return false;
     dialog.handleKey(ev);
-    if (dialog.closed) {
-      const outcome = dialog.outcome;
-      if (outcome.message !== undefined && outcome.message !== "") {
-        this.controller.addMessage(
-          outcome.message,
-          outcome.error === true ? "error" : "plain",
-        );
-      }
-      this.#dialog = undefined;
-      // Hand off to another panel (Go closeAuthDialog + openXDialog).
-      if (outcome.handoff === "auth") this.openAuthDialog();
-      else if (outcome.handoff === "defaultModel") {
-        this.openDefaultModelDialog("global");
-      } else if (outcome.handoff === "tuilang") this.openTuiLangDialog();
-    }
+    this.#settleDialog();
     return true;
   }
 
-  openModelDialog(): CommandResult {
+  /**
+   * Processes the outcome of a dialog closed by a synchronous key handler or
+   * by an asynchronous service call (fire-and-forget persistence).
+   */
+  #settleDialog(): void {
+    const dialog = this.#dialog;
+    if (dialog === undefined || !dialog.closed) return;
+    const outcome = dialog.outcome;
+    if (outcome.message !== undefined && outcome.message !== "") {
+      this.controller.addMessage(
+        outcome.message,
+        outcome.error === true ? "error" : "plain",
+      );
+    }
+    this.#dialog = undefined;
+    // Hand off to another panel (Go closeAuthDialog + openXDialog).
+    if (outcome.handoff === "auth") void this.openAuthDialog();
+    else if (outcome.handoff === "defaultModel") {
+      void this.openDefaultModelDialog("global");
+    } else if (outcome.handoff === "tuilang") void this.openTuiLangDialog();
+  }
+
+  /** Installs the shell's rerender hook for asynchronous state changes. */
+  setRenderScheduler(scheduler: () => void): void {
+    this.#renderScheduler = scheduler;
+  }
+
+  /** Renders after an asynchronous update and settles a closed dialog. */
+  requestRender(): void {
+    this.#settleDialog();
+    this.#renderScheduler();
+  }
+
+  async openModelDialog(): Promise<CommandResult> {
+    await Promise.resolve();
     this.#openDialog(
       new Dialog((d) => new ModelDialog(this.dialogHost, d)),
     );
     return {};
   }
 
-  openDefaultModelDialog(scope: string): CommandResult {
+  async openDefaultModelDialog(scope: string): Promise<CommandResult> {
+    const [catalog, settings] = await Promise.all([
+      this.#service.listProviders(),
+      this.#service.getSettings(),
+    ]);
     this.#openDialog(
-      new Dialog((d) => new DefaultModelDialog(this.dialogHost, d, scope)),
+      new Dialog((d) =>
+        new DefaultModelDialog(this.dialogHost, d, scope, {
+          catalog,
+          defaultProvider: settings.defaultProvider ?? "",
+          defaultModel: settings.defaultModel ?? "",
+        })
+      ),
     );
     return {};
   }
 
-  openEnvDialog(): CommandResult {
-    this.#openDialog(new Dialog((d) => new EnvDialog(this.dialogHost, d)));
-    return {};
-  }
-
-  openSessionsDialog(): CommandResult {
-    this.#openDialog(new Dialog((d) => new SessionsDialog(this.dialogHost, d)));
-    return {};
-  }
-
-  openAuthDialog(initialProvider?: string): CommandResult {
+  async openEnvDialog(): Promise<CommandResult> {
+    const vars = await this.#service.listEnv();
     this.#openDialog(
-      new Dialog((d) => new AuthDialog(this.dialogHost, d, initialProvider)),
+      new Dialog((d) => new EnvDialog(this.dialogHost, d, vars)),
     );
     return {};
   }
 
-  openSettingsDialog(providerID?: string): CommandResult {
+  async openSessionsDialog(): Promise<CommandResult> {
+    const items = await this.#service.listPersistedSessions({
+      workDir: this.#workDir,
+    });
+    this.#openDialog(
+      new Dialog((d) => new SessionsDialog(this.dialogHost, d, items)),
+    );
+    return {};
+  }
+
+  async openAuthDialog(initialProvider?: string): Promise<CommandResult> {
+    const settings = await this.#service.getSettings();
+    this.#openDialog(
+      new Dialog((d) =>
+        new AuthDialog(this.dialogHost, d, settings, initialProvider)
+      ),
+    );
+    return {};
+  }
+
+  async openSettingsDialog(providerID?: string): Promise<CommandResult> {
     // `/settings <provider>` deep-links into that provider's auth detail (Go
     // openSettingsDialog(args)).
     if (providerID !== undefined && providerID.trim() !== "") {
-      return this.openAuthDialog(providerID.trim());
+      return await this.openAuthDialog(providerID.trim());
     }
-    this.#openDialog(new Dialog((d) => new SettingsDialog(this.dialogHost, d)));
+    const settings = await this.#service.getSettings();
+    this.#openDialog(
+      new Dialog((d) => new SettingsDialog(this.dialogHost, d, settings)),
+    );
     return {};
   }
 
-  openTuiLangDialog(): CommandResult {
+  async openTuiLangDialog(): Promise<CommandResult> {
     const scope = isProjectDir(this.#workDir) ? "project" : "global";
+    const settings = await this.#service.getSettings();
     this.#openDialog(
-      new Dialog((d) => new TuiLangDialog(this.dialogHost, d, scope)),
+      new Dialog((d) => new TuiLangDialog(this.dialogHost, d, scope, settings)),
     );
     return {};
   }
 
   setDefaultModel(parts: string[]): Promise<CommandResult> {
-    return Promise.resolve(this.openDefaultModelDialog(parts[1] ?? "global"));
+    return this.openDefaultModelDialog(parts[1] ?? "global");
   }
 
-  tuiLang(parts: string[]): CommandResult {
+  tuiLang(parts: string[]): Promise<CommandResult> {
     return this.#sessionCommands.tuiLang(parts);
   }
 
@@ -784,6 +856,7 @@ export class TUISession implements CommandHost {
       } catch (err) {
         this.controller.addMessage(errorMessage(err), "error");
       }
+      this.requestRender();
       return;
     }
     try {
@@ -795,6 +868,7 @@ export class TUISession implements CommandHost {
         this.controller.addMessage(errorMessage(err), "error");
       }
     }
+    this.requestRender();
   }
 
   /** Submits one user message as a durable conversation-turn run. */
@@ -816,187 +890,172 @@ export class TUISession implements CommandHost {
       if (this.#esmCancelRequested) {
         this.#esmCancelRequested = false;
       } else {
-        this.startESMContinuationIfIdle();
+        await this.startESMContinuationIfIdle();
       }
     }
   }
 
   /**
-   * One durable conversation-turn run: admission, intent/run rows, agent
-   * construction, and event pumping. The admission guard is held (and later
-   * released) for the whole turn, including failures before the event loop.
+   * One durable conversation-turn run over the service: prompt admission,
+   * event consumption, and cancellation are Core-owned; the TUI only projects
+   * the canonical run events into the controller.
    */
   async #runPromptTurn(text: string): Promise<void> {
     this.controller.addMessage(`> ${text}`, "plain");
-    const header = this.#manager.getHeader();
-    const sessionId = header?.id ?? "";
-    if (sessionId === "") {
+    const sessionId = this.currentSessionID();
+    if (this.#sessionView === undefined || sessionId === "") {
       throw new Error("session initialization failed; cannot start a run");
     }
-    const guard = await acquireExecutionAdmission(
-      undefined,
-      this.#manager.getSessionDir(),
+    // Staged clipboard images (prepareInput) join the submission here; plain
+    // text goes through the same prompt path with no staged resources.
+    const preparedInputs = this.#preparedInputs;
+    this.#preparedInputs = [];
+    const accepted = await this.#service.prompt({
       sessionId,
-      {},
-    );
+      text,
+      providerName: this.#providerName,
+      modelID: this.#modelID,
+      mode: this.#mode,
+      thinkingLevel: this.#thinking,
+      ...(preparedInputs.length > 0 ? { preparedInputs } : {}),
+    });
+    this.#activeRunID = accepted.runId;
+    if (accepted.agentId !== undefined && accepted.agentId !== "") {
+      this.controller.setLeadAgentId(accepted.agentId);
+    }
+    const run = new TuiRun({
+      runId: accepted.runId,
+      sessionId,
+      mode: this.#mode,
+      model: this.#modelID,
+    });
+    this.controller.attachRun(run);
     try {
-      const startedAt = new Date();
-      const runId = `tui_${generateID()}`;
-      // Staged clipboard images (prepareInput) join the submission here; plain
-      // text goes through the same acceptInput path with no ingresses.
-      const preparedInputs = this.#preparedInputs;
-      this.#preparedInputs = [];
-      const submission = preparedInputs.length > 0
-        ? this.#runtime.attachPreparedInput(undefined, text, preparedInputs)
-        : await this.#runtime.acceptInput(undefined, runId, text, []);
-      const userMessage: Message = this.#runtime.buildUserMessage(
-        undefined,
-        submission,
-      );
-      const descriptor = await createSessionRunDescriptor({
-        sessionId,
-        runId,
-        source: "tui",
-        model: this.#model.id,
-        mode: this.#mode,
-        workDir: this.#workDir,
-        text,
-        userMessage,
-        resourceIds: resourceIds(submission),
-        startedAt,
-      });
-      const intentId = descriptor.intent.id;
-      const { turnId } = descriptor;
-      const execution = createSessionExecutionRuntime(
-        this.#manager.getSessionDir(),
-      );
-      this.#runtime.setExecution(execution);
-      this.#currentExecution = execution;
-      execution.beginIntentDurable(
-        undefined,
-        descriptor.intent,
-        descriptor.run,
-        descriptor.startEvent,
-      );
-      const run = new TuiRun({
-        execution,
-        decisions: this.#decisions,
-        runId,
-        sessionId,
-        sessionDir: this.#manager.getSessionDir(),
-        mode: this.#mode,
-        model: this.#model.id,
-      });
-      this.controller.attachRun(run);
-      const agent = this.#runtime.buildAgent({
-        provider: this.#provider,
-        providerName: this.#providerName,
-        model: this.#model,
-        settings: this.#settings,
-        allow: loadAllow(),
-        mode: this.#mode,
-        thinkingLevel: this.#thinking,
-        extraContext: this.#runtime.extraContext,
-        ruleContent: this.#runtime.ruleContent,
-        hydrateHistory: true,
-      });
-      agent.setConversationTurn(turnId, intentId, runId);
-      this.#agent = agent;
-      this.controller.setLeadAgentId(agent.id());
-      this.#commands.setAgent(agent);
-      execution.setAgent(agent);
-      const executor = new SessionExecutor({
-        driver: {
-          admit: async () => {
-            await Promise.resolve();
-            return () => undefined;
-          },
-          createRun: async () => {
-            await Promise.resolve();
-            return {
-              runId,
-              cancel: () => execution.cancel(),
-              events: (async function* () {
-                for await (
-                  const event of agent.runWithUserMessage(userMessage)
-                ) {
-                  yield fromAgentEvent(event);
-                }
-              })(),
-            };
-          },
-          finish: (id, state) =>
-            execution.finishWithState(id, state as RunState),
-        },
-        newId: () => runId,
-        publish: (event) => {
-          if (event.agentEvent !== undefined) {
-            this.controller.handleAgentEvent(event.agentEvent);
-          }
-        },
-      });
-      await executor.prompt(text);
-      await executor.waitForIdle();
+      for await (
+        const event of this.#service.subscribeRunEvents(
+          sessionId,
+          accepted.runId,
+        )
+      ) {
+        const agentEvent = coreEventToAgentEvent(event);
+        if (agentEvent !== undefined) {
+          this.controller.handleAgentEvent(agentEvent);
+        }
+      }
     } finally {
-      guard.release();
+      this.#activeRunID = "";
     }
   }
 
   /** Cancels the active run (ctrl+c while busy). */
   cancelRun(): void {
-    this.#currentExecution?.cancel();
-    this.abortESMWorker();
+    const sessionId = this.currentSessionID();
+    const runId = this.#activeRunID;
+    if (this.#sessionView !== undefined && sessionId !== "" && runId !== "") {
+      void this.#service.cancelRun({ sessionId, runId }).catch((error) => {
+        this.controller.addMessage(errorMessage(error), "error");
+      });
+    }
+    void this.abortESMWorker();
   }
 
-  /** Answers the shown approval through the decision binding. */
-  answerApproval(approved: boolean): void {
-    const shown = this.controller.shownApproval;
-    if (!shown) return;
-    // Decision routing (resolve → deliver → resume) is owned by the controller,
-    // which bound the resolver when the request arrived. The resolution goes
-    // through the run handle so the resolved DecisionRecord is persisted while
-    // identity/first-response-wins stays canonical.
-    try {
-      this.#resolveDecision(
-        shown.approvalID,
-        DECISION_APPROVAL,
-        approved ? "true" : "false",
-      );
-    } catch {
-      // Already resolved/expired: fall back to clearing the panel below.
-      this.controller.resolveApproval(shown.approvalID, approved);
+  /** Closes the service session exactly once (Core-owned teardown). */
+  async close(): Promise<void> {
+    if (this.#closed) return;
+    this.#closed = true;
+    this.#stopDecisions?.();
+    this.#stopDecisions = undefined;
+    if (this.#sessionView !== undefined) {
+      await this.#service.closeSession({
+        sessionId: this.#sessionView.sessionId,
+      });
     }
   }
 
   /**
-   * Resolves one decision through the attached run (persisting the resolved
-   * DecisionRecord) and falls back to the in-memory DecisionService when no
-   * run is attached.
+   * Creates one fresh Core-owned session: the Core mints the persisted
+   * identity and the TUI adopts the returned canonical view.
    */
-  #resolveDecision(id: string, kind: DecisionKind, value: string): void {
-    const run = this.controller.currentRunHandle();
-    if (run?.resolveDecision !== undefined) {
-      run.resolveDecision(id, kind, value);
+  async createFreshSession(): Promise<TUISessionView> {
+    const view = await this.#service.createSession({
+      workDir: this.#workDir,
+      providerName: this.#providerName,
+      modelID: this.#modelID,
+      mode: this.#mode,
+      thinkingLevel: this.#thinking,
+      capabilities: { multiAgent: this.#multiAgent },
+    });
+    this.adoptSession(view);
+    return view;
+  }
+
+  /** Adopts one Core-owned session view as the live session (switch/fork). */
+  adoptSession(view: TUISessionView): void {
+    this.#sessionView = view;
+    this.#workDir = view.workDir !== "" ? view.workDir : this.#workDir;
+    this.refreshHeader();
+  }
+
+  /** Surfaces one Core-requested decision through the standard panel path. */
+  #handleDecisionRequest(request: TUIDecisionRequest): void {
+    if (request.kind === "approval") {
+      this.controller.handleAgentEvent({
+        type: EVENT_TOOL_APPROVAL_REQUEST,
+        approvalId: request.requestId,
+        approvalTool: request.toolName ?? "",
+        ...(request.args === undefined ? {} : { approvalArgs: request.args }),
+      });
       return;
     }
-    this.#decisions.resolveWith({ id, kind, status: "resolved", value });
+    this.controller.handleAgentEvent({
+      type: EVENT_QUESTION_REQUEST,
+      questionId: request.requestId,
+      questionText: request.question ?? "",
+      ...(request.options === undefined
+        ? {}
+        : { questionOptions: request.options }),
+      ...(request.context === undefined
+        ? {}
+        : { questionContext: request.context }),
+    });
+  }
+
+  /**
+   * Delivers one resolved decision back to the originating Core request.
+   * Identity, first-response-wins, and the resolved DecisionRecord are
+   * Core-owned; an already resolved or expired request is dropped silently.
+   */
+  #answerDecision(answer: TUIDecisionAnswer): void {
+    void this.#service.answerDecision(answer).catch((error) => {
+      if (isDecisionNotFound(error)) return;
+      this.controller.addMessage(errorMessage(error), "error");
+    });
+  }
+
+  /** Answers the shown approval through the Core decision request. */
+  answerApproval(approved: boolean): void {
+    const shown = this.controller.shownApproval;
+    if (!shown) return;
+    this.#answerDecision({
+      requestId: shown.approvalID,
+      kind: "approval",
+      approved,
+    });
+    // Panel advancement (clear shown slot, surface the next queued request)
+    // stays controller-owned.
+    this.controller.resolveApproval(shown.approvalID, approved);
   }
 
   /** Answers the shown question with the chosen option. */
   answerQuestion(value: string): void {
     const shown = this.controller.shownQuestion;
     if (!shown) return;
-    // Panel advancement (clear shown slot, surface the next queued question)
-    // is owned by the controller via the resolver bound when the request
-    // arrived; this mirrors the approval path.
-    const advance = () => this.controller.resolveQuestion(shown.questionID);
-    try {
-      this.#resolveDecision(shown.questionID, DECISION_QUESTION, value);
-    } catch {
-      // Already resolved/expired: still advance the panel.
-      advance();
-      return;
-    }
+    this.#answerDecision({
+      requestId: shown.questionID,
+      kind: "question",
+      answer: value,
+    });
+    this.controller.resolveQuestion(shown.questionID);
     this.controller.addMessage(
       value === "" ? "Answered" : value,
       "plain",
@@ -1035,7 +1094,7 @@ export class TUISession implements CommandHost {
       default:
         this.#mode = "yolo";
     }
-    this.#configureRuntimeSession();
+    this.#syncSessionConfig();
     this.controller.addMessage(
       this.translator.text("commands.mode", this.#mode.toUpperCase()),
       "plain",
@@ -1114,19 +1173,31 @@ export class TUISession implements CommandHost {
         kind: act !== undefined && act.kind !== "" ? act.kind : "subagent",
       });
     }
-    try {
-      for (const id of this.ensureAgentManager().list()) {
-        if (id === "" || id === lead || seen.has(id)) continue;
-        seen.add(id);
-        targets.push({ id: `agent:${id}`, label: id, kind: "subagent" });
-      }
-    } catch {
-      // Runtime not built yet; the recorded activities above already cover
-      // every agent that has produced events.
-    }
     const modal = new ToolModalState(this.#termWidth, this.#termHeight);
     modal.setTargets(targets);
     this.#toolModal = modal;
+    // Managed sub-agents live in the Core-owned registry; extend the tabs when
+    // the projection arrives (the recorded activities above already cover
+    // every agent that has produced events).
+    void this.#service
+      .listAgents({ sessionId: this.currentSessionID() })
+      .then((agents) => {
+        if (this.#toolModal !== modal) return;
+        let changed = false;
+        for (const agent of agents) {
+          const id = agent.id;
+          if (id === "" || id === lead || seen.has(id)) continue;
+          seen.add(id);
+          targets.push({ id: `agent:${id}`, label: id, kind: "subagent" });
+          changed = true;
+        }
+        if (!changed) return;
+        modal.setTargets(targets);
+        this.requestRender();
+      })
+      .catch(() => {
+        // The projection is best-effort; recorded activities stay authoritative.
+      });
   }
 
   /**
@@ -1348,15 +1419,33 @@ export class TUISession implements CommandHost {
   }
 
   openESMPanel(): void {
-    try {
-      const store = new ESMStore(this.#manager.getSessionDir());
-      const sessionId = this.currentSessionID();
-      this.#esmObjective = sessionId === "" ? null : store.get(sessionId);
-    } catch {
-      this.#esmObjective = null;
-    }
     this.#esmOpen = true;
     this.#esmScroll = 0;
+    this.#refreshESMState();
+  }
+
+  /** Refreshes the Core-owned ESM objective snapshot for the panel. */
+  #refreshESMState(): void {
+    const sessionId = this.currentSessionID();
+    if (sessionId === "") {
+      this.#esmObjective = null;
+      return;
+    }
+    void this.#service
+      .esmState({ sessionId })
+      .then((view) => {
+        this.#esmObjective = view.objective === null
+          ? null
+          : esmObjectiveFromView(view.objective);
+        if (view.activeAgentId !== "") {
+          this.#esmActiveAgentId = view.activeAgentId;
+        }
+        this.requestRender();
+      })
+      .catch(() => {
+        this.#esmObjective = null;
+        this.requestRender();
+      });
   }
 
   closeESMPanel(): void {
@@ -1432,33 +1521,14 @@ export class TUISession implements CommandHost {
     if (this.#esmActiveAgentId === id) this.#esmActiveAgentId = "";
   }
 
-  // --- Runtime accessors used by the command layer ---------------------------
+  // --- Service accessors used by the command layer ---------------------------
 
-  get runtime(): SessionRuntime {
-    return this.#runtime;
+  /** The front-end-neutral service owning session/run semantics. */
+  get service(): TUIService {
+    return this.#service;
   }
 
-  get manager(): Manager {
-    return this.#manager;
-  }
-
-  get settings(): Settings {
-    return this.#settings;
-  }
-
-  get model(): import("../provider/mod.ts").Model {
-    return this.#model;
-  }
-
-  get provider(): import("../provider/mod.ts").Provider {
-    return this.#provider;
-  }
-
-  get decisions(): DecisionService {
-    return this.#decisions;
-  }
-
-  get thinkingLevel(): ThinkingLevel {
+  get thinkingLevel(): string {
     return this.#thinking;
   }
 
@@ -1468,73 +1538,29 @@ export class TUISession implements CommandHost {
 
   /** The canonical session ID (empty before initialization). */
   currentSessionID(): string {
-    return this.#manager.getHeader()?.id ?? "";
-  }
-
-  /** Rebinds the session after a fork/switch. */
-  async bindManager(manager: Manager): Promise<void> {
-    this.#manager = manager;
-    const header = manager.getHeader();
-    if (header !== null) {
-      this.#workDir = header.cwd !== "" ? header.cwd : this.#workDir;
-    }
-    await this.#runtime.bindSession(manager, SOURCE_TUI);
+    return this.#sessionView?.sessionId ?? "";
   }
 
   /** Binds a provider/model pair chosen in a dialog to the live session. */
   applyModelBinding(providerName: string, modelID: string): void {
-    const created = create(
-      this.#settings,
-      providerName,
-      modelID,
-      { requireModel: true },
-    );
-    this.#provider = created.provider;
     this.#providerName = providerName;
-    this.#model = created.model;
+    this.#modelID = modelID;
     this.refreshHeader();
-    this.#configureRuntimeSession();
+    this.#syncSessionConfig();
   }
 
-  /** Re-reads settings.json and re-applies the provider/model binding. */
+  /** Re-reads the Core-owned settings projection after a settings edit. */
   reloadSettings(): void {
-    const fresh = loadSettingsWithMeta().settings;
-    this.#settings = fresh;
-    const created = create(
-      fresh,
-      this.#providerName,
-      this.#model.id,
-      { requireModel: false },
-    );
-    this.#provider = created.provider;
-    this.#model = created.model;
-    this.refreshHeader();
-    this.#configureRuntimeSession();
-  }
-
-  /** Rebuilds the provider/model binding from settings. */
-  reloadModel(): void {
-    const created = create(
-      this.#settings,
-      this.#providerName,
-      this.#model.id,
-      { requireModel: true },
-    );
-    this.#provider = created.provider;
-    this.#model = created.model;
-  }
-
-  /** Returns the listing helper bound to this session's directory. */
-  listSessionDetails(): SessionDetail[] {
-    return listManagerSessions(
-      this.#manager.getHeader()?.cwd ?? this.#workDir,
-      this.#manager.getSessionDir(),
-    );
+    void this.#service.settings().then((view) => {
+      this.#settingsView = view;
+    }).catch((error) => {
+      this.controller.addMessage(errorMessage(error), "error");
+    });
   }
 
   /** Updates the header shown by the shell after a model/provider change. */
   refreshHeader(): void {
-    this.header.modelName = this.#model.id;
+    this.header.modelName = this.#modelID;
     this.header.providerName = this.#providerName;
   }
 }

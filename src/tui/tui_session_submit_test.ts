@@ -1,17 +1,20 @@
 // Regression tests for interactive submission plumbing: decision answers must
-// route through the attached RunHandle so the resolved DecisionRecord is
-// persisted, and a failure before a run starts must unwind the busy state and
-// surface one error row instead of wedging the session.
+// route through the Core-owned decision request (identity and
+// first-response-wins stay canonical), and a failure before a run starts must
+// unwind the busy state and surface one error row instead of wedging the
+// session.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
-  DECISION_APPROVAL,
-  DECISION_QUESTION,
-  type DecisionKind,
-} from "../agentruntime/decision.ts";
-import type { RunState } from "../agentruntime/run_state.ts";
-import { defaultSettings } from "../config/settings.ts";
-import type { RunHandle } from "./app_controller.ts";
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+} from "@std/assert";
+import {
+  createFakeTUIService,
+  type FakeTUIService,
+  TUIServiceError,
+} from "./service.ts";
 import { TUISession } from "./tui_session.ts";
 
 /**
@@ -31,91 +34,112 @@ function isolateConfigDir(): { restore: () => void } {
   };
 }
 
-function session(): TUISession {
-  const settings = defaultSettings();
+function session(
+  service: FakeTUIService = createFakeTUIService(),
+): TUISession {
   return new TUISession(
     {
-      provider: settings.defaultProvider ?? "openai",
-      model: settings.defaultModel ?? "",
+      provider: "openai",
+      model: "",
       mode: "yolo",
       thinking: "",
       workDir: Deno.cwd(),
       version: "test",
     },
-    settings,
+    service,
   );
 }
 
-function recordingRun(
-  resolved: Array<[string, DecisionKind, string]>,
-): RunHandle {
-  return {
-    registerDecision: () => undefined,
-    bindDecision: () => {},
-    finish: (_state: RunState) => {},
-    resolveDecision: (id, kind, value) => void resolved.push([id, kind, value]),
-  };
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 10));
 }
 
-Deno.test("answerApproval resolves through the attached run handle", () => {
+Deno.test("answerApproval answers the Core decision request", async () => {
   const iso = isolateConfigDir();
   try {
-    const s = session();
-    const resolved: Array<[string, DecisionKind, string]> = [];
-    s.controller.attachRun(recordingRun(resolved));
+    const fake = createFakeTUIService();
+    const s = session(fake);
+    fake.requestDecision({
+      sessionId: "session-1",
+      runId: "run-1",
+      requestId: "ap-1",
+      kind: "approval",
+      toolName: "write",
+    });
     s.controller.shownApproval = {
       agentID: undefined,
       approvalID: "ap-1",
       toolName: "write",
     };
     s.answerApproval(true);
-    s.controller.shownApproval = {
-      agentID: undefined,
-      approvalID: "ap-2",
-      toolName: "bash",
-    };
-    s.answerApproval(false);
-    assertEquals(resolved, [
-      ["ap-1", DECISION_APPROVAL, "true"],
-      ["ap-2", DECISION_APPROVAL, "false"],
-    ]);
+    await tick();
+    // The panel advances locally while the answer went to the Core request.
+    assertEquals(s.controller.shownApproval, undefined);
+    // First response wins: the request is resolved in the Core-owned store.
+    await assertRejects(
+      () =>
+        fake.answerDecision({
+          requestId: "ap-1",
+          kind: "approval",
+          approved: true,
+        }),
+      TUIServiceError,
+      "TUI decision not found",
+    );
   } finally {
     iso.restore();
   }
 });
 
-Deno.test("answerQuestion resolves through the attached run handle", () => {
+Deno.test("answerQuestion answers the Core decision request", async () => {
   const iso = isolateConfigDir();
   try {
-    const s = session();
-    const resolved: Array<[string, DecisionKind, string]> = [];
-    s.controller.attachRun(recordingRun(resolved));
+    const fake = createFakeTUIService();
+    const s = session(fake);
+    fake.requestDecision({
+      sessionId: "session-1",
+      runId: "run-1",
+      requestId: "q-1",
+      kind: "question",
+      question: "pick",
+    });
     s.controller.shownQuestion = { questionID: "q-1", question: "pick" };
     s.answerQuestion("option-a");
-    assertEquals(resolved, [["q-1", DECISION_QUESTION, "option-a"]]);
+    await tick();
+    assertEquals(s.controller.shownQuestion, undefined);
+    await assertRejects(
+      () =>
+        fake.answerDecision({
+          requestId: "q-1",
+          kind: "question",
+          answer: "option-a",
+        }),
+      TUIServiceError,
+      "TUI decision not found",
+    );
   } finally {
     iso.restore();
   }
 });
 
-Deno.test("answers without a resolving run fall back to clearing the panel", () => {
+Deno.test("answering an unknown decision still clears the panel quietly", async () => {
   const iso = isolateConfigDir();
   try {
     const s = session();
-    s.controller.attachRun({
-      registerDecision: () => undefined,
-      bindDecision: () => {},
-      finish: (_state: RunState) => {},
-    });
     s.controller.shownApproval = {
       agentID: undefined,
       approvalID: "ap-fallback",
       toolName: "write",
     };
-    // The decision was never registered, so the DecisionService rejects the
-    // resolution and the answer path must still advance the panel.
+    // The decision is unknown to the Core (already resolved or expired): the
+    // answer is dropped silently and the panel still advances.
     s.answerApproval(true);
+    await tick();
     assertEquals(s.controller.shownApproval, undefined);
+    const errors = s.controller.store.messages.filter((m) =>
+      m.startsWith("Error:")
+    );
+    assertEquals(errors, []);
   } finally {
     iso.restore();
   }

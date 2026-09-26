@@ -14,6 +14,7 @@ import {
   type CoreRpcMessage,
   type CoreRpcNotification,
   type CoreRpcRequest,
+  type CoreShutdownResult,
   parseCoreRpcMessage,
 } from "./protocol.ts";
 import type { ResolvedCoreConfig } from "./config.ts";
@@ -34,6 +35,13 @@ export interface CoreServerOptions {
   runtime?: CoreRuntimeHost;
   /** Optional shared event transport for the Runtime Host. */
   events?: CoreEventStream;
+  /**
+   * Optional graceful shutdown hook invoked by `core.shutdown`. The Core
+   * command owns registration removal and lock release through this hook;
+   * without it the method reports "Method not found" instead of pretending
+   * to stop a server nobody can clean up.
+   */
+  onShutdown?: () => void;
 }
 
 /** A running Core HTTP listener. */
@@ -336,6 +344,20 @@ export class CoreServer {
           features: [...CORE_FEATURES],
         };
         return "id" in message ? coreResult(id, result) : undefined;
+      }
+      case CORE_METHODS.shutdown: {
+        // JSON-RPC notifications are one-way and must never be able to stop
+        // the shared Core; only a request with an id is acknowledged.
+        if (!("id" in message)) return undefined;
+        const onShutdown = this.#options.onShutdown;
+        if (onShutdown === undefined) {
+          return coreError(id, -32601, "Method not found");
+        }
+        // Schedule the stop after the response is handed back so the caller
+        // observes the acknowledgement before the listener starts closing.
+        setTimeout(() => onShutdown(), 0);
+        const result: CoreShutdownResult = { ok: true };
+        return coreResult(id, result);
       }
       default: {
         const dispatcher = this.#dispatcher;

@@ -26,6 +26,7 @@ import {
   type CoreRpcRequest,
   type CoreRpcResponse,
   type CoreRpcSuccessResponse,
+  type CoreShutdownResult,
   parseCoreRpcMessage,
 } from "./protocol.ts";
 import { CORE_PROTOCOL_VERSION } from "./server.ts";
@@ -614,6 +615,47 @@ export class CoreClient {
       },
     };
     return connectionObject;
+  }
+
+  /**
+   * Requests graceful shutdown of the registered Core (`core.shutdown`).
+   *
+   * This lifecycle operation serves owners of a Core process (a standalone
+   * private Core or operator tooling). It deliberately does not require a
+   * `ready` discovery so a reachable but version-incompatible registered Core
+   * can still be stopped and replaced; callers verify registration identity
+   * before acting on the result.
+   */
+  async shutdown(signal?: AbortSignal): Promise<CoreShutdownResult> {
+    const requestSignal = combineAbortSignals(this.#signal, signal);
+    let registration: CoreRegistration | undefined;
+    try {
+      registration = await new CoreRegistry(this.#paths).read();
+    } catch (error) {
+      throw new CoreClientProtocolError("Core registration is invalid", {
+        cause: error,
+      });
+    }
+    if (registration === undefined) {
+      throw new CoreClientError("no Core is registered");
+    }
+    const url = registrationUrl(registration, this.#config);
+    const outcome = await this.#sendRpc(
+      url,
+      CORE_METHODS.shutdown,
+      undefined,
+      this.#nextId(),
+      REQUEST_TIMEOUT_MS,
+      requestSignal,
+    );
+    if (!outcome.ok) throw outcome.error;
+    const result = parseCoreShutdownResult(outcome.result);
+    if (result === undefined) {
+      throw new CoreClientProtocolError(
+        "Core shutdown response has an invalid shape",
+      );
+    }
+    return result;
   }
 
   /** Calls and validates `core.health` for the current connection. */
@@ -1567,11 +1609,24 @@ function parseCoreHealth(value: unknown): CoreHealth | undefined {
   };
 }
 
+function parseCoreShutdownResult(
+  value: unknown,
+): CoreShutdownResult | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const object = value as Record<string, unknown>;
+  return object.ok === true ? { ok: true } : undefined;
+}
+
 function isLocalCoreHost(value: string): boolean {
   return isLoopbackCoreHost(value) || isWildcardCoreHost(value);
 }
 
-function processLiveness(pid: number): "alive" | "dead" | "unknown" {
+/** Reports whether a PID is alive, dead, or indeterminate on this host. */
+export function processLiveness(
+  pid: number,
+): "alive" | "dead" | "unknown" {
   try {
     Deno.kill(pid, 0);
     return "alive";
@@ -1579,6 +1634,75 @@ function processLiveness(pid: number): "alive" | "dead" | "unknown" {
     if (error instanceof Deno.errors.NotFound) return "dead";
     return "unknown";
   }
+}
+
+/** The read-only registry surface used when observing a Core's exit. */
+export interface CoreRegistrationReader {
+  read(): MaybePromise<CoreRegistration | undefined>;
+}
+
+type MaybePromise<T> = T | Promise<T>;
+
+/**
+ * Waits until the registered Core is observed gone: its registration was
+ * removed (or replaced by another owner) or its local process is dead.
+ *
+ * Returns false when the wait budget expires with the registration still
+ * current, so callers can distinguish "requested, still exiting" from
+ * "observed exit".
+ */
+export async function waitForRegistrationExit(
+  registry: CoreRegistrationReader,
+  registration: CoreRegistration,
+  options: {
+    timeoutMs: number;
+    intervalMs?: number;
+    sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+    signal?: AbortSignal;
+  },
+): Promise<boolean> {
+  const intervalMs = options.intervalMs ?? 50;
+  const sleep = options.sleep ?? defaultSleep;
+  const deadline = Date.now() + options.timeoutMs;
+  while (true) {
+    if (options.signal?.aborted) throw abortReason(options.signal);
+    let current: CoreRegistration | undefined;
+    try {
+      current = await registry.read();
+    } catch {
+      return false;
+    }
+    if (current === undefined || current.id !== registration.id) return true;
+    if (
+      isLocalCoreHost(registration.host) &&
+      processLiveness(registration.pid) === "dead"
+    ) {
+      return true;
+    }
+    if (Date.now() >= deadline) return false;
+    await sleep(intervalMs, options.signal);
+  }
+}
+
+async function defaultSleep(
+  ms: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) throw abortReason(signal);
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(abortReason(signal!));
+    };
+    if (signal !== undefined) {
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (signal.aborted) onAbort();
+    }
+  });
 }
 
 function staleResult(

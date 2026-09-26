@@ -35,6 +35,8 @@ export const coreBoundaryAllowlist: Record<string, string> = {
   "src/core/paths.ts": "Core state path configuration",
   "src/core/protocol.ts": "Core JSON-RPC protocol",
   "src/core/registry.ts": "Core discovery registration lifecycle",
+  "src/core/private_core.ts":
+    "Isolated private Core lifecycle for standalone entry points",
   "src/core/runtime.ts": "Core Runtime Host neutral contracts",
   "src/core/runtime_protocol.ts": "Core Runtime Host JSON-RPC domain schemas",
   "src/core/runtime_host.ts": "Core Runtime Host implementation boundary",
@@ -113,6 +115,74 @@ const DIRECT_SQL_CALL =
   /\b(db|tx|database|sqlDB|rootDB|sessionDB|first|second|reopened)\s*\.\s*(prepare|exec|query)\s*\(/;
 
 const NEW_AGENT = /\bnew\s+(Agent|AgentLoop)\s*\(/;
+
+// TUI/CLI front-end ownership (Task 6/7 of the TUI service abstraction): the
+// interactive and print entries are thin `TUIService`/Core Client projections.
+// They may never depend on Agent, SessionRuntime, session-lifecycle/fork,
+// provider-construction, session-store, or DAO modules; the canonical event
+// vocabulary arrives through `src/agentruntime/events.ts`.
+export const TUI_FORBIDDEN_IMPORT_ROOTS = [
+  "src/agent/",
+  "src/agentruntime/session_runtime.ts",
+  "src/agentruntime/session_lifecycle.ts",
+  "src/agentruntime/fork.ts",
+  "src/provider/",
+  "src/session/",
+  "src/dao/",
+];
+
+/** `src/tui/service.ts` is a pure port: no runtime implementation imports. */
+export const TUI_SERVICE_FORBIDDEN_IMPORT_ROOTS = [
+  "src/agent/",
+  "src/agentruntime/",
+  "src/provider/",
+  "src/session/",
+  "src/dao/",
+];
+
+/** Extra import roots banned from the CLI print entry (Core Client only). */
+export const CLI_PRINT_FORBIDDEN_IMPORT_ROOTS = [
+  ...TUI_FORBIDDEN_IMPORT_ROOTS,
+  "src/agentruntime/execution.ts",
+  "src/agentruntime/execution_admission.ts",
+  "src/agentruntime/session_run.ts",
+  "src/agentruntime/input_materializer.ts",
+];
+
+/** Constructor classes the TUI/CLI front-end may never instantiate. */
+export const TUI_FORBIDDEN_NEW_CLASSES = [
+  "Agent",
+  "AgentLoop",
+  "AgentManager",
+  "Builder",
+  "ExecutionRuntime",
+  "DecisionService",
+];
+
+/** Runtime factory calls the TUI/CLI front-end may never invoke directly. */
+export const TUI_FORBIDDEN_CALLS = [
+  "createAgentManager",
+  "createSessionExecutionRuntime",
+  "createSessionRunDescriptor",
+  "acquireExecutionAdmission",
+  "createSessionRuntime",
+];
+
+/** Entry modules where the plan names the bare `createSession` construction. */
+export const TUI_ENTRY_FILES = [
+  "src/tui/tui_session.ts",
+  "src/cli/root_tui.ts",
+  "src/cli/root_print.ts",
+];
+
+const BARE_CREATE_SESSION = /(?<![.\w$])createSession\s*\(/;
+
+/** Reports whether a production file belongs to the TUI/CLI front-end graph. */
+export function isTuiFrontendPath(rel: string): boolean {
+  const slash = toSlash(rel);
+  return slash.startsWith("src/tui/") ||
+    slash === "src/cli/root_tui.ts" || slash === "src/cli/root_print.ts";
+}
 
 const CANONICAL_RUN_PERSISTENCE = [
   "saveSessionRun",
@@ -522,6 +592,54 @@ function scanFile(rel: string, src: string): Violation[] {
     }
   }
 
+  if (isTuiFrontendPath(rel)) {
+    const slash = toSlash(rel);
+    const banned = slash === "src/tui/service.ts"
+      ? TUI_SERVICE_FORBIDDEN_IMPORT_ROOTS
+      : slash === "src/cli/root_print.ts"
+      ? CLI_PRINT_FORBIDDEN_IMPORT_ROOTS
+      : TUI_FORBIDDEN_IMPORT_ROOTS;
+    for (const specifier of importSpecifiers(src)) {
+      const target = resolveImportTarget(rel, specifier);
+      if (
+        target !== undefined &&
+        banned.some((root) =>
+          root.endsWith("/") ? target.startsWith(root) : target === root
+        )
+      ) {
+        add(
+          `TUI front-end imports runtime implementation module ${specifier}; use the TUIService/Core Client surface`,
+        );
+      }
+    }
+    const newOwner = new RegExp(
+      `\\bnew\\s+(${TUI_FORBIDDEN_NEW_CLASSES.join("|")})\\s*\\(`,
+    );
+    const newMatch = newOwner.exec(src);
+    if (newMatch) {
+      add(
+        `TUI front-end constructs ${
+          newMatch[1]
+        }; runtime owners are built only by the Core runtime host`,
+      );
+    }
+    for (const name of TUI_FORBIDDEN_CALLS) {
+      const bareCall = new RegExp(`(?<![.\\w$])${name}\\s*\\(`);
+      if (bareCall.test(src)) {
+        add(
+          `TUI front-end invokes runtime owner ${name}; use the TUIService/Core Client surface`,
+        );
+      }
+    }
+    if (
+      TUI_ENTRY_FILES.includes(slash) && BARE_CREATE_SESSION.test(src)
+    ) {
+      add(
+        "TUI front-end constructs createSession; persisted session identity is Core-owned",
+      );
+    }
+  }
+
   if (!isDatabaseOwner(rel) && foreignKeyEnforcementPattern.test(src)) {
     add(
       "SQLite foreign key enforcement is owned by src/db; do not enable foreign_keys here",
@@ -623,6 +741,13 @@ export function productionViolations(root: string): Violation[] {
       : a.file.localeCompare(b.file)
   );
   return violations;
+}
+
+/** TUI/CLI front-end ownership violations (the Task 6/7 boundary). */
+export function tuiBoundaryViolations(root: string): Violation[] {
+  return productionViolations(root).filter((violation) =>
+    isTuiFrontendPath(violation.file)
+  );
 }
 
 // The public SDK (`sdk/`) and the examples must never import `src/`; wiring

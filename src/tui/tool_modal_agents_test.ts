@@ -6,6 +6,7 @@ import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
+import { createFakeTUIService } from "./service.ts";
 import { defaultSettings } from "../config/settings.ts";
 import {
   EVENT_STATUS,
@@ -28,7 +29,7 @@ function makeSession(controller: AppController): TUISession {
       workDir: Deno.cwd(),
       version: "test",
     },
-    settings,
+    createFakeTUIService(),
   );
   // Swap in the controller with recorded activity.
   // deno-lint-ignore no-explicit-any

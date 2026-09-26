@@ -29,6 +29,7 @@ const EXPECTED_INFO: CoreInfo = {
   features: [
     CORE_METHODS.health,
     CORE_METHODS.info,
+    CORE_METHODS.shutdown,
     ...Object.values(CORE_RUNTIME_METHODS),
   ],
 };
@@ -866,6 +867,156 @@ Deno.test("CoreClient close clears discovered state without stopping the server"
       assertEquals(rediscovered.status, "ready");
     } finally {
       await handle.stop();
+    }
+  });
+});
+
+function shutdownServer(): { server: CoreServer; calls: () => number } {
+  let shutdownCalls = 0;
+  const server = new CoreServer({
+    config: config(),
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    onShutdown: () => {
+      shutdownCalls++;
+    },
+  });
+  return { server, calls: () => shutdownCalls };
+}
+
+async function waitForShutdownCall(
+  predicate: () => boolean,
+  timeoutMs = 1_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("timed out waiting for the core.shutdown hook");
+}
+
+Deno.test("CoreClient shutdown sends core.shutdown and validates the acknowledgement", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const { server, calls } = shutdownServer();
+    const handle = await server.start();
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        assertEquals(await client.shutdown(), { ok: true });
+      } finally {
+        await client.close();
+      }
+      await waitForShutdownCall(() => calls() === 1);
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient shutdown works against a version-incompatible registered Core", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const { server, calls } = shutdownServer();
+    const handle = await server.start();
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port),
+      );
+      // A different expected version makes discovery report `incompatible`,
+      // which is exactly the upgrade path `core stop` must still be able to
+      // shut down gracefully.
+      const client = new CoreClient(
+        clientOptions(stateDir, { version: "9.9.9-incompatible" }),
+      );
+      try {
+        const discovered = await client.discover();
+        assertEquals(discovered.status, "incompatible");
+        assertEquals(await client.shutdown(), { ok: true });
+      } finally {
+        await client.close();
+      }
+      await waitForShutdownCall(() => calls() === 1);
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient shutdown surfaces a method-not-found RPC error", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    // A Core server without a shutdown hook behaves like an older build.
+    const handle = await startServer();
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        const error = await assertRejects(
+          () => client.shutdown(),
+          CoreClientRpcError,
+        );
+        assertEquals((error as CoreClientRpcError).code, -32601);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient shutdown rejects an invalid acknowledgement shape", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const probe = await startProbe(async (request) => {
+      const body = await request.json() as { id?: unknown };
+      return new Response(
+        JSON.stringify(
+          coreResult((body.id ?? null) as string | number | null, {
+            ok: false,
+          }),
+        ),
+        { headers: { "content-type": "application/json" } },
+      );
+    });
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, probe.address.port),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        await assertRejects(
+          () => client.shutdown(),
+          CoreClientProtocolError,
+          "invalid shape",
+        );
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await probe.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient shutdown fails when no Core is registered", async () => {
+  await withStateDir(async (stateDir) => {
+    const client = new CoreClient(clientOptions(stateDir));
+    try {
+      await assertRejects(
+        () => client.shutdown(),
+        Error,
+        "no Core is registered",
+      );
+    } finally {
+      await client.close();
     }
   });
 });

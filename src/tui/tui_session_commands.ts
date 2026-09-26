@@ -6,32 +6,26 @@
 // Each function is a thin translation of the Go handler onto the Deno port's
 // shared modules. The TUI never builds provider content, opens raw databases,
 // or owns a second agent loop: clipboard bytes go through Runtime
-// `prepareInput`, /systeminit and /btw reuse the shared Runtime, and cron goes
-// through the shared SQLite store.
+// `prepareInput`, /systeminit reuses the shared prompt path, /btw runs as a
+// Core-owned transient side query, and cron goes through the shared SQLite
+// store.
 
 import * as path from "@std/path";
+import { encodeBase64 } from "@std/encoding/base64";
 import {
-  defaultProviderConfig,
-  defaultProviderConfigsAll,
-  getProviderConfig,
+  getSessionDir,
   isProjectDir,
   loadProjectSettingsSparse,
-  resolveKey,
-  saveGlobalSettingsPatch,
-  saveProjectSettingsPatch,
+  loadSettings,
 } from "../config/settings.ts";
-import { loadAllow } from "../config/allow.ts";
-import { EVENT_TEXT_DELTA } from "../agent/events.ts";
 import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import type { CronStore } from "../cron/cron.ts";
 import { ATTACHMENT_IMAGE } from "../agentruntime/attachment.ts";
-import type { PreparedInput } from "../agentruntime/input_materializer.ts";
-import { createRegistry } from "../tools/tool.ts";
-import { Agent } from "../agent/agent.ts";
 import { prompt as systemInitPrompt } from "../systeminit/systeminit.ts";
 import { openFile } from "../platform/platform.ts";
 import { localTimeZone, utcOffset } from "./i18n.ts";
 import type { CommandResult } from "./commands.ts";
+import type { TUIPreparedInput } from "./service.ts";
 import type { TUISession } from "./tui_session.ts";
 
 /**
@@ -40,37 +34,24 @@ import type { TUISession } from "./tui_session.ts";
  */
 export interface TuiSessionLike {
   readonly translator: TUISession["translator"];
-  readonly settings: TUISession["settings"];
   readonly workDir: string;
   readonly mode: string;
   readonly busy: boolean;
   readonly multiAgent: boolean;
   readonly providerName: string;
   readonly modelID: string;
-  readonly provider: TUISession["provider"];
-  readonly model: TUISession["model"];
   readonly thinkingLevel: TUISession["thinkingLevel"];
-  readonly runtime: TUISession["runtime"];
+  readonly service: TUISession["service"];
   readonly controller: TUISession["controller"];
   readonly input: TUISession["input"];
-  readonly manager: TUISession["manager"];
   currentSessionID(): string;
   setMode(mode: string): void;
   submitPrompt(text: string): Promise<void>;
-  addPreparedInput(prepared: PreparedInput): void;
+  addPreparedInput(prepared: TUIPreparedInput): void;
 }
 
 /** Clipboard images are capped like the Go TUI (20 MiB). */
 const PASTED_IMAGE_MAX_BYTES = 20 << 20;
-
-/** Read-only tool set granted to a /btw side-question sub-agent. */
-const BTW_READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "skill_ref"];
-
-const BTW_SYSTEM_HINT =
-  "[Side question mode] You are answering a quick side question for the user. " +
-  "Treat the prior conversation as read-only context. Do NOT modify any files. " +
-  "Your answer will be shown in a temporary overlay and will NOT be remembered by the main task. " +
-  "Be concise and directly answer the question.";
 
 export class TuiSessionCommands {
   #session: TuiSessionLike;
@@ -94,26 +75,27 @@ export class TuiSessionCommands {
   // --- Providers (/auth, /settings) -----------------------------------------
 
   /** Lists configured providers with a masked credential state. */
-  showProviders(): string {
+  async showProviders(): Promise<string> {
     const tr = this.#session.translator;
-    const settings = this.#session.settings;
-    const names = new Set<string>();
-    for (const name of Object.keys(settings.providers ?? {})) names.add(name);
-    for (const name of Object.keys(defaultProviderConfigsAll())) {
-      names.add(name);
-    }
-    const sorted = [...names].sort();
+    // The provider/model catalog is the secret-safe Core projection; the TUI
+    // only renders it and never reads provider credentials itself.
+    const view = await this.#session.service.settings();
+    const sorted = [...view.providers].sort((a, b) =>
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+    );
     if (sorted.length === 0) return tr.text("auth.no_providers");
     const lines = [tr.text("auth.providers_title", sorted.length)];
-    for (const name of sorted) {
-      const configured = resolveKey(settings, name) !== "";
-      const state = configured
+    for (const provider of sorted) {
+      const state = provider.apiKeyConfigured
         ? tr.text("auth.provider_configured")
         : tr.text("auth.provider_unconfigured");
-      const modelCount = getProviderConfig(settings, name)?.models.length ??
-        defaultProviderConfig(name)?.models.length ?? 0;
       lines.push(
-        tr.text("auth.provider_entry", name, state, `${modelCount} models`),
+        tr.text(
+          "auth.provider_entry",
+          provider.name,
+          state,
+          `${provider.modelCount} models`,
+        ),
       );
     }
     lines.push("", tr.text("auth.usage"));
@@ -144,13 +126,11 @@ export class TuiSessionCommands {
         defaultProvider: this.#session.providerName,
         defaultModel: this.#session.modelID,
       };
-      if (scope === "global") {
-        saveGlobalSettingsPatch(updates);
-      } else {
-        saveProjectSettingsPatch(updates);
-      }
-      this.#session.settings.defaultProvider = updates.defaultProvider;
-      this.#session.settings.defaultModel = updates.defaultModel;
+      // Settings edits flow through the service so the Core refreshes too.
+      await this.#session.service.updateSettings({
+        scope: scope as "global" | "project",
+        updates,
+      });
       return {
         message: tr.text(
           "settings.default_model_saved",
@@ -168,9 +148,10 @@ export class TuiSessionCommands {
 
   // --- TUI language (/tuilang) ----------------------------------------------
 
-  tuiLang(parts: string[]): CommandResult {
+  async tuiLang(parts: string[]): Promise<CommandResult> {
     const tr = this.#session.translator;
-    const configured = this.#session.settings.tuilang ?? "auto";
+    const configured = (await this.#session.service.getSettings()).tuilang ??
+      "auto";
     if (parts.length === 1) {
       // Go MsgTUILangStatus: configured, effective language, UTC offset, and
       // whether the value comes from project or global settings.
@@ -211,12 +192,11 @@ export class TuiSessionCommands {
       return { message: tr.text("tuilang.project_unavailable"), error: true };
     }
     try {
-      if (scope === "global") {
-        saveGlobalSettingsPatch({ tuilang: value });
-      } else {
-        saveProjectSettingsPatch({ tuilang: value });
-      }
-      this.#session.settings.tuilang = value;
+      // Settings edits flow through the service so the Core refreshes too.
+      await this.#session.service.updateSettings({
+        scope: scope as "global" | "project",
+        updates: { tuilang: value },
+      });
       return {
         message: tr.text("tuilang.saved", scope, value, tr.language),
       };
@@ -233,8 +213,10 @@ export class TuiSessionCommands {
   #cron(): CronStore | undefined {
     if (this.#cronStore === undefined) {
       try {
+        // The shared session store root comes from the one config resolver
+        // (`config.getSessionDir`), never from a session/persistence handle.
         this.#cronStore = createSQLiteCronStore(
-          this.#session.manager.getSessionDir(),
+          getSessionDir(loadSettings()),
         );
       } catch {
         this.#cronStore = undefined;
@@ -414,21 +396,12 @@ export class TuiSessionCommands {
       };
     }
     try {
-      const prepared = await this.#session.runtime.prepareInput(undefined, {
-        origin: "tui",
-        eventId: `tui-paste-${crypto.randomUUID()}`,
-        itemIndex: 0,
-        reference: "",
+      const prepared = await this.#session.service.prepareInput({
+        sessionId: this.#session.currentSessionID(),
+        name: "clipboard.png",
+        mediaType: "image/png",
+        contentBase64: encodeBase64(bytes),
         kind: ATTACHMENT_IMAGE,
-        filenameHint: "clipboard.png",
-        mediaTypeHint: "image/png",
-        sizeHint: bytes.length,
-        open: () => ({
-          bytes: bytes!,
-          filename: "clipboard.png",
-          mediaType: "image/png",
-          contentSize: bytes!.length,
-        }),
       });
       this.#session.addPreparedInput(prepared);
       this.#pastedImageCounter++;
@@ -486,52 +459,23 @@ export class TuiSessionCommands {
     if (this.#btwActive) {
       return { message: tr.text("btw.already_running"), error: true };
     }
-    const runtime = this.#session.runtime;
-    const registry = createRegistry(
-      runtime.workDir,
-      runtime.sandboxMgr?.getActive(),
-    );
-    // A read-only registry keeps the side query from mutating the workspace.
-    for (const tool of registry.all()) {
-      if (!BTW_READ_ONLY_TOOLS.includes(tool.name())) {
-        registry.remove(tool.name());
-      }
-    }
-    const extra = runtime.extraContext === ""
-      ? BTW_SYSTEM_HINT
-      : `${runtime.extraContext}\n\n${BTW_SYSTEM_HINT}`;
-    let agent: Agent;
-    try {
-      agent = runtime.buildTransientAgent(registry, {
-        id: "btw",
-        provider: this.#session.provider,
-        providerName: this.#session.providerName,
-        model: this.#session.model,
-        mode: "agent",
-        settings: this.#session.settings,
-        allow: loadAllow(),
-        extraContext: extra,
-        thinkingLevel: this.#session.thinkingLevel,
-      });
-    } catch (err) {
-      return {
-        message: tr.text("btw.build_failed", (err as Error).message),
-        error: true,
-      };
-    }
     this.#btwActive = true;
     try {
-      let answer = "";
-      for await (const ev of agent.run(question)) {
-        if (ev.type === EVENT_TEXT_DELTA && ev.textDelta) {
-          answer += ev.textDelta;
-        }
-      }
+      // The side query is a Core-owned transient agent over a read-only tool
+      // registry; the answer never enters the session history.
+      const result = await this.#session.service.askTransient({
+        sessionId: this.#session.currentSessionID(),
+        question,
+        providerName: this.#session.providerName,
+        modelID: this.#session.modelID,
+        thinkingLevel: this.#session.thinkingLevel,
+      });
+      const answer = result.answer.trim();
       return {
         message: [
           tr.text("btw.title", question),
           "",
-          answer.trim() === "" ? tr.text("btw.thinking") : answer.trim(),
+          answer === "" ? tr.text("btw.thinking") : answer,
         ].join("\n"),
       };
     } catch (err) {

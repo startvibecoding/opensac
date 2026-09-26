@@ -5,6 +5,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
+import { createFakeTUIService } from "./service.ts";
 import { defaultSettings } from "../config/settings.ts";
 import type { Event } from "../agent/events.ts";
 import {
@@ -37,7 +38,7 @@ function harness(): {
       workDir: Deno.cwd(),
       version: "test",
     },
-    settings,
+    createFakeTUIService(),
   );
   // Swap in the controller that owns the recorded plan state.
   // deno-lint-ignore no-explicit-any

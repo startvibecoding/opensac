@@ -1,36 +1,66 @@
 import { decodeBase64, encodeBase64 } from "@std/encoding/base64";
 import * as path from "@std/path";
 import { AttachmentService } from "../agentruntime/input.ts";
-import { defaultAttachmentPolicy } from "../agentruntime/attachment.ts";
+import {
+  ATTACHMENT_AUDIO,
+  ATTACHMENT_FILE,
+  ATTACHMENT_IMAGE,
+  ATTACHMENT_VIDEO,
+  defaultAttachmentPolicy,
+} from "../agentruntime/attachment.ts";
 import type {
+  CoreAgentView,
+  CoreCapabilityView,
+  CoreEsmCommandInput,
+  CoreEsmObjectiveView,
+  CoreEsmView,
+  CoreExpertBundleView,
+  CoreExpertStateView,
+  CoreExpertSummaryView,
   CoreExtensionHandler,
+  CorePreparedInput,
+  CorePrepareInput,
   CorePromptExecution,
   CorePromptInput,
+  CoreProviderCatalogView,
   CoreReverseRequest,
   CoreRuntimeDependencies,
   CoreRuntimeEvent,
   CoreRuntimeHost,
   CoreRuntimeHostOptions,
   CoreRunView,
+  CoreSessionContextView,
   CoreSessionCreateInput,
   CoreSessionRuntime,
   CoreSessionView,
+  CoreSkillView,
+  CoreTransientPromptInput,
+  CoreTransientPromptResult,
 } from "./runtime.ts";
 import {
   Builder,
   type SessionRuntime,
 } from "../agentruntime/session_runtime.ts";
 import {
-  createSession,
+  deleteSession as deletePersistedSession,
+  listPersistedSessions as listPersistedSessionInfos,
+  openOrCreateSession,
   openSession as openPersistedSession,
 } from "../agentruntime/session_lifecycle.ts";
 import { DecisionService } from "../agentruntime/decision.ts";
+import { fork } from "../agentruntime/fork.ts";
 import {
   createSessionExecutionRuntime,
   createSessionRunDescriptor,
 } from "../agentruntime/session_run.ts";
-import { resourceIds } from "../agentruntime/input_materializer.ts";
-import { fromAgentEvent } from "../agentruntime/session_executor.ts";
+import {
+  type PreparedInput,
+  resourceIds,
+} from "../agentruntime/input_materializer.ts";
+import {
+  fromAgentEvent,
+  serializeAgentEvent,
+} from "../agentruntime/session_executor.ts";
 import {
   create as createProvider,
   resolvedModels,
@@ -45,19 +75,24 @@ import {
   thinkingOff,
 } from "../provider/types.ts";
 import {
+  defaultProviderConfigsAll,
   defaultSettings,
   defaultSkillHubOfficialHandle,
   getGlobalSkillsDir,
+  getProviderConfig,
   getSessionDir,
   globalSettingsPath,
   isACPArtifactEnabled,
   isArtifactEnabled,
   isWebSearchEnabled,
   loadGlobalSettingsOrDefault,
+  loadGlobalSettingsSparse,
+  loadSettingsFor,
   resolveImageGenerationToken,
   resolveProviderConfig,
   sandboxLevelFromSettings,
   saveGlobalSettingsPatch,
+  saveProjectSettingsPatchFor,
   type Settings,
   skillsDisabled,
   toolExecutionEffectiveMaxConcurrency,
@@ -106,7 +141,7 @@ import {
   defaultKnowledgeBaseIndexPolicy,
   type KnowledgeBaseService,
 } from "../agentruntime/knowledgebase.ts";
-import { SOURCE_ACP } from "../agentruntime/source.ts";
+import { resolveUnattendedMode, SOURCE_ACP } from "../agentruntime/source.ts";
 import {
   clientsForSettings,
   createLocalIndex,
@@ -152,6 +187,100 @@ import {
   EVENT_THINK_DELTA,
   EVENT_TOOL_APPROVAL_REQUEST,
 } from "../agent/events.ts";
+import type { AgentManager } from "../agent/manager.ts";
+import { createRunContext } from "../agent/run_context.ts";
+import { registerDelegateSubAgentTool } from "../agent/subagent.ts";
+import { createAgentManager } from "../agentruntime/agent_manager.ts";
+import {
+  AgentManagerESMAdapter,
+  type ESMRoleEventSink,
+} from "../agentruntime/esm_role_adapter.ts";
+import {
+  canAutoRun,
+  ESMStore,
+  type Objective,
+  Supervisor,
+} from "../esm/mod.ts";
+import { createRegistry } from "../tools/tool.ts";
+
+/** Read-only tool set granted to a transient side query (TUI /btw). */
+const TRANSIENT_READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "skill_ref"];
+
+const TRANSIENT_SYSTEM_HINT =
+  "[Side question mode] You are answering a quick side question for the user. " +
+  "Treat the prior conversation as read-only context. Do NOT modify any files. " +
+  "Your answer will be shown in a temporary overlay and will NOT be remembered by the main task. " +
+  "Be concise and directly answer the question.";
+
+/** One queued Core event item before the host assigns its sequence. */
+interface QueuedCoreEvent {
+  eventType: string;
+  payload: Record<string, unknown>;
+  terminal?: boolean;
+}
+
+/**
+ * Minimal async queue bridging worker callbacks to an event generator so the
+ * host can publish them through the canonical event stream.
+ */
+class AsyncEventQueue<T> {
+  #items: T[] = [];
+  #wake: (() => void) | undefined;
+  #closed = false;
+
+  push(item: T): void {
+    if (this.#closed) return;
+    this.#items.push(item);
+    this.#wake?.();
+  }
+
+  close(): void {
+    this.#closed = true;
+    this.#wake?.();
+  }
+
+  async *stream(): AsyncGenerator<T> {
+    for (;;) {
+      while (this.#items.length > 0) yield this.#items.shift()!;
+      if (this.#closed) return;
+      await new Promise<void>((resolve) => {
+        this.#wake = resolve;
+        if (this.#items.length > 0 || this.#closed) {
+          this.#wake = undefined;
+          resolve();
+        }
+      });
+      this.#wake = undefined;
+    }
+  }
+}
+
+/** Projects one persisted ESM objective row into its JSON-safe view. */
+function esmObjectiveView(obj: Objective): CoreEsmObjectiveView {
+  return {
+    sessionId: obj.sessionId,
+    esmId: obj.esmId,
+    objective: obj.objective,
+    status: obj.status,
+    tokensUsed: obj.tokensUsed,
+    timeUsedMs: obj.timeUsedMs,
+    blockedCount: obj.blockedCount,
+    blockedReason: obj.blockedReason,
+    blockedRunId: obj.blockedRunId,
+    completionReason: obj.completionReason,
+    completionRunId: obj.completionRunId,
+    completionReview: obj.completionReview,
+    phase: obj.phase,
+    progressSummary: obj.progressSummary,
+    remainingWork: [...obj.remainingWork],
+    rejectionCount: obj.rejectionCount,
+    rejectionRunId: obj.rejectionRunId,
+    recoveryCount: obj.recoveryCount,
+    recoveryReason: obj.recoveryReason,
+    createdAt: validDate(obj.createdAt),
+    updatedAt: validDate(obj.updatedAt),
+  };
+}
 
 interface SessionRecord {
   view: CoreSessionView;
@@ -2440,6 +2569,88 @@ function applicationView(settings: Settings): Record<string, unknown> {
   };
 }
 
+/** Reads one settings document (effective merge or global sparse). */
+function settingsDocumentFor(
+  scope: "effective" | "global",
+  workDir: string,
+): Settings {
+  return scope === "global"
+    ? loadGlobalSettingsSparse()
+    : loadSettingsFor(workDir === "" ? "." : workDir);
+}
+
+/**
+ * Applies one sparse settings patch in the requested scope and returns the
+ * refreshed effective document for the work directory. Every settings edit
+ * flows through this path so the on-disk files and the Core-owned settings
+ * snapshot refresh together.
+ */
+function updateSettingsDocumentFor(
+  scope: "global" | "project",
+  updates: Record<string, unknown>,
+  workDir: string,
+): Settings {
+  const cwd = workDir === "" ? "." : workDir;
+  if (scope === "global") saveGlobalSettingsPatch(updates);
+  else saveProjectSettingsPatchFor(cwd, updates);
+  return loadSettingsFor(cwd);
+}
+
+/**
+ * Refreshes the shared Core settings snapshot in place after a settings edit.
+ * Every Core closure (session runtimes, extension handler, host defaults) holds
+ * this same object, so an in-place refresh keeps prompt-time provider
+ * construction and management reads current (the settings staleness bug that
+ * motivated routing TUI settings edits through the service).
+ */
+function refreshSharedSettings(shared: Settings, fresh: Settings): Settings {
+  Object.assign(shared, fresh);
+  return shared;
+}
+
+/** Projects the built-in-plus-configured provider catalog. */
+function providerCatalogView(settings: Settings): CoreProviderCatalogView[] {
+  const ids = new Set<string>();
+  for (const id of Object.keys(defaultProviderConfigsAll())) ids.add(id);
+  for (const id of Object.keys(settings.providers ?? {})) ids.add(id);
+  const sorted = [...ids];
+  sortProviderIDs(sorted);
+  return sorted.map((id) => {
+    const configured = getProviderConfig(settings, id);
+    return {
+      id,
+      configured: configured !== undefined,
+      isDefault: id === settings.defaultProvider,
+      api: configured?.api ?? "openai-chat",
+      baseUrl: configured?.baseUrl ?? "",
+      modelCount: configured?.models.length ?? 0,
+      models: resolvedModels(settings, id).map((model) => ({
+        id: model.id,
+        name: model.name,
+      })),
+    };
+  });
+}
+
+/** Reads the global environment-variable document. */
+function envDocumentView(): Record<string, string> {
+  return envList(loadEnv());
+}
+
+/**
+ * Replaces the global environment-variable document: variables missing from
+ * `vars` are removed and present values round-trip exactly.
+ */
+function updateEnvDocumentVars(
+  vars: Record<string, string>,
+): Record<string, string> {
+  const config = loadEnv();
+  const existing = envList(config);
+  const unset = Object.keys(existing).filter((name) => !(name in vars));
+  applyEnvPatch(config, { ...vars }, unset);
+  return envList(config);
+}
+
 function settingsView(settings: Settings): Record<string, unknown> {
   return {
     defaultProvider: settings.defaultProvider ?? "",
@@ -2465,6 +2676,10 @@ function providerViews(settings: Settings): Record<string, unknown>[] {
       name,
       maskedKey,
       modelCount: resolvedModels(settings, name).length,
+      models: resolvedModels(settings, name).map((model) => ({
+        id: model.id,
+        name: model.name,
+      })),
       apiKeyConfigured: maskedKey !== null,
     };
     if (provider.baseUrl !== undefined && provider.baseUrl !== "") {
@@ -2862,6 +3077,26 @@ function validDate(value: Date): string {
   return Number.isNaN(value.getTime()) ? "" : value.toISOString();
 }
 
+/** Maps a wire attachment kind (or media type) onto the canonical kind. */
+function attachmentKindFor(
+  kind: string | undefined,
+  mediaType: string,
+): "image" | "file" | "audio" | "video" {
+  switch (kind) {
+    case "image":
+      return ATTACHMENT_IMAGE;
+    case "audio":
+      return ATTACHMENT_AUDIO;
+    case "video":
+      return ATTACHMENT_VIDEO;
+    case "file":
+      return ATTACHMENT_FILE;
+    default:
+      break;
+  }
+  return mediaType.startsWith("image/") ? ATTACHMENT_IMAGE : ATTACHMENT_FILE;
+}
+
 class ProductionCoreSessionRuntime implements CoreSessionRuntime {
   readonly sessionId: string;
   readonly #settings: Settings;
@@ -2874,9 +3109,21 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
   readonly #providerFactory: typeof createProvider;
   readonly #reverseRequest: CoreReverseRequest | undefined;
   readonly #openExisting: boolean;
+  readonly #approvalPolicy: string;
+  readonly #questionPolicy: string;
   #manager: Manager | undefined;
   #runtime: SessionRuntime | undefined;
   readonly #activeSkills = new Map<string, boolean>();
+  /** Lazily-built shared AgentManager (delegate tool + ESM role agents). */
+  #agentManager: AgentManager | undefined;
+  #delegateEnabled = false;
+  #multiAgentEnabled = false;
+  /** The running ESM continuation worker, if any. */
+  #esmWorker:
+    | { runId: string; cancel: () => void; done: Promise<void> }
+    | undefined;
+  /** The ESM role agent currently executing, if any. */
+  #esmActiveAgentId = "";
 
   constructor(input: {
     sessionId: string;
@@ -2886,6 +3133,9 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     modelID: string;
     mode?: string;
     thinkingLevel?: string;
+    capabilities?: Record<string, boolean>;
+    approvalPolicy?: string;
+    questionPolicy?: string;
     settings: Settings;
     providerFactory?: typeof createProvider;
     reverseRequest?: CoreReverseRequest;
@@ -2900,9 +3150,47 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     this.#mode = input.mode ?? input.settings.defaultMode ?? "yolo";
     this.#thinkingLevel = input.thinkingLevel ??
       input.settings.defaultThinkingLevel ?? "";
+    this.#multiAgentEnabled = input.capabilities?.multiAgent === true;
+    this.#approvalPolicy = (input.approvalPolicy ?? "").trim() !== ""
+      ? (input.approvalPolicy as string)
+      : "runtime";
+    this.#questionPolicy = (input.questionPolicy ?? "").trim() !== ""
+      ? (input.questionPolicy as string)
+      : "runtime";
     this.#providerFactory = input.providerFactory ?? createProvider;
     this.#reverseRequest = input.reverseRequest;
     this.#openExisting = input.openExisting === true;
+  }
+
+  /** Opens (or creates) this session's persisted identity exactly once. */
+  #ensureManager(): Manager {
+    if (this.#manager !== undefined) return this.#manager;
+    const sessionDir = this.#settings.sessionDir ?? "";
+    const manager = this.#openExisting
+      ? openPersistedSession(sessionDir, this.sessionId)
+      : openOrCreateSession({
+        workDir: this.#workDir,
+        sessionDir,
+        id: this.sessionId,
+      });
+    this.#manager = manager;
+    return manager;
+  }
+
+  /**
+   * Projects the persisted session identity (work directory and persisted
+   * mode) so one canonical binding reaches the host session view. Establishing
+   * the summary also creates the persisted row of a fresh session, so its
+   * identity is Core-owned and visible to session listings immediately.
+   */
+  persistedSummary(): { workDir?: string; mode?: string } {
+    const manager = this.#ensureManager();
+    const header = manager.getHeader();
+    const mode = manager.getLatestModeChange()?.mode ?? "";
+    return {
+      workDir: header?.cwd ?? this.#workDir,
+      ...(mode.trim() === "" ? {} : { mode }),
+    };
   }
 
   async #ensureRuntime(): Promise<{
@@ -2912,14 +3200,7 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     if (this.#manager !== undefined && this.#runtime !== undefined) {
       return { manager: this.#manager, runtime: this.#runtime };
     }
-    const sessionDir = this.#settings.sessionDir ?? "";
-    const manager = this.#openExisting
-      ? openPersistedSession(sessionDir, this.sessionId)
-      : createSession({
-        workDir: this.#workDir,
-        sessionDir,
-        id: this.sessionId,
-      });
+    const manager = this.#ensureManager();
     const runtime = await new Builder(
       this.#settings,
       sandboxLevelFromSettings(this.#settings),
@@ -2933,7 +3214,6 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
       manager,
     });
     runtime.setDecisions(new DecisionService());
-    this.#manager = manager;
     this.#runtime = runtime;
     return { manager, runtime };
   }
@@ -2953,23 +3233,561 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     });
   }
 
-  async prompt(input: CorePromptInput): Promise<CorePromptExecution> {
-    const { manager, runtime } = await this.#ensureRuntime();
+  async listSkills(): Promise<CoreSkillView[]> {
+    const { runtime } = await this.#ensureRuntime();
+    const manager = runtime.skillsMgr;
+    if (manager === undefined) return [];
+    return manager.list().map((skill) => ({
+      name: skill.name,
+      source: skill.source,
+      description: skill.description,
+      active: this.#activeSkills.get(skill.name) === true,
+    }));
+  }
+
+  async prepareInput(
+    input: CorePrepareInput & { sessionId: string },
+  ): Promise<CorePreparedInput> {
+    const { runtime } = await this.#ensureRuntime();
+    const bytes = decodeBase64(input.contentBase64);
+    const kind = attachmentKindFor(input.kind, input.mediaType);
+    const prepared = await runtime.prepareInput(undefined, {
+      origin: this.#source,
+      eventId: `core-input-${generateID()}`,
+      itemIndex: 0,
+      reference: "",
+      kind,
+      filenameHint: input.name,
+      mediaTypeHint: input.mediaType,
+      sizeHint: bytes.byteLength,
+      open: () => ({
+        bytes,
+        filename: input.name,
+        mediaType: input.mediaType,
+        contentSize: bytes.byteLength,
+      }),
+    });
+    return {
+      resourceId: prepared.resourceId,
+      kind: prepared.kind,
+      relativePath: prepared.relativePath,
+      filename: prepared.filename,
+      mediaType: prepared.mediaType,
+      bytes: prepared.bytes,
+    };
+  }
+
+  async capabilityView(): Promise<CoreCapabilityView> {
+    const { runtime } = await this.#ensureRuntime();
+    const snapshot = runtime.capabilitySnapshot();
+    return {
+      sandbox: { enabled: snapshot.sandboxEnabled, available: true },
+      browser: { enabled: snapshot.browserEnabled, available: true },
+      webSearch: { enabled: snapshot.webSearchEnabled, available: true },
+      artifact: {
+        enabled: runtime.artifactCapabilitySnapshot(),
+        available: true,
+      },
+    };
+  }
+
+  async contextView(): Promise<CoreSessionContextView> {
+    const { runtime } = await this.#ensureRuntime();
+    return {
+      ruleContent: runtime.ruleContent,
+      extraContext: runtime.extraContext,
+    };
+  }
+
+  async setContext(input: {
+    ruleContent?: string;
+    extraContext?: string;
+  }): Promise<void> {
+    const { runtime } = await this.#ensureRuntime();
+    if (input.ruleContent !== undefined) {
+      runtime.ruleContent = input.ruleContent;
+    }
+    if (input.extraContext !== undefined) {
+      runtime.extraContext = input.extraContext;
+    }
+  }
+
+  async listExperts(): Promise<CoreExpertSummaryView[]> {
+    const { runtime } = await this.#ensureRuntime();
+    return runtime.listExperts().map((summary) => ({
+      name: summary.name,
+      displayName: {
+        zh: summary.displayName.zh ?? "",
+        en: summary.displayName.en ?? "",
+      },
+      expertType: summary.expertType,
+      source: summary.source,
+      invalid: summary.invalid === true,
+      invalidReason: summary.invalidReason ?? "",
+    }));
+  }
+
+  async inspectExpert(expertId: string): Promise<CoreExpertBundleView> {
+    const { runtime } = await this.#ensureRuntime();
+    const bundle = runtime.inspectExpert(expertId);
+    return {
+      name: bundle.name,
+      displayName: {
+        zh: bundle.manifest.displayName.zh ?? "",
+        en: bundle.manifest.displayName.en ?? "",
+      },
+      expertType: bundle.manifest.expertType,
+      invalid: bundle.invalid === true,
+      invalidReason: bundle.invalidReason,
+      members: (bundle.manifest.members ?? []).map((member) => ({
+        id: member.id,
+        name: { zh: member.name?.zh ?? "", en: member.name?.en ?? "" },
+        profession: {
+          zh: member.profession?.zh ?? "",
+          en: member.profession?.en ?? "",
+        },
+        role: member.role ?? "",
+      })),
+    };
+  }
+
+  async expertState(): Promise<CoreExpertStateView> {
+    const { runtime } = await this.#ensureRuntime();
+    return { expertId: runtime.expertState().binding?.id ?? "" };
+  }
+
+  async setExpert(expertId: string): Promise<void> {
+    const { runtime } = await this.#ensureRuntime();
+    await runtime.setExpert(expertId);
+  }
+
+  // --- Managed agents (delegate tool + ESM role agents) ---------------------
+
+  /** Lazily builds the shared AgentManager on the session Runtime. */
+  async #ensureAgentManager(): Promise<AgentManager> {
+    if (this.#agentManager !== undefined) return this.#agentManager;
+    const { runtime } = await this.#ensureRuntime();
     const created = this.#providerFactory(
       this.#settings,
       this.#providerName,
       this.#modelID,
       { requireModel: true },
     );
+    this.#agentManager = createAgentManager({
+      runtime,
+      provider: created.provider,
+      model: created.model,
+      settings: this.#settings,
+      providerName: this.#providerName,
+      delegateEnabled: true,
+      multiAgentEnabled: this.#multiAgentEnabled,
+    });
+    return this.#agentManager;
+  }
+
+  async listAgents(): Promise<CoreAgentView[]> {
+    const manager = await this.#ensureAgentManager();
+    return manager.list().map((id) => ({
+      id,
+      parent: manager.parent(id) ?? "",
+      children: [...manager.childrenOf(id)],
+      state: manager.statuses.get(id)?.state ?? "",
+    }));
+  }
+
+  async destroyAgent(agentId: string): Promise<void> {
+    const manager = await this.#ensureAgentManager();
+    manager.destroy(agentId);
+  }
+
+  async setDelegate(enabled: boolean): Promise<boolean> {
+    const { runtime } = await this.#ensureRuntime();
+    const registry = runtime.registry;
+    if (registry === null) {
+      throw new Error("agent manager runtime is unavailable");
+    }
+    if (enabled) {
+      const manager = await this.#ensureAgentManager();
+      registerDelegateSubAgentTool(registry, manager);
+      this.#delegateEnabled = true;
+    } else {
+      registry.remove("delegate_subagent");
+      this.#delegateEnabled = false;
+    }
+    return this.#delegateEnabled;
+  }
+
+  delegateState(): Promise<boolean> {
+    return Promise.resolve(this.#delegateEnabled);
+  }
+
+  async setCapability(input: {
+    id: string;
+    enabled: boolean;
+  }): Promise<CoreCapabilityView> {
+    const { runtime } = await this.#ensureRuntime();
+    runtime.setCapabilityOption(input.id, input.enabled);
+    return await this.capabilityView();
+  }
+
+  /** Applies session capability changes mirrored through `session.config.set`. */
+  setCapabilities(capabilities: Record<string, boolean>): void {
+    if (typeof capabilities.multiAgent === "boolean") {
+      this.#multiAgentEnabled = capabilities.multiAgent;
+    }
+  }
+
+  // --- ESM supervisor --------------------------------------------------------
+
+  #esmStore(sessionDir: string): ESMStore {
+    return new ESMStore(sessionDir);
+  }
+
+  #esmView(objective: Objective | null): CoreEsmView {
+    return {
+      objective: objective === null || objective.esmId === ""
+        ? null
+        : esmObjectiveView(objective),
+      workerRunning: this.#esmWorker !== undefined,
+      activeAgentId: this.#esmActiveAgentId,
+    };
+  }
+
+  #esmObjective(store: ESMStore): Objective | null {
+    try {
+      return store.get(this.sessionId);
+    } catch {
+      return null;
+    }
+  }
+
+  async esmState(): Promise<CoreEsmView> {
+    const { manager } = await this.#ensureRuntime();
+    return this.#esmView(
+      this.#esmObjective(this.#esmStore(manager.getSessionDir())),
+    );
+  }
+
+  async esmCommand(
+    input: Omit<CoreEsmCommandInput, "sessionId">,
+  ): Promise<CoreEsmView> {
+    const { manager } = await this.#ensureRuntime();
+    const store = this.#esmStore(manager.getSessionDir());
+    const sessionId = this.sessionId;
+    switch (input.action) {
+      case "create":
+        store.create(sessionId, input.objective ?? "");
+        break;
+      case "edit":
+        store.edit(sessionId, input.objective ?? "");
+        break;
+      case "pause":
+        store.pause(sessionId);
+        break;
+      case "resume":
+        store.resume(sessionId);
+        break;
+      case "guide":
+        store.addGuidance(sessionId, input.guide ?? "");
+        break;
+      case "clear":
+        store.clear(sessionId);
+        break;
+    }
+    return this.#esmView(this.#esmObjective(store));
+  }
+
+  async esmContinue(): Promise<CorePromptExecution & { started: boolean }> {
+    const { manager, runtime } = await this.#ensureRuntime();
+    const sessionId = this.sessionId;
+    const existing = this.#esmWorker;
+    if (existing !== undefined) {
+      return { runId: existing.runId, started: false };
+    }
+    const store = this.#esmStore(manager.getSessionDir());
+    const objective = this.#esmObjective(store);
+    if (objective === null || !canAutoRun(objective)) {
+      return { runId: "", started: false };
+    }
+    const runId = `esm_${generateID()}`;
+    const queue = new AsyncEventQueue<QueuedCoreEvent>();
+    const mode = resolveUnattendedMode(this.#mode);
+    const sink: ESMRoleEventSink = {
+      teamExpertActive: () => runtime.teamExpertActive(),
+      setActiveAgent: (agentId) => {
+        this.#esmActiveAgentId = agentId;
+      },
+      clearActiveAgent: (agentId) => {
+        if (this.#esmActiveAgentId === agentId) this.#esmActiveAgentId = "";
+      },
+      publishRoleEvent: (event) => {
+        const shared = fromAgentEvent(event);
+        queue.push({
+          eventType: "agent_event",
+          payload: {
+            ...shared.payload,
+            agentEvent: serializeAgentEvent(event),
+          },
+        });
+      },
+      publishMessage: (message) => {
+        queue.push({ eventType: "esm_status", payload: { text: message } });
+      },
+    };
+    const adapter = new AgentManagerESMAdapter(
+      await this.#ensureAgentManager(),
+      sink,
+      this.#workDir,
+      mode,
+    );
+    const supervisor = new Supervisor({ store, adapter, events: adapter });
+    const controller = new AbortController();
+    const cancel = (): void => controller.abort();
+    const done = (async () => {
+      try {
+        let iterationRunId = runId;
+        for (;;) {
+          const result = await supervisor.run(
+            sessionId,
+            iterationRunId,
+            this.#workDir,
+            mode,
+            controller.signal,
+          );
+          if (controller.signal.aborted) {
+            queue.push({
+              eventType: "esm_finished",
+              payload: { status: "cancelled" },
+              terminal: true,
+            });
+            return;
+          }
+          if (result.error !== undefined && result.error !== null) {
+            const message = result.error instanceof Error
+              ? result.error.message
+              : String(result.error);
+            queue.push({
+              eventType: "esm_finished",
+              payload: {
+                status: "failed",
+                text: `ESM continuation stopped: ${message}`,
+                error: message,
+              },
+              terminal: true,
+            });
+            return;
+          }
+          const next = this.#esmObjective(store);
+          if (next === null || !canAutoRun(next)) {
+            queue.push({
+              eventType: "esm_finished",
+              payload: { status: "completed" },
+              terminal: true,
+            });
+            return;
+          }
+          iterationRunId = `esm_${generateID()}`;
+        }
+      } finally {
+        if (this.#esmWorker?.runId === runId) this.#esmWorker = undefined;
+        queue.close();
+      }
+    })();
+    this.#esmWorker = { runId, cancel, done };
+    const events = (async function* () {
+      for await (const item of queue.stream()) {
+        yield {
+          sessionId,
+          runId,
+          sequence: 0,
+          eventType: item.eventType,
+          payload: item.payload,
+          terminal: item.terminal === true,
+        };
+      }
+    })();
+    return { runId, started: true, events };
+  }
+
+  async esmStop(): Promise<void> {
+    const worker = this.#esmWorker;
+    if (worker === undefined) return;
+    this.#esmWorker = undefined;
+    worker.cancel();
+    await worker.done.catch(() => {});
+  }
+
+  // --- Transient side queries (TUI /btw) ------------------------------------
+
+  async askTransient(
+    input: Omit<CoreTransientPromptInput, "sessionId">,
+  ): Promise<CoreTransientPromptResult> {
+    const { runtime } = await this.#ensureRuntime();
+    const providerName = input.providerName ?? this.#providerName;
+    const modelID = input.modelID ?? this.#modelID;
+    const created = this.#providerFactory(
+      this.#settings,
+      providerName,
+      modelID,
+      {
+        requireModel: true,
+      },
+    );
+    const registry = createRegistry(
+      this.#workDir,
+      runtime.sandboxMgr?.getActive(),
+    );
+    // A read-only registry keeps the side query from mutating the workspace.
+    for (const tool of registry.all()) {
+      if (!TRANSIENT_READ_ONLY_TOOLS.includes(tool.name())) {
+        registry.remove(tool.name());
+      }
+    }
+    // The rule/extra context is Core-owned session state.
+    const extra = runtime.extraContext === ""
+      ? TRANSIENT_SYSTEM_HINT
+      : `${runtime.extraContext}\n\n${TRANSIENT_SYSTEM_HINT}`;
+    const agent = runtime.buildTransientAgent(registry, {
+      id: "btw",
+      provider: created.provider,
+      providerName,
+      model: created.model,
+      mode: "agent",
+      settings: this.#settings,
+      allow: loadAllow(),
+      extraContext: extra,
+      thinkingLevel: normalizeThinkingLevel(
+        input.thinkingLevel ?? this.#thinkingLevel,
+      ),
+    });
+    let answer = "";
+    for await (const ev of agent.run(input.question)) {
+      if (ev.type === EVENT_TEXT_DELTA && ev.textDelta) {
+        answer += ev.textDelta;
+      }
+    }
+    return { answer };
+  }
+
+  // --- Conversation compaction ----------------------------------------------
+
+  async compact(): Promise<CorePromptExecution> {
+    const { runtime } = await this.#ensureRuntime();
+    const created = this.#providerFactory(
+      this.#settings,
+      this.#providerName,
+      this.#modelID,
+      { requireModel: true },
+    );
+    const runId = `compact_${generateID()}`;
+    const sessionId = this.sessionId;
+    // Compaction hydrates the persisted conversation onto a fresh agent; it is
+    // an event-only run (no durable conversation turn) exactly like the
+    // in-process compaction it replaces.
+    const agent = runtime.buildAgent({
+      provider: created.provider,
+      providerName: this.#providerName,
+      model: created.model,
+      settings: this.#settings,
+      allow: loadAllow(),
+      mode: this.#mode,
+      thinkingLevel: normalizeThinkingLevel(this.#thinkingLevel),
+      extraContext: runtime.extraContext,
+      ruleContent: runtime.ruleContent,
+      hydrateHistory: true,
+    });
+    const events = (async function* () {
+      if (!agent.canForceCompact()) {
+        yield {
+          sessionId,
+          runId,
+          sequence: 0,
+          eventType: "run_finished",
+          payload: { status: "completed", compact: "skipped" },
+          terminal: true,
+        };
+        return;
+      }
+      const queue = new AsyncEventQueue<QueuedCoreEvent>();
+      const compactDone = (async () => {
+        try {
+          const error = await agent.compact(
+            createRunContext(),
+            (ev) => {
+              const shared = fromAgentEvent(ev);
+              queue.push({
+                eventType: "agent_event",
+                payload: {
+                  ...shared.payload,
+                  agentEvent: serializeAgentEvent(ev),
+                },
+              });
+              return true;
+            },
+            true,
+          );
+          if (error !== undefined && error !== null) {
+            queue.push({
+              eventType: "run_finished",
+              payload: { status: "failed", error: error.message },
+              terminal: true,
+            });
+          } else {
+            queue.push({
+              eventType: "run_finished",
+              payload: { status: "completed", compact: "done" },
+              terminal: true,
+            });
+          }
+        } catch (error) {
+          queue.push({
+            eventType: "run_finished",
+            payload: {
+              status: "failed",
+              error: error instanceof Error ? error.message : String(error),
+            },
+            terminal: true,
+          });
+        } finally {
+          queue.close();
+        }
+      })();
+      for await (const item of queue.stream()) {
+        yield {
+          sessionId,
+          runId,
+          sequence: 0,
+          eventType: item.eventType,
+          payload: item.payload,
+          terminal: item.terminal === true,
+        };
+      }
+      await compactDone;
+    })();
+    return { runId, agentId: agent.id(), events };
+  }
+
+  async prompt(input: CorePromptInput): Promise<CorePromptExecution> {
+    const { manager, runtime } = await this.#ensureRuntime();
+    const created = this.#providerFactory(
+      this.#settings,
+      input.providerName ?? this.#providerName,
+      input.modelID ?? this.#modelID,
+      { requireModel: true },
+    );
+    const mode = input.mode ?? this.#mode;
+    const thinkingLevel = input.thinkingLevel ?? this.#thinkingLevel;
     const runId = `core_${generateID()}`;
     const execution = createSessionExecutionRuntime(manager.getSessionDir());
     runtime.setExecution(execution);
-    const submission = await runtime.acceptInput(
-      undefined,
-      runId,
-      input.text,
-      [],
-    );
+    const preparedInputs = input.preparedInputs ?? [];
+    const submission = preparedInputs.length > 0
+      ? runtime.attachPreparedInput(
+        undefined,
+        input.text,
+        preparedInputs as PreparedInput[],
+      )
+      : await runtime.acceptInput(undefined, runId, input.text, []);
     let userMessage;
     try {
       userMessage = runtime.buildUserMessage(undefined, submission);
@@ -2982,12 +3800,21 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
       runId,
       source: this.#source,
       model: created.model.id,
-      mode: this.#mode,
+      mode,
       workDir: this.#workDir,
       text: input.text,
       userMessage,
       resourceIds: resourceIds(submission),
       startedAt: new Date(),
+      // Per-session run policy travels with every canonical run record so
+      // print/unattended sessions keep their decision semantics on replay.
+      policy: {
+        source: this.#source,
+        mode,
+        workDir: this.#workDir,
+        approvalPolicy: this.#approvalPolicy,
+        questionPolicy: this.#questionPolicy,
+      },
     });
     const signal = execution.beginIntentDurable(
       undefined,
@@ -2997,12 +3824,12 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     );
     const agent = runtime.buildAgent({
       provider: created.provider,
-      providerName: this.#providerName,
+      providerName: input.providerName ?? this.#providerName,
       model: created.model,
       settings: this.#settings,
       allow: loadAllow(),
-      mode: this.#mode,
-      thinkingLevel: normalizeThinkingLevel(this.#thinkingLevel),
+      mode,
+      thinkingLevel: normalizeThinkingLevel(thinkingLevel),
       extraContext: runtime.extraContext,
       ruleContent: runtime.ruleContent,
       hydrateHistory: true,
@@ -3074,7 +3901,12 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
             continue;
           }
           const shared = fromAgentEvent(event);
-          const payload = { ...shared.payload };
+          const payload: Record<string, unknown> = {
+            ...shared.payload,
+            // Canonical wire projection: the full agent event travels with the
+            // flattened payload so adapters can render exact event semantics.
+            agentEvent: serializeAgentEvent(event),
+          };
           if (event.type === EVENT_ERROR) payload.status = "failed";
           if (shared.terminal) {
             terminal = true;
@@ -3115,7 +3947,7 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
         };
       }
     })();
-    return { runId, events };
+    return { runId, agentId: agent.id(), events };
   }
 
   async cancelRun(_runId: string): Promise<void> {
@@ -3124,6 +3956,12 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
   }
 
   async close(): Promise<void> {
+    const worker = this.#esmWorker;
+    if (worker !== undefined) {
+      this.#esmWorker = undefined;
+      worker.cancel();
+      await worker.done.catch(() => {});
+    }
     if (this.#runtime !== undefined) await this.#runtime.shutdown();
   }
 }
@@ -3137,13 +3975,15 @@ export function createProductionCoreRuntimeDependencies(
     createSessionRuntime: (input) =>
       new ProductionCoreSessionRuntime({
         ...input,
-        settings,
+        // The host-owned snapshot wins so a refreshed shared settings object
+        // reaches every new session runtime; the closure is the fallback.
+        settings: input.settings ?? settings,
         providerFactory,
       }),
     openSessionRuntime: (input) =>
       new ProductionCoreSessionRuntime({
         ...input,
-        settings,
+        settings: input.settings ?? settings,
         providerFactory,
         openExisting: true,
       }),
@@ -3181,20 +4021,33 @@ export async function createCoreRuntimeHost(
 
   const createRecord = (
     input: CoreSessionCreateInput,
-    sessionId = newId(),
+    sessionId = "",
     openExisting = false,
   ): SessionRecord => {
     ensureOpen();
     const timestamp = now();
+    const explicit = sessionId.trim() !== ""
+      ? sessionId.trim()
+      : (input.sessionId ?? "").trim();
+    const resolvedId = explicit !== "" ? explicit : newId();
+    const resolvedSource = (input.source ?? "").trim() !== ""
+      ? (input.source as string)
+      : options.source;
     const view: CoreSessionView = {
-      sessionId,
+      sessionId: resolvedId,
       workDir: input.workDir,
-      source: options.source,
+      source: resolvedSource,
       providerName: input.providerName ?? options.providerName,
       modelID: input.modelID ?? options.modelID,
       mode: input.mode ?? "",
       thinkingLevel: input.thinkingLevel ?? "",
       capabilities: { ...(input.capabilities ?? {}) },
+      approvalPolicy: (input.approvalPolicy ?? "").trim() !== ""
+        ? (input.approvalPolicy as string)
+        : "runtime",
+      questionPolicy: (input.questionPolicy ?? "").trim() !== ""
+        ? (input.questionPolicy as string)
+        : "runtime",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -3202,16 +4055,31 @@ export async function createCoreRuntimeHost(
       ? dependencies.openSessionRuntime ?? dependencies.createSessionRuntime
       : dependencies.createSessionRuntime;
     const runtime = createRuntime({
-      sessionId,
+      sessionId: resolvedId,
       workDir: view.workDir,
-      source: options.source,
+      source: view.source,
       providerName: view.providerName,
       modelID: view.modelID,
       mode: view.mode,
       thinkingLevel: view.thinkingLevel,
+      capabilities: { ...(input.capabilities ?? {}) },
+      approvalPolicy: view.approvalPolicy,
+      questionPolicy: view.questionPolicy,
       settings: options.settings,
       reverseRequest: options.reverseRequest,
     });
+    // The runtime projects its persisted identity (work directory and
+    // persisted mode) so one canonical binding reaches the session view.
+    const persisted = runtime.persistedSummary?.();
+    if (persisted?.workDir !== undefined && persisted.workDir.trim() !== "") {
+      view.workDir = persisted.workDir;
+    }
+    if (
+      persisted?.mode !== undefined && persisted.mode.trim() !== "" &&
+      (input.mode ?? "").trim() === ""
+    ) {
+      view.mode = persisted.mode;
+    }
     const record: SessionRecord = {
       view,
       runtime,
@@ -3220,7 +4088,7 @@ export async function createCoreRuntimeHost(
       activeSkills: new Map(),
       eventWaiters: new Set(),
     };
-    sessions.set(sessionId, record);
+    sessions.set(resolvedId, record);
     return record;
   };
 
@@ -3286,6 +4154,13 @@ export async function createCoreRuntimeHost(
   const host: CoreRuntimeHost = {
     async createSession(input) {
       await Promise.resolve();
+      // Adopting an existing identity is open-or-create: one session ID maps to
+      // exactly one host record even when a client rebinds to it.
+      const adopted = (input.sessionId ?? "").trim();
+      if (adopted !== "") {
+        const existing = sessions.get(adopted);
+        if (existing !== undefined) return cloneSession(existing.view);
+      }
       return cloneSession(createRecord(input).view);
     },
 
@@ -3302,6 +4177,19 @@ export async function createCoreRuntimeHost(
       const record = requireSession(input.sessionId);
       await record.runtime.close();
       sessions.delete(input.sessionId);
+    },
+
+    async deleteSession(input) {
+      const record = sessions.get(input.sessionId);
+      if (record !== undefined) {
+        await record.runtime.close();
+        sessions.delete(input.sessionId);
+      }
+      // Deleting is Core-owned even when the session was never opened here.
+      await deletePersistedSession(
+        getSessionDir(options.settings),
+        input.sessionId,
+      );
     },
 
     async history(input) {
@@ -3330,6 +4218,9 @@ export async function createCoreRuntimeHost(
         sessionId: input.sessionId,
         runId: run.runId,
         status: "running",
+        ...(accepted.agentId === undefined
+          ? {}
+          : { agentId: accepted.agentId }),
       };
     },
 
@@ -3355,6 +4246,24 @@ export async function createCoreRuntimeHost(
       return [...sessions.values()].map((record) => cloneSession(record.view));
     },
 
+    async listPersistedSessions(input) {
+      await Promise.resolve();
+      ensureOpen();
+      const workDir = (input.workDir ?? "").trim() !== ""
+        ? input.workDir!
+        : options.workDir;
+      return listPersistedSessionInfos(
+        workDir,
+        getSessionDir(options.settings),
+      ).map((info) => ({
+        sessionId: info.id,
+        workDir: info.workDir,
+        modTime: info.modTime,
+        messageCount: info.messageCount,
+        preview: info.preview,
+      }));
+    },
+
     async setSessionConfig(input) {
       await Promise.resolve();
       const record = requireSession(input.sessionId);
@@ -3368,6 +4277,7 @@ export async function createCoreRuntimeHost(
       }
       if (input.capabilities !== undefined) {
         record.view.capabilities = { ...input.capabilities };
+        record.runtime.setCapabilities?.(record.view.capabilities);
       }
       record.view.updatedAt = now();
       return cloneSession(record.view);
@@ -3389,6 +4299,329 @@ export async function createCoreRuntimeHost(
       return Promise.resolve(
         sessionSkillState(requireSession(input.sessionId)),
       );
+    },
+
+    async listSessionSkills(input) {
+      const record = requireSession(input.sessionId);
+      return await record.runtime.listSkills?.() ?? [];
+    },
+
+    async prepareInput(input) {
+      const record = requireSession(input.sessionId);
+      const prepare = record.runtime.prepareInput;
+      if (prepare === undefined) {
+        throw new Error(
+          "input preparation is not available in the Core Runtime",
+        );
+      }
+      return await prepare.call(record.runtime, input);
+    },
+
+    async sessionCapabilities(input) {
+      const record = requireSession(input.sessionId);
+      return await record.runtime.capabilityView?.() ?? {};
+    },
+
+    async sessionContext(input) {
+      const record = requireSession(input.sessionId);
+      return await record.runtime.contextView?.() ?? {
+        ruleContent: "",
+        extraContext: "",
+      };
+    },
+
+    async setSessionContext(input) {
+      const record = requireSession(input.sessionId);
+      const setContext = record.runtime.setContext;
+      if (setContext === undefined) {
+        throw new Error(
+          "session context is not available in the Core Runtime",
+        );
+      }
+      await setContext.call(record.runtime, input);
+      return await record.runtime.contextView?.() ?? {
+        ruleContent: "",
+        extraContext: "",
+      };
+    },
+
+    async listExperts(input) {
+      const record = requireSession(input.sessionId);
+      const listExperts = record.runtime.listExperts;
+      if (listExperts === undefined) {
+        throw new Error(
+          "expert discovery is not available in the Core Runtime",
+        );
+      }
+      return await listExperts.call(record.runtime);
+    },
+
+    async inspectExpert(input) {
+      const record = requireSession(input.sessionId);
+      const inspectExpert = record.runtime.inspectExpert;
+      if (inspectExpert === undefined) {
+        throw new Error(
+          "expert discovery is not available in the Core Runtime",
+        );
+      }
+      return await inspectExpert.call(record.runtime, input.expertId);
+    },
+
+    async expertState(input) {
+      const record = requireSession(input.sessionId);
+      return await record.runtime.expertState?.() ?? { expertId: "" };
+    },
+
+    async setExpert(input) {
+      const record = requireSession(input.sessionId);
+      const setExpert = record.runtime.setExpert;
+      if (setExpert === undefined) {
+        throw new Error("expert binding is not available in the Core Runtime");
+      }
+      await setExpert.call(record.runtime, input.expertId);
+      return await record.runtime.expertState?.() ?? {
+        expertId: input.expertId,
+      };
+    },
+
+    async forkSession(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      // The Runtime-owned fork preserves the source identity and history; a
+      // non-null expertId applies only to the child branch.
+      const result = fork(getSessionDir(options.settings), {
+        sourceSessionId: input.sessionId,
+        requestId: `core-fork-${generateID()}`,
+        titleMode: input.titleMode ?? "",
+        ...(input.expertId === undefined
+          ? {}
+          : { expertId: input.expertId.trim() }),
+      });
+      // The child branch becomes a Core-owned session the client can bind.
+      return cloneSession(
+        createRecord({ workDir: record.view.workDir }, result.sessionId, true)
+          .view,
+      );
+    },
+
+    async listAgents(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      return await record.runtime.listAgents?.() ?? [];
+    },
+
+    async destroyAgent(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      const destroy = record.runtime.destroyAgent;
+      if (destroy === undefined) {
+        throw new Error(
+          "agent management is not available in the Core Runtime",
+        );
+      }
+      await destroy.call(record.runtime, input.agentId);
+    },
+
+    async setDelegate(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      const setDelegate = record.runtime.setDelegate;
+      if (setDelegate === undefined) {
+        throw new Error("delegate mode is not available in the Core Runtime");
+      }
+      return { enabled: await setDelegate.call(record.runtime, input.enabled) };
+    },
+
+    async delegateState(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      return {
+        enabled: await record.runtime.delegateState?.() ?? false,
+      };
+    },
+
+    async setSessionCapability(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      const setCapability = record.runtime.setCapability;
+      if (setCapability === undefined) {
+        throw new Error(
+          "capability updates are not available in the Core Runtime",
+        );
+      }
+      return await setCapability.call(record.runtime, {
+        id: input.id,
+        enabled: input.enabled,
+      });
+    },
+
+    async esmState(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      return await record.runtime.esmState?.() ?? {
+        objective: null,
+        workerRunning: false,
+        activeAgentId: "",
+      };
+    },
+
+    async esmUpdate(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      const command = record.runtime.esmCommand;
+      if (command === undefined) {
+        throw new Error("ESM supervisor is not available in the Core Runtime");
+      }
+      return await command.call(record.runtime, {
+        action: input.action,
+        ...(input.objective === undefined
+          ? {}
+          : { objective: input.objective }),
+        ...(input.guide === undefined ? {} : { guide: input.guide }),
+      });
+    },
+
+    async esmContinue(input) {
+      const record = requireSession(input.sessionId);
+      const cont = record.runtime.esmContinue;
+      if (cont === undefined) {
+        throw new Error("ESM supervisor is not available in the Core Runtime");
+      }
+      const execution = await cont.call(record.runtime);
+      if (!execution.started || execution.runId === "") {
+        return { runId: execution.runId, started: false };
+      }
+      const timestamp = now();
+      const run: CoreRunView = {
+        sessionId: input.sessionId,
+        runId: execution.runId,
+        status: "running",
+        sequence: 0,
+        startedAt: timestamp,
+        updatedAt: timestamp,
+      };
+      record.runs.set(run.runId, run);
+      publish(record, run, "run_started", { text: "" });
+      if (execution.events !== undefined) {
+        void consumeRuntimeEvents(record, run, execution.events);
+      }
+      return { runId: run.runId, started: true };
+    },
+
+    async esmStop(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      await record.runtime.esmStop?.();
+    },
+
+    async transientPrompt(input) {
+      await Promise.resolve();
+      const record = requireSession(input.sessionId);
+      const ask = record.runtime.askTransient;
+      if (ask === undefined) {
+        throw new Error(
+          "transient prompts are not available in the Core Runtime",
+        );
+      }
+      return await ask.call(record.runtime, {
+        question: input.question,
+        ...(input.providerName === undefined
+          ? {}
+          : { providerName: input.providerName }),
+        ...(input.modelID === undefined ? {} : { modelID: input.modelID }),
+        ...(input.thinkingLevel === undefined
+          ? {}
+          : { thinkingLevel: input.thinkingLevel }),
+      });
+    },
+
+    async compact(input) {
+      const record = requireSession(input.sessionId);
+      const runCompact = record.runtime.compact;
+      if (runCompact === undefined) {
+        throw new Error(
+          "conversation compaction is not available in the Core Runtime",
+        );
+      }
+      const execution = await runCompact.call(record.runtime);
+      const timestamp = now();
+      const run: CoreRunView = {
+        sessionId: input.sessionId,
+        runId: execution.runId,
+        status: "running",
+        sequence: 0,
+        startedAt: timestamp,
+        updatedAt: timestamp,
+      };
+      record.runs.set(run.runId, run);
+      publish(record, run, "run_started", { text: "", compact: true });
+      if (execution.events !== undefined) {
+        void consumeRuntimeEvents(record, run, execution.events);
+      }
+      return {
+        sessionId: input.sessionId,
+        runId: run.runId,
+        status: "running" as const,
+      };
+    },
+
+    async settingsDocument(input) {
+      await Promise.resolve();
+      return settingsDocumentFor(
+        input.scope ?? "effective",
+        input.workDir ?? options.workDir,
+      );
+    },
+
+    async updateSettingsDocument(input) {
+      await Promise.resolve();
+      const workDir = input.workDir === undefined || input.workDir === ""
+        ? options.workDir
+        : input.workDir;
+      const fresh = updateSettingsDocumentFor(
+        input.scope,
+        input.updates,
+        workDir,
+      );
+      refreshSharedSettings(options.settings, fresh);
+      return fresh;
+    },
+
+    async providerCatalog(input) {
+      await Promise.resolve();
+      return providerCatalogView(
+        settingsDocumentFor("effective", input.workDir ?? options.workDir),
+      );
+    },
+
+    async validateProviderModel(input) {
+      await Promise.resolve();
+      const settings = settingsDocumentFor(
+        "effective",
+        input.workDir ?? options.workDir,
+      );
+      // Validation mirrors the TUI editor exactly: construct the pair against
+      // the effective document with the candidate defaults and rethrow the raw
+      // factory cause so the dialog can render it.
+      createProvider(
+        {
+          ...settings,
+          defaultProvider: input.providerID,
+          defaultModel: input.modelID,
+        },
+        input.providerID,
+        input.modelID,
+      );
+    },
+
+    async envDocument() {
+      await Promise.resolve();
+      return envDocumentView();
+    },
+
+    async updateEnvDocument(input) {
+      await Promise.resolve();
+      return updateEnvDocumentVars(input.vars);
     },
 
     subscribeRunEvents(sessionId, runId, cursor = 0) {

@@ -12,7 +12,7 @@
 import {
   TOOL_EXECUTION_FAILED,
   type ToolExecutionState,
-} from "../agent/events.ts";
+} from "../agentruntime/events.ts";
 import type { FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import type { Translator } from "./i18n.ts";

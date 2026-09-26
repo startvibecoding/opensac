@@ -4,7 +4,7 @@
 // points: a `RunHandle` for the ExecutionRuntime/DecisionService bridge and
 // callbacks for messages/spinner. The Ink layer subscribes and renders.
 
-import type { Event } from "../agent/events.ts";
+import type { Event } from "../agentruntime/events.ts";
 import type { TaskPlan } from "../tools/tool.ts";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
@@ -29,7 +29,7 @@ import {
   TASK_INCOMPLETE,
   TASK_SUCCESS,
   type TaskStatus,
-} from "../agent/events.ts";
+} from "../agentruntime/events.ts";
 import type { RunState } from "../agentruntime/run_state.ts";
 import type { ContextUsage } from "../context/context.ts";
 import {

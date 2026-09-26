@@ -7,12 +7,28 @@ import {
 } from "./protocol.ts";
 import {
   CORE_RUNTIME_METHODS,
+  parseAgentParams,
+  parseCapabilitySetParams,
   parseConfigParams,
+  parseContextUpdateParams,
+  parseDelegateParams,
+  parseEnvUpdateParams,
+  parseEsmCommandParams,
   parseEventParams,
+  parseExpertParams,
+  parseForkParams,
+  parsePrepareParams,
   parsePromptParams,
+  parseProviderValidateParams,
   parseRunParams,
   parseSessionCreateParams,
   parseSessionIdParams,
+  parseSessionListPersistedParams,
+  parseSettingsReadParams,
+  parseSettingsUpdateParams,
+  parseSkillParams,
+  parseTransientPromptParams,
+  parseWorkDirParams,
   runtimeParamsObject,
 } from "./runtime_protocol.ts";
 import type { CoreRuntimeHost } from "./runtime.ts";
@@ -99,11 +115,22 @@ export class CoreRuntimeDispatcher {
         await this.#host.closeSession(input);
         return null;
       }
+      case CORE_RUNTIME_METHODS.sessionDelete: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        await this.#host.deleteSession(input);
+        return null;
+      }
       case CORE_RUNTIME_METHODS.sessionList:
         if (params !== undefined && runtimeParamsObject(params) === undefined) {
           throw invalidParams();
         }
         return await this.#host.listSessions();
+      case CORE_RUNTIME_METHODS.sessionListPersisted: {
+        const input = parseSessionListPersistedParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.listPersistedSessions(input);
+      }
       case CORE_RUNTIME_METHODS.sessionHistory: {
         const input = parseSessionIdParams(params);
         if (input === undefined) throw invalidParams();
@@ -126,6 +153,159 @@ export class CoreRuntimeDispatcher {
         const input = parsePromptParams(params);
         if (input === undefined) throw invalidParams();
         return await this.#host.prompt(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionSkillsList: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.listSessionSkills(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionSkillSet: {
+        const input = parseSkillParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.setSessionSkill?.(input) ?? null;
+      }
+      case CORE_RUNTIME_METHODS.sessionSkillState: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.getSessionSkillState?.(input) ?? null;
+      }
+      case CORE_RUNTIME_METHODS.sessionCapabilities: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.sessionCapabilities(input);
+      }
+      case CORE_RUNTIME_METHODS.inputPrepare: {
+        const input = parsePrepareParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.prepareInput(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionContextGet: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.sessionContext(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionContextSet: {
+        const input = parseContextUpdateParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.setSessionContext(input);
+      }
+      case CORE_RUNTIME_METHODS.expertList: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.listExperts(input);
+      }
+      case CORE_RUNTIME_METHODS.expertShow: {
+        const input = parseExpertParams(params);
+        if (input === undefined || input.expertId === "") throw invalidParams();
+        return await this.#host.inspectExpert(input);
+      }
+      case CORE_RUNTIME_METHODS.expertState: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.expertState(input);
+      }
+      case CORE_RUNTIME_METHODS.expertSet: {
+        const input = parseExpertParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.setExpert(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionFork: {
+        const input = parseForkParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.forkSession(input);
+      }
+      case CORE_RUNTIME_METHODS.agentList: {
+        const input = parseAgentParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.listAgents(input);
+      }
+      case CORE_RUNTIME_METHODS.agentDestroy: {
+        const input = parseAgentParams(params);
+        if (input === undefined || input.agentId === undefined) {
+          throw invalidParams();
+        }
+        await this.#host.destroyAgent({
+          sessionId: input.sessionId,
+          agentId: input.agentId,
+        });
+        return null;
+      }
+      case CORE_RUNTIME_METHODS.delegateSet: {
+        const input = parseDelegateParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.setDelegate(input);
+      }
+      case CORE_RUNTIME_METHODS.delegateGet: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.delegateState(input);
+      }
+      case CORE_RUNTIME_METHODS.capabilitySet: {
+        const input = parseCapabilitySetParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.setSessionCapability(input);
+      }
+      case CORE_RUNTIME_METHODS.esmState: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.esmState(input);
+      }
+      case CORE_RUNTIME_METHODS.esmUpdate: {
+        const input = parseEsmCommandParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.esmUpdate(input);
+      }
+      case CORE_RUNTIME_METHODS.esmContinue: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.esmContinue(input);
+      }
+      case CORE_RUNTIME_METHODS.esmStop: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        await this.#host.esmStop(input);
+        return null;
+      }
+      case CORE_RUNTIME_METHODS.transientPrompt: {
+        const input = parseTransientPromptParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.transientPrompt(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionCompact: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.compact(input);
+      }
+      case CORE_RUNTIME_METHODS.settingsGet: {
+        const input = parseSettingsReadParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.settingsDocument(input);
+      }
+      case CORE_RUNTIME_METHODS.settingsUpdate: {
+        const input = parseSettingsUpdateParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.updateSettingsDocument(input);
+      }
+      case CORE_RUNTIME_METHODS.modelCatalog: {
+        const input = parseWorkDirParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.providerCatalog(input);
+      }
+      case CORE_RUNTIME_METHODS.modelValidate: {
+        const input = parseProviderValidateParams(params);
+        if (input === undefined) throw invalidParams();
+        await this.#host.validateProviderModel(input);
+        return null;
+      }
+      case CORE_RUNTIME_METHODS.envList:
+        if (params !== undefined && runtimeParamsObject(params) === undefined) {
+          throw invalidParams();
+        }
+        return await this.#host.envDocument();
+      case CORE_RUNTIME_METHODS.envUpdate: {
+        const input = parseEnvUpdateParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.updateEnvDocument(input);
       }
       case CORE_RUNTIME_METHODS.runStatus: {
         const input = parseRunParams(params);

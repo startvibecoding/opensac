@@ -1,6 +1,9 @@
 // the CLI root interactive
 // action. Assembles the TUISession (shared runtime + controller + input state),
 // renders the TuiShell, and lets the shell's raw-stdin loop drive input.
+// The TUI is a client of the single shared `opensac core`: this wiring builds
+// the Core Client-backed TUIService exactly like `opensac acp` and never
+// constructs Runtime implementations itself.
 // React createElement is used because this module is plain TS (no .tsx).
 
 import React from "react";
@@ -9,7 +12,13 @@ import process from "node:process";
 import { atomicStdout } from "../tui/sync_output.ts";
 import { TuiShell } from "../tui/tui_shell.tsx";
 import { TUISession } from "../tui/tui_session.ts";
+import { createCoreClientTUIService } from "../tui/core_service.ts";
 import type { Settings } from "../config/mod.ts";
+import { configDir } from "../config/mod.ts";
+import { CoreClient } from "../core/client.ts";
+import { resolveCoreConfig } from "../core/config.ts";
+import { CORE_PROTOCOL_VERSION } from "../core/server.ts";
+import { current as appVersionCurrent } from "../version/version.ts";
 import { CURSOR_BLINK_INTERVAL_MS } from "../tui/components/editor/editor.ts";
 
 export interface TUIOptions {
@@ -70,9 +79,32 @@ export async function runInteractiveAction(
   settings: Settings,
 ): Promise<void> {
   const workDir = options.workDir !== "" ? options.workDir : Deno.cwd();
+  // The TUI is a thin client of the shared Core: discover or auto-start it
+  // exactly like `opensac acp` and project every run through its JSON-RPC
+  // protocol plus the canonical event stream.
+  const core = new CoreClient({
+    stateDir: configDir(),
+    version: appVersionCurrent(),
+    protocolVersion: CORE_PROTOCOL_VERSION,
+    config: resolveCoreConfig(settings),
+  });
+  const discovery = await core.ensureStarted();
+  if (discovery.status !== "ready") {
+    await core.close();
+    const hint = discovery.status === "incompatible"
+      ? '; run "opensac core stop" to replace it'
+      : "";
+    throw new Error(`Core is not ready: ${discovery.status}${hint}`);
+  }
+  const service = createCoreClientTUIService(core, { workDir });
   const session = new TUISession(
-    { ...options, workDir, version: "dev" },
-    settings,
+    {
+      ...options,
+      workDir,
+      version: "dev",
+      tuilang: settings.tuilang ?? "",
+    },
+    service,
   );
   await session.start();
 
@@ -100,6 +132,12 @@ export async function runInteractiveAction(
       }),
     );
   };
+  // Asynchronous service completions (commands, dialog persistence) repaint
+  // through this hook; while a run streams, the refresh timer below batches
+  // repaints instead.
+  session.setRenderScheduler(() => {
+    if (!session.busy) rerender();
+  });
 
   // Track terminal resize (Go tea.WindowSizeMsg → SetWidth + rerender):
   // SIGWINCH fires on every resize while a real terminal is attached.
@@ -162,6 +200,8 @@ export async function runInteractiveAction(
   clearInterval(blinkTimer);
   removeResizeListener();
   instance.unmount();
+  await session.close();
+  await core.close();
 
   if (session.reloadRequested) {
     await reloadProcess();

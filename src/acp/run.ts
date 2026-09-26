@@ -1,5 +1,11 @@
+import { join } from "@std/path";
 import { CoreClient } from "../core/client.ts";
 import { resolveCoreConfig } from "../core/config.ts";
+import {
+  type PrivateCoreHandle,
+  type PrivateCoreOptions,
+  startPrivateCore,
+} from "../core/private_core.ts";
 import { CORE_PROTOCOL_VERSION } from "../core/server.ts";
 import { configDir, loadSettings } from "../config/mod.ts";
 import { current as appVersionCurrent } from "../version/version.ts";
@@ -32,6 +38,12 @@ export interface RunOptions {
   artifact?: boolean;
   permissionTimeoutMs?: number;
   questionTimeoutMs?: number;
+  /**
+   * Run against an isolated private Core instead of the shared Core. The
+   * private Core owns its own state directory and is shut down when the
+   * bridge exits; the shared Core is never touched.
+   */
+  standalone?: boolean;
 }
 
 /** ACP transport resources that may be replaced by tests. */
@@ -56,6 +68,12 @@ export function stdioTransport(): RunTransport {
 
 export interface ACPCoreRunDependencies {
   createClient(): BridgeCoreClient | Promise<BridgeCoreClient>;
+  /**
+   * Optional exit hook owning resources beyond the bridge connection. It runs
+   * before `bridge.close()` so an owned private Core can be shut down while
+   * its client is still usable.
+   */
+  dispose?: () => void | Promise<void>;
 }
 
 async function createDefaultACPCoreClient(): Promise<BridgeCoreClient> {
@@ -69,9 +87,58 @@ async function createDefaultACPCoreClient(): Promise<BridgeCoreClient> {
   const discovery = await core.ensureStarted();
   if (discovery.status !== "ready") {
     await core.close();
-    throw new Error(`Core is not ready: ${discovery.status}`);
+    const hint = discovery.status === "incompatible"
+      ? '; run "opensac core stop" to replace it'
+      : "";
+    throw new Error(`Core is not ready: ${discovery.status}${hint}`);
   }
   return new ACPBridgeClient({ core });
+}
+
+/**
+ * Dependencies for `opensac acp --standalone`: one isolated private Core per
+ * bridge process, created on demand and closed with the bridge. The private
+ * Core never registers into the shared discovery, so it cannot be confused
+ * with (or replace) the user's shared Core. Test callers may override the
+ * private Core lifecycle inputs.
+ */
+export function standaloneACPCoreDependencies(
+  overrides: Partial<PrivateCoreOptions> = {},
+): ACPCoreRunDependencies {
+  let privateCore: PrivateCoreHandle | undefined;
+  return {
+    createClient: async () => {
+      privateCore = await startPrivateCore({
+        version: appVersionCurrent(),
+        protocolVersion: CORE_PROTOCOL_VERSION,
+        parentDir: join(configDir(), "standalone"),
+        ...overrides,
+      });
+      return new ACPBridgeClient({ core: privateCore.client });
+    },
+    dispose: async () => {
+      const handle = privateCore;
+      privateCore = undefined;
+      if (handle === undefined) return;
+      const outcome = await handle.close();
+      if (!outcome.exited) {
+        // stderr only: stdout is the ACP NDJSON wire.
+        Deno.stderr.writeSync(
+          new TextEncoder().encode(
+            "opensac acp: private Core did not exit in time; its state directory was kept\n",
+          ),
+        );
+      }
+    },
+  };
+}
+
+export function defaultACPCoreDependencies(
+  opts: RunOptions,
+): ACPCoreRunDependencies {
+  return opts.standalone === true
+    ? standaloneACPCoreDependencies()
+    : { createClient: createDefaultACPCoreClient };
 }
 
 function withACPCoreDefaults(
@@ -104,11 +171,10 @@ function withACPCoreDefaults(
 export async function runACPCore(
   opts: RunOptions = {},
   transport: RunTransport = stdioTransport(),
-  dependencies: ACPCoreRunDependencies = {
-    createClient: createDefaultACPCoreClient,
-  },
+  dependencies?: ACPCoreRunDependencies,
 ): Promise<void> {
-  const client = await dependencies.createClient();
+  const deps = dependencies ?? defaultACPCoreDependencies(opts);
+  const client = await deps.createClient();
   const bridge = new ACPBridge({
     client,
     context: { source: "acp", workDir: Deno.cwd() },
@@ -117,7 +183,11 @@ export async function runACPCore(
   try {
     await dispatchCoreLoop(bridge, transport, opts);
   } finally {
-    await bridge.close();
+    try {
+      await deps.dispose?.();
+    } finally {
+      await bridge.close();
+    }
   }
 }
 

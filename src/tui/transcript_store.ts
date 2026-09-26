@@ -12,7 +12,7 @@ import type { TaskPlan } from "../tools/tool.ts";
 import {
   TOOL_EXECUTION_INTERRUPTED,
   type ToolExecutionState,
-} from "../agent/events.ts";
+} from "../agentruntime/events.ts";
 
 export type ToolResultStatus = "running" | "completed" | "interrupted";
 

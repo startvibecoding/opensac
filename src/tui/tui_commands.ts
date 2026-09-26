@@ -16,14 +16,7 @@ import {
   setGlobalAutoEdit,
   setProjectAutoEdit,
 } from "../config/allow.ts";
-import {
-  clearEnv,
-  envList,
-  loadEnv,
-  saveEnv,
-  setEnv,
-  unsetEnv,
-} from "../config/env.ts";
+import { saveEnv } from "../config/env.ts";
 import {
   defaultMCPConfig,
   fullMCPConfigTemplate,
@@ -36,26 +29,18 @@ import {
 import {
   getGlobalSkillsDir,
   isProjectDir,
-  saveGlobalSettingsPatch,
-  saveProjectSettingsPatch,
   type Settings,
 } from "../config/settings.ts";
 import { ensureRuleFile, ruleFilePath } from "../contextfiles/contextfiles.ts";
-import { registerDelegateSubAgentTool } from "../agent/subagent.ts";
-import type { AgentManager } from "../agent/manager.ts";
+import type {
+  TUIAgentView,
+  TUIEsmObjectiveView,
+  TUIExpertBundleView,
+  TUISessionListEntry,
+  TUISessionView,
+} from "./service.ts";
+import type { CoreRuntimeEvent } from "../core/runtime.ts";
 import { CONFIG_OPTION_BROWSER } from "../agentruntime/session_options.ts";
-import { ExpertSwitchRequiresForkError } from "../agentruntime/expert.ts";
-import { fork, forkWithExpert } from "../agentruntime/fork.ts";
-import {
-  createSession,
-  deleteSession as deleteSessionRuntime,
-  openSession,
-} from "../agentruntime/session_lifecycle.ts";
-import { listForDirDetailed, type SessionDetail } from "../session/manager.ts";
-import type { Manager as SessionManager } from "../session/manager.ts";
-import { createRunContext } from "../agent/run_context.ts";
-import type { Agent } from "../agent/agent.ts";
-import type { Event } from "../agent/events.ts";
 import { Service as SkillHubService } from "../skillhub/service.ts";
 import { projectSkillDirs } from "../skills/skills.ts";
 import { createLocalIndex } from "../skillhub/local.ts";
@@ -63,14 +48,6 @@ import type { Market } from "../skillhub/types.ts";
 import { clientsForSettings } from "../skillhub/factory.ts";
 import { defaultStore as workflowStore } from "../workflow/tools.ts";
 import { defaultActiveRegistry } from "../workflow/active.ts";
-import {
-  EsmInvalidObjectiveError,
-  EsmInvalidTransitionError,
-  EsmObjectiveExistsError,
-  EsmObjectiveNotFoundError,
-  ESMStore,
-  type Objective,
-} from "../esm/mod.ts";
 import { DB as StatsDB } from "../stats/stats.ts";
 import { Server as StatsServer } from "../stats/server.ts";
 import { formatDuration } from "./formatters.ts";
@@ -83,27 +60,32 @@ const DEFAULT_STATS_ADDR = "127.0.0.1:7878";
 
 interface TUIHost {
   workDir: string;
-  settings: Settings;
   translator: TUISession["translator"];
-  runtime: TUISession["runtime"];
-  manager: SessionManager;
+  service: TUISession["service"];
   controller: TUISession["controller"];
   currentSessionID(): string;
-  bindManager(manager: SessionManager): Promise<void>;
+  /** Adopts one Core-owned session view as the live session (switch/fork). */
+  adoptSession(view: TUISessionView): void;
+  /** Creates one fresh Core-owned session and adopts its view. */
+  createFreshSession(): Promise<TUISessionView>;
   setMode(mode: string): void;
-  ensureAgentManager(): import("../agent/manager.ts").AgentManager;
-  startESMContinuationIfIdle(): void;
-  abortESMWorker(): void;
+  /** Starts (or reports) the Core-owned ESM continuation worker. */
+  startESMContinuationIfIdle(): Promise<void>;
+  /** Stops the Core-owned ESM continuation worker, if any. */
+  abortESMWorker(): Promise<void>;
+  /**
+   * Consumes one service run's canonical events into the controller and
+   * resolves with the terminal event (if any).
+   */
+  consumeRunEvents(
+    sessionId: string,
+    runId: string,
+  ): Promise<CoreRuntimeEvent | undefined>;
 }
 
 export class TuiCommands {
   #host: TUIHost;
-  #activeSkills = new Set<string>();
-  /** The accumulated extra-context bytes appended by activateSkill. */
-  #appendedSkillContext = "";
-  #delegateMode = false;
   #activeAgent = "main";
-  #agent: Agent | undefined;
   #reloadRequested = false;
   #statsServer: StatsServer | undefined;
   #statsServerURL = "";
@@ -112,26 +94,21 @@ export class TuiCommands {
     this.#host = host;
   }
 
-  /** Retains the built agent so /compact can drive a forced compaction. */
-  setAgent(agent: Agent): void {
-    this.#agent = agent;
-  }
-
   #tr() {
     return this.#host.translator;
   }
 
   // --- Skills ---------------------------------------------------------------
 
-  listSkills(): string {
+  async listSkills(): Promise<string> {
     const tr = this.#tr();
-    const mgr = this.#host.runtime.skillsMgr;
-    if (mgr === undefined) return tr.text("skills.unavailable");
-    const skills = mgr.list();
+    const skills = await this.#host.service.listSkills({
+      sessionId: this.#host.currentSessionID(),
+    });
     if (skills.length === 0) return tr.text("skills.empty");
     const lines = [tr.text("skill.available_title")];
     for (const skill of skills) {
-      const marker = this.#activeSkills.has(skill.name) ? "*" : " ";
+      const marker = skill.active ? "*" : " ";
       lines.push(
         `  [${marker}] ${skill.name} (${skill.source}): ${skill.description}`,
       );
@@ -140,37 +117,50 @@ export class TuiCommands {
     return lines.join("\n");
   }
 
-  activateSkill(name: string): string {
+  async activateSkill(name: string): Promise<string> {
     const tr = this.#tr();
-    const mgr = this.#host.runtime.skillsMgr;
-    if (mgr === undefined) return tr.text("skills.unavailable");
-    const skill = mgr.get(name);
+    const sessionId = this.#host.currentSessionID();
+    const skills = await this.#host.service.listSkills({ sessionId });
+    const skill = skills.find((entry) => entry.name === name);
     if (skill === undefined) return tr.text("skill.not_found", name);
-    if (this.#activeSkills.has(name)) {
-      return tr.text("skill.already_active", name);
-    }
-    const ctx = mgr.buildSkillContext(name);
-    this.#host.runtime.extraContext = this.#host.runtime.extraContext + ctx;
-    this.#appendedSkillContext += ctx;
-    this.#activeSkills.add(name);
+    if (skill.active) return tr.text("skill.already_active", name);
+    // Skill activation is Runtime-owned: the Core refreshes the session
+    // resources instead of appending skill context to adapter-local state.
+    await this.#host.service.setSkillActive({
+      sessionId,
+      name,
+      active: true,
+    });
     return tr.text("skill.activated", name, skill.source, skill.description);
   }
 
   /**
-   * Clears skill activations and restores the pre-skill extra context (Go
-   * /clear rebuilds activeSkills + extraContext).
+   * Clears skill activations (Go /clear rebuilds activeSkills). Deactivation
+   * is service-owned and runs in the background while the UI resets now.
    */
   clearActiveSkills(): void {
-    if (this.#appendedSkillContext !== "") {
-      const current = this.#host.runtime.extraContext ?? "";
-      this.#host.runtime.extraContext = current.endsWith(
-          this.#appendedSkillContext,
+    const sessionId = this.#host.currentSessionID();
+    void this.#host.service
+      .listSkills({ sessionId })
+      .then((skills) =>
+        Promise.all(
+          skills
+            .filter((skill) => skill.active)
+            .map((skill) =>
+              this.#host.service.setSkillActive({
+                sessionId,
+                name: skill.name,
+                active: false,
+              })
+            ),
         )
-        ? current.slice(0, -this.#appendedSkillContext.length)
-        : current;
-    }
-    this.#appendedSkillContext = "";
-    this.#activeSkills.clear();
+      )
+      .catch((error) => {
+        this.#host.controller.addMessage(
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+          "error",
+        );
+      });
   }
 
   // --- MCP ------------------------------------------------------------------
@@ -239,11 +229,13 @@ export class TuiCommands {
 
   // --- Experts --------------------------------------------------------------
 
-  listExperts(): string {
+  async listExperts(): Promise<string> {
     const tr = this.#tr();
-    const experts = this.#host.runtime.listExperts();
+    const sessionId = this.#host.currentSessionID();
+    const experts = await this.#host.service.listExperts({ sessionId });
     if (experts.length === 0) return tr.text("expert.empty");
-    const boundID = this.#host.runtime.expertState().binding?.id ?? "";
+    const boundID = (await this.#host.service.expertState({ sessionId }))
+      .expertId;
     const lines = ["Experts:", ""];
     for (const e of experts) {
       const marker = e.name === boundID ? "*" : " ";
@@ -261,9 +253,12 @@ export class TuiCommands {
   }
 
   /** Shows one expert bundle's full details (Go formatExpertBundle). */
-  showExpert(id: string): string {
+  async showExpert(id: string): Promise<string> {
     try {
-      const bundle = this.#host.runtime.inspectExpert(id);
+      const bundle = await this.#host.service.showExpert({
+        sessionId: this.#host.currentSessionID(),
+        expertId: id,
+      });
       return this.#formatExpertBundle(bundle);
     } catch (err) {
       return this.#tr().text(
@@ -273,48 +268,34 @@ export class TuiCommands {
     }
   }
 
-  #formatExpertBundle(bundle: {
-    name: string;
-    manifest: {
-      expertType: string;
-      displayName: { zh: string; en: string };
-      members?: Array<{
-        id: string;
-        name?: { zh: string; en: string };
-        profession?: { zh: string; en: string };
-        role?: string;
-      }>;
-    };
-    invalid: boolean;
-    invalidReason: string;
-  }): string {
+  #formatExpertBundle(bundle: TUIExpertBundleView): string {
     const tr = this.#tr();
     const lines = [`Expert: ${bundle.name}`];
     const displayName = tr.language === "zh"
-      ? bundle.manifest.displayName.zh
-      : bundle.manifest.displayName.en;
+      ? bundle.displayName.zh
+      : bundle.displayName.en;
     lines.push(`Name: ${displayName}`);
-    lines.push(`Type: ${bundle.manifest.expertType}`);
+    lines.push(`Type: ${bundle.expertType}`);
     if (bundle.invalid) {
       lines.push(`Status: invalid — ${bundle.invalidReason}`);
       return lines.join("\n");
     }
     lines.push("Status: available");
-    if (bundle.manifest.expertType === "team") {
+    if (bundle.expertType === "team") {
       lines.push("Members:");
-      for (const member of bundle.manifest.members ?? []) {
+      for (const member of bundle.members) {
         let line = `  - ${member.id}`;
-        const name = tr.language === "zh" ? member.name?.zh : member.name?.en;
-        if (name !== undefined && name !== "" && name !== member.id) {
+        const name = tr.language === "zh" ? member.name.zh : member.name.en;
+        if (name !== "" && name !== member.id) {
           line += ` (${name})`;
         }
         const profession = tr.language === "zh"
-          ? member.profession?.zh
-          : member.profession?.en;
-        if (profession !== undefined && profession !== "") {
+          ? member.profession.zh
+          : member.profession.en;
+        if (profession !== "") {
           line += `: ${profession}`;
         }
-        if (member.role !== undefined && member.role !== "") {
+        if (member.role !== "") {
           line += ` [${member.role}]`;
         }
         lines.push(line);
@@ -326,11 +307,13 @@ export class TuiCommands {
   async bindExpert(id: string): Promise<CommandResult> {
     const tr = this.#tr();
     try {
-      await this.#host.runtime.setExpert(id);
+      await this.#host.service.setExpert({
+        sessionId: this.#host.currentSessionID(),
+        expertId: id,
+      });
     } catch (err) {
-      if (err instanceof ExpertSwitchRequiresForkError) {
-        return { message: err.message, error: true };
-      }
+      // Includes the Core's expert-switch-requires-fork failure: the raw cause
+      // keeps its message through the service projection.
       return { message: (err as Error).message, error: true };
     }
     return {
@@ -347,24 +330,18 @@ export class TuiCommands {
       return { message: tr.text("sessions.no_match", id), error: true };
     }
     try {
-      const result = forkWithExpert(
-        this.#host.manager.getSessionDir(),
-        {
-          sourceSessionId: sessionID,
-          requestId: `tui-fork-${crypto.randomUUID()}`,
-          titleMode: "",
-        },
-        id,
-      );
-      const child = openSession(
-        this.#host.manager.getSessionDir(),
-        result.sessionId,
-      );
-      await this.#host.bindManager(child);
+      // The Core-owned fork preserves the source identity and history while
+      // applying the expert binding only to the child branch.
+      const child = await this.#host.service.forkSession({
+        sessionId: sessionID,
+        expertId: id,
+        titleMode: "",
+      });
+      this.#host.adoptSession(child);
       this.#host.controller.store.resetTranscriptState();
       this.#host.controller.resetContextUsage();
       return {
-        message: tr.text("expert.switched", result.sessionId, id),
+        message: tr.text("expert.switched", child.sessionId, id),
       };
     } catch (err) {
       return { message: (err as Error).message, error: true };
@@ -373,12 +350,11 @@ export class TuiCommands {
 
   // --- Sessions -------------------------------------------------------------
 
-  listSessions(): string {
+  async listSessions(): Promise<string> {
     const tr = this.#tr();
-    const details = listForDirDetailed(
-      this.#host.workDir,
-      this.#host.manager.getSessionDir(),
-    );
+    const details = await this.#host.service.listPersistedSessions({
+      workDir: this.#host.workDir,
+    });
     return renderSessionList(
       details,
       this.#host.currentSessionID(),
@@ -395,26 +371,22 @@ export class TuiCommands {
       return { message: tr.text("sessions.no_match", ""), error: true };
     }
     try {
-      const result = fork(this.#host.manager.getSessionDir(), {
-        sourceSessionId: sessionID,
-        requestId: `tui-fork-${crypto.randomUUID()}`,
+      // The Core-owned fork preserves the source identity and history and
+      // creates the child branch as a Core-owned session.
+      const child = await this.#host.service.forkSession({
+        sessionId: sessionID,
         titleMode: "",
       });
-      const child = openSession(
-        this.#host.manager.getSessionDir(),
-        result.sessionId,
-      );
-      await this.#host.bindManager(child);
+      this.#host.adoptSession(child);
       this.#host.controller.store.resetTranscriptState();
       this.#host.controller.resetContextUsage();
-      const detail = listForDirDetailed(
-        this.#host.workDir,
-        this.#host.manager.getSessionDir(),
-      ).find((d) => d.id === result.sessionId);
+      const detail = (await this.#host.service.listPersistedSessions({
+        workDir: this.#host.workDir,
+      })).find((entry) => entry.sessionId === child.sessionId);
       return {
         message: tr.text(
           "sessions.switched",
-          result.sessionId,
+          child.sessionId,
           detail?.messageCount ?? 0,
         ),
       };
@@ -423,14 +395,15 @@ export class TuiCommands {
     }
   }
 
-  #resolveSession(query: string): SessionDetail | undefined {
-    const details = listForDirDetailed(
-      this.#host.workDir,
-      this.#host.manager.getSessionDir(),
-    );
-    const exact = details.find((d) => d.id === query);
+  async #resolveSession(
+    query: string,
+  ): Promise<TUISessionListEntry | undefined> {
+    const details = await this.#host.service.listPersistedSessions({
+      workDir: this.#host.workDir,
+    });
+    const exact = details.find((d) => d.sessionId === query);
     if (exact !== undefined) return exact;
-    const matches = details.filter((d) => d.id.startsWith(query));
+    const matches = details.filter((d) => d.sessionId.startsWith(query));
     if (matches.length === 1) return matches[0];
     return undefined;
   }
@@ -440,25 +413,26 @@ export class TuiCommands {
     if (this.#host.currentSessionID() === id) {
       return { message: tr.text("sessions.already_current") };
     }
-    const detail = this.#resolveSession(id);
+    const detail = await this.#resolveSession(id);
     if (detail === undefined) {
       return { message: tr.text("sessions.no_match", id), error: true };
     }
     try {
-      const manager = openSession(
-        this.#host.manager.getSessionDir(),
-        detail.id,
-      );
-      await this.#host.bindManager(manager);
+      const view = await this.#host.service.openSession({
+        sessionId: detail.sessionId,
+      });
+      this.#host.adoptSession(view);
       // A persisted session mode wins; an empty one falls back to the yolo
       // product default (the Runtime re-resolves source-forced modes).
-      this.#host.setMode(
-        this.#host.manager.getLatestModeChange()?.mode || "yolo",
-      );
+      this.#host.setMode(view.mode !== "" ? view.mode : "yolo");
       this.#host.controller.store.resetTranscriptState();
       this.#host.controller.resetContextUsage();
       return {
-        message: tr.text("sessions.switched", detail.id, detail.messageCount),
+        message: tr.text(
+          "sessions.switched",
+          detail.sessionId,
+          detail.messageCount,
+        ),
       };
     } catch (err) {
       return { message: (err as Error).message, error: true };
@@ -468,8 +442,7 @@ export class TuiCommands {
   async clearSession(): Promise<CommandResult> {
     const tr = this.#tr();
     try {
-      const manager = createSession({ workDir: this.#host.workDir });
-      await this.#host.bindManager(manager);
+      await this.#host.createFreshSession();
       this.#host.controller.store.resetTranscriptState();
       this.#host.controller.resetContextUsage();
       return { message: tr.text("sessions.clear_hint") };
@@ -486,13 +459,13 @@ export class TuiCommands {
         error: true,
       };
     }
-    const detail = this.#resolveSession(id);
+    const detail = await this.#resolveSession(id);
     if (detail === undefined) {
       return { message: tr.text("sessions.no_match", id), error: true };
     }
     try {
-      await deleteSessionRuntime(this.#host.manager.getSessionDir(), detail.id);
-      return { message: tr.text("sessions.deleted", detail.id) };
+      await this.#host.service.deleteSession({ sessionId: detail.sessionId });
+      return { message: tr.text("sessions.deleted", detail.sessionId) };
     } catch (err) {
       return {
         message: tr.text("sessions.delete_failed", (err as Error).message),
@@ -582,11 +555,10 @@ export class TuiCommands {
   // --- ESM ------------------------------------------------------------------
 
   async handleESM(cmd: string): Promise<CommandResult> {
-    await Promise.resolve();
     const tr = this.#tr();
     const sessionID = this.#host.currentSessionID();
     if (sessionID === "") return { message: tr.text("esm.panel.no_objective") };
-    const store = new ESMStore(this.#host.manager.getSessionDir());
+    const service = this.#host.service;
     const raw = cmd.trim().replace(/^\/esm/, "").trim();
     const [sub, ...restArr] = raw === "" ? ["status"] : raw.split(/\s+/);
     const rest = restArr.join(" ");
@@ -606,83 +578,112 @@ export class TuiCommands {
     try {
       switch (sub) {
         case "status":
-          return { message: this.#formatESM(store.get(sessionID)) };
-        case "edit":
+          return {
+            message: this.#formatESM(
+              (await service.esmState({ sessionId: sessionID })).objective,
+            ),
+          };
+        case "edit": {
           if (rest === "") {
             return {
               message: tr.text("commands.usage", "/esm edit <objective>"),
               error: true,
             };
           }
-          store.edit(sessionID, rest);
-          return { message: this.#formatESM(store.get(sessionID)) };
-        case "pause":
+          const view = await service.esmCommand({
+            sessionId: sessionID,
+            action: "edit",
+            objective: rest,
+          });
+          return { message: this.#formatESM(view.objective) };
+        }
+        case "pause": {
           if (rest !== "") {
             return {
               message: tr.text("commands.usage", "/esm pause"),
               error: true,
             };
           }
-          store.pause(sessionID);
-          return { message: this.#formatESM(store.get(sessionID)) };
-        case "resume":
+          const view = await service.esmCommand({
+            sessionId: sessionID,
+            action: "pause",
+          });
+          return { message: this.#formatESM(view.objective) };
+        }
+        case "resume": {
           if (rest !== "") {
             return {
               message: tr.text("commands.usage", "/esm resume"),
               error: true,
             };
           }
-          store.resume(sessionID);
-          this.#host.startESMContinuationIfIdle();
-          return { message: this.#formatESM(store.get(sessionID)) };
-        case "guide":
+          const view = await service.esmCommand({
+            sessionId: sessionID,
+            action: "resume",
+          });
+          await this.#host.startESMContinuationIfIdle();
+          return { message: this.#formatESM(view.objective) };
+        }
+        case "guide": {
           if (rest === "") {
             return {
               message: tr.text("commands.usage", "/esm guide <text>"),
               error: true,
             };
           }
-          store.addGuidance(sessionID, rest);
-          this.#host.startESMContinuationIfIdle();
+          await service.esmCommand({
+            sessionId: sessionID,
+            action: "guide",
+            guide: rest,
+          });
+          await this.#host.startESMContinuationIfIdle();
           return { message: "Guidance queued for the next ESM role run." };
-        case "clear":
+        }
+        case "clear": {
           if (rest !== "") {
             return {
               message: tr.text("commands.usage", "/esm clear"),
               error: true,
             };
           }
-          store.clear(sessionID);
-          this.#host.abortESMWorker();
+          await service.esmCommand({ sessionId: sessionID, action: "clear" });
+          await this.#host.abortESMWorker();
           return { message: "Enable Supervisor Mode cleared." };
-        default:
-          store.create(sessionID, raw);
-          this.#host.startESMContinuationIfIdle();
-          return { message: this.#formatESM(store.get(sessionID)) };
+        }
+        default: {
+          const view = await service.esmCommand({
+            sessionId: sessionID,
+            action: "create",
+            objective: raw,
+          });
+          await this.#host.startESMContinuationIfIdle();
+          return { message: this.#formatESM(view.objective) };
+        }
       }
     } catch (err) {
       return { message: this.#formatESMError(err), error: true };
     }
   }
 
-  /** Maps ESM store errors to the Go command messages. */
+  /** Maps ESM service errors to the Go command messages. */
   #formatESMError(err: unknown): string {
-    if (err instanceof EsmObjectiveNotFoundError) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("esm objective not found")) {
       return "No ESM objective. Create one with /esm <objective>.";
     }
-    if (err instanceof EsmObjectiveExistsError) {
+    if (message.includes("esm objective already exists")) {
       return "An unfinished ESM objective already exists. Use /esm edit <objective> or /esm clear.";
     }
-    if (err instanceof EsmInvalidObjectiveError) {
+    if (message.includes("esm objective cannot be empty")) {
       return "ESM objective cannot be empty.";
     }
-    if (err instanceof EsmInvalidTransitionError) {
+    if (message.includes("invalid esm status transition")) {
       return "ESM status cannot be changed that way.";
     }
-    return (err as Error).message;
+    return message;
   }
 
-  #formatESM(obj: Objective | null): string {
+  #formatESM(obj: TUIEsmObjectiveView | null): string {
     const tr = this.#tr();
     if (obj === null || obj.esmId === "") {
       return [
@@ -717,9 +718,9 @@ export class TuiCommands {
 
   // --- Environment ----------------------------------------------------------
 
-  listEnv(): string {
+  async listEnv(): Promise<string> {
     const tr = this.#tr();
-    const vars = envList(loadEnv());
+    const vars = await this.#host.service.listEnv();
     const keys = Object.keys(vars).sort();
     if (keys.length === 0) return tr.text("env.empty");
     const lines = [tr.text("env.title", keys.length)];
@@ -727,11 +728,12 @@ export class TuiCommands {
     return lines.join("\n");
   }
 
-  setEnv(key: string, value: string): CommandResult {
+  async setEnv(key: string, value: string): Promise<CommandResult> {
     const tr = this.#tr();
     try {
-      const cfg = loadEnv();
-      setEnv(cfg, key, value);
+      const vars = await this.#host.service.listEnv();
+      vars[key] = value;
+      await this.#host.service.updateEnv({ vars });
       return { message: tr.text("env.set", key) };
     } catch (err) {
       return {
@@ -741,11 +743,12 @@ export class TuiCommands {
     }
   }
 
-  unsetEnv(key: string): CommandResult {
+  async unsetEnv(key: string): Promise<CommandResult> {
     const tr = this.#tr();
     try {
-      const cfg = loadEnv();
-      unsetEnv(cfg, key);
+      const vars = await this.#host.service.listEnv();
+      delete vars[key];
+      await this.#host.service.updateEnv({ vars });
       return { message: tr.text("env.unset", key) };
     } catch (err) {
       return {
@@ -755,10 +758,10 @@ export class TuiCommands {
     }
   }
 
-  clearEnv(): CommandResult {
+  async clearEnv(): Promise<CommandResult> {
     const tr = this.#tr();
     try {
-      clearEnv(loadEnv());
+      await this.#host.service.updateEnv({ vars: {} });
       return { message: tr.text("env.cleared") };
     } catch (err) {
       return {
@@ -896,11 +899,13 @@ export class TuiCommands {
 
   // --- Modes ----------------------------------------------------------------
 
-  delegateMode(arg: string): CommandResult {
+  async delegateMode(arg: string): Promise<CommandResult> {
     const tr = this.#tr();
+    const sessionId = this.#host.currentSessionID();
     if (arg === "status") {
+      const state = await this.#host.service.delegateState({ sessionId });
       return {
-        message: tr.text("delegate.status", this.#delegateMode ? "ON" : "OFF"),
+        message: tr.text("delegate.status", state.enabled ? "ON" : "OFF"),
       };
     }
     if (this.#host.controller.isThinking) {
@@ -908,11 +913,14 @@ export class TuiCommands {
     }
     switch (arg) {
       case "on":
-        return this.#enableDelegate();
-      case "off":
-        this.#host.runtime.registry?.remove("delegate_subagent");
-        this.#delegateMode = false;
+        return await this.#enableDelegate();
+      case "off": {
+        await this.#host.service.setDelegate({
+          sessionId,
+          enabled: false,
+        });
         return { message: tr.text("delegate.changed", "OFF") };
+      }
       default:
         return {
           message: tr.text("commands.usage", "/delegate [on|off|status]"),
@@ -921,31 +929,31 @@ export class TuiCommands {
     }
   }
 
-  /** Registers the blocking delegate tool on the shared AgentManager. */
-  #enableDelegate(): CommandResult {
+  /** Enables the blocking delegate tool on the Core-owned shared manager. */
+  async #enableDelegate(): Promise<CommandResult> {
     const tr = this.#tr();
-    const runtime = this.#host.runtime;
-    if (runtime.registry === null) {
-      return { message: tr.text("agent.manager_unavailable"), error: true };
-    }
+    const sessionId = this.#host.currentSessionID();
     try {
-      registerDelegateSubAgentTool(
-        runtime.registry,
-        this.#host.ensureAgentManager(),
-      );
+      await this.#host.service.setDelegate({
+        sessionId,
+        enabled: true,
+      });
     } catch (err) {
       return { message: (err as Error).message, error: true };
     }
-    this.#delegateMode = true;
     return { message: tr.text("delegate.changed", "ON") };
   }
 
-  browserMode(arg: string): CommandResult {
+  async browserMode(arg: string): Promise<CommandResult> {
     const tr = this.#tr();
+    const sessionId = this.#host.currentSessionID();
     if (arg === "status") {
-      const caps = this.#host.runtime.capabilitySnapshot();
+      const caps = await this.#host.service.capabilities({ sessionId });
       return {
-        message: tr.text("browser.status", caps.browserEnabled ? "ON" : "OFF"),
+        message: tr.text(
+          "browser.status",
+          caps.browser?.enabled === true ? "ON" : "OFF",
+        ),
       };
     }
     if (this.#host.controller.isThinking) {
@@ -958,29 +966,33 @@ export class TuiCommands {
       };
     }
     try {
-      this.#host.runtime.setCapabilityOption(
-        CONFIG_OPTION_BROWSER,
-        arg === "on",
-      );
+      await this.#host.service.setCapability({
+        sessionId,
+        id: CONFIG_OPTION_BROWSER,
+        enabled: arg === "on",
+      });
     } catch (err) {
       return { message: (err as Error).message, error: true };
     }
     return { message: tr.text("browser.status", arg === "on" ? "ON" : "OFF") };
   }
 
-  statusLine(parts: string[]): CommandResult {
+  async statusLine(parts: string[]): Promise<CommandResult> {
     const tr = this.#tr();
     const sub = (parts[1] ?? "status").toLowerCase();
     switch (sub) {
       case "status":
-        return this.#statusLineStatus();
+        return await this.#statusLineStatus();
       case "on":
       case "off":
-        return this.#statusLineToggle(sub === "on", parts[2] ?? "project");
+        return await this.#statusLineToggle(
+          sub === "on",
+          parts[2] ?? "project",
+        );
       case "command":
-        return this.#statusLineCommand(parts);
+        return await this.#statusLineCommand(parts);
       case "refresh":
-        return this.#statusLineRefresh(parts);
+        return await this.#statusLineRefresh(parts);
       default:
         return {
           message: tr.text(
@@ -993,8 +1005,9 @@ export class TuiCommands {
   }
 
   /** Renders the status-line configuration (Go showStatusLineStatus). */
-  #statusLineStatus(): CommandResult {
-    const cfg = this.#host.settings.statusLine ?? {};
+  async #statusLineStatus(): Promise<CommandResult> {
+    const settings = await this.#host.service.getSettings();
+    const cfg = settings.statusLine ?? {};
     if (cfg.enabled !== true) {
       return { message: "Status line: OFF\nFooter: builtin" };
     }
@@ -1011,7 +1024,10 @@ export class TuiCommands {
   }
 
   /** Toggles the status line on/off in a project/global scope. */
-  #statusLineToggle(enabled: boolean, scopeRaw: string): CommandResult {
+  async #statusLineToggle(
+    enabled: boolean,
+    scopeRaw: string,
+  ): Promise<CommandResult> {
     const tr = this.#tr();
     const scope = scopeRaw.toLowerCase();
     if (scope !== "project" && scope !== "global") {
@@ -1023,7 +1039,7 @@ export class TuiCommands {
         error: true,
       };
     }
-    const current = this.#host.settings.statusLine ?? {};
+    const current = (await this.#host.service.getSettings()).statusLine ?? {};
     const next = {
       ...current,
       enabled,
@@ -1037,9 +1053,10 @@ export class TuiCommands {
         : {}),
     };
     try {
-      if (scope === "global") saveGlobalSettingsPatch({ statusLine: next });
-      else saveProjectSettingsPatch({ statusLine: next });
-      this.#host.settings.statusLine = next;
+      await this.#host.service.updateSettings({
+        scope: scope as "global" | "project",
+        updates: { statusLine: next },
+      });
     } catch (err) {
       return {
         message: tr.text("statusline.failed", (err as Error).message),
@@ -1054,7 +1071,7 @@ export class TuiCommands {
   }
 
   /** Sets the status-line command (Go setStatusLineCommand). */
-  #statusLineCommand(parts: string[]): CommandResult {
+  async #statusLineCommand(parts: string[]): Promise<CommandResult> {
     const tr = this.#tr();
     if (parts.length < 3) {
       return {
@@ -1082,7 +1099,7 @@ export class TuiCommands {
         error: true,
       };
     }
-    const current = this.#host.settings.statusLine ?? {};
+    const current = (await this.#host.service.getSettings()).statusLine ?? {};
     const next = {
       ...current,
       type: "command",
@@ -1091,9 +1108,10 @@ export class TuiCommands {
       fallback: current.fallback ?? "builtin",
     };
     try {
-      if (scope === "global") saveGlobalSettingsPatch({ statusLine: next });
-      else saveProjectSettingsPatch({ statusLine: next });
-      this.#host.settings.statusLine = next;
+      await this.#host.service.updateSettings({
+        scope: scope as "global" | "project",
+        updates: { statusLine: next },
+      });
     } catch (err) {
       return {
         message: tr.text("statusline.failed", (err as Error).message),
@@ -1106,7 +1124,7 @@ export class TuiCommands {
   }
 
   /** Sets the status-line refresh interval in seconds (Go setStatusLineRefresh). */
-  #statusLineRefresh(parts: string[]): CommandResult {
+  async #statusLineRefresh(parts: string[]): Promise<CommandResult> {
     const tr = this.#tr();
     if (parts.length < 3) {
       return {
@@ -1132,12 +1150,13 @@ export class TuiCommands {
         error: true,
       };
     }
-    const current = this.#host.settings.statusLine ?? {};
+    const current = (await this.#host.service.getSettings()).statusLine ?? {};
     const next = { ...current, refreshInterval: refresh };
     try {
-      if (scope === "global") saveGlobalSettingsPatch({ statusLine: next });
-      else saveProjectSettingsPatch({ statusLine: next });
-      this.#host.settings.statusLine = next;
+      await this.#host.service.updateSettings({
+        scope: scope as "global" | "project",
+        updates: { statusLine: next },
+      });
     } catch (err) {
       return {
         message: tr.text("statusline.failed", (err as Error).message),
@@ -1153,7 +1172,7 @@ export class TuiCommands {
 
   // --- Rule -----------------------------------------------------------------
 
-  handleRule(parts: string[]): CommandResult {
+  async handleRule(parts: string[]): Promise<CommandResult> {
     const tr = this.#tr();
     if (this.#host.controller.isThinking) {
       return { message: tr.text("rule.running"), error: true };
@@ -1171,7 +1190,12 @@ export class TuiCommands {
         this.#host.workDir,
         overwrite,
       );
-      this.#host.runtime.ruleContent = content;
+      // The rule text is Core-owned session context: update it through the
+      // service so Core-run prompts see it immediately.
+      await this.#host.service.setSessionContext({
+        sessionId: this.#host.currentSessionID(),
+        ruleContent: content,
+      });
       if (written) {
         return {
           message: [
@@ -1197,13 +1221,12 @@ export class TuiCommands {
 
   // --- SkillHub -------------------------------------------------------------
 
-  #skillHub(): SkillHubService {
-    const globalDir = this.#host.settings.skills === undefined ? "" : "";
+  #skillHub(settings: Settings): SkillHubService {
     return new SkillHubService(
-      globalDir,
+      "",
       projectSkillDirs(this.#host.workDir),
-      this.#host.settings.skillHub?.officialHandles ?? [],
-      ...clientsForSettings(this.#host.settings.skillHub ?? {}),
+      settings.skillHub?.officialHandles ?? [],
+      ...clientsForSettings(settings.skillHub ?? {}),
     );
   }
 
@@ -1229,7 +1252,8 @@ export class TuiCommands {
 
   async handleSkillHub(parts: string[]): Promise<CommandResult> {
     const tr = this.#tr();
-    const service = this.#skillHub();
+    const settings = await this.#host.service.getSettings();
+    const service = this.#skillHub(settings);
     const sub = parts[1] ?? "list";
     try {
       switch (sub) {
@@ -1290,7 +1314,7 @@ export class TuiCommands {
             market: market as Market,
             id,
             scope: this.#skillHubScope(),
-            targetDir: this.#skillHubTargetDir(),
+            targetDir: this.#skillHubTargetDir(settings),
             overwrite: parts.includes("--force"),
           });
           return { message: `Installed ${result.name}` };
@@ -1345,13 +1369,13 @@ export class TuiCommands {
               market: market as Market,
               id,
               scope,
-              targetDir: this.#skillHubTargetDir(),
+              targetDir: this.#skillHubTargetDir(settings),
             });
           }
           const results = await service.installSkillSet(undefined, requests);
           if (activate) {
             for (const result of results) {
-              this.activateSkill(result.name);
+              await this.activateSkill(result.name);
             }
           }
           return {
@@ -1362,7 +1386,7 @@ export class TuiCommands {
         }
         case "installed": {
           const index = createLocalIndex(
-            this.#skillHubTargetDir(),
+            this.#skillHubTargetDir(settings),
             projectSkillDirs(this.#host.workDir),
           );
           const states = index.list();
@@ -1397,11 +1421,11 @@ export class TuiCommands {
     }
   }
 
-  #skillHubTargetDir(): string {
+  #skillHubTargetDir(settings: Settings): string {
     if (this.#skillHubScope() === "project") {
       return projectSkillDirs(this.#host.workDir)[0];
     }
-    return getGlobalSkillsDir(this.#host.settings);
+    return getGlobalSkillsDir(settings);
   }
 
   // --- Stats ----------------------------------------------------------------
@@ -1519,30 +1543,32 @@ export class TuiCommands {
   // --- Agents ---------------------------------------------------------------
 
   /**
-   * Lists agents (Go listAgents). The TUI has no Runtime AgentManager wired
-   * yet, so this mirrors Go's nil-manager path exactly.
+   * Lists agents (Go listAgents) from the Core-owned managed-agent registry.
+   * The Core owns every AgentManager; the TUI only renders the projection.
    */
-  listAgents(): string {
+  async listAgents(): Promise<string> {
     const tr = this.#tr();
     const lines = [tr.text("agent.multi_status", "main")];
-    let manager: AgentManager;
+    let agents: TUIAgentView[];
     try {
-      manager = this.#host.ensureAgentManager();
+      agents = await this.#host.service.listAgents({
+        sessionId: this.#host.currentSessionID(),
+      });
     } catch {
       lines.push(`  ${tr.text("agent.manager_unavailable")}`);
       return lines.join("\n");
     }
-    const ids = manager.list();
-    if (ids.length === 0) {
+    if (agents.length === 0) {
       lines.push(`  ${tr.text("agent.no_agents")}`);
       return lines.join("\n");
     }
-    for (const id of ids) {
-      const parentID = manager.parent(id);
-      const childCount = manager.childrenOf(id).length;
-      let info = `  ${id} [running]`;
-      if (parentID !== undefined) info += ` parent=${parentID}`;
-      if (childCount > 0) info += ` children=${childCount}`;
+    for (const agent of agents) {
+      const state = agent.state !== "" ? agent.state : "running";
+      let info = `  ${agent.id} [${state}]`;
+      if (agent.parent !== "") info += ` parent=${agent.parent}`;
+      if (agent.children.length > 0) {
+        info += ` children=${agent.children.length}`;
+      }
       lines.push(info);
     }
     return lines.join("\n");
@@ -1550,15 +1576,16 @@ export class TuiCommands {
 
   /** Switches the focused agent (Go switchAgent). */
   async switchAgent(id: string): Promise<CommandResult> {
-    await Promise.resolve();
     const tr = this.#tr();
-    let manager: AgentManager;
+    let agents: TUIAgentView[];
     try {
-      manager = this.#host.ensureAgentManager();
+      agents = await this.#host.service.listAgents({
+        sessionId: this.#host.currentSessionID(),
+      });
     } catch {
       return { message: tr.text("agent.manager_unavailable"), error: true };
     }
-    const existing = manager.get(id);
+    const existing = agents.find((agent) => agent.id === id);
     if (existing === undefined) {
       return { message: tr.text("agent.not_found", id), error: true };
     }
@@ -1566,18 +1593,14 @@ export class TuiCommands {
     return { message: tr.text("agent.focused", id) };
   }
 
-  /** Destroys a sub-agent (Go destroyAgent). */
+  /** Destroys a sub-agent (Go destroyAgent) through the Core-owned manager. */
   async destroyAgent(id: string): Promise<CommandResult> {
-    await Promise.resolve();
     const tr = this.#tr();
-    let manager: AgentManager;
     try {
-      manager = this.#host.ensureAgentManager();
-    } catch {
-      return { message: tr.text("agent.manager_unavailable"), error: true };
-    }
-    try {
-      manager.destroy(id);
+      await this.#host.service.destroyAgent({
+        sessionId: this.#host.currentSessionID(),
+        agentId: id,
+      });
     } catch {
       return { message: tr.text("agent.not_found", id), error: true };
     }
@@ -1586,21 +1609,34 @@ export class TuiCommands {
 
   // --- Compaction -----------------------------------------------------------
 
+  /** Forces one Core-owned conversation compaction and projects its events. */
   async compact(): Promise<CommandResult> {
     const tr = this.#tr();
-    const agent = this.#agent;
-    if (agent === undefined) {
-      return { message: tr.text("compact.empty"), error: true };
-    }
-    if (!agent.canForceCompact()) {
-      return { message: tr.text("compact.skipped"), error: true };
-    }
-    const sink = (ev: Event): boolean => {
-      this.#host.controller.handleAgentEvent(ev);
-      return true;
-    };
+    const sessionId = this.#host.currentSessionID();
+    let runId: string;
     try {
-      await agent.compact(createRunContext(), sink, true);
+      const accepted = await this.#host.service.compact({ sessionId });
+      runId = accepted.runId;
+    } catch (err) {
+      return { message: (err as Error).message, error: true };
+    }
+    try {
+      const terminal = await this.#host.consumeRunEvents(sessionId, runId);
+      const payload = terminal?.payload ?? {};
+      const status = String(payload.status ?? "completed");
+      const compacted = String(payload.compact ?? "");
+      if (status === "failed") {
+        const error = payload.error;
+        return {
+          message: typeof error === "string" && error !== ""
+            ? error
+            : tr.text("compact.done"),
+          error: true,
+        };
+      }
+      if (compacted === "skipped") {
+        return { message: tr.text("compact.skipped"), error: true };
+      }
       return { message: tr.text("compact.done") };
     } catch (err) {
       return { message: (err as Error).message, error: true };
@@ -1626,4 +1662,4 @@ function formatStatsDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export { defaultActiveRegistry, registerDelegateSubAgentTool, saveEnv };
+export { defaultActiveRegistry, saveEnv };

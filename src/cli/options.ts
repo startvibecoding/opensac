@@ -35,6 +35,8 @@ export interface CLIOptions {
   // ACP decision deadlines (raw Go duration strings)
   acpPermissionTimeout: string;
   acpQuestionTimeout: string;
+  // ACP isolated private Core
+  acpStandalone: boolean;
 }
 
 export function defaultCLIOptions(): CLIOptions {
@@ -61,6 +63,7 @@ export function defaultCLIOptions(): CLIOptions {
     cron: false,
     acpPermissionTimeout: "",
     acpQuestionTimeout: "",
+    acpStandalone: false,
   };
 }
 

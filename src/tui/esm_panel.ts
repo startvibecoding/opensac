@@ -21,6 +21,17 @@ import type { AgentActivity } from "./activity.ts";
 import { formatDuration } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
 import { wrapPlainText } from "./renderutil.ts";
+import type { TUIEsmObjectiveView } from "./service.ts";
+
+/** Maps the JSON-safe Core ESM objective view onto the panel's Objective. */
+export function esmObjectiveFromView(view: TUIEsmObjectiveView): Objective {
+  return {
+    ...view,
+    remainingWork: [...view.remainingWork],
+    createdAt: new Date(view.createdAt),
+    updatedAt: new Date(view.updatedAt),
+  };
+}
 
 export interface ESMPanelActivityContext {
   activeAgentId: string;

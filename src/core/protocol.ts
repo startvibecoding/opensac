@@ -71,6 +71,11 @@ export interface CoreHealth {
   protocolVersion: number;
 }
 
+/** Acknowledgement returned by a successful Core shutdown request. */
+export interface CoreShutdownResult {
+  ok: true;
+}
+
 /** Capability and version information returned by the Core info method. */
 export interface CoreInfo {
   version: string;
@@ -83,6 +88,7 @@ export interface CoreInfo {
 export const CORE_METHODS = {
   health: "core.health",
   info: "core.info",
+  shutdown: "core.shutdown",
 } as const;
 
 type CoreRpcObject = Record<string, unknown>;

@@ -9,7 +9,12 @@ import {
   parseGoDurationMs,
   resolveACPTimeout,
 } from "./options.ts";
-import { acpRunOptions, createRootCommand } from "./command.ts";
+import {
+  acpRunOptions,
+  createACPCommand,
+  createCoreCommand,
+  createRootCommand,
+} from "./command.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 
 Deno.test("parseGoDurationMs covers Go duration units", () => {
@@ -61,6 +66,7 @@ Deno.test("acpRunOptions maps CLI flags and resolved timeouts", () => {
   flags.multiAgent = true;
   flags.workflows = true;
   flags.browser = true;
+  flags.acpStandalone = true;
   flags.acpPermissionTimeout = "7m";
   const opts = acpRunOptions(flags, "9.9.9");
   assertEquals(opts.provider, "deepseek");
@@ -71,6 +77,7 @@ Deno.test("acpRunOptions maps CLI flags and resolved timeouts", () => {
   assertEquals(opts.multiAgent, true);
   assertEquals(opts.workflows, true);
   assertEquals(opts.browser, true);
+  assertEquals(opts.standalone, true);
   assertEquals(opts.version, "9.9.9");
   assertEquals(opts.permissionTimeoutMs, 420_000);
   // Question timeout reads env when the flag is empty.
@@ -85,6 +92,39 @@ Deno.test("acpRunOptions maps CLI flags and resolved timeouts", () => {
     if (previous === undefined) Deno.env.delete("OPENSAC_ACP_QUESTION_TIMEOUT");
     else Deno.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", previous);
   }
+});
+
+Deno.test("acp exposes --standalone and core exposes the stop lifecycle command", async () => {
+  const acpHelp = await createACPCommand("test-version").getHelp();
+  assert(acpHelp.includes("--standalone"), "acp help must list --standalone");
+  const coreHelp = await createCoreCommand("test-version").getHelp();
+  assert(coreHelp.includes("stop"), "core help must list stop");
+});
+
+Deno.test("core dispatches bare start and the stop subcommand to their own runners", async () => {
+  const calls: string[] = [];
+  const runners = {
+    start: (version: string) => {
+      calls.push(`start:${version}`);
+      return Promise.resolve(0);
+    },
+    stop: (version: string) => {
+      calls.push(`stop:${version}`);
+      return Promise.resolve({
+        status: "absent" as const,
+        exited: true,
+        signalled: false,
+      });
+    },
+  };
+  // Regression: Cliffy resolves subcommands only when the parent action is
+  // registered before the subcommands. With the wrong order, `core stop`
+  // started a Core and bare `core` printed help.
+  await createCoreCommand("test-version", runners).parse([]);
+  assertEquals(calls, ["start:test-version"]);
+  calls.length = 0;
+  await createCoreCommand("test-version", runners).parse(["stop"]);
+  assertEquals(calls, ["stop:test-version"]);
 });
 
 Deno.test("doctor command projects JSON and human output", () => {

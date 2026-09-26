@@ -1,63 +1,80 @@
 // TUI ESM supervisor wiring + modal/panel sizing tests.
 //
-// Covers the gaps reported against mothx: the TUI must start an ESM
-// continuation worker (worker/critic/audit role agents) after /esm create and
-// resume, and Ctrl+O / Ctrl+E layouts must adapt to the terminal size.
+// Covers the gaps reported against mothx: the TUI consumes the Core-owned ESM
+// continuation worker's canonical run events after /esm create and resume, and
+// Ctrl+O / Ctrl+E layouts must adapt to the terminal size.
 
 import { assert, assertEquals } from "@std/assert";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import { TUISession } from "./tui_session.ts";
-import { defaultSettings } from "../config/settings.ts";
-import { Store as ESMStore } from "../esm/store.ts";
+import { createFakeTUIService, type FakeTUIService } from "./service.ts";
 import { displayWidth } from "./formatters.ts";
 
-function makeSession(): TUISession {
-  const settings = defaultSettings();
-  return new TUISession(
+function makeSession(): { session: TUISession; service: FakeTUIService } {
+  const service = createFakeTUIService();
+  const session = new TUISession(
     {
-      provider: settings.defaultProvider ?? "openai",
-      model: settings.defaultModel ?? "",
+      provider: "openai",
+      model: "",
       mode: "yolo",
       thinking: "",
       workDir: Deno.cwd(),
       version: "test",
     },
-    settings,
+    service,
   );
+  return { session, service };
 }
 
 test(
   "esm continuation stays idle without an objective",
-  () => {
-    const session = makeSession();
-    session.startESMContinuationIfIdle();
+  async () => {
+    const { session } = makeSession();
+    await session.startESMContinuationIfIdle();
     assertEquals(session.esmWorkerRunning, false);
   },
 );
 
 test(
-  "esm continuation with an objective stays idle while the runtime is unbuilt",
-  () => {
-    const session = makeSession();
+  "esm continuation consumes the Core worker stream and settles idle",
+  async () => {
+    const { session, service } = makeSession();
+    await session.start();
     const sessionID = session.currentSessionID();
-    assert(sessionID !== "", "session header must be initialized");
-    const store = new ESMStore(session.manager.getSessionDir());
-    store.create(sessionID, "ship the release");
-    // The lazily-built runtime/manager path must degrade to idle instead of
-    // throwing when start() has not run (a fresh process before Builder.build).
-    session.startESMContinuationIfIdle();
+    assert(sessionID !== "", "Core-owned session must be bound");
+    await service.esmCommand({
+      sessionId: sessionID,
+      action: "create",
+      objective: "ship the release",
+    });
+    await session.startESMContinuationIfIdle();
+    assertEquals(session.esmWorkerRunning, true);
+    // The Core-owned worker terminalizes through canonical run events; the
+    // consumer releases once the stream ends.
+    service.emit(sessionID, "esm-continuation", "esm_status", {
+      text: "worker started",
+    });
+    service.emit(
+      sessionID,
+      "esm-continuation",
+      "esm_finished",
+      { status: "completed" },
+      true,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
     assertEquals(session.esmWorkerRunning, false);
     // Aborting while idle is a no-op.
-    session.abortESMWorker();
+    await session.abortESMWorker();
     assertEquals(session.esmWorkerRunning, false);
-    store.clear(sessionID);
+    await service.esmCommand({ sessionId: sessionID, action: "clear" });
+    await session.close();
   },
 );
 
 test(
   "tool modal width and height adapt to the terminal",
   () => {
-    const session = makeSession();
+    const { session } = makeSession();
     session.controller.addMessage("hello");
     session.setTerminalSize(70, 24);
     session.openToolModal();
@@ -82,7 +99,7 @@ test(
 test(
   "esm panel width and height adapt to the terminal",
   () => {
-    const session = makeSession();
+    const { session } = makeSession();
     session.setTerminalSize(64, 20);
     session.openESMPanel();
     const view = session.esmPanelView();

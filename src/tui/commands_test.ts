@@ -38,11 +38,11 @@ function host(overrides: Partial<CommandHost> = {}): {
       return Promise.resolve({ message: "compacted" });
     },
     listSkills() {
-      return "skills";
+      return Promise.resolve("skills");
     },
     activateSkill(name) {
       calls.push(`activateSkill:${name}`);
-      return `activated ${name}`;
+      return Promise.resolve(`activated ${name}`);
     },
     listMCPServers() {
       return "mcps";
@@ -52,11 +52,11 @@ function host(overrides: Partial<CommandHost> = {}): {
       return { message: `mcp ${scope}` };
     },
     listExperts() {
-      return "experts";
+      return Promise.resolve("experts");
     },
     showExpert(id) {
       calls.push(`showExpert:${id}`);
-      return `expert ${id}`;
+      return Promise.resolve(`expert ${id}`);
     },
     bindExpert(id): Promise<CommandResult> {
       calls.push(`bindExpert:${id}`);
@@ -66,8 +66,8 @@ function host(overrides: Partial<CommandHost> = {}): {
       calls.push(`forkExpert:${id}`);
       return Promise.resolve({ message: `forked ${id}` });
     },
-    listSessions() {
-      return "sessions";
+    listSessions(): Promise<string> {
+      return Promise.resolve("sessions");
     },
     forkSession(): Promise<CommandResult> {
       calls.push("forkSession");
@@ -104,19 +104,19 @@ function host(overrides: Partial<CommandHost> = {}): {
       return Promise.resolve({ message: "btw" });
     },
     listEnv() {
-      return "env";
+      return Promise.resolve("env");
     },
-    setEnv(k): CommandResult {
+    setEnv(k): Promise<CommandResult> {
       calls.push(`setEnv:${k}`);
-      return { message: k };
+      return Promise.resolve({ message: k });
     },
-    unsetEnv(k): CommandResult {
+    unsetEnv(k): Promise<CommandResult> {
       calls.push(`unsetEnv:${k}`);
-      return { message: k };
+      return Promise.resolve({ message: k });
     },
-    clearEnv(): CommandResult {
+    clearEnv(): Promise<CommandResult> {
       calls.push("clearEnv");
-      return { message: "cleared" };
+      return Promise.resolve({ message: "cleared" });
     },
     allowEditPath(parts): CommandResult {
       calls.push(`allowEdit:${parts.join(",")}`);
@@ -126,21 +126,21 @@ function host(overrides: Partial<CommandHost> = {}): {
       calls.push(`allowAuto:${parts.join(",")}`);
       return { message: "aa" };
     },
-    delegateMode(arg): CommandResult {
+    delegateMode(arg): Promise<CommandResult> {
       calls.push(`delegate:${arg}`);
-      return { message: "d" };
+      return Promise.resolve({ message: "d" });
     },
-    browserMode(arg): CommandResult {
+    browserMode(arg): Promise<CommandResult> {
       calls.push(`browser:${arg}`);
-      return { message: "b" };
+      return Promise.resolve({ message: "b" });
     },
-    statusLine(parts): CommandResult {
+    statusLine(parts): Promise<CommandResult> {
       calls.push(`statusline:${parts.join(",")}`);
-      return { message: "s" };
+      return Promise.resolve({ message: "s" });
     },
-    handleRule(parts): CommandResult {
+    handleRule(parts): Promise<CommandResult> {
       calls.push(`rule:${parts.join(",")}`);
-      return { message: "r" };
+      return Promise.resolve({ message: "r" });
     },
     handleSkillHub(parts): Promise<CommandResult> {
       calls.push(`skillhub:${parts.join(",")}`);
@@ -150,8 +150,8 @@ function host(overrides: Partial<CommandHost> = {}): {
       calls.push(`stats:${parts.join(",")}`);
       return Promise.resolve({ message: "st" });
     },
-    listAgents() {
-      return "agents";
+    listAgents(): Promise<string> {
+      return Promise.resolve("agents");
     },
     switchAgent(id): Promise<CommandResult> {
       calls.push(`switchAgent:${id}`);
@@ -170,15 +170,15 @@ function host(overrides: Partial<CommandHost> = {}): {
     },
     showProviders() {
       calls.push("showProviders");
-      return "providers";
+      return Promise.resolve("providers");
     },
     setDefaultModel(parts): Promise<CommandResult> {
       calls.push(`setDefaultModel:${parts.join(",")}`);
       return Promise.resolve({ message: "default" });
     },
-    tuiLang(parts): CommandResult {
+    tuiLang(parts): Promise<CommandResult> {
       calls.push(`tuiLang:${parts.join(",")}`);
-      return { message: "lang" };
+      return Promise.resolve({ message: "lang" });
     },
     cron(parts): CommandResult {
       calls.push(`cron:${parts.join(",")}`);
@@ -192,29 +192,29 @@ function host(overrides: Partial<CommandHost> = {}): {
       calls.push("pasteImage");
       return Promise.resolve({ message: "pasted" });
     },
-    openModelDialog(): CommandResult {
+    openModelDialog(): Promise<CommandResult> {
       calls.push("openModelDialog");
-      return {};
+      return Promise.resolve({});
     },
-    openAuthDialog(): CommandResult {
+    openAuthDialog(): Promise<CommandResult> {
       calls.push("openAuthDialog");
-      return {};
+      return Promise.resolve({});
     },
-    openSettingsDialog(providerID?: string): CommandResult {
+    openSettingsDialog(providerID?: string): Promise<CommandResult> {
       calls.push(`openSettingsDialog:${providerID ?? ""}`);
-      return {};
+      return Promise.resolve({});
     },
-    openEnvDialog(): CommandResult {
+    openEnvDialog(): Promise<CommandResult> {
       calls.push("openEnvDialog");
-      return {};
+      return Promise.resolve({});
     },
-    openSessionsDialog(): CommandResult {
+    openSessionsDialog(): Promise<CommandResult> {
       calls.push("openSessionsDialog");
-      return {};
+      return Promise.resolve({});
     },
-    openTuiLangDialog(): CommandResult {
+    openTuiLangDialog(): Promise<CommandResult> {
       calls.push("openTuiLangDialog");
-      return {};
+      return Promise.resolve({});
     },
   };
   return { host: { ...base, ...overrides }, calls };

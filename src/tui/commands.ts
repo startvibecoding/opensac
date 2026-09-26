@@ -44,16 +44,16 @@ export interface CommandHost {
   setModel(modelID: string): Promise<CommandResult>;
   clearConversation(): void;
   compact(): Promise<CommandResult>;
-  listSkills(): string;
-  activateSkill(name: string): string;
+  listSkills(): Promise<string>;
+  activateSkill(name: string): Promise<string>;
   listMCPServers(): string;
   initMCPConfig(scope: string, full: boolean, force: boolean): CommandResult;
-  listExperts(): string;
+  listExperts(): Promise<string>;
   /** Shows one expert bundle's full details (/expert show <id>). */
-  showExpert(id: string): string;
+  showExpert(id: string): Promise<string>;
   bindExpert(id: string): Promise<CommandResult>;
   forkSwitchExpert(id: string): Promise<CommandResult>;
-  listSessions(): string;
+  listSessions(): Promise<string>;
   /** Forks the current session, preserving its history (/sessions fork). */
   forkSession(): Promise<CommandResult>;
   switchSession(id: string): Promise<CommandResult>;
@@ -65,19 +65,19 @@ export interface CommandHost {
   cancelWorkflow(id: string): Promise<CommandResult>;
   handleESM(cmd: string): Promise<CommandResult>;
   handleBTW(cmd: string): Promise<CommandResult>;
-  listEnv(): string;
-  setEnv(key: string, value: string): CommandResult;
-  unsetEnv(key: string): CommandResult;
-  clearEnv(): CommandResult;
+  listEnv(): Promise<string>;
+  setEnv(key: string, value: string): Promise<CommandResult>;
+  unsetEnv(key: string): Promise<CommandResult>;
+  clearEnv(): Promise<CommandResult>;
   allowEditPath(parts: string[]): CommandResult;
   allowAutoEdit(parts: string[]): CommandResult;
-  delegateMode(arg: string): CommandResult;
-  browserMode(arg: string): CommandResult;
-  statusLine(parts: string[]): CommandResult;
-  handleRule(parts: string[]): CommandResult;
+  delegateMode(arg: string): Promise<CommandResult>;
+  browserMode(arg: string): Promise<CommandResult>;
+  statusLine(parts: string[]): Promise<CommandResult>;
+  handleRule(parts: string[]): Promise<CommandResult>;
   handleSkillHub(parts: string[]): Promise<CommandResult>;
   listStats(parts: string[]): Promise<CommandResult>;
-  listAgents(): string;
+  listAgents(): Promise<string>;
   /** Switches the focused agent (/agent switch <id>). */
   switchAgent(id: string): Promise<CommandResult>;
   /** Destroys a sub-agent (/agent destroy <id>). */
@@ -85,11 +85,11 @@ export interface CommandHost {
   multiAgentEnabled(): boolean;
   handleReload(): Promise<CommandResult>;
   /** Lists configured providers and their credential state (/auth, /settings). */
-  showProviders(): string;
+  showProviders(): Promise<string>;
   /** Sets the default provider/model in global or project settings. */
   setDefaultModel(parts: string[]): Promise<CommandResult>;
   /** Reports or updates the TUI language. */
-  tuiLang(parts: string[]): CommandResult;
+  tuiLang(parts: string[]): Promise<CommandResult>;
   /** Manages scheduled tasks. */
   cron(parts: string[]): CommandResult;
   /** Runs the /systeminit prompt through the agent. */
@@ -97,17 +97,17 @@ export interface CommandHost {
   /** Attaches the clipboard image to the draft. */
   pasteImage(): Promise<CommandResult>;
   /** Opens the interactive model switcher. */
-  openModelDialog(): CommandResult;
+  openModelDialog(): Promise<CommandResult>;
   /** Opens the interactive provider/auth editor. */
-  openAuthDialog(): CommandResult;
+  openAuthDialog(): Promise<CommandResult>;
   /** Opens the interactive settings browser (/settings [provider]). */
-  openSettingsDialog(providerID?: string): CommandResult;
+  openSettingsDialog(providerID?: string): Promise<CommandResult>;
   /** Opens the interactive environment-variable editor. */
-  openEnvDialog(): CommandResult;
+  openEnvDialog(): Promise<CommandResult>;
   /** Opens the interactive session browser. */
-  openSessionsDialog(): CommandResult;
+  openSessionsDialog(): Promise<CommandResult>;
   /** Opens the interactive TUI-language picker. */
-  openTuiLangDialog(): CommandResult;
+  openTuiLangDialog(): Promise<CommandResult>;
 }
 
 /** Renders the help text (Go commandHelpText). */
@@ -151,8 +151,8 @@ export async function dispatchCommand(
   if (command.startsWith("/skill:")) {
     const name = command.slice("/skill:".length);
     return name === ""
-      ? { message: host.listSkills() }
-      : { message: host.activateSkill(name) };
+      ? { message: await host.listSkills() }
+      : { message: await host.activateSkill(name) };
   }
 
   switch (command) {
@@ -180,12 +180,12 @@ export async function dispatchCommand(
       }
       return await host.compact();
     case "/skills":
-      return { message: host.listSkills() };
+      return { message: await host.listSkills() };
     case "/skill":
       return {
         message: parts.length > 1
-          ? host.activateSkill(parts[1])
-          : host.listSkills(),
+          ? await host.activateSkill(parts[1])
+          : await host.listSkills(),
       };
     case "/mcps":
       return { message: host.listMCPServers() };
@@ -203,8 +203,8 @@ export async function dispatchCommand(
     case "/btw":
       return await host.handleBTW(line);
     case "/env":
-      if (parts.length === 1) return host.openEnvDialog();
-      return cmdEnv(host, parts);
+      if (parts.length === 1) return await host.openEnvDialog();
+      return await cmdEnv(host, parts);
     case "/alloweditpath":
       return host.allowEditPath(parts);
     case "/allowautoedit":
@@ -324,7 +324,7 @@ async function cmdExpert(
   const tr = host.translator;
   const usage = "/expert [list|show <id>|bind <id>|unbind|switch <id>]";
   if (parts.length === 1 || parts[1] === "list") {
-    return { message: host.listExperts() };
+    return { message: await host.listExperts() };
   }
   switch (parts[1]) {
     case "show":
@@ -334,7 +334,7 @@ async function cmdExpert(
           error: true,
         };
       }
-      return { message: host.showExpert(parts[2]) };
+      return { message: await host.showExpert(parts[2]) };
     case "bind":
       if (parts.length < 3) {
         return {
@@ -363,11 +363,11 @@ async function cmdSessions(
   parts: string[],
 ): Promise<CommandResult> {
   const tr = host.translator;
-  if (parts.length === 1) return { message: host.listSessions() };
+  if (parts.length === 1) return { message: await host.listSessions() };
   switch (parts[1]) {
     case "ls":
     case "list":
-      return { message: host.listSessions() };
+      return { message: await host.listSessions() };
     case "set":
     case "switch":
     case "use":
@@ -438,62 +438,65 @@ async function cmdWorkflows(
   };
 }
 
-function cmdEnv(host: CommandHost, parts: string[]): CommandResult {
+async function cmdEnv(
+  host: CommandHost,
+  parts: string[],
+): Promise<CommandResult> {
   const tr = host.translator;
   const sub = (parts[1] ?? "list").toLowerCase();
   switch (sub) {
     case "list":
-      return { message: host.listEnv() };
+      return { message: await host.listEnv() };
     case "set":
       if (parts.length < 4) {
         return { message: tr.text("env.usage"), error: true };
       }
-      return host.setEnv(parts[2], parts.slice(3).join(" "));
+      return await host.setEnv(parts[2], parts.slice(3).join(" "));
     case "unset":
       if (parts.length < 3) {
         return { message: tr.text("env.usage"), error: true };
       }
-      return host.unsetEnv(parts[2]);
+      return await host.unsetEnv(parts[2]);
     case "clear":
-      return host.clearEnv();
+      return await host.clearEnv();
     default:
       return { message: tr.text("env.usage"), error: true };
   }
 }
 
-function cmdAgent(
+async function cmdAgent(
   host: CommandHost,
   parts: string[],
 ): Promise<CommandResult> {
   const tr = host.translator;
   if (!host.multiAgentEnabled()) {
-    return Promise.resolve({ message: tr.text("agent.disabled") });
+    return { message: tr.text("agent.disabled") };
   }
   if (parts.length < 2) {
-    return Promise.resolve({
+    return {
       message: tr.text("commands.usage", "/agent list|switch|destroy"),
       error: true,
-    });
+    };
   }
   switch (parts[1]) {
     case "list":
-      return Promise.resolve({ message: host.listAgents() });
+      return { message: await host.listAgents() };
     case "switch":
       if (parts.length < 3) {
-        return Promise.resolve({
+        return {
           message: tr.text("commands.usage", "/agent switch <id>"),
           error: true,
-        });
+        };
       }
-      return host.switchAgent(parts[2]);
+      return await host.switchAgent(parts[2]);
     case "destroy":
       if (parts.length < 3) {
-        return Promise.resolve({
+        return {
           message: tr.text("commands.usage", "/agent destroy <id>"),
           error: true,
-        });
+        };
       }
-      return host.destroyAgent(parts[2]);
+      return await host.destroyAgent(parts[2]);
     default:
       return Promise.resolve({
         message: tr.text(

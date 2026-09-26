@@ -2,14 +2,24 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   type CoreCommandDependencies,
   type CoreCommandOptions,
+  type CoreStopClient,
+  type CoreStopDependencies,
+  type CoreStopRegistryLike,
   runCoreCommand,
   startCoreCommand,
+  stopCoreCommand,
 } from "./core.ts";
 import { defaultSettings, type Settings } from "../config/mod.ts";
 import { type ResolvedCoreConfig } from "../core/config.ts";
+import {
+  CoreAuthenticationError,
+  CoreClientRpcError,
+  type CoreDiscoveryResult,
+  CoreIncompatibleError,
+} from "../core/client.ts";
 import { CorePaths } from "../core/paths.ts";
 import { type CoreRegistration, CoreRegistry } from "../core/registry.ts";
-import { CORE_METHODS } from "../core/protocol.ts";
+import { CORE_METHODS, type CoreShutdownResult } from "../core/protocol.ts";
 import type { CoreRuntimeHost } from "../core/runtime.ts";
 import {
   CoreServer,
@@ -975,4 +985,258 @@ Deno.test("fixed-port classification rejects redirects as unrelated", async () =
 Deno.test("Core command defaults use the process version source", () => {
   assert(currentVersion().trim().length > 0);
   assertEquals(CORE_PROTOCOL_VERSION, 1);
+});
+
+// ---------------------------------------------------------------------------
+// `opensac core stop`
+// ---------------------------------------------------------------------------
+
+function stopOptions(
+  overrides: Partial<CoreCommandOptions & { stopTimeoutMs: number }> = {},
+): CoreCommandOptions & { stopTimeoutMs?: number } {
+  return {
+    config: config(),
+    stateDir: "core-stop-test",
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    ...overrides,
+  };
+}
+
+function stopDeps(init: {
+  discovery: CoreDiscoveryResult;
+  shutdown?: () => Promise<CoreShutdownResult>;
+  registry?: CoreStopRegistryLike;
+  kills?: Array<[number, string]>;
+}): CoreStopDependencies {
+  const kills = init.kills ?? [];
+  return {
+    createClient: (): CoreStopClient => ({
+      discover: () => Promise.resolve(init.discovery),
+      shutdown: init.shutdown ?? (() => Promise.resolve({ ok: true })),
+      close: () => Promise.resolve(),
+    }),
+    registry: init.registry ?? {
+      read: () => Promise.resolve(undefined),
+      isCurrent: () => Promise.resolve(true),
+    },
+    kill: (pid, signalName) => {
+      kills.push([pid, signalName]);
+    },
+    sleep: () => Promise.resolve(),
+  };
+}
+
+function readyDiscovery(reg: CoreRegistration): CoreDiscoveryResult {
+  return {
+    status: "ready",
+    registration: reg,
+    info: {
+      version: TEST_VERSION,
+      protocolVersion: TEST_PROTOCOL_VERSION,
+      coreProtocolVersion: CORE_PROTOCOL_VERSION,
+      features: [],
+    },
+    health: {
+      healthy: true,
+      version: TEST_VERSION,
+      protocolVersion: TEST_PROTOCOL_VERSION,
+    },
+    url: "http://127.0.0.1:1",
+  };
+}
+
+function incompatibleDiscovery(reg: CoreRegistration): CoreDiscoveryResult {
+  return {
+    status: "incompatible",
+    registration: reg,
+    expectedVersion: "9.9.9",
+    expectedProtocolVersion: TEST_PROTOCOL_VERSION,
+    error: new CoreIncompatibleError("version mismatch", {
+      expectedVersion: "9.9.9",
+      expectedProtocolVersion: TEST_PROTOCOL_VERSION,
+    }),
+  };
+}
+
+function methodNotFound(): CoreClientRpcError {
+  return new CoreClientRpcError(
+    { code: -32601, message: "Method not found" },
+    1,
+  );
+}
+
+async function deadPid(): Promise<number> {
+  const child = new Deno.Command(Deno.execPath(), {
+    args: ["eval", ""],
+    stdin: "null",
+    stdout: "null",
+    stderr: "null",
+  }).spawn();
+  await child.status;
+  return child.pid;
+}
+
+Deno.test("stopCoreCommand reports absent when no Core is registered", async () => {
+  const outcome = await stopCoreCommand(
+    stopOptions(),
+    stopDeps({ discovery: { status: "missing" } }),
+  );
+  assertEquals(outcome, { status: "absent", exited: true, signalled: false });
+});
+
+Deno.test("stopCoreCommand reports absent for a stale registration whose process is gone", async () => {
+  const reg = registration(4096, { pid: await deadPid() });
+  const outcome = await stopCoreCommand(
+    stopOptions(),
+    stopDeps({
+      discovery: {
+        status: "stale",
+        registration: reg,
+        reason: "registered Core process is not running",
+      },
+    }),
+  );
+  assertEquals(outcome, { status: "absent", exited: true, signalled: false });
+});
+
+Deno.test("stopCoreCommand refuses to signal a stale Core it cannot verify", async () => {
+  const kills: Array<[number, string]> = [];
+  const reg = registration(4096, { pid: Deno.pid });
+  await assertRejects(
+    () =>
+      stopCoreCommand(
+        stopOptions(),
+        stopDeps({
+          discovery: {
+            status: "stale",
+            registration: reg,
+            reason: "registered Core endpoint is unreachable",
+          },
+          kills,
+        }),
+      ),
+    Error,
+    "not answering",
+  );
+  assertEquals(kills, []);
+});
+
+Deno.test("stopCoreCommand refuses to signal a Core with foreign authentication", async () => {
+  const kills: Array<[number, string]> = [];
+  const reg = registration(4096, { pid: Deno.pid });
+  await assertRejects(
+    () =>
+      stopCoreCommand(
+        stopOptions(),
+        stopDeps({
+          discovery: {
+            status: "unauthenticated",
+            registration: reg,
+            error: new CoreAuthenticationError(),
+          },
+          kills,
+        }),
+      ),
+    Error,
+    "different authentication",
+  );
+  assertEquals(kills, []);
+});
+
+Deno.test("stopCoreCommand stops a ready Core through core.shutdown", async () => {
+  const kills: Array<[number, string]> = [];
+  let shutdownCalls = 0;
+  const reg = registration(4096, { pid: Deno.pid });
+  const outcome = await stopCoreCommand(
+    stopOptions(),
+    stopDeps({
+      discovery: readyDiscovery(reg),
+      shutdown: () => {
+        shutdownCalls++;
+        return Promise.resolve({ ok: true });
+      },
+      kills,
+    }),
+  );
+  assertEquals(outcome, { status: "stopped", exited: true, signalled: false });
+  assertEquals(shutdownCalls, 1);
+  assertEquals(kills, []);
+});
+
+Deno.test("stopCoreCommand reports a requested stop that is still exiting", async () => {
+  const reg = registration(4096, { pid: Deno.pid });
+  const outcome = await stopCoreCommand(
+    stopOptions({ stopTimeoutMs: 0 }),
+    stopDeps({
+      discovery: readyDiscovery(reg),
+      registry: {
+        read: () => Promise.resolve(reg),
+        isCurrent: () => Promise.resolve(true),
+      },
+    }),
+  );
+  assertEquals(outcome, { status: "stopped", exited: false, signalled: false });
+});
+
+Deno.test("stopCoreCommand signals an older Core that predates core.shutdown", async () => {
+  const kills: Array<[number, string]> = [];
+  const reg = registration(4096, { pid: Deno.pid });
+  const outcome = await stopCoreCommand(
+    stopOptions(),
+    stopDeps({
+      discovery: incompatibleDiscovery(reg),
+      shutdown: () => Promise.reject(methodNotFound()),
+      registry: {
+        read: () => Promise.resolve(undefined),
+        isCurrent: () => Promise.resolve(true),
+      },
+      kills,
+    }),
+  );
+  assertEquals(outcome, { status: "stopped", exited: true, signalled: true });
+  assertEquals(kills, [[reg.pid, "SIGTERM"]]);
+});
+
+Deno.test("stopCoreCommand fails closed when registration identity cannot be proven", async () => {
+  const kills: Array<[number, string]> = [];
+  const reg = registration(4096, { pid: Deno.pid });
+  await assertRejects(
+    () =>
+      stopCoreCommand(
+        stopOptions(),
+        stopDeps({
+          discovery: incompatibleDiscovery(reg),
+          shutdown: () => Promise.reject(methodNotFound()),
+          registry: {
+            read: () => Promise.resolve(reg),
+            isCurrent: () => Promise.resolve(false),
+          },
+          kills,
+        }),
+      ),
+    CoreClientRpcError,
+  );
+  assertEquals(kills, []);
+});
+
+Deno.test("stopCoreCommand stops a real Core through the graceful path", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const handle = await startCoreCommand(options({ stateDir }));
+    try {
+      await waitForRegistration(paths, () => true);
+      const outcome = await stopCoreCommand({
+        ...options({ stateDir }),
+        stopTimeoutMs: 5_000,
+      });
+      assertEquals(outcome, {
+        status: "stopped",
+        exited: true,
+        signalled: false,
+      });
+      assertEquals(await handle.done, 0);
+    } finally {
+      await handle.stop();
+    }
+  });
 });

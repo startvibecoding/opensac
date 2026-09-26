@@ -51,6 +51,48 @@ export function fromAgentEvent(event: Event): SessionExecutorEvent {
   };
 }
 
+const ERROR_VALUE_KEY = "__errorValue";
+
+/**
+ * JSON-safe projection of one canonical Agent event. `Error` values (the
+ * `error`/`toolError` fields) become tagged records so a transport round-trip
+ * preserves their messages; every other field is plain data already.
+ */
+export function serializeAgentEvent(event: Event): Record<string, unknown> {
+  return JSON.parse(
+    JSON.stringify(event, (_key, value) =>
+      value instanceof Error
+        ? {
+          [ERROR_VALUE_KEY]: { name: value.name, message: value.message },
+        }
+        : value),
+  ) as Record<string, unknown>;
+}
+
+/** Rebuilds one Agent event from its serialized projection. */
+export function deserializeAgentEvent(
+  record: Record<string, unknown>,
+): Event {
+  return JSON.parse(JSON.stringify(record), (_key, value) => {
+    if (
+      value !== null && typeof value === "object" &&
+      ERROR_VALUE_KEY in (value as Record<string, unknown>)
+    ) {
+      const raw = (value as Record<string, unknown>)[ERROR_VALUE_KEY] as
+        | { name?: unknown; message?: unknown }
+        | undefined;
+      const error = new Error(
+        typeof raw?.message === "string" ? raw.message : "",
+      );
+      if (typeof raw?.name === "string" && raw.name !== "") {
+        error.name = raw.name;
+      }
+      return error;
+    }
+    return value;
+  }) as Event;
+}
+
 /** Runtime operations required by the shared prompt executor. */
 export interface SessionExecutionDriver {
   admit(): Promise<() => void>;

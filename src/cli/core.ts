@@ -13,7 +13,14 @@ import {
   resolveCoreConfig,
   type ResolvedCoreConfig,
 } from "../core/config.ts";
-import { CoreClient, type CoreDiscoveryResult } from "../core/client.ts";
+import {
+  CoreClient,
+  CoreClientRpcError,
+  type CoreDiscoveryResult,
+  processLiveness,
+  waitForRegistrationExit,
+} from "../core/client.ts";
+import { type CoreShutdownResult } from "../core/protocol.ts";
 import {
   registrationConnectHost,
   registrationMatchesConfiguredEndpoint,
@@ -364,11 +371,62 @@ function createLazyProductionRuntimeHost(
       load().then((runtime) => runtime.openSession(input)),
     closeSession: (input) =>
       load().then((runtime) => runtime.closeSession(input)),
+    deleteSession: (input) =>
+      load().then((runtime) => runtime.deleteSession(input)),
+    listSessionSkills: (input) =>
+      load().then((runtime) => runtime.listSessionSkills(input)),
+    prepareInput: (input) =>
+      load().then((runtime) => runtime.prepareInput(input)),
+    sessionCapabilities: (input) =>
+      load().then((runtime) => runtime.sessionCapabilities(input)),
+    sessionContext: (input) =>
+      load().then((runtime) => runtime.sessionContext(input)),
+    setSessionContext: (input) =>
+      load().then((runtime) => runtime.setSessionContext(input)),
+    listExperts: (input) =>
+      load().then((runtime) => runtime.listExperts(input)),
+    inspectExpert: (input) =>
+      load().then((runtime) => runtime.inspectExpert(input)),
+    expertState: (input) =>
+      load().then((runtime) => runtime.expertState(input)),
+    setExpert: (input) => load().then((runtime) => runtime.setExpert(input)),
+    forkSession: (input) =>
+      load().then((runtime) => runtime.forkSession(input)),
+    listAgents: (input) => load().then((runtime) => runtime.listAgents(input)),
+    destroyAgent: (input) =>
+      load().then((runtime) => runtime.destroyAgent(input)),
+    setDelegate: (input) =>
+      load().then((runtime) => runtime.setDelegate(input)),
+    delegateState: (input) =>
+      load().then((runtime) => runtime.delegateState(input)),
+    setSessionCapability: (input) =>
+      load().then((runtime) => runtime.setSessionCapability(input)),
+    esmState: (input) => load().then((runtime) => runtime.esmState(input)),
+    esmUpdate: (input) => load().then((runtime) => runtime.esmUpdate(input)),
+    esmContinue: (input) =>
+      load().then((runtime) => runtime.esmContinue(input)),
+    esmStop: (input) => load().then((runtime) => runtime.esmStop(input)),
+    transientPrompt: (input) =>
+      load().then((runtime) => runtime.transientPrompt(input)),
+    compact: (input) => load().then((runtime) => runtime.compact(input)),
+    settingsDocument: (input) =>
+      load().then((runtime) => runtime.settingsDocument(input)),
+    updateSettingsDocument: (input) =>
+      load().then((runtime) => runtime.updateSettingsDocument(input)),
+    providerCatalog: (input) =>
+      load().then((runtime) => runtime.providerCatalog(input)),
+    validateProviderModel: (input) =>
+      load().then((runtime) => runtime.validateProviderModel(input)),
+    envDocument: () => load().then((runtime) => runtime.envDocument()),
+    updateEnvDocument: (input) =>
+      load().then((runtime) => runtime.updateEnvDocument(input)),
     history: (input) => load().then((runtime) => runtime.history(input)),
     prompt: (input) => load().then((runtime) => runtime.prompt(input)),
     cancelRun: (input) => load().then((runtime) => runtime.cancelRun(input)),
     getRun: (input) => load().then((runtime) => runtime.getRun(input)),
     listSessions: () => load().then((runtime) => runtime.listSessions()),
+    listPersistedSessions: (input) =>
+      load().then((runtime) => runtime.listPersistedSessions(input)),
     setSessionConfig: (input) =>
       load().then((runtime) => runtime.setSessionConfig(input)),
     setSessionSkill: (input) =>
@@ -551,6 +609,10 @@ export async function startCoreCommand(
   let registrationId: string | undefined;
   let registration: CoreRegistration | undefined;
   let startupUncertain: CoreServerStartFailure | undefined;
+  // Resolved by a `core.shutdown` request. ownedCoreHandle turns it into the
+  // same idempotent stop used for signals so cleanup stays single-path:
+  // server stop, runtime shutdown, registration removal, lock release.
+  const stopRequested = deferred<void>();
 
   try {
     throwIfAborted(signal);
@@ -560,6 +622,7 @@ export async function startCoreCommand(
       version,
       protocolVersion,
       events,
+      onShutdown: () => stopRequested.resolve(),
       runtime: createLazyProductionRuntimeHost(
         settings,
         (event) => events.publish(event),
@@ -623,6 +686,7 @@ export async function startCoreCommand(
     registration,
     lock,
     deps.ownershipMonitorIntervalMs,
+    stopRequested.promise,
   );
 }
 
@@ -698,6 +762,233 @@ export async function runCoreCommand(
       }
     }
     externalSignal?.removeEventListener("abort", relayExternalAbort);
+  }
+}
+
+/** Options for `opensac core stop`. */
+export interface CoreStopOptions {
+  /** A resolved (or partial) Core configuration override. */
+  config?: ResolvedCoreConfig | CoreSettings;
+  /** State root containing core.json and core.lock. */
+  stateDir?: string;
+  /** Product version recorded by the Core and its clients. */
+  version?: string;
+  /** Core application protocol version recorded by the service. */
+  protocolVersion?: number;
+  /** Cancels discovery, shutdown, and exit waiting. */
+  signal?: AbortSignal;
+  /** Bounded wait for the stopped Core to exit; defaults to 15 seconds. */
+  stopTimeoutMs?: number;
+}
+
+/** Result of an `opensac core stop` run. */
+export interface CoreStopOutcome {
+  /** "stopped" when a running Core was asked to exit; "absent" when none ran. */
+  status: "stopped" | "absent";
+  /** True when the Core process was observed exiting within the wait budget. */
+  exited: boolean;
+  /** True when the registered process was signalled instead of `core.shutdown`. */
+  signalled: boolean;
+}
+
+/** The client surface `core stop` needs from `CoreClient`. */
+export interface CoreStopClient {
+  discover(signal?: AbortSignal): Promise<CoreDiscoveryResult>;
+  shutdown(signal?: AbortSignal): Promise<CoreShutdownResult>;
+  close(): Promise<void>;
+}
+
+/** Identity inputs for the lifecycle client created by `core stop`. */
+export interface CoreStopClientOptions {
+  paths: CorePaths;
+  config: ResolvedCoreConfig;
+  version: string;
+  protocolVersion: number;
+  signal?: AbortSignal;
+}
+
+/** The registry surface `core stop` needs for exit observation and identity. */
+export interface CoreStopRegistryLike {
+  read(): MaybePromise<CoreRegistration | undefined>;
+  isCurrent?(registration: CoreRegistration): MaybePromise<boolean>;
+}
+
+/** Injectable process and filesystem seams used by `core stop`. */
+export interface CoreStopDependencies {
+  /** Load settings when options.config is not supplied. */
+  loadSettings?: (signal?: AbortSignal) => MaybePromise<Settings>;
+  /** Optional settings value for callers that already loaded them. */
+  settings?: Settings;
+  /** Default state root when options.stateDir is not supplied. */
+  stateDir?: string | (() => string);
+  /** Optional CorePaths factory, primarily for focused tests. */
+  createPaths?: (stateDir: string) => CorePaths;
+  /** Alias for createPaths. */
+  paths?: (stateDir: string) => CorePaths;
+  /** Registry facade used for registration identity and exit observation. */
+  registry?:
+    | CoreStopRegistryLike
+    | ((paths: CorePaths) => CoreStopRegistryLike);
+  /** Alias for registry. */
+  createRegistry?: (paths: CorePaths) => CoreStopRegistryLike;
+  /** Create the lifecycle client used for discovery and shutdown. */
+  createClient?: (
+    options: CoreStopClientOptions,
+  ) => MaybePromise<CoreStopClient>;
+  /** Sends a termination signal to a verified local Core process. */
+  kill?: (pid: number, signal: "SIGTERM") => void;
+  /** Bounded wait used while observing a stopped Core's exit. */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** Signal used when options.signal is absent. */
+  signal?: AbortSignal;
+}
+
+const DEFAULT_STOP_TIMEOUT_MS = 15_000;
+const EXIT_POLL_INTERVAL_MS = 100;
+
+/**
+ * Stops a running Core through `core.shutdown` and waits for it to exit.
+ *
+ * The SIGTERM fallback is deliberately narrow: it is only used when discovery
+ * already verified the registered endpoint identity and the Core is an older
+ * build that predates `core.shutdown`. A registration that cannot be verified
+ * (stale endpoint, foreign authentication) fails closed with an actionable
+ * error instead of signalling a process it cannot identify.
+ */
+export async function stopCoreCommand(
+  options: CoreStopOptions = {},
+  deps: CoreStopDependencies = {},
+): Promise<CoreStopOutcome> {
+  const signal = options.signal ?? deps.signal;
+  throwIfAborted(signal);
+
+  const settings = await resolveCommandSettings(
+    options,
+    { loadSettings: deps.loadSettings, settings: deps.settings },
+    signal,
+  );
+  throwIfAborted(signal);
+  const resolvedConfig = resolveCoreConfig(settings);
+  const stateDir = resolveStateDir(options, { stateDir: deps.stateDir });
+  const paths = (deps.createPaths ?? deps.paths ?? CorePaths.fromStateDir)(
+    stateDir,
+  );
+  const version = resolveVersion(options, {});
+  const protocolVersion = resolveProtocolVersion(options, {});
+  const registry = resolveStopRegistry(paths, deps);
+  const kill = deps.kill ?? ((pid, signalName) => Deno.kill(pid, signalName));
+
+  const client = await (deps.createClient ?? createStopClient)({
+    paths,
+    config: resolvedConfig,
+    version,
+    protocolVersion,
+    signal,
+  });
+  try {
+    const discovery = await client.discover(signal);
+    if (discovery.status === "missing") {
+      return { status: "absent", exited: true, signalled: false };
+    }
+    const registration = "registration" in discovery
+      ? discovery.registration
+      : undefined;
+
+    if (discovery.status === "stale") {
+      if (
+        registration === undefined ||
+        processLiveness(registration.pid) === "dead"
+      ) {
+        return { status: "absent", exited: true, signalled: false };
+      }
+      throw new Error(
+        `A registered Core process (PID ${registration.pid}) is not answering; stop it manually before restarting`,
+        { cause: discovery.error },
+      );
+    }
+    if (discovery.status === "unauthenticated") {
+      throw new Error(
+        `A registered Core${
+          registration === undefined ? "" : ` (PID ${registration.pid})`
+        } requires different authentication; fix core.passwords or stop it manually`,
+        { cause: discovery.error },
+      );
+    }
+    if (registration === undefined) {
+      throw new Error("Registered Core has no registration identity");
+    }
+
+    // ready | incompatible: discovery reached the registered endpoint.
+    let signalled = false;
+    try {
+      await client.shutdown(signal);
+    } catch (error) {
+      const replaceable = isMethodNotFound(error) &&
+        await isCurrentRegistration(registry, registration);
+      if (!replaceable) throw error;
+      // Older Core builds predate `core.shutdown`. Their endpoint identity was
+      // verified by discovery and SIGTERM is that process's clean stop path
+      // (the same path as a terminal signal), so replacing them is safe once
+      // the registration is still current.
+      kill(registration.pid, "SIGTERM");
+      signalled = true;
+    }
+
+    const exited = await waitForRegistrationExit(registry, registration, {
+      timeoutMs: options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS,
+      intervalMs: EXIT_POLL_INTERVAL_MS,
+      sleep: deps.sleep,
+      signal,
+    });
+    return { status: "stopped", exited, signalled };
+  } finally {
+    await client.close();
+  }
+}
+
+function createStopClient(
+  options: CoreStopClientOptions,
+): CoreStopClient {
+  return new CoreClient({
+    stateDir: options.paths.stateDir,
+    version: options.version,
+    protocolVersion: options.protocolVersion,
+    config: options.config,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
+}
+
+function resolveStopRegistry(
+  paths: CorePaths,
+  deps: CoreStopDependencies,
+): CoreStopRegistryLike {
+  if (deps.registry !== undefined) {
+    return typeof deps.registry === "function"
+      ? deps.registry(paths)
+      : deps.registry;
+  }
+  if (deps.createRegistry !== undefined) return deps.createRegistry(paths);
+  return new CoreRegistry(paths);
+}
+
+function isMethodNotFound(error: unknown): boolean {
+  return error instanceof CoreClientRpcError && error.code === -32601;
+}
+
+/**
+ * Registration identity is required before the destructive signal fallback.
+ * A registry without an `isCurrent` probe cannot prove identity, so the
+ * fallback fails closed in that case.
+ */
+async function isCurrentRegistration(
+  registry: CoreStopRegistryLike,
+  registration: CoreRegistration,
+): Promise<boolean> {
+  if (registry.isCurrent === undefined) return false;
+  try {
+    return await registry.isCurrent(registration);
+  } catch {
+    return false;
   }
 }
 
@@ -998,6 +1289,7 @@ function ownedCoreHandle(
   registration: CoreRegistration,
   lock: CoreLockLike,
   monitorIntervalMs = 100,
+  stopRequested?: Promise<void>,
 ): CoreCommandHandle {
   const done = deferred<number>();
   let stopPromise: Promise<void> | undefined;
@@ -1098,6 +1390,12 @@ function ownedCoreHandle(
       void stop().catch(() => undefined);
     }
   };
+
+  if (stopRequested !== undefined) {
+    // A `core.shutdown` request performs the same cleanup as a termination
+    // signal; `done` then carries the lifecycle exit code to runCoreCommand.
+    void stopRequested.then(() => stop().catch(() => undefined));
+  }
 
   return { url: server.url, stop, done: done.promise };
 }

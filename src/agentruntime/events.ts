@@ -1,0 +1,56 @@
+// The adapter-facing projection of the canonical Agent event vocabulary.
+//
+// The canonical vocabulary is owned by `src/agent/events.ts` (one event
+// semantic model for every projection). Adapters (TUI, CLI, ACP bridges) must
+// import this neutral re-export module instead of `src/agent/` so the
+// front-end graph never depends on Agent implementation modules. Nothing here
+// defines event semantics; it only re-exports the canonical names.
+
+export {
+  type Event,
+  EVENT_AGENT_END,
+  EVENT_AGENT_START,
+  EVENT_BUDGET_PRESSURE,
+  EVENT_COMPACTION_END,
+  EVENT_COMPACTION_START,
+  EVENT_CONTEXT_PRESSURE,
+  EVENT_DONE,
+  EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
+  EVENT_MESSAGE_END,
+  EVENT_MESSAGE_START,
+  EVENT_MESSAGE_UPDATE,
+  EVENT_PLAN_UPDATE,
+  EVENT_QUESTION_REQUEST,
+  EVENT_QUESTION_RESPONSE,
+  EVENT_RETRY,
+  EVENT_RUN_FINISHED,
+  EVENT_STATUS,
+  EVENT_TEXT_DELTA,
+  EVENT_THINK_DELTA,
+  EVENT_TOOL_APPROVAL_REQUEST,
+  EVENT_TOOL_APPROVAL_RESPONSE,
+  EVENT_TOOL_CALL,
+  EVENT_TOOL_EXECUTION_END,
+  EVENT_TOOL_EXECUTION_START,
+  EVENT_TOOL_EXECUTION_UPDATE,
+  EVENT_TOOL_RESULT,
+  EVENT_TURN_END,
+  EVENT_TURN_START,
+  EVENT_USAGE,
+  type EventType,
+  TASK_CANCELED,
+  TASK_ERROR,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
+  TASK_SUCCESS,
+  type TaskStatus,
+  taskStatusIsSuccessful,
+  taskStatusIsTerminal,
+  TOOL_EXECUTION_COMPLETED,
+  TOOL_EXECUTION_FAILED,
+  TOOL_EXECUTION_INTERRUPTED,
+  TOOL_EXECUTION_REUSED,
+  type ToolExecutionState,
+  type ToolImage,
+} from "../agent/events.ts";

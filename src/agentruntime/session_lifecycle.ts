@@ -11,6 +11,7 @@ import type { RuntimeLeaseGuard } from "../session/mod.ts";
 import {
   createManager,
   deleteSessionWithMutation as sessionDeleteSessionWithMutation,
+  listForDirDetailed,
   type Manager,
   openByID,
   openByIDExact,
@@ -59,6 +60,24 @@ export function openSession(sessionDir: string, id: string): Manager {
   return openByIDExact(sessionDir, id);
 }
 
+/**
+ * Opens a persisted session by ID, creating it with that ID only when no
+ * session with it exists yet. Callers that adopt an existing session identity
+ * (for example a client-supplied `sessionId`) use this so one identity always
+ * maps to exactly one persisted session.
+ */
+export function openOrCreateSession(opts: CreateSessionOptions): Manager {
+  const id = (opts.id ?? "").trim();
+  if (id !== "") {
+    try {
+      return openSession(opts.sessionDir ?? "", id);
+    } catch {
+      // No persisted session with this ID yet; create it below.
+    }
+  }
+  return createSession(opts);
+}
+
 /** Removes a persisted session by ID when it is not active. */
 export async function deleteSession(
   sessionDir: string,
@@ -91,6 +110,32 @@ export function deleteSessionWithMutation(
 ): void {
   const mgr = openSession(sessionDir, id);
   sessionDeleteSessionWithMutation(mgr.getFile(), sessionDir, guard);
+}
+
+/** The adapter-neutral summary of one persisted session row. */
+export interface PersistedSessionInfo {
+  id: string;
+  workDir: string;
+  modTime: Date;
+  messageCount: number;
+  preview: string;
+}
+
+/**
+ * Lists the persisted sessions of one working directory (adapter-neutral
+ * projection of the DAO-backed session listing).
+ */
+export function listPersistedSessions(
+  workDir: string,
+  sessionDir = "",
+): PersistedSessionInfo[] {
+  return listForDirDetailed(workDir, sessionDir).map((detail) => ({
+    id: detail.id,
+    workDir: detail.cwd,
+    modTime: detail.modTime,
+    messageCount: detail.messageCount,
+    preview: detail.preview,
+  }));
 }
 
 /**

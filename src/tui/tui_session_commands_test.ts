@@ -5,6 +5,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { defaultSettings } from "../config/settings.ts";
 import { Translator } from "./i18n.ts";
+import { createFakeTUIService } from "./service.ts";
 import {
   TuiSessionCommands,
   type TuiSessionLike,
@@ -29,32 +30,31 @@ function stub(multiAgent = false): Stub {
     providerName: settings.defaultProvider ?? "",
     modelID: settings.defaultModel ?? "",
     currentSessionID: () => "s1",
-    manager: { getSessionDir: () => "" },
     controller: {
       addMessage: (t: string) => void messages.push(t),
     },
     input: { insertText: () => {} },
-    runtime: {},
+    service: createFakeTUIService(),
   } as unknown as TuiSessionLike;
   return { commands: new TuiSessionCommands(session), settings, messages };
 }
 
-Deno.test("showProviders lists configured providers and usage", () => {
+Deno.test("showProviders lists configured providers and usage", async () => {
   const { commands } = stub();
-  const text = commands.showProviders();
+  const text = await commands.showProviders();
   assertStringIncludes(text, "Providers");
-  assertStringIncludes(text, "deepseek-openai");
+  assertStringIncludes(text, "test-provider");
 });
 
-Deno.test("tuiLang reports the configured language", () => {
+Deno.test("tuiLang reports the configured language", async () => {
   const { commands } = stub();
-  const result = commands.tuiLang(["/tuilang"]);
+  const result = await commands.tuiLang(["/tuilang"]);
   assertStringIncludes(result.message ?? "", "auto");
 });
 
-Deno.test("tuiLang rejects an invalid value", () => {
+Deno.test("tuiLang rejects an invalid value", async () => {
   const { commands } = stub();
-  const result = commands.tuiLang(["/tuilang", "global", "klingon"]);
+  const result = await commands.tuiLang(["/tuilang", "global", "klingon"]);
   assertEquals(result.error, true);
 });
 
@@ -66,9 +66,16 @@ Deno.test("cron is gated on multi-agent mode", () => {
 });
 
 Deno.test("cron rejects an unknown subcommand", () => {
-  const { commands } = stub(true);
-  const result = commands.cron(["/cron", "bogus"]);
-  assertEquals(result.error, true);
+  // The cron store opens the shared session database: keep it inside a temp
+  // config dir so tests never touch the developer's real sessions.db.
+  const iso = isolateConfigDir();
+  try {
+    const { commands } = stub(true);
+    const result = commands.cron(["/cron", "bogus"]);
+    assertEquals(result.error, true);
+  } finally {
+    iso.restore();
+  }
 });
 
 /**
@@ -108,6 +115,35 @@ Deno.test("previewPastedImage reports when nothing was pasted", () => {
   const { commands } = stub();
   const result = commands.previewPastedImage();
   assertStringIncludes(result.message ?? "", "No image");
+});
+
+Deno.test("handleBTW asks the Core-owned transient query", async () => {
+  const settings = defaultSettings();
+  const service = createFakeTUIService();
+  await service.createSession({ workDir: Deno.cwd(), sessionId: "s1" });
+  service.transientAnswer = "stub side answer";
+  const session = {
+    translator: new Translator("en"),
+    settings,
+    workDir: Deno.cwd(),
+    mode: "yolo",
+    busy: false,
+    multiAgent: false,
+    providerName: "test-provider",
+    modelID: "test-model",
+    thinkingLevel: "off",
+    currentSessionID: () => "s1",
+    manager: { getSessionDir: () => "" },
+    controller: { addMessage: () => {} },
+    input: { insertText: () => {} },
+    service,
+  } as unknown as TuiSessionLike;
+  const commands = new TuiSessionCommands(session);
+  const result = await commands.handleBTW("/btw what is this?");
+  assertEquals(result.error, undefined, result.message);
+  assertStringIncludes(result.message ?? "", "stub side answer");
+  // A second overlapping query is rejected while the first is active.
+  assertEquals((await commands.handleBTW("")).message !== undefined, true);
 });
 
 Deno.test("systemInit refuses to run while the agent is busy", async () => {

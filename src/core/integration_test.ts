@@ -26,6 +26,7 @@ const EXPECTED_INFO: CoreInfo = {
   features: [
     CORE_METHODS.health,
     CORE_METHODS.info,
+    CORE_METHODS.shutdown,
     ...Object.values(CORE_RUNTIME_METHODS),
   ],
 };
@@ -226,5 +227,37 @@ Deno.test("concurrent Core clients share one locked registration and server", as
     }
 
     assertEquals(await new CoreRegistry(paths).read(), undefined);
+  });
+});
+
+Deno.test("a core.shutdown request stops the Core command and releases ownership", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const handle = await startCoreCommand(commandOptions(stateDir));
+    try {
+      assert(await new CoreRegistry(paths).read() !== undefined);
+
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        assertEquals(await client.shutdown(), { ok: true });
+      } finally {
+        await client.close();
+      }
+
+      // The request runs the same idempotent stop path as a termination
+      // signal: server stop, runtime close, registration removal, lock
+      // release, and a clean lifecycle exit code.
+      assertEquals(await handle.done, 0);
+      assertEquals(await new CoreRegistry(paths).read(), undefined);
+    } finally {
+      await handle.stop();
+    }
+
+    // The released lock lets a fresh Core own the same state directory.
+    const second = await startCoreCommand(commandOptions(stateDir));
+    try {
+      assert(await new CoreRegistry(paths).read() !== undefined);
+    } finally {
+      await second.stop();
+    }
   });
 });

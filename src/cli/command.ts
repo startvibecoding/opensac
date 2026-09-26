@@ -20,7 +20,11 @@ import {
 import { runACPCore, type RunOptions } from "../acp/run.ts";
 import { isStartupError } from "../acp/support.ts";
 import { executeDoctorCommand } from "./doctor.ts";
-import { runCoreCommand } from "./core.ts";
+import {
+  type CoreStopOutcome,
+  runCoreCommand,
+  stopCoreCommand,
+} from "./core.ts";
 import { executeKnowledgeMCPCommand } from "./knowledge_mcp.ts";
 import {
   defaultStatsOptions,
@@ -77,6 +81,7 @@ export function acpRunOptions(
     webSearch: flags.webSearch,
     browser: flags.browser,
     artifact: flags.artifact,
+    standalone: flags.acpStandalone,
     permissionTimeoutMs: resolveACPTimeout(
       flags.acpPermissionTimeout,
       "OPENSAC_ACP_PERMISSION_TIMEOUT",
@@ -198,6 +203,17 @@ export function createACPCommand(version: string): Command {
         ),
       },
     )
+    .option(
+      "--standalone",
+      "Run against an isolated private Core instead of the shared Core",
+      {
+        action: boolSetter(
+          flags as unknown as Record<string, unknown>,
+          "acpStandalone",
+          "standalone",
+        ),
+      },
+    )
     .action(async () => {
       try {
         await runACPCore(acpRunOptions(flags, version));
@@ -209,15 +225,71 @@ export function createACPCommand(version: string): Command {
   return cmd;
 }
 
+/** Injectable Core lifecycle entry points, mainly for dispatch tests. */
+export interface CoreCommandRunners {
+  /** Runs the long-lived Core host and returns its lifecycle exit code. */
+  start?: (version: string) => Promise<number>;
+  /** Stops a running Core and reports the outcome. */
+  stop?: (version: string) => Promise<CoreStopOutcome>;
+}
+
 /** Builds the shared Core lifecycle subcommand. */
-export function createCoreCommand(version = currentVersion()): Command {
-  return new Command()
+export function createCoreCommand(
+  version = currentVersion(),
+  runners: CoreCommandRunners = {},
+): Command {
+  const start = runners.start ??
+    ((v: string) => runCoreCommand({ version: v }));
+  const stop = runners.stop ?? ((v: string) => stopCoreCommand({ version: v }));
+  const command = new Command()
     .description("Start the shared OpenSAC Core (not a UI-specific server)")
+    .noExit();
+  // Cliffy 1.3.x resolves subcommands only when the action is registered
+  // before the subcommands; registering `stop` first would run this action
+  // for `opensac core stop` and show help for bare `opensac core`.
+  command.action(async () => {
+    const exitCode = await start(version);
+    if (exitCode !== 0) Deno.exit(exitCode);
+  });
+  command.command("stop", createCoreStopCommand(stop, version));
+  return command as unknown as Command;
+}
+
+/** Builds the `core stop` lifecycle subcommand. */
+function createCoreStopCommand(
+  stop: (version: string) => Promise<CoreStopOutcome>,
+  version = currentVersion(),
+): Command {
+  return new Command()
+    .description("Stop the running shared OpenSAC Core")
     .noExit()
     .action(async () => {
-      const exitCode = await runCoreCommand({ version });
-      if (exitCode !== 0) Deno.exit(exitCode);
-    });
+      try {
+        const outcome = await stop(version);
+        if (outcome.status === "absent") {
+          console.log("No running OpenSAC Core.");
+          return;
+        }
+        if (!outcome.exited) {
+          console.log(
+            "OpenSAC Core shutdown requested; it is still exiting.",
+          );
+          return;
+        }
+        console.log(
+          outcome.signalled
+            ? "OpenSAC Core stopped (SIGTERM fallback for an older Core build)."
+            : "OpenSAC Core stopped.",
+        );
+      } catch (error) {
+        console.error(
+          `opensac core stop failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        Deno.exit(1);
+      }
+    }) as unknown as Command;
 }
 
 /** Builds the `doctor` subcommand. */

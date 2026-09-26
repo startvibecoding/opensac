@@ -1,8 +1,17 @@
 // deno-lint-ignore-file require-await -- async fake runtime models the Promise-based Runtime seam
-import { assertEquals, assertRejects } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+} from "@std/assert";
 import { encodeBase64 } from "@std/encoding/base64";
 import { join } from "@std/path";
-import { defaultSettings, type Settings } from "../config/settings.ts";
+import {
+  defaultSettings,
+  getSessionDir,
+  type Settings,
+} from "../config/settings.ts";
 import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import { knowledgeBaseCronJobID } from "../agentruntime/knowledge_cron.ts";
 import {
@@ -16,6 +25,8 @@ import {
   type DeliveryOperation,
   type DeliveryPlan,
   getDeliveryOperation,
+  getExecutionIntent,
+  openByIDExact,
   updateDeliveryOperation,
 } from "../session/mod.ts";
 import {
@@ -23,9 +34,15 @@ import {
   RunStore,
   SessionRunEventSink,
 } from "../agentruntime/mod.ts";
+import { getDurableRun } from "../agentruntime/run_queries.ts";
 import { create as createFactoryProvider } from "../provider/factory/factory.ts";
 import { MockProvider } from "../provider/mock.ts";
-import { type Model, streamDone, streamTextDelta } from "../provider/types.ts";
+import {
+  type Model,
+  streamDone,
+  streamError,
+  streamTextDelta,
+} from "../provider/types.ts";
 import { SOURCE_ACP } from "../agentruntime/source.ts";
 import type { Service as SkillHubService } from "../skillhub/mod.ts";
 import { AttachmentService } from "../agentruntime/input.ts";
@@ -41,6 +58,10 @@ import type {
   CoreRuntimeHostOptions,
   CoreSessionRuntime,
 } from "./runtime.ts";
+import {
+  testWithIsolatedConfig as test,
+  withIsolatedConfig,
+} from "../test_helpers.ts";
 
 class FakeSessionRuntime implements CoreSessionRuntime {
   readonly sessionId: string;
@@ -213,7 +234,7 @@ function seedFailedDelivery(sessionDir: string, failureCode: string): {
   return { sessionId, operationId };
 }
 
-Deno.test("production Core dependencies create and close a persisted session", async () => {
+test("production Core dependencies create and close a persisted session", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-production-",
   });
@@ -235,7 +256,46 @@ Deno.test("production Core dependencies create and close a persisted session", a
   }
 });
 
-Deno.test("production Core dependencies execute a prompt with a provider", async () => {
+test("Core-owned session identity is minted, listed, and reopens with its persisted mode", async () => {
+  const workDir = await Deno.makeTempDir({
+    prefix: "opensac-core-identity-",
+  });
+  try {
+    const settings = defaultSettings();
+    const host = await createCoreRuntimeHost({
+      source: SOURCE_ACP,
+      workDir,
+      settings,
+      providerName: "",
+      modelID: "",
+      dependencies: createProductionCoreRuntimeDependencies(settings),
+    });
+    const session = await host.createSession({ workDir });
+    assert(session.sessionId !== "", "the Core mints the persisted identity");
+    // The identity is persisted eagerly: it appears in the persisted listing
+    // before any prompt ran and survives close/reopen (TUI session switching).
+    const listed = await host.listPersistedSessions({ workDir });
+    assert(
+      listed.some((entry) => entry.sessionId === session.sessionId),
+      `expected ${session.sessionId} in ${JSON.stringify(listed)}`,
+    );
+    // Persisted session facts (work directory and mode) reach the view on
+    // open instead of being resolved by a front-end.
+    const manager = openByIDExact(getSessionDir(settings), session.sessionId);
+    manager.appendModeChange("plan");
+    await host.closeSession({ sessionId: session.sessionId });
+    const reopened = await host.openSession({ sessionId: session.sessionId });
+    assertEquals(reopened.sessionId, session.sessionId);
+    assertEquals(reopened.workDir, workDir);
+    assertEquals(reopened.mode, "plan");
+    await host.close();
+  } finally {
+    await Deno.remove(workDir, { recursive: true });
+    closeDatabases();
+  }
+});
+
+test("production Core dependencies execute a prompt with a provider", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-prompt-" });
   const model: Model = {
     id: "mock-model",
@@ -288,7 +348,7 @@ Deno.test("production Core dependencies execute a prompt with a provider", async
   }
 });
 
-Deno.test("Core Runtime Host consumes SessionRuntime event streams", async () => {
+test("Core Runtime Host consumes SessionRuntime event streams", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-stream-" });
   try {
     const observed: CoreRuntimeEvent[] = [];
@@ -328,7 +388,7 @@ Deno.test("Core Runtime Host consumes SessionRuntime event streams", async () =>
   }
 });
 
-Deno.test("production Core extension handler owns project, attachment, doctor, and env surfaces", async () => {
+test("production Core extension handler owns project, attachment, doctor, and env surfaces", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-extension-" });
   try {
     const settings = defaultSettings();
@@ -525,7 +585,7 @@ Deno.test("production Core extension handler owns project, attachment, doctor, a
   }
 });
 
-Deno.test("production Core settings patch persists allowed defaults", async () => {
+test("production Core settings patch persists allowed defaults", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-settings-" });
   const previous = Deno.env.get("OPENSAC_DIR");
   Deno.env.set("OPENSAC_DIR", workDir);
@@ -551,7 +611,7 @@ Deno.test("production Core settings patch persists allowed defaults", async () =
   }
 });
 
-Deno.test("production Core stats summary returns an empty aggregate without stats DB", async () => {
+test("production Core stats summary returns an empty aggregate without stats DB", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-stats-summary-",
   });
@@ -576,7 +636,7 @@ Deno.test("production Core stats summary returns an empty aggregate without stat
   }
 });
 
-Deno.test("production Core stats timeseries returns an empty series without stats DB", async () => {
+test("production Core stats timeseries returns an empty series without stats DB", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-stats-series-",
   });
@@ -599,7 +659,7 @@ Deno.test("production Core stats timeseries returns an empty series without stat
   }
 });
 
-Deno.test("production Core memory get and put round trip", async () => {
+test("production Core memory get and put round trip", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-memory-" });
   const previous = Deno.env.get("OPENSAC_DIR");
   Deno.env.set("OPENSAC_DIR", workDir);
@@ -673,7 +733,7 @@ Deno.test("production Core memory get and put round trip", async () => {
   }
 });
 
-Deno.test("production Core knowledge bases create/list/get/update/delete", async () => {
+test("production Core knowledge bases create/list/get/update/delete", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-knowledge-" });
   try {
     const rootDir = join(workDir, "docs");
@@ -760,7 +820,7 @@ Deno.test("production Core knowledge bases create/list/get/update/delete", async
   }
 });
 
-Deno.test("production Core knowledge scan starts a cached background index", async () => {
+test("production Core knowledge scan starts a cached background index", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-knowledge-scan-",
   });
@@ -818,7 +878,7 @@ Deno.test("production Core knowledge scan starts a cached background index", asy
   }
 });
 
-Deno.test("production Core knowledge query requires an indexed base", async () => {
+test("production Core knowledge query requires an indexed base", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-knowledge-query-",
   });
@@ -861,7 +921,7 @@ Deno.test("production Core knowledge query requires an indexed base", async () =
   }
 });
 
-Deno.test("production Core knowledge MCP apply writes the canonical server", async () => {
+test("production Core knowledge MCP apply writes the canonical server", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-knowledge-mcp-",
   });
@@ -912,7 +972,7 @@ Deno.test("production Core knowledge MCP apply writes the canonical server", asy
   }
 });
 
-Deno.test("production Core SkillHub settings stay secret-safe across patch", async () => {
+test("production Core SkillHub settings stay secret-safe across patch", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-skillhub-settings-",
   });
@@ -979,7 +1039,7 @@ Deno.test("production Core SkillHub settings stay secret-safe across patch", asy
   }
 });
 
-Deno.test("production Core SkillHub markets project the Core catalog", async () => {
+test("production Core SkillHub markets project the Core catalog", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-skillhub-catalog-",
   });
@@ -1002,7 +1062,7 @@ Deno.test("production Core SkillHub markets project the Core catalog", async () 
   }
 });
 
-Deno.test("production Core SkillHub mutations delegate to the Core service", async () => {
+test("production Core SkillHub mutations delegate to the Core service", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-skillhub-mutation-",
   });
@@ -1063,7 +1123,7 @@ Deno.test("production Core SkillHub mutations delegate to the Core service", asy
   }
 });
 
-Deno.test("production Core cron run delegates execution to the Core runner", async () => {
+test("production Core cron run delegates execution to the Core runner", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-cron-run-" });
   try {
     const settings = defaultSettings();
@@ -1095,7 +1155,7 @@ Deno.test("production Core cron run delegates execution to the Core runner", asy
   }
 });
 
-Deno.test("production Core cron list/create/update/remove persists jobs", async () => {
+test("production Core cron list/create/update/remove persists jobs", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-cron-" });
   try {
     const settings = defaultSettings();
@@ -1161,7 +1221,7 @@ Deno.test("production Core cron list/create/update/remove persists jobs", async 
   }
 });
 
-Deno.test("production Core deliveries list and retry failed operations", async () => {
+test("production Core deliveries list and retry failed operations", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-deliveries-",
   });
@@ -1200,7 +1260,7 @@ Deno.test("production Core deliveries list and retry failed operations", async (
   }
 });
 
-Deno.test("production Core MCP set replaces servers without leaking secrets", async () => {
+test("production Core MCP set replaces servers without leaking secrets", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-mcp-set-" });
   const previous = Deno.env.get("OPENSAC_DIR");
   Deno.env.set("OPENSAC_DIR", workDir);
@@ -1249,7 +1309,7 @@ Deno.test("production Core MCP set replaces servers without leaking secrets", as
   }
 });
 
-Deno.test("production Core MCP list projects global configuration", async () => {
+test("production Core MCP list projects global configuration", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-mcp-list-" });
   const previous = Deno.env.get("OPENSAC_DIR");
   Deno.env.set("OPENSAC_DIR", workDir);
@@ -1293,7 +1353,7 @@ Deno.test("production Core MCP list projects global configuration", async () => 
   }
 });
 
-Deno.test("production Core skills list projects shared skill state", async () => {
+test("production Core skills list projects shared skill state", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-skills-list-",
   });
@@ -1332,7 +1392,7 @@ Deno.test("production Core skills list projects shared skill state", async () =>
   }
 });
 
-Deno.test("production Core skills set persists disabled state", async () => {
+test("production Core skills set persists disabled state", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-skills-set-",
   });
@@ -1368,7 +1428,7 @@ Deno.test("production Core skills set persists disabled state", async () => {
   }
 });
 
-Deno.test("production Core application get returns a secret-safe settings view", async () => {
+test("production Core application get returns a secret-safe settings view", async () => {
   const settings = defaultSettings();
   settings.defaultMode = "plan";
   settings.enablePlanTool = true;
@@ -1415,7 +1475,7 @@ Deno.test("production Core application get returns a secret-safe settings view",
   assertEquals(JSON.stringify(result).includes("secret-image-token"), false);
 });
 
-Deno.test("production Core application patch persists allowed sections", async () => {
+test("production Core application patch persists allowed sections", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-application-patch-",
   });
@@ -1461,7 +1521,7 @@ Deno.test("production Core application patch persists allowed sections", async (
   }
 });
 
-Deno.test("production Core provider discovery uses the Core provider boundary", async () => {
+test("production Core provider discovery uses the Core provider boundary", async () => {
   const server = Deno.serve(
     { hostname: "127.0.0.1", port: 0 },
     (request) => {
@@ -1510,7 +1570,7 @@ Deno.test("production Core provider discovery uses the Core provider boundary", 
   }
 });
 
-Deno.test("production Core provider test pings through the Core provider factory", async () => {
+test("production Core provider test pings through the Core provider factory", async () => {
   const model = {
     id: "fake-model",
     name: "Fake",
@@ -1554,7 +1614,7 @@ Deno.test("production Core provider test pings through the Core provider factory
   assertEquals(result.latencyMs >= 0, true);
 });
 
-Deno.test("production Core provider save persists a secret-safe catalog", async () => {
+test("production Core provider save persists a secret-safe catalog", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-provider-save-",
   });
@@ -1583,11 +1643,13 @@ Deno.test("production Core provider save persists a secret-safe catalog", async 
         modelCount: number;
         maskedKey: string;
         apiKeyConfigured: boolean;
+        models?: { id: string; name: string }[];
       }[];
     }).providers.find((provider) => provider.name === "custom");
     assertEquals(custom, {
       name: "custom",
       modelCount: 1,
+      models: [{ id: "custom-model", name: "Custom" }],
       maskedKey: "sec***key",
       apiKeyConfigured: true,
     });
@@ -1603,7 +1665,7 @@ Deno.test("production Core provider save persists a secret-safe catalog", async 
   }
 });
 
-Deno.test("production Core provider delete removes a global override", async () => {
+test("production Core provider delete removes a global override", async () => {
   const workDir = await Deno.makeTempDir({
     prefix: "opensac-core-provider-delete-",
   });
@@ -1647,7 +1709,7 @@ Deno.test("production Core provider delete removes a global override", async () 
   }
 });
 
-Deno.test("Core Runtime Host forwards reverse-request transport to session runtimes", async () => {
+test("Core Runtime Host forwards reverse-request transport to session runtimes", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-reverse-" });
   let received: unknown;
   try {
@@ -1674,7 +1736,7 @@ Deno.test("Core Runtime Host forwards reverse-request transport to session runti
   }
 });
 
-Deno.test("Core Runtime Host opens a persisted session through its factory", async () => {
+test("Core Runtime Host opens a persisted session through its factory", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-open-" });
   const opened: string[] = [];
   try {
@@ -1702,7 +1764,7 @@ Deno.test("Core Runtime Host opens a persisted session through its factory", asy
   }
 });
 
-Deno.test("Core Runtime Host creates, prompts, cancels, and closes one session runtime", async () => {
+test("Core Runtime Host creates, prompts, cancels, and closes one session runtime", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-host-" });
   const created: FakeSessionRuntime[] = [];
   const options: CoreRuntimeHostOptions = {
@@ -1759,7 +1821,7 @@ Deno.test("Core Runtime Host creates, prompts, cancels, and closes one session r
   }
 });
 
-Deno.test("Core Runtime Host reuses the runtime for a session opened again", async () => {
+test("Core Runtime Host reuses the runtime for a session opened again", async () => {
   const workDir = await Deno.makeTempDir({ prefix: "opensac-core-host-" });
   const created: FakeSessionRuntime[] = [];
 
@@ -1791,3 +1853,777 @@ Deno.test("Core Runtime Host reuses the runtime for a session opened again", asy
     await Deno.remove(workDir, { recursive: true });
   }
 });
+
+test("Core Runtime Host routes skill, prepared-input, and capability projections", async () => {
+  const workDir = await Deno.makeTempDir({ prefix: "opensac-core-host-" });
+  try {
+    class CapabilityRuntime extends FakeSessionRuntime {
+      skill: { name: string; active: boolean } | undefined;
+
+      setSkillActive(
+        input: { name: string; active: boolean },
+      ): Promise<void> {
+        this.skill = input;
+        return Promise.resolve();
+      }
+
+      listSkills() {
+        return Promise.resolve([{
+          name: "review",
+          source: "project",
+          description: "Review skill",
+          active: this.skill?.active === true,
+        }]);
+      }
+
+      prepareInput(input: { name: string; mediaType: string }) {
+        return Promise.resolve({
+          resourceId: "resource-1",
+          kind: "image",
+          relativePath: ".opensac/inputs/resource-1",
+          filename: input.name,
+          mediaType: input.mediaType,
+          bytes: 2,
+        });
+      }
+
+      capabilityView() {
+        return Promise.resolve({
+          sandbox: { enabled: true, available: true },
+        });
+      }
+    }
+    const created: CapabilityRuntime[] = [];
+    const host = await createCoreRuntimeHost({
+      source: SOURCE_ACP,
+      workDir,
+      settings: defaultSettings(),
+      providerName: "test-provider",
+      modelID: "test-model",
+      dependencies: {
+        createSessionRuntime: (input) => {
+          const runtime = new CapabilityRuntime(input.sessionId);
+          created.push(runtime);
+          return runtime;
+        },
+      },
+    });
+    const session = await host.createSession({ workDir });
+
+    assertEquals(
+      await host.listSessionSkills({
+        sessionId: session.sessionId,
+      }),
+      [{
+        name: "review",
+        source: "project",
+        description: "Review skill",
+        active: false,
+      }],
+    );
+    await host.setSessionSkill?.({
+      sessionId: session.sessionId,
+      name: "review",
+      active: true,
+    });
+    assertEquals(created[0].skill, { name: "review", active: true });
+    assertEquals(
+      await host.listSessionSkills({
+        sessionId: session.sessionId,
+      }),
+      [{
+        name: "review",
+        source: "project",
+        description: "Review skill",
+        active: true,
+      }],
+    );
+
+    assertEquals(
+      await host.prepareInput({
+        sessionId: session.sessionId,
+        name: "clipboard.png",
+        mediaType: "image/png",
+        contentBase64: "aGk=",
+      }),
+      {
+        resourceId: "resource-1",
+        kind: "image",
+        relativePath: ".opensac/inputs/resource-1",
+        filename: "clipboard.png",
+        mediaType: "image/png",
+        bytes: 2,
+      },
+    );
+    assertEquals(
+      await host.sessionCapabilities({
+        sessionId: session.sessionId,
+      }),
+      { sandbox: { enabled: true, available: true } },
+    );
+
+    await host.close();
+  } finally {
+    await Deno.remove(workDir, { recursive: true });
+  }
+});
+
+test("production Core settings, env, and catalog documents round-trip through the host", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({ prefix: "opensac-core-docs-" });
+    try {
+      const settings = defaultSettings();
+      settings.sessionDir = join(workDir, "sessions");
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_ACP,
+        workDir,
+        settings,
+        providerName: "",
+        modelID: "",
+        dependencies: createProductionCoreRuntimeDependencies(settings),
+      });
+
+      // Effective and global documents read fresh from disk.
+      const effective = await host.settingsDocument({
+        scope: "effective",
+        workDir,
+      });
+      assertEquals(effective.defaultMode, "yolo");
+      const global = await host.settingsDocument({ scope: "global" });
+      assertEquals(global.defaultProvider, undefined);
+
+      // A sparse global patch persists and refreshes the shared snapshot the
+      // Core closures hold (the settings staleness fix).
+      const updated = await host.updateSettingsDocument({
+        scope: "global",
+        updates: {
+          defaultProvider: "custom-x",
+          defaultModel: "custom-model",
+        },
+        workDir,
+      });
+      assertEquals(updated.defaultProvider, "custom-x");
+      assertEquals(settings.defaultProvider, "custom-x");
+
+      // Project patches land in the work directory's project settings.
+      await host.updateSettingsDocument({
+        scope: "project",
+        updates: { defaultMode: "agent" },
+        workDir,
+      });
+      assertEquals(
+        (await host.settingsDocument({ scope: "effective", workDir }))
+          .defaultMode,
+        "agent",
+      );
+
+      // The catalog covers built-in presets with their resolved models.
+      const catalog = await host.providerCatalog({ workDir });
+      const preset = catalog.find((entry) => entry.id === "deepseek-openai");
+      assert(preset !== undefined);
+      assertEquals(preset.isDefault, false);
+      assert(preset.models.length > 0);
+
+      // Pair validation resolves through the factory and reports raw causes.
+      await host.validateProviderModel({
+        providerID: "deepseek-openai",
+        modelID: "deepseek-v4-flash",
+        workDir,
+      });
+      const failure = await assertRejects(() =>
+        host.validateProviderModel({
+          providerID: "nope",
+          modelID: "nope",
+          workDir,
+        })
+      );
+      assertStringIncludes(
+        (failure as Error).message,
+        "unknown provider: nope",
+      );
+
+      // Env documents replace wholesale: missing names are removed.
+      assertEquals(await host.envDocument(), {});
+      assertEquals(await host.updateEnvDocument({ vars: { A: "1", B: "2" } }), {
+        A: "1",
+        B: "2",
+      });
+      assertEquals(await host.updateEnvDocument({ vars: { B: "3" } }), {
+        B: "3",
+      });
+
+      await host.close();
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
+});
+
+test("production Core session context updates rule and extra context", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({ prefix: "opensac-core-context-" });
+    const model: Model = {
+      id: "mock-model",
+      name: "Mock Model",
+      provider: "mock",
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 8192,
+      maxTokens: 1024,
+    };
+    const provider = new MockProvider("mock", [model], [
+      { type: streamTextDelta, textDelta: "hello" },
+      { type: streamDone, stopReason: "end_turn" },
+    ]);
+    try {
+      const settings = defaultSettings();
+      settings.sessionDir = join(workDir, "sessions");
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_ACP,
+        workDir,
+        settings,
+        providerName: "mock",
+        modelID: model.id,
+        dependencies: createProductionCoreRuntimeDependencies(
+          settings,
+          () => ({ provider, model }),
+        ),
+      });
+      const session = await host.createSession({ workDir });
+      const updated = await host.setSessionContext({
+        sessionId: session.sessionId,
+        ruleContent: "rules",
+        extraContext: "extra",
+      });
+      assertEquals(updated, { ruleContent: "rules", extraContext: "extra" });
+      assertEquals(
+        await host.sessionContext({ sessionId: session.sessionId }),
+        {
+          ruleContent: "rules",
+          extraContext: "extra",
+        },
+      );
+      // Absent fields keep their current value.
+      const merged = await host.setSessionContext({
+        sessionId: session.sessionId,
+        extraContext: "more",
+      });
+      assertEquals(merged, { ruleContent: "rules", extraContext: "more" });
+      await host.close();
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
+});
+
+test("production Core expert binding and fork stay Core-owned", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({ prefix: "opensac-core-expert-" });
+    const model: Model = {
+      id: "mock-model",
+      name: "Mock Model",
+      provider: "mock",
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 8192,
+      maxTokens: 1024,
+    };
+    const provider = new MockProvider("mock", [model], [
+      { type: streamTextDelta, textDelta: "hello" },
+      { type: streamDone, stopReason: "end_turn" },
+    ]);
+    try {
+      const settings = defaultSettings();
+      settings.sessionDir = join(workDir, "sessions");
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_ACP,
+        workDir,
+        settings,
+        providerName: "mock",
+        modelID: model.id,
+        dependencies: createProductionCoreRuntimeDependencies(
+          settings,
+          () => ({ provider, model }),
+        ),
+      });
+      const session = await host.createSession({ workDir });
+
+      // Forking needs one completed conversation turn in the source session.
+      const accepted = await host.prompt({
+        sessionId: session.sessionId,
+        text: "hi",
+      });
+      const drained: CoreRuntimeEvent[] = [];
+      for await (
+        const event of host.subscribeRunEvents(
+          session.sessionId,
+          accepted.runId,
+        )
+      ) {
+        drained.push(event);
+      }
+      assertEquals(drained.at(-1)?.terminal, true);
+
+      // Built-in expert bundles are discoverable through the neutral surface.
+      const experts = await host.listExperts({
+        sessionId: session.sessionId,
+      });
+      assert(experts.length > 0);
+      const builtin = experts.find((entry) => entry.source === "builtin");
+      assert(builtin !== undefined);
+      const bundle = await host.inspectExpert({
+        sessionId: session.sessionId,
+        expertId: builtin.name,
+      });
+      assertEquals(bundle.name, builtin.name);
+
+      // Binding persists on the session and unbinding clears it.
+      assertEquals(
+        await host.expertState({ sessionId: session.sessionId }),
+        { expertId: "" },
+      );
+      assertEquals(
+        await host.setExpert({
+          sessionId: session.sessionId,
+          expertId: builtin.name,
+        }),
+        { expertId: builtin.name },
+      );
+      const other = experts.find((entry) =>
+        entry.name !== builtin.name && entry.invalid !== true
+      );
+      if (other !== undefined) {
+        // Switching one bound expert to another requires a fork.
+        await assertRejects(() =>
+          host.setExpert({
+            sessionId: session.sessionId,
+            expertId: other.name,
+          })
+        );
+        // The Core-owned fork applies the expert only to the child branch.
+        const child = await host.forkSession({
+          sessionId: session.sessionId,
+          expertId: other.name,
+          titleMode: "",
+        });
+        assert(child.sessionId !== session.sessionId);
+        assertEquals(
+          await host.expertState({ sessionId: session.sessionId }),
+          { expertId: builtin.name },
+        );
+        assertEquals(
+          await host.expertState({ sessionId: child.sessionId }),
+          { expertId: other.name },
+        );
+      }
+      assertEquals(
+        await host.setExpert({ sessionId: session.sessionId, expertId: "" }),
+        { expertId: "" },
+      );
+      await host.close();
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
+});
+
+/** Records the tool surface of the latest chat request. */
+class RecordingProvider extends MockProvider {
+  lastToolNames: string[] = [];
+
+  override async *chat(
+    params: import("../provider/types.ts").ChatParams,
+  ): AsyncGenerator<import("../provider/types.ts").StreamEvent> {
+    this.lastToolNames = (params.tools ?? []).map((tool) => tool.name);
+    yield* super.chat(params);
+  }
+}
+
+/** Holds the chat stream open until the run aborts (long-role simulation). */
+class HangingProvider extends MockProvider {
+  override async *chat(
+    params: import("../provider/types.ts").ChatParams,
+  ): AsyncGenerator<import("../provider/types.ts").StreamEvent> {
+    await new Promise<void>((resolve) => {
+      if (params.abort?.aborted === true) {
+        resolve();
+        return;
+      }
+      params.abort?.addEventListener("abort", () => resolve(), { once: true });
+    });
+    yield {
+      type: streamError,
+      error: new DOMException("The operation was aborted.", "AbortError"),
+    };
+  }
+}
+
+const CORE_TEST_MODEL: Model = {
+  id: "mock-model",
+  name: "Mock Model",
+  provider: "mock",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 8192,
+  maxTokens: 1024,
+};
+
+test(
+  "production Core delegate toggle registers the blocking tool on the shared registry",
+  () =>
+    withIsolatedConfig(async () => {
+      const workDir = await Deno.makeTempDir({
+        prefix: "opensac-core-delegate-",
+      });
+      const model = CORE_TEST_MODEL;
+      const recording = new RecordingProvider("mock", [model], [
+        { type: streamTextDelta, textDelta: "hello" },
+        { type: streamDone, stopReason: "end_turn" },
+      ]);
+      try {
+        const settings = defaultSettings();
+        settings.sessionDir = join(workDir, "sessions");
+        const host = await createCoreRuntimeHost({
+          source: SOURCE_ACP,
+          workDir,
+          settings,
+          providerName: "mock",
+          modelID: model.id,
+          dependencies: createProductionCoreRuntimeDependencies(
+            settings,
+            () => ({ provider: recording, model }),
+          ),
+        });
+        const session = await host.createSession({ workDir });
+        assertEquals(
+          await host.delegateState({ sessionId: session.sessionId }),
+          { enabled: false },
+        );
+        assertEquals(
+          await host.setDelegate({
+            sessionId: session.sessionId,
+            enabled: true,
+          }),
+          { enabled: true },
+        );
+        assertEquals(
+          await host.listAgents({ sessionId: session.sessionId }),
+          [],
+        );
+
+        // The blocking delegate tool joins every prompt's tool surface once
+        // enabled and disappears again after disabling.
+        const first = await host.prompt({
+          sessionId: session.sessionId,
+          text: "hi",
+        });
+        for await (
+          const _event of host.subscribeRunEvents(
+            session.sessionId,
+            first.runId,
+          )
+        ) {
+          // drain
+        }
+        assert(recording.lastToolNames.includes("delegate_subagent"));
+
+        assertEquals(
+          await host.setDelegate({
+            sessionId: session.sessionId,
+            enabled: false,
+          }),
+          { enabled: false },
+        );
+        const second = await host.prompt({
+          sessionId: session.sessionId,
+          text: "again",
+        });
+        for await (
+          const _event of host.subscribeRunEvents(
+            session.sessionId,
+            second.runId,
+          )
+        ) {
+          // drain
+        }
+        assert(!recording.lastToolNames.includes("delegate_subagent"));
+        await host.close();
+      } finally {
+        await Deno.remove(workDir, { recursive: true });
+      }
+    }),
+);
+
+test(
+  "production Core ESM supervisor state and continuation are Core-owned",
+  () =>
+    withIsolatedConfig(async () => {
+      const workDir = await Deno.makeTempDir({ prefix: "opensac-core-esm-" });
+      const model = CORE_TEST_MODEL;
+      const hanging = new HangingProvider("mock", [model], []);
+      try {
+        const settings = defaultSettings();
+        settings.sessionDir = join(workDir, "sessions");
+        const host = await createCoreRuntimeHost({
+          source: SOURCE_ACP,
+          workDir,
+          settings,
+          providerName: "mock",
+          modelID: model.id,
+          dependencies: createProductionCoreRuntimeDependencies(
+            settings,
+            () => ({ provider: hanging, model }),
+          ),
+        });
+        const session = await host.createSession({ workDir });
+        assertEquals(await host.esmState({ sessionId: session.sessionId }), {
+          objective: null,
+          workerRunning: false,
+          activeAgentId: "",
+        });
+        const created = await host.esmUpdate({
+          sessionId: session.sessionId,
+          action: "create",
+          objective: "ship the release",
+        });
+        assertEquals(created.objective?.objective, "ship the release");
+        assertEquals(created.objective?.status, "active");
+
+        // A paused objective cannot auto-run: no continuation starts.
+        const paused = await host.esmUpdate({
+          sessionId: session.sessionId,
+          action: "pause",
+        });
+        assertEquals(paused.objective?.status, "paused");
+        assertEquals(
+          await host.esmContinue({ sessionId: session.sessionId }),
+          { runId: "", started: false },
+        );
+
+        // Resuming starts the Core-owned worker; stopping terminalizes it.
+        await host.esmUpdate({
+          sessionId: session.sessionId,
+          action: "resume",
+        });
+        const continuation = await host.esmContinue({
+          sessionId: session.sessionId,
+        });
+        assertEquals(continuation.started, true);
+        assert(continuation.runId !== "");
+        assertEquals(
+          (await host.esmState({ sessionId: session.sessionId })).workerRunning,
+          true,
+        );
+        const events: CoreRuntimeEvent[] = [];
+        const drain = (async () => {
+          for await (
+            const event of host.subscribeRunEvents(
+              session.sessionId,
+              continuation.runId,
+            )
+          ) {
+            events.push(event);
+          }
+        })();
+        await host.esmStop({ sessionId: session.sessionId });
+        await drain;
+        assertEquals(events.at(-1)?.eventType, "esm_finished");
+        assertEquals(events.at(-1)?.payload.status, "cancelled");
+        assertEquals(
+          (await host.esmState({ sessionId: session.sessionId })).workerRunning,
+          false,
+        );
+        await host.close();
+      } finally {
+        await Deno.remove(workDir, { recursive: true });
+      }
+    }),
+);
+
+test(
+  "production Core transient prompt answers over a read-only registry",
+  () =>
+    withIsolatedConfig(async () => {
+      const workDir = await Deno.makeTempDir({
+        prefix: "opensac-core-transient-",
+      });
+      const model = CORE_TEST_MODEL;
+      const provider = new MockProvider("mock", [model], [
+        { type: streamTextDelta, textDelta: "hello" },
+        { type: streamDone, stopReason: "end_turn" },
+      ]);
+      try {
+        const settings = defaultSettings();
+        settings.sessionDir = join(workDir, "sessions");
+        const host = await createCoreRuntimeHost({
+          source: SOURCE_ACP,
+          workDir,
+          settings,
+          providerName: "mock",
+          modelID: model.id,
+          dependencies: createProductionCoreRuntimeDependencies(
+            settings,
+            () => ({ provider, model }),
+          ),
+        });
+        const session = await host.createSession({ workDir });
+        const result = await host.transientPrompt({
+          sessionId: session.sessionId,
+          question: "what is this?",
+        });
+        assertEquals(result.answer, "hello");
+        await host.close();
+      } finally {
+        await Deno.remove(workDir, { recursive: true });
+      }
+    }),
+);
+
+test(
+  "production Core compact runs as an event-only run",
+  () =>
+    withIsolatedConfig(async () => {
+      const workDir = await Deno.makeTempDir({
+        prefix: "opensac-core-compact-",
+      });
+      const model = CORE_TEST_MODEL;
+      const provider = new MockProvider("mock", [model], [
+        { type: streamTextDelta, textDelta: "summary" },
+        { type: streamDone, stopReason: "end_turn" },
+      ]);
+      try {
+        const settings = defaultSettings();
+        settings.sessionDir = join(workDir, "sessions");
+        const host = await createCoreRuntimeHost({
+          source: SOURCE_ACP,
+          workDir,
+          settings,
+          providerName: "mock",
+          modelID: model.id,
+          dependencies: createProductionCoreRuntimeDependencies(
+            settings,
+            () => ({ provider, model }),
+          ),
+        });
+        const session = await host.createSession({ workDir });
+        // Without conversation history the compaction is a completed no-op.
+        const skipped = await host.compact({ sessionId: session.sessionId });
+        const skippedEvents: CoreRuntimeEvent[] = [];
+        for await (
+          const event of host.subscribeRunEvents(
+            session.sessionId,
+            skipped.runId,
+          )
+        ) {
+          skippedEvents.push(event);
+        }
+        assertEquals(skippedEvents.at(-1)?.eventType, "run_finished");
+        assertEquals(skippedEvents.at(-1)?.payload.compact, "skipped");
+
+        // After one conversation turn the compaction runs to completion.
+        const accepted = await host.prompt({
+          sessionId: session.sessionId,
+          text: "hi",
+        });
+        for await (
+          const _event of host.subscribeRunEvents(
+            session.sessionId,
+            accepted.runId,
+          )
+        ) {
+          // drain
+        }
+        const compacted = await host.compact({ sessionId: session.sessionId });
+        const compactedEvents: CoreRuntimeEvent[] = [];
+        for await (
+          const event of host.subscribeRunEvents(
+            session.sessionId,
+            compacted.runId,
+          )
+        ) {
+          compactedEvents.push(event);
+        }
+        const terminal = compactedEvents.at(-1);
+        assertEquals(terminal?.eventType, "run_finished");
+        assertEquals(terminal?.payload.status, "completed");
+        assertEquals(terminal?.payload.compact, "done");
+        await host.close();
+      } finally {
+        await Deno.remove(workDir, { recursive: true });
+      }
+    }),
+);
+
+test(
+  "production Core session source and run policy reach the canonical run record",
+  () =>
+    withIsolatedConfig(async () => {
+      const workDir = await Deno.makeTempDir({
+        prefix: "opensac-core-policy-",
+      });
+      const model = CORE_TEST_MODEL;
+      const provider = new MockProvider("mock", [model], [
+        { type: streamTextDelta, textDelta: "hello" },
+        { type: streamDone, stopReason: "end_turn" },
+      ]);
+      try {
+        const settings = defaultSettings();
+        settings.sessionDir = join(workDir, "sessions");
+        const host = await createCoreRuntimeHost({
+          source: SOURCE_ACP,
+          workDir,
+          settings,
+          providerName: "mock",
+          modelID: model.id,
+          dependencies: createProductionCoreRuntimeDependencies(
+            settings,
+            () => ({ provider, model }),
+          ),
+        });
+        const session = await host.createSession({
+          workDir,
+          source: "cli",
+          approvalPolicy: "print",
+          questionPolicy: "unattended",
+        });
+        assertEquals(session.source, "cli");
+        assertEquals(session.approvalPolicy, "print");
+        assertEquals(session.questionPolicy, "unattended");
+
+        const accepted = await host.prompt({
+          sessionId: session.sessionId,
+          text: "hi",
+        });
+        for await (
+          const _event of host.subscribeRunEvents(
+            session.sessionId,
+            accepted.runId,
+          )
+        ) {
+          // drain
+        }
+
+        // The canonical run and intent keep the source and decision policy.
+        const sessionDir = join(workDir, "sessions");
+        const run = getDurableRun(sessionDir, accepted.runId);
+        assert(run !== null);
+        assertEquals(run.source, "cli");
+        const intent = getExecutionIntent(sessionDir, run.intentId);
+        assert(intent !== null);
+        const policy = intent.policy as {
+          source: string;
+          approvalPolicy: string;
+          questionPolicy: string;
+        };
+        assertEquals(policy.source, "cli");
+        assertEquals(policy.approvalPolicy, "print");
+        assertEquals(policy.questionPolicy, "unattended");
+        await host.close();
+      } finally {
+        await Deno.remove(workDir, { recursive: true });
+      }
+    }),
+);

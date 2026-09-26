@@ -1,10 +1,8 @@
-// TUI host adapter for the shared ESM Supervisor, ported from the Go TUI's
-// esmRuntimeAdapter + runESMRoleAgentWithTimeoutForRole.
-//
-// Roles run as managed child agents on the session's shared AgentManager; the
-// child's events are forwarded into the AppController so the activity store
-// (and therefore the Ctrl+O detail panel and the ESM panel activity line) show
-// what each role agent is doing. ESM policy stays in src/esm.
+// Core-owned ESM role runner: executes supervisor roles as managed child
+// agents on the session's shared AgentManager and reports lifecycle/activity
+// through a neutral event sink. All ESM policy stays in src/esm; this adapter
+// only executes roles and projects host events, mirroring the TUI adapter it
+// replaces (Go esmRuntimeAdapter + runESMRoleAgentWithTimeoutForRole).
 
 import type { AgentAdapter } from "../agent/bridge.ts";
 import type { AgentManager } from "../agent/manager.ts";
@@ -42,34 +40,41 @@ import {
   type RuntimeEvent,
   type RuntimeEventSink,
 } from "../esm/mod.ts";
-import type { AppController } from "./app_controller.ts";
 
-/** The ESM role execution surface the adapter needs from the session. */
-export interface ESMRoleHost {
-  readonly controller: AppController;
+/** The neutral projection surface the adapter reports ESM activity through. */
+export interface ESMRoleEventSink {
+  /** True when the session's expert binding forces a team worker. */
   teamExpertActive(): boolean;
-  setESMActiveAgent(id: string): void;
-  clearESMActiveAgent(id: string): void;
+  /** Reports the child agent currently executing a role. */
+  setActiveAgent(agentId: string): void;
+  /** Clears the active-agent tracking when `agentId` is still active. */
+  clearActiveAgent(agentId: string): void;
+  /** Reports one child-agent activity event (canonical Agent event). */
+  publishRoleEvent(event: Event): void;
+  /** Reports one supervisor lifecycle message. */
+  publishMessage(message: string): void;
 }
 
 /**
- * TuiESMRuntimeAdapter executes ESM roles on the shared AgentManager and
- * projects lifecycle events into the TUI controller.
+ * Executes ESM roles on a shared AgentManager and projects lifecycle events
+ * through the sink. The Core Runtime Host owns the sink and translates
+ * reported events into canonical Core run events.
  */
-export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
+export class AgentManagerESMAdapter
+  implements RuntimeAdapter, RuntimeEventSink {
   #manager: AgentManager;
-  #host: ESMRoleHost;
+  #sink: ESMRoleEventSink;
   #workDir: string;
   #mode: string;
 
   constructor(
     manager: AgentManager,
-    host: ESMRoleHost,
+    sink: ESMRoleEventSink,
     workDir: string,
     mode: string,
   ) {
     this.#manager = manager;
-    this.#host = host;
+    this.#sink = sink;
     this.#workDir = workDir;
     this.#mode = mode;
   }
@@ -101,10 +106,10 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
     }
   }
 
-  /** Publishes a supervisor lifecycle message as a status row. */
+  /** Publishes a supervisor lifecycle message through the sink. */
   publishESMEvent(event: RuntimeEvent): void {
     if (event.message !== "") {
-      this.#host.controller.addMessage(event.message, "status");
+      this.#sink.publishMessage(event.message);
     }
   }
 
@@ -113,7 +118,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
     req: RoleRequest,
   ): Promise<RoleResult> {
     const started = new Date();
-    const teamWorker = req.role === roleWorker && this.#host.teamExpertActive();
+    const teamWorker = req.role === roleWorker && this.#sink.teamExpertActive();
     const opts: AgentOptions = {
       id: req.runId,
       isSubAgent: true,
@@ -128,7 +133,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
     };
     const child: AgentAdapter = this.#manager.create(opts);
     const childId = child.id();
-    this.#host.setESMActiveAgent(childId);
+    this.#sink.setActiveAgent(childId);
     try {
       this.#manager.markRunning(childId);
       const result: RoleResult = {
@@ -196,7 +201,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
       if (runErr !== undefined) throw runErr;
       return result;
     } finally {
-      this.#host.clearESMActiveAgent(childId);
+      this.#sink.clearActiveAgent(childId);
       try {
         this.#manager.destroy(childId);
       } catch {
@@ -205,7 +210,7 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
     }
   }
 
-  /** Maps one child event onto the internal event shape the controller folds. */
+  /** Maps one child event onto the canonical Agent event shape. */
   #publishRoleEvent(childId: string, ev: PublicEvent): void {
     let out: Event;
     switch (ev.type) {
@@ -255,6 +260,6 @@ export class TuiESMRuntimeAdapter implements RuntimeAdapter, RuntimeEventSink {
         return;
     }
     out.agentId = childId;
-    this.#host.controller.handleAgentEvent(out);
+    this.#sink.publishRoleEvent(out);
   }
 }

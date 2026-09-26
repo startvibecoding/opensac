@@ -13,9 +13,14 @@ import {
   SettingsDialog,
 } from "./dialogs.ts";
 import { defaultSettings } from "../config/settings.ts";
+import { resolvedModels } from "../provider/factory/factory.ts";
 import { Translator } from "./i18n.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
-import type { SessionDetail } from "../session/manager.ts";
+import type { TUISessionListEntry } from "./service.ts";
+import type {
+  TUIProviderCatalogEntry,
+  TUISettingsWriteScope,
+} from "./service.ts";
 
 interface Recorder {
   applied: Array<[string, string]>;
@@ -23,6 +28,18 @@ interface Recorder {
   switched: string[];
   created: number;
   deleted: string[];
+  saved: Array<
+    { scope: TUISettingsWriteScope; updates: Record<string, unknown> }
+  >;
+  savedEnv: Array<Record<string, string>>;
+  validated: Array<[string, string]>;
+  renders: number;
+}
+
+/** Lets fire-and-forget dialog persistence settle before assertions. */
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function host(overrides: Partial<DialogHost> = {}): {
@@ -36,20 +53,40 @@ function host(overrides: Partial<DialogHost> = {}): {
     switched: [],
     created: 0,
     deleted: [],
+    saved: [],
+    savedEnv: [],
+    validated: [],
+    renders: 0,
   };
   const base: DialogHost = {
     translator: new Translator("en"),
-    settings,
     workDir: Deno.cwd(),
     providerName: settings.defaultProvider ?? "",
     modelID: settings.defaultModel ?? "",
     allow: {},
-    sessionDir: () => "/tmp/nonexistent-sessions",
     currentSessionID: () => "s1",
+    listModels: (p) =>
+      resolvedModels(settings, p).map((m) => ({ id: m.id, name: m.name })),
     applyModel: (p, m) => void rec.applied.push([p, m]),
+    loadSettings: () => Promise.resolve({ ...settings }),
+    saveSettings: (scope, updates) => {
+      rec.saved.push({ scope, updates });
+      return Promise.resolve({ ...settings, ...updates });
+    },
+    validateProviderModel: (providerID, modelID) => {
+      rec.validated.push([providerID, modelID]);
+      return Promise.resolve();
+    },
+    listProviders: () => Promise.resolve(providerCatalog(settings)),
+    loadEnv: () => Promise.resolve({}),
+    saveEnv: (vars) => {
+      rec.savedEnv.push({ ...vars });
+      return Promise.resolve();
+    },
     reloadSettings: () => void rec.reloads++,
+    requestRender: () => void rec.renders++,
     switchSession: (d) => {
-      rec.switched.push(d.id);
+      rec.switched.push(d.sessionId);
       return Promise.resolve();
     },
     newSession: () => {
@@ -62,6 +99,25 @@ function host(overrides: Partial<DialogHost> = {}): {
     },
   };
   return { host: { ...base, ...overrides }, rec };
+}
+
+/** Builds one provider catalog projection from the default presets. */
+function providerCatalog(
+  settings: ReturnType<typeof defaultSettings>,
+): TUIProviderCatalogEntry[] {
+  const id = settings.defaultProvider ?? "";
+  return [{
+    id,
+    configured: true,
+    isDefault: true,
+    api: "openai-chat",
+    baseUrl: "",
+    modelCount: 1,
+    models: resolvedModels(settings, id).map((m) => ({
+      id: m.id,
+      name: m.name,
+    })),
+  }];
 }
 
 function feed(dialog: Dialog, chunk: string): void {
@@ -147,21 +203,43 @@ Deno.test("model dialog filters by typed query", () => {
   assertStringIncludes(view, "deepseek-v4-pro");
 });
 
-Deno.test("default-model dialog steps provider then model and persists", () => {
+/** Builds the Core projections one default-model dialog renders. */
+function defaultModelData(): {
+  catalog: TUIProviderCatalogEntry[];
+  defaultProvider: string;
+  defaultModel: string;
+} {
+  const settings = defaultSettings();
+  return {
+    catalog: providerCatalog(settings),
+    defaultProvider: settings.defaultProvider ?? "",
+    defaultModel: settings.defaultModel ?? "",
+  };
+}
+
+Deno.test("default-model dialog steps provider then model and persists", async () => {
   const { host: h, rec } = host();
-  const dialog = new Dialog((d) => new DefaultModelDialog(h, d, "global"));
+  const dialog = new Dialog((d) =>
+    new DefaultModelDialog(h, d, "global", defaultModelData())
+  );
   // Pick the first provider (deepseek-openai), then the first model.
   feed(dialog, "\r");
   assert(!dialog.closed);
   feed(dialog, "\r");
+  await settle();
   assertEquals(dialog.closed, true);
   assertEquals(rec.applied.length, 1);
+  assertEquals(rec.validated.length, 1);
+  assertEquals(rec.saved.length, 1);
+  assertEquals(rec.saved[0].scope, "global");
   assertStringIncludes(dialog.outcome.message ?? "", "Default model set");
 });
 
 Deno.test("default-model dialog escape steps back from the model view", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new DefaultModelDialog(h, d, "global"));
+  const dialog = new Dialog((d) =>
+    new DefaultModelDialog(h, d, "global", defaultModelData())
+  );
   feed(dialog, "\r"); // into model view
   feed(dialog, "\x1b"); // back to provider view
   assert(!dialog.closed);
@@ -170,7 +248,7 @@ Deno.test("default-model dialog escape steps back from the model view", () => {
 
 Deno.test("env dialog adds a variable through key then value prompts", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new EnvDialog(h, d));
+  const dialog = new Dialog((d) => new EnvDialog(h, d, {}));
   // Navigate to "+ Add Variable" (after the two trailing rows).
   const page = dialog.view(90);
   assertStringIncludes(page, "Add Variable");
@@ -185,7 +263,7 @@ Deno.test("env dialog adds a variable through key then value prompts", () => {
 
 Deno.test("env dialog rejects an invalid variable name", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new EnvDialog(h, d));
+  const dialog = new Dialog((d) => new EnvDialog(h, d, {}));
   feed(dialog, "\x1b[B\x1b[B");
   feed(dialog, "\r");
   feed(dialog, "BAD=NAME");
@@ -193,32 +271,11 @@ Deno.test("env dialog rejects an invalid variable name", () => {
   assertStringIncludes(dialog.view(90), "Invalid environment variable name");
 });
 
-/** Redirects the config dir to a temp dir for tests that persist settings. */
-function isolateConfigDir(): { restore: () => void } {
-  const dir = Deno.makeTempDirSync();
-  const previous = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", dir);
-  return {
-    restore: () => {
-      if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
-      else Deno.env.set("OPENSAC_DIR", previous);
-      Deno.removeSync(dir, { recursive: true });
-    },
-  };
-}
+/** The host surface is service-backed; nothing here writes the user config. */
 
-Deno.test("auth dialog walks provider -> credentials and saves", () => {
-  const iso = isolateConfigDir();
-  try {
-    authDialogWalksAndSaves();
-  } finally {
-    iso.restore();
-  }
-});
-
-function authDialogWalksAndSaves(): void {
+Deno.test("auth dialog walks provider -> credentials and saves", async () => {
   const { host: h, rec } = host();
-  const dialog = new Dialog((d) => new AuthDialog(h, d));
+  const dialog = new Dialog((d) => new AuthDialog(h, d, defaultSettings()));
   assertStringIncludes(dialog.view(90), "Connect Provider");
   feed(dialog, "\r"); // Existing Provider
   assertStringIncludes(dialog.view(90), "Choose Provider");
@@ -238,16 +295,19 @@ function authDialogWalksAndSaves(): void {
   assertStringIncludes(dialog.view(90), "***********");
   feed(dialog, "\r"); // submit key → credentials list
   feed(dialog, "\x1b"); // back to group list (cursor reset to top)
-  // Move down to Done (last item) and save.
+  // Move down to Done (last item) and save through the service.
   for (let i = 0; i < 8; i++) feed(dialog, "\x1b[B");
   feed(dialog, "\r");
+  await settle();
   assertEquals(dialog.closed, true);
   assertEquals(rec.reloads, 1);
-}
+  assertEquals(rec.saved.length, 1);
+  assertEquals(rec.saved[0].scope, "global");
+});
 
 Deno.test("auth dialog escape steps back through views", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new AuthDialog(h, d));
+  const dialog = new Dialog((d) => new AuthDialog(h, d, defaultSettings()));
   feed(dialog, "\r"); // providers
   feed(dialog, "\r"); // provider detail
   feed(dialog, "\x1b"); // back to providers
@@ -259,38 +319,31 @@ Deno.test("auth dialog escape steps back through views", () => {
   assertEquals(dialog.closed, true);
 });
 
-Deno.test("sessions dialog lists, switches, and deletes", () => {
-  const detail = (id: string, count: number): SessionDetail => ({
-    id,
-    path: `/tmp/${id}`,
+Deno.test("sessions dialog lists, switches, and deletes", async () => {
+  const detail = (id: string, count: number): TUISessionListEntry => ({
+    sessionId: id,
+    workDir: Deno.cwd(),
     modTime: new Date(),
-    name: "",
-    cwd: Deno.cwd(),
-    channelType: "",
-    channelId: "",
-    parentSession: "",
-    forkBoundarySeq: 0,
-    seedLength: 0,
-    forkKind: "",
-    expertId: "",
     messageCount: count,
     preview: "",
   });
-  const { host: h, rec } = host({
-    sessionDir: () => Deno.cwd(),
-  });
-  // Seed the list through the real listing by overriding to a stub is not
-  // possible here; drive the controller directly instead.
-  const dialog = new Dialog((d) => new SessionsDialog(h, d));
-  void detail;
-  void rec;
-  // The real listing may be empty in a temp dir; the panel must still render.
-  assertStringIncludes(dialog.view(90), "Sessions");
+  const { host: h, rec } = host();
+  const dialog = new Dialog((d) =>
+    new SessionsDialog(h, d, [detail("s1", 1), detail("s2", 2)])
+  );
+  // The seeded rows render with their message counts.
+  assertStringIncludes(dialog.view(90), "s2  2 msgs");
+  // Selecting another session switches through the host projection.
+  feed(dialog, "\x1b[B");
+  feed(dialog, "\r");
+  await settle();
+  assertEquals(rec.switched, ["s2"]);
+  assertEquals(dialog.closed, true);
 });
 
-Deno.test("settings dialog walks the category tree and cycles fields", () => {
+Deno.test("settings dialog walks the category tree and cycles fields", async () => {
   const { host: h, rec } = host();
-  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   assertStringIncludes(dialog.view(90), "Settings");
   // Root → Defaults (index 1 in Go order: providers, defaults, behavior).
   feed(dialog, "\x1b[B");
@@ -303,12 +356,14 @@ Deno.test("settings dialog walks the category tree and cycles fields", () => {
   // Select "Enable Plan Tool" (second row) and cycle it; the host reloads.
   feed(dialog, "\x1b[B");
   feed(dialog, "\r");
+  await settle();
   assertEquals(rec.reloads >= 1, true);
+  assertEquals(rec.saved.length >= 1, true);
 });
 
 Deno.test("settings dialog done returns to the root then closes", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\x1b[B"); // Defaults
   feed(dialog, "\r");
   feed(dialog, "\x1b[B\x1b[B\x1b[B"); // thinking → mode → Done
@@ -319,20 +374,21 @@ Deno.test("settings dialog done returns to the root then closes", () => {
   assertEquals(dialog.closed, true);
 });
 
-Deno.test("settings dialog third-level input edits a field", () => {
+Deno.test("settings dialog third-level input edits a field", async () => {
   const { host: h, rec } = host();
-  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\x1b[B\x1b[B"); // Behavior
   feed(dialog, "\r");
   feed(dialog, "\r"); // Theme (first row) → input box
   feed(dialog, "light");
   feed(dialog, "\r");
+  await settle();
   assertEquals(rec.reloads >= 1, true);
 });
 
 Deno.test("settings providers hands off to the auth dialog", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\r"); // Providers (first row)
   assertEquals(dialog.closed, true);
   assertEquals(dialog.outcome.handoff, "auth");
@@ -340,7 +396,7 @@ Deno.test("settings providers hands off to the auth dialog", () => {
 
 Deno.test("settings defaults model picker hands off to the default-model dialog", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) => new SettingsDialog(h, d));
+  const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\x1b[B"); // Defaults
   feed(dialog, "\r");
   feed(dialog, "\r"); // Default Provider / Model (first row)

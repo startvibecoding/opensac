@@ -8,19 +8,40 @@ import { AuthDialog } from "./auth_dialog.ts";
 import type { AuthHost, AuthPanel } from "./auth_dialog.ts";
 import {
   configDir,
+  loadGlobalSettingsSparse,
+  loadSettingsFor,
   type ProviderConfig,
+  saveGlobalSettingsPatch,
+  saveProjectSettingsPatchFor,
   type Settings,
 } from "../config/settings.ts";
 
-function makeHost(settings: Settings): AuthHost {
+/** Lets the fire-and-forget confirm persistence settle before assertions. */
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function makeHost(): AuthHost {
   return {
     translator: {
       text: (id: string, ...args: unknown[]) =>
         args.length ? `${id}(${args.join(",")})` : id,
     },
-    settings,
     applyModel: () => {},
     reloadSettings: () => {},
+    // The dialog persists through the service; the tests back it with the real
+    // config APIs inside an isolated OPENSAC_DIR to keep the round-trip honest.
+    loadSettings: (scope) =>
+      Promise.resolve(
+        scope === "global" ? loadGlobalSettingsSparse() : loadSettingsFor("."),
+      ),
+    saveSettings: (scope, updates) => {
+      if (scope === "global") saveGlobalSettingsPatch(updates);
+      else saveProjectSettingsPatchFor(".", updates);
+      return Promise.resolve(loadSettingsFor("."));
+    },
+    requestRender: () => {},
   };
 }
 
@@ -56,7 +77,7 @@ function dialog(
   initial = "",
 ): [AuthDialog, MockPanel] {
   const panel = new MockPanel();
-  return [new AuthDialog(makeHost(settings), panel, initial), panel];
+  return [new AuthDialog(makeHost(), panel, settings, initial), panel];
 }
 
 test("main menu offers existing and custom", () => {
@@ -264,6 +285,7 @@ test(
     d.submit("sk-brand-new-value");
     d.back();
     d.confirm();
+    await settle();
     assertEquals(panel.closed, true);
 
     // Verify the sparse patch landed on disk with the edited key and preserved
@@ -292,11 +314,12 @@ test(
   },
 );
 
-test("confirm with no models still closes cleanly", () => {
+test("confirm with no models still closes cleanly", async () => {
   const [d, panel] = dialog();
   d.select("custom");
   d.submit("lonely-provider");
   d.confirm();
+  await settle();
   assertEquals(panel.closed, true);
 });
 

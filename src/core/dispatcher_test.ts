@@ -2,6 +2,7 @@
 import { assertEquals } from "@std/assert";
 import { CoreRuntimeDispatcher } from "./dispatcher.ts";
 import { CoreEventStream } from "./event_stream.ts";
+import type { CoreRpcParams } from "./protocol.ts";
 import type { CoreRuntimeHost } from "./runtime.ts";
 
 function testHost(
@@ -18,6 +19,8 @@ function testHost(
         mode: input.mode ?? "yolo",
         thinkingLevel: input.thinkingLevel ?? "",
         capabilities: input.capabilities ?? {},
+        approvalPolicy: "runtime",
+        questionPolicy: "runtime",
         createdAt: new Date(0),
         updatedAt: new Date(0),
       };
@@ -26,6 +29,113 @@ function testHost(
       throw new Error("not used");
     },
     async closeSession() {},
+    async deleteSession() {},
+    async listSessionSkills() {
+      return [];
+    },
+    async prepareInput(input) {
+      return {
+        resourceId: "resource-1",
+        kind: "file",
+        relativePath: "",
+        filename: input.name,
+        mediaType: input.mediaType,
+        bytes: 0,
+      };
+    },
+    async sessionCapabilities() {
+      return {};
+    },
+    async sessionContext() {
+      return { ruleContent: "", extraContext: "" };
+    },
+    async setSessionContext() {
+      return { ruleContent: "", extraContext: "" };
+    },
+    async settingsDocument() {
+      return {};
+    },
+    async updateSettingsDocument() {
+      return {};
+    },
+    async providerCatalog() {
+      return [];
+    },
+    async validateProviderModel() {},
+    async envDocument() {
+      return {};
+    },
+    async updateEnvDocument(input) {
+      return input.vars;
+    },
+    async listExperts() {
+      return [];
+    },
+    async inspectExpert() {
+      return {
+        name: "",
+        displayName: { zh: "", en: "" },
+        expertType: "",
+        invalid: false,
+        invalidReason: "",
+        members: [],
+      };
+    },
+    async expertState() {
+      return { expertId: "" };
+    },
+    async setExpert() {
+      return { expertId: "" };
+    },
+    async forkSession() {
+      return {
+        sessionId: "session-2",
+        workDir: "/tmp",
+        source: "acp",
+        providerName: "test-provider",
+        modelID: "test-model",
+        mode: "yolo",
+        thinkingLevel: "",
+        capabilities: {},
+        approvalPolicy: "runtime",
+        questionPolicy: "runtime",
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      };
+    },
+    async listAgents() {
+      return [];
+    },
+    async destroyAgent() {},
+    async setDelegate(input) {
+      return { enabled: input.enabled };
+    },
+    async delegateState() {
+      return { enabled: false };
+    },
+    async setSessionCapability() {
+      return {};
+    },
+    async esmState() {
+      return { objective: null, workerRunning: false, activeAgentId: "" };
+    },
+    async esmUpdate() {
+      return { objective: null, workerRunning: false, activeAgentId: "" };
+    },
+    async esmContinue() {
+      return { runId: "", started: false };
+    },
+    async esmStop() {},
+    async transientPrompt() {
+      return { answer: "" };
+    },
+    async compact(input) {
+      return {
+        sessionId: input.sessionId,
+        runId: "compact-1",
+        status: "running",
+      };
+    },
     async history() {
       return [];
     },
@@ -48,6 +158,9 @@ function testHost(
     async listSessions() {
       return [];
     },
+    async listPersistedSessions() {
+      return [];
+    },
     async setSessionConfig(input) {
       return {
         sessionId: input.sessionId,
@@ -58,6 +171,8 @@ function testHost(
         mode: input.mode ?? "yolo",
         thinkingLevel: input.thinkingLevel ?? "",
         capabilities: input.capabilities ?? {},
+        approvalPolicy: "runtime",
+        questionPolicy: "runtime",
         createdAt: new Date(0),
         updatedAt: new Date(0),
       };
@@ -87,6 +202,45 @@ Deno.test("CoreRuntimeDispatcher dispatches session.create and preserves request
     response?.result && (response.result as { sessionId: string }).sessionId,
     "session-1",
   );
+});
+
+Deno.test("CoreRuntimeDispatcher dispatches session.listPersisted listings", async () => {
+  const seen: Array<{ workDir?: string }> = [];
+  const host = {
+    ...testHost(),
+    async listPersistedSessions(input: { workDir?: string }) {
+      seen.push({ ...input });
+      return [{
+        sessionId: "session-9",
+        workDir: input.workDir ?? "",
+        modTime: new Date(0),
+        messageCount: 2,
+        preview: "hello",
+      }];
+    },
+  };
+  const dispatcher = new CoreRuntimeDispatcher({
+    host,
+    events: new CoreEventStream(),
+  });
+  const response = await dispatcher.dispatch({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "session.listPersisted",
+    params: { workDir: "/tmp/project" },
+  }, new AbortController().signal);
+  assertEquals(seen, [{ workDir: "/tmp/project" }]);
+  assertEquals(
+    (response?.result as Array<{ sessionId: string }>)[0].sessionId,
+    "session-9",
+  );
+  // Missing params mean "the Core host's own work directory".
+  await dispatcher.dispatch({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "session.listPersisted",
+  }, new AbortController().signal);
+  assertEquals(seen[1], {});
 });
 
 Deno.test("CoreRuntimeDispatcher sends extension methods to the Core extension handler", async () => {
@@ -134,4 +288,492 @@ Deno.test("CoreRuntimeDispatcher returns stable errors and no response for notif
     params: { sessionId: "session-1" },
   }, new AbortController().signal);
   assertEquals(notification, undefined);
+});
+
+Deno.test("CoreRuntimeDispatcher forwards neutral policy and content fields to the host", async () => {
+  const captured: Array<{ method: string; input: unknown }> = [];
+  const base = testHost();
+  const host: CoreRuntimeHost = {
+    ...base,
+    async createSession(input) {
+      captured.push({ method: "createSession", input });
+      return await base.createSession(input);
+    },
+    async prompt(input) {
+      captured.push({ method: "prompt", input });
+      return await base.prompt(input);
+    },
+  };
+  const dispatcher = new CoreRuntimeDispatcher({
+    host,
+    events: new CoreEventStream(),
+  });
+
+  await dispatcher.dispatch({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "session.create",
+    params: {
+      workDir: "/tmp/project",
+      providerName: "test-provider",
+      modelID: "test-model",
+      mode: "agent",
+      thinkingLevel: "",
+      capabilities: { multiAgent: true },
+      source: "cli",
+      approvalPolicy: "print",
+      questionPolicy: "unattended",
+    },
+  }, new AbortController().signal);
+  await dispatcher.dispatch({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "session.prompt",
+    params: {
+      sessionId: "session-1",
+      text: "hello",
+      attachments: ["image-1"],
+      metadata: { source: "cli" },
+    },
+  }, new AbortController().signal);
+
+  // These fields were previously dropped by the param parsers, silently
+  // ignoring ACP --mode/--thinking and prompt attachments on the Core RPC.
+  assertEquals(captured, [
+    {
+      method: "createSession",
+      input: {
+        workDir: "/tmp/project",
+        providerName: "test-provider",
+        modelID: "test-model",
+        mode: "agent",
+        thinkingLevel: "",
+        capabilities: { multiAgent: true },
+        source: "cli",
+        approvalPolicy: "print",
+        questionPolicy: "unattended",
+      },
+    },
+    {
+      method: "prompt",
+      input: {
+        sessionId: "session-1",
+        text: "hello",
+        attachments: ["image-1"],
+        metadata: { source: "cli" },
+      },
+    },
+  ]);
+});
+
+Deno.test("CoreRuntimeDispatcher rejects malformed neutral fields instead of dropping them", async () => {
+  const dispatcher = new CoreRuntimeDispatcher({
+    host: testHost(),
+    events: new CoreEventStream(),
+  });
+
+  for (
+    const params of [
+      {
+        workDir: "/tmp",
+        mode: 5,
+      },
+      {
+        workDir: "/tmp",
+        capabilities: { multiAgent: "yes" },
+      },
+      {
+        sessionId: "session-1",
+        text: "hello",
+        attachments: ["ok", 3],
+      },
+      {
+        sessionId: "session-1",
+        text: "hello",
+        metadata: [1, 2],
+      },
+    ]
+  ) {
+    const response = await dispatcher.dispatch({
+      jsonrpc: "2.0",
+      id: 9,
+      method: "workDir" in params ? "session.create" : "session.prompt",
+      params: params as Record<string, unknown>,
+    }, new AbortController().signal);
+    assertEquals(response?.error?.code, -32602);
+  }
+});
+
+Deno.test("CoreRuntimeDispatcher routes the settings, catalog, env, and context surfaces", async () => {
+  const seen: Array<[string, unknown]> = [];
+  const host = {
+    ...testHost(),
+    async settingsDocument(input: {
+      scope?: "effective" | "global";
+      workDir?: string;
+    }) {
+      seen.push(["settingsDocument", input]);
+      return { defaultProvider: "p" };
+    },
+    async updateSettingsDocument(input: {
+      scope: "global" | "project";
+      updates: Record<string, unknown>;
+      workDir?: string;
+    }) {
+      seen.push(["updateSettingsDocument", input]);
+      return {};
+    },
+    async providerCatalog(input: { workDir?: string }) {
+      seen.push(["providerCatalog", input]);
+      return [];
+    },
+    async validateProviderModel(input: {
+      providerID: string;
+      modelID: string;
+      workDir?: string;
+    }) {
+      seen.push(["validateProviderModel", input]);
+      if (input.providerID === "nope") {
+        throw new Error("unknown provider: nope");
+      }
+    },
+    async envDocument() {
+      seen.push(["envDocument", {}]);
+      return { A: "1" };
+    },
+    async updateEnvDocument(input: { vars: Record<string, string> }) {
+      seen.push(["updateEnvDocument", input]);
+      return input.vars;
+    },
+    async sessionContext(input: { sessionId: string }) {
+      seen.push(["sessionContext", input]);
+      return { ruleContent: "r", extraContext: "e" };
+    },
+    async setSessionContext(input: {
+      sessionId: string;
+      ruleContent?: string;
+      extraContext?: string;
+    }) {
+      seen.push(["setSessionContext", input]);
+      return {
+        ruleContent: input.ruleContent ?? "",
+        extraContext: input.extraContext ?? "",
+      };
+    },
+  };
+  const dispatcher = new CoreRuntimeDispatcher({
+    host,
+    events: new CoreEventStream(),
+  });
+  const call = (
+    id: number,
+    method: string,
+    params?: Record<string, unknown>,
+  ) =>
+    dispatcher.dispatch(
+      {
+        jsonrpc: "2.0",
+        id,
+        method,
+        ...(params === undefined ? {} : { params }),
+      },
+      new AbortController().signal,
+    );
+
+  const settings = await call(1, "settings.get", {
+    scope: "global",
+    workDir: "/w",
+  });
+  assertEquals(
+    (settings?.result as { defaultProvider: string }).defaultProvider,
+    "p",
+  );
+  await call(2, "settings.update", {
+    scope: "project",
+    updates: { a: 1 },
+    workDir: "/w",
+  });
+  await call(3, "model.catalog", { workDir: "/w" });
+  await call(4, "model.validate", {
+    providerID: "p",
+    modelID: "m",
+    workDir: "/w",
+  });
+  const failure = await call(5, "model.validate", {
+    providerID: "nope",
+    modelID: "m",
+  });
+  // Validation failures carry the raw cause.
+  assertEquals(failure?.error?.message, "unknown provider: nope");
+  await call(6, "env.list");
+  await call(7, "env.update", { vars: { A: "1" } });
+  await call(8, "session.context.get", { sessionId: "s1" });
+  await call(9, "session.context.set", {
+    sessionId: "s1",
+    ruleContent: "r",
+  });
+  const invalid = await call(10, "settings.update", {
+    scope: "nope",
+    updates: {},
+  });
+  assertEquals(invalid?.error?.code, -32602);
+
+  assertEquals(seen, [
+    ["settingsDocument", { scope: "global", workDir: "/w" }],
+    [
+      "updateSettingsDocument",
+      { scope: "project", updates: { a: 1 }, workDir: "/w" },
+    ],
+    ["providerCatalog", { workDir: "/w" }],
+    ["validateProviderModel", { providerID: "p", modelID: "m", workDir: "/w" }],
+    ["validateProviderModel", {
+      providerID: "nope",
+      modelID: "m",
+      workDir: "",
+    }],
+    ["envDocument", {}],
+    ["updateEnvDocument", { vars: { A: "1" } }],
+    ["sessionContext", { sessionId: "s1" }],
+    ["setSessionContext", { sessionId: "s1", ruleContent: "r" }],
+  ]);
+});
+
+Deno.test("CoreRuntimeDispatcher routes expert and fork requests", async () => {
+  const seen: Array<[string, unknown]> = [];
+  const host = {
+    ...testHost(),
+    async listExperts(input: { sessionId: string }) {
+      seen.push(["listExperts", input]);
+      return [];
+    },
+    async inspectExpert(input: { sessionId: string; expertId: string }) {
+      seen.push(["inspectExpert", input]);
+      return {
+        name: input.expertId,
+        displayName: { zh: "", en: "" },
+        expertType: "agent",
+        invalid: false,
+        invalidReason: "",
+        members: [],
+      };
+    },
+    async expertState(input: { sessionId: string }) {
+      seen.push(["expertState", input]);
+      return { expertId: "" };
+    },
+    async setExpert(input: { sessionId: string; expertId: string }) {
+      seen.push(["setExpert", input]);
+      return { expertId: input.expertId };
+    },
+    async forkSession(input: {
+      sessionId: string;
+      expertId?: string;
+      titleMode?: string;
+    }) {
+      seen.push(["forkSession", input]);
+      return {
+        sessionId: "session-2",
+        workDir: "/tmp",
+        source: "acp",
+        providerName: "",
+        modelID: "",
+        mode: "yolo",
+        thinkingLevel: "",
+        capabilities: {},
+        approvalPolicy: "runtime",
+        questionPolicy: "runtime",
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      };
+    },
+  };
+  const dispatcher = new CoreRuntimeDispatcher({
+    host,
+    events: new CoreEventStream(),
+  });
+  const call = (
+    id: number,
+    method: string,
+    params?: Record<string, unknown>,
+  ) =>
+    dispatcher.dispatch(
+      {
+        jsonrpc: "2.0",
+        id,
+        method,
+        ...(params === undefined ? {} : { params }),
+      },
+      new AbortController().signal,
+    );
+
+  await call(1, "expert.list", { sessionId: "s1" });
+  await call(2, "expert.show", { sessionId: "s1", expertId: "e1" });
+  // expert.show requires an explicit expert identity.
+  const invalidShow = await call(3, "expert.show", { sessionId: "s1" });
+  assertEquals(invalidShow?.error?.code, -32602);
+  await call(4, "expert.state", { sessionId: "s1" });
+  await call(5, "expert.set", { sessionId: "s1", expertId: "e1" });
+  await call(6, "session.fork", {
+    sessionId: "s1",
+    expertId: "e1",
+    titleMode: "",
+  });
+
+  assertEquals(seen, [
+    ["listExperts", { sessionId: "s1" }],
+    ["inspectExpert", { sessionId: "s1", expertId: "e1" }],
+    ["expertState", { sessionId: "s1" }],
+    ["setExpert", { sessionId: "s1", expertId: "e1" }],
+    ["forkSession", { sessionId: "s1", expertId: "e1", titleMode: "" }],
+  ]);
+});
+
+Deno.test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and transient surface", async () => {
+  const captured: Array<{ method: string; input: unknown }> = [];
+  const base = testHost();
+  const host: CoreRuntimeHost = {
+    ...base,
+    async listAgents(input) {
+      captured.push({ method: "listAgents", input });
+      return await base.listAgents(input);
+    },
+    async destroyAgent(input) {
+      captured.push({ method: "destroyAgent", input });
+    },
+    async setDelegate(input) {
+      captured.push({ method: "setDelegate", input });
+      return await base.setDelegate(input);
+    },
+    async setSessionCapability(input) {
+      captured.push({ method: "setSessionCapability", input });
+      return await base.setSessionCapability(input);
+    },
+    async esmUpdate(input) {
+      captured.push({ method: "esmUpdate", input });
+      return await base.esmUpdate(input);
+    },
+    async esmContinue(input) {
+      captured.push({ method: "esmContinue", input });
+      return { runId: "esm-1", started: true };
+    },
+    async esmStop(input) {
+      captured.push({ method: "esmStop", input });
+    },
+    async transientPrompt(input) {
+      captured.push({ method: "transientPrompt", input });
+      return { answer: "side" };
+    },
+    async compact(input) {
+      captured.push({ method: "compact", input });
+      return await base.compact(input);
+    },
+  };
+  const dispatcher = new CoreRuntimeDispatcher({
+    host,
+    events: new CoreEventStream(),
+  });
+  const signal = new AbortController().signal;
+  const call = (id: number | string, method: string, params?: CoreRpcParams) =>
+    dispatcher.dispatch(
+      { jsonrpc: "2.0", id, method, params },
+      signal,
+    );
+
+  assertEquals(
+    (await call(1, "agent.list", { sessionId: "session-1" }))?.result,
+    [],
+  );
+  assertEquals(
+    (await call(2, "agent.destroy", {
+      sessionId: "session-1",
+      agentId: "a1",
+    }))?.result,
+    null,
+  );
+  assertEquals(
+    (await call(3, "delegate.set", {
+      sessionId: "session-1",
+      enabled: true,
+    }))?.result,
+    { enabled: true },
+  );
+  assertEquals(
+    (await call(4, "session.capability.set", {
+      sessionId: "session-1",
+      id: "browser",
+      enabled: true,
+    }))?.result,
+    {},
+  );
+  assertEquals(
+    (await call(5, "esm.update", {
+      sessionId: "session-1",
+      action: "create",
+      objective: "ship",
+    }))?.result,
+    { objective: null, workerRunning: false, activeAgentId: "" },
+  );
+  assertEquals(
+    (await call(6, "esm.continue", { sessionId: "session-1" }))?.result,
+    { runId: "esm-1", started: true },
+  );
+  assertEquals(
+    (await call(7, "esm.stop", { sessionId: "session-1" }))?.result,
+    null,
+  );
+  assertEquals(
+    (await call(8, "transient.prompt", {
+      sessionId: "session-1",
+      question: "what?",
+    }))?.result,
+    { answer: "side" },
+  );
+  assertEquals(
+    (await call(9, "session.compact", { sessionId: "session-1" }))?.result,
+    {
+      sessionId: "session-1",
+      runId: "compact-1",
+      status: "running",
+    },
+  );
+
+  // Invalid parameter shapes are rejected before reaching the host.
+  const badAgent = await call(10, "agent.destroy", { sessionId: "session-1" });
+  assertEquals(badAgent?.error?.code, -32602);
+  const badEsm = await call(11, "esm.update", {
+    sessionId: "session-1",
+    action: "bogus",
+  });
+  assertEquals(badEsm?.error?.code, -32602);
+
+  assertEquals(captured, [
+    { method: "listAgents", input: { sessionId: "session-1" } },
+    {
+      method: "destroyAgent",
+      input: { sessionId: "session-1", agentId: "a1" },
+    },
+    {
+      method: "setDelegate",
+      input: { sessionId: "session-1", enabled: true },
+    },
+    {
+      method: "setSessionCapability",
+      input: { sessionId: "session-1", id: "browser", enabled: true },
+    },
+    {
+      method: "esmUpdate",
+      input: {
+        sessionId: "session-1",
+        action: "create",
+        objective: "ship",
+      },
+    },
+    { method: "esmContinue", input: { sessionId: "session-1" } },
+    { method: "esmStop", input: { sessionId: "session-1" } },
+    {
+      method: "transientPrompt",
+      input: { sessionId: "session-1", question: "what?" },
+    },
+    { method: "compact", input: { sessionId: "session-1" } },
+  ]);
 });

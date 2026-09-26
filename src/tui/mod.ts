@@ -159,8 +159,4 @@ export {
   TuiSessionCommands,
   type TuiSessionLike,
 } from "./tui_session_commands.ts";
-export {
-  formatSessionEntry,
-  listManagerSessions,
-  renderSessionList,
-} from "./session_commands.ts";
+export { formatSessionEntry, renderSessionList } from "./session_commands.ts";

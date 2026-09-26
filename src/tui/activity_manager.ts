@@ -7,7 +7,7 @@ import {
   TOOL_EXECUTION_FAILED,
   TOOL_EXECUTION_INTERRUPTED,
   type ToolExecutionState,
-} from "../agent/events.ts";
+} from "../agentruntime/events.ts";
 import type { ActivityItem, ActivityStatus } from "./turn_card.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────

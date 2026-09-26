@@ -1377,8 +1377,20 @@ function writeGlobalSettingsData(data: string): void {
 export function saveProjectSettingsPatch(
   updates: Record<string, unknown>,
 ): void {
+  saveProjectSettingsPatchFor(".", updates);
+}
+
+/**
+ * Updates only the given top-level keys in the project settings file of `cwd`.
+ * The Core uses this to edit one session's project settings without depending
+ * on the Core process working directory.
+ */
+export function saveProjectSettingsPatchFor(
+  cwd: string,
+  updates: Record<string, unknown>,
+): void {
   if (Object.keys(updates).length === 0) return;
-  const settingsPath = projectSettingsPath();
+  const settingsPath = projectPathFor(cwd, "settings.json");
   const projectDir = path.dirname(settingsPath);
   Deno.mkdirSync(projectDir, { recursive: true, mode: 0o700 });
   let existing: Record<string, unknown> = {};

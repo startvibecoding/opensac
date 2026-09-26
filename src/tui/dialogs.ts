@@ -8,26 +8,7 @@
 // a status display.
 
 import { type AllowConfig } from "../config/allow.ts";
-import { clearEnv, envList, loadEnv, setEnv, unsetEnv } from "../config/env.ts";
-import {
-  defaultProviderConfigsAll,
-  getProviderConfig,
-  isProjectDir,
-  saveGlobalSettingsPatch,
-  saveProjectSettingsPatch,
-  type Settings,
-} from "../config/settings.ts";
-import {
-  create as createProvider,
-  providerSortPriority,
-  resolvedModels,
-  sortProviderIDs,
-} from "../provider/factory/factory.ts";
-import type {
-  Manager as SessionManager,
-  SessionDetail,
-} from "../session/manager.ts";
-import { listForDirDetailed } from "../session/manager.ts";
+import { isProjectDir, type Settings } from "../config/settings.ts";
 import {
   Dialog,
   type DialogController,
@@ -36,38 +17,53 @@ import {
   formatAge,
 } from "./dialog.ts";
 import type { Translator } from "./i18n.ts";
+import type {
+  TUIProviderCatalogEntry,
+  TUISessionListEntry,
+  TUISettingsReadScope,
+  TUISettingsWriteScope,
+} from "./service.ts";
 
 /** The session surface a dialog may read and mutate. */
 export interface DialogHost {
   readonly translator: Translator;
-  readonly settings: Settings;
   readonly workDir: string;
   readonly providerName: string;
   readonly modelID: string;
   readonly allow: AllowConfig;
-  /** Session directory holding sessions.db. */
-  sessionDir(): string;
   currentSessionID(): string;
+  /**
+   * The Core-owned model catalog projection for one provider; dialogs render
+   * this projection instead of reading provider configuration themselves.
+   */
+  listModels(providerName: string): Array<{ id: string; name: string }>;
   /** Applies a new provider/model binding to the live session. */
   applyModel(providerName: string, modelID: string): void;
+  /** Loads one settings document through the Core-owned service. */
+  loadSettings(scope?: TUISettingsReadScope): Promise<Settings>;
+  /** Applies one sparse settings patch through the Core-owned service. */
+  saveSettings(
+    scope: TUISettingsWriteScope,
+    updates: Record<string, unknown>,
+  ): Promise<Settings>;
+  /** Validates one provider/model pair through the Core-owned service. */
+  validateProviderModel(providerID: string, modelID: string): Promise<void>;
+  /** Loads the Core-owned provider catalog (built-ins plus configured). */
+  listProviders(): Promise<TUIProviderCatalogEntry[]>;
+  /** Loads the environment-variable document through the service. */
+  loadEnv(): Promise<Record<string, string>>;
+  /** Replaces the environment-variable document through the service. */
+  saveEnv(vars: Record<string, string>): Promise<void>;
   /** Re-reads settings into the live session after an edit. */
   reloadSettings(): void;
+  /** Renders after an asynchronous dialog update. */
+  requestRender(): void;
   /** Switches to another session and replays it. */
-  switchSession(detail: SessionDetail): Promise<void>;
+  switchSession(entry: TUISessionListEntry): Promise<void>;
   /** Creates a fresh session for the current work directory. */
   newSession(): Promise<void>;
   /** Deletes a session by exact ID. */
   deleteSession(id: string): Promise<void>;
-}
-
-/** Every built-in provider preset plus configured ones, sorted. */
-export function providerIDs(settings: Settings): string[] {
-  const ids = new Set<string>();
-  for (const id of Object.keys(defaultProviderConfigsAll())) ids.add(id);
-  for (const id of Object.keys(settings.providers ?? {})) ids.add(id);
-  const list = [...ids];
-  sortProviderIDs(list);
-  return list;
 }
 
 // --- /model -----------------------------------------------------------------
@@ -83,12 +79,11 @@ export class ModelDialog implements DialogController {
   }
 
   page(): DialogPage {
-    const ids = resolvedModels(this.#host.settings, this.#host.providerName)
-      .map((m) => m.id);
+    const models = this.#host.listModels(this.#host.providerName);
     return {
       title: this.#host.translator.text("dialog.model.title"),
       search: true,
-      items: ids.map((id) => ({
+      items: models.map(({ id }) => ({
         label: id,
         value: id,
         current: id === this.#host.modelID,
@@ -99,8 +94,8 @@ export class ModelDialog implements DialogController {
 
   select(value: string): void {
     const tr = this.#host.translator;
-    const model = this.#host.settings.providers?.[this.#host.providerName]
-      ?.models.find((m) => m.id === value);
+    const model = this.#host.listModels(this.#host.providerName)
+      .find((entry) => entry.id === value);
     this.#host.applyModel(this.#host.providerName, value);
     this.#dialog.close(
       tr.text(
@@ -122,59 +117,75 @@ export class ModelDialog implements DialogController {
 // --- /defaultModel ----------------------------------------------------------
 
 /** The `/defaultModel` two-step picker: provider, then model, then persist. */
+/** The Core-owned projections one default-model dialog renders. */
+export interface DefaultModelDialogData {
+  catalog: TUIProviderCatalogEntry[];
+  defaultProvider: string;
+  defaultModel: string;
+}
+
 export class DefaultModelDialog implements DialogController {
   #host: DialogHost;
   #dialog: Dialog;
-  #scope: string;
+  #scope: TUISettingsWriteScope;
   #view: "provider" | "model" = "provider";
   #providerID = "";
   #error = "";
+  #catalog: TUIProviderCatalogEntry[];
+  #defaultProvider: string;
+  #defaultModel: string;
 
-  constructor(host: DialogHost, dialog: Dialog, scope: string) {
+  constructor(
+    host: DialogHost,
+    dialog: Dialog,
+    scope: string,
+    data: DefaultModelDialogData,
+  ) {
     this.#host = host;
     this.#dialog = dialog;
     this.#scope = scope === "project" ? "project" : "global";
+    this.#catalog = data.catalog;
+    this.#defaultProvider = data.defaultProvider;
+    this.#defaultModel = data.defaultModel;
   }
 
   page(): DialogPage {
     const tr = this.#host.translator;
-    const settings = this.#host.settings;
     if (this.#view === "provider") {
       return {
         title: tr.text("dialog.default_model.title", this.#scope),
         search: true,
-        items: providerIDs(settings).map((id) => ({
-          label: id,
-          description: this.#providerDescription(id),
-          value: id,
-          current: id === settings.defaultProvider,
+        items: this.#catalog.map((entry) => ({
+          label: entry.id,
+          description: this.#providerDescription(entry),
+          value: entry.id,
+          current: entry.id === this.#defaultProvider,
         })),
         hint: tr.text("dialog.default_model.provider_hint"),
         error: this.#error,
       };
     }
-    const models = resolvedModels(settings, this.#providerID).map((m) => m.id);
+    const models =
+      this.#catalog.find((entry) => entry.id === this.#providerID)?.models ??
+        [];
     return {
       title: `${
         tr.text("dialog.default_model.title", this.#scope)
       } · ${this.#providerID}`,
       search: true,
-      items: models.map((id) => ({
+      items: models.map(({ id }) => ({
         label: id,
         value: id,
-        current: id === settings.defaultModel,
+        current: id === this.#defaultModel,
       })),
       hint: tr.text("dialog.default_model.model_hint"),
       error: this.#error,
     };
   }
 
-  #providerDescription(id: string): string {
-    const pc = getProviderConfig(this.#host.settings, id);
-    if (pc === undefined) return "";
-    return `${pc.api ?? "openai-chat"} · ${
-      pc.baseUrl ?? ""
-    } · ${pc.models.length} models`;
+  #providerDescription(entry: TUIProviderCatalogEntry): string {
+    if (!entry.configured) return "";
+    return `${entry.api} · ${entry.baseUrl} · ${entry.modelCount} models`;
   }
 
   select(value: string): void {
@@ -185,44 +196,38 @@ export class DefaultModelDialog implements DialogController {
       this.#dialog.resetCursor();
       return;
     }
-    this.#save(value);
+    void this.#save(value);
   }
 
-  #save(modelID: string): void {
+  async #save(modelID: string): Promise<void> {
     const tr = this.#host.translator;
-    // Validate the pair through the shared factory before persisting.
+    // Validate the pair through the Core-owned factory before persisting.
     try {
-      createProvider(
-        {
-          ...this.#host.settings,
-          defaultProvider: this.#providerID,
-          defaultModel: modelID,
-        },
-        this.#providerID,
-        modelID,
-      );
+      await this.#host.validateProviderModel(this.#providerID, modelID);
     } catch (err) {
       this.#error = tr.text(
         "dialog.default_model.validation_failed",
         (err as Error).message,
       );
+      this.#host.requestRender();
       return;
     }
     try {
-      // Sparse settings edits go through the patch API (global or project).
-      const updates = {
+      // Sparse settings edits go through the service (global or project).
+      await this.#host.saveSettings(this.#scope, {
         defaultProvider: this.#providerID,
         defaultModel: modelID,
-      };
-      if (this.#scope === "global") saveGlobalSettingsPatch(updates);
-      else saveProjectSettingsPatch(updates);
+      });
     } catch (err) {
       this.#error = tr.text(
         "dialog.default_model.save_failed",
         (err as Error).message,
       );
+      this.#host.requestRender();
       return;
     }
+    this.#defaultProvider = this.#providerID;
+    this.#defaultModel = modelID;
     this.#host.applyModel(this.#providerID, modelID);
     this.#dialog.close(
       tr.text(
@@ -232,6 +237,7 @@ export class DefaultModelDialog implements DialogController {
         modelID,
       ),
     );
+    this.#host.requestRender();
   }
 
   submit(): void {}
@@ -262,10 +268,14 @@ export class EnvDialog implements DialogController {
   #addIndex = 0;
   #doneIndex = 0;
 
-  constructor(host: DialogHost, dialog: Dialog) {
+  constructor(
+    host: DialogHost,
+    dialog: Dialog,
+    vars: Record<string, string>,
+  ) {
     this.#host = host;
     this.#dialog = dialog;
-    this.#vars = envList(loadEnv());
+    this.#vars = { ...vars };
   }
 
   #keys(): string[] {
@@ -321,25 +331,23 @@ export class EnvDialog implements DialogController {
       this.#dialog.openInput("");
       return;
     }
-    // "done": persist the whole set.
+    // "done": persist the whole set through the service.
+    void this.#persist();
+  }
+
+  async #persist(): Promise<void> {
     try {
-      const current = loadEnv();
-      const existing = envList(current);
-      for (const key of Object.keys(existing)) {
-        if (!(key in this.#vars)) unsetEnv(current, key);
-      }
-      for (const [key, val] of Object.entries(this.#vars)) {
-        setEnv(current, key, val);
-      }
-      if (Object.keys(this.#vars).length === 0) clearEnv(current);
+      await this.#host.saveEnv({ ...this.#vars });
     } catch (err) {
       this.#error = this.#host.translator.text(
         "dialog.env.save_failed",
         (err as Error).message,
       );
+      this.#host.requestRender();
       return;
     }
     this.#dialog.close(this.#host.translator.text("env.cleared"));
+    this.#host.requestRender();
   }
 
   submit(value: string): void {
@@ -383,14 +391,18 @@ export class EnvDialog implements DialogController {
 export class SessionsDialog implements DialogController {
   #host: DialogHost;
   #dialog: Dialog;
-  #items: SessionDetail[];
+  #items: TUISessionListEntry[];
   #error = "";
   #message = "";
 
-  constructor(host: DialogHost, dialog: Dialog) {
+  constructor(
+    host: DialogHost,
+    dialog: Dialog,
+    items: TUISessionListEntry[],
+  ) {
     this.#host = host;
     this.#dialog = dialog;
-    this.#items = listForDirDetailed(host.workDir, host.sessionDir());
+    this.#items = items;
   }
 
   page(): DialogPage {
@@ -400,11 +412,11 @@ export class SessionsDialog implements DialogController {
     const items: DialogItem[] = this.#items.map((detail) => {
       const preview = detail.preview.trim().replace(/\s+/g, " ");
       return {
-        label: `${detail.id}  ${detail.messageCount} msgs  ${
+        label: `${detail.sessionId}  ${detail.messageCount} msgs  ${
           formatAge(detail.modTime, now, tr)
         }${preview === "" ? "" : `  ${preview}`}`,
-        value: `session:${detail.id}`,
-        current: detail.id === currentID,
+        value: `session:${detail.sessionId}`,
+        current: detail.sessionId === currentID,
       };
     });
     return {
@@ -422,7 +434,7 @@ export class SessionsDialog implements DialogController {
 
   async #switchTo(id: string): Promise<void> {
     const tr = this.#host.translator;
-    const detail = this.#items.find((d) => d.id === id);
+    const detail = this.#items.find((d) => d.sessionId === id);
     if (detail === undefined) {
       this.#error = tr.text("sessions.no_match", id);
       return;
@@ -434,7 +446,7 @@ export class SessionsDialog implements DialogController {
     try {
       await this.#host.switchSession(detail);
       this.#dialog.close(
-        tr.text("sessions.switched", detail.id, detail.messageCount),
+        tr.text("sessions.switched", detail.sessionId, detail.messageCount),
       );
     } catch (err) {
       this.#error = tr.text("sessions.error_listing", (err as Error).message);
@@ -473,14 +485,14 @@ export class SessionsDialog implements DialogController {
     const tr = this.#host.translator;
     const detail = this.#items[this.#dialog.cursor];
     if (detail === undefined) return;
-    if (detail.id === this.#host.currentSessionID()) {
+    if (detail.sessionId === this.#host.currentSessionID()) {
       this.#error = tr.text("sessions.cannot_delete_current");
       return;
     }
     try {
-      await this.#host.deleteSession(detail.id);
-      this.#items = this.#items.filter((d) => d.id !== detail.id);
-      this.#message = tr.text("sessions.deleted", detail.id);
+      await this.#host.deleteSession(detail.sessionId);
+      this.#items = this.#items.filter((d) => d.sessionId !== detail.sessionId);
+      this.#message = tr.text("sessions.deleted", detail.sessionId);
       this.#error = "";
       this.#dialog.resetCursor();
     } catch (err) {
@@ -505,8 +517,18 @@ import { AuthDialog as StructuredAuthDialog } from "./auth_dialog.ts";
 export class AuthDialog implements DialogController {
   #auth: StructuredAuthDialog;
 
-  constructor(host: DialogHost, dialog: Dialog, initialProvider = "") {
-    this.#auth = new StructuredAuthDialog(host, dialog, initialProvider);
+  constructor(
+    host: DialogHost,
+    dialog: Dialog,
+    settings: Settings,
+    initialProvider = "",
+  ) {
+    this.#auth = new StructuredAuthDialog(
+      host,
+      dialog,
+      settings,
+      initialProvider,
+    );
   }
 
   page(): DialogPage {
@@ -576,10 +598,13 @@ export class SettingsDialog implements DialogController {
   #field = "";
   #tuiScope: "global" | "project" = "global";
   #error = "";
+  /** The settings document this dialog renders and edits. */
+  #settings: Settings;
 
-  constructor(host: DialogHost, dialog: Dialog) {
+  constructor(host: DialogHost, dialog: Dialog, settings: Settings) {
     this.#host = host;
     this.#dialog = dialog;
+    this.#settings = settings;
   }
 
   // --- Page rendering -------------------------------------------------------
@@ -590,7 +615,7 @@ export class SettingsDialog implements DialogController {
 
   #rawPage(): DialogPage {
     const tr = this.#host.translator;
-    const s = this.#host.settings;
+    const s = this.#settings;
     switch (this.#view) {
       case "root":
         return this.#rootPage();
@@ -968,7 +993,7 @@ export class SettingsDialog implements DialogController {
 
   #rootPage(): DialogPage {
     const tr = this.#host.translator;
-    const s = this.#host.settings;
+    const s = this.#settings;
     const providers = Object.keys(s.providers ?? {});
     return {
       title: tr.text("dialog.settings.title"),
@@ -1255,12 +1280,12 @@ export class SettingsDialog implements DialogController {
   }
 
   #toolExecutionMode(): string {
-    const te = this.#host.settings.toolExecution;
+    const te = this.#settings.toolExecution;
     return this.#value(te?.mode ?? "parallel");
   }
 
   #toolExecutionMaxConcurrency(): number {
-    return this.#host.settings.toolExecution?.maxConcurrency ?? 10;
+    return this.#settings.toolExecution?.maxConcurrency ?? 10;
   }
 
   // --- Selection -------------------------------------------------------------
@@ -1334,20 +1359,20 @@ export class SettingsDialog implements DialogController {
     // Plain booleans: flip and save.
     switch (value) {
       case "authored":
-        this.#save({ authored: this.#host.settings.authored !== true });
+        this.#save({ authored: this.#settings.authored !== true });
         return;
       case "contextFiles.enabled":
         this.#save({
           contextFiles: {
-            ...(this.#host.settings.contextFiles ?? { enabled: false }),
-            enabled: this.#host.settings.contextFiles?.enabled !== true,
+            ...(this.#settings.contextFiles ?? { enabled: false }),
+            enabled: this.#settings.contextFiles?.enabled !== true,
           },
         });
         return;
       case "statusLine.enabled": {
         const next = {
-          ...(this.#host.settings.statusLine ?? {}),
-          enabled: this.#host.settings.statusLine?.enabled !== true,
+          ...(this.#settings.statusLine ?? {}),
+          enabled: this.#settings.statusLine?.enabled !== true,
         };
         if (next.enabled) this.#normalizeStatusLine(next);
         this.#save({ statusLine: next });
@@ -1356,27 +1381,27 @@ export class SettingsDialog implements DialogController {
       case "compaction.enabled":
         this.#save({
           compaction: {
-            ...(this.#host.settings.compaction ??
+            ...(this.#settings.compaction ??
               { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
-            enabled: this.#host.settings.compaction?.enabled !== true,
+            enabled: this.#settings.compaction?.enabled !== true,
           },
         });
         return;
       case "sandbox.enabled":
         this.#save({
           sandbox: {
-            ...(this.#host.settings.sandbox ??
+            ...(this.#settings.sandbox ??
               { enabled: false, level: "none", allowNetwork: false }),
-            enabled: this.#host.settings.sandbox?.enabled !== true,
+            enabled: this.#settings.sandbox?.enabled !== true,
           },
         });
         return;
       case "retry.enabled":
         this.#save({
           retry: {
-            ...(this.#host.settings.retry ??
+            ...(this.#settings.retry ??
               { enabled: false, maxRetries: 0, baseDelayMs: 0 }),
-            enabled: this.#host.settings.retry?.enabled !== true,
+            enabled: this.#settings.retry?.enabled !== true,
           },
         });
         return;
@@ -1420,21 +1445,21 @@ export class SettingsDialog implements DialogController {
     if (field === "webSearch.enabled") {
       this.#save({
         webSearch: {
-          ...(this.#host.settings.webSearch ?? {}),
+          ...(this.#settings.webSearch ?? {}),
           enabled: next,
         },
       });
     } else if (field === "imageGeneration.enabled") {
       this.#save({
         imageGeneration: {
-          ...(this.#host.settings.imageGeneration ?? {}),
+          ...(this.#settings.imageGeneration ?? {}),
           enabled: next,
         },
       });
     } else if (field === "approval.confirmBeforeWrite") {
       this.#save({
         approval: {
-          ...(this.#host.settings.approval ?? {}),
+          ...(this.#settings.approval ?? {}),
           confirmBeforeWrite: next,
         },
       });
@@ -1444,7 +1469,7 @@ export class SettingsDialog implements DialogController {
   }
 
   #readField(field: string): string | undefined {
-    const s = this.#host.settings;
+    const s = this.#settings;
     switch (field) {
       case "defaultThinkingLevel":
         return s.defaultThinkingLevel;
@@ -1458,7 +1483,7 @@ export class SettingsDialog implements DialogController {
   }
 
   #readOptionalBool(field: string): boolean | undefined {
-    const s = this.#host.settings;
+    const s = this.#settings;
     switch (field) {
       case "enablePlanTool":
         return s.enablePlanTool;
@@ -1479,7 +1504,7 @@ export class SettingsDialog implements DialogController {
 
   #cycleTuiLang(): void {
     const order = ["auto", "zh", "en"];
-    const current = this.#host.settings.tuilang ?? "auto";
+    const current = this.#settings.tuilang ?? "auto";
     const idx = order.indexOf(current);
     const next = order[(idx + 1) % order.length];
     this.#saveTuiLangValue(next);
@@ -1500,30 +1525,29 @@ export class SettingsDialog implements DialogController {
   }
 
   #saveTuiLang(): void {
-    this.#saveTuiLangValue(this.#host.settings.tuilang ?? "auto");
+    this.#saveTuiLangValue(this.#settings.tuilang ?? "auto");
   }
 
   #saveTuiLangValue(value: string): void {
-    try {
-      if (this.#tuiScope === "project") {
-        if (!isProjectDir(this.#host.workDir)) {
-          this.#error = this.#host.translator.text(
-            "settings.language.project_unavailable",
-          );
-          return;
-        }
-        saveProjectSettingsPatch({ tuilang: value });
-      } else {
-        saveGlobalSettingsPatch({ tuilang: value });
-      }
-      this.#host.settings.tuilang = value;
-      this.#host.reloadSettings();
-    } catch (err) {
+    if (this.#tuiScope === "project" && !isProjectDir(this.#host.workDir)) {
+      this.#error = this.#host.translator.text(
+        "settings.language.project_unavailable",
+      );
+      return;
+    }
+    void this.#host.saveSettings(this.#tuiScope, { tuilang: value }).then(
+      () => {
+        this.#settings.tuilang = value;
+        this.#host.reloadSettings();
+        this.#host.requestRender();
+      },
+    ).catch((err) => {
       this.#error = this.#host.translator.text(
         "settings.language.save_failed",
         (err as Error).message,
       );
-    }
+      this.#host.requestRender();
+    });
   }
 
   #normalizeStatusLine(next: Record<string, unknown>): void {
@@ -1543,7 +1567,7 @@ export class SettingsDialog implements DialogController {
 
   /** The current value prefilled when the input box opens. */
   #inputValue(field: string): string {
-    const s = this.#host.settings;
+    const s = this.#settings;
     switch (field) {
       case "theme":
         return s.theme ?? "";
@@ -1639,7 +1663,7 @@ export class SettingsDialog implements DialogController {
 
   /** Builds a global-settings patch for one input field. */
   #buildPatch(field: string, input: string): Record<string, unknown> | null {
-    const s = this.#host.settings;
+    const s = this.#settings;
     const tr = this.#host.translator;
     switch (field) {
       case "theme":
@@ -1819,15 +1843,17 @@ export class SettingsDialog implements DialogController {
 
   /** Persists a patch to global settings and refreshes the live session. */
   #save(patch: Record<string, unknown>): void {
-    try {
-      saveGlobalSettingsPatch(patch);
+    void this.#host.saveSettings("global", patch).then((fresh) => {
+      this.#settings = fresh;
       this.#host.reloadSettings();
-    } catch (err) {
+      this.#host.requestRender();
+    }).catch((err) => {
       this.#error = this.#host.translator.text(
         "settings.save_failed",
         (err as Error).message,
       );
-    }
+      this.#host.requestRender();
+    });
   }
 
   key(): void {}
@@ -1852,11 +1878,19 @@ export class TuiLangDialog implements DialogController {
   #scope: "global" | "project";
   #view: "scope" | "language" = "scope";
   #error = "";
+  /** The settings document this dialog renders and edits. */
+  #settings: Settings;
 
-  constructor(host: DialogHost, dialog: Dialog, scope: "global" | "project") {
+  constructor(
+    host: DialogHost,
+    dialog: Dialog,
+    scope: "global" | "project",
+    settings: Settings,
+  ) {
     this.#host = host;
     this.#dialog = dialog;
     this.#scope = scope;
+    this.#settings = settings;
   }
 
   page(): DialogPage {
@@ -1882,7 +1916,7 @@ export class TuiLangDialog implements DialogController {
         error: this.#error,
       };
     }
-    const configured = this.#host.settings.tuilang ?? "auto";
+    const configured = this.#settings.tuilang ?? "auto";
     return {
       title: tr.text("dialog.tuilang.title"),
       items: ["auto", "zh", "en"].map((value) => ({
@@ -1908,19 +1942,15 @@ export class TuiLangDialog implements DialogController {
 
   #save(value: string): void {
     const tr = this.#host.translator;
-    try {
-      if (this.#scope === "global") {
-        saveGlobalSettingsPatch({ tuilang: value });
-      } else {
-        saveProjectSettingsPatch({ tuilang: value });
-      }
-      this.#host.settings.tuilang = value;
-    } catch (err) {
+    void this.#host.saveSettings(this.#scope, { tuilang: value }).then(() => {
+      this.#settings.tuilang = value;
+      this.#host.reloadSettings();
+      this.#dialog.close(tr.text("tuilang.saved", this.#scope, value, value));
+      this.#host.requestRender();
+    }).catch((err) => {
       this.#error = tr.text("tuilang.save_failed", (err as Error).message);
-      return;
-    }
-    this.#host.reloadSettings();
-    this.#dialog.close(tr.text("tuilang.saved", this.#scope, value, value));
+      this.#host.requestRender();
+    });
   }
 
   submit(): void {}
@@ -1935,17 +1965,4 @@ export class TuiLangDialog implements DialogController {
     }
     this.#dialog.close();
   }
-}
-
-/** Orders provider IDs so well-known vendors come first (shared ranking). */
-export function compareProviderIDs(a: string, b: string): number {
-  const pa = providerSortPriority(a);
-  const pb = providerSortPriority(b);
-  if (pa !== pb) return pa - pb;
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-/** Exposed for tests: the session manager directory helper. */
-export function sessionDirectory(manager: SessionManager): string {
-  return manager.getSessionDir();
 }

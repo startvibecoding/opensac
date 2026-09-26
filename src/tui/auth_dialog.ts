@@ -23,11 +23,7 @@ import type {
   ResponsesToolControlConfig,
   Settings,
 } from "../config/settings.ts";
-import {
-  defaultProviderConfigsAll,
-  loadGlobalSettingsSparse,
-  saveGlobalSettingsPatch,
-} from "../config/settings.ts";
+import { defaultProviderConfigsAll } from "../config/settings.ts";
 import { presetModelConfig } from "../config/model_preset.ts";
 import type { DialogItem, DialogPage } from "./dialog.ts";
 
@@ -133,9 +129,17 @@ export type AuthView =
 /** Host surface required by the dialog (subset of the dialogs.ts DialogHost). */
 export interface AuthHost {
   readonly translator: AuthTranslator;
-  readonly settings: Settings;
   applyModel(providerName: string, modelID: string): void;
   reloadSettings(): void;
+  /** Loads one settings document through the Core-owned service. */
+  loadSettings(scope?: "effective" | "global"): Promise<Settings>;
+  /** Applies one sparse settings patch through the Core-owned service. */
+  saveSettings(
+    scope: "global" | "project",
+    updates: Record<string, unknown>,
+  ): Promise<Settings>;
+  /** Renders after an asynchronous dialog update. */
+  requestRender(): void;
 }
 
 interface AuthTranslator {
@@ -508,6 +512,8 @@ const FIELD_TABLE: Partial<Record<AuthView, FieldSpec[]>> = {
 export class AuthDialog {
   #host: AuthHost;
   #panel: AuthPanel;
+  /** The settings document this dialog renders and edits. */
+  #settings: Settings;
 
   #view: AuthView = "main";
   #stack: AuthView[] = [];
@@ -530,10 +536,12 @@ export class AuthDialog {
   constructor(
     host: AuthHost,
     panel: AuthPanel,
+    settings: Settings,
     initialProvider = "",
   ) {
     this.#host = host;
     this.#panel = panel;
+    this.#settings = settings;
     const provider = initialProvider.trim();
     if (provider !== "") {
       this.#providerID = provider;
@@ -577,7 +585,7 @@ export class AuthDialog {
   // ── draft loading ─────────────────────────────────────────────────────────
 
   #resolveProviderConfig(id: string): ProviderConfig | undefined {
-    const configured = this.#host.settings.providers?.[id];
+    const configured = this.#settings.providers?.[id];
     if (configured !== undefined) return configured;
     const presets = defaultProviderPresets();
     return presets[id];
@@ -640,11 +648,11 @@ export class AuthDialog {
           search: true,
           hint,
           error: this.#error,
-          items: providerIDsFromSettings(this.#host.settings).map((id) => ({
+          items: providerIDsFromSettings(this.#settings).map((id) => ({
             label: id,
             description: this.#providerListState(id),
             value: `provider:${id}`,
-            current: id === this.#host.settings.defaultProvider,
+            current: id === this.#settings.defaultProvider,
           })),
         };
 
@@ -1244,18 +1252,23 @@ export class AuthDialog {
   // ── confirm & persist ────────────────────────────────────────────────────
 
   confirm(): void {
+    void this.#saveProvider();
+  }
+
+  async #saveProvider(): Promise<void> {
     const tr = this.#host.translator;
     const config = providerConfigFromDraft(this.#provider, this.#models);
     try {
-      // saveGlobalSettingsPatch replaces top-level keys wholesale: merge the
-      // edited provider into the existing map, otherwise every other provider
-      // (and its API key) would be wiped from settings.json.
-      const sparse = loadGlobalSettingsSparse();
+      // Sparse settings writes replace top-level keys wholesale: merge the
+      // edited provider into the existing global map, otherwise every other
+      // provider (and its API key) would be wiped from settings.json.
+      const sparse = await this.#host.loadSettings("global");
       const providers = { ...(sparse.providers ?? {}) };
       providers[this.#providerID] = config;
-      saveGlobalSettingsPatch({ providers });
+      await this.#host.saveSettings("global", { providers });
     } catch (err) {
       this.#error = tr.text("settings.save_failed", (err as Error).message);
+      this.#host.requestRender();
       return;
     }
     const firstModel = config.models[0]?.id ?? "";
@@ -1264,6 +1277,7 @@ export class AuthDialog {
     this.#panel.close(
       tr.text("dialog.auth.saved", this.#providerID, firstModel),
     );
+    this.#host.requestRender();
   }
 
   // ── online model fetching ────────────────────────────────────────────────

@@ -1,12 +1,19 @@
 // () + main_util.go runPrint(): the CLI
-// root `-p` print action. Runs one canonical durable turn through the shared
-// runtime and streams the agent events to stdout/stderr (text or NDJSON).
-// The interactive TUI action lands in the next slice; this is the command
-// path that must exist for scripts and CI.
+// root `-P` print action. Runs one canonical durable turn through the shared
+// `opensac core` over the Core Client short connection (the same host the TUI
+// and the ACP bridge use) and projects the canonical run events to
+// stdout/stderr (text or NDJSON). The print action never constructs Providers,
+// Builders, SessionRuntimes, or ExecutionRuntimes: session identity, the
+// durable run, and the print/unattended run policy are Core-owned.
 
-import { create } from "../provider/factory/factory.ts";
-import { consumeEvents } from "../agent/eventloop.ts";
-import type { Event } from "../agent/events.ts";
+import { configDir, type Settings } from "../config/mod.ts";
+import { CoreClient } from "../core/client.ts";
+import { resolveCoreConfig } from "../core/config.ts";
+import { CORE_PROTOCOL_VERSION } from "../core/server.ts";
+import { current as appVersionCurrent } from "../version/version.ts";
+import { createCoreClientTUIService } from "../tui/core_service.ts";
+import type { TUIDecisionRequest, TUIService } from "../tui/service.ts";
+import { coreEventToAgentEvent } from "../tui/run_event_projection.ts";
 import {
   EVENT_HOSTED_ITEM,
   EVENT_RUN_FINISHED,
@@ -17,28 +24,7 @@ import {
   EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
   EVENT_TOOL_RESULT,
-  TASK_CANCELED,
-  TASK_FAILED,
-  TASK_INCOMPLETE,
-} from "../agent/events.ts";
-import { Builder } from "../agentruntime/session_runtime.ts";
-import { SOURCE_CLI } from "../agentruntime/source.ts";
-import { ExecutionRuntime } from "../agentruntime/execution.ts";
-import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
-import {
-  createSessionExecutionRuntime,
-  createSessionRunDescriptor,
-} from "../agentruntime/session_run.ts";
-import { generateID } from "../session/mod.ts";
-import { resourceIds } from "../agentruntime/input_materializer.ts";
-import { createSession } from "../agentruntime/session_lifecycle.ts";
-import {
-  isArtifactEnabled,
-  loadAllow,
-  sandboxLevelFromSettings,
-  type Settings,
-} from "../config/mod.ts";
-import { normalizeThinkingLevel } from "../provider/mod.ts";
+} from "../agentruntime/events.ts";
 
 export interface PrintOptions {
   prompt: string;
@@ -61,11 +47,78 @@ export interface PrintOptions {
 
 export interface PrintDeps {
   settings: Settings;
+  /**
+   * Injected service seam (tests). Production connects to the shared Core
+   * through `createCoreClientTUIService`, exactly like the TUI entry.
+   */
+  service?: TUIService;
 }
 
 export interface PrintRunResult {
   output: string;
   exitCode: number;
+}
+
+/** The print run's service plus its connection teardown. */
+interface PrintService {
+  service: TUIService;
+  close: () => Promise<void>;
+}
+
+/** Discovers or auto-starts the shared Core (like `opensac acp`/the TUI). */
+async function openPrintService(
+  deps: PrintDeps,
+  workDir: string,
+): Promise<PrintService> {
+  if (deps.service !== undefined) {
+    return { service: deps.service, close: () => Promise.resolve() };
+  }
+  const core = new CoreClient({
+    stateDir: configDir(),
+    version: appVersionCurrent(),
+    protocolVersion: CORE_PROTOCOL_VERSION,
+    config: resolveCoreConfig(deps.settings),
+  });
+  const discovery = await core.ensureStarted();
+  if (discovery.status !== "ready") {
+    await core.close();
+    const hint = discovery.status === "incompatible"
+      ? '; run "opensac core stop" to replace it'
+      : "";
+    throw new Error(`Core is not ready: ${discovery.status}${hint}`);
+  }
+  return {
+    service: createCoreClientTUIService(core, { workDir }),
+    close: () => core.close(),
+  };
+}
+
+/**
+ * Answers one Core-requested human decision unattended: a question is answered
+ * empty (the `unattended` question policy) and an approval is denied so the run
+ * is never wedged; the canonical approval event still fails the print run.
+ */
+async function answerUnattended(
+  service: TUIService,
+  request: TUIDecisionRequest,
+): Promise<void> {
+  try {
+    if (request.kind === "approval") {
+      await service.answerDecision({
+        requestId: request.requestId,
+        kind: "approval",
+        approved: false,
+      });
+      return;
+    }
+    await service.answerDecision({
+      requestId: request.requestId,
+      kind: "question",
+      answer: "",
+    });
+  } catch {
+    // First response wins elsewhere; print must never block on decisions.
+  }
 }
 
 /** Runs one print-mode turn; returns the text output and process exit code. */
@@ -80,264 +133,182 @@ export async function runPrintAction(
   const mdWidth = options.mdWidth ?? 80;
   const workDir = options.workDir !== "" ? options.workDir : Deno.cwd();
 
-  const created = create(settings, options.provider, options.model, {
-    requireModel: true,
-  });
   const providerName = options.provider !== ""
     ? options.provider
     : (settings.defaultProvider ?? "");
+  const modelID = options.model !== ""
+    ? options.model
+    : (settings.defaultModel ?? "");
   const mode = options.mode || settings.defaultMode || "yolo";
-  const thinkingLevel = normalizeThinkingLevel(
-    options.thinking || settings.defaultThinkingLevel || "",
-  ) as import("../provider/mod.ts").ThinkingLevel;
+  const thinkingLevel = options.thinking || settings.defaultThinkingLevel ||
+    "";
 
   if (options.json) {
-    emitJSON({
+    emitJSON(write, {
       type: "start",
-      provider: created.provider.name(),
-      model: created.model.id,
+      provider: providerName,
+      model: modelID,
       mode,
     });
   } else {
-    writeError(
-      `Using ${created.provider.name()}/${created.model.id} in ${mode} mode`,
-    );
+    writeError(`Using ${providerName}/${modelID} in ${mode} mode`);
   }
 
-  // Session setup: one fresh session per print run (Go setupSession default).
-  const manager = createSession({ workDir });
-  const header = manager.getHeader();
-  const sessionId = header?.id ?? "";
-
-  // SessionRuntime is built through the shared Builder (registry, skills,
-  // sandbox, MCP): the only production construction path.
-  const runtime = await new Builder(settings, levelFromSettings(settings))
-    .build(
-      undefined,
-      {
-        source: SOURCE_CLI,
-        workDir,
-        workflows: options.workflows === true,
-        browser: false,
-        artifactEnabled: isArtifactEnabled(settings),
-        manager,
-      },
-    );
-
-  let release: (() => void) | undefined;
-  let execution: ExecutionRuntime | undefined;
-  let runId = "";
-  let intentId = "";
-  let turnId = "";
-  let submission = await runtime.acceptInput(undefined, "", options.prompt, []);
-  let userMessage: import("../provider/mod.ts").Message | undefined;
-
-  if (sessionId !== "") {
-    const guard = await acquireExecutionAdmission(
-      undefined,
-      manager.getSessionDir(),
-      sessionId,
-      {},
-    );
-    release = () => guard.release();
-    const startedAt = new Date();
-    runId = `cli_${generateID()}`;
-    submission = await runtime.acceptInput(
-      undefined,
-      runId,
-      options.prompt,
-      [],
-    );
-    userMessage = runtime.buildUserMessage(undefined, submission);
-    const descriptor = await createSessionRunDescriptor({
-      sessionId,
-      runId,
-      source: "cli",
-      model: created.model.id,
-      mode,
-      workDir,
-      text: options.prompt,
-      userMessage,
-      resourceIds: resourceIds(submission),
-      startedAt,
-      policy: {
-        source: "cli",
-        mode,
-        workDir,
-        approvalPolicy: "print",
-        questionPolicy: "unattended",
-      },
-    });
-    intentId = descriptor.intent.id;
-    turnId = descriptor.turnId;
-    execution = createSessionExecutionRuntime(manager.getSessionDir());
-    runtime.setExecution(execution);
-    execution.beginIntentDurable(
-      undefined,
-      descriptor.intent,
-      descriptor.run,
-      descriptor.startEvent,
-    );
-  }
-
-  const agent = runtime.buildAgent({
-    provider: created.provider,
-    providerName,
-    model: created.model,
-    settings,
-    allow: loadAllow(),
-    mode,
-    thinkingLevel,
-    extraContext: runtime.extraContext,
-    ruleContent: runtime.ruleContent,
-    multiAgent: options.multiAgent === true,
-    delegateMode: options.delegate === true,
-    workflows: options.workflows === true,
-  });
-  if (turnId !== "") {
-    agent.setConversationTurn(turnId, intentId, runId);
-    execution?.setAgent(agent);
-  }
-
-  const events = agent.runWithUserMessage(userMessage!);
-  let textBuffer = "";
-  let runErr: string | null = null;
-  let terminalState = "completed";
-
+  const { service, close } = await openPrintService(deps, workDir);
   try {
-    await consumeEvents(events, {
-      handleAgentEvent(event: Event): void {
-        switch (event.type) {
+    // Session setup: one fresh Core-owned session per print run (Go
+    // setupSession default). The Core mints the persisted identity and records
+    // the canonical run with the print/unattended run policy.
+    const session = await service.createSession({
+      workDir,
+      providerName,
+      modelID,
+      mode,
+      thinkingLevel,
+      source: "cli",
+      approvalPolicy: "print",
+      questionPolicy: "unattended",
+      ...(options.multiAgent === true
+        ? { capabilities: { multiAgent: true } }
+        : {}),
+    });
+    const sessionId = session.sessionId;
+    if (options.delegate === true) {
+      await service.setDelegate({ sessionId, enabled: true });
+    }
+
+    // Human decisions stay Core-owned; print answers them unattended so the
+    // run can never block on a person.
+    const stopDecisions = service.onDecisionRequest((request) => {
+      void answerUnattended(service, request);
+    });
+
+    let textBuffer = "";
+    let runErr: string | null = null;
+    let runId = "";
+
+    const drainText = (): void => {
+      if (textBuffer === "") return;
+      write(wrapLines(textBuffer, mdWidth));
+      textBuffer = "";
+    };
+
+    try {
+      const accepted = await service.prompt({
+        sessionId,
+        text: options.prompt,
+        providerName,
+        modelID,
+        mode,
+        thinkingLevel,
+      });
+      runId = accepted.runId;
+      for await (
+        const event of service.subscribeRunEvents(sessionId, accepted.runId)
+      ) {
+        const agentEvent = coreEventToAgentEvent(event);
+        if (agentEvent === undefined) continue;
+        switch (agentEvent.type) {
           case EVENT_TOOL_APPROVAL_REQUEST:
             throw new Error(
-              `tool approval required in print mode for ${event.approvalTool}; rerun interactively, use --mode yolo, or whitelist the command`,
+              `tool approval required in print mode for ${agentEvent.approvalTool}; rerun interactively, use --mode yolo, or whitelist the command`,
             );
           case EVENT_TEXT_DELTA:
             if (options.json) {
-              emitJSON({ type: "text_delta", text: event.textDelta });
+              emitJSON(write, {
+                type: "text_delta",
+                text: agentEvent.textDelta,
+              });
             } else {
-              textBuffer += event.textDelta ?? "";
+              textBuffer += agentEvent.textDelta ?? "";
             }
-            return;
+            continue;
           case EVENT_THINK_DELTA:
             if (options.json) {
-              emitJSON({ type: "think_delta", think: event.thinkDelta });
-            }
-            return;
-          case EVENT_HOSTED_ITEM:
-            if (options.json && event.hostedItem) {
-              emitJSON({
-                type: "hosted_item",
-                hostedItem: event.hostedItem,
+              emitJSON(write, {
+                type: "think_delta",
+                think: agentEvent.thinkDelta,
               });
             }
-            return;
+            continue;
+          case EVENT_HOSTED_ITEM:
+            if (options.json && agentEvent.hostedItem) {
+              emitJSON(write, {
+                type: "hosted_item",
+                hostedItem: agentEvent.hostedItem,
+              });
+            }
+            continue;
           case EVENT_TOOL_CALL:
             drainText();
             if (options.json) {
-              emitJSON({
+              emitJSON(write, {
                 type: "tool_call",
-                id: event.toolCall?.id,
-                name: event.toolCall?.name,
-                arguments: event.toolArgs,
+                id: agentEvent.toolCall?.id,
+                name: agentEvent.toolCall?.name,
+                arguments: agentEvent.toolArgs,
               });
             } else {
-              writeError(`[tool: ${event.toolCall?.name}]`);
+              writeError(`[tool: ${agentEvent.toolCall?.name}]`);
             }
-            return;
+            continue;
           case EVENT_TOOL_EXECUTION_START:
             if (options.json) {
-              emitJSON({ type: "tool_execution_start", name: event.toolName });
+              emitJSON(write, {
+                type: "tool_execution_start",
+                name: agentEvent.toolName,
+              });
             } else {
-              writeError(`[running: ${event.toolName}] `);
+              writeError(`[running: ${agentEvent.toolName}] `);
             }
-            return;
+            continue;
           case EVENT_TOOL_EXECUTION_END:
             if (options.json) {
-              emitJSON({
+              emitJSON(write, {
                 type: "tool_execution_end",
-                name: event.toolName,
-                error: event.toolError?.message,
+                name: agentEvent.toolName,
+                error: agentEvent.toolError?.message,
               });
             } else {
               writeError(
-                event.toolError ? `error: ${event.toolError.message}` : "done",
+                agentEvent.toolError
+                  ? `error: ${agentEvent.toolError.message}`
+                  : "done",
               );
             }
-            return;
+            continue;
           case EVENT_TOOL_RESULT:
-            return;
+            continue;
           case EVENT_RUN_FINISHED:
             drainText();
-            if (event.status === TASK_FAILED) terminalState = "failed";
-            else if (event.status === TASK_CANCELED) {
-              terminalState = "cancelled";
-            } else if (event.status === TASK_INCOMPLETE) {
-              terminalState = "incomplete";
-            }
-            return;
+            continue;
           default:
-            return;
+            continue;
         }
-      },
-    });
-  } catch (error) {
-    runErr = (error as Error).message;
-    drainText();
-  }
-
-  function drainText(): void {
-    if (textBuffer === "") return;
-    write(wrapLines(textBuffer, mdWidth));
-    textBuffer = "";
-  }
-
-  if (runErr !== null) {
-    if (execution !== undefined && runId !== "") {
-      execution.finishDurableWithRetry(undefined, runId, "failed", runErr, {
-        sessionId,
-        runId,
-        eventType: "failed",
-        source: "cli",
-        status: "failed",
-        model: created.model.id,
-        mode,
-        timestamp: new Date(),
-      });
+      }
+    } catch (error) {
+      runErr = (error as Error).message;
+      drainText();
+    } finally {
+      stopDecisions();
+      if (runId !== "") {
+        try {
+          await service.cancelRun({ sessionId, runId });
+        } catch {
+          // The run may already be terminal; closing below releases it.
+        }
+      }
+      await service.closeSession({ sessionId });
     }
-    release?.();
-    runtime.close?.();
-    return { output: textBuffer, exitCode: 1 };
-  }
 
-  drainText();
-  if (
-    execution !== undefined && runId !== "" && terminalState !== "completed"
-  ) {
-    execution.finishDurableWithRetry(
-      undefined,
-      runId,
-      terminalState,
-      runErr ?? "",
-      {
-        sessionId,
-        runId,
-        eventType: terminalState,
-        source: "cli",
-        status: terminalState,
-        model: created.model.id,
-        mode,
-        timestamp: new Date(),
-      },
-    );
+    drainText();
+    if (runErr !== null) {
+      return { output: textBuffer, exitCode: 1 };
+    }
+    return { output: textBuffer, exitCode: 0 };
+  } finally {
+    await close();
   }
-  release?.();
-  runtime.close?.();
-
-  if (runErr !== null) {
-    return { output: "", exitCode: 1 };
-  }
-  return { output: textBuffer, exitCode: 0 };
 }
 
 function wrapLines(text: string, width: number): string {
@@ -371,10 +342,9 @@ interface PrintJSONEvent {
   hostedItem?: unknown;
 }
 
-function emitJSON(event: PrintJSONEvent): void {
-  console.log(JSON.stringify(event));
-}
-
-function levelFromSettings(settings: Settings) {
-  return sandboxLevelFromSettings(settings);
+function emitJSON(
+  write: (line: string) => void,
+  event: PrintJSONEvent,
+): void {
+  write(JSON.stringify(event));
 }

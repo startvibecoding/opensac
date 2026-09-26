@@ -126,6 +126,7 @@ Deno.test("CoreServer serves core.health and core.info without private configura
         features: [
           CORE_METHODS.health,
           CORE_METHODS.info,
+          CORE_METHODS.shutdown,
           ...Object.values(CORE_RUNTIME_METHODS),
         ],
       },
@@ -376,4 +377,98 @@ Deno.test("CoreAuth ignores URL and JSON-RPC params and uses only Bearer auth", 
     ),
     true,
   );
+});
+
+async function waitForShutdownHook(
+  predicate: () => boolean,
+  timeoutMs = 1_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("timed out waiting for the shutdown hook");
+}
+
+Deno.test("CoreServer acknowledges core.shutdown and invokes the shutdown hook", async () => {
+  let shutdownCalls = 0;
+  const server = new CoreServer({
+    config: config(),
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    onShutdown: () => {
+      shutdownCalls++;
+    },
+  });
+  const handle = await server.start();
+  try {
+    const response = await fetch(new URL("/rpc", handle.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "stop-1",
+        method: CORE_METHODS.shutdown,
+      }),
+    });
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), {
+      jsonrpc: "2.0",
+      id: "stop-1",
+      result: { ok: true },
+    });
+    await waitForShutdownHook(() => shutdownCalls === 1);
+  } finally {
+    await stopServer(handle);
+  }
+});
+
+Deno.test("CoreServer rejects core.shutdown when no shutdown hook is wired", async () => {
+  const handle = await startServer();
+  try {
+    const response = await fetch(new URL("/rpc", handle.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: CORE_METHODS.shutdown,
+      }),
+    });
+    const body = await response.json() as {
+      error?: { code?: number; message?: string };
+    };
+    assertEquals(body.error?.code, -32601);
+  } finally {
+    await stopServer(handle);
+  }
+});
+
+Deno.test("CoreServer ignores a core.shutdown notification", async () => {
+  let shutdownCalls = 0;
+  const server = new CoreServer({
+    config: config(),
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    onShutdown: () => {
+      shutdownCalls++;
+    },
+  });
+  const handle = await server.start();
+  try {
+    const response = await fetch(new URL("/rpc", handle.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: CORE_METHODS.shutdown,
+      }),
+    });
+    assertEquals(response.status, 204);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assertEquals(shutdownCalls, 0);
+  } finally {
+    await stopServer(handle);
+  }
 });

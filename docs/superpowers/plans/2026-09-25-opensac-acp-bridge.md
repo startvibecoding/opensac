@@ -54,6 +54,10 @@ This checklist records implementation state separately from the detailed TDD ste
 - Task 8 is verified for the current bridge boundary; all manage families, including SkillHub, now route through Core-owned handlers.
 - Final full repository test suite after the SkillHub migration: `2097 passed, 0 failed`.
 - Final ACP management cleanup removed six obsolete ACP direct-management source/test files; the post-cleanup full repository suite passed (`2054/2054`), with `deno task check`, `deno task lint`, `deno fmt --check`, and `git diff --check` passing.
+- Final lifecycle wrap-up (Core service closure): `core.shutdown` is now a Core protocol method (`CORE_METHODS.shutdown`), acknowledged by `CoreServer` through the command-owned `onShutdown` hook and running the same idempotent stop path as a termination signal (server stop, runtime close, registration removal, lock release). `CoreClient.shutdown()` performs the request even against a version-incompatible registered Core, and `opensac core stop` stops a running Core with a narrow, identity-checked SIGTERM fallback for older builds that predate the method (fail-closed when registration identity cannot be proven).
+- `opensac acp --standalone` runs against an isolated private Core (`src/core/private_core.ts`): a fresh per-invocation state directory that doubles as the Core's `OPENSAC_DIR` (OS-assigned loopback port, no shared discovery or lock), shut down and cleaned up when the bridge exits. `runACPCore` gained an optional `dispose` hook that runs before `bridge.close()` so an owned private Core is closed through its still-usable client.
+- Cliffy 1.3 dispatch note: a command must register its action before its subcommands; `createCoreCommand` follows that order so bare `opensac core` starts the Core and `opensac core stop` dispatches to the stop action (regression-tested in `src/cli/cli_test.ts`).
+- Final full repository suite after the lifecycle wrap-up: `2080 passed, 0 failed`; `deno task check`, `deno task lint`, `deno fmt --check`, and `deno task test:architecture` pass (new `src/core/private_core.ts` is classified in the Core boundary allowlist as a lifecycle file).
 
 ## Global Constraints
 
@@ -734,8 +738,8 @@ Confirm no generated binaries, password values, HTTP/3 dependency, direct ACP Ru
 
 After ACP bridge verification:
 
-1. TUI Core Client migration;
-2. CLI Print Core Client migration;
+1. TUI Core Client migration — now executed by `docs/superpowers/plans/2026-09-25-tui-service-abstraction.md` (endpoint: TUI is a client of the shared `opensac core`; the in-process adapter is only a named migration bridge with a removal condition);
+2. CLI Print Core Client migration — same plan, Task 7;
 3. WebUI Core JSON-RPC projection;
 4. public Core Client SDK extraction;
 5. removal of remaining legacy adapter-only compatibility bridges.

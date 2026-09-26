@@ -174,6 +174,8 @@ Deno.test("uses the initial Core method constants", () => {
   assertEquals(CORE_METHODS, {
     health: "core.health",
     info: "core.info",
+    shutdown: "core.shutdown",
   });
   assertMatch(CORE_METHODS.health, /^core\./);
+  assertMatch(CORE_METHODS.shutdown, /^core\./);
 });
