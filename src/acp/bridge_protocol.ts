@@ -54,6 +54,9 @@ export function mapACPRequestToCore(
     case "session/new":
       return coreRequest(id, "session.create", {
         workDir: stringValue(params.workDir ?? params.cwd) ?? context.workDir,
+        // The entry declares its RuntimeSource once; run policy resolves from
+        // this identity instead of the shared Core's fallback.
+        source: context.source,
         ...optionalString(params, "providerName", "provider"),
         ...optionalString(params, "modelID", "model"),
         ...optionalString(params, "mode", "mode"),

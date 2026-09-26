@@ -35,15 +35,33 @@ function errorCode(err: unknown): string {
 const retryableHTTPStatusPattern =
   /(?:http|api error|status)\s*[:=]?\s*([45][0-9]{2})/;
 
+/** Phrases and statuses that identify a permanent credential/permission failure. */
+const authenticationFailurePattern =
+  /authentication fail|auth(?:entication)? error|unauthori[sz]ed|forbidden|invalid[\s_-]*api[\s_-]*key|api[\s_-]*key.{0,40}invalid|api[\s_-]*key.{0,40}incorrect|incorrect api key|invalid[\s_-]*credential|wrong api key|(?:http|api error|status)\s*[:=]?\s*(?:401|403)\b/;
+
+/**
+ * A rejected credential or permission can never succeed on retry. These are
+ * genuine boundaries (not recoverable transport failures): the run must fail
+ * with the actionable configuration error instead of retrying forever.
+ */
+function isAuthenticationFailure(err: unknown, statusCode: number): boolean {
+  if (statusCode === 401 || statusCode === 403) return true;
+  if (err == null) return false;
+  return authenticationFailurePattern.test(errMessage(err).toLowerCase());
+}
+
 /**
  * Determines whether an error or HTTP status code warrants a retry. Provider
  * gateways frequently use 4xx for temporary quota, routing, and compatibility
- * failures, so every HTTP 4xx/5xx response is retryable here.
+ * failures, so most HTTP 4xx/5xx responses are retryable here; authentication
+ * and permission failures are permanent and never retried.
  */
 export function isRetryable(err: unknown, statusCode: number): boolean {
   // Permanent provider refusals (content inspection/moderation) are never
   // transient.
   if (isContentRejectionError(err)) return false;
+
+  if (isAuthenticationFailure(err, statusCode)) return false;
 
   if (statusCode >= 400 && statusCode < 600) return true;
 

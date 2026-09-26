@@ -22,12 +22,14 @@ import {
   claimDeliveryOperation,
   closeDatabases,
   createDeliveryPlan,
+  currentRuntimeLeaseBinding,
   type DeliveryOperation,
   type DeliveryPlan,
   getDeliveryOperation,
   getExecutionIntent,
   openByIDExact,
   updateDeliveryOperation,
+  validateRuntimeLease,
 } from "../session/mod.ts";
 import {
   type DurableRun,
@@ -38,9 +40,11 @@ import { getDurableRun } from "../agentruntime/run_queries.ts";
 import { create as createFactoryProvider } from "../provider/factory/factory.ts";
 import { MockProvider } from "../provider/mock.ts";
 import {
+  type ChatParams,
   type Model,
   streamDone,
   streamError,
+  type StreamEvent,
   streamTextDelta,
 } from "../provider/types.ts";
 import { SOURCE_ACP } from "../agentruntime/source.ts";
@@ -2627,3 +2631,99 @@ test(
       }
     }),
 );
+
+test("production prompt holds the execution lease the ownership fence revalidates", async () => {
+  const workDir = await Deno.makeTempDir({ prefix: "opensac-core-lease-" });
+  const model: Model = {
+    id: "mock-model",
+    name: "Mock Model",
+    provider: "mock",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 8192,
+    maxTokens: 1024,
+  };
+  // Gate the mock stream so the lease assertions run while the run is live.
+  let releaseStream!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    releaseStream = resolve;
+  });
+  class GatedProvider extends MockProvider {
+    override async *chat(params: ChatParams): AsyncGenerator<StreamEvent> {
+      await gate;
+      yield* super.chat(params);
+    }
+  }
+  const provider = new GatedProvider("mock", [model], [
+    { type: streamTextDelta, textDelta: "hello" },
+    { type: streamDone, stopReason: "end_turn" },
+  ]);
+  try {
+    const settings = defaultSettings();
+    const host = await createCoreRuntimeHost({
+      source: SOURCE_ACP,
+      workDir,
+      settings,
+      providerName: "mock",
+      modelID: model.id,
+      dependencies: createProductionCoreRuntimeDependencies(
+        settings,
+        () => ({ provider, model }),
+      ),
+    });
+    const session = await host.createSession({ workDir });
+    const accepted = await host.prompt({
+      sessionId: session.sessionId,
+      text: "hi",
+    });
+    const sessionDir = getSessionDir(settings);
+    // Regression: the prompt path never acquired the execution admission, so
+    // the ownership fence's final revalidation threw and every side-effecting
+    // tool was blocked ("tool execution blocked by Runtime ownership fence").
+    validateRuntimeLease(
+      sessionDir,
+      session.sessionId,
+      accepted.runId,
+      "execution",
+    );
+
+    releaseStream();
+    for await (
+      const _event of host.subscribeRunEvents(session.sessionId, accepted.runId)
+    ) {
+      // Drain to the terminal event.
+    }
+    // Terminal runs release the admission so the next run can acquire it
+    // (the release lands on the generator's completion, after the terminal
+    // event was published).
+    for (let i = 0; i < 200; i++) {
+      if (currentRuntimeLeaseBinding(sessionDir, session.sessionId) === null) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assertEquals(
+      currentRuntimeLeaseBinding(sessionDir, session.sessionId),
+      null,
+    );
+    const second = await host.prompt({
+      sessionId: session.sessionId,
+      text: "again",
+    });
+    validateRuntimeLease(
+      sessionDir,
+      session.sessionId,
+      second.runId,
+      "execution",
+    );
+    for await (
+      const _event of host.subscribeRunEvents(session.sessionId, second.runId)
+    ) {
+      // Drain to the terminal event.
+    }
+    await host.close();
+  } finally {
+    await Deno.remove(workDir, { recursive: true });
+  }
+});

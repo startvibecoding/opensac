@@ -21,6 +21,7 @@ import type {
   TUISessionView,
   TUISettingsView,
 } from "./service.ts";
+import { SOURCE_TUI } from "../agentruntime/source.ts";
 import { isDecisionNotFound } from "./service.ts";
 import { coreEventToAgentEvent } from "./run_event_projection.ts";
 import type { CoreRuntimeEvent } from "../core/runtime.ts";
@@ -719,6 +720,11 @@ export class TUISession implements CommandHost {
   #settleDialog(): void {
     const dialog = this.#dialog;
     if (dialog === undefined || !dialog.closed) return;
+    // Settle first: clear the dialog before publishing its outcome. The
+    // message below schedules a render synchronously, and a render settles
+    // dialogs again — publishing first would re-enter this method on the same
+    // closed dialog and recurse until the stack blows.
+    this.#dialog = undefined;
     const outcome = dialog.outcome;
     if (outcome.message !== undefined && outcome.message !== "") {
       this.controller.addMessage(
@@ -726,7 +732,6 @@ export class TUISession implements CommandHost {
         outcome.error === true ? "error" : "plain",
       );
     }
-    this.#dialog = undefined;
     // Hand off to another panel (Go closeAuthDialog + openXDialog).
     if (outcome.handoff === "auth") void this.openAuthDialog();
     else if (outcome.handoff === "defaultModel") {
@@ -979,6 +984,9 @@ export class TUISession implements CommandHost {
   async createFreshSession(): Promise<TUISessionView> {
     const view = await this.#service.createSession({
       workDir: this.#workDir,
+      // The entry declares its RuntimeSource once so run policy resolves from
+      // the TUI identity instead of the shared Core's fallback.
+      source: SOURCE_TUI,
       providerName: this.#providerName,
       modelID: this.#modelID,
       mode: this.#mode,

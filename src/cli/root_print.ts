@@ -15,8 +15,11 @@ import { createCoreClientTUIService } from "../tui/core_service.ts";
 import type { TUIDecisionRequest, TUIService } from "../tui/service.ts";
 import { coreEventToAgentEvent } from "../tui/run_event_projection.ts";
 import {
+  EVENT_ERROR,
   EVENT_HOSTED_ITEM,
+  EVENT_RETRY,
   EVENT_RUN_FINISHED,
+  EVENT_STATUS,
   EVENT_TEXT_DELTA,
   EVENT_THINK_DELTA,
   EVENT_TOOL_APPROVAL_REQUEST,
@@ -24,6 +27,9 @@ import {
   EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
   EVENT_TOOL_RESULT,
+  TASK_CANCELED,
+  TASK_FAILED,
+  TASK_INCOMPLETE,
 } from "../agentruntime/events.ts";
 
 export interface PrintOptions {
@@ -186,6 +192,12 @@ export async function runPrintAction(
     let textBuffer = "";
     let runErr: string | null = null;
     let runId = "";
+    // Canonical terminal state of the Core-owned run. A failed or cancelled
+    // run must surface as a message and a non-zero exit code instead of the
+    // old silent success (scripts could not tell a failed turn from a
+    // completed one).
+    let terminalState = "completed";
+    let terminalError: string | undefined;
 
     const drainText = (): void => {
       if (textBuffer === "") return;
@@ -277,10 +289,44 @@ export async function runPrintAction(
               );
             }
             continue;
+          case EVENT_STATUS:
+            // Long retry loops must stay visible instead of silent waiting;
+            // text mode reports retries on stderr, NDJSON gets every status.
+            if (options.json) {
+              emitJSON(write, {
+                type: "status",
+                ...(agentEvent.statusMessage === undefined
+                  ? {}
+                  : { message: agentEvent.statusMessage }),
+              });
+            } else if (agentEvent.retryStatus === true) {
+              writeError(agentEvent.statusMessage ?? "retrying");
+            }
+            continue;
+          case EVENT_RETRY:
+          case EVENT_ERROR: {
+            const message = agentEvent.statusMessage;
+            if (options.json) {
+              emitJSON(write, {
+                type: agentEvent.type === EVENT_RETRY ? "retry" : "error",
+                ...(message === undefined ? {} : { message }),
+              });
+            } else if (message !== undefined) {
+              writeError(message);
+            }
+            continue;
+          }
           case EVENT_TOOL_RESULT:
             continue;
           case EVENT_RUN_FINISHED:
             drainText();
+            if (agentEvent.status === TASK_FAILED) terminalState = "failed";
+            else if (agentEvent.status === TASK_CANCELED) {
+              terminalState = "cancelled";
+            } else if (agentEvent.status === TASK_INCOMPLETE) {
+              terminalState = "incomplete";
+            }
+            terminalError ??= agentEvent.error?.message;
             continue;
           default:
             continue;
@@ -293,7 +339,13 @@ export async function runPrintAction(
       stopDecisions();
       if (runId !== "") {
         try {
-          await service.cancelRun({ sessionId, runId });
+          const view = await service.cancelRun({ sessionId, runId });
+          // The run view is authoritative for the durable terminal state and
+          // carries the failure reason the Core recorded for the run.
+          if (view.status === "completed") terminalState = "completed";
+          else if (view.status === "cancelled") terminalState = "cancelled";
+          else if (view.status !== "running") terminalState = "failed";
+          terminalError ??= view.error;
         } catch {
           // The run may already be terminal; closing below releases it.
         }
@@ -303,7 +355,25 @@ export async function runPrintAction(
 
     drainText();
     if (runErr !== null) {
+      if (options.json) emitJSON(write, { type: "error", message: runErr });
+      else writeError(runErr);
       return { output: textBuffer, exitCode: 1 };
+    }
+    if (terminalState !== "completed") {
+      const message = terminalError ?? `run ${terminalState}`;
+      if (options.json) {
+        emitJSON(write, {
+          type: "run_finished",
+          status: terminalState,
+          ...(terminalError === undefined ? {} : { error: terminalError }),
+        });
+      } else {
+        writeError(message);
+      }
+      return { output: textBuffer, exitCode: 1 };
+    }
+    if (options.json) {
+      emitJSON(write, { type: "run_finished", status: "completed" });
     }
     return { output: textBuffer, exitCode: 0 };
   } finally {
@@ -340,6 +410,8 @@ interface PrintJSONEvent {
   arguments?: unknown;
   error?: string;
   hostedItem?: unknown;
+  status?: string;
+  message?: string;
 }
 
 function emitJSON(

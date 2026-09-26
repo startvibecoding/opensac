@@ -17,11 +17,14 @@ import {
 import { tuiBoundaryViolations } from "../architecture/guard.ts";
 import { type PrintOptions, runPrintAction } from "./root_print.ts";
 import {
+  EVENT_RETRY,
   EVENT_RUN_FINISHED,
+  EVENT_STATUS,
   EVENT_TOOL_CALL,
   EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
   TASK_CANCELED,
+  TASK_FAILED,
   TASK_SUCCESS,
 } from "../agentruntime/events.ts";
 
@@ -254,6 +257,10 @@ Deno.test("print mode fails with exit 1 when a tool needs approval", async () =>
     { settings: defaultSettings(), service: scripted.service },
   );
   assertEquals(result.exitCode, 1);
+  assertStringIncludes(
+    err.join("\n"),
+    "tool approval required in print mode",
+  );
   // The pending decision is answered unattended so the Core run is never wedged.
   assertEquals(scripted.answers, [
     { requestId: "ap-1", kind: "approval", approved: false },
@@ -289,9 +296,10 @@ Deno.test("print mode answers questions unattended and keeps exit semantics", as
   ]);
 });
 
-Deno.test("print mode preserves the current exit-code semantics", async () => {
-  // Current semantics: the durable terminal status alone never changes the
-  // process exit code; only a failed turn (thrown error) exits 1.
+Deno.test("print mode surfaces failed runs instead of silent success", async () => {
+  // A non-completed durable run must report why it failed and exit non-zero:
+  // scripts can tell a failed turn from a completed one.
+  const err: string[] = [];
   const scripted = scriptedService({
     events: [
       {
@@ -299,17 +307,68 @@ Deno.test("print mode preserves the current exit-code semantics", async () => {
         payload: {
           status: "failed",
           error: "model exploded",
-          agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_CANCELED },
+          agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_FAILED },
         },
         terminal: true,
       },
     ],
   });
-  const result = await runPrintAction(printOptions(), {
-    settings: defaultSettings(),
-    service: scripted.service,
+  const result = await runPrintAction(
+    printOptions({ writeError: (line) => err.push(line) }),
+    { settings: defaultSettings(), service: scripted.service },
+  );
+  assertEquals(result.exitCode, 1);
+  assertStringIncludes(err.join("\n"), "model exploded");
+});
+
+Deno.test("print mode emits terminal NDJSON records with the run status", async () => {
+  const out: string[] = [];
+  const completed = scriptedService({
+    events: [
+      {
+        eventType: "run_finished",
+        payload: {
+          status: "completed",
+          agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+        },
+        terminal: true,
+      },
+    ],
   });
-  assertEquals(result.exitCode, 0);
+  const ok = await runPrintAction(
+    printOptions({ json: true, writeOut: (line) => out.push(line) }),
+    { settings: defaultSettings(), service: completed.service },
+  );
+  assertEquals(ok.exitCode, 0);
+  assertEquals(JSON.parse(out.at(-1)!), {
+    type: "run_finished",
+    status: "completed",
+  });
+
+  out.length = 0;
+  const failed = scriptedService({
+    events: [
+      {
+        eventType: "run_finished",
+        payload: {
+          status: "failed",
+          error: "boom",
+          agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_FAILED },
+        },
+        terminal: true,
+      },
+    ],
+  });
+  const bad = await runPrintAction(
+    printOptions({ json: true, writeOut: (line) => out.push(line) }),
+    { settings: defaultSettings(), service: failed.service },
+  );
+  assertEquals(bad.exitCode, 1);
+  assertEquals(JSON.parse(out.at(-1)!), {
+    type: "run_finished",
+    status: "failed",
+    error: "boom",
+  });
 });
 
 Deno.test("print mode keeps session continuation/resume semantics (fresh session per run)", async () => {
@@ -364,4 +423,59 @@ Deno.test("root_print has no Builder/ExecutionRuntime construction left", () => 
   ) {
     assertEquals(pattern.exec(src), null, `root_print.ts matches ${pattern}`);
   }
+});
+
+Deno.test("print mode keeps retry progress and provider errors visible", async () => {
+  const events: ScriptEvent[] = [
+    {
+      eventType: "agent_event",
+      payload: {
+        agentEvent: {
+          type: EVENT_STATUS,
+          statusMessage: "Retrying (attempt 4/5); waiting 24s...",
+          retryStatus: true,
+        },
+      },
+    },
+    {
+      eventType: "agent_event",
+      payload: {
+        agentEvent: {
+          type: EVENT_RETRY,
+          statusMessage: "Authentication Fails",
+        },
+      },
+    },
+    {
+      eventType: "run_finished",
+      payload: {
+        status: "failed",
+        error: "Authentication Fails",
+        agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_FAILED },
+      },
+      terminal: true,
+    },
+  ];
+
+  // Text mode reports retry progress and the failure reason on stderr.
+  const err: string[] = [];
+  const scripted = scriptedService({ events });
+  const result = await runPrintAction(
+    printOptions({ writeError: (line) => err.push(line) }),
+    { settings: defaultSettings(), service: scripted.service },
+  );
+  assertEquals(result.exitCode, 1);
+  assertStringIncludes(err.join("\n"), "Retrying (attempt 4/5)");
+  assertStringIncludes(err.join("\n"), "Authentication Fails");
+
+  // NDJSON consumers see every status and retry record.
+  const out: string[] = [];
+  const scriptedJson = scriptedService({ events });
+  await runPrintAction(
+    printOptions({ json: true, writeOut: (line) => out.push(line) }),
+    { settings: defaultSettings(), service: scriptedJson.service },
+  );
+  const types = out.map((line) => (JSON.parse(line) as { type: string }).type);
+  assert(types.includes("status"), JSON.stringify(types));
+  assert(types.includes("retry"), JSON.stringify(types));
 });

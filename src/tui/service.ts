@@ -571,11 +571,18 @@ export function createFakeTUIService(): FakeTUIService {
       terminal,
     };
     run.events.push(event);
-    if (terminal && run.status === "running") {
-      run.status = String(
-        payload.status ?? "completed",
-      ) as TUIRunView["status"];
-      run.updatedAt = now();
+    if (terminal) {
+      if (run.status === "running") {
+        run.status = String(
+          payload.status ?? "completed",
+        ) as TUIRunView["status"];
+        run.updatedAt = now();
+      }
+      // Mirror the canonical run store: the run view carries the recorded
+      // failure reason, not only the transient event payload.
+      if (run.error === undefined && typeof payload.error === "string") {
+        run.error = payload.error;
+      }
     }
     for (const waiter of [...run.waiters]) waiter();
     return event;

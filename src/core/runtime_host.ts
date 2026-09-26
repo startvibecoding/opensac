@@ -125,6 +125,8 @@ import {
   validateEnvName,
 } from "../config/env.ts";
 import {
+  acquireExecutionAdmission,
+  currentRuntimeLeaseBinding,
   DeliveryOperationAbsentError,
   generateID,
   getDeliveryOperation,
@@ -133,6 +135,7 @@ import {
   type Manager,
   openByIDExact,
   reopenFailedDeliveryOperation,
+  type RuntimeLeaseGuard,
 } from "../session/mod.ts";
 import { deliveryFailureRetryable } from "../agentruntime/delivery_coordinator.ts";
 import { knowledgeBaseCronJobID } from "../agentruntime/knowledge_cron.ts";
@@ -3769,6 +3772,31 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
 
   async prompt(input: CorePromptInput): Promise<CorePromptExecution> {
     const { manager, runtime } = await this.#ensureRuntime();
+    const sessionDir = manager.getSessionDir();
+    // The Runtime ownership fence revalidates a held execution lease before
+    // any side effect. Acquire this run's admission here — the run-begin
+    // transaction binds it to the run — unless the caller already holds this
+    // session's lease (cron and knowledge-index runs wrap the call).
+    const admission = currentRuntimeLeaseBinding(sessionDir, this.sessionId) ===
+        null
+      ? await acquireExecutionAdmission(sessionDir, this.sessionId)
+      : null;
+    try {
+      return await this.#promptOwned(input, manager, runtime, admission);
+    } catch (error) {
+      // Setup failed before a run exists: the generator never starts, so the
+      // admission must be released here or the session wedges.
+      admission?.release();
+      throw error;
+    }
+  }
+
+  async #promptOwned(
+    input: CorePromptInput,
+    manager: Manager,
+    runtime: SessionRuntime,
+    admission: RuntimeLeaseGuard | null,
+  ): Promise<CorePromptExecution> {
     const created = this.#providerFactory(
       this.#settings,
       input.providerName ?? this.#providerName,
@@ -3945,6 +3973,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
           },
           terminal: true,
         };
+      } finally {
+        // The admission guards this run's side effects until it is terminal;
+        // abandoning the stream releases it the same way.
+        admission?.release();
       }
     })();
     return { runId, agentId: agent.id(), events };

@@ -1020,3 +1020,85 @@ Deno.test("CoreClient shutdown fails when no Core is registered", async () => {
     }
   });
 });
+
+Deno.test("CoreEventConnection correlates WebSocket requests with their responses", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    // Regression: the pending map once stored raw ids but matched responses
+    // through JSON.stringify(message.id), so subscribe/replay hung forever.
+    const seen: string[] = [];
+    let resolvePort!: (port: number) => void;
+    const portReady = new Promise<number>((resolve) => {
+      resolvePort = resolve;
+    });
+    const server = Deno.serve(
+      {
+        hostname: "127.0.0.1",
+        port: 0,
+        onListen: (address) => resolvePort(address.port),
+      },
+      async (request) => {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === "/rpc") {
+          const body = await request.json() as {
+            id?: unknown;
+            method?: unknown;
+          };
+          const result = body.method === CORE_METHODS.info ? EXPECTED_INFO : {
+            healthy: true,
+            version: TEST_VERSION,
+            protocolVersion: TEST_PROTOCOL_VERSION,
+          };
+          return new Response(
+            JSON.stringify(coreResult(body.id ?? null, result)),
+            { headers: { "content-type": "application/json" } },
+          );
+        }
+        if (pathname === "/events") {
+          const { socket, response } = Deno.upgradeWebSocket(request);
+          socket.onmessage = (message) => {
+            const body = JSON.parse(String(message.data)) as {
+              id?: unknown;
+              method?: unknown;
+            };
+            if (typeof body.method === "string") seen.push(body.method);
+            socket.send(JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id ?? null,
+              result: { ok: true },
+            }));
+          };
+          return response;
+        }
+        return new Response("not found", { status: 404 });
+      },
+    );
+    const port = await portReady;
+    try {
+      await writeRegistration(paths, registration(stateDir, port));
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        const events = await client.connectEvents();
+        const bounded = <T>(operation: Promise<T>): Promise<T> =>
+          Promise.race([
+            operation,
+            new Promise<never>((_resolve, reject) =>
+              setTimeout(
+                () => reject(new Error("event request timed out")),
+                2_000,
+              )
+            ),
+          ]);
+        await bounded(events.subscribe("session-1", "run-1", 0));
+        const replay = await bounded(events.replay("session-1", "run-1", 0));
+        assertEquals(seen, ["run.events.subscribe", "run.events.replay"]);
+        assertEquals(replay, { ok: true });
+        await events.close();
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await server.shutdown();
+      await server.finished;
+    }
+  });
+});

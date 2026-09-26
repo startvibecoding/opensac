@@ -45,6 +45,7 @@ import {
   type CoreServerStartFailure,
   isCoreServerStartFailure,
 } from "../core/server.ts";
+import { SOURCE_UNKNOWN } from "../agentruntime/source.ts";
 import { current as currentVersion } from "../version/version.ts";
 import type { CoreRuntimeHost } from "../core/runtime.ts";
 
@@ -274,7 +275,7 @@ function createLazyProductionRuntimeHost(
   const load = (): Promise<CoreRuntimeHost> => {
     hostPromise ??= import("../core/runtime_host.ts").then(async (module) => {
       const runtime = await module.createCoreRuntimeHost({
-        source: "core",
+        source: SOURCE_UNKNOWN,
         workDir: Deno.cwd(),
         settings,
         providerName: settings.defaultProvider ?? "",

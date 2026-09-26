@@ -22,11 +22,12 @@ function formatViolations(violations: Violation[]): string {
   return violations.map((v) => `${v.file}: ${v.message}`).join("\n- ");
 }
 
-/** Task 6 scope: the TUI graph and its interactive CLI entry. */
+/** Task 6 scope: the whole TUI/CLI front-end graph, print included. */
 function task6Violations(root: string): Violation[] {
-  return tuiBoundaryViolations(root).filter((violation) =>
-    violation.file !== "src/cli/root_print.ts"
-  );
+  // `src/cli/root_print.ts` is held to the same boundary as the interactive
+  // entries: it only ever had a transitional exclusion, which is now removed
+  // (it reports zero violations and stays enforced like every other entry).
+  return tuiBoundaryViolations(root);
 }
 
 Deno.test("TUI production graph has no runtime-owner bypass", () => {
@@ -111,7 +112,13 @@ Deno.test("TUISession and root_tui keep the ownership rules", () => {
     "dao/",
     "agent/",
   ];
-  for (const rel of ["src/tui/tui_session.ts", "src/cli/root_tui.ts"]) {
+  for (
+    const rel of [
+      "src/tui/tui_session.ts",
+      "src/cli/root_tui.ts",
+      "src/cli/root_print.ts",
+    ]
+  ) {
     const src = Deno.readTextFileSync(join(projectRoot, rel));
     for (const specifier of importSpecifiers(src)) {
       for (const forbidden of forbiddenSpecifiers) {

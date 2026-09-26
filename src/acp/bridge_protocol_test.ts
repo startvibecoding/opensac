@@ -25,7 +25,12 @@ Deno.test("mapACPRequestToCore preserves session/new and raw request id", () => 
   const mapped = mapACPRequestToCore(request, context);
   assertEquals(mapped.method, "session.create");
   assertEquals(mapped.id, "request-1");
-  assertEquals(mapped.params, { workDir: "/tmp/project" });
+  // The entry declares its RuntimeSource so run policy resolves from the
+  // front-end identity instead of the shared Core's fallback.
+  assertEquals(mapped.params, {
+    workDir: "/tmp/project",
+    source: "acp",
+  });
 });
 
 Deno.test("mapCoreResponseToACP uses the original raw ACP id", () => {

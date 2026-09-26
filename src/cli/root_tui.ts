@@ -77,7 +77,16 @@ export function applyEditorWidth(
 export async function runInteractiveAction(
   options: TUIOptions,
   settings: Settings,
+  deps: { isTerminal?: () => boolean } = {},
 ): Promise<void> {
+  const isTerminal = deps.isTerminal ?? (() => Deno.stdin.isTerminal());
+  if (!isTerminal()) {
+    // Ink's reconciler crashes on non-TTY stdin; fail before it starts so a
+    // piped/CI invocation gets one actionable message instead of a stack.
+    throw new Error(
+      "interactive mode requires a terminal (TTY); use -P for non-interactive runs",
+    );
+  }
   const workDir = options.workDir !== "" ? options.workDir : Deno.cwd();
   // The TUI is a thin client of the shared Core: discover or auto-start it
   // exactly like `opensac acp` and project every run through its JSON-RPC

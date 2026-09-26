@@ -28,7 +28,8 @@ Deno.test("IsRetryable_NetworkErrors", () => {
     ["524", null, 524, true],
     ["500", null, 500, true],
     ["400 retryable", null, 400, true],
-    ["401 retryable", null, 401, true],
+    ["401 authentication never retryable", null, 401, false],
+    ["403 permission never retryable", null, 403, false],
     ["499 retryable", null, 499, true],
     ["599 retryable", null, 599, true],
     ["ECONNRESET", coded("read ECONNRESET", "ECONNRESET"), 0, true],
@@ -229,4 +230,32 @@ Deno.test("TruncateErrRuneSafe", () => {
   assert(got.endsWith("..."), got);
   const body = got.slice(0, -3);
   for (const r of body) assert(r === "错", `broken rune ${r}`);
+});
+
+Deno.test("IsRetryable_AuthenticationFailures", () => {
+  const tests: Array<[string, unknown, number, boolean]> = [
+    [
+      "invalid api key message",
+      new Error(
+        "Authentication Fails, Your api key: ****KEY} is invalid (request_id: f8f3)",
+      ),
+      0,
+      false,
+    ],
+    ["401 unauthorized message", new Error("401 Unauthorized"), 0, false],
+    ["403 forbidden message", new Error("api error 403: forbidden"), 0, false],
+    ["invalid_api_key code", new Error("invalid_api_key"), 0, false],
+    ["unauthorized token", new Error("unauthorized: token expired"), 0, false],
+    ["quota still retryable", new Error("quota exceeded"), 429, true],
+    ["server error still retryable", new Error("server_error"), 500, true],
+    [
+      "auth failure with 401 status",
+      new Error("Authentication Fails"),
+      401,
+      false,
+    ],
+  ];
+  for (const [name, err, code, want] of tests) {
+    assertEquals(isRetryable(err, code), want, name);
+  }
 });

@@ -17,6 +17,7 @@ import {
   type TUIDecisionAnswer,
   type TUIService,
 } from "./service.ts";
+import { splitInputChunk } from "./keys.ts";
 import { TUISession } from "./tui_session.ts";
 
 interface Recorder {
@@ -217,4 +218,28 @@ test("an early submit failure unwinds busy without a bound session", async () =>
     message.startsWith("Error:")
   );
   assert(errors.length >= 1, "expected a visible error row");
+});
+
+test("settling a dialog publishes its message exactly once without recursing", async () => {
+  // Regression: #settleDialog used to publish the outcome message before
+  // clearing the dialog, so addMessage -> scheduleRender -> requestRender ->
+  // #settleDialog recursed on the same closed dialog until the stack blew.
+  const fake = createFakeTUIService();
+  const rec = recordingService(fake);
+  const session = makeSession(rec.service);
+  session.setRenderScheduler(() => {});
+
+  await session.openDefaultModelDialog("global");
+  const before = session.controller.store.messages.length;
+  assert(session.handleDialogKey(splitInputChunk("\r")[0]));
+  assert(session.handleDialogKey(splitInputChunk("\r")[0]));
+  await tick();
+
+  // Exactly one outcome message is published (its text is localized), and it
+  // is published once — the pre-fix recursion published forever or crashed.
+  const added = session.controller.store.messages.slice(before);
+  assertEquals(added.length, 1);
+  assert(added[0].length > 0);
+  // The dialog settled: further keys are no longer consumed.
+  assertEquals(session.handleDialogKey(splitInputChunk("\r")[0]), false);
 });

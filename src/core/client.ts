@@ -520,7 +520,9 @@ export class CoreClient {
     ): Promise<unknown> => {
       const id = `event-${nextId++}`;
       const result = new Promise<unknown>((resolve, reject) => {
-        pending.set(id, { resolve, reject });
+        // The lookup side matches responses by `JSON.stringify(message.id)`;
+        // store the key the same way or no response can ever resolve.
+        pending.set(JSON.stringify(id), { resolve, reject });
       });
       send({
         jsonrpc: "2.0",
