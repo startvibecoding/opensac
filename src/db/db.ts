@@ -8,7 +8,14 @@
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue } from "node:sqlite";
 import * as path from "@std/path";
-import { isSQLiteBusy, isSQLiteReadOnly, sleepSync } from "./busy.ts";
+import {
+  isSQLiteBusy,
+  isSQLiteReadOnly,
+  recordBeginWait,
+  recordBusyRetryHit,
+  recordBusyRetryWait,
+  sleepSync,
+} from "./busy.ts";
 import { recordIndexRepair } from "./repair.ts";
 import {
   isSchemaIncompatible,
@@ -219,17 +226,28 @@ export function runInTx<T>(connection: DB, fn: (db: DB) => T): T {
   }
 }
 
-/** Takes the writer lock up front, matching the Go DSN's `_txlock=immediate`. */
+/**
+ * Takes the writer lock up front, matching the Go DSN's `_txlock=immediate`.
+ * Every attempt is reported to `recordBeginWait` and every transient busy
+ * retry to the busy counters, so the published contention metrics stay live
+ * (Go `retryBusy`).
+ */
 function beginImmediate(connection: DB): void {
   const deadline = Date.now() + 90_000;
   let delay = 200;
   for (;;) {
+    const attemptStart = performance.now();
     try {
       connection.exec("BEGIN IMMEDIATE");
+      recordBeginWait(performance.now() - attemptStart);
       return;
     } catch (err) {
-      if (!isSQLiteBusy(err) || Date.now() + delay >= deadline) throw err;
+      recordBeginWait(performance.now() - attemptStart);
+      if (!isSQLiteBusy(err)) throw err;
+      recordBusyRetryHit();
+      if (Date.now() + delay >= deadline) throw err;
       sleepSync(delay);
+      recordBusyRetryWait(delay);
       delay = Math.min(delay * 2, 2_000);
     }
   }

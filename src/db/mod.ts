@@ -24,6 +24,8 @@ export {
   isSQLiteBusy,
   isSQLiteReadOnly,
   recordBeginWait,
+  recordBusyRetryHit,
+  recordBusyRetryWait,
   sqliteResultCode,
 } from "./busy.ts";
 export {

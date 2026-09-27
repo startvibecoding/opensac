@@ -78,3 +78,17 @@ export function recordBeginWait(elapsedMs: number): void {
     beginWaitCounters.maxMs = elapsedMs;
   }
 }
+
+/**
+ * Records one transient SQLITE_BUSY/SQLITE_LOCKED begin attempt. Counted
+ * before the budget check so a final failed attempt stays observable, matching
+ * Go's `retryBusy`.
+ */
+export function recordBusyRetryHit(): void {
+  busyRetryCounters.hits += 1;
+}
+
+/** Records the backoff actually slept between two begin attempts. */
+export function recordBusyRetryWait(waitMs: number): void {
+  busyRetryCounters.waitMs += waitMs;
+}
