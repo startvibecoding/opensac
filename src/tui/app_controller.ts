@@ -39,8 +39,10 @@ import {
 } from "../agentruntime/decision.ts";
 import { AgentActivityStore } from "./activity.ts";
 import { ActivityManager } from "./activity_manager.ts";
-import { TranscriptStore } from "./transcript_store.ts";
+import { type MessageKind, TranscriptStore } from "./transcript_store.ts";
 import { Translator } from "./i18n.ts";
+
+export type { MessageKind };
 
 /** The execution-lifecycle bridge the controller needs (tuiRun in Go). */
 export interface RunHandle {
@@ -74,7 +76,49 @@ export interface PendingQuestion {
   context?: string;
 }
 
-export type MessageKind = "status" | "error" | "warning" | "plain";
+/** Terminal hosted-item statuses that stay visible in the simple view. */
+const TERMINAL_HOSTED_STATUSES = new Set([
+  "completed",
+  "complete",
+  "done",
+  "failed",
+  "error",
+  "canceled",
+  "cancelled",
+]);
+
+/**
+ * Whether a hosted-item row also renders in the simple event view (Go
+ * shouldShowHostedItem): progress rows are full-view detail, terminal rows
+ * and items without a status stay visible.
+ */
+function hostedItemVisibleInCompact(status: string): boolean {
+  const normalized = status.trim().toLowerCase();
+  return normalized === "" || TERMINAL_HOSTED_STATUSES.has(normalized);
+}
+
+/**
+ * Whether a lifecycle status row also renders in the simple event view (Go
+ * isImportantEventStatus): warnings, failures, denials, cancellations and
+ * permission problems are never routine noise.
+ */
+function isImportantEventStatus(message: string): boolean {
+  const lower = message.trim().toLowerCase();
+  for (
+    const marker of [
+      "warning",
+      "error",
+      "failed",
+      "denied",
+      "canceled",
+      "cancelled",
+      "permission",
+    ]
+  ) {
+    if (lower.includes(marker)) return true;
+  }
+  return false;
+}
 
 export interface AppControllerCallbacks {
   onMessage(kind: MessageKind, text: string): void;
@@ -172,8 +216,19 @@ export class AppController {
   /** Adds a message row (Go addMessage): a plain transcript row plus the
    * typed notification channel for the Ink layer. */
   addMessage(text: string, kind: MessageKind = "plain"): void {
-    this.store.messages.push(text);
+    this.store.addMessageRow(text, kind);
     this.#cb.onMessage(kind, text);
+    this.#cb.scheduleRender();
+  }
+
+  /**
+   * Adds a routine lifecycle row (Go addEventMessage). A row that is not
+   * visible in the simple view stays in the transcript but renders only in the
+   * full event view, so switching Ctrl+G back to full replays it.
+   */
+  addEventMessage(text: string, visibleInCompact: boolean): void {
+    this.store.addMessageRow(text, "status", !visibleInCompact);
+    this.#cb.onMessage("status", text);
     this.#cb.scheduleRender();
   }
 
@@ -205,10 +260,13 @@ export class AppController {
 
       case EVENT_HOSTED_ITEM:
         if (event.hostedItem) {
-          let line = "hosted item";
+          let line = this.#translator.text("activity.hosted_item");
           if (event.hostedItem.type) line += ` [${event.hostedItem.type}]`;
           if (event.hostedItem.status) line += `: ${event.hostedItem.status}`;
-          this.addMessage(line, "status");
+          this.addEventMessage(
+            line,
+            hostedItemVisibleInCompact(event.hostedItem.status ?? ""),
+          );
         }
         this.#cb.scheduleRender();
         return;
@@ -295,7 +353,10 @@ export class AppController {
 
       case EVENT_STATUS:
         if (!event.retryStatus && event.statusMessage) {
-          this.addMessage(event.statusMessage, "status");
+          this.addEventMessage(
+            event.statusMessage,
+            isImportantEventStatus(event.statusMessage),
+          );
           this.#cb.scheduleRender();
         }
         return;

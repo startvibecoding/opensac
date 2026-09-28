@@ -75,6 +75,28 @@ export function toolSectionValue(content: string, section: string): string {
   return "";
 }
 
+/** A `[section]` marker line (`[stdout]`, `[exit_code]`, …). */
+const SECTION_MARKER_RE = /^\[[a-z_]+\]$/;
+
+/**
+ * Whole body of a `[section]` block (every line up to the next marker), or
+ * `null` when the section is absent. Unlike `toolSectionValue` this keeps the
+ * full multi-line body rather than only the first line.
+ */
+function toolSectionBody(content: string, section: string): string | null {
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() !== section) continue;
+    const body: string[] = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (SECTION_MARKER_RE.test(lines[j].trim())) break;
+      body.push(lines[j]);
+    }
+    return body.join("\n").trim();
+  }
+  return null;
+}
+
 /** Single-line header: `[tool] path?` (Go formatToolHeader). */
 export function toolHeader(input: ToolRowInput): string {
   const p = toolPath(input.toolArgs);
@@ -121,6 +143,34 @@ function bashCommandLine(tr: Translator, input: ToolRowInput): string {
     command = Array.from(command).slice(0, 160).join("");
   }
   return `[bash] ${command} (${bashStatus(tr, input)})`;
+}
+
+/** First meaningful line of a captured stream (blank/`(no output)` skipped). */
+function outputLine(body: string | null): string | null {
+  if (body === null) return null;
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed === "(no output)") continue;
+    return trimmed;
+  }
+  return null;
+}
+
+/**
+ * Single-line output excerpt for the simple view: the first meaningful
+ * stdout line, falling back to stderr when stdout is empty. The structured
+ * `[runtime]`/`[command]`/… markers belong to the full view only — the row
+ * header already carries the command and its status, so repeating a marker
+ * here would read as the result's whole content.
+ */
+function bashExcerpt(input: ToolRowInput): string {
+  for (const content of [input.fullContent, input.summary]) {
+    if (content === "") continue;
+    const line = outputLine(toolSectionBody(content, "[stdout]")) ??
+      outputLine(toolSectionBody(content, "[stderr]"));
+    if (line !== null) return truncateRaw(line, 160);
+  }
+  return "";
 }
 
 // ── running rows ────────────────────────────────────────────────────────────
@@ -345,13 +395,13 @@ export function formatToolRow(
   }
   if (input.toolName === "bash") {
     const header = bashCommandLine(tr, input);
-    let summary = input.summary;
-    if (summary === "" && input.status === "interrupted") return header;
-    if (summary === "") summary = "...";
+    if (input.summary === "" && input.status === "interrupted") return header;
     if (compact) {
-      const nl = summary.indexOf("\n");
-      if (nl >= 0) summary = summary.slice(0, nl);
+      const excerpt = bashExcerpt(input);
+      return excerpt === "" ? header : `${header} ${excerpt}`;
     }
+    let summary = input.summary;
+    if (summary === "") summary = "...";
     return summary.includes("\n")
       ? `${header}\n${summary}`
       : `${header} ${summary}`;
@@ -406,4 +456,39 @@ export function defaultToolSummary(
 function truncateRaw(s: string, max: number): string {
   const runes = Array.from(s);
   return runes.length <= max ? s : runes.slice(0, max - 3).join("") + "...";
+}
+
+/**
+ * Parallel calls at which a batch collapses into one tree block instead of
+ * rendering one independent row per call (Go `minToolGroupSize`).
+ */
+export const MIN_TOOL_GROUP_SIZE = 2;
+
+/**
+ * Renders a parallel tool-call batch as a tree (Go `renderToolGroupBlock`):
+ * a title carrying the live count, then one indented branch per call. The
+ * caller supplies the already-formatted per-call rows in message order, so a
+ * batch keeps its shape for its whole lifetime — the title switches from the
+ * running form to the completed form once every call reached a terminal state.
+ * Empty member rows are dropped; `title` keeps the full group count.
+ */
+export function formatToolGroup(title: string, members: string[]): string {
+  const bodies = members.map((m) => m.trimRight()).filter((m) =>
+    m.trim() !== ""
+  );
+  const lines = [title];
+  for (let i = 0; i < bodies.length; i++) {
+    const branch = i === bodies.length - 1 ? "└─ " : "├─ ";
+    lines.push(treeIndentBlock(branch, bodies[i]));
+  }
+  return lines.join("\n");
+}
+
+/** Prefixes the first line of `body` with the branch and indents the rest. */
+function treeIndentBlock(branch: string, body: string): string {
+  const lines = body.split("\n");
+  if (lines.length === 1) return branch + lines[0];
+  return branch +
+    lines[0] +
+    lines.slice(1).map((line) => `\n   ${line}`).join("");
 }

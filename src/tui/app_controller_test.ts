@@ -8,6 +8,7 @@ import type { Event } from "../agent/events.ts";
 import {
   EVENT_DONE,
   EVENT_ERROR,
+  EVENT_HOSTED_ITEM,
   EVENT_PLAN_UPDATE,
   EVENT_RUN_FINISHED,
   EVENT_STATUS,
@@ -190,6 +191,51 @@ Deno.test("status messages become transcript rows; retry-status skipped", () => 
     statusMessage: "internal",
   }));
   assertEquals(messages.length, 1);
+});
+
+Deno.test("routine lifecycle rows are full-view-only, important ones are not", () => {
+  const { c, messages } = controller("lead");
+  c.handleAgentEvent(ev({
+    type: EVENT_STATUS,
+    statusMessage: "Context compacted: 1200 tokens",
+  }));
+  c.handleAgentEvent(ev({
+    type: EVENT_STATUS,
+    statusMessage: "Tool failed: permission denied",
+  }));
+  assertEquals(messages.length, 2);
+  // The simple view drops routine lifecycle rows, but keeps them in the
+  // transcript so the full view can replay them.
+  assertEquals(c.store.isFullOnly(0), true);
+  assertEquals(c.store.isFullOnly(1), false);
+  assertEquals(c.store.messageKinds.get(0), "status");
+  assertEquals(c.store.messageKinds.get(1), "status");
+});
+
+Deno.test("hosted items only stay visible in the simple view once terminal", () => {
+  const { c } = controller("lead");
+  c.handleAgentEvent(ev({
+    type: EVENT_HOSTED_ITEM,
+    hostedItem: { type: "image", status: "running" },
+  }));
+  c.handleAgentEvent(ev({
+    type: EVENT_HOSTED_ITEM,
+    hostedItem: { type: "image", status: "completed" },
+  }));
+  assertEquals(c.store.isFullOnly(0), true);
+  assertEquals(c.store.isFullOnly(1), false);
+  assertEquals(c.store.messages[1], "hosted item [image]: completed");
+});
+
+Deno.test("clearing the transcript forgets kinds and full-view-only rows", () => {
+  const { c } = controller("lead");
+  c.handleAgentEvent(ev({ type: EVENT_STATUS, statusMessage: "compacting" }));
+  const generation = c.store.generation;
+  c.store.resetTranscriptState();
+  assertEquals(c.store.messages, []);
+  assertEquals(c.store.isFullOnly(0), false);
+  assertEquals(c.store.messageKinds.size, 0);
+  assertEquals(c.store.generation, generation + 1);
 });
 
 Deno.test("run finished terminalizes the run and interrupted tools", () => {
@@ -626,14 +672,8 @@ Deno.test({
       toolName: "bash",
       toolArgs: { command: "cd /a/b & ls" },
     }));
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_EXECUTION_START,
-      toolCallId: "t-read",
-      toolName: "read",
-      toolArgs: { path: "src/main.ts" },
-    }));
     const stdout = new FakeStdout();
-    const instance = render(
+    const view = () =>
       App({
         controller: c,
         header: {
@@ -643,17 +683,34 @@ Deno.test({
           cwd: "/w",
         },
         width: 90,
-      }),
-      {
-        stdout: stdout as unknown as NodeJS.WriteStream,
-        exitOnCtrlC: false,
-        patchConsole: false,
-      },
-    );
+      });
+    const instance = render(view(), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      exitOnCtrlC: false,
+      patchConsole: false,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert(stdout.output.includes("bash: cd /a/b & ls"), stdout.output);
+
+    // Only a lone running call stays on the activity timeline: a call that
+    // starts while a sibling runs joins the sibling's tree block instead
+    // (see tool_group_test.ts).
+    c.handleAgentEvent(ev({
+      type: EVENT_TOOL_RESULT,
+      toolCallId: "t-bash",
+      toolName: "bash",
+      toolResult: "ok",
+    }));
+    c.handleAgentEvent(ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "t-read",
+      toolName: "read",
+      toolArgs: { path: "src/main.ts" },
+    }));
+    instance.rerender(view());
     await new Promise((resolve) => setTimeout(resolve, 50));
     instance.unmount();
     const out = stdout.output;
-    assert(out.includes("bash: cd /a/b & ls"), out);
     assert(out.includes("read: src/main.ts"), out);
   },
 });

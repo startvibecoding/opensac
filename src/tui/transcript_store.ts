@@ -13,8 +13,12 @@ import {
   TOOL_EXECUTION_INTERRUPTED,
   type ToolExecutionState,
 } from "../agentruntime/events.ts";
+import { MIN_TOOL_GROUP_SIZE } from "./tool_row_format.ts";
 
 export type ToolResultStatus = "running" | "completed" | "interrupted";
+
+/** Presentation kind of a plain message row (status rows render dim). */
+export type MessageKind = "status" | "error" | "warning" | "plain";
 
 export interface ToolResultEntry {
   toolCallID: string;
@@ -33,6 +37,12 @@ export interface ToolResultEntry {
   executionState: ToolExecutionState | "";
   /** Index in messages where this tool row lives. */
   msgIndex: number;
+  /**
+   * Parallel-batch id (Go `toolResult.groupID`): rows sharing a non-zero id
+   * render and commit as one tree block once the group is big enough; a lone
+   * row keeps its id but renders on its own.
+   */
+  groupID: number;
 }
 
 /** Parameters of a tool result event the store matches against. */
@@ -68,6 +78,20 @@ export class TranscriptStore {
   messages: string[] = [];
   toolResults: ToolResultEntry[] = [];
 
+  /** Presentation kind per plain message row (index → kind). */
+  readonly messageKinds = new Map<number, MessageKind>();
+  /**
+   * Rows that belong to the full event view only (Go `hiddenEventIdx`): they
+   * stay in the transcript so Ctrl+G can replay them, but the simple view
+   * omits them from the managed view and from terminal scrollback.
+   */
+  readonly fullOnlyRows = new Set<number>();
+  /**
+   * Bumped on every transcript reset: a cleared transcript re-uses row
+   * indices, so render layers key rows by generation as well.
+   */
+  generation = 0;
+
   /** The translator bound at construction (used by Ink row formatting). */
   get translator(): Translator {
     return this.#translator;
@@ -79,12 +103,31 @@ export class TranscriptStore {
   #assistantRaw = new Map<number, string>();
   #assistantDirty = new Set<number>();
   #thinkRaw = new Map<number, string>();
+  /** Monotonic id source for parallel tool-call groups (Go toolGroupSeq). */
+  #toolGroupSeq = 0;
 
   constructor(options: TranscriptStoreOptions) {
     this.#translator = options.translator;
     this.#summarize = options.summarize ??
       ((toolName, result, diff) =>
         summarizeToolResult(toolName, result, diff, this.#translator));
+  }
+
+  /**
+   * Appends a plain message row (Go addMessage) and returns its transcript
+   * index. `fullOnly` marks a routine lifecycle row (Go addEventMessage).
+   */
+  addMessageRow(text: string, kind: MessageKind, fullOnly = false): number {
+    const index = this.messages.length;
+    this.messages.push(text);
+    this.messageKinds.set(index, kind);
+    if (fullOnly) this.fullOnlyRows.add(index);
+    return index;
+  }
+
+  /** Whether the row renders only in the full event view. */
+  isFullOnly(index: number): boolean {
+    return this.fullOnlyRows.has(index);
   }
 
   // ── streaming slots ────────────────────────────────────────────────────────
@@ -219,8 +262,44 @@ export class TranscriptStore {
       toolError: "",
       executionState: "",
       msgIndex: msgIdx,
+      groupID: this.#assignToolGroup(),
     });
     this.messages.push("");
+  }
+
+  /**
+   * Group id for a tool call that is about to start (Go `assignToolGroup`):
+   * a call that starts while its predecessor is still running joins that
+   * sibling's group (parallel execution), otherwise it opens a new group. A
+   * group only renders as a tree once it holds `MIN_TOOL_GROUP_SIZE` rows.
+   */
+  #assignToolGroup(): number {
+    const last = this.toolResults[this.toolResults.length - 1];
+    if (last !== undefined && last.status === "running") {
+      if (last.groupID === 0) last.groupID = ++this.#toolGroupSeq;
+      return last.groupID;
+    }
+    return ++this.#toolGroupSeq;
+  }
+
+  /** Parallel-group id of the tool row at `msgIndex`, or 0 when there is none. */
+  toolGroupIDAt(msgIndex: number): number {
+    for (const row of this.toolResults) {
+      if (row.msgIndex === msgIndex) return row.groupID;
+    }
+    return 0;
+  }
+
+  /** Rows of a parallel group in message order (Go toolGroupMembers). */
+  toolGroupMembers(groupID: number): ToolResultEntry[] {
+    if (groupID <= 0) return [];
+    return this.toolResults.filter((row) => row.groupID === groupID);
+  }
+
+  /** Whether a group holds enough parallel calls to render as a tree block. */
+  isMultiToolGroup(groupID: number): boolean {
+    return groupID > 0 &&
+      this.toolGroupMembers(groupID).length >= MIN_TOOL_GROUP_SIZE;
   }
 
   /**
@@ -287,6 +366,9 @@ export class TranscriptStore {
       ),
       toolError: event.toolError ? event.toolError.message : "",
       executionState: event.toolExecutionState ?? "",
+      // A result that opens its own row never raced a sibling, so it stays
+      // ungrouped (Go leaves groupID at zero for straggler rows).
+      groupID: 0,
     });
     this.messages.push("");
   }
@@ -320,6 +402,10 @@ export class TranscriptStore {
   resetTranscriptState(): void {
     this.messages = [];
     this.toolResults = [];
+    this.messageKinds.clear();
+    this.fullOnlyRows.clear();
+    this.generation++;
+    this.#toolGroupSeq = 0;
     this.currentAssistantIdx = -1;
     this.currentThinkIdx = -1;
     this.#assistantRaw.clear();

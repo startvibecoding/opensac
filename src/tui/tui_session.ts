@@ -134,7 +134,10 @@ export class TUISession implements CommandHost {
   #esmActiveAgentId = "";
   #esmOpen = false;
   #esmScroll = 0;
-  #compactMode = false;
+  /** Simple event view (Ctrl+G): one-line tool rows, routine lifecycle rows
+   * hidden until the full view is toggled back on (Go compactMode, default
+   * on). */
+  #compactMode = true;
   #multiAgent: boolean;
   #reloadRequested = false;
   /** The Core ESM continuation run currently consumed, if any. */
@@ -1109,11 +1112,14 @@ export class TUISession implements CommandHost {
     );
   }
 
+  /** Ctrl+G: toggles between the simple and full event display. */
   toggleCompactMode(): void {
     this.#compactMode = !this.#compactMode;
     this.controller.addMessage(
-      this.#compactMode ? "Compact mode: ON" : "Compact mode: OFF",
-      "plain",
+      this.translator.text(
+        this.#compactMode ? "event_view.simple" : "event_view.full",
+      ),
+      "status",
     );
   }
 

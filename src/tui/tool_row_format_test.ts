@@ -206,6 +206,121 @@ Deno.test("empty summary falls back to ellipsis", () => {
   assertEquals(row, "[ls] ...");
 });
 
+const bashResult = (
+  stdout: string,
+  stderr = "(no output)",
+  exitCode = 0,
+) =>
+  [
+    "[runtime]",
+    "bash",
+    "[command]",
+    "deno task check",
+    "[cwd]",
+    "/w",
+    "[stdout]",
+    stdout,
+    "[stderr]",
+    stderr,
+    "[exit_code]",
+    String(exitCode),
+  ].join("\n");
+
+Deno.test("compact bash row excerpts stdout, never the section markers", () => {
+  const full = bashResult("hello from stdout\nmore");
+  const row = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      toolArgs: { command: "deno task check" },
+      summary: full,
+      fullContent: full,
+    }),
+    true,
+  );
+  assertEquals(row, "[bash] deno task check (succeeded) hello from stdout");
+  assert(!row.includes("[runtime]"), row);
+  assert(!row.includes("[stdout]"), row);
+});
+
+Deno.test("compact bash row falls back to stderr when stdout is empty", () => {
+  const full = bashResult("(no output)", "boom: things broke", 1);
+  const row = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      toolArgs: { command: "false" },
+      summary: full,
+      fullContent: full,
+    }),
+    true,
+  );
+  assertEquals(row, "[bash] false (exit 1) boom: things broke");
+});
+
+Deno.test("compact bash row omits the summary when there is no output", () => {
+  const full = bashResult("(no output)");
+  const row = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      toolArgs: { command: "true" },
+      summary: full,
+      fullContent: full,
+    }),
+    true,
+  );
+  assertEquals(row, "[bash] true (succeeded)");
+});
+
+Deno.test("compact bash row drops the marker text of a started job", () => {
+  const started =
+    "[runtime]\nbash\n[command]\nnpm run dev\nUse 'jobs' tool to check status or 'kill' to stop.";
+  const row = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      toolArgs: { command: "npm run dev" },
+      summary: started,
+      fullContent: started,
+    }),
+    true,
+  );
+  assertEquals(row, "[bash] npm run dev (started)");
+});
+
+Deno.test("compact bash excerpt truncates a single long stdout line", () => {
+  const full = bashResult("x".repeat(400));
+  const row = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      toolArgs: { command: "cmd" },
+      summary: full,
+      fullContent: full,
+    }),
+    true,
+  );
+  const excerpt = row.slice("[bash] cmd (succeeded) ".length);
+  assertEquals(excerpt.length, 160);
+  assertEquals(excerpt.slice(-3), "...");
+});
+
+Deno.test("full bash row keeps the whole structured result", () => {
+  const full = bashResult("hello from stdout\nmore");
+  const row = formatToolRow(
+    tr,
+    input({
+      toolName: "bash",
+      toolArgs: { command: "deno task check" },
+      summary: full,
+      fullContent: full,
+    }),
+    false,
+  );
+  assertEquals(row, `[bash] deno task check (succeeded)\n${full}`);
+});
+
 Deno.test("running rows prefix the spinner before the running label", () => {
   const bash = formatToolRow(
     tr,
