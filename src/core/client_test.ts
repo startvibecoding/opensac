@@ -17,6 +17,7 @@ import {
   CoreClientRpcError,
   CoreIncompatibleError,
   type CoreLauncher,
+  CoreLauncherError,
   CoreStartupError,
 } from "./client.ts";
 
@@ -1099,6 +1100,299 @@ Deno.test("CoreEventConnection correlates WebSocket requests with their response
     } finally {
       await server.shutdown();
       await server.finished;
+    }
+  });
+});
+
+// ── startup and connection continuity across a Core restart ─────────────────
+
+/** A free local port with nothing listening on it. */
+function closedEphemeralPort(): number {
+  const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
+  const port = (listener.addr as Deno.NetAddr).port;
+  listener.close();
+  return port;
+}
+
+/** Core-shaped probe: `/rpc` answers info/health, `/events` upgrades to WS. */
+async function startCoreProbe(): Promise<CoreServerHandle> {
+  let resolveAddress!: (address: Deno.NetAddr) => void;
+  const addressReady = new Promise<Deno.NetAddr>((resolve) => {
+    resolveAddress = resolve;
+  });
+  const server = Deno.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      onListen: (address) => resolveAddress(address as Deno.NetAddr),
+    },
+    async (request) => {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === "/events") {
+        const { socket, response } = Deno.upgradeWebSocket(request);
+        socket.onmessage = (message) => {
+          const body = JSON.parse(String(message.data)) as { id?: unknown };
+          socket.send(JSON.stringify({
+            jsonrpc: "2.0",
+            id: body.id ?? null,
+            result: { ok: true },
+          }));
+        };
+        return response;
+      }
+      if (pathname !== "/rpc") {
+        return new Response("not found", { status: 404 });
+      }
+      const body = await request.json() as { id?: unknown; method?: unknown };
+      const result = body.method === CORE_METHODS.info ? EXPECTED_INFO : {
+        healthy: true,
+        version: TEST_VERSION,
+        protocolVersion: TEST_PROTOCOL_VERSION,
+      };
+      return new Response(
+        JSON.stringify(coreResult(body.id ?? null, result)),
+        { headers: { "content-type": "application/json" } },
+      );
+    },
+  );
+  const address = await addressReady;
+  return {
+    address,
+    url: `http://127.0.0.1:${address.port}`,
+    stop: async () => {
+      await server.shutdown();
+      await server.finished;
+    },
+  };
+}
+
+Deno.test("CoreClient adopts a peer Core that registers after its own launcher exits", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    let launches = 0;
+    let handle: CoreServerHandle | undefined;
+    const launcher: CoreLauncher = () => {
+      launches++;
+      // A spawned `opensac core` child that lost the Core lock to a peer (or
+      // adopted that peer) exits instead of serving.
+      return Promise.reject(
+        new CoreLauncherError("Core child exited during startup (code 0)"),
+      );
+    };
+    const peer = (async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      handle = await startServer();
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port, { id: "peer" }),
+      );
+    })();
+    const client = new CoreClient(
+      clientOptions(stateDir, { launcher, startTimeoutMs: 1_500 }),
+    );
+    try {
+      const result = await client.ensureStarted();
+      if (result.status !== "ready") {
+        throw new Error(`expected ready discovery, got ${result.status}`);
+      }
+      assertEquals(result.registration.id, "peer");
+      assertEquals(launches, 1);
+    } finally {
+      await peer.catch(() => undefined);
+      await client.close();
+      await handle?.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient reports a launcher failure once the adoption window closes", async () => {
+  await withStateDir(async (stateDir) => {
+    const launcher: CoreLauncher = () =>
+      Promise.reject(
+        new CoreLauncherError("Core child exited during startup (code 1)"),
+      );
+    const client = new CoreClient(
+      clientOptions(stateDir, { launcher, startTimeoutMs: 60 }),
+    );
+
+    const error = await assertRejects(
+      () => client.ensureStarted(),
+      CoreStartupError,
+    );
+    assert(
+      error.message.startsWith("Core launcher failed:"),
+      `unexpected message: ${error.message}`,
+    );
+    assert(error.cause instanceof CoreLauncherError);
+  });
+});
+
+Deno.test("late launch cleanup keeps a registration whose process is still alive", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    let releaseLauncher!: () => void;
+    const launcher: CoreLauncher = () =>
+      new Promise<void>((resolve) => {
+        releaseLauncher = resolve;
+      });
+    const client = new CoreClient(
+      clientOptions(stateDir, { launcher, startTimeoutMs: 20 }),
+    );
+    await assertRejects(() => client.ensureStarted(), CoreStartupError);
+
+    // A peer Core published its registration while our startup failed. Its
+    // endpoint does not answer this probe, but its process is alive, so the
+    // row is not demonstrably ours to delete.
+    await writeRegistration(
+      paths,
+      registration(stateDir, closedEphemeralPort(), { id: "peer" }),
+    );
+    releaseLauncher();
+    await client.close();
+
+    const current = await new CoreRegistry(paths).read();
+    assert(current !== undefined, "peer registration was removed by cleanup");
+    assertEquals(current.id, "peer");
+  });
+});
+
+Deno.test("CoreClient call re-resolves a replacement Core after the endpoint refuses", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const servers: CoreServerHandle[] = [];
+    try {
+      const first = await startCoreProbe();
+      servers.push(first);
+      await writeRegistration(
+        paths,
+        registration(stateDir, first.address.port, { id: "first" }),
+      );
+      const client = new CoreClient(
+        clientOptions(stateDir, { takeoverWaitMs: 1_000 }),
+      );
+      try {
+        assertEquals(await client.call("core.info"), EXPECTED_INFO);
+
+        // The Core restarts: the endpoint in use goes away and the
+        // replacement publishes its registration a moment later.
+        await first.stop();
+        const second = await startCoreProbe();
+        servers.push(second);
+        assert(second.address.port !== first.address.port);
+        setTimeout(() => {
+          void writeRegistration(
+            paths,
+            registration(stateDir, second.address.port, { id: "second" }),
+          );
+        }, 30);
+
+        assertEquals(await client.call("core.info"), EXPECTED_INFO);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      for (const server of servers) await server.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient does not replay a request the Core may have received", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    let handled = 0;
+    const handle = await startProbe(async (request) => {
+      const body = await request.json() as {
+        id: string | number | null;
+        method: string;
+      };
+      if (body.method === CORE_METHODS.info) {
+        return new Response(
+          JSON.stringify(coreResult(body.id, EXPECTED_INFO)),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (body.method === CORE_METHODS.health) {
+        return new Response(
+          JSON.stringify(coreResult(body.id, {
+            healthy: true,
+            version: TEST_VERSION,
+            protocolVersion: TEST_PROTOCOL_VERSION,
+          })),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      handled++;
+      return new Response("<html>gateway error</html>", { status: 502 });
+    });
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        await client.discover();
+        // A response that never made it back is uncertain: it must fail once
+        // instead of being replayed against the endpoint.
+        await assertRejects(
+          () => client.call("mcp.call"),
+          CoreClientProtocolError,
+        );
+        assertEquals(handled, 1);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient event sockets survive a Core restart onto a new endpoint", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const servers: CoreServerHandle[] = [];
+    try {
+      const first = await startCoreProbe();
+      servers.push(first);
+      await writeRegistration(
+        paths,
+        registration(stateDir, first.address.port, { id: "first" }),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        const events = await client.connectEvents();
+        assertEquals(events.connected, true);
+
+        // `reconnect` re-resolves the registered endpoint instead of redialing
+        // the URL from before the restart.
+        await first.stop();
+        const second = await startCoreProbe();
+        servers.push(second);
+        assert(second.address.port !== first.address.port);
+        await writeRegistration(
+          paths,
+          registration(stateDir, second.address.port, { id: "second" }),
+        );
+        await events.reconnect();
+        assertEquals(events.connected, true);
+
+        // The initial dial re-resolves too: the connection cached by the last
+        // reconnect points at a Core that has just been replaced again.
+        await second.stop();
+        const third = await startCoreProbe();
+        servers.push(third);
+        assert(third.address.port !== second.address.port);
+        setTimeout(() => {
+          void writeRegistration(
+            paths,
+            registration(stateDir, third.address.port, { id: "third" }),
+          );
+        }, 30);
+        const reopened = await client.connectEvents();
+        assertEquals(reopened.connected, true);
+        await reopened.close();
+        await events.close();
+      } finally {
+        await client.close();
+      }
+    } finally {
+      for (const server of servers) await server.stop();
     }
   });
 });

@@ -40,6 +40,25 @@ export const MAX_CORE_START_TIMEOUT_MS = 300_000;
 const START_POLL_INTERVAL_MS = 25;
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/** Default wait for a replacement Core after the endpoint in use refused. */
+export const DEFAULT_CORE_TAKEOVER_WAIT_MS = 2_000;
+
+/** Largest accepted endpoint-takeover wait. */
+export const MAX_CORE_TAKEOVER_WAIT_MS = 60_000;
+
+/**
+ * How long a failed launcher keeps startup polling for a peer Core.
+ *
+ * A spawned `opensac core` child that exits because another process won the
+ * Core lock (a concurrent `opensac core restart` is starting the shared Core,
+ * or the child adopted that peer and returned) must not fail this client's
+ * startup while the peer is about to publish its registration.
+ */
+const LAUNCH_ADOPTION_GRACE_MS = 2_000;
+
+/** Lower bound for one discovery attempt inside the takeover window. */
+const TAKEOVER_PROBE_FLOOR_MS = 250;
+
 /**
  * Starts the current OpenSAC Core process.
  *
@@ -68,6 +87,13 @@ export interface CoreClientOptions {
   password?: string;
   /** Bounded readiness budget for `ensureStarted`; defaults to 10 seconds. */
   startTimeoutMs?: number;
+  /**
+   * Bounded wait for a replacement Core when the endpoint in use refuses a
+   * request or an event dial because the Core was restarted concurrently.
+   * Defaults to 2 seconds; 0 keeps a single discovery attempt and fails on
+   * the first non-ready answer.
+   */
+  takeoverWaitMs?: number;
   /** Optional cancellation signal for discovery and RPC requests. */
   signal?: AbortSignal;
   /**
@@ -329,6 +355,7 @@ export class CoreClient {
   readonly #config: ResolvedCoreConfig;
   readonly #launcher: CoreLauncher;
   readonly #startTimeoutMs: number;
+  readonly #takeoverWaitMs: number;
   readonly #signal?: AbortSignal;
   readonly #ignoreProcessLiveness: boolean;
 
@@ -362,6 +389,7 @@ export class CoreClient {
     this.#config = copyConfig(options.config);
     this.#selectedPassword = initialPassword(this.#config, options.password);
     this.#startTimeoutMs = validateStartTimeout(options.startTimeoutMs);
+    this.#takeoverWaitMs = validateTakeoverWait(options.takeoverWaitMs);
     this.#signal = options.signal;
     this.#ignoreProcessLiveness = options.ignoreProcessLiveness === true;
 
@@ -454,29 +482,51 @@ export class CoreClient {
     validateMethod(method);
     validateParams(params);
     const requestSignal = combineAbortSignals(this.#signal, signal);
-    const connection = await this.#requireConnection(requestSignal);
-    const requestId = this.#nextId();
-    const outcome = await this.#sendRpc(
-      connection.url,
-      method,
-      params,
-      requestId,
-      REQUEST_TIMEOUT_MS,
-      requestSignal,
-    );
-    if (!outcome.ok) throw outcome.error;
-    return outcome.result as T;
+    let connection = await this.#requireConnection(requestSignal);
+    let retried = false;
+    while (true) {
+      const requestId = this.#nextId();
+      let outcome: RpcOutcome;
+      try {
+        outcome = await this.#sendRpc(
+          connection.url,
+          method,
+          params,
+          requestId,
+          REQUEST_TIMEOUT_MS,
+          requestSignal,
+        );
+      } catch (error) {
+        if (!retried && isNeverConnectedError(error)) {
+          // The connection was never established, so this request cannot have
+          // reached a Core: the endpoint it was addressed to is gone and the
+          // registered Core may have been restarted elsewhere. Resolve that
+          // replacement and send the request once more.
+          retried = true;
+          connection = await this.#resolveReplacementConnection(requestSignal);
+          continue;
+        }
+        if (isEndpointGoneError(error)) {
+          // The endpoint stopped answering mid-request. The outcome of this
+          // request is uncertain, so it is never replayed — but the cached
+          // connection is dropped so the next call re-discovers instead of
+          // reusing a dead endpoint.
+          this.#connection = undefined;
+        }
+        throw error;
+      }
+      if (!outcome.ok) throw outcome.error;
+      return outcome.result as T;
+    }
   }
 
   async connectEvents(signal?: AbortSignal): Promise<CoreEventConnection> {
     const requestSignal = combineAbortSignals(this.#signal, signal);
-    const connection = await this.#requireConnection(requestSignal);
-    const url = `${
-      connection.url.replace(/^http:/, "ws:").replace(/^https:/, "wss:")
-    }/events`;
+    let connection = await this.#requireConnection(requestSignal);
+    let url = eventsUrl(connection.url);
     let socket: WebSocket;
-    const openSocket = async (): Promise<WebSocket> => {
-      const next = new WebSocket(url);
+    const openSocket = async (endpoint: string): Promise<WebSocket> => {
+      const next = new WebSocket(endpoint);
       await new Promise<void>((resolve, reject) => {
         const onOpen = () => {
           cleanup();
@@ -495,7 +545,20 @@ export class CoreClient {
       });
       return next;
     };
-    socket = await openSocket();
+    // Captured for the connection object below: its `this` is the object
+    // literal, so it resolves the endpoint through this closure.
+    const resolveEndpoint = (): Promise<CoreConnection> =>
+      this.#resolveReplacementConnection(requestSignal);
+    try {
+      socket = await openSocket(url);
+    } catch {
+      // The Core may have been replaced between discovery and this dial (a
+      // concurrent `opensac core restart`): resolve the registered endpoint
+      // once more and dial the replacement before giving up.
+      connection = await resolveEndpoint();
+      url = eventsUrl(connection.url);
+      socket = await openSocket(url);
+    }
 
     const pending = new Map<string, {
       resolve(result: unknown): void;
@@ -597,7 +660,12 @@ export class CoreClient {
       },
       async reconnect() {
         await connectionObject.close();
-        const next = await openSocket();
+        // The Core may have restarted onto another endpoint while the socket
+        // was down; resolve the registered endpoint again instead of redialing
+        // the URL from before the restart.
+        connection = await resolveEndpoint();
+        url = eventsUrl(connection.url);
+        const next = await openSocket(url);
         socket = next;
         closed = false;
         socket.onmessage = (event) => {
@@ -728,13 +796,13 @@ export class CoreClient {
       }
       signal.addEventListener("abort", relayExternalAbort, { once: true });
     }
-    const deadlineTimer = setTimeout(
-      () =>
-        controller.abort(
-          new DOMException("Core startup deadline elapsed", "TimeoutError"),
-        ),
-      this.#startTimeoutMs,
-    );
+    let deadlineElapsed = false;
+    const deadlineTimer = setTimeout(() => {
+      deadlineElapsed = true;
+      controller.abort(
+        new DOMException("Core startup deadline elapsed", "TimeoutError"),
+      );
+    }, this.#startTimeoutMs);
     let ready = false;
     try {
       let discovery: CoreDiscoveryResult;
@@ -797,56 +865,88 @@ export class CoreClient {
       const launchPromise = Promise.resolve().then(() =>
         this.#launcher(controller.signal)
       );
-      void launchPromise.catch(() => undefined);
       // A launcher may represent a long-lived child rather than a one-shot
-      // spawn operation. Poll readiness concurrently and use a launcher
-      // rejection as a typed failure signal instead of awaiting a process that
-      // intentionally remains alive.
-      const launchFailure: Promise<never> = launchPromise.then(
-        () => new Promise<never>(() => undefined),
-        (error) => Promise.reject(error),
+      // spawn operation, so its completion is never awaited here. A rejection
+      // is remembered instead of failing startup on the spot: a child that
+      // exits because another process won the Core lock (a concurrent
+      // `opensac core restart` is starting the shared Core, or the child
+      // adopted that peer and returned) leaves a healthy Core that may publish
+      // its registration a moment later.
+      let launchError: unknown;
+      let launchFailedAt = 0;
+      void launchPromise.then(
+        () => undefined,
+        (error) => {
+          launchError = error;
+          launchFailedAt = Date.now();
+        },
       );
 
       while (true) {
-        const remaining = deadline - Date.now();
+        const pollDeadline = launchError === undefined
+          ? deadline
+          : Math.min(deadline, launchFailedAt + LAUNCH_ADOPTION_GRACE_MS);
+        const remaining = pollDeadline - Date.now();
         if (remaining <= 0) {
           this.#trackLateLaunchCleanup(launchPromise, baseline);
-          throw new CoreStartupError(
-            "Core did not become ready before the startup deadline",
-            discovery,
-            this.#startTimeoutMs,
-          );
+          if (controller.signal.aborted && !deadlineElapsed) {
+            throw new CoreStartupError(
+              "Core startup was cancelled while waiting for readiness",
+              discovery,
+              this.#startTimeoutMs,
+              { cause: controller.signal.reason },
+            );
+          }
+          throw launchError === undefined
+            ? new CoreStartupError(
+              "Core did not become ready before the startup deadline",
+              discovery,
+              this.#startTimeoutMs,
+            )
+            : launcherStartupError(
+              launchError,
+              discovery,
+              this.#startTimeoutMs,
+            );
         }
 
         try {
           discovery = await awaitWithDeadline(
-            Promise.race([
-              this.#discover({
-                requestTimeoutMs: Math.min(REQUEST_TIMEOUT_MS, remaining),
-                signal: controller.signal,
-              }),
-              launchFailure,
-            ]),
-            deadline,
+            this.#discover({
+              requestTimeoutMs: Math.min(REQUEST_TIMEOUT_MS, remaining),
+              signal: controller.signal,
+            }),
+            pollDeadline,
             "Core discovery timed out while waiting for startup",
             controller.signal,
           );
         } catch (error) {
-          if (controller.signal.aborted || Date.now() >= deadline) {
+          // An external cancellation ends startup; the startup deadline aborts
+          // the controller itself and must not be mistaken for one.
+          const cancelled = controller.signal.aborted && !deadlineElapsed;
+          if (cancelled || Date.now() >= pollDeadline) {
             this.#trackLateLaunchCleanup(launchPromise, baseline);
           }
-          if (error instanceof CoreLauncherError) {
+          if (
+            launchError !== undefined && !cancelled &&
+            Date.now() >= pollDeadline
+          ) {
+            throw launcherStartupError(
+              launchError,
+              discovery,
+              this.#startTimeoutMs,
+            );
+          }
+          if (controller.signal.aborted) {
             throw new CoreStartupError(
-              `Core launcher failed: ${error.message}`,
+              "Core startup was cancelled while waiting for readiness",
               discovery,
               this.#startTimeoutMs,
               { cause: error },
             );
           }
           throw new CoreStartupError(
-            controller.signal.aborted
-              ? "Core startup was cancelled while waiting for readiness"
-              : "Core discovery failed while waiting for startup",
+            "Core discovery failed while waiting for startup",
             staleResult(
               undefined,
               "Core discovery failed",
@@ -875,12 +975,26 @@ export class CoreClient {
           );
         }
 
-        const wait = Math.min(START_POLL_INTERVAL_MS, deadline - Date.now());
+        const wait = Math.min(
+          START_POLL_INTERVAL_MS,
+          pollDeadline - Date.now(),
+        );
         if (wait > 0) {
           try {
             await delay(wait, controller.signal);
           } catch (error) {
             this.#trackLateLaunchCleanup(launchPromise, baseline);
+            // The startup deadline aborts the controller itself; a launcher
+            // failure that outlived its adoption window still wins over that
+            // synthetic cancellation, but a real one does not.
+            const cancelled = controller.signal.aborted && !deadlineElapsed;
+            if (launchError !== undefined && !cancelled) {
+              throw launcherStartupError(
+                launchError,
+                discovery,
+                this.#startTimeoutMs,
+              );
+            }
             throw new CoreStartupError(
               controller.signal.aborted
                 ? "Core startup was cancelled while waiting for readiness"
@@ -913,6 +1027,51 @@ export class CoreClient {
       return this.#connection;
     }
     throw discoveryError(discovered);
+  }
+
+  /**
+   * Re-resolves the registered Core after the endpoint in use refused a
+   * request or an event dial.
+   *
+   * A concurrent `opensac core restart` publishes its registration only once
+   * the replacement is listening, so discovery is polled for a short bounded
+   * window instead of failing on the first `missing`/`stale` answer.
+   * Readiness ends the wait; incompatible and unauthenticated results are
+   * terminal for this client and are surfaced immediately.
+   */
+  async #resolveReplacementConnection(
+    signal?: AbortSignal,
+  ): Promise<CoreConnection> {
+    this.#connection = undefined;
+    const pendingCleanup = this.#pendingLaunchCleanup;
+    if (pendingCleanup !== undefined) await pendingCleanup;
+
+    const deadline = Date.now() + this.#takeoverWaitMs;
+    while (true) {
+      throwIfAborted(signal);
+      const remaining = deadline - Date.now();
+      const requestTimeoutMs = Math.min(
+        REQUEST_TIMEOUT_MS,
+        Math.max(remaining, TAKEOVER_PROBE_FLOOR_MS),
+      );
+      const discovery = await this.#discover({ requestTimeoutMs, signal });
+      if (discovery.status === "ready") {
+        const connection: CoreConnection = {
+          url: discovery.url,
+          registration: discovery.registration,
+        };
+        this.#connection = connection;
+        return connection;
+      }
+      if (
+        discovery.status === "incompatible" ||
+        discovery.status === "unauthenticated"
+      ) {
+        throw discoveryError(discovery);
+      }
+      if (Date.now() >= deadline) throw discoveryError(discovery);
+      await delay(START_POLL_INTERVAL_MS, signal);
+    }
   }
 
   async #readLaunchBaseline(): Promise<CoreRegistration | undefined> {
@@ -962,6 +1121,19 @@ export class CoreClient {
     // Only remove a registration that is demonstrably unusable. A healthy
     // late Core is left for the next caller rather than being treated as a
     // malicious side effect.
+    //
+    // An alive PID is never proof of unusability: while a concurrent
+    // `opensac core restart` is coming up, its replacement can be registered
+    // but slower than this probe to answer, and deleting that row would strand
+    // a healthy Core. The same applies to a remote or indeterminate PID, which
+    // cannot be judged from this host at all.
+    if (
+      !isLocalCoreHost(current.host) ||
+      processLiveness(current.pid) !== "dead"
+    ) {
+      return;
+    }
+
     const result = await this.#discover({
       requestTimeoutMs: 100,
       signal: AbortSignal.timeout(200),
@@ -1530,6 +1702,21 @@ function validateStartTimeout(value: number | undefined): number {
   return value;
 }
 
+function validateTakeoverWait(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_CORE_TAKEOVER_WAIT_MS;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > MAX_CORE_TAKEOVER_WAIT_MS
+  ) {
+    throw new TypeError(
+      `CoreClient takeoverWaitMs must be an integer from 0 to ${MAX_CORE_TAKEOVER_WAIT_MS}`,
+    );
+  }
+  return value;
+}
+
 function initialPassword(
   config: ResolvedCoreConfig,
   override: string | undefined,
@@ -1762,6 +1949,138 @@ function discoveryError(result: CoreDiscoveryResult): CoreClientError {
     case "unauthenticated":
       return result.error;
   }
+}
+
+/**
+ * Wraps a launcher failure as the typed startup error callers rely on. The
+ * launcher error stays the `cause` so a child's own diagnostics (port in use,
+ * exit code, sanitized output) remain reachable.
+ */
+function launcherStartupError(
+  error: unknown,
+  discovery: CoreDiscoveryResult,
+  timeoutMs: number,
+): CoreStartupError {
+  return error instanceof CoreLauncherError
+    ? new CoreStartupError(
+      `Core launcher failed: ${error.message}`,
+      discovery,
+      timeoutMs,
+      { cause: error },
+    )
+    : new CoreStartupError(
+      "Core launcher failed",
+      discovery,
+      timeoutMs,
+      { cause: error },
+    );
+}
+
+/** WebSocket endpoint of the Core event stream for an HTTP base URL. */
+function eventsUrl(baseUrl: string): string {
+  return `${
+    baseUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:")
+  }/events`;
+}
+
+/** Signals that mean a connection was never established with a Core. */
+const NEVER_CONNECTED_CODES = new Set([
+  "ECONNREFUSED",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+]);
+
+const NEVER_CONNECTED_PATTERNS = [
+  /connection refused/i,
+  /os error 111/i,
+  /host (?:is )?unreachable/i,
+  /network is unreachable/i,
+  /failed to lookup address/i,
+];
+
+/** Signals that mean an established connection stopped answering. */
+const ENDPOINT_GONE_CODES = new Set([
+  ...NEVER_CONNECTED_CODES,
+  "ECONNRESET",
+  "ENOTCONN",
+  "EPIPE",
+  "UND_ERR_SOCKET",
+]);
+
+const ENDPOINT_GONE_PATTERNS = [
+  ...NEVER_CONNECTED_PATTERNS,
+  /connection reset/i,
+  /os error 104/i,
+  /broken pipe/i,
+  /os error 32/i,
+  /socket hang up/i,
+  /other side closed/i,
+];
+
+/**
+ * Collects the messages and structured codes of an error cause chain.
+ *
+ * Deno's `fetch` reports a refused connection as `TypeError: fetch failed`
+ * wrapping a transport error string without a `code`, so classification has
+ * to look at the whole chain rather than the top-level error alone.
+ */
+function transportDiagnostics(error: unknown): {
+  text: string;
+  codes: Set<string>;
+} {
+  const parts: string[] = [];
+  const codes = new Set<string>();
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (
+    current !== null && typeof current === "object" && !seen.has(current)
+  ) {
+    seen.add(current);
+    const value = current as {
+      message?: unknown;
+      code?: unknown;
+      cause?: unknown;
+    };
+    if (typeof value.message === "string") parts.push(value.message);
+    if (typeof value.code === "string") codes.add(value.code.toUpperCase());
+    current = value.cause;
+  }
+  return { text: parts.join("\n"), codes };
+}
+
+function transportMatches(
+  error: unknown,
+  codes: Set<string>,
+  patterns: RegExp[],
+): boolean {
+  const diagnostics = transportDiagnostics(error);
+  for (const code of diagnostics.codes) {
+    if (codes.has(code)) return true;
+  }
+  return patterns.some((pattern) => pattern.test(diagnostics.text));
+}
+
+/**
+ * True when the request never reached a Core, so replaying it against a
+ * replacement endpoint cannot duplicate a side effect.
+ */
+function isNeverConnectedError(error: unknown): boolean {
+  return transportMatches(
+    error,
+    NEVER_CONNECTED_CODES,
+    NEVER_CONNECTED_PATTERNS,
+  );
+}
+
+/**
+ * True when the endpoint stopped answering mid-request. The outcome of such a
+ * request is uncertain, so it is never replayed — only the cached connection
+ * is dropped.
+ */
+function isEndpointGoneError(error: unknown): boolean {
+  return transportMatches(error, ENDPOINT_GONE_CODES, ENDPOINT_GONE_PATTERNS);
 }
 
 function discoveryMessage(result: CoreDiscoveryResult): string {
