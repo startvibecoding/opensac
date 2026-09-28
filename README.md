@@ -61,7 +61,7 @@ deno task test    # deno test -A
 deno task lint    # deno lint
 deno task fmt     # deno fmt
 deno task start   # run src/main.ts
-deno task build   # deno compile -> bin/opensac
+deno task build   # deno compile -> bin/opensac (version = newest v* git tag)
 ```
 
 Configuration lives in `deno.json` — tasks, formatter, linter, compiler options,
