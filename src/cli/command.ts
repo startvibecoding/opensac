@@ -21,8 +21,16 @@ import { runACPCore, type RunOptions } from "../acp/run.ts";
 import { isStartupError } from "../acp/support.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 import {
+  type CorePairOutcome,
+  type CoreRestartOutcome,
+  type CoreStartOutcome,
+  type CoreStatusOutcome,
   type CoreStopOutcome,
+  launchCoreCommand,
+  pairCoreCommand,
+  restartCoreCommand,
   runCoreCommand,
+  statusCoreCommand,
   stopCoreCommand,
 } from "./core.ts";
 import { executeKnowledgeMCPCommand } from "./knowledge_mcp.ts";
@@ -225,12 +233,29 @@ export function createACPCommand(version: string): Command {
   return cmd;
 }
 
+/** Flags forwarded from the `core pair` action to its runner. */
+export interface CorePairRunOptions {
+  /** Candidate client password verified against the running Core. */
+  password?: string;
+}
+
 /** Injectable Core lifecycle entry points, mainly for dispatch tests. */
 export interface CoreCommandRunners {
   /** Runs the long-lived Core host and returns its lifecycle exit code. */
   start?: (version: string) => Promise<number>;
   /** Stops a running Core and reports the outcome. */
   stop?: (version: string) => Promise<CoreStopOutcome>;
+  /** Reports the registered Core state without starting anything. */
+  status?: (version: string) => Promise<CoreStatusOutcome>;
+  /** Starts (or reuses) the shared Core as a background process. */
+  launch?: (version: string) => Promise<CoreStartOutcome>;
+  /** Stops the running Core and starts a replacement. */
+  restart?: (version: string) => Promise<CoreRestartOutcome>;
+  /** Verifies that a client can pair with the running Core. */
+  pair?: (
+    version: string,
+    options: CorePairRunOptions,
+  ) => Promise<CorePairOutcome>;
 }
 
 /** Builds the shared Core lifecycle subcommand. */
@@ -241,8 +266,24 @@ export function createCoreCommand(
   const start = runners.start ??
     ((v: string) => runCoreCommand({ version: v }));
   const stop = runners.stop ?? ((v: string) => stopCoreCommand({ version: v }));
+  const status = runners.status ??
+    ((v: string) => statusCoreCommand({ version: v }));
+  const launch = runners.launch ??
+    ((v: string) => launchCoreCommand({ version: v }));
+  const restart = runners.restart ??
+    ((v: string) => restartCoreCommand({ version: v }));
+  const pair = runners.pair ??
+    ((v: string, options: CorePairRunOptions) =>
+      pairCoreCommand({
+        version: v,
+        ...(options.password === undefined
+          ? {}
+          : { password: options.password }),
+      }));
   const command = new Command()
-    .description("Start the shared OpenSAC Core (not a UI-specific server)")
+    .description(
+      "Run the shared OpenSAC Core host in the foreground (manage it with status, start, restart, stop, pair)",
+    )
     .noExit();
   // Cliffy 1.3.x resolves subcommands only when the action is registered
   // before the subcommands; registering `stop` first would run this action
@@ -251,8 +292,215 @@ export function createCoreCommand(
     const exitCode = await start(version);
     if (exitCode !== 0) Deno.exit(exitCode);
   });
+  command.command("status", createCoreStatusCommand(status, version));
+  command.command("start", createCoreStartCommand(launch, version));
   command.command("stop", createCoreStopCommand(stop, version));
+  command.command("restart", createCoreRestartCommand(restart, version));
+  command.command("pair", createCorePairCommand(pair, version));
   return command as unknown as Command;
+}
+
+/** Builds the `core status` lifecycle subcommand. */
+function createCoreStatusCommand(
+  status: (version: string) => Promise<CoreStatusOutcome>,
+  version: string,
+): Command {
+  return new Command()
+    .description("Show whether the shared OpenSAC Core is running")
+    .noExit()
+    .option("--json", "Print one machine-readable JSON status")
+    .action((flags: ParsedFlags) =>
+      runAndPrint(async () => {
+        const outcome = await status(version);
+        console.log(formatCoreStatus(outcome, flags.json === true));
+        return outcome.running ? 0 : 1;
+      }, "opensac core status")
+    ) as unknown as Command;
+}
+
+/** Builds the `core start` lifecycle subcommand. */
+function createCoreStartCommand(
+  launch: (version: string) => Promise<CoreStartOutcome>,
+  version: string,
+): Command {
+  return new Command()
+    .description("Start the shared OpenSAC Core in the background")
+    .noExit()
+    .option("--json", "Print one machine-readable JSON result")
+    .action((flags: ParsedFlags) =>
+      runAndPrint(async () => {
+        console.log(
+          formatCoreStart(await launch(version), flags.json === true),
+        );
+        return 0;
+      }, "opensac core start")
+    ) as unknown as Command;
+}
+
+/** Builds the `core restart` lifecycle subcommand. */
+function createCoreRestartCommand(
+  restart: (version: string) => Promise<CoreRestartOutcome>,
+  version: string,
+): Command {
+  return new Command()
+    .description("Restart the shared OpenSAC Core")
+    .noExit()
+    .option("--json", "Print one machine-readable JSON result")
+    .action((flags: ParsedFlags) =>
+      runAndPrint(async () => {
+        console.log(
+          formatCoreRestart(await restart(version), flags.json === true),
+        );
+        return 0;
+      }, "opensac core restart")
+    ) as unknown as Command;
+}
+
+/** Builds the `core pair` lifecycle subcommand. */
+function createCorePairCommand(
+  pair: (
+    version: string,
+    options: CorePairRunOptions,
+  ) => Promise<CorePairOutcome>,
+  version: string,
+): Command {
+  return new Command()
+    .description(
+      "Verify and print the connection details a client needs to pair with the shared OpenSAC Core",
+    )
+    .noExit()
+    .option(
+      "--password <password>",
+      "Candidate client password verified against the running Core (stored passwords are never printed)",
+    )
+    .option("--json", "Print one machine-readable JSON result")
+    .action((flags: ParsedFlags) =>
+      runAndPrint(async () => {
+        const password = typeof flags.password === "string"
+          ? flags.password
+          : undefined;
+        const outcome = await pair(version, {
+          ...(password === undefined ? {} : { password }),
+        });
+        console.log(formatCorePair(outcome, flags.json === true));
+        return 0;
+      }, "opensac core pair")
+    ) as unknown as Command;
+}
+
+/** Runs one lifecycle action, reporting failures without a stack trace. */
+async function runAndPrint(
+  operation: () => Promise<number>,
+  label: string,
+): Promise<void> {
+  try {
+    const exitCode = await operation();
+    if (exitCode !== 0) Deno.exit(exitCode);
+  } catch (error) {
+    console.error(
+      `${label} failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    Deno.exit(1);
+  }
+}
+
+/** Formats `opensac core status` for humans or machines. */
+export function formatCoreStatus(
+  outcome: CoreStatusOutcome,
+  json: boolean,
+): string {
+  if (json) return JSON.stringify(outcome);
+  const lines = outcome.running
+    ? [`OpenSAC Core is running at ${outcome.url} (PID ${outcome.pid ?? "?"}).`]
+    : ["OpenSAC Core is not running."];
+  if (outcome.version !== undefined && outcome.protocolVersion !== undefined) {
+    lines.push(
+      `  Version:  ${outcome.version} (protocol ${outcome.protocolVersion})`,
+    );
+  }
+  if (outcome.running && outcome.startedAt !== undefined) {
+    const uptime = outcome.uptimeMs === undefined
+      ? ""
+      : ` (up ${formatUptime(outcome.uptimeMs)})`;
+    lines.push(
+      `  Started:  ${new Date(outcome.startedAt).toISOString()}${uptime}`,
+    );
+  }
+  lines.push(`  Auth:     ${outcome.auth ? "enabled" : "disabled"}`);
+  if (outcome.reason !== undefined) {
+    lines.push(`  Reason:   ${outcome.reason}`);
+  }
+  return lines.join("\n");
+}
+
+/** Formats `opensac core start` for humans or machines. */
+export function formatCoreStart(
+  outcome: CoreStartOutcome,
+  json: boolean,
+): string {
+  if (json) return JSON.stringify(outcome);
+  const verb = outcome.status === "started"
+    ? "OpenSAC Core started"
+    : "OpenSAC Core is already running";
+  return `${verb} at ${outcome.url} (PID ${outcome.pid}).`;
+}
+
+/** Formats `opensac core restart` for humans or machines. */
+export function formatCoreRestart(
+  outcome: CoreRestartOutcome,
+  json: boolean,
+): string {
+  if (json) return JSON.stringify(outcome);
+  return [
+    formatCoreStop(outcome.stopped),
+    formatCoreStart(outcome.started, false),
+  ].join("\n");
+}
+
+/** Formats `opensac core pair` for humans or machines. */
+export function formatCorePair(
+  outcome: CorePairOutcome,
+  json: boolean,
+): string {
+  if (json) return JSON.stringify(outcome);
+  const auth = !outcome.auth
+    ? "disabled (unauthenticated local clients)"
+    : outcome.verified
+    ? "enabled (candidate password accepted)"
+    : "enabled (configured client password accepted)";
+  return [
+    `Paired with the running OpenSAC Core at ${outcome.url} (PID ${outcome.pid}).`,
+    `  Version:  ${outcome.version} (protocol ${outcome.protocolVersion})`,
+    `  Auth:     ${auth}`,
+  ].join("\n");
+}
+
+/** Formats the shared `core stop` result for humans. */
+function formatCoreStop(outcome: CoreStopOutcome): string {
+  if (outcome.status === "absent") return "No running OpenSAC Core.";
+  if (!outcome.exited) {
+    return "OpenSAC Core shutdown requested; it is still exiting.";
+  }
+  return outcome.signalled
+    ? "OpenSAC Core stopped (SIGTERM fallback for an older Core build)."
+    : "OpenSAC Core stopped.";
+}
+
+/** Renders an uptime like `2d 3h 4m 5s` from a millisecond duration. */
+function formatUptime(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+  return parts.join(" ");
 }
 
 /** Builds the `core stop` lifecycle subcommand. */
@@ -264,31 +512,10 @@ function createCoreStopCommand(
     .description("Stop the running shared OpenSAC Core")
     .noExit()
     .action(async () => {
-      try {
-        const outcome = await stop(version);
-        if (outcome.status === "absent") {
-          console.log("No running OpenSAC Core.");
-          return;
-        }
-        if (!outcome.exited) {
-          console.log(
-            "OpenSAC Core shutdown requested; it is still exiting.",
-          );
-          return;
-        }
-        console.log(
-          outcome.signalled
-            ? "OpenSAC Core stopped (SIGTERM fallback for an older Core build)."
-            : "OpenSAC Core stopped.",
-        );
-      } catch (error) {
-        console.error(
-          `opensac core stop failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        Deno.exit(1);
-      }
+      await runAndPrint(async () => {
+        console.log(formatCoreStop(await stop(version)));
+        return 0;
+      }, "opensac core stop");
     }) as unknown as Command;
 }
 

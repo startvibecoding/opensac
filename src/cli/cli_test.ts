@@ -11,10 +11,20 @@ import {
 } from "./options.ts";
 import {
   acpRunOptions,
+  type CoreCommandRunners,
   createACPCommand,
   createCoreCommand,
   createRootCommand,
+  formatCorePair,
+  formatCoreRestart,
+  formatCoreStart,
+  formatCoreStatus,
 } from "./command.ts";
+import {
+  type CorePairOutcome,
+  type CoreStartOutcome,
+  type CoreStatusOutcome,
+} from "./core.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 
 Deno.test("parseGoDurationMs covers Go duration units", () => {
@@ -223,4 +233,176 @@ Deno.test("root -P print action is wired (no longer a placeholder)", async () =>
   const help = await root.getHelp();
   assert(help.includes("prompt..."), help);
   assert(help.includes("--print"), help);
+});
+
+Deno.test("core exposes status, start, stop, restart, and pair subcommands", () => {
+  // deno-lint-ignore no-explicit-any
+  const command = createCoreCommand("test-version") as any;
+  const names = command
+    .getCommands()
+    .map((sub: { getName(): string }) => sub.getName());
+  assertEquals([...names].sort(), [
+    "pair",
+    "restart",
+    "start",
+    "status",
+    "stop",
+  ]);
+});
+
+Deno.test("core dispatches status, start, restart, and pair to their own runners", async () => {
+  const startOutcome: CoreStartOutcome = {
+    status: "started",
+    url: "http://127.0.0.1:1",
+    pid: 7,
+    version: "test-version",
+    protocolVersion: 1,
+  };
+  const calls: string[] = [];
+  const runners: CoreCommandRunners = {
+    start: (version) => {
+      calls.push(`foreground:${version}`);
+      return Promise.resolve(0);
+    },
+    status: (version) => {
+      calls.push(`status:${version}`);
+      return Promise.resolve({
+        status: "ready",
+        running: true,
+        auth: false,
+        url: "http://127.0.0.1:1",
+        pid: 7,
+        version: "test-version",
+        protocolVersion: 1,
+        startedAt: 0,
+        uptimeMs: 0,
+      });
+    },
+    launch: (version) => {
+      calls.push(`start:${version}`);
+      return Promise.resolve(startOutcome);
+    },
+    restart: (version) => {
+      calls.push(`restart:${version}`);
+      return Promise.resolve({
+        stopped: { status: "stopped", exited: true, signalled: false },
+        started: startOutcome,
+      });
+    },
+    pair: (version, options) => {
+      calls.push(`pair:${version}:${options.password ?? ""}`);
+      return Promise.resolve({
+        url: "http://127.0.0.1:1",
+        pid: 7,
+        version: "test-version",
+        protocolVersion: 1,
+        auth: false,
+        verified: false,
+      });
+    },
+  };
+
+  await createCoreCommand("test-version", runners).parse(["status"]);
+  assertEquals(calls, ["status:test-version"]);
+  calls.length = 0;
+  await createCoreCommand("test-version", runners).parse(["start"]);
+  assertEquals(calls, ["start:test-version"]);
+  calls.length = 0;
+  await createCoreCommand("test-version", runners).parse(["restart"]);
+  assertEquals(calls, ["restart:test-version"]);
+  calls.length = 0;
+  await createCoreCommand("test-version", runners).parse([
+    "pair",
+    "--password",
+    "pw",
+  ]);
+  assertEquals(calls, ["pair:test-version:pw"]);
+  calls.length = 0;
+  await createCoreCommand("test-version", runners).parse([]);
+  assertEquals(calls, ["foreground:test-version"]);
+});
+
+Deno.test("core lifecycle formatters project human and JSON output", () => {
+  const statusOutcome: CoreStatusOutcome = {
+    status: "ready",
+    running: true,
+    auth: false,
+    url: "http://127.0.0.1:1",
+    pid: 7,
+    version: "test-version",
+    protocolVersion: 1,
+    startedAt: 1_700_000_000_000,
+    uptimeMs: 65_000,
+  };
+  assertEquals(
+    formatCoreStatus(statusOutcome, true),
+    JSON.stringify(statusOutcome),
+  );
+  const human = formatCoreStatus(statusOutcome, false);
+  assert(
+    human.includes("OpenSAC Core is running at http://127.0.0.1:1 (PID 7)."),
+    human,
+  );
+  assert(human.includes("(up 1m 5s)"), human);
+  assert(human.includes("Auth:     disabled"), human);
+
+  const absent = formatCoreStatus(
+    {
+      status: "missing",
+      running: false,
+      auth: false,
+      reason: "no registered Core",
+    },
+    false,
+  );
+  assert(absent.includes("OpenSAC Core is not running."), absent);
+  assert(absent.includes("Reason:   no registered Core"), absent);
+
+  const startOutcome: CoreStartOutcome = {
+    status: "started",
+    url: "http://127.0.0.1:1",
+    pid: 7,
+    version: "test-version",
+    protocolVersion: 1,
+  };
+  assertEquals(
+    formatCoreStart(startOutcome, false),
+    "OpenSAC Core started at http://127.0.0.1:1 (PID 7).",
+  );
+  assertEquals(
+    formatCoreStart({ ...startOutcome, status: "running" }, false),
+    "OpenSAC Core is already running at http://127.0.0.1:1 (PID 7).",
+  );
+
+  assertEquals(
+    formatCoreRestart(
+      {
+        stopped: { status: "stopped", exited: true, signalled: false },
+        started: startOutcome,
+      },
+      false,
+    ),
+    "OpenSAC Core stopped.\nOpenSAC Core started at http://127.0.0.1:1 (PID 7).",
+  );
+
+  const pairOutcome: CorePairOutcome = {
+    url: "http://127.0.0.1:1",
+    pid: 7,
+    version: "test-version",
+    protocolVersion: 1,
+    auth: false,
+    verified: false,
+  };
+  const paired = formatCorePair(pairOutcome, false);
+  assert(
+    paired.includes(
+      "Paired with the running OpenSAC Core at http://127.0.0.1:1 (PID 7).",
+    ),
+    paired,
+  );
+  assert(paired.includes("unauthenticated local clients"), paired);
+  assert(
+    formatCorePair({ ...pairOutcome, auth: true, verified: true }, false)
+      .includes("candidate password accepted"),
+  );
 });

@@ -2,11 +2,18 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   type CoreCommandDependencies,
   type CoreCommandOptions,
+  type CoreLifecycleClient,
+  type CoreLifecycleDependencies,
+  type CorePairOptions,
   type CoreStopClient,
   type CoreStopDependencies,
   type CoreStopRegistryLike,
+  launchCoreCommand,
+  pairCoreCommand,
+  restartCoreCommand,
   runCoreCommand,
   startCoreCommand,
+  statusCoreCommand,
   stopCoreCommand,
 } from "./core.ts";
 import { defaultSettings, type Settings } from "../config/mod.ts";
@@ -1235,6 +1242,377 @@ Deno.test("stopCoreCommand stops a real Core through the graceful path", async (
         signalled: false,
       });
       assertEquals(await handle.done, 0);
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `opensac core status` / `start` / `restart` / `pair`
+// ---------------------------------------------------------------------------
+
+interface LifecycleProbe {
+  discoverCalls: number;
+  ensureStartedCalls: number;
+  selectedPasswords: Array<string | undefined>;
+  closeCalls: number;
+}
+
+function lifecycleProbe(): LifecycleProbe {
+  return {
+    discoverCalls: 0,
+    ensureStartedCalls: 0,
+    selectedPasswords: [],
+    closeCalls: 0,
+  };
+}
+
+/** Builds an injected lifecycle client draining `discoveries` in order. */
+function lifecycleClient(
+  probe: LifecycleProbe,
+  discoveries: CoreDiscoveryResult[],
+  started?: CoreDiscoveryResult,
+): CoreLifecycleClient {
+  const queue = [...discoveries];
+  let last: CoreDiscoveryResult = { status: "missing" };
+  return {
+    discover: () => {
+      probe.discoverCalls++;
+      const next = queue.shift();
+      if (next !== undefined) last = next;
+      return Promise.resolve(last);
+    },
+    ensureStarted: () => {
+      probe.ensureStartedCalls++;
+      return Promise.resolve(started ?? last);
+    },
+    setPassword: (password) => void probe.selectedPasswords.push(password),
+    close: () => {
+      probe.closeCalls++;
+      return Promise.resolve();
+    },
+  };
+}
+
+function lifecycleOptions(
+  overrides: Partial<CorePairOptions> = {},
+): CorePairOptions {
+  return {
+    config: config(),
+    stateDir: "core-lifecycle-test",
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    ...overrides,
+  };
+}
+
+function lifecycleDeps(
+  probe: LifecycleProbe,
+  init: {
+    discoveries: CoreDiscoveryResult[];
+    started?: CoreDiscoveryResult;
+    now?: () => number;
+  },
+): CoreLifecycleDependencies {
+  return {
+    createClient: () => lifecycleClient(probe, init.discoveries, init.started),
+    ...(init.now === undefined ? {} : { now: init.now }),
+  };
+}
+
+Deno.test("statusCoreCommand reports a running Core with its uptime", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const outcome = await statusCoreCommand(
+    lifecycleOptions({ config: config({ auth: true, passwords: ["pw"] }) }),
+    lifecycleDeps(probe, {
+      discoveries: [readyDiscovery(reg)],
+      now: () => reg.startedAt + 65_000,
+    }),
+  );
+  assertEquals(outcome, {
+    status: "ready",
+    running: true,
+    auth: true,
+    url: "http://127.0.0.1:1",
+    pid: reg.pid,
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    startedAt: reg.startedAt,
+    uptimeMs: 65_000,
+  });
+  assertEquals(probe.ensureStartedCalls, 0);
+  assertEquals(probe.closeCalls, 1);
+});
+
+Deno.test("statusCoreCommand reports a missing Core without starting one", async () => {
+  const probe = lifecycleProbe();
+  const outcome = await statusCoreCommand(
+    lifecycleOptions(),
+    lifecycleDeps(probe, { discoveries: [{ status: "missing" }] }),
+  );
+  assertEquals(outcome, {
+    status: "missing",
+    running: false,
+    auth: false,
+    reason: "no registered Core",
+  });
+  assertEquals(probe.ensureStartedCalls, 0);
+  assertEquals(probe.closeCalls, 1);
+});
+
+Deno.test("statusCoreCommand projects a stale registration as not running", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096, { pid: await deadPid() });
+  const outcome = await statusCoreCommand(
+    lifecycleOptions(),
+    lifecycleDeps(probe, {
+      discoveries: [{
+        status: "stale",
+        registration: reg,
+        reason: "registered Core process is not running",
+      }],
+    }),
+  );
+  assertEquals(outcome, {
+    status: "stale",
+    running: false,
+    auth: false,
+    pid: reg.pid,
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    startedAt: reg.startedAt,
+    reason: "registered Core process is not running",
+  });
+});
+
+Deno.test("launchCoreCommand reuses a healthy Core instead of launching a second one", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const outcome = await launchCoreCommand(
+    lifecycleOptions(),
+    lifecycleDeps(probe, { discoveries: [readyDiscovery(reg)] }),
+  );
+  assertEquals(outcome, {
+    status: "running",
+    url: "http://127.0.0.1:1",
+    pid: reg.pid,
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+  });
+  assertEquals(probe.ensureStartedCalls, 0);
+  assertEquals(probe.closeCalls, 1);
+});
+
+Deno.test("launchCoreCommand starts a missing Core exactly once", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const outcome = await launchCoreCommand(
+    lifecycleOptions(),
+    lifecycleDeps(probe, {
+      discoveries: [{ status: "missing" }],
+      started: readyDiscovery(reg),
+    }),
+  );
+  assertEquals(outcome.status, "started");
+  assertEquals(outcome.pid, reg.pid);
+  assertEquals(probe.ensureStartedCalls, 1);
+});
+
+Deno.test("launchCoreCommand refuses to replace an incompatible registered Core", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  await assertRejects(
+    () =>
+      launchCoreCommand(
+        lifecycleOptions(),
+        lifecycleDeps(probe, { discoveries: [incompatibleDiscovery(reg)] }),
+      ),
+    Error,
+    "incompatible",
+  );
+  assertEquals(probe.ensureStartedCalls, 0);
+});
+
+Deno.test("restartCoreCommand stops the running Core before starting a replacement", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const stopped: string[] = [];
+  const outcome = await restartCoreCommand(lifecycleOptions(), {
+    ...lifecycleDeps(probe, {
+      discoveries: [{ status: "missing" }],
+      started: readyDiscovery(reg),
+    }),
+    stop: (stoppedOptions) => {
+      stopped.push(stoppedOptions.version ?? "");
+      return Promise.resolve({
+        status: "stopped" as const,
+        exited: true,
+        signalled: false,
+      });
+    },
+  });
+  assertEquals(stopped, [TEST_VERSION]);
+  assertEquals(outcome.stopped, {
+    status: "stopped",
+    exited: true,
+    signalled: false,
+  });
+  assertEquals(outcome.started.status, "started");
+  assertEquals(probe.ensureStartedCalls, 1);
+});
+
+Deno.test("restartCoreCommand starts a Core when none was running", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const outcome = await restartCoreCommand(lifecycleOptions(), {
+    ...lifecycleDeps(probe, {
+      discoveries: [{ status: "missing" }],
+      started: readyDiscovery(reg),
+    }),
+    stop: () =>
+      Promise.resolve({
+        status: "absent" as const,
+        exited: true,
+        signalled: false,
+      }),
+  });
+  assertEquals(outcome.stopped.status, "absent");
+  assertEquals(outcome.started.status, "started");
+});
+
+Deno.test("restartCoreCommand refuses to start while the old Core is still exiting", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  await assertRejects(
+    () =>
+      restartCoreCommand(lifecycleOptions(), {
+        ...lifecycleDeps(probe, {
+          discoveries: [{ status: "missing" }],
+          started: readyDiscovery(reg),
+        }),
+        stop: () =>
+          Promise.resolve({
+            status: "stopped" as const,
+            exited: false,
+            signalled: false,
+          }),
+      }),
+    Error,
+    "did not exit",
+  );
+  assertEquals(probe.ensureStartedCalls, 0);
+});
+
+Deno.test("pairCoreCommand reports the paired endpoint without a password", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const outcome = await pairCoreCommand(
+    lifecycleOptions(),
+    lifecycleDeps(probe, { discoveries: [readyDiscovery(reg)] }),
+  );
+  assertEquals(outcome, {
+    url: "http://127.0.0.1:1",
+    pid: reg.pid,
+    version: TEST_VERSION,
+    protocolVersion: TEST_PROTOCOL_VERSION,
+    auth: false,
+    verified: false,
+  });
+  assertEquals(probe.selectedPasswords, []);
+  assertEquals(probe.closeCalls, 1);
+});
+
+Deno.test("pairCoreCommand verifies a candidate password against the Core", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  const outcome = await pairCoreCommand(
+    lifecycleOptions({
+      config: config({ auth: true, passwords: ["secret"] }),
+      password: "secret",
+    }),
+    lifecycleDeps(probe, {
+      discoveries: [readyDiscovery(reg), readyDiscovery(reg)],
+    }),
+  );
+  assertEquals(outcome.verified, true);
+  assertEquals(probe.selectedPasswords, ["secret"]);
+});
+
+Deno.test("pairCoreCommand rejects a candidate password the Core refuses", async () => {
+  const probe = lifecycleProbe();
+  const reg = registration(4096);
+  await assertRejects(
+    () =>
+      pairCoreCommand(
+        lifecycleOptions({
+          config: config({ auth: true, passwords: ["secret"] }),
+          password: "wrong",
+        }),
+        lifecycleDeps(probe, {
+          discoveries: [
+            readyDiscovery(reg),
+            {
+              status: "unauthenticated",
+              registration: reg,
+              error: new CoreAuthenticationError(),
+            },
+          ],
+        }),
+      ),
+    Error,
+    "rejected",
+  );
+  assertEquals(probe.selectedPasswords, ["wrong"]);
+});
+
+Deno.test("pairCoreCommand refuses a password when core auth is disabled", async () => {
+  const probe = lifecycleProbe();
+  await assertRejects(
+    () =>
+      pairCoreCommand(
+        lifecycleOptions({ password: "secret" }),
+        lifecycleDeps(probe, { discoveries: [] }),
+      ),
+    Error,
+    "core.auth is disabled",
+  );
+  assertEquals(probe.closeCalls, 0);
+});
+
+Deno.test("pairCoreCommand explains how to start a Core that is not running", async () => {
+  const probe = lifecycleProbe();
+  await assertRejects(
+    () =>
+      pairCoreCommand(
+        lifecycleOptions(),
+        lifecycleDeps(probe, { discoveries: [{ status: "missing" }] }),
+      ),
+    Error,
+    "opensac core start",
+  );
+  assertEquals(probe.closeCalls, 1);
+});
+
+Deno.test("status, start, and pair project a real running Core", async () => {
+  await withStateDir(async (stateDir) => {
+    const handle = await startCoreCommand(options({ stateDir }));
+    try {
+      const deps = { stateDir };
+      const status = await statusCoreCommand(options({ stateDir }), deps);
+      assertEquals(status.running, true);
+      assertEquals(status.url, handle.url);
+      assertEquals(status.uptimeMs !== undefined && status.uptimeMs >= 0, true);
+
+      const start = await launchCoreCommand(options({ stateDir }), deps);
+      assertEquals(start.status, "running");
+      assertEquals(start.url, handle.url);
+
+      const pair = await pairCoreCommand(options({ stateDir }), deps);
+      assertEquals(pair.url, handle.url);
+      assertEquals(pair.auth, false);
+      assertEquals(pair.verified, false);
     } finally {
       await handle.stop();
     }

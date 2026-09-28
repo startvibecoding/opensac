@@ -993,6 +993,458 @@ async function isCurrentRegistration(
   }
 }
 
+// ---------------------------------------------------------------------------
+// `opensac core status` / `start` / `restart` / `pair`
+//
+// These subcommands are the management projection of the same Core lifecycle
+// the foreground host owns: `status` only reads registration/discovery state,
+// `start` and `restart` reuse the client's single-launch path (the Core child
+// outlives this command exactly like the TUI/ACP auto-start path), and `pair`
+// verifies that a client can actually authenticate against the running Core.
+// None of them builds a second start/stop state machine.
+// ---------------------------------------------------------------------------
+
+/** Options shared by the read-only and client-managed Core subcommands. */
+export interface CoreLifecycleOptions {
+  /** A resolved (or partial) Core configuration override. */
+  config?: ResolvedCoreConfig | CoreSettings;
+  /** State root containing core.json and core.lock. */
+  stateDir?: string;
+  /** Product version recorded by the Core and its clients. */
+  version?: string;
+  /** Core application protocol version recorded by the service. */
+  protocolVersion?: number;
+  /** Cancels discovery, startup, and shutdown work. */
+  signal?: AbortSignal;
+}
+
+/** Client surface shared by `status`, `start`, `restart`, and `pair`. */
+export interface CoreLifecycleClient {
+  /** Reads the registered Core without starting a process. */
+  discover(signal?: AbortSignal): Promise<CoreDiscoveryResult>;
+  /** Starts at most one Core process and resolves once it is ready. */
+  ensureStarted?(signal?: AbortSignal): Promise<CoreDiscoveryResult>;
+  /** Selects the Bearer password used by subsequent requests. */
+  setPassword?(password: string | undefined): void;
+  /** Releases client resources; never stops a running Core. */
+  close(): Promise<void>;
+}
+
+/** Identity inputs for the lifecycle client created by these subcommands. */
+export interface CoreLifecycleClientOptions {
+  paths: CorePaths;
+  config: ResolvedCoreConfig;
+  version: string;
+  protocolVersion: number;
+  signal?: AbortSignal;
+}
+
+/** Injectable process and filesystem seams used by these subcommands. */
+export interface CoreLifecycleDependencies {
+  /** Load settings when options.config is not supplied. */
+  loadSettings?: (signal?: AbortSignal) => MaybePromise<Settings>;
+  /** Optional settings value for callers that already loaded them. */
+  settings?: Settings;
+  /** Default state root when options.stateDir is not supplied. */
+  stateDir?: string | (() => string);
+  /** Optional CorePaths factory, primarily for focused tests. */
+  createPaths?: (stateDir: string) => CorePaths;
+  /** Alias for createPaths. */
+  paths?: (stateDir: string) => CorePaths;
+  /** Create the lifecycle client used for discovery and startup. */
+  createClient?: (
+    options: CoreLifecycleClientOptions,
+  ) => MaybePromise<CoreLifecycleClient>;
+  /** Signal used when options.signal is absent. */
+  signal?: AbortSignal;
+  /** Clock used for the `status` uptime projection. */
+  now?: () => number;
+}
+
+/** Result of `opensac core status`. */
+export interface CoreStatusOutcome {
+  /** Discovery classification of the registered shared Core. */
+  status: CoreDiscoveryResult["status"];
+  /** True only when the registered Core answered as a healthy peer. */
+  running: boolean;
+  /** Whether the configured Core requires client authentication. */
+  auth: boolean;
+  /** URL exposed by the registered Core, when it answered. */
+  url?: string;
+  /** Registered Core process ID, when a registration was read. */
+  pid?: number;
+  /** Product version recorded by the registration. */
+  version?: string;
+  /** Core application protocol version recorded by the registration. */
+  protocolVersion?: number;
+  /** Registration start time in epoch milliseconds. */
+  startedAt?: number;
+  /** Milliseconds since the registered Core started, when running. */
+  uptimeMs?: number;
+  /** Human-readable explanation for a non-running classification. */
+  reason?: string;
+}
+
+/** Result of `opensac core start`. */
+export interface CoreStartOutcome {
+  /** "started" when this command launched the Core, "running" when reused. */
+  status: "started" | "running";
+  /** URL exposed by the running Core. */
+  url: string;
+  /** PID of the running Core process. */
+  pid: number;
+  /** Product version recorded by the Core. */
+  version: string;
+  /** Core application protocol version recorded by the Core. */
+  protocolVersion: number;
+}
+
+/** Options for `opensac core restart`. */
+export interface CoreRestartOptions extends CoreLifecycleOptions {
+  /** Bounded wait for the stopped Core to exit; defaults to 15 seconds. */
+  stopTimeoutMs?: number;
+}
+
+/** Result of `opensac core restart`. */
+export interface CoreRestartOutcome {
+  /** How the previous Core was stopped; "absent" when none ran. */
+  stopped: CoreStopOutcome;
+  /** How the replacement Core was started. */
+  started: CoreStartOutcome;
+}
+
+/** Options for `opensac core pair`. */
+export interface CorePairOptions extends CoreLifecycleOptions {
+  /** Candidate client password verified against the running Core. */
+  password?: string;
+}
+
+/** Result of `opensac core pair`. */
+export interface CorePairOutcome {
+  /** URL exposed by the paired Core. */
+  url: string;
+  /** PID of the paired Core process. */
+  pid: number;
+  /** Product version recorded by the Core. */
+  version: string;
+  /** Core application protocol version recorded by the Core. */
+  protocolVersion: number;
+  /** Whether the configured Core requires client authentication. */
+  auth: boolean;
+  /** True when a candidate password was supplied and accepted. */
+  verified: boolean;
+}
+
+/** Injectable stop seam used by `opensac core restart`. */
+export interface CoreRestartDependencies extends CoreLifecycleDependencies {
+  /** Stops the running Core; defaults to `stopCoreCommand`. */
+  stop?: (
+    options: CoreStopOptions,
+    deps: CoreStopDependencies,
+  ) => Promise<CoreStopOutcome>;
+  /** Stop dependencies forwarded to the stop implementation. */
+  stopDeps?: CoreStopDependencies;
+}
+
+/**
+ * Reports the state of the registered shared Core without starting or
+ * stopping anything. A non-running classification is a normal result, not an
+ * error; callers decide the exit code from `running`.
+ */
+export async function statusCoreCommand(
+  options: CoreLifecycleOptions = {},
+  deps: CoreLifecycleDependencies = {},
+): Promise<CoreStatusOutcome> {
+  const signal = options.signal ?? deps.signal;
+  throwIfAborted(signal);
+  const context = await resolveLifecycleContext(options, deps, signal);
+  throwIfAborted(signal);
+
+  const client = await createLifecycleClient(context, deps, signal);
+  try {
+    const discovery = await client.discover(signal);
+    return projectStatus(
+      discovery,
+      context.config.auth,
+      deps.now ?? Date.now,
+    );
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Starts the shared Core as a background process and resolves once its
+ * registration is published, so `opensac core start` returns instead of
+ * attaching the caller to the service. A healthy Core is reused unchanged.
+ */
+export async function launchCoreCommand(
+  options: CoreLifecycleOptions = {},
+  deps: CoreLifecycleDependencies = {},
+): Promise<CoreStartOutcome> {
+  const signal = options.signal ?? deps.signal;
+  throwIfAborted(signal);
+  const context = await resolveLifecycleContext(options, deps, signal);
+  throwIfAborted(signal);
+
+  const client = await createLifecycleClient(context, deps, signal);
+  try {
+    const existing = await client.discover(signal);
+    if (existing.status === "ready") {
+      return projectStart(existing, "running");
+    }
+    if (existing.status === "incompatible") {
+      throw new Error(
+        'A registered Core is already running but incompatible; run "opensac core stop" to replace it',
+        { cause: existing.error },
+      );
+    }
+    if (existing.status === "unauthenticated") {
+      throw new Error(
+        "A registered Core requires different authentication; fix core.passwords or stop it manually",
+        { cause: existing.error },
+      );
+    }
+
+    throwIfAborted(signal);
+    const ensureStarted = client.ensureStarted;
+    if (ensureStarted === undefined) {
+      throw new Error("Core startup is unavailable for this client");
+    }
+    const started = await ensureStarted.call(client, signal);
+    if (started.status !== "ready") {
+      throw new Error(`OpenSAC Core is not ready: ${started.status}`);
+    }
+    return projectStart(started, "started");
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Stops a running Core through the canonical stop path and starts a
+ * replacement. Starting with no running Core is a normal restart.
+ */
+export async function restartCoreCommand(
+  options: CoreRestartOptions = {},
+  deps: CoreRestartDependencies = {},
+): Promise<CoreRestartOutcome> {
+  const signal = options.signal ?? deps.signal;
+  throwIfAborted(signal);
+
+  const stop = deps.stop ?? stopCoreCommand;
+  const stopped = await stop(options, resolveRestartStopDeps(deps, signal));
+  if (stopped.status === "stopped" && !stopped.exited) {
+    throw new Error(
+      "OpenSAC Core did not exit within the stop budget; run `opensac core restart` again once it exits",
+    );
+  }
+
+  const started = await launchCoreCommand(options, deps);
+  return { stopped, started };
+}
+
+/**
+ * Verifies that a client can pair with the running Core and reports the
+ * endpoint a paired client uses. Configured passwords are never printed; a
+ * caller supplies a candidate with `--password` and the Core itself decides
+ * whether it authenticates.
+ */
+export async function pairCoreCommand(
+  options: CorePairOptions = {},
+  deps: CoreLifecycleDependencies = {},
+): Promise<CorePairOutcome> {
+  const signal = options.signal ?? deps.signal;
+  throwIfAborted(signal);
+  const context = await resolveLifecycleContext(options, deps, signal);
+  throwIfAborted(signal);
+
+  const password = options.password;
+  if (password !== undefined && !context.config.auth) {
+    throw new Error(
+      "core.auth is disabled, so the running OpenSAC Core accepts unauthenticated clients and needs no pairing password",
+    );
+  }
+
+  const client = await createLifecycleClient(context, deps, signal);
+  try {
+    const discovery = await client.discover(signal);
+    assertPairable(discovery);
+
+    let verified = false;
+    if (password !== undefined) {
+      if (client.setPassword === undefined) {
+        throw new Error("This Core client cannot verify a pairing password");
+      }
+      client.setPassword(password);
+      const authenticated = await client.discover(signal);
+      if (authenticated.status !== "ready") {
+        throw new Error(
+          authenticated.status === "unauthenticated"
+            ? "The pairing password was rejected by the running OpenSAC Core"
+            : `Cannot pair: OpenSAC Core is not ready (${authenticated.status})`,
+        );
+      }
+      verified = true;
+    }
+
+    return {
+      url: discovery.url,
+      pid: discovery.registration.pid,
+      version: discovery.registration.version,
+      protocolVersion: discovery.registration.protocolVersion,
+      auth: context.config.auth,
+      verified,
+    };
+  } finally {
+    await client.close();
+  }
+}
+
+/** Fails unless discovery proved a healthy Core the client can pair with. */
+function assertPairable(
+  discovery: CoreDiscoveryResult,
+): asserts discovery is Extract<CoreDiscoveryResult, { status: "ready" }> {
+  if (discovery.status === "ready") return;
+  const hint = discovery.status === "missing"
+    ? '; run "opensac core start" first'
+    : "";
+  throw new Error(
+    `Cannot pair: OpenSAC Core is not ready (${discovery.status})${hint}`,
+    "error" in discovery && discovery.error instanceof Error
+      ? { cause: discovery.error }
+      : undefined,
+  );
+}
+
+interface CoreLifecycleContext {
+  config: ResolvedCoreConfig;
+  paths: CorePaths;
+  version: string;
+  protocolVersion: number;
+}
+
+async function resolveLifecycleContext(
+  options: CoreLifecycleOptions,
+  deps: CoreLifecycleDependencies,
+  signal?: AbortSignal,
+): Promise<CoreLifecycleContext> {
+  const settings = await resolveCommandSettings(
+    options,
+    { loadSettings: deps.loadSettings, settings: deps.settings },
+    signal,
+  );
+  const stateDir = resolveStateDir(options, { stateDir: deps.stateDir });
+  return {
+    config: resolveCoreConfig(settings),
+    paths: (deps.createPaths ?? deps.paths ?? CorePaths.fromStateDir)(stateDir),
+    version: resolveVersion(options, {}),
+    protocolVersion: resolveProtocolVersion(options, {}),
+  };
+}
+
+function createLifecycleClient(
+  context: CoreLifecycleContext,
+  deps: CoreLifecycleDependencies,
+  signal?: AbortSignal,
+): MaybePromise<CoreLifecycleClient> {
+  const options: CoreLifecycleClientOptions = {
+    paths: context.paths,
+    config: context.config,
+    version: context.version,
+    protocolVersion: context.protocolVersion,
+    ...(signal === undefined ? {} : { signal }),
+  };
+  return (deps.createClient ?? defaultLifecycleClient)(options);
+}
+
+function defaultLifecycleClient(
+  options: CoreLifecycleClientOptions,
+): CoreLifecycleClient {
+  return new CoreClient({
+    stateDir: options.paths.stateDir,
+    version: options.version,
+    protocolVersion: options.protocolVersion,
+    config: options.config,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
+}
+
+function resolveRestartStopDeps(
+  deps: CoreRestartDependencies,
+  signal?: AbortSignal,
+): CoreStopDependencies {
+  if (deps.stopDeps !== undefined) return deps.stopDeps;
+  return {
+    ...(deps.loadSettings === undefined
+      ? {}
+      : { loadSettings: deps.loadSettings }),
+    ...(deps.settings === undefined ? {} : { settings: deps.settings }),
+    ...(deps.stateDir === undefined ? {} : { stateDir: deps.stateDir }),
+    ...(deps.createPaths === undefined
+      ? {}
+      : { createPaths: deps.createPaths }),
+    ...(deps.paths === undefined ? {} : { paths: deps.paths }),
+    ...(signal === undefined ? {} : { signal }),
+  };
+}
+
+function projectStatus(
+  discovery: CoreDiscoveryResult,
+  auth: boolean,
+  now: () => number,
+): CoreStatusOutcome {
+  const registration = "registration" in discovery
+    ? discovery.registration
+    : undefined;
+  const reason = statusReason(discovery);
+  return {
+    status: discovery.status,
+    running: discovery.status === "ready",
+    auth,
+    ...(discovery.status === "ready" ? { url: discovery.url } : {}),
+    ...(registration === undefined ? {} : {
+      pid: registration.pid,
+      version: registration.version,
+      protocolVersion: registration.protocolVersion,
+      startedAt: registration.startedAt,
+      ...(discovery.status === "ready"
+        ? { uptimeMs: Math.max(0, now() - registration.startedAt) }
+        : {}),
+    }),
+    ...(reason === undefined ? {} : { reason }),
+  };
+}
+
+function statusReason(discovery: CoreDiscoveryResult): string | undefined {
+  switch (discovery.status) {
+    case "ready":
+      return undefined;
+    case "missing":
+      return "no registered Core";
+    case "stale":
+      return discovery.reason;
+    case "incompatible":
+      return `registered Core is incompatible: ${discovery.error.message}`;
+    case "unauthenticated":
+      return "registered Core requires authentication the configured passwords cannot satisfy";
+  }
+}
+
+function projectStart(
+  discovery: Extract<CoreDiscoveryResult, { status: "ready" }>,
+  status: "started" | "running",
+): CoreStartOutcome {
+  const { registration } = discovery;
+  return {
+    status,
+    url: discovery.url,
+    pid: registration.pid,
+    version: registration.version,
+    protocolVersion: registration.protocolVersion,
+  };
+}
+
 async function resolveCommandSettings(
   options: CoreCommandOptions,
   deps: CoreCommandDependencies,
