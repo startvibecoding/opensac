@@ -32,6 +32,13 @@ import {
   type ToolResult,
 } from "./tool.ts";
 
+/**
+ * Upper bound on a synchronous bash result (UTF-16 units). The result is a
+ * sectioned block, so truncation must never cut away the trailing
+ * `[exit_code]` marker.
+ */
+export const MAX_BASH_RESULT_CHARS = 50_000;
+
 /** Wraps a byte buffer with a max size limit, mirroring Go's `limitedBuffer`. */
 class LimitedBuffer {
   #chunks: Uint8Array[] = [];
@@ -362,21 +369,17 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
     cleanup?.();
 
     const stdoutStr = trimTrailingNewline(decode(stdoutBuf.bytes()));
-    let stderrStr = trimTrailingNewline(decode(stderrBuf.bytes()));
-    const out = stdoutStr === "" ? "(no output)" : stdoutStr;
-    stderrStr = stderrStr === "" ? "(no output)" : stderrStr;
-
+    const stderrStr = trimTrailingNewline(decode(stderrBuf.bytes()));
     const exitCode = status.code ?? 0;
 
-    let result = "[runtime]\n" + runtimeLabel + "\n" + "[command]\n" +
-      command + "\n[cwd]\n" + workDir + "\n[stdout]\n" + out +
-      "\n[stderr]\n" + stderrStr + "\n[exit_code]\n" + exitCode;
-
-    if (result.length > 50000) {
-      const prefix = truncateString(result, 50000);
-      result = prefix +
-        `\n... (truncated ${result.length - prefix.length} bytes)`;
-    }
+    const result = buildBashResult(
+      runtimeLabel,
+      command,
+      workDir,
+      stdoutStr,
+      stderrStr,
+      exitCode,
+    );
 
     return createTextToolResult(result);
   }
@@ -458,6 +461,58 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
     if (v !== undefined) return clampTimeout(v);
     return 45000;
   }
+}
+
+/**
+ * Assembles the canonical sync bash result: section markers first, then the
+ * captured streams and the exit code.
+ *
+ * Over the cap only the captured streams shrink (stdout gets three quarters
+ * of the budget, stderr the rest). The section markers and `[exit_code]`
+ * always survive, because a truncation that dropped them would make a failed
+ * command read as a success; the whole result is truncated only when the
+ * surrounding metadata itself is oversized.
+ */
+export function buildBashResult(
+  runtimeLabel: string,
+  command: string,
+  workDir: string,
+  stdout: string,
+  stderr: string,
+  exitCode: number,
+): string {
+  const out = stdout === "" ? "(no output)" : stdout;
+  const err = stderr === "" ? "(no output)" : stderr;
+  const build = (outBody: string, errBody: string) =>
+    "[runtime]\n" + runtimeLabel + "\n[command]\n" + command + "\n[cwd]\n" +
+    workDir + "\n[stdout]\n" + outBody + "\n[stderr]\n" + errBody +
+    "\n[exit_code]\n" + exitCode;
+
+  const result = build(out, err);
+  if (result.length <= MAX_BASH_RESULT_CHARS) return result;
+
+  const note = "... (truncated)";
+  // Everything but the two captured streams (markers, command, cwd, exit
+  // code) is fixed and never truncated.
+  const budget = MAX_BASH_RESULT_CHARS -
+    (result.length - out.length - err.length);
+  // Each share must be able to hold the truncation note plus one kept byte.
+  if (budget >= 4 * (note.length + 2)) {
+    // A truncated stream keeps its trailing note inside its own share, so
+    // the two shares always add up to the budget.
+    const errShare = Math.min(err.length, Math.floor(budget / 4));
+    const outShare = budget - errShare;
+    const shrink = (body: string, share: number) => {
+      if (body.length <= share) return body;
+      return truncateString(body, share - note.length - 1) + "\n" + note;
+    };
+    return build(shrink(out, outShare), shrink(err, errShare));
+  }
+
+  // The metadata alone is oversized (e.g. a huge command): keep the hard cap
+  // even though the trailing sections are lost.
+  const prefix = truncateString(result, MAX_BASH_RESULT_CHARS);
+  return prefix + `\n... (truncated ${result.length - prefix.length} bytes)`;
 }
 
 function spawnChild(

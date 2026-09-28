@@ -35,7 +35,11 @@ import {
 import { createJobManager } from "./jobmanager.ts";
 import { formatGoDuration } from "./jobmanager.ts";
 import { EditTool } from "./edit.ts";
-import { createBashTool } from "./bash.ts";
+import {
+  buildBashResult,
+  createBashTool,
+  MAX_BASH_RESULT_CHARS,
+} from "./bash.ts";
 
 function tempDir(): string {
   return Deno.makeTempDirSync();
@@ -454,6 +458,31 @@ Deno.test("BashTool captures stderr and non-zero exit code", async () => {
 
   const failing = await tool.execute(ctx, { command: "exit 3" });
   assertStringIncludes(failing.text, "[exit_code]\n3");
+});
+
+Deno.test("buildBashResult keeps every section when the output is oversized", () => {
+  const result = buildBashResult(
+    "bash",
+    "loud-failure",
+    "/w",
+    "x".repeat(70_000),
+    "e".repeat(60_000),
+    3,
+  );
+  assert(result.length <= MAX_BASH_RESULT_CHARS, `${result.length}`);
+  assertStringIncludes(result, "[runtime]\nbash\n[command]\nloud-failure");
+  assertStringIncludes(result, "[stdout]\nx");
+  assertStringIncludes(result, "[stderr]\ne");
+  assertStringIncludes(result, "[exit_code]\n3");
+  assertStringIncludes(result, "... (truncated)");
+});
+
+Deno.test("buildBashResult leaves a small result untouched", () => {
+  assertEquals(
+    buildBashResult("bash", "echo hi", "/w", "hi", "", 0),
+    "[runtime]\nbash\n[command]\necho hi\n[cwd]\n/w\n[stdout]\nhi\n" +
+      "[stderr]\n(no output)\n[exit_code]\n0",
+  );
 });
 
 Deno.test("BashTool uses non-interactive auth env", async () => {
