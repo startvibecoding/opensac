@@ -287,3 +287,37 @@ test("a Core restart shows in the live view and never enters history", async () 
 
   await session.close();
 });
+
+test("a connected front end does not announce a reconnect it never lost", async () => {
+  const fake = createFakeTUIService();
+  const rec = recordingService(fake);
+  const session = makeSession(rec.service, { coreReconnectNoticeMs: 20 });
+  await session.start();
+
+  // Subscribing replays the current state; a front end that was connected all
+  // along must not claim it reconnected.
+  assertEquals(session.controller.coreConnection, "connected");
+  assertEquals(
+    session.controller.coreConnectionNotice,
+    "",
+    "startup must not announce a reconnect",
+  );
+
+  // A real restart is still announced, and recovering clears the flag so the
+  // replay of a later subscribe stays silent.
+  fake.setConnectionState("reconnecting");
+  assertEquals(
+    session.controller.coreConnectionNotice,
+    session.translator.text("core.reconnecting"),
+  );
+  fake.setConnectionState("connected");
+  assertEquals(
+    session.controller.coreConnectionNotice,
+    session.translator.text("core.reconnected"),
+  );
+  fake.setConnectionState("connected");
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assertEquals(session.controller.coreConnectionNotice, "");
+
+  await session.close();
+});

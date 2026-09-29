@@ -129,6 +129,8 @@ export class TUISession implements CommandHost {
   #stopConnectionState: (() => void) | undefined;
   /** Pending timer that clears the confirmed-reconnect notice. */
   #connectionNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Whether a Core restart has actually been observed since the last recovery. */
+  #coreWasReconnecting = false;
   #closed = false;
   /** Runtime-staged clipboard images awaiting the next submission. */
   #preparedInputs: TUIPreparedInput[] = [];
@@ -252,6 +254,12 @@ export class TUISession implements CommandHost {
    * leaves the live view as it was before the restart happened.
    */
   #handleConnectionState(state: TUICoreConnectionState): void {
+    if (state === "connected" && !this.#coreWasReconnecting) {
+      // The subscription replays the current state, so a front end that was
+      // already connected must not claim it reconnected.
+      return;
+    }
+    this.#coreWasReconnecting = state === "reconnecting";
     this.#clearConnectionNotice();
     this.controller.setCoreConnection(
       state,

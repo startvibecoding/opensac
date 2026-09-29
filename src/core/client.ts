@@ -620,7 +620,10 @@ export class CoreClient {
     // is reported. An intentional `close()` sets `closed` first and is silent.
     const watchSocket = (target: WebSocket): void => {
       target.addEventListener("close", () => {
-        if (closed) return;
+        // A socket replaced by `reconnect()` closes asynchronously, after the
+        // replacement is already live. Reporting that would blame a healthy
+        // connection for a close the client asked for.
+        if (closed || target !== socket) return;
         closed = true;
         for (const waiter of pending.values()) {
           waiter.reject(

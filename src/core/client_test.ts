@@ -1769,6 +1769,15 @@ Deno.test("CoreClient event sockets survive a Core restart onto a new endpoint",
         await events.reconnect();
         assertEquals(events.connected, true);
 
+        // A deliberate reconnect is not a dropped connection: the replaced
+        // socket closes asynchronously, after the replacement is already live,
+        // and must not be reported as an outage.
+        let dropped = 0;
+        events.onClose(() => dropped++);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        assertEquals(dropped, 0);
+        assertEquals(events.connected, true);
+
         // The initial dial re-resolves too: the connection cached by the last
         // reconnect points at a Core that has just been replaced again.
         await second.stop();

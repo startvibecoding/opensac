@@ -304,14 +304,9 @@ function ControllerApp({
         </Box>
       )}
       {!overlayOpen && controller.coreConnectionNotice !== "" && (
-        <Text
-          dimColor={controller.coreConnection === "connected"}
-          color={controller.coreConnection === "reconnecting"
-            ? "yellow"
-            : undefined}
-        >
-          {controller.coreConnectionNotice}
-        </Text>
+        controller.coreConnection === "reconnecting"
+          ? <Text color="yellow">{controller.coreConnectionNotice}</Text>
+          : <Text dimColor>{controller.coreConnectionNotice}</Text>
       )}
       {!overlayOpen && controller.isThinking && (
         <Text dimColor>
