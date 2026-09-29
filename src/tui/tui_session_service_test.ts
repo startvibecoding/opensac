@@ -288,6 +288,39 @@ test("a Core restart shows in the live view and never enters history", async () 
   await session.close();
 });
 
+test("a replaced incompatible Core is reported locally and clears itself", async () => {
+  const fake = createFakeTUIService();
+  const rec = recordingService(fake);
+  const session = makeSession(rec.service, { coreReconnectNoticeMs: 20 });
+  await session.start();
+
+  const history = (): number => session.controller.store.messages.length;
+  const before = history();
+
+  // A registered Core the client cannot talk to was replaced during startup.
+  session.notifyCoreReplaced();
+  assertEquals(
+    session.controller.coreConnectionNotice,
+    session.translator.text("core.replaced"),
+  );
+  assertEquals(session.controller.coreConnection, "connected");
+  assertEquals(history(), before, "the replacement must not enter history");
+
+  // The notice is localized: both dictionaries carry the key, and the session
+  // uses the translator rather than an English literal.
+  assert(session.translator.text("core.replaced").length > 0);
+  assert(
+    !session.translator.text("core.replaced").includes("undefined"),
+  );
+
+  // It clears itself, and a later connection replay stays silent because a
+  // healthy front end did not actually lose its connection.
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assertEquals(session.controller.coreConnectionNotice, "");
+
+  await session.close();
+});
+
 test("a connected front end does not announce a reconnect it never lost", async () => {
   const fake = createFakeTUIService();
   const rec = recordingService(fake);

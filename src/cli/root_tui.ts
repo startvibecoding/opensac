@@ -97,7 +97,16 @@ export async function runInteractiveAction(
     protocolVersion: CORE_PROTOCOL_VERSION,
     config: resolveCoreConfig(settings),
   });
-  const discovery = await core.ensureStarted();
+  // A registered Core built from different code can answer nothing this client
+  // asks, so it is replaced instead of blocking startup behind a manual
+  // `opensac core stop`. Everything else about discovery is unchanged.
+  let coreReplaced = false;
+  const discovery = await core.ensureStarted(undefined, {
+    replaceIncompatible: true,
+    onReplacingIncompatible: () => {
+      coreReplaced = true;
+    },
+  });
   if (discovery.status !== "ready") {
     await core.close();
     const hint = discovery.status === "incompatible"
@@ -115,6 +124,9 @@ export async function runInteractiveAction(
     },
     service,
   );
+  // The replacement already happened, so this reports it in the user's language
+  // once the live view exists. It is not a transcript entry.
+  if (coreReplaced) session.notifyCoreReplaced();
   await session.start();
 
   let width = terminalWidth();

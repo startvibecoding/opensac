@@ -268,12 +268,37 @@ export class TUISession implements CommandHost {
       ),
     );
     if (state === "connected") {
-      this.#connectionNoticeTimer = setTimeout(() => {
-        this.#connectionNoticeTimer = undefined;
-        this.controller.clearCoreConnectionNotice();
-        this.requestRender();
-      }, this.#coreReconnectNoticeMs);
+      this.#scheduleConnectionNoticeClear();
     }
+    this.requestRender();
+  }
+
+  /** Clears a settled connection notice after the confirmation window. */
+  #scheduleConnectionNoticeClear(): void {
+    this.#connectionNoticeTimer = setTimeout(() => {
+      this.#connectionNoticeTimer = undefined;
+      this.controller.clearCoreConnectionNotice();
+      this.requestRender();
+    }, this.#coreReconnectNoticeMs);
+  }
+
+  /**
+   * Reports that the registered Core was unusable and has been replaced.
+   *
+   * A Core built from different code cannot answer a single request, so the
+   * client replaces it rather than refusing to start. That is a transport
+   * condition, not conversation: it shows in the live view through the same
+   * notice slot as a reconnect and then clears itself, and it never becomes a
+   * transcript entry.
+   */
+  notifyCoreReplaced(): void {
+    this.#coreWasReconnecting = true;
+    this.#clearConnectionNotice();
+    this.controller.setCoreConnection(
+      "connected",
+      this.translator.text("core.replaced"),
+    );
+    this.#scheduleConnectionNoticeClear();
     this.requestRender();
   }
 

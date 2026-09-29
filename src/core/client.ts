@@ -41,6 +41,13 @@ export const DEFAULT_CORE_START_TIMEOUT_MS = 10_000;
 /** The largest accepted auto-start budget. */
 export const MAX_CORE_START_TIMEOUT_MS = 300_000;
 
+/**
+ * How long a replaced Core is given to actually exit. A Core that answered
+ * `core.shutdown` normally leaves well inside this; the budget only covers a
+ * process that is slow to unwind.
+ */
+export const DEFAULT_CORE_REPLACE_TIMEOUT_MS = 15_000;
+
 const START_POLL_INTERVAL_MS = 25;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -158,6 +165,29 @@ export type CoreDiscoveryResult =
   | CoreDiscoveryStale
   | CoreDiscoveryIncompatible
   | CoreDiscoveryUnauthenticated;
+
+/** Options for `ensureStarted`. */
+export interface EnsureStartedOptions {
+  /**
+   * Replaces a registered Core that this client can never use instead of
+   * failing startup.
+   *
+   * A version or protocol mismatch means the registered Core cannot answer a
+   * single request from this build, so there is no useful client that can talk
+   * to it. Replacing it is what an operator would otherwise do by hand with
+   * `opensac core stop`, and the replacement is the same launch every other
+   * startup performs. This is opt-in because it stops another process.
+   */
+  replaceIncompatible?: boolean;
+  /**
+   * Invoked once, immediately before an incompatible Core is stopped, so a
+   * front end can tell the user why the Core is going away. Not called when no
+   * replacement happens.
+   */
+  onReplacingIncompatible?: (registration: CoreRegistration) => void;
+  /** How long to wait for the replaced Core to actually exit. */
+  replaceTimeoutMs?: number;
+}
 
 /** Alias for callers that prefer the success-oriented name. */
 export type CoreDiscoverySuccess = CoreDiscoveryReady;
@@ -467,10 +497,13 @@ export class CoreClient {
    * Ensures a healthy Core is available, launching at most one process for
    * concurrent callers on this client instance.
    */
-  ensureStarted(signal?: AbortSignal): Promise<CoreDiscoveryResult> {
+  ensureStarted(
+    signal?: AbortSignal,
+    options: EnsureStartedOptions = {},
+  ): Promise<CoreDiscoveryResult> {
     if (this.#startPromise !== undefined) return this.#startPromise;
 
-    const promise = this.#ensureStarted(signal);
+    const promise = this.#ensureStartedAllowingReplacement(signal, options);
     this.#startPromise = promise;
     void promise.then(
       () => {
@@ -481,6 +514,95 @@ export class CoreClient {
       },
     );
     return promise;
+  }
+
+  /**
+   * Replaces an unusable registered Core, when asked to, before the ordinary
+   * startup path runs.
+   *
+   * The replacement happens up front rather than as a retry inside
+   * `#ensureStarted`, so the existing deadline, launch-adoption, and polling
+   * rules stay exactly as they are. A replacement that does not complete is not
+   * fatal here: the same registration is still in place, and `#ensureStarted`
+   * then reports the mismatch with its own accurate error.
+   */
+  async #ensureStartedAllowingReplacement(
+    signal: AbortSignal | undefined,
+    options: EnsureStartedOptions,
+  ): Promise<CoreDiscoveryResult> {
+    if (options.replaceIncompatible === true) {
+      await this.#replaceIncompatibleCore(signal, options);
+    }
+    return await this.#ensureStarted(signal);
+  }
+
+  /**
+   * Stops a registered Core whose version or protocol this client cannot use,
+   * leaving the next startup to launch a replacement.
+   *
+   * Returns true only when a Core was actually stopped and observed gone, so a
+   * caller can tell a completed replacement from an attempted one.
+   */
+  async #replaceIncompatibleCore(
+    signal: AbortSignal | undefined,
+    options: EnsureStartedOptions,
+  ): Promise<boolean> {
+    const registry = new CoreRegistry(this.#paths);
+    let discovery: CoreDiscoveryResult;
+    try {
+      discovery = await this.discover(signal);
+    } catch {
+      // A discovery failure is the ordinary startup path's problem to report;
+      // it says nothing about compatibility.
+      return false;
+    }
+    if (discovery.status !== "incompatible") return false;
+    const registration = discovery.registration;
+    if (registration === undefined) return false;
+
+    options.onReplacingIncompatible?.(registration);
+
+    let signalled = false;
+    try {
+      await this.shutdown(signal);
+    } catch (error) {
+      // A Core predating `core.shutdown` cannot be asked politely. SIGTERM is
+      // that process's clean stop path, but it is only safe once the
+      // registration is still the one discovery inspected: a replacement that
+      // appeared in between must never be signalled by mistake.
+      const replaceable = isMethodNotFoundError(error) &&
+        await isCurrentRegistration(registry, registration);
+      if (!replaceable) return false;
+      try {
+        Deno.kill(registration.pid, "SIGTERM");
+        signalled = true;
+      } catch {
+        return false;
+      }
+    }
+
+    const exited = await waitForRegistrationExit(registry, registration, {
+      timeoutMs: options.replaceTimeoutMs ?? DEFAULT_CORE_REPLACE_TIMEOUT_MS,
+      signal,
+    });
+    if (!exited) {
+      // The stop was requested but the Core still holds its registration, so
+      // launching a replacement now would race it for the Core lock. Report the
+      // mismatch instead; the caller decides whether to force the issue.
+      throw new CoreStartupError(
+        signalled
+          ? "The registered Core is incompatible and did not exit in time"
+          : "The registered Core is incompatible and did not shut down in time",
+        discovery,
+        options.replaceTimeoutMs ?? DEFAULT_CORE_REPLACE_TIMEOUT_MS,
+      );
+    }
+
+    // The endpoint this client cached points at the Core that just exited, so
+    // the next startup must resolve the replacement's registration instead.
+    this.#connection = undefined;
+    this.#discoveryPromise = undefined;
+    return true;
   }
 
   /** Sends one ordinary JSON-RPC request to the discovered `/rpc` endpoint. */
@@ -1899,6 +2021,27 @@ export function processLiveness(
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) return "dead";
     return "unknown";
+  }
+}
+
+/** A JSON-RPC "method not found", i.e. a Core older than `core.shutdown`. */
+function isMethodNotFoundError(error: unknown): boolean {
+  return error instanceof CoreClientRpcError && error.code === -32601;
+}
+
+/**
+ * Confirms a registration is still the current one before anything destructive
+ * is done to it. A registry that cannot answer counts as "not current", so an
+ * unverifiable identity fails closed.
+ */
+async function isCurrentRegistration(
+  registry: CoreRegistry,
+  registration: CoreRegistration,
+): Promise<boolean> {
+  try {
+    return await registry.isCurrent(registration);
+  } catch {
+    return false;
   }
 }
 
