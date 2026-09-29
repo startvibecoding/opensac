@@ -2,21 +2,41 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { verifyPlatformPackages } from "./npm_verify_platforms.ts";
 
-/** Fetch stub that answers per package name, defaulting to 404. */
+/**
+ * Fetch stub that answers per package, defaulting to 404.
+ *
+ * `isPublished` reads the packument route (`/{package}`) and looks the version
+ * up in its `versions` map, because GitHub Packages does not implement the
+ * `/{package}/{version}` route and answers it with 405. `published` is still
+ * keyed `name@version` so the tests read the same as the manifests they check.
+ */
 function registryFetch(
   published: Record<string, number>,
 ): typeof fetch {
+  const byName = new Map<string, Record<string, number>>();
+  for (const [key, status] of Object.entries(published)) {
+    const at = key.lastIndexOf("@");
+    const name = key.slice(0, at);
+    const entry = byName.get(name) ?? {};
+    entry[key.slice(at + 1)] = status;
+    byName.set(name, entry);
+  }
   return ((input: string | URL | Request) => {
-    const url = String(input instanceof Request ? input.url : input);
-    const version = url.slice(url.lastIndexOf("/") + 1);
-    const name = decodeURIComponent(
-      url.slice(
-        url.lastIndexOf("/", url.lastIndexOf("/") - 1) + 1,
-        url.lastIndexOf("/"),
-      ),
+    const raw = String(input instanceof Request ? input.url : input)
+      .replace(/\/+$/, "");
+    const name = decodeURIComponent(raw.slice(raw.lastIndexOf("/") + 1));
+    const versions = byName.get(name);
+    if (versions === undefined) {
+      return Promise.resolve(new Response("{}", { status: 404 }));
+    }
+    // Preserve a non-200 answer so a registry failure still surfaces.
+    const failure = Object.values(versions).find((status) => status !== 200);
+    if (failure !== undefined) {
+      return Promise.resolve(new Response("{}", { status: failure }));
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ versions }), { status: 200 }),
     );
-    const status = published[`${name}@${version}`] ?? 404;
-    return Promise.resolve(new Response("{}", { status }));
   }) as unknown as typeof fetch;
 }
 

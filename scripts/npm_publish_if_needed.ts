@@ -27,14 +27,35 @@ export interface PublishOptions {
   npm?: string;
 }
 
-/** Registry URL that reports whether one exact version exists. */
-export function versionUrl(
-  registry: string,
-  name: string,
-  version: string,
-): string {
+/**
+ * Registry URL for a package's packument (its version list).
+ *
+ * The check deliberately does not use the `/{package}/{version}` single-version
+ * manifest route. That route exists on registry.npmjs.org but is not
+ * implemented by GitHub Packages, which answers it with `405 Method Not
+ * Allowed` -- so every `make npm-publish-github` aborted on the first platform
+ * package. The packument route is the one both registries implement, and the
+ * abbreviated form carries the `versions` map without the full metadata.
+ */
+export function packumentUrl(registry: string, name: string): string {
   const base = registry.replace(/\/+$/, "");
-  return `${base}/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+  return `${base}/${encodeURIComponent(name)}`;
+}
+
+/**
+ * Auth header for a registry read, when a token is available.
+ *
+ * The check used to send no credentials, but npm reads `NODE_AUTH_TOKEN` from
+ * the environment and the workflow sets it (`secrets.GITHUB_TOKEN` for GitHub
+ * Packages, `secrets.NPM_TOKEN` for npmjs). Without it a private package
+ * answers 404 to hide its existence, which this script would misread as "not
+ * published" and then republish over a live version.
+ */
+export function authHeader(
+  env: { get(key: string): string | undefined } = Deno.env,
+): Record<string, string> {
+  const token = env.get("NODE_AUTH_TOKEN") ?? env.get("NPM_TOKEN") ?? "";
+  return token === "" ? {} : { Authorization: `Bearer ${token}` };
 }
 
 /** Reads `name` and `version` from a package manifest. */
@@ -52,9 +73,10 @@ export function readPackageJson(
 }
 
 /**
- * Whether `name@version` is already in the registry. A 404 means "not
- * published"; any other status is a real failure and must not be read as
- * "publish it", or a registry hiccup would republish a live version.
+ * Whether `name@version` is already in the registry.
+ *
+ * A 404 means "not published"; any other status is a real failure and must not
+ * be read as "publish it", or a registry hiccup would republish a live version.
  */
 export async function isPublished(
   registry: string,
@@ -62,14 +84,30 @@ export async function isPublished(
   version: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<boolean> {
-  const response = await fetchImpl(versionUrl(registry, name, version), {
-    headers: { Accept: "application/json" },
+  const response = await fetchImpl(packumentUrl(registry, name), {
+    headers: {
+      Accept: "application/vnd.npm.install-v1+json",
+      ...authHeader(),
+    },
   });
-  if (response.status === 200) return true;
   if (response.status === 404) return false;
-  throw new Error(
-    `Registry check for ${name}@${version} failed: HTTP ${response.status}`,
-  );
+  if (response.status !== 200) {
+    throw new Error(
+      `Registry check for ${name}@${version} failed: HTTP ${response.status}`,
+    );
+  }
+  // The packument lists every published version, so membership is the answer.
+  // A body that is not the expected shape is a failure, not "not published".
+  const body = await response.json().catch(() => null) as
+    | { versions?: Record<string, unknown> }
+    | null;
+  const versions = body?.versions;
+  if (versions === undefined || versions === null) {
+    throw new Error(
+      `Registry check for ${name}@${version} failed: packument has no versions`,
+    );
+  }
+  return Object.hasOwn(versions, version);
 }
 
 export interface ParsedArgs extends Omit<PublishOptions, "npm"> {}
