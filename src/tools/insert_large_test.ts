@@ -11,23 +11,30 @@ const insertInMemoryLimit = 32 * 1024 * 1024;
 
 Deno.test("InsertTool streams a large file insertion", async () => {
   const dir = Deno.makeTempDirSync();
-  const file = path.join(dir, "large.txt");
-  const data = new Uint8Array(insertInMemoryLimit + 1);
-  data.fill("a".charCodeAt(0));
-  Deno.writeFileSync(file, data);
+  try {
+    const file = path.join(dir, "large.txt");
+    const data = new Uint8Array(insertInMemoryLimit + 1);
+    data.fill("a".charCodeAt(0));
+    Deno.writeFileSync(file, data);
 
-  const tool = new InsertTool(createRegistry(dir, undefined));
-  const r = await tool.execute(
-    {},
-    { path: "large.txt", content: "tail", position: { type: "tail" } },
-  );
-  assert(r.insert);
-  assertEquals(r.insert.offset, data.length);
-  const got = Deno.readFileSync(file);
-  assertEquals(got.length, data.length + "\ntail".length);
-  assert(
-    new TextDecoder().decode(got.subarray(got.length - 5)) === "\ntail",
-  );
+    const tool = new InsertTool(createRegistry(dir, undefined));
+    const r = await tool.execute(
+      {},
+      { path: "large.txt", content: "tail", position: { type: "tail" } },
+    );
+    assert(r.insert);
+    assertEquals(r.insert.offset, data.length);
+    const got = Deno.readFileSync(file);
+    assertEquals(got.length, data.length + "\ntail".length);
+    assert(
+      new TextDecoder().decode(got.subarray(got.length - 5)) === "\ntail",
+    );
+  } finally {
+    // This test writes a file larger than the insert in-memory limit, so
+    // leaving it behind leaked >32MB into the temp dir on every run and could
+    // fill a tmpfs mount outright.
+    Deno.removeSync(dir, { recursive: true });
+  }
 });
 
 Deno.test("BashTool applies a sync timeout", async () => {
