@@ -100,6 +100,24 @@ export function platformPackageName(
 }
 
 /**
+ * Go/Docker style arch names mapped to the npm `cpu` field.
+ *
+ * `process.arch` and `Deno.build.arch` both say `x64`, while a Docker
+ * `TARGETARCH` (and a Go `GOARCH`) says `amd64` for the same machine. Accepting
+ * both spellings is what lets the image build resolve its target from the
+ * platform table instead of hardcoding a second list of platforms.
+ */
+export const ARCH_ALIASES: Readonly<Record<string, string>> = {
+  amd64: "x64",
+  x86_64: "x64",
+};
+
+/** Resolves a `process.arch`, `Deno.build.arch`, or `TARGETARCH` spelling. */
+export function resolveArch(arch: string): string {
+  return ARCH_ALIASES[arch] ?? arch;
+}
+
+/**
  * npm `os`/`cpu` for a `process.platform`/`process.arch` pair, or "" when the
  * pair has no published platform. The install wrapper uses this to report an
  * unsupported host with the same table the packages were built from.
@@ -108,8 +126,9 @@ export function npmPlatformFor(
   os: string,
   arch: string,
 ): string | undefined {
+  const cpu = resolveArch(arch);
   const match = PLATFORM_TARGETS.find(
-    (target) => target.os === os && target.cpu === arch,
+    (target) => target.os === os && target.cpu === cpu,
   );
   return match?.npmPlatform;
 }

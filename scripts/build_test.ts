@@ -3,6 +3,7 @@ import { join } from "@std/path";
 import {
   buildEnvFile,
   compileArgs,
+  explicitBuildVersion,
   packageVersion,
   pickLatestVersionTag,
   resolveBuildVersion,
@@ -79,6 +80,28 @@ Deno.test("ResolveBuildVersionFallsBackToPackageVersion", async () => {
 
 Deno.test("BuildEnvFileCarriesBuildVersion", () => {
   assertEquals(buildEnvFile("v1.2.3"), "OPENSAC_BUILD_VERSION=v1.2.3\n");
+});
+
+Deno.test("ExplicitBuildVersionOverridesTheGitTag", () => {
+  assertEquals(explicitBuildVersion(["--build-version=v9.9.9"]), "v9.9.9");
+  assertEquals(
+    explicitBuildVersion(["--target=linux-x64", "--build-version= v1.0.0 "]),
+    "v1.0.0",
+  );
+  // Absent means "resolve it the usual way", which the container image build
+  // relies on when it does not pass a tag.
+  assertEquals(explicitBuildVersion(["--all"]), undefined);
+  assertEquals(explicitBuildVersion([]), undefined);
+});
+
+Deno.test("ExplicitBuildVersionRejectsAnEmptyValue", () => {
+  let message = "";
+  try {
+    explicitBuildVersion(["--build-version="]);
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+  assertEquals(message.includes("requires a version"), true, message);
 });
 
 Deno.test("CompileArgsEmbedEnvFileBeforeEntry", () => {

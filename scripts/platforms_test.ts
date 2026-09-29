@@ -4,6 +4,7 @@ import {
   npmPlatformFor,
   PLATFORM_TARGETS,
   platformPackageName,
+  resolveArch,
   WINDOWS_SUFFIX,
 } from "./platforms.ts";
 
@@ -64,4 +65,16 @@ Deno.test("NpmPlatformForMatchesTheProcessPlatformAndArch", () => {
   assertEquals(npmPlatformFor("win32", "x64"), "win32-x64");
   assertEquals(npmPlatformFor("sunos", "x64"), undefined);
   assertEquals(npmPlatformFor("linux", "mips"), undefined);
+});
+
+Deno.test("NpmPlatformForAcceptsDockerTargetArchNames", () => {
+  // A Docker build only knows `TARGETARCH`; the image resolves its release
+  // target through this function instead of a second, hand-written list.
+  assertEquals(resolveArch("amd64"), "x64");
+  assertEquals(resolveArch("x86_64"), "x64");
+  assertEquals(resolveArch("arm64"), "arm64");
+  assertEquals(resolveArch("riscv64"), "riscv64");
+  assertEquals(npmPlatformFor("linux", "amd64"), "linux-x64");
+  assertEquals(npmPlatformFor("linux", "arm64"), "linux-arm64");
+  assertEquals(npmPlatformFor("linux", "riscv64"), undefined);
 });

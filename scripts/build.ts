@@ -79,6 +79,31 @@ export async function resolveBuildVersion(
   return await packageVersion(repoDir);
 }
 
+/** The `--build-version=<v>` flag name, without the value. */
+export const BUILD_VERSION_FLAG = "--build-version=";
+
+/**
+ * Reads an explicit `--build-version=<v>` override, or undefined when the flag
+ * is absent.
+ *
+ * The git tag stays the default source of the product version, but a build from
+ * a source tree with no git history cannot see one: the container image build
+ * context excludes `.git`, so it passes the tag it was cut from. An empty value
+ * is an error rather than a silent fallback, because a binary that reports the
+ * wrong version is worse than a build that stops.
+ */
+export function explicitBuildVersion(
+  args: readonly string[],
+): string | undefined {
+  const flag = args.find((arg) => arg.startsWith(BUILD_VERSION_FLAG));
+  if (flag === undefined) return undefined;
+  const value = flag.slice(BUILD_VERSION_FLAG.length).trim();
+  if (value === "") {
+    throw new Error(`${BUILD_VERSION_FLAG} requires a version`);
+  }
+  return value;
+}
+
 /** Env file payload embedded into the compiled binary. */
 export function buildEnvFile(version: string): string {
   return `OPENSAC_BUILD_VERSION=${version}\n`;
@@ -182,7 +207,15 @@ function hostTarget(): PlatformTarget {
 
 if (import.meta.main) {
   const repoDir = resolve(import.meta.dirname ?? ".", "..");
-  const version = await resolveBuildVersion(repoDir);
+  let version: string;
+  try {
+    // A bad flag is a usage error, not a stack trace.
+    const override = explicitBuildVersion(Deno.args);
+    version = override ?? await resolveBuildVersion(repoDir);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    Deno.exit(1);
+  }
   if (Deno.args.includes("--version")) {
     // Print the version that would be embedded, without compiling.
     console.log(version);

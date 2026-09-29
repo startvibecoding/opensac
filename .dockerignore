@@ -1,0 +1,21 @@
+# Build output and local state never belong in the image: the builder compiles
+# from source, and a stale bin/ or config directory would shadow it.
+.git
+.github
+bin/
+dist/
+node_modules/
+desktop/node_modules/
+desktop/dist/
+npm/packages/
+npm/bin/
+npm/scripts/
+docs/
+.opensac/
+.mothx/
+.idea/
+.vscode/
+*.md
+!README.md
+Dockerfile
+.dockerignore

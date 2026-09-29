@@ -8,6 +8,12 @@
 //
 // Package manifests are generated, not hand-edited: `npm/packages/*` is build
 // output and is git-ignored.
+//
+// The same generator produces both registries a release publishes to. npmjs
+// takes the unscoped `opensac-installer`, while GitHub Packages only accepts a
+// package inside the owner's scope, so `--scope` prefixes every generated name
+// and `--out` writes the scoped tree beside the tracked `npm/` entry package
+// instead of overwriting it. One generator, two registries, one platform table.
 
 import { dirname, fromFileUrl, join, resolve } from "@std/path";
 import {
@@ -49,13 +55,38 @@ export function toPackageVersion(buildVersion: string): string {
     .replace(/-dirty$/, "");
 }
 
+/**
+ * Normalizes an npm scope to its canonical `@owner` form, accepting `owner`,
+ * `@owner`, or an empty value. A malformed scope is rejected here rather than
+ * becoming a package name the registry will refuse to publish.
+ */
+export function normalizeScope(scope?: string): string {
+  const trimmed = (scope ?? "").trim();
+  if (trimmed === "") return "";
+  const withAt = trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+  if (!/^@[a-z0-9][a-z0-9._-]*$/i.test(withAt)) {
+    throw new Error(`Invalid npm scope: ${scope}`);
+  }
+  return withAt;
+}
+
+/** Prefixes a package name with `scope`, or returns it unchanged when unscoped. */
+export function scopedName(name: string, scope?: string): string {
+  const normalized = normalizeScope(scope);
+  return normalized === "" ? name : `${normalized}/${name}`;
+}
+
 /** Manifest for one platform package: only the fields npm resolves on. */
 export function platformPackageJson(
   target: PlatformTarget,
   version: string,
+  scope?: string,
 ): NpmPackageJson {
   return {
-    name: platformPackageName(target.npmPlatform, INSTALLER_NAME),
+    name: scopedName(
+      platformPackageName(target.npmPlatform, INSTALLER_NAME),
+      scope,
+    ),
     version,
     description: `OpenSAC native binary for ${target.os}-${target.cpu}`,
     os: [target.os],
@@ -73,10 +104,13 @@ export function platformPackageJson(
 export function optionalDependencies(
   built: readonly PlatformTarget[],
   version: string,
+  scope?: string,
 ): Record<string, string> {
   const deps: Record<string, string> = {};
   for (const target of built) {
-    deps[platformPackageName(target.npmPlatform, INSTALLER_NAME)] = version;
+    deps[
+      scopedName(platformPackageName(target.npmPlatform, INSTALLER_NAME), scope)
+    ] = version;
   }
   return deps;
 }
@@ -93,10 +127,15 @@ const PLATFORM_MAP_NAME = "platforms.js";
  * Source of the generated platform map the wrapper requires. It is a plain
  * CommonJS module so the wrapper needs no JSON loader and no build step.
  */
-export function platformMapModule(): string {
+export function platformMapModule(scope?: string): string {
   const entries = PLATFORM_TARGETS.map((target) =>
     `  ${JSON.stringify(target.npmPlatform)}: ${
-      JSON.stringify(platformPackageName(target.npmPlatform, INSTALLER_NAME))
+      JSON.stringify(
+        scopedName(
+          platformPackageName(target.npmPlatform, INSTALLER_NAME),
+          scope,
+        ),
+      )
     },`
   );
   return [
@@ -117,6 +156,8 @@ export function platformMapModule(): string {
 export async function installEntryAssets(
   repoDir: string,
   npmDir = join(repoDir, "npm"),
+  scope?: string,
+  entryTemplate = join(repoDir, "npm", "package.json"),
 ): Promise<void> {
   const binDir = join(npmDir, "bin");
   await Deno.mkdir(binDir, { recursive: true });
@@ -133,7 +174,7 @@ export async function installEntryAssets(
   // hand: the published wrapper can never disagree with the platform table.
   await Deno.writeTextFile(
     join(binDir, PLATFORM_MAP_NAME),
-    platformMapModule() + "\n",
+    platformMapModule(scope) + "\n",
   );
 
   const scriptsDir = join(npmDir, "scripts");
@@ -142,6 +183,18 @@ export async function installEntryAssets(
     join(repoDir, "scripts", POSTINSTALL_SOURCE),
     join(scriptsDir, "postinstall.js"),
   );
+
+  // The entry manifest's `files` lists a README, so the generated tree gets the
+  // one the template was written next to. A scoped build writes into its own
+  // directory and would otherwise publish without it.
+  try {
+    await Deno.copyFile(
+      join(dirname(entryTemplate), "README.md"),
+      join(npmDir, "README.md"),
+    );
+  } catch {
+    // No README beside the template: nothing to install, not a failure.
+  }
 }
 
 /** True when the target's binary exists and is non-empty. */
@@ -160,17 +213,38 @@ async function writeManifest(path: string, pkg: NpmPackageJson): Promise<void> {
   await Deno.writeTextFile(path, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
+/** Where a generated package tree goes, and under which npm scope. */
+export interface NpmPackageOptions {
+  /**
+   * Output tree. Defaults to the tracked `npm/` entry package, which is then
+   * rewritten in place; a different directory leaves the tracked manifest
+   * alone and is what a scoped GitHub Packages build uses.
+   */
+  npmDir?: string;
+  /** npm scope for every generated name, e.g. `@owner`. Empty = unscoped. */
+  scope?: string;
+  /**
+   * Entry manifest used as the template for the generated entry package.
+   * Defaults to the tracked `npm/package.json`.
+   */
+  entryTemplate?: string;
+}
+
 /**
- * Builds `npm/packages/<name>/` for every target whose binary is present in
- * `bin/`, and rewrites the entry package's `optionalDependencies` to match.
- * Returns the targets that were packaged.
+ * Builds `<npmDir>/packages/<installer>-<platform>/` for every target whose
+ * binary is present in `bin/`, and writes an entry package whose
+ * `optionalDependencies` match. Returns the targets that were packaged.
  */
 export async function buildNpmPackages(
   repoDir: string,
   version: string,
-  npmDir = join(repoDir, "npm"),
+  options: NpmPackageOptions = {},
 ): Promise<PlatformTarget[]> {
-  await installEntryAssets(repoDir, npmDir);
+  const npmDir = options.npmDir ?? join(repoDir, "npm");
+  const scope = normalizeScope(options.scope);
+  const entryTemplate = options.entryTemplate ??
+    join(repoDir, "npm", "package.json");
+  await installEntryAssets(repoDir, npmDir, scope, entryTemplate);
   const packagesDir = join(npmDir, "packages");
   // Regenerate from scratch so a removed platform cannot linger as a stale
   // package that still looks publishable.
@@ -194,7 +268,7 @@ export async function buildNpmPackages(
     }
     await writeManifest(
       join(pkgDir, "package.json"),
-      platformPackageJson(target, version),
+      platformPackageJson(target, version, scope),
     );
     built.push(target);
   }
@@ -205,13 +279,16 @@ export async function buildNpmPackages(
     );
   }
 
-  const entryManifest = join(npmDir, "package.json");
+  // The entry package is generated from the tracked manifest so a scoped build
+  // keeps the same description, keywords, and `files` list as the unscoped one;
+  // only the name, version, and platform map are release-specific.
   const entry = JSON.parse(
-    await Deno.readTextFile(entryManifest),
+    await Deno.readTextFile(entryTemplate),
   ) as NpmPackageJson;
+  entry.name = scopedName(INSTALLER_NAME, scope);
   entry.version = version;
-  entry.optionalDependencies = optionalDependencies(built, version);
-  await writeManifest(entryManifest, entry);
+  entry.optionalDependencies = optionalDependencies(built, version, scope);
+  await writeManifest(join(npmDir, "package.json"), entry);
 
   return built;
 }
@@ -225,9 +302,21 @@ if (import.meta.main) {
     );
     Deno.exit(1);
   }
-  const built = await buildNpmPackages(repoDir, version);
+  let options: NpmPackageOptions = {};
+  for (const arg of Deno.args) {
+    if (arg.startsWith("--scope=")) {
+      options = { ...options, scope: normalizeScope(arg.slice(8)) };
+    } else if (arg.startsWith("--out=")) {
+      options = { ...options, npmDir: resolve(repoDir, arg.slice(6)) };
+    } else {
+      console.error(`Unknown option: ${arg}`);
+      Deno.exit(1);
+    }
+  }
+  const built = await buildNpmPackages(repoDir, version, options);
+  const tree = options.npmDir ?? join(repoDir, "npm");
   console.error(
-    `Built ${built.length} platform package(s) at ${version}: ` +
+    `Built ${built.length} platform package(s) at ${version} in ${tree}: ` +
       built.map((target) => target.npmPlatform).join(", "),
   );
 }

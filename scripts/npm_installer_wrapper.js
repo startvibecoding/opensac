@@ -77,8 +77,26 @@ function reportMissingBinary(platform, packageName) {
   console.error(`Expected it in the ${packageName} package.`);
   console.error("");
   console.error("Reinstall to fetch the platform binary:");
-  console.error("  npm install -g opensac-installer");
+  console.error(`  npm install -g ${entryPackageName()}`);
   process.exit(1);
+}
+
+/**
+ * Name of the entry package this wrapper was installed from, so the reinstall
+ * hint names the package the user actually has. The same wrapper is published
+ * unscoped to npmjs and scoped to GitHub Packages, and only this manifest knows
+ * which one it is.
+ */
+function entryPackageName() {
+  try {
+    const manifest = require(path.join(__dirname, "..", "package.json"));
+    if (manifest && typeof manifest.name === "string" && manifest.name !== "") {
+      return manifest.name;
+    }
+  } catch {
+    // Fall through to the unscoped default.
+  }
+  return "opensac-installer";
 }
 
 function main() {

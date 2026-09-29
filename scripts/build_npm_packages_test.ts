@@ -1,11 +1,13 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { join } from "@std/path";
 import {
   buildNpmPackages,
   INSTALLER_NAME,
+  normalizeScope,
   optionalDependencies,
   platformMapModule,
   platformPackageJson,
+  scopedName,
   toPackageVersion,
 } from "./build_npm_packages.ts";
 import { findPlatform, PLATFORM_TARGETS } from "./platforms.ts";
@@ -45,10 +47,30 @@ async function makeRepo(
       )
     }\n`,
   );
+  await Deno.writeTextFile(join(dir, "npm", "README.md"), "# opensac\n");
   for (const binary of binaries) {
     await Deno.writeTextFile(join(dir, "bin", binary), "binary");
   }
   return { dir, cleanup: () => Deno.remove(dir, { recursive: true }) };
+}
+
+/** Absolute path of the real npm wrapper source in this repository. */
+function realWrapperSource(): string {
+  return join(import.meta.dirname ?? ".", WRAPPER_SOURCE);
+}
+
+/** Whether `node` can run, so the wrapper test can execute the real script. */
+async function hasNode(): Promise<boolean> {
+  try {
+    const status = await new Deno.Command("node", {
+      args: ["--version"],
+      stdout: "null",
+      stderr: "null",
+    }).spawn().status;
+    return status.success;
+  } catch {
+    return false;
+  }
 }
 
 Deno.test("ToPackageVersionStripsTheVPrefixAndDirtySuffix", () => {
@@ -78,6 +100,165 @@ Deno.test("OptionalDependenciesCoverOnlyTheGivenPlatforms", () => {
     "opensac-installer-linux-x64",
   ]);
   assertEquals(deps["opensac-installer-linux-x64"], "3.0.0");
+});
+
+Deno.test("NormalizeScopeAcceptsBothFormsAndRejectsGarbage", () => {
+  assertEquals(normalizeScope(""), "");
+  assertEquals(normalizeScope(undefined), "");
+  assertEquals(normalizeScope("owner"), "@owner");
+  assertEquals(normalizeScope("@owner"), "@owner");
+  assertEquals(normalizeScope("  @owner  "), "@owner");
+  assertEquals(
+    scopedName("opensac-installer", "@owner"),
+    "@owner/opensac-installer",
+  );
+  assertEquals(scopedName("opensac-installer"), "opensac-installer");
+  assertThrows(() => normalizeScope("@"), Error);
+  assertThrows(() => normalizeScope("@own er"), Error);
+});
+
+Deno.test("ScopedPlatformPackageJsonCarriesTheScope", () => {
+  const target = findPlatform("linux-x64");
+  if (target === undefined) throw new Error("linux-x64 must be a platform");
+  const pkg = platformPackageJson(target, "1.2.3", "owner");
+  assertEquals(pkg.name, "@owner/opensac-installer-linux-x64");
+  assertEquals(pkg.os, ["linux"]);
+});
+
+Deno.test("OptionalDependenciesCarryTheScope", () => {
+  const linux = PLATFORM_TARGETS.filter((t) => t.os === "linux");
+  const deps = optionalDependencies(linux, "3.0.0", "@owner");
+  assertEquals(Object.keys(deps).sort(), [
+    "@owner/opensac-installer-linux-arm64",
+    "@owner/opensac-installer-linux-x64",
+  ]);
+  // The generated map is what the published wrapper requires, so it has to use
+  // the same scoped names or a GitHub Packages install resolves nothing.
+  const map = platformMapModule("@owner");
+  assertEquals(
+    map.includes('"linux-x64": "@owner/opensac-installer-linux-x64",'),
+    true,
+  );
+});
+
+Deno.test("BuildNpmPackagesWritesAScopedTreeBesideTheTrackedOne", async () => {
+  const { dir, cleanup } = await makeRepo([
+    "opensac-linux-amd64",
+    "opensac-darwin-arm64",
+  ]);
+  try {
+    const outDir = join(dir, "dist", "npm-github");
+    const built = await buildNpmPackages(dir, "2.0.0", {
+      npmDir: outDir,
+      scope: "@owner",
+    });
+    assertEquals(built.map((t) => t.npmPlatform), [
+      "linux-x64",
+      "darwin-arm64",
+    ]);
+
+    const platform = JSON.parse(
+      await Deno.readTextFile(
+        join(outDir, "packages", "opensac-installer-linux-x64", "package.json"),
+      ),
+    );
+    assertEquals(platform.name, "@owner/opensac-installer-linux-x64");
+    assertEquals(platform.version, "2.0.0");
+    assertEquals(
+      await Deno.readTextFile(
+        join(
+          outDir,
+          "packages",
+          "opensac-installer-linux-x64",
+          "bin",
+          "opensac",
+        ),
+      ),
+      "binary",
+    );
+
+    const entry = JSON.parse(
+      await Deno.readTextFile(join(outDir, "package.json")),
+    );
+    assertEquals(entry.name, "@owner/opensac-installer");
+    assertEquals(entry.version, "2.0.0");
+    assertEquals(Object.keys(entry.optionalDependencies).sort(), [
+      "@owner/opensac-installer-darwin-arm64",
+      "@owner/opensac-installer-linux-x64",
+    ]);
+    // The entry template still supplies the non-release-specific fields.
+    assertEquals(entry.bin, { opensac: "bin/opensac" });
+    // The manifest's `files` lists a README, so the generated tree needs one.
+    assertEquals(
+      await Deno.readTextFile(join(outDir, "README.md")),
+      "# opensac\n",
+    );
+
+    // The tracked npmjs manifest must be untouched by a scoped build.
+    const tracked = JSON.parse(
+      await Deno.readTextFile(join(dir, "npm", "package.json")),
+    );
+    assertEquals(tracked.name, INSTALLER_NAME);
+    assertEquals(tracked.version, "0.0.0");
+    assertEquals(tracked.optionalDependencies, undefined);
+  } finally {
+    await cleanup();
+  }
+});
+
+Deno.test("TheWrapperReinstallHintNamesThePackageItCameFrom", async () => {
+  if (!await hasNode()) {
+    console.log("node is unavailable; skipping the wrapper execution test");
+    return;
+  }
+  const dir = await Deno.makeTempDir({ prefix: "opensac-wrapper-test-" });
+  try {
+    const entryDir = join(dir, "entry");
+    await Deno.mkdir(join(entryDir, "bin"), { recursive: true });
+    // A generated entry package whose platform package is not installed: the
+    // path that prints the reinstall hint.
+    await Deno.writeTextFile(
+      join(entryDir, "package.json"),
+      `${
+        JSON.stringify({ name: "@owner/opensac-installer", version: "1.0.0" })
+      }\n`,
+    );
+    await Deno.copyFile(
+      realWrapperSource(),
+      join(entryDir, "bin", "opensac"),
+    );
+    await Deno.writeTextFile(
+      join(entryDir, "bin", "platforms.js"),
+      platformMapModule("@owner"),
+    );
+    const result = await new Deno.Command("node", {
+      args: [join(entryDir, "bin", "opensac")],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    const stderr = new TextDecoder().decode(result.stderr);
+    assertEquals(result.success, false, "a missing binary must exit non-zero");
+    assertEquals(
+      stderr.includes("npm install -g @owner/opensac-installer"),
+      true,
+      `the hint must name the scoped package, got: ${stderr}`,
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("BuildNpmPackagesRejectsAnInvalidScope", async () => {
+  const { dir, cleanup } = await makeRepo(["opensac-linux-amd64"]);
+  try {
+    await assertRejects(
+      () => buildNpmPackages(dir, "1.0.0", { scope: "not a scope" }),
+      Error,
+      "scope",
+    );
+  } finally {
+    await cleanup();
+  }
 });
 
 Deno.test("BuildNpmPackagesCopiesBinariesAndWritesManifests", async () => {

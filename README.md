@@ -68,6 +68,53 @@ Configuration lives in `deno.json` — tasks, formatter, linter, compiler option
 and the import map. There is no build step for development: Deno runs TypeScript
 directly.
 
+## Releases
+
+A `v*` git tag is the release. `.github/workflows/` turns one tag into the four
+artifacts a user can install from, all built from that tag's commit and all
+carrying the tag as their version:
+
+| Workflow | Result |
+| --- | --- |
+| `release.yml` | GitHub Release with the six platform binaries, the npm tarballs, and `checksums.txt` |
+| `npm-publish.yml` | `@<owner>/opensac-installer` on GitHub Packages, and `opensac-installer` on npmjs.org |
+| `ghcr-publish.yml` | `ghcr.io/<owner>/opensac` images (`ubuntu`, `debian`, and `alpine` variants) for `linux/amd64` and `linux/arm64` |
+
+The platform list is never written into a workflow: each one reads
+`scripts/platforms.ts`, the single owner of the release platform table, so adding
+a platform there is enough to have it built, published, and attached.
+
+`make` is the same interface locally, including the container image:
+
+```sh
+make build-all                     # every published platform into bin/
+make npm-packages                  # generate the npmjs package tree
+make npm-packages-github NPM_SCOPE=@owner   # the scoped GitHub Packages tree
+make npm-pack                      # tarballs into dist/npm/, publishing nothing
+make docker-build                  # build the image locally
+```
+
+GitHub Packages authenticates with the workflow's own `GITHUB_TOKEN`, so it needs
+no configuration. Publishing to npmjs.org is opt-in: set the `PUBLISH_NPMJS`
+repository variable to `true` and add an `NPM_TOKEN` secret.
+
+### Container image
+
+The image runs the shared Core host rather than the TUI, which has no terminal to
+draw in, and exposes the Core HTTP API on port 4096:
+
+```sh
+docker run --rm -p 4096:4096 -v "$PWD:/workspace" -v opensac-state:/opensac \
+  ghcr.io/startvibecoding/opensac:v0.1.0
+```
+
+`/workspace` is where the agent works; `/opensac` holds settings, sessions, and
+credentials, so mount it as a volume to keep them. The image ships a
+`settings.json` that binds the Core to `0.0.0.0`, because the default
+`127.0.0.1` is unreachable from outside the container. There is no
+authentication by default: set `core.auth` and a password in your own
+`settings.json`, or terminate TLS in front of the port.
+
 ## Database
 
 `src/db` owns the process-wide SQLite connection lifecycle and is the only

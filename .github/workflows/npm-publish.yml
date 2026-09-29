@@ -1,0 +1,184 @@
+name: Build and Publish npm Packages
+
+# A tag publishes the same binaries to both registries an opensac install can
+# come from: npmjs as the unscoped `opensac-installer`, and GitHub Packages as
+# `@<owner>/opensac-installer`. Both sets are generated from the same
+# `scripts/platforms.ts` by the same `make` targets a local release uses.
+#
+# GitHub Packages needs no secret (it authenticates with GITHUB_TOKEN), so it
+# runs on every tag. The npmjs job is gated on the `PUBLISH_NPMJS` repository
+# variable and the `NPM_TOKEN` secret, so a fork without that name still gets a
+# working GitHub Packages release.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DENO_VERSION: "2.9.7"
+
+jobs:
+  plan:
+    name: Plan package platforms
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    outputs:
+      platforms: ${{ steps.plan.outputs.platforms }}
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Read the platform table
+        id: plan
+        run: |
+          set -euo pipefail
+          echo "platforms=$(deno eval --quiet 'import { PLATFORM_TARGETS } from "./scripts/platforms.ts"; console.log(JSON.stringify(PLATFORM_TARGETS.map((t) => t.npmPlatform)));')" \
+            >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: plan
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJson(needs.plan.outputs.platforms) }}
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Verify the tag is the version a build embeds
+        run: |
+          set -euo pipefail
+          version="$(deno run -A scripts/build.ts --version)"
+          echo "tag=${RELEASE_TAG} build version=${version}"
+          if [ "${version}" != "${RELEASE_TAG}" ]; then
+            echo "::error::the newest v* tag (${version}) is not ${RELEASE_TAG};" \
+              "publishing this tag would ship another version's number"
+            exit 1
+          fi
+
+      - name: Compile ${{ matrix.platform }}
+        run: deno run -A scripts/build.ts --target=${{ matrix.platform }}
+
+      - name: Upload the binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.platform }}
+          path: bin/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-github:
+    name: Publish to GitHub Packages
+    needs: [build]
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@${{ github.repository_owner }}"
+
+      - name: Collect every platform binary
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          merge-multiple: true
+          path: bin
+
+      - name: Publish the platform packages, then the entry package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make npm-publish-github NPM_SCOPE=@${{ github.repository_owner }}
+
+  publish-npmjs:
+    name: Publish to npmjs.org
+    needs: [build]
+    runs-on: ubuntu-latest
+    # Secrets cannot be read from a job-level `if`, so the opt-in is the
+    # PUBLISH_NPMJS repository variable. A fork or a maintainer who does not own
+    # the npmjs name leaves it unset and only the GitHub Packages set is built.
+    if: ${{ vars.PUBLISH_NPMJS == 'true' }}
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Require the npm token
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::PUBLISH_NPMJS is enabled but the NPM_TOKEN secret is empty"
+            exit 1
+          fi
+
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Collect every platform binary
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          merge-multiple: true
+          path: bin
+
+      - name: Publish the platform packages, then the entry package
+        run: make npm-publish-all
