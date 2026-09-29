@@ -1,7 +1,14 @@
 // Focused tests for the system-prompt builder.
 
 import { assert, assertEquals } from "@std/assert";
-import { buildSubAgentContext, buildSystemPrompt } from "./system_prompt.ts";
+import { resolveBashShell } from "../platform/platform.ts";
+import { createBashTool } from "../tools/bash.ts";
+import { createRegistry, createRegistryWithConfig } from "../tools/tool.ts";
+import {
+  buildSubAgentContext,
+  buildSystemPrompt,
+  buildSystemPromptWithOptions,
+} from "./system_prompt.ts";
 
 Deno.test("system prompt includes identity, mode, tools and guidelines", () => {
   const prompt = buildSystemPrompt(
@@ -80,4 +87,66 @@ Deno.test("sub-agent context includes the operating contract", () => {
   const ctx = buildSubAgentContext();
   assertEquals(ctx.includes("## Sub-Agent Operating Contract"), true);
   assertEquals(ctx.includes("**Result:**"), true);
+});
+
+Deno.test("the advertised shell is the shell the bash tool runs", () => {
+  // Regression: the prompt used to override the shell on Windows (advertising
+  // the extracted BusyBox) while `bash` executed powershell/cmd, so the model
+  // wrote POSIX syntax that then failed. Both sides must share one resolver.
+  const prompt = buildSystemPrompt(
+    "yolo",
+    ["bash"],
+    "/work",
+    "",
+    "",
+    {},
+    [],
+    false,
+    false,
+    false,
+  );
+  const tool = createBashTool(createRegistry("/work", undefined));
+  assert(
+    prompt.includes(`- Shell: ${resolveBashShell()}`),
+    "system prompt must advertise the shell the bash tool resolves",
+  );
+  assertEquals(tool.resolveShell(), resolveBashShell());
+});
+
+Deno.test("a configured settings.shellPath reaches the tool and the prompt", () => {
+  // Regression: `settings.shellPath` was dead config. It was persisted and shown
+  // in the TUI, but nothing ever read it, so the user's chosen shell was
+  // silently ignored.
+  const dir = Deno.makeTempDirSync({ prefix: ".opensac-shellpath-" });
+  try {
+    const custom = `${dir}/myshell`;
+    Deno.writeTextFileSync(custom, "#!/bin/sh\n");
+
+    const registry = createRegistryWithConfig({
+      workDir: "/work",
+      shellPath: custom,
+    });
+    const tool = createBashTool(registry);
+    assertEquals(tool.resolveShell(), custom);
+
+    const prompt = buildSystemPromptWithOptions(
+      "yolo",
+      ["bash"],
+      "/work",
+      "",
+      "",
+      {},
+      [],
+      false,
+      false,
+      false,
+      { shellPath: registry.shellPath() },
+    );
+    assert(
+      prompt.includes(`- Shell: ${custom}`),
+      "prompt must advertise the configured shell",
+    );
+  } finally {
+    Deno.removeSync(dir, { recursive: true });
+  }
 });

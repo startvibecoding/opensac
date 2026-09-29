@@ -3641,6 +3641,9 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     const registry = createRegistry(
       this.#workDir,
       runtime.sandboxMgr?.getActive(),
+      // The side query must resolve its shell exactly like the session's
+      // canonical run does.
+      this.#settings.shellPath ?? "",
     );
     // A read-only registry keeps the side query from mutating the workspace.
     for (const tool of registry.all()) {

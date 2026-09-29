@@ -11,7 +11,15 @@
 // Windows embedded-BusyBox path is not reproduced.
 
 import { envList, loadEnv } from "../config/env.ts";
-import { defaultShell, isWindows, shellArgs } from "../platform/platform.ts";
+import {
+  isWindows,
+  resolveBashShell,
+  shellArgs,
+} from "../platform/platform.ts";
+// Shell identity and validation now live with the rest of the shell resolution
+// in platform.ts, but stay re-exported here because the tools surface is
+// public.
+export { isValidShell } from "../platform/platform.ts";
 import {
   type CommandCleanupProvider,
   type CommandSpec,
@@ -277,14 +285,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
   }
 
   resolveShell(): string {
-    let shell = defaultShell();
-    if (!isWindows()) {
-      const s = Deno.env.get("SHELL");
-      if (s && s !== "" && isValidShell(s)) {
-        shell = s;
-      }
-    }
-    return shell;
+    return resolveBashShell(this.#registry.shellPath());
   }
 
   buildCommand(
@@ -614,27 +615,6 @@ function runtimeForShell(shell: string): string {
 
 function basename(p: string): string {
   return p.replaceAll("\\", "/").split("/").pop() ?? p;
-}
-
-const validShellNames = new Set([
-  "sh",
-  "bash",
-  "zsh",
-  "fish",
-  "dash",
-  "ksh",
-]);
-
-/** Checks whether the given path is a known shell binary. */
-export function isValidShell(p: string): boolean {
-  const name = basename(p);
-  if (!validShellNames.has(name)) return false;
-  try {
-    const info = Deno.statSync(p);
-    return info.isFile;
-  } catch {
-    return false;
-  }
 }
 
 /** Creates a new bash tool (a fresh JobManager unless one is supplied). */

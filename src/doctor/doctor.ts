@@ -94,6 +94,9 @@ export function run(cwd: string, version: string): Response {
     checks.push(...checkConfiguredProviders(settings!));
     checks.push(...checkEnvironmentOverrides());
   }
+  // The shell check needs settings, so it runs after they load. It reports the
+  // shell that will actually execute commands, not just the platform default.
+  checks.push(...checkShell(settings));
   checks.push(...checkSandbox(settings));
   checks.push(...checkMCP(cwd));
   checks.push(checkSessions(settings));
@@ -134,22 +137,6 @@ function checkEnvironment(cwd: string): Check[] {
       detail: Deno.version.deno,
     },
   ];
-  const shell = platform.defaultShell();
-  if (statExists(shell) === undefined) {
-    checks.push({
-      id: "environment.shell",
-      status: STATUS_WARN,
-      title: "Shell",
-      detail: shell + " (not found)",
-    });
-  } else {
-    checks.push({
-      id: "environment.shell",
-      status: STATUS_OK,
-      title: "Shell",
-      detail: shell,
-    });
-  }
   const home = platform.homeDir();
   if (statExists(home) === undefined) {
     checks.push({
@@ -523,6 +510,37 @@ function appendSandboxConfig(
     status: STATUS_OK,
     title: "Sandbox config",
     detail: `enabled=${enabled}, level=${level}`,
+  }];
+}
+
+function checkShell(settings: Settings | undefined): Check[] {
+  const configured = settings?.shellPath ?? "";
+  const shell = platform.resolveBashShell(configured);
+  // A configured shell that cannot be resolved is silently ignored by the
+  // resolver, so surface it here instead of letting every command quietly run
+  // in a different shell than the user asked for.
+  if (configured !== "" && configured !== shell) {
+    return [{
+      id: "environment.shell",
+      status: STATUS_WARN,
+      title: "Shell",
+      detail: `configured ${configured} (not found)`,
+      fix: "Set settings.shellPath to an existing shell, or clear it",
+    }];
+  }
+  if (statExists(shell) === undefined) {
+    return [{
+      id: "environment.shell",
+      status: STATUS_WARN,
+      title: "Shell",
+      detail: shell + " (not found)",
+    }];
+  }
+  return [{
+    id: "environment.shell",
+    status: STATUS_OK,
+    title: "Shell",
+    detail: shell,
   }];
 }
 

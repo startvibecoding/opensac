@@ -359,6 +359,9 @@ function createAgentFromFactory(
     skillsMgr: f.skillsMgr,
     enablePlanTool: f.settings === undefined || isPlanToolEnabled(f.settings),
     envVars: envList(loadEnv()),
+    // An explicit `settings.shellPath` is the user's decision and outranks the
+    // platform policy; without it the shell policy in platform.ts decides.
+    shellPath: f.settings?.shellPath ?? "",
   });
 
   // Decision 5: Sub-agents cannot spawn sub-agents.

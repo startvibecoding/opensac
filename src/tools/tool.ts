@@ -240,6 +240,11 @@ export interface RegistryConfig {
   imageHint?: Hint;
   /** Extra environment variables for bash/skills. */
   envVars?: Record<string, string>;
+  /**
+   * Explicit user-configured shell (`settings.shellPath`). Resolved once here so
+   * the `bash` tool and the system prompt cannot disagree about the shell.
+   */
+  shellPath?: string;
 }
 
 /** Manages available tools. */
@@ -254,6 +259,7 @@ export class Registry {
   #imageHint: Hint;
   #envVars: Record<string, string>;
   #additionalDirs: string[] = [];
+  #shellPath: string;
 
   constructor(
     workDir: string,
@@ -264,6 +270,7 @@ export class Registry {
       skillsMgr?: SkillsManager;
       imageHint?: Hint;
       envVars: Record<string, string>;
+      shellPath?: string;
     },
   ) {
     this.#workDir = workDir;
@@ -273,6 +280,15 @@ export class Registry {
     this.#skillsMgr = init.skillsMgr;
     this.#imageHint = init.imageHint ?? {};
     this.#envVars = init.envVars;
+    this.#shellPath = init.shellPath ?? "";
+  }
+
+  /**
+   * The explicit user-configured shell, or "" when unset. This is the single
+   * value both the `bash` tool and the system prompt resolve against.
+   */
+  shellPath(): string {
+    return this.#shellPath;
   }
 
   /** Extra environment variables for command execution. */
@@ -535,11 +551,13 @@ function escapes(rel: string): boolean {
 export function createRegistry(
   workDir: string,
   sb: Sandbox | undefined,
+  shellPath = "",
 ): Registry {
   return new Registry(workDir, sb, {
     jobManager: createJobManager(),
     fileLocks: defaultFileLockManager(),
     envVars: envList(loadEnv()),
+    shellPath,
   });
 }
 
@@ -560,6 +578,7 @@ export function createRegistryWithConfig(cfg: RegistryConfig): Registry {
     skillsMgr: cfg.skillsMgr,
     imageHint: cfg.imageHint,
     envVars,
+    shellPath: cfg.shellPath,
   });
 
   if (!cfg.toolFilter || cfg.toolFilter.length === 0) {

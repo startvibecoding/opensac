@@ -315,30 +315,63 @@ export function defaultShell(): string {
   return defaultShellForOS(
     goos(),
     isExecutableAbsolutePath,
-    (name: string) => lookPathSync(name) !== null,
+    lookPathSync,
   );
 }
 
-function defaultShellForOS(
+/**
+ * Directories searched for a shell by absolute path, before falling back to a
+ * PATH lookup. Both are checked because distributions disagree on which one
+ * carries the shell (`/bin/bash` on Debian, `/usr/bin/bash` on NixOS and
+ * Homebrew).
+ */
+const SHELL_SEARCH_DIRS = ["/bin", "/usr/bin"];
+
+/**
+ * Shell names in fallback order.
+ *
+ * bash leads because it is the shell the tool is named after and the syntax
+ * most agent instructions assume. zsh, fish, and ash follow so a host without
+ * bash still gets a real shell instead of a silent downgrade; ash is what
+ * Alpine and other BusyBox systems provide. `sh` is the guaranteed last resort
+ * and exists on essentially every POSIX host.
+ *
+ * macOS leads with zsh instead: zsh is its actual login shell, and preferring
+ * Apple's decade-old bash 3.2 over the user's zsh would be a downgrade.
+ */
+function shellCandidateOrder(goosValue: string): string[] {
+  if (goosValue === "darwin") return ["zsh", "bash", "fish", "ash", "sh"];
+  return ["bash", "zsh", "fish", "ash", "sh"];
+}
+
+/**
+ * Resolves the platform default shell from injected lookups, so the fallback
+ * order can be tested without a host that is missing bash.
+ */
+export function defaultShellForOS(
   goosValue: string,
   isExecutable: (p: string) => boolean,
-  lookPathFn: (name: string) => boolean,
+  lookPath: (name: string) => string | null,
 ): string {
-  switch (goosValue) {
-    case "windows":
-      if (lookPathFn("powershell.exe")) return "powershell.exe";
-      return "cmd.exe";
-    case "darwin":
-      if (isExecutable("/bin/zsh")) return "/bin/zsh";
-      return "/bin/sh";
-    case "linux":
-      if (isExecutable("/bin/bash")) return "/bin/bash";
-      return "/bin/sh";
-    case "plan9":
-      return "/bin/rc";
-    default: // BSD, Solaris, illumos, AIX, and others
-      return "/bin/sh";
+  if (goosValue === "windows") {
+    if (lookPath("powershell.exe") !== null) return "powershell.exe";
+    return "cmd.exe";
   }
+  if (goosValue === "plan9") return "/bin/rc";
+
+  for (const name of shellCandidateOrder(goosValue)) {
+    for (const dir of SHELL_SEARCH_DIRS) {
+      const candidate = `${dir}/${name}`;
+      if (isExecutable(candidate)) return candidate;
+    }
+    // A shell outside /bin and /usr/bin (Homebrew, nix, /opt) is still usable;
+    // the PATH result keeps the tool executing an absolute path.
+    const onPath = lookPath(name);
+    if (onPath !== null) return onPath;
+  }
+  // Nothing was found. `sh` is the last resort, and returning it keeps the
+  // failure a normal "command not found" rather than an empty shell.
+  return "/bin/sh";
 }
 
 function isExecutableAbsolutePath(p: string): boolean {
@@ -369,11 +402,118 @@ export function lookPathSync(name: string): string | null {
   return null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shell resolution
+//
+// This is the single owner of "which shell runs a command". The bash tool and
+// the system prompt must agree: a prompt that advertises BusyBox while the tool
+// executes PowerShell makes the model emit POSIX syntax that then fails.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const validShellNames = new Set([
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "ash",
+  "dash",
+  "ksh",
+  "csh",
+  "tcsh",
+]);
+
+/** Checks whether the given path is a known shell binary. */
+export function isValidShell(p: string): boolean {
+  const name = shellBasename(p);
+  if (!validShellNames.has(name)) return false;
+  try {
+    const info = Deno.statSync(p);
+    return info.isFile;
+  } catch {
+    return false;
+  }
+}
+
+function shellBasename(p: string): string {
+  return p.replaceAll("\\", "/").split("/").pop() ?? p;
+}
+
+/** Inputs for {@link resolveShellForOS}, injected so the policy is testable. */
+export interface ShellResolution {
+  /** Target OS, as reported by {@link goos}. */
+  goos: string;
+  /** Extracted BusyBox path, or "" when unavailable. */
+  busyboxPath: string;
+  /** The platform default shell. */
+  defaultShell: string;
+  /** The raw `SHELL` environment variable. */
+  shellEnv: string;
+  /** Validator for an explicit `SHELL` override. */
+  isValidShell: (p: string) => boolean;
+  /** Explicit user-configured shell (`settings.shellPath`), if any. */
+  configuredShell?: string;
+}
+
+/**
+ * Resolves the shell used to execute commands.
+ *
+ * An explicit configured shell wins over every other rule, so a user who set
+ * `settings.shellPath` in the TUI actually gets it. Windows then runs the
+ * extracted BusyBox so the model gets the same POSIX semantics as every other
+ * platform, falling back to the platform default (`powershell.exe`, then
+ * `cmd.exe`) when BusyBox is unavailable. Elsewhere a valid `SHELL` wins over
+ * the platform default.
+ *
+ * A configured shell that does not resolve to a file is ignored rather than
+ * failing every command; `opensac doctor` is where a broken value is reported.
+ */
+export function resolveShellForOS(resolution: ShellResolution): string {
+  const configured = resolution.configuredShell ?? "";
+  if (configured !== "" && isShellFile(configured)) return configured;
+  if (resolution.goos === "windows") {
+    return resolution.busyboxPath !== ""
+      ? resolution.busyboxPath
+      : resolution.defaultShell;
+  }
+  const shellEnv = resolution.shellEnv;
+  if (shellEnv !== "" && resolution.isValidShell(shellEnv)) return shellEnv;
+  return resolution.defaultShell;
+}
+
+/** Reports whether a path is an existing regular file usable as a shell. */
+function isShellFile(p: string): boolean {
+  try {
+    return Deno.statSync(p).isFile;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves the shell for this process. The `bash` tool and the system prompt
+ * both call this with the same configured value, so the advertised shell and
+ * the executed shell cannot drift.
+ */
+export function resolveBashShell(configuredShell = ""): string {
+  return resolveShellForOS({
+    goos: goos(),
+    busyboxPath: isWindows() ? windowsBusyboxPath().path : "",
+    defaultShell: defaultShell(),
+    shellEnv: Deno.env.get("SHELL") ?? "",
+    isValidShell,
+    configuredShell,
+  });
+}
+
 /** Returns the arguments to execute a command in the shell. */
 export function shellArgs(shell: string, command: string): string[] {
-  let shellName = path.basename(shell).toLowerCase();
-  const ext = path.extname(shellName);
-  if (ext) shellName = shellName.slice(0, -ext.length);
+  // The shell can be a native Windows path (the extracted BusyBox lives under
+  // the Windows config dir), so resolve the name with separator-agnostic logic
+  // instead of the host's `path` flavor. Otherwise a Windows shell name is only
+  // recognized when the host also uses backslashes.
+  let shellName = shellBasename(shell).toLowerCase();
+  const dot = shellName.lastIndexOf(".");
+  if (dot > 0) shellName = shellName.slice(0, dot);
   if (shellName.startsWith("busybox")) return ["sh", "-c", command];
   if (shellName === "powershell" || shellName === "pwsh") {
     return ["-NoProfile", "-NonInteractive", "-Command", command];
@@ -624,13 +764,32 @@ function ensureWindowsBusyboxPath(): string {
   try {
     Deno.writeFileSync(tmp, asset.data);
     Deno.chmodSync(tmp, 0o755);
-    Deno.renameSync(tmp, target);
+    try {
+      Deno.renameSync(tmp, target);
+    } catch (err) {
+      // A concurrent parent/Core process, or a BusyBox that is currently
+      // running and holding the image open on Windows, can make the rename
+      // fail. The target is usable in that case, so prefer it over failing and
+      // caching the error for the rest of the process.
+      if (statFileIfPresent(target) !== undefined) return target;
+      throw err;
+    }
   } finally {
     try {
       Deno.removeSync(tmp);
     } catch {
-      // Best-effort cleanup.
+      // Best-effort cleanup. A successful rename already moved the file, so the
+      // temp path is normally gone by now.
     }
   }
   return target;
+}
+
+function statFileIfPresent(p: string): Deno.FileInfo | undefined {
+  try {
+    const info = Deno.statSync(p);
+    return info.isFile ? info : undefined;
+  } catch {
+    return undefined;
+  }
 }

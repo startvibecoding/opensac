@@ -759,6 +759,9 @@ export class Agent {
       authored: this.config.settings?.authored === true,
       expertIdentity: this.config.expertIdentity,
       expertRoster: this.config.expertRoster,
+      // Read from the same Registry the `bash` tool resolves against, so the
+      // advertised shell and the executed shell cannot drift.
+      shellPath: registry.shellPath(),
     };
     this.#frozenSystemPrompt = buildSystemPromptWithOptions(
       this.config.mode ?? "",

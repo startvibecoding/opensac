@@ -1,14 +1,13 @@
 import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import {
   arch,
-  defaultShell,
   isBSD,
   isMacOS,
   isPlan9,
   isSolaris,
   isWindows,
   os,
-  windowsBusyboxPath,
+  resolveBashShell,
 } from "../platform/platform.ts";
 
 /**
@@ -50,6 +49,12 @@ export interface SystemPromptOptions {
   authored?: boolean;
   expertIdentity?: string;
   expertRoster?: string;
+  /**
+   * The explicit user-configured shell, taken from the same Registry the
+   * `bash` tool uses. Passing it keeps the advertised shell identical to the
+   * executed one.
+   */
+  shellPath?: string;
 }
 
 const authoredSystemPrompt =
@@ -79,12 +84,10 @@ export function buildSystemPromptWithOptions(
     maxToolConcurrency = defaultToolExecutionMaxConcurrency;
   }
 
-  // Get platform-specific shell
-  let shell = defaultShell();
-  if (isWindows()) {
-    const bb = windowsBusyboxPath();
-    if (bb.ok) shell = bb.path;
-  }
+  // Get platform-specific shell. This must be the same resolver, with the same
+  // configured value, that the `bash` tool uses; otherwise the prompt
+  // advertises a shell the tool never runs.
+  const shell = resolveBashShell(options.shellPath ?? "");
 
   // Core identity and environment
   out +=
@@ -106,8 +109,8 @@ that should guide your approach.
   // Platform-specific notes
   if (isWindows()) {
     out +=
-      `Note: You are running on Windows. Use the embedded BusyBox shell first when available, and fall back to PowerShell if needed.
-Path separators should use backslashes (\\). Environment variables use %VAR% syntax.
+      `Note: You are running on Windows. The shell advertised above is the one commands actually run in.
+Prefer POSIX shell syntax and $VAR environment variables. Path separators work with either slash or backslash.
 `;
   } else if (isMacOS()) {
     out +=

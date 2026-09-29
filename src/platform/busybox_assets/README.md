@@ -17,8 +17,14 @@ release.
 
 `internal/platform/busybox_windows.go` embeds both files with `go:embed`,
 extracts the one matching the current Windows architecture into the Windows
-config `bin` directory on first use, and exposes it as the default shell for the
-`bash` tool when no other shell is available.
+config `bin` directory on first use, and exposes it as the shell the `bash` tool
+runs, so the model gets the same POSIX semantics on Windows as on every other
+platform. When the extraction is unavailable the shell falls back to
+`powershell.exe`, then `cmd.exe`.
+
+The extraction is shared by the parent process and the Core child (both use
+`$OPENSAC_DIR/bin`), so a concurrent extraction is expected: the losing writer
+reuses the file the winner installed instead of failing.
 
 ## Update
 
