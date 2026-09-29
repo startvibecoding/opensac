@@ -198,6 +198,16 @@ export type TUICapabilityView = Record<
   { enabled: boolean; available: boolean }
 >;
 
+/**
+ * The shared Core connection as a front end sees it.
+ *
+ * A Core that restarts drops its event socket, and that drop is the only
+ * signal a client can get, so this projects a client-side observation rather
+ * than Core-owned state: `reconnecting` from the drop until the replacement
+ * endpoint answers again.
+ */
+export type TUICoreConnectionState = "connected" | "reconnecting";
+
 /** Stable service-level failure shared by the port and every adapter. */
 export class TUIServiceError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -397,6 +407,14 @@ export interface TUIService {
   onDecisionRequest(
     listener: (request: TUIDecisionRequest) => void,
   ): () => void;
+  /**
+   * Subscribes to the shared Core connection state so a front end can tell the
+   * user that the Core is restarting. The current state is delivered on
+   * subscribe; the listener returns an unsubscribe function.
+   */
+  onConnectionState(
+    listener: (state: TUICoreConnectionState) => void,
+  ): () => void;
   /** Answers one pending decision; the first response wins. */
   answerDecision(input: TUIDecisionAnswer): Promise<void>;
 }
@@ -434,6 +452,11 @@ export interface FakeTUIService extends TUIService {
   }): TUIAgentView;
   /** Test-only: the answer returned by `askTransient`. */
   transientAnswer: string;
+  /**
+   * Test-only: publishes a shared Core connection state, standing in for a
+   * Core that restarted under the client.
+   */
+  setConnectionState(state: TUICoreConnectionState): void;
 }
 
 const BASE_TIME_MS = 1_700_000_000_000;
@@ -479,6 +502,10 @@ export function createFakeTUIService(): FakeTUIService {
   const decisionListeners = new Set<
     (request: TUIDecisionRequest) => void
   >();
+  const connectionListeners = new Set<
+    (state: TUICoreConnectionState) => void
+  >();
+  let connectionState: TUICoreConnectionState = "connected";
   let sessionCount = 0;
   let runCount = 0;
   let attachmentCount = 0;
@@ -1341,6 +1368,14 @@ export function createFakeTUIService(): FakeTUIService {
       return () => decisionListeners.delete(listener);
     },
 
+    onConnectionState(
+      listener: (state: TUICoreConnectionState) => void,
+    ): () => void {
+      connectionListeners.add(listener);
+      listener(connectionState);
+      return () => connectionListeners.delete(listener);
+    },
+
     answerDecision(input: TUIDecisionAnswer): Promise<void> {
       const pending = decisions.get(input.requestId);
       if (pending === undefined || pending.kind !== input.kind) {
@@ -1401,6 +1436,11 @@ export function createFakeTUIService(): FakeTUIService {
     },
     set transientAnswer(value: string) {
       transientAnswerValue = value;
+    },
+    setConnectionState(state: TUICoreConnectionState) {
+      if (state === connectionState) return;
+      connectionState = state;
+      for (const listener of [...connectionListeners]) listener(state);
     },
   };
 }

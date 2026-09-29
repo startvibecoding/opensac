@@ -29,6 +29,7 @@ import {
   TUICancelInput,
   TUICapabilityView,
   TUICompactAccepted,
+  type TUICoreConnectionState,
   TUIDecisionAnswer,
   TUIDecisionRequest,
   TUIEsmCommandInput,
@@ -75,6 +76,11 @@ export interface TUICoreEventConnection {
   ): () => void;
   /** Reverse requests (approval/question) issued by the Core Runtime. */
   onRequest(listener: (request: CoreRpcRequest) => void): () => void;
+  /**
+   * Reports that the Core dropped the socket on its own, which is what a Core
+   * restart looks like from here.
+   */
+  onClose(listener: () => void): () => void;
   /** Sends one reverse-request response back to the Core Runtime. */
   respond(response: ReturnType<typeof coreResult>): void;
 }
@@ -109,6 +115,18 @@ export function createCoreClientTUIService(
   const workDirParams = (): Record<string, unknown> =>
     workDir === "" ? {} : { workDir };
   const decisionListeners = new Set<(request: TUIDecisionRequest) => void>();
+  const connectionListeners = new Set<
+    (state: TUICoreConnectionState) => void
+  >();
+  // The decision bridge is this front end's one long-lived Core connection, so
+  // its lifecycle is the connection state. A Core restart drops that socket,
+  // and the state stays `reconnecting` until a replacement endpoint answers.
+  let connectionState: TUICoreConnectionState = "connected";
+  const publishConnection = (state: TUICoreConnectionState): void => {
+    if (state === connectionState) return;
+    connectionState = state;
+    for (const listener of [...connectionListeners]) listener(state);
+  };
   const pendingDecisions = new Map<
     string,
     { id: CoreRpcId; connection: TUICoreEventConnection }
@@ -119,8 +137,11 @@ export function createCoreClientTUIService(
   // decisions). It is established before the first prompt so a decision can
   // never be issued while no client is listening.
   const ensureDecisionBridge = (): Promise<void> => {
-    decisionBridge ??= (async () => {
+    if (decisionBridge !== undefined) return decisionBridge;
+    const bridge = (async () => {
       const connection = await client.connectEvents();
+      // The replacement endpoint answered, so the Core is reachable again.
+      publishConnection("connected");
       connection.onRequest((request) => {
         const projected = projectDecisionRequest(request);
         if (projected === undefined) return;
@@ -131,8 +152,22 @@ export function createCoreClientTUIService(
         });
         for (const listener of [...decisionListeners]) listener(projected);
       });
+      // A restarted Core drops this socket. Forget it so the next use re-dials
+      // the replacement endpoint, and drop the pending decisions it can no
+      // longer answer: the run that asked for them died with that process.
+      connection.onClose(() => {
+        if (decisionBridge === bridge) decisionBridge = undefined;
+        pendingDecisions.clear();
+        publishConnection("reconnecting");
+      });
     })();
-    return decisionBridge;
+    decisionBridge = bridge;
+    // A failed dial must not be cached, or every later prompt would reuse the
+    // rejection and no decision could ever be received again.
+    void bridge.catch(() => {
+      if (decisionBridge === bridge) decisionBridge = undefined;
+    });
+    return bridge;
   };
 
   return {
@@ -203,7 +238,10 @@ export function createCoreClientTUIService(
     },
 
     async prompt(input: TUIPromptInput): Promise<TUIPromptAccepted> {
-      void ensureDecisionBridge();
+      // Awaited so the socket is listening before the Core can raise a
+      // decision for this prompt. A bridge that cannot be established must not
+      // fail the prompt: the run still starts and simply cannot ask.
+      await ensureDecisionBridge().catch(() => undefined);
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionPrompt,
         {
@@ -718,6 +756,19 @@ export function createCoreClientTUIService(
       return () => decisionListeners.delete(listener);
     },
 
+    onConnectionState(
+      listener: (state: TUICoreConnectionState) => void,
+    ): () => void {
+      connectionListeners.add(listener);
+      // A subscriber that arrives mid-outage must see the outage, not the
+      // initial state it would otherwise assume.
+      listener(connectionState);
+      // Make sure the connection is actually being watched: the bridge is also
+      // what notices a Core that goes away.
+      void ensureDecisionBridge().catch(() => undefined);
+      return () => connectionListeners.delete(listener);
+    },
+
     async answerDecision(input: TUIDecisionAnswer): Promise<void> {
       const pending = pendingDecisions.get(input.requestId);
       if (pending === undefined) {
@@ -810,6 +861,14 @@ async function* streamRunEvents(
     buffered.push(event);
     wake?.();
   });
+  // A Core that restarts drops this socket, and the run it was streaming died
+  // with that process. Nothing will ever arrive on it again, so the stream has
+  // to end rather than wait for a notification that cannot come.
+  let dropped = false;
+  const stopWatchingClose = connection.onClose(() => {
+    dropped = true;
+    wake?.();
+  });
   try {
     await connection.subscribe(sessionId, runId, cursor);
     const replayed = toEventList(
@@ -833,6 +892,7 @@ async function* streamRunEvents(
         yield event;
         if (event.terminal) return;
       }
+      if (dropped) throw runEventStreamClosed(runId);
       await new Promise<void>((resolve) => {
         wake = resolve;
         // Re-check after registering to close the notify/await race.
@@ -844,8 +904,17 @@ async function* streamRunEvents(
       wake = undefined;
     }
   } finally {
+    wake = undefined;
     stopListening();
+    stopWatchingClose();
   }
+}
+
+/** The Core closed a run's event stream, which a restart is the only cause of. */
+function runEventStreamClosed(runId: string): TUIServiceError {
+  return new TUIServiceError(
+    `the Core closed the event stream for run ${runId}; it most likely restarted`,
+  );
 }
 
 /** Projects one persisted session listing row. */

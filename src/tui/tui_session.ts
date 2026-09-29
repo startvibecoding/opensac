@@ -14,6 +14,7 @@ import {
   EVENT_TOOL_APPROVAL_REQUEST,
 } from "../agentruntime/events.ts";
 import type {
+  TUICoreConnectionState,
   TUIDecisionAnswer,
   TUIDecisionRequest,
   TUIPreparedInput,
@@ -72,7 +73,15 @@ export interface TUISessionOptions {
   multiAgent?: boolean;
   /** Configured TUI language (empty resolves to auto). */
   tuilang?: string;
+  /**
+   * How long a confirmed Core reconnect stays in the live view before it
+   * clears itself. Defaults to three seconds.
+   */
+  coreReconnectNoticeMs?: number;
 }
+
+/** How long a confirmed Core reconnect stays in the live view. */
+const CORE_RECONNECT_NOTICE_MS = 3_000;
 
 /** Resolves the session translator from settings (Go NewApp). */
 export function tuiTranslatorFromSettings(settings: {
@@ -104,6 +113,7 @@ export class TUISession implements CommandHost {
   #mode: string;
   #thinking: string;
   #workDir: string;
+  #coreReconnectNoticeMs: number;
   #busy = false;
   /** The front-end-neutral service owning session/run semantics. */
   readonly #service: TUIService;
@@ -115,6 +125,10 @@ export class TUISession implements CommandHost {
   #activeRunID = "";
   /** Unsubscribe hook for Core-requested human decisions. */
   #stopDecisions: (() => void) | undefined;
+  /** Unsubscribe hook for shared Core connection transitions. */
+  #stopConnectionState: (() => void) | undefined;
+  /** Pending timer that clears the confirmed-reconnect notice. */
+  #connectionNoticeTimer: ReturnType<typeof setTimeout> | undefined;
   #closed = false;
   /** Runtime-staged clipboard images awaiting the next submission. */
   #preparedInputs: TUIPreparedInput[] = [];
@@ -156,6 +170,8 @@ export class TUISession implements CommandHost {
   ) {
     this.#service = service;
     this.#workDir = options.workDir;
+    this.#coreReconnectNoticeMs = options.coreReconnectNoticeMs ??
+      CORE_RECONNECT_NOTICE_MS;
     this.#multiAgent = options.multiAgent ?? false;
     // Explicit CLI flags win; empty values resolve from the Core-owned
     // settings projection in start() (the Runtime re-resolves run policy).
@@ -221,6 +237,42 @@ export class TUISession implements CommandHost {
     this.#stopDecisions = this.#service.onDecisionRequest((request) =>
       this.#handleDecisionRequest(request)
     );
+    // A Core restart is invisible from here until the shared connection says
+    // so, so tell the user instead of letting the next prompt look frozen.
+    this.#stopConnectionState = this.#service.onConnectionState((state) =>
+      this.#handleConnectionState(state)
+    );
+  }
+
+  /**
+   * Projects one shared Core connection transition into the live view.
+   *
+   * A restart is a transport condition, not conversation, so it never reaches
+   * the transcript. The reconnect is confirmed briefly and then cleared, which
+   * leaves the live view as it was before the restart happened.
+   */
+  #handleConnectionState(state: TUICoreConnectionState): void {
+    this.#clearConnectionNotice();
+    this.controller.setCoreConnection(
+      state,
+      this.translator.text(
+        state === "connected" ? "core.reconnected" : "core.reconnecting",
+      ),
+    );
+    if (state === "connected") {
+      this.#connectionNoticeTimer = setTimeout(() => {
+        this.#connectionNoticeTimer = undefined;
+        this.controller.clearCoreConnectionNotice();
+        this.requestRender();
+      }, this.#coreReconnectNoticeMs);
+    }
+    this.requestRender();
+  }
+
+  #clearConnectionNotice(): void {
+    if (this.#connectionNoticeTimer === undefined) return;
+    clearTimeout(this.#connectionNoticeTimer);
+    this.#connectionNoticeTimer = undefined;
   }
 
   get compactMode(): boolean {
@@ -973,6 +1025,9 @@ export class TUISession implements CommandHost {
     this.#closed = true;
     this.#stopDecisions?.();
     this.#stopDecisions = undefined;
+    this.#stopConnectionState?.();
+    this.#stopConnectionState = undefined;
+    this.#clearConnectionNotice();
     if (this.#sessionView !== undefined) {
       await this.#service.closeSession({
         sessionId: this.#sessionView.sessionId,

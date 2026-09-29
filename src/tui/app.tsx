@@ -303,6 +303,16 @@ function ControllerApp({
           ))}
         </Box>
       )}
+      {!overlayOpen && controller.coreConnectionNotice !== "" && (
+        <Text
+          dimColor={controller.coreConnection === "connected"}
+          color={controller.coreConnection === "reconnecting"
+            ? "yellow"
+            : undefined}
+        >
+          {controller.coreConnectionNotice}
+        </Text>
+      )}
       {!overlayOpen && controller.isThinking && (
         <Text dimColor>
           ~ {controller.translator.text("thinking.in_progress")}

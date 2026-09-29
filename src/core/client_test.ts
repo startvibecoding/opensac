@@ -9,12 +9,16 @@ import {
   coreResult,
 } from "./protocol.ts";
 import { CoreServer, type CoreServerHandle } from "./server.ts";
-import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
+import {
+  CORE_ERROR_SESSION_NOT_RESIDENT,
+  CORE_RUNTIME_METHODS,
+} from "./runtime_protocol.ts";
 import {
   CoreClient,
   type CoreClientOptions,
   CoreClientProtocolError,
   CoreClientRpcError,
+  CoreClientTransportError,
   CoreIncompatibleError,
   type CoreLauncher,
   CoreLauncherError,
@@ -1114,6 +1118,92 @@ function closedEphemeralPort(): number {
   return port;
 }
 
+const requestEncoder = new TextEncoder();
+const requestDecoder = new TextDecoder();
+
+/** Reads one HTTP/1.1 request, headers and declared body, off a raw socket. */
+async function readHttpRequest(conn: Deno.Conn): Promise<string> {
+  const buffer = new Uint8Array(8192);
+  let text = "";
+  let headerEnd = -1;
+  while (headerEnd < 0) {
+    const read = await conn.read(buffer);
+    if (read === null) return text;
+    text += requestDecoder.decode(buffer.subarray(0, read));
+    headerEnd = text.indexOf("\r\n\r\n");
+  }
+  const declared = /content-length:\s*(\d+)/i.exec(text.slice(0, headerEnd));
+  const length = declared === null ? 0 : Number(declared[1]);
+  const bodyStart = headerEnd + 4;
+  while (text.length - bodyStart < length) {
+    const read = await conn.read(buffer);
+    if (read === null) break;
+    text += requestDecoder.decode(buffer.subarray(0, read));
+  }
+  return text;
+}
+
+/**
+ * A Core endpoint that answers discovery and then vanishes mid-request.
+ *
+ * Deno reports the second shape as `client error (SendRequest): connection
+ * closed before message completed`, so the socket has to be closed without an
+ * answer rather than refused at connect time.
+ */
+function startVanishingCore(): {
+  address: Deno.NetAddr;
+  dropped: () => number;
+  stop(): Promise<void>;
+} {
+  let dropped = 0;
+  const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
+  const address = listener.addr as Deno.NetAddr;
+  const accepting = (async () => {
+    while (true) {
+      const conn = await listener.accept().catch(() => undefined);
+      if (conn === undefined) return;
+      void (async () => {
+        try {
+          const text = await readHttpRequest(conn);
+          const method = /"method":"([^"]*)"/.exec(text)?.[1] ?? "";
+          const id = /"id":("[^"]*"|\d+)/.exec(text)?.[1] ?? "1";
+          if (
+            method === CORE_METHODS.info || method === CORE_METHODS.health
+          ) {
+            const result = method === CORE_METHODS.info ? EXPECTED_INFO : {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            };
+            const body = JSON.stringify(coreResult(JSON.parse(id), result));
+            await conn.write(requestEncoder.encode(
+              `HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n` +
+                `content-length: ${
+                  requestEncoder.encode(body).length
+                }\r\nconnection: close\r\n\r\n${body}`,
+            ));
+          } else {
+            // The Core is gone: the request arrived, the answer never does.
+            dropped++;
+          }
+        } catch {
+          // A socket that dies mid-read is a dropped request too.
+        } finally {
+          conn.close();
+        }
+      })();
+    }
+  })();
+  return {
+    address,
+    dropped: () => dropped,
+    stop: async () => {
+      listener.close();
+      await accepting;
+    },
+  };
+}
+
 /** Core-shaped probe: `/rpc` answers info/health, `/events` upgrades to WS. */
 async function startCoreProbe(): Promise<CoreServerHandle> {
   let resolveAddress!: (address: Deno.NetAddr) => void;
@@ -1226,6 +1316,24 @@ Deno.test("CoreClient reports a launcher failure once the adoption window closes
   });
 });
 
+Deno.test("CoreClient reports a launcher failure that is not an Error", async () => {
+  await withStateDir(async (stateDir) => {
+    // A launcher is caller-supplied, so its rejection value is arbitrary.
+    // A missing failure signal must not degrade into a deadline report that
+    // hides why startup stopped.
+    const launcher: CoreLauncher = () => Promise.reject(undefined);
+    const client = new CoreClient(
+      clientOptions(stateDir, { launcher, startTimeoutMs: 60 }),
+    );
+
+    const error = await assertRejects(
+      () => client.ensureStarted(),
+      CoreStartupError,
+    );
+    assertEquals(error.message, "Core launcher failed");
+  });
+});
+
 Deno.test("late launch cleanup keeps a registration whose process is still alive", async () => {
   await withStateDir(async (stateDir, paths) => {
     let releaseLauncher!: () => void;
@@ -1251,6 +1359,36 @@ Deno.test("late launch cleanup keeps a registration whose process is still alive
     const current = await new CoreRegistry(paths).read();
     assert(current !== undefined, "peer registration was removed by cleanup");
     assertEquals(current.id, "peer");
+  });
+});
+
+Deno.test("CoreClient reports a real cancellation ahead of a launcher failure", async () => {
+  await withStateDir(async (stateDir) => {
+    const controller = new AbortController();
+    // A launcher that fails immediately, the way a child that lost the Core
+    // lock does, while the caller gives up inside the adoption window.
+    const launcher: CoreLauncher = () => {
+      queueMicrotask(() =>
+        controller.abort(new DOMException("caller gave up", "AbortError"))
+      );
+      return Promise.reject(
+        new CoreLauncherError("Core child exited during startup (code 0)"),
+      );
+    };
+    const client = new CoreClient(
+      clientOptions(stateDir, { launcher, startTimeoutMs: 5_000 }),
+    );
+
+    const error = await assertRejects(
+      () => client.ensureStarted(controller.signal),
+      CoreStartupError,
+    );
+    // A caller that cancelled is a different failure from a launcher that
+    // failed, and the caller is the one who has to hear about it.
+    assertEquals(
+      error.message,
+      "Core startup was cancelled while waiting for readiness",
+    );
   });
 });
 
@@ -1335,6 +1473,265 @@ Deno.test("CoreClient does not replay a request the Core may have received", asy
           CoreClientProtocolError,
         );
         assertEquals(handled, 1);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient drops the cached endpoint when a Core vanishes mid-request", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const vanishing = startVanishingCore();
+    const replacement = await startCoreProbe();
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, vanishing.address.port, { id: "vanishing" }),
+      );
+      const client = new CoreClient(
+        clientOptions(stateDir, { takeoverWaitMs: 500 }),
+      );
+      try {
+        assertEquals((await client.discover()).status, "ready");
+
+        // The Core disappears with this request in flight. Its outcome is
+        // uncertain, so the request fails once and is never replayed.
+        await assertRejects(
+          () => client.call("session.create", {}),
+          CoreClientTransportError,
+        );
+        assertEquals(vanishing.dropped(), 1);
+
+        // The replacement is already listening on another port while the old
+        // endpoint still accepts connections, so only a dropped cache can
+        // reach it: a stale endpoint would answer again and drop again.
+        await writeRegistration(
+          paths,
+          registration(stateDir, replacement.address.port, {
+            id: "replacement",
+          }),
+        );
+        assertEquals(await client.call("session.create", {}), {
+          healthy: true,
+          version: TEST_VERSION,
+          protocolVersion: TEST_PROTOCOL_VERSION,
+        });
+        assertEquals(vanishing.dropped(), 1);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await vanishing.stop();
+      await replacement.stop();
+    }
+  });
+});
+
+/**
+ * A Core whose `session.open` restores residency, standing in for the Core
+ * Runtime Host after a restart: session-scoped calls first fail with the
+ * not-resident code and only succeed once the session has been re-opened.
+ */
+async function startRestartingCoreProbe(
+  resident: Set<string> | "session.open never restores",
+): Promise<CoreServerHandle> {
+  let resolveAddress!: (address: Deno.NetAddr) => void;
+  const addressReady = new Promise<Deno.NetAddr>((resolve) => {
+    resolveAddress = resolve;
+  });
+  const server = Deno.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      onListen: (address) => resolveAddress(address as Deno.NetAddr),
+    },
+    async (request) => {
+      const message = await request.json() as {
+        id?: unknown;
+        method?: unknown;
+        params?: { sessionId?: unknown };
+      };
+      const id = message.id ?? null;
+      const sessionId = message.params?.sessionId;
+      if (message.method === CORE_METHODS.info) {
+        return new Response(
+          JSON.stringify(coreResult(id, EXPECTED_INFO)),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (message.method === CORE_METHODS.health) {
+        return new Response(
+          JSON.stringify(coreResult(id, {
+            healthy: true,
+            version: TEST_VERSION,
+            protocolVersion: TEST_PROTOCOL_VERSION,
+          })),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (message.method === CORE_RUNTIME_METHODS.sessionOpen) {
+        // Re-opening is what makes a persisted session resident again.
+        if (
+          resident !== "session.open never restores" &&
+          typeof sessionId === "string"
+        ) {
+          resident.add(sessionId);
+        }
+        return new Response(
+          JSON.stringify(coreResult(id, { sessionId })),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (
+        typeof sessionId === "string" &&
+        (resident === "session.open never restores" || !resident.has(sessionId))
+      ) {
+        return new Response(
+          JSON.stringify(coreError(
+            id,
+            CORE_ERROR_SESSION_NOT_RESIDENT,
+            `session not found: ${sessionId}`,
+            { sessionId },
+          )),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify(coreResult(id, { ok: true })),
+        { headers: { "content-type": "application/json" } },
+      );
+    },
+  );
+  const address = await addressReady;
+  return {
+    address,
+    url: `http://127.0.0.1:${address.port}`,
+    stop: async () => {
+      await server.shutdown();
+      await server.finished;
+    },
+  };
+}
+
+Deno.test("CoreClient re-opens a session the Core restarted and replays the request", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const resident = new Set<string>();
+    const handle = await startRestartingCoreProbe(resident);
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port, { id: "restarted" }),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        // The client holds an ID the serving Core has never made resident,
+        // which is exactly its state after the Core restarted underneath it.
+        assertEquals(
+          await client.call("session.prompt", {
+            sessionId: "session-before-restart",
+            text: "hello",
+          }),
+          { ok: true },
+        );
+        assertEquals(
+          resident.has("session-before-restart"),
+          true,
+          "the client must re-open the session before replaying",
+        );
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient re-opens a not-resident session only once per call", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    // A Core that keeps reporting the session as not resident even after the
+    // client re-opened it. The replay must be bounded, not a loop.
+    const handle = await startRestartingCoreProbe(
+      "session.open never restores",
+    );
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port, { id: "stubborn" }),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        await assertRejects(
+          () =>
+            client.call("session.prompt", {
+              sessionId: "session-before-restart",
+              text: "hello",
+            }),
+          CoreClientRpcError,
+        );
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient does not replay a request that failed for another reason", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    let handled = 0;
+    const handle = await startProbe(async (request) => {
+      const body = await request.json() as {
+        id: string | number | null;
+        method: string;
+      };
+      if (
+        body.method === CORE_METHODS.info ||
+        body.method === CORE_METHODS.health
+      ) {
+        handled++;
+        return new Response(
+          JSON.stringify(coreResult(
+            body.id,
+            body.method === CORE_METHODS.info ? EXPECTED_INFO : {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            },
+          )),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      handled++;
+      return new Response(
+        JSON.stringify(coreError(
+          body.id,
+          -32603,
+          "session run is busy",
+        )),
+        { headers: { "content-type": "application/json" } },
+      );
+    });
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        await client.discover();
+        const before = handled;
+        await assertRejects(
+          () => client.call("session.prompt", { sessionId: "s", text: "hi" }),
+          CoreClientRpcError,
+        );
+        // Only the failed request: no re-open was attempted for an ordinary
+        // Core error.
+        assertEquals(handled, before + 1);
       } finally {
         await client.close();
       }

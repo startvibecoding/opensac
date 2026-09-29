@@ -404,6 +404,11 @@ export interface CoreRuntimeHostOptions {
   extension?: CoreExtensionHandler;
   eventSink?: (event: CoreRuntimeEvent) => void;
   reverseRequest?: CoreReverseRequest;
+  /**
+   * Reports a failed orphan-recovery sweep. Convergence is retried on the next
+   * tick, so a report is diagnostic only and never fails startup.
+   */
+  onRecoveryError?: (error: Error) => void;
 }
 
 /** The shared Core-owned runtime facade. */

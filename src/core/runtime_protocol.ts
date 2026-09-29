@@ -172,6 +172,27 @@ function optionalPreparedInputs(
   return parsed;
 }
 
+/**
+ * JSON-RPC error code for a session that is persisted but not resident in the
+ * Core process serving the request.
+ *
+ * The Core answers this before it performs any work, so a client that still
+ * holds the session ID may re-open the session and replay the request exactly
+ * once. It is the stable signal for "the Core restarted underneath this
+ * client"; adapters must not match on the error message.
+ */
+export const CORE_ERROR_SESSION_NOT_RESIDENT = -32004;
+
+/** Runtime-host error carrying the Core error code of a not-resident session. */
+export class CoreSessionNotResidentError extends Error {
+  override name = "CoreSessionNotResidentError";
+  readonly code = CORE_ERROR_SESSION_NOT_RESIDENT;
+
+  constructor(readonly sessionId: string) {
+    super(`session not found: ${sessionId}`);
+  }
+}
+
 /** Optional policy fields shared by session creation and config updates. */
 export interface CoreSessionConfigFields {
   providerName?: string;

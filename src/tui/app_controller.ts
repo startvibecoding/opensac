@@ -40,6 +40,7 @@ import {
 import { AgentActivityStore } from "./activity.ts";
 import { ActivityManager } from "./activity_manager.ts";
 import { type MessageKind, TranscriptStore } from "./transcript_store.ts";
+import type { TUICoreConnectionState } from "./service.ts";
 import { Translator } from "./i18n.ts";
 
 export type { MessageKind };
@@ -145,6 +146,19 @@ export class AppController {
   waitingForQuestion = false;
   isThinking = false;
   runTerminalHandled = false;
+  /**
+   * The shared Core connection as the front end sees it. A restart is a
+   * transient condition, so it lives in the live view and is never committed
+   * to the transcript: history records what the user asked, not the transport
+   * underneath it.
+   */
+  coreConnection: TUICoreConnectionState = "connected";
+  /**
+   * The line shown while the connection settles. A reconnect is confirmed
+   * briefly and then cleared, so the live view returns to normal without
+   * leaving a row behind.
+   */
+  coreConnectionNotice = "";
   /** Latest provider-reported context usage (mothx a.contextUsage). */
   contextUsage: ContextUsage | undefined;
 
@@ -229,6 +243,27 @@ export class AppController {
   addEventMessage(text: string, visibleInCompact: boolean): void {
     this.store.addMessageRow(text, "status", !visibleInCompact);
     this.#cb.onMessage("status", text);
+    this.#cb.scheduleRender();
+  }
+
+  /**
+   * Projects one shared Core connection transition into the live view. This
+   * deliberately does not touch the transcript: the condition is about the
+   * transport, and it clears itself once the connection settles.
+   */
+  setCoreConnection(
+    state: TUICoreConnectionState,
+    notice: string,
+  ): void {
+    this.coreConnection = state;
+    this.coreConnectionNotice = notice;
+    this.#cb.scheduleRender();
+  }
+
+  /** Clears a settled connection notice from the live view. */
+  clearCoreConnectionNotice(): void {
+    if (this.coreConnectionNotice === "") return;
+    this.coreConnectionNotice = "";
     this.#cb.scheduleRender();
   }
 

@@ -12,6 +12,8 @@ import {
   getSessionDir,
   type Settings,
 } from "../config/settings.ts";
+import { CoreSessionNotResidentError } from "./runtime_protocol.ts";
+import { SessionRecoveryRequiredError } from "../session/mod.ts";
 import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import { knowledgeBaseCronJobID } from "../agentruntime/knowledge_cron.ts";
 import {
@@ -257,6 +259,139 @@ test("production Core dependencies create and close a persisted session", async 
     await host.close();
   } finally {
     await Deno.remove(workDir, { recursive: true });
+  }
+});
+
+test("a restarted Core reports a persisted session as not resident and re-opens it", async () => {
+  const workDir = await Deno.makeTempDir({
+    prefix: "opensac-core-restart-",
+  });
+  try {
+    const settings = defaultSettings();
+    const options = {
+      source: SOURCE_ACP,
+      workDir,
+      settings,
+      providerName: "",
+      modelID: "",
+      dependencies: createProductionCoreRuntimeDependencies(settings),
+    };
+    const before = await createCoreRuntimeHost(options);
+    const session = await before.createSession({ workDir });
+    await before.close();
+
+    // A new Core process shares the session database but not the previous
+    // process's in-memory session map.
+    const after = await createCoreRuntimeHost(options);
+    try {
+      assertEquals(
+        (await after.listSessions()).length,
+        0,
+        "a restarted Core has no resident session",
+      );
+      await assertRejects(
+        () => after.history({ sessionId: session.sessionId }),
+        CoreSessionNotResidentError,
+      );
+      // The persisted identity is intact and re-opening restores it.
+      assert(
+        (await after.listPersistedSessions({ workDir })).some((entry) =>
+          entry.sessionId === session.sessionId
+        ),
+        "the persisted session survives the restart",
+      );
+      const reopened = await after.openSession({
+        sessionId: session.sessionId,
+      });
+      assertEquals(reopened.sessionId, session.sessionId);
+      assertEquals(
+        (await after.history({ sessionId: session.sessionId })).length,
+        0,
+      );
+    } finally {
+      await after.close();
+    }
+  } finally {
+    await Deno.remove(workDir, { recursive: true });
+    closeDatabases();
+  }
+});
+
+test("a restarted Core converges a Run left running by the previous process", async () => {
+  const workDir = await Deno.makeTempDir({
+    prefix: "opensac-core-orphan-",
+  });
+  try {
+    const settings = defaultSettings();
+    const sessionDir = getSessionDir(settings);
+    const options = {
+      source: SOURCE_ACP,
+      workDir,
+      settings,
+      providerName: "",
+      modelID: "",
+      dependencies: createProductionCoreRuntimeDependencies(settings),
+    };
+    const before = await createCoreRuntimeHost(options);
+    const session = await before.createSession({ workDir });
+    const started = new Date();
+    // A durable Run whose owning process is gone: the Core died mid-run.
+    new RunStore(sessionDir).create(
+      {
+        id: "orphan-run",
+        sessionId: session.sessionId,
+        intentId: "orphan-intent",
+        retryOf: "",
+        attempt: 1,
+        workDir,
+        source: "acp",
+        model: "",
+        mode: "yolo",
+        status: "running",
+        startedAt: started,
+        finishedAt: new Date(0),
+        error: "",
+        errorInfo: {},
+        progress: {},
+        usage: null,
+        contextUsage: null,
+        inputResourceIds: [],
+        submissionKeyHash: "",
+        submissionScope: "",
+        submissionFingerprint: "",
+        userEntryId: "",
+        assistantEntryId: "",
+        conversationTurnId: "",
+        conversationTurn: false,
+      } satisfies DurableRun,
+    );
+    await before.close();
+
+    const after = await createCoreRuntimeHost(options);
+    try {
+      await after.openSession({ sessionId: session.sessionId });
+      // Admission reconciles the orphan through the shared recovery path
+      // rather than surfacing a bare recovery-required error. A prompt that
+      // never reaches its provider is enough: the point is that admission no
+      // longer rejects the session.
+      let failure: unknown;
+      try {
+        await after.prompt({ sessionId: session.sessionId, text: "hi" });
+      } catch (error) {
+        failure = error;
+      }
+      assert(
+        !(failure instanceof SessionRecoveryRequiredError),
+        `admission must recover the orphan, got ${
+          failure instanceof Error ? failure.name : String(failure)
+        }`,
+      );
+    } finally {
+      await after.close();
+    }
+  } finally {
+    await Deno.remove(workDir, { recursive: true });
+    closeDatabases();
   }
 });
 

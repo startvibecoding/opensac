@@ -37,6 +37,7 @@ import type {
   CoreTransientPromptInput,
   CoreTransientPromptResult,
 } from "./runtime.ts";
+import { CoreSessionNotResidentError } from "./runtime_protocol.ts";
 import {
   Builder,
   type SessionRuntime,
@@ -125,7 +126,6 @@ import {
   validateEnvName,
 } from "../config/env.ts";
 import {
-  acquireExecutionAdmission,
   currentRuntimeLeaseBinding,
   DeliveryOperationAbsentError,
   generateID,
@@ -137,6 +137,8 @@ import {
   reopenFailedDeliveryOperation,
   type RuntimeLeaseGuard,
 } from "../session/mod.ts";
+import { acquireExecutionAdmission } from "../agentruntime/execution_admission.ts";
+import { RecoveryCoordinator } from "../agentruntime/recovery_coordinator.ts";
 import { deliveryFailureRetryable } from "../agentruntime/delivery_coordinator.ts";
 import { knowledgeBaseCronJobID } from "../agentruntime/knowledge_cron.ts";
 import {
@@ -3777,9 +3779,13 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     // any side effect. Acquire this run's admission here — the run-begin
     // transaction binds it to the run — unless the caller already holds this
     // session's lease (cron and knowledge-index runs wrap the call).
+    // The admission wrapper reconciles a durable Run orphaned by an earlier
+    // Core process through the shared lease-first recovery path, then retries,
+    // so a restart surfaces a real recovery result instead of a raw
+    // recovery-required error.
     const admission = currentRuntimeLeaseBinding(sessionDir, this.sessionId) ===
         null
-      ? await acquireExecutionAdmission(sessionDir, this.sessionId)
+      ? await acquireExecutionAdmission(undefined, sessionDir, this.sessionId)
       : null;
     try {
       return await this.#promptOwned(input, manager, runtime, admission);
@@ -4033,6 +4039,19 @@ export async function createCoreRuntimeHost(
   const sessions = new Map<string, SessionRecord>();
   let closed = false;
 
+  // A Core that restarts inherits durable Runs that its previous process left
+  // non-terminal. Convergence is lease-first, so a live owner is never
+  // displaced: the startup scan skips a run whose lease is still valid and the
+  // periodic sweep picks it up once that lease lapses.
+  const recovery = new RecoveryCoordinator(getSessionDir(options.settings), {
+    onError: (error) => {
+      // A failed sweep is retried on the next tick; the host must stay usable.
+      options.onRecoveryError?.(error);
+    },
+  });
+  const recoveryStarted = recovery.start();
+  void recoveryStarted.catch(() => undefined);
+
   const ensureOpen = () => {
     if (closed) throw new Error("core runtime host is closed");
   };
@@ -4041,7 +4060,10 @@ export async function createCoreRuntimeHost(
     ensureOpen();
     const session = sessions.get(sessionId);
     if (session === undefined) {
-      throw new Error(`session not found: ${sessionId}`);
+      // Persisted identity survives a Core restart; residency does not. The
+      // typed error lets a client re-open this exact session and replay the
+      // request, which is safe because no work was started.
+      throw new CoreSessionNotResidentError(sessionId);
     }
     return session;
   };
@@ -4683,6 +4705,9 @@ export async function createCoreRuntimeHost(
     async close() {
       if (closed) return;
       closed = true;
+      // Stop the sweep before the runtimes so no scan races a shutdown.
+      await recoveryStarted.catch(() => undefined);
+      await recovery.stop();
       await Promise.all(
         [...sessions.values()].map((record) => record.runtime.close()),
       );

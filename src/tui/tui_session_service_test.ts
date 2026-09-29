@@ -78,7 +78,10 @@ function recordingService(
   };
 }
 
-function makeSession(service: TUIService): TUISession {
+function makeSession(
+  service: TUIService,
+  options: { coreReconnectNoticeMs?: number } = {},
+): TUISession {
   return new TUISession(
     {
       provider: "openai",
@@ -87,6 +90,7 @@ function makeSession(service: TUIService): TUISession {
       thinking: "",
       workDir: Deno.cwd(),
       version: "test",
+      ...options,
     },
     service,
   );
@@ -242,4 +246,44 @@ test("settling a dialog publishes its message exactly once without recursing", a
   assert(added[0].length > 0);
   // The dialog settled: further keys are no longer consumed.
   assertEquals(session.handleDialogKey(splitInputChunk("\r")[0]), false);
+});
+
+test("a Core restart shows in the live view and never enters history", async () => {
+  const fake = createFakeTUIService();
+  const rec = recordingService(fake);
+  const session = makeSession(rec.service, { coreReconnectNoticeMs: 20 });
+  await session.start();
+
+  const history = (): string[] => session.controller.store.messages;
+  const before = history().length;
+
+  // Reconnecting: a live-view line, never a transcript row.
+  fake.setConnectionState("reconnecting");
+  assertEquals(session.controller.coreConnection, "reconnecting");
+  assertEquals(
+    session.controller.coreConnectionNotice,
+    session.translator.text("core.reconnecting"),
+  );
+  assertEquals(history().length, before, "the restart must not enter history");
+
+  // Reconnected: confirmed in the same live view.
+  fake.setConnectionState("connected");
+  assertEquals(session.controller.coreConnection, "connected");
+  assertEquals(
+    session.controller.coreConnectionNotice,
+    session.translator.text("core.reconnected"),
+  );
+  assertEquals(
+    history().length,
+    before,
+    "the reconnect must not enter history",
+  );
+
+  // The confirmation clears itself, leaving the live view as it was.
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assertEquals(session.controller.coreConnectionNotice, "");
+  assertEquals(session.controller.coreConnection, "connected");
+  assertEquals(history().length, before);
+
+  await session.close();
 });

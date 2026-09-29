@@ -59,6 +59,9 @@ class FakeEventConnection implements CoreEventConnection {
     this.requestListener = listener;
     return () => this.requestListener = undefined;
   }
+  onClose(_listener: () => void) {
+    return () => {};
+  }
   respond(response: import("../core/protocol.ts").CoreRpcResponse) {
     this.responses.push(response);
   }

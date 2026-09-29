@@ -77,7 +77,19 @@ class FakeEventConnection implements TUICoreEventConnection {
     return () => {};
   }
 
+  #closeListeners = new Set<() => void>();
+
+  onClose(listener: () => void): () => void {
+    this.#closeListeners.add(listener);
+    return () => this.#closeListeners.delete(listener);
+  }
+
   respond(_response: ReturnType<typeof coreResult>): void {}
+
+  /** Stands in for a Core that dropped this socket on its own. */
+  drop(): void {
+    for (const listener of [...this.#closeListeners]) listener();
+  }
 
   emit(event: CoreRuntimeEvent): void {
     const notification: CoreRpcNotification = {
@@ -96,16 +108,24 @@ class FakeEventConnection implements TUICoreEventConnection {
 interface FakeClient extends TUICoreClient {
   calls: Array<{ method: string; params: unknown }>;
   events: FakeEventConnection;
+  /** Every event connection handed out, in dial order. */
+  eventConnections: FakeEventConnection[];
 }
 
 function fakeClient(
   results: Record<string, unknown | (() => unknown)> = {},
-  options: { failWith?: (method: string) => Error | undefined } = {},
+  options: {
+    failWith?: (method: string) => Error | undefined;
+    /** Hand out a new event connection per dial, as a real client would. */
+    freshEvents?: boolean;
+  } = {},
 ): FakeClient {
   const events = new FakeEventConnection();
+  const eventConnections: FakeEventConnection[] = [];
   return {
     calls: [],
     events,
+    eventConnections,
     call<T>(method: string, params?: unknown): Promise<T> {
       this.calls.push({ method, params });
       const failure = options.failWith?.(method);
@@ -119,7 +139,13 @@ function fakeClient(
       );
     },
     connectEvents(): Promise<TUICoreEventConnection> {
-      return Promise.resolve(events);
+      const connection = options.freshEvents === true
+        ? new FakeEventConnection()
+        : events;
+      eventConnections.push(connection);
+      const failure = options.failWith?.("connectEvents");
+      if (failure !== undefined) return Promise.reject(failure);
+      return Promise.resolve(connection);
     },
   };
 }
@@ -280,6 +306,27 @@ Deno.test("core TUIService starts event streams from the requested cursor", asyn
   assertEquals(client.events.subscribed, [
     { sessionId: "session-1", runId: "run-1", cursor: 1 },
   ]);
+});
+
+Deno.test("core TUIService ends a run stream the Core drops instead of hanging", async () => {
+  const client = fakeClient();
+  client.events.replayed = [event(1, "run_started", false)];
+  const service = createCoreClientTUIService(client);
+
+  const iterator = service.subscribeRunEvents("session-1", "run-1", 0);
+  assertEquals((await iterator.next()).value?.sequence, 1);
+
+  // The Core restarted: the socket is gone and the run died with it. Waiting
+  // for a notification that can never arrive would leave the TUI spinning
+  // forever, so the stream has to end with an error instead.
+  const pending = iterator.next();
+  client.events.drop();
+  const error = await assertRejects(() => pending, TUIServiceError);
+  assert(
+    error.message.includes("run-1"),
+    `the error must name the lost run, got ${error.message}`,
+  );
+  assertEquals(client.events.listenerCount, 0);
 });
 
 Deno.test("core TUIService reports missing capabilities explicitly", async () => {
@@ -841,4 +888,89 @@ Deno.test("core TUIService maps agent, delegate, ESM, transient, and compact cal
     sessionId: "session-1",
     question: "what?",
   });
+});
+
+Deno.test("core TUIService re-establishes the decision bridge after the Core drops it", async () => {
+  const client = fakeClient(
+    {
+      "session.prompt": {
+        sessionId: "session-1",
+        runId: "run-1",
+        status: "running",
+      },
+    },
+    { freshEvents: true },
+  );
+  const service = createCoreClientTUIService(client);
+
+  // The bridge is established once and reused, not re-dialed per prompt.
+  await service.prompt({ sessionId: "session-1", text: "one" });
+  await service.prompt({ sessionId: "session-1", text: "two" });
+  assertEquals(client.eventConnections.length, 1);
+
+  // A Core restart drops the socket. The next prompt must re-dial, otherwise
+  // no approval could ever be requested again.
+  client.eventConnections[0].drop();
+  await service.prompt({ sessionId: "session-1", text: "three" });
+  assertEquals(client.eventConnections.length, 2);
+  // The replacement connection is the one now carrying decisions.
+  assertEquals(client.eventConnections[0].listenerCount, 0);
+});
+
+Deno.test("core TUIService retries the decision bridge after a failed dial", async () => {
+  let failNext = true;
+  const client = fakeClient(
+    {
+      "session.prompt": {
+        sessionId: "session-1",
+        runId: "run-1",
+        status: "running",
+      },
+    },
+    {
+      freshEvents: true,
+      failWith: (method) =>
+        method === "connectEvents" && failNext
+          ? new TUIServiceError("Core event WebSocket failed")
+          : undefined,
+    },
+  );
+  const service = createCoreClientTUIService(client);
+
+  // A bridge that could not be dialed must not be cached, or every later
+  // prompt would reuse the rejection and no decision could ever arrive again.
+  await service.prompt({ sessionId: "session-1", text: "one" });
+  failNext = false;
+  await service.prompt({ sessionId: "session-1", text: "two" });
+  assertEquals(client.eventConnections.length, 2);
+});
+
+Deno.test("core TUIService reports a Core restart and the reconnect that follows", async () => {
+  const client = fakeClient(
+    {
+      "session.prompt": {
+        sessionId: "session-1",
+        runId: "run-1",
+        status: "running",
+      },
+    },
+    { freshEvents: true },
+  );
+  const service = createCoreClientTUIService(client);
+  const states: string[] = [];
+  const stop = service.onConnectionState((state) => states.push(state));
+
+  // A subscriber sees the current state, not an assumed one.
+  assertEquals(states, ["connected"]);
+
+  await service.prompt({ sessionId: "session-1", text: "one" });
+  client.eventConnections[0].drop();
+  await service.prompt({ sessionId: "session-1", text: "two" });
+
+  assertEquals(states, ["connected", "reconnecting", "connected"]);
+  // The first delivery is the subscribe-time replay, not a transition.
+  assertEquals(states.length, 3);
+  stop();
+  client.eventConnections[1].drop();
+  assertEquals(states.length, 3, "an unsubscribed listener hears nothing");
 });

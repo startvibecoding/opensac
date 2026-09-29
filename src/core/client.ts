@@ -12,6 +12,10 @@ import {
   registrationUrl,
 } from "./endpoint.ts";
 import { CorePaths } from "./paths.ts";
+import {
+  CORE_ERROR_SESSION_NOT_RESIDENT,
+  CORE_RUNTIME_METHODS,
+} from "./runtime_protocol.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 import {
   CORE_METHODS,
@@ -330,6 +334,12 @@ export interface CoreEventConnection {
     listener: (notification: CoreRpcNotification) => void,
   ): () => void;
   onRequest(listener: (request: CoreRpcRequest) => void): () => void;
+  /**
+   * Reports that the Core dropped the event socket on its own — a restart, for
+   * example. An intentional `close()` does not notify, so a listener can tell
+   * "my subscription is gone" from "I asked for it to be gone".
+   */
+  onClose(listener: () => void): () => void;
   respond(response: CoreRpcResponse): void;
   close(): Promise<void>;
   reconnect(): Promise<void>;
@@ -484,6 +494,9 @@ export class CoreClient {
     const requestSignal = combineAbortSignals(this.#signal, signal);
     let connection = await this.#requireConnection(requestSignal);
     let retried = false;
+    // At most one re-open per call: the replay must not loop if the Core keeps
+    // reporting the same session as not resident.
+    let residentReplayed = false;
     while (true) {
       const requestId = this.#nextId();
       let outcome: RpcOutcome;
@@ -515,9 +528,38 @@ export class CoreClient {
         }
         throw error;
       }
-      if (!outcome.ok) throw outcome.error;
+      if (!outcome.ok) {
+        // A session the Core reports as not resident is the restart case: the
+        // Core rejected the request before doing any work, so re-opening that
+        // session and replaying is safe. Every other error stands.
+        if (!residentReplayed && reopensResidentSession(outcome.error)) {
+          residentReplayed = true;
+          await this.#reopenResidentSession(
+            residentSessionId(outcome.error),
+            requestSignal,
+          );
+          continue;
+        }
+        throw outcome.error;
+      }
       return outcome.result as T;
     }
+  }
+
+  /**
+   * Re-opens a persisted session in the Core that just reported it as not
+   * resident. A session that no longer exists fails here, which surfaces the
+   * real cause instead of replaying into a second failure.
+   */
+  async #reopenResidentSession(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.call(
+      CORE_RUNTIME_METHODS.sessionOpen,
+      { sessionId },
+      signal,
+    );
   }
 
   async connectEvents(signal?: AbortSignal): Promise<CoreEventConnection> {
@@ -568,8 +610,28 @@ export class CoreClient {
       (notification: CoreRpcNotification) => void
     >();
     const requests = new Set<(request: CoreRpcRequest) => void>();
+    const drops = new Set<() => void>();
     let closed = false;
     let nextId = 1;
+
+    // A restarted Core drops this socket without the client asking. Requests
+    // already in flight can never be answered, and a listener that owns a
+    // long-lived subscription has to re-establish it, so an unexpected close
+    // is reported. An intentional `close()` sets `closed` first and is silent.
+    const watchSocket = (target: WebSocket): void => {
+      target.addEventListener("close", () => {
+        if (closed) return;
+        closed = true;
+        for (const waiter of pending.values()) {
+          waiter.reject(
+            new CoreClientTransportError("Core event WebSocket closed"),
+          );
+        }
+        pending.clear();
+        for (const listener of [...drops]) listener();
+      });
+    };
+    watchSocket(socket);
 
     const send = (message: CoreRpcMessage): void => {
       if (closed || socket.readyState !== WebSocket.OPEN) {
@@ -643,6 +705,10 @@ export class CoreClient {
         requests.add(listener);
         return () => requests.delete(listener);
       },
+      onClose(listener) {
+        drops.add(listener);
+        return () => drops.delete(listener);
+      },
       respond(response) {
         send(response);
       },
@@ -668,6 +734,7 @@ export class CoreClient {
         const next = await openSocket(url);
         socket = next;
         closed = false;
+        watchSocket(next);
         socket.onmessage = (event) => {
           if (typeof event.data !== "string") return;
           try {
@@ -872,42 +939,65 @@ export class CoreClient {
       // `opensac core restart` is starting the shared Core, or the child
       // adopted that peer and returned) leaves a healthy Core that may publish
       // its registration a moment later.
+      let launchFailed = false;
       let launchError: unknown;
       let launchFailedAt = 0;
       void launchPromise.then(
         () => undefined,
         (error) => {
+          launchFailed = true;
           launchError = error;
           launchFailedAt = Date.now();
         },
       );
 
+      // Ranks the failures every exit of the readiness poll can report, so the
+      // rule lives in one place: a real cancellation wins, then a launcher that
+      // failed outside its adoption window, then the exit's own failure. The
+      // startup deadline aborts the controller itself, so it is never mistaken
+      // for a cancellation, and a launcher failure is only reported once the
+      // window in which a peer could still be adopted has closed. `otherwise`
+      // builds the error that is specific to the call site.
+      const startupFailure = (
+        pollDeadline: number,
+        cause: unknown,
+        otherwise: (cause: unknown) => CoreStartupError,
+      ): CoreStartupError => {
+        if (controller.signal.aborted && !deadlineElapsed) {
+          return new CoreStartupError(
+            "Core startup was cancelled while waiting for readiness",
+            discovery,
+            this.#startTimeoutMs,
+            { cause },
+          );
+        }
+        if (launchFailed && Date.now() >= pollDeadline) {
+          return launcherStartupError(
+            launchError,
+            discovery,
+            this.#startTimeoutMs,
+          );
+        }
+        return otherwise(cause);
+      };
+
       while (true) {
-        const pollDeadline = launchError === undefined
-          ? deadline
-          : Math.min(deadline, launchFailedAt + LAUNCH_ADOPTION_GRACE_MS);
+        const pollDeadline = launchFailed
+          ? Math.min(deadline, launchFailedAt + LAUNCH_ADOPTION_GRACE_MS)
+          : deadline;
         const remaining = pollDeadline - Date.now();
         if (remaining <= 0) {
           this.#trackLateLaunchCleanup(launchPromise, baseline);
-          if (controller.signal.aborted && !deadlineElapsed) {
-            throw new CoreStartupError(
-              "Core startup was cancelled while waiting for readiness",
-              discovery,
-              this.#startTimeoutMs,
-              { cause: controller.signal.reason },
-            );
-          }
-          throw launchError === undefined
-            ? new CoreStartupError(
-              "Core did not become ready before the startup deadline",
-              discovery,
-              this.#startTimeoutMs,
-            )
-            : launcherStartupError(
-              launchError,
-              discovery,
-              this.#startTimeoutMs,
-            );
+          throw startupFailure(
+            pollDeadline,
+            controller.signal.reason,
+            () =>
+              new CoreStartupError(
+                "Core did not become ready before the startup deadline",
+                discovery,
+                this.#startTimeoutMs,
+              ),
+          );
         }
 
         try {
@@ -921,39 +1011,29 @@ export class CoreClient {
             controller.signal,
           );
         } catch (error) {
-          // An external cancellation ends startup; the startup deadline aborts
-          // the controller itself and must not be mistaken for one.
-          const cancelled = controller.signal.aborted && !deadlineElapsed;
-          if (cancelled || Date.now() >= pollDeadline) {
-            this.#trackLateLaunchCleanup(launchPromise, baseline);
-          }
+          // Only an exit that abandons this launch tracks the late
+          // registration cleanup; a discovery failure early in the adoption
+          // window still has the startup cancellation to stop the launcher.
           if (
-            launchError !== undefined && !cancelled &&
+            (controller.signal.aborted && !deadlineElapsed) ||
             Date.now() >= pollDeadline
           ) {
-            throw launcherStartupError(
-              launchError,
-              discovery,
-              this.#startTimeoutMs,
-            );
+            this.#trackLateLaunchCleanup(launchPromise, baseline);
           }
-          if (controller.signal.aborted) {
-            throw new CoreStartupError(
-              "Core startup was cancelled while waiting for readiness",
-              discovery,
-              this.#startTimeoutMs,
-              { cause: error },
-            );
-          }
-          throw new CoreStartupError(
-            "Core discovery failed while waiting for startup",
-            staleResult(
-              undefined,
-              "Core discovery failed",
-              asClientError(error, "Core discovery failed"),
-            ),
-            this.#startTimeoutMs,
-            { cause: error },
+          throw startupFailure(
+            pollDeadline,
+            error,
+            (cause) =>
+              new CoreStartupError(
+                "Core discovery failed while waiting for startup",
+                staleResult(
+                  undefined,
+                  "Core discovery failed",
+                  asClientError(cause, "Core discovery failed"),
+                ),
+                this.#startTimeoutMs,
+                { cause },
+              ),
           );
         }
         if (discovery.status === "ready") {
@@ -984,24 +1064,18 @@ export class CoreClient {
             await delay(wait, controller.signal);
           } catch (error) {
             this.#trackLateLaunchCleanup(launchPromise, baseline);
-            // The startup deadline aborts the controller itself; a launcher
-            // failure that outlived its adoption window still wins over that
-            // synthetic cancellation, but a real one does not.
-            const cancelled = controller.signal.aborted && !deadlineElapsed;
-            if (launchError !== undefined && !cancelled) {
-              throw launcherStartupError(
-                launchError,
-                discovery,
-                this.#startTimeoutMs,
-              );
-            }
-            throw new CoreStartupError(
-              controller.signal.aborted
-                ? "Core startup was cancelled while waiting for readiness"
-                : "Core startup polling failed",
-              discovery,
-              this.#startTimeoutMs,
-              { cause: error },
+            throw startupFailure(
+              pollDeadline,
+              error,
+              (cause) =>
+                new CoreStartupError(
+                  controller.signal.aborted
+                    ? "Core startup was cancelled while waiting for readiness"
+                    : "Core startup polling failed",
+                  discovery,
+                  this.#startTimeoutMs,
+                  { cause },
+                ),
             );
           }
         }
@@ -1955,6 +2029,10 @@ function discoveryError(result: CoreDiscoveryResult): CoreClientError {
  * Wraps a launcher failure as the typed startup error callers rely on. The
  * launcher error stays the `cause` so a child's own diagnostics (port in use,
  * exit code, sanitized output) remain reachable.
+ *
+ * A launcher is caller-supplied, so its rejection value is not necessarily an
+ * `Error`; anything that is not a `CoreLauncherError` still reports a launcher
+ * failure rather than the weaker "did not become ready" message.
  */
 function launcherStartupError(
   error: unknown,
@@ -1972,8 +2050,30 @@ function launcherStartupError(
       "Core launcher failed",
       discovery,
       timeoutMs,
-      { cause: error },
+      error === undefined ? {} : { cause: error },
     );
+}
+
+/**
+ * True when the Core rejected the request because its session is persisted but
+ * not resident in the serving process.
+ *
+ * The Core answers this before starting any work, so the request never had an
+ * effect and the caller may re-open the session and replay it. The signal is
+ * the dedicated protocol code, never the error message.
+ */
+function reopensResidentSession(error: unknown): boolean {
+  return error instanceof CoreClientRpcError &&
+    error.code === CORE_ERROR_SESSION_NOT_RESIDENT;
+}
+
+/** The session the Core named in a not-resident error, if it named one. */
+function residentSessionId(error: unknown): string {
+  if (!(error instanceof CoreClientRpcError)) return "";
+  const data = error.data;
+  if (data === null || typeof data !== "object") return "";
+  const sessionId = (data as { sessionId?: unknown }).sessionId;
+  return typeof sessionId === "string" ? sessionId : "";
 }
 
 /** WebSocket endpoint of the Core event stream for an HTTP base URL. */
@@ -2017,6 +2117,12 @@ const ENDPOINT_GONE_PATTERNS = [
   /os error 32/i,
   /socket hang up/i,
   /other side closed/i,
+  // Deno's `fetch` reports a Core that disappears while a request is in
+  // flight as a *send* failure, not a connection error: the request may
+  // already have reached the peer, so the outcome is uncertain and must only
+  // invalidate the cached endpoint, never be replayed.
+  /connection closed before message completed/i,
+  /client error \(SendRequest\)/i,
 ];
 
 /**

@@ -669,6 +669,8 @@ export const catalogs: Record<Language, Record<MessageID, string>> = {
     "shell.busy": "working… — ctrl+c cancel run",
     "reload.requested":
       "↻ Reloading: starting a fresh process with a new session...",
+    "core.reconnecting": "↻ Core restarting: reconnecting…",
+    "core.reconnected": "✓ Core reconnected",
     "tool.modal.no_details": "No tool details captured yet.",
     "agent.multi_on": "Multi-agent mode: ON",
     "agent.multi_status": "Multi-agent mode: ON (active: %s)",
@@ -1374,6 +1376,8 @@ export const catalogs: Record<Language, Record<MessageID, string>> = {
       "回车发送 · alt+回车换行 · tab 切换模式 · ctrl+o 详情 · ctrl+e esm · ctrl+c 退出",
     "shell.busy": "运行中… — ctrl+c 取消运行",
     "reload.requested": "↻ 正在重载：以新会话启动新进程...",
+    "core.reconnecting": "↻ Core 正在重启：重新连接中…",
+    "core.reconnected": "✓ Core 已重新连接",
     "tool.modal.no_details": "暂无工具详情。",
     "agent.multi_on": "多 Agent 模式：开启",
     "agent.multi_status": "多 Agent 模式：开启（当前：%s）",

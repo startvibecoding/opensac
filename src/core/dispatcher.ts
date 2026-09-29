@@ -6,7 +6,9 @@ import {
   type CoreRpcResponse,
 } from "./protocol.ts";
 import {
+  CORE_ERROR_SESSION_NOT_RESIDENT,
   CORE_RUNTIME_METHODS,
+  CoreSessionNotResidentError,
   parseAgentParams,
   parseCapabilitySetParams,
   parseConfigParams,
@@ -73,6 +75,17 @@ export class CoreRuntimeDispatcher {
       if (message.id === undefined) return undefined;
       if (error instanceof CoreDispatchError) {
         return coreError(id, error.code, error.message, error.data);
+      }
+      if (error instanceof CoreSessionNotResidentError) {
+        // A not-resident session is an expected, replayable condition rather
+        // than a server fault, so it keeps its own code and names the session
+        // the client must re-open.
+        return coreError(
+          id,
+          CORE_ERROR_SESSION_NOT_RESIDENT,
+          error.message,
+          { sessionId: error.sessionId },
+        );
       }
       return coreError(
         id,
