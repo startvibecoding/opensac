@@ -2476,11 +2476,18 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+// Permissions granted to a Core child launched from source. The child is the
+// real runtime host: it runs tools, MCP servers, git, and sandbox binaries, so
+// it needs run access to the same programs the parent would run. Omitting
+// `--allow-run` here made every source-installed CLI fail inside the child with
+// `Requires run access to "/bin/bash", run again with the --allow-run flag`,
+// even though the parent shim was installed with full access.
 const DENO_SOURCE_PERMISSION_ARGS = [
   "--allow-read",
   "--allow-write",
   "--allow-net",
   "--allow-env",
+  "--allow-run",
   "--allow-ffi",
   "--allow-sys",
 ];

@@ -424,6 +424,9 @@ Deno.test("final review: source launcher grants the child explicit permissions",
       "--allow-write",
       "--allow-net",
       "--allow-env",
+      // The child is the runtime host, so it must be able to run the same
+      // programs the parent runs (shell tools, git, MCP servers, sandbox).
+      "--allow-run",
       "--allow-ffi",
       "--allow-sys",
     ]
@@ -431,6 +434,45 @@ Deno.test("final review: source launcher grants the child explicit permissions",
     assertEquals(args.includes(permission), true, permission);
   }
   assertEquals(args.includes("core"), true);
+});
+
+Deno.test("final review: source launcher child can spawn a subprocess", async () => {
+  // Regression: the child permissions omitted `--allow-run`, so a globally
+  // installed `opensac` reported `Requires run access to "/bin/bash"` for
+  // every tool even though the parent shim had full access.
+  const args = defaultLauncherArgs(Deno.execPath());
+  const script = path.join(
+    await Deno.makeTempDir({ prefix: ".opensac-core-run-" }),
+    "spawn.ts",
+  );
+  await Deno.writeTextFile(
+    script,
+    `const command = new Deno.Command(Deno.execPath(), {
+      args: ["eval", "console.log('child-ok')"],
+      stdout: "piped",
+      stderr: "piped",
+    });
+    const output = await command.output();
+    await Deno.writeTextFile(Deno.args[0], new TextDecoder().decode(output.stdout));
+    `,
+  );
+  const resultFile = `${script}.out`;
+  const child = new Deno.Command(Deno.execPath(), {
+    args: ["run", ...args.slice(0, -2), script, resultFile],
+    stdin: "null",
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn();
+  const [stdout, stderr, status] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.status,
+  ]);
+  assertEquals(status.success, true, `${stdout}\n${stderr}`);
+  assertEquals(
+    (await Deno.readTextFile(resultFile)).trim(),
+    "child-ok",
+  );
 });
 
 Deno.test("final review: real source launcher starts and stops a Core child", async () => {
