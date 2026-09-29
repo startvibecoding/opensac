@@ -20,9 +20,13 @@ ARG TARGETARCH
 ARG VERSION
 # Deno's dependency graph changes far less often than the sources, so caching it
 # behind its own layer keeps most source edits from re-resolving the world.
+# The layer deliberately copies no source: caching an entry point needs that
+# entry point's whole relative import graph to be present, so a partial copy
+# fails to resolve, and copying the sources would invalidate this layer on every
+# edit. `deno install` resolves the whole dependency closure from deno.json and
+# deno.lock alone, which is exactly the layer boundary wanted here.
 COPY deno.json deno.lock ./
-COPY src/main.ts src/
-RUN deno cache --frozen-lockfile src/main.ts
+RUN deno install --frozen-lockfile
 COPY . .
 # The build context has no .git, and a build reads the product version from the
 # newest v* tag, so the tag the release was cut from is passed explicitly. The
