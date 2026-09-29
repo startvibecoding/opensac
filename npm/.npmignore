@@ -1,0 +1,7 @@
+# Platform packages are published separately; `npm pack` on this directory must
+# not fold them into the entry tarball.
+packages/
+
+# Pack artifacts and local state.
+*.tgz
+node_modules/

@@ -8,6 +8,13 @@ bin/
 dist/
 ui/dist/
 
+# Generated npm packages. The manifests under npm/packages/ and the entry
+# package's bin/ wrapper are rebuilt by `make npm-packages`; only the hand-written
+# sources in npm/ (package.json, .npmignore, README.md) are tracked.
+npm/packages/
+npm/bin/
+npm/scripts/
+
 # Node (present only if npm packages are used)
 node_modules/
 ui/node_modules/

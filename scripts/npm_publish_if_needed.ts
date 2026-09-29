@@ -1,0 +1,175 @@
+// Publishes one npm package, skipping it when that version already exists.
+//
+// A release publishes the platform packages, the entry package, and sometimes
+// both again for a pre-release tag. Re-running must not fail on the versions
+// that already landed, so each package is checked against the registry first.
+//
+// This script is a release tool: `make npm-publish*` is the only intended
+// entry point, and it publishes to the configured registry.
+
+import { join, resolve } from "@std/path";
+
+export interface NpmPackageJson {
+  name: string;
+  version: string;
+}
+
+export interface PublishOptions {
+  /** Registry base URL, without a trailing slash. */
+  registry: string;
+  /** dist-tag to publish under, e.g. `latest` or `next`. */
+  tag: string;
+  /** Directory holding the package manifest. Defaults to the process cwd. */
+  packageDir?: string;
+  /** Extra arguments appended to `npm publish`. */
+  extraArgs?: readonly string[];
+  /** npm executable. */
+  npm?: string;
+}
+
+/** Registry URL that reports whether one exact version exists. */
+export function versionUrl(
+  registry: string,
+  name: string,
+  version: string,
+): string {
+  const base = registry.replace(/\/+$/, "");
+  return `${base}/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+}
+
+/** Reads `name` and `version` from a package manifest. */
+export function readPackageJson(
+  packageDir: string,
+): Promise<NpmPackageJson> {
+  const manifestPath = join(packageDir, "package.json");
+  return Deno.readTextFile(manifestPath).then((text) => {
+    const parsed = JSON.parse(text) as Partial<NpmPackageJson>;
+    if (!parsed.name || !parsed.version) {
+      throw new Error(`${manifestPath} must contain a name and a version`);
+    }
+    return { name: parsed.name, version: parsed.version };
+  });
+}
+
+/**
+ * Whether `name@version` is already in the registry. A 404 means "not
+ * published"; any other status is a real failure and must not be read as
+ * "publish it", or a registry hiccup would republish a live version.
+ */
+export async function isPublished(
+  registry: string,
+  name: string,
+  version: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  const response = await fetchImpl(versionUrl(registry, name, version), {
+    headers: { Accept: "application/json" },
+  });
+  if (response.status === 200) return true;
+  if (response.status === 404) return false;
+  throw new Error(
+    `Registry check for ${name}@${version} failed: HTTP ${response.status}`,
+  );
+}
+
+export interface ParsedArgs extends Omit<PublishOptions, "npm"> {}
+
+/**
+ * Parses `[--tag <t>] [--registry <url>] [<package-dir>] [-- <npm args>]`.
+ * A flag that is missing its value is an error rather than a silent default,
+ * because publishing under the wrong tag or registry is not recoverable.
+ */
+export function parseArgs(
+  argv: readonly string[],
+  defaults: { registry: string; tag: string },
+): ParsedArgs {
+  const separator = argv.indexOf("--");
+  const flags = separator === -1 ? argv : argv.slice(0, separator);
+  const extraArgs = separator === -1 ? [] : argv.slice(separator + 1);
+
+  let registry = defaults.registry;
+  let tag = defaults.tag;
+  let packageDir: string | undefined;
+
+  for (let i = 0; i < flags.length; i += 1) {
+    const flag = flags[i];
+    if (flag === "--tag" || flag === "--registry") {
+      const value = flags[i + 1];
+      if (value === undefined) throw new Error(`${flag} requires a value`);
+      if (flag === "--tag") tag = value;
+      else registry = value;
+      i += 1;
+      continue;
+    }
+    if (flag.startsWith("--")) throw new Error(`Unknown option: ${flag}`);
+    if (packageDir !== undefined) {
+      throw new Error(`Unexpected extra package directory: ${flag}`);
+    }
+    packageDir = flag;
+  }
+
+  return { registry, tag, packageDir, extraArgs };
+}
+
+export interface PublishResult {
+  label: string;
+  published: boolean;
+  reason?: string;
+}
+
+/** Publishes the package unless its version is already on the registry. */
+export async function publishIfNeeded(
+  options: PublishOptions,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PublishResult> {
+  const packageDir = resolve(options.packageDir ?? Deno.cwd());
+  const pkg = await readPackageJson(packageDir);
+  const label = `${pkg.name}@${pkg.version}`;
+
+  if (await isPublished(options.registry, pkg.name, pkg.version, fetchImpl)) {
+    return { label, published: false, reason: "already published" };
+  }
+
+  const npm = options.npm ?? "npm";
+  const args = [
+    "publish",
+    "--tag",
+    options.tag,
+    "--registry",
+    options.registry,
+    ...(options.extraArgs ?? []),
+  ];
+  console.log(`  Publishing ${label} with tag ${options.tag}...`);
+  const status = await new Deno.Command(npm, {
+    args,
+    cwd: packageDir,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn().status;
+  if (!status.success) {
+    throw new Error(`npm publish failed for ${label}`);
+  }
+  return { label, published: true };
+}
+
+if (import.meta.main) {
+  const parsed = parseArgs(Deno.args, {
+    registry: Deno.env.get("NPM_REGISTRY") ??
+      Deno.env.get("npm_config_registry") ??
+      "https://registry.npmjs.org",
+    tag: "latest",
+  });
+  try {
+    const result = await publishIfNeeded({
+      ...parsed,
+      npm: Deno.env.get("NPM") ?? "npm",
+    });
+    if (!result.published) {
+      console.log(`  Skipping ${result.label}: ${result.reason}`);
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    Deno.exit(1);
+  }
+}

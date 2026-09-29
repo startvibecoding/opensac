@@ -1,0 +1,42 @@
+{
+  "name": "opensac-installer",
+  "version": "0.0.1",
+  "description": "AI coding assistant for the terminal. One binary, many providers.",
+  "bin": {
+    "opensac": "bin/opensac"
+  },
+  "files": [
+    "bin/opensac",
+    "bin/platforms.js",
+    "scripts/",
+    "README.md"
+  ],
+  "keywords": [
+    "ai",
+    "coding",
+    "assistant",
+    "terminal",
+    "cli",
+    "agent",
+    "llm"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/startvibecoding/opensac.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "optionalDependencies": {
+    "opensac-installer-linux-x64": "0.0.1",
+    "opensac-installer-linux-arm64": "0.0.1",
+    "opensac-installer-darwin-x64": "0.0.1",
+    "opensac-installer-darwin-arm64": "0.0.1",
+    "opensac-installer-win32-x64": "0.0.1",
+    "opensac-installer-win32-arm64": "0.0.1"
+  }
+}

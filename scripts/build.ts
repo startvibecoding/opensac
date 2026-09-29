@@ -7,6 +7,11 @@
 // tracked source file.
 
 import { resolve } from "@std/path";
+import {
+  npmPlatformFor,
+  PLATFORM_TARGETS,
+  type PlatformTarget,
+} from "./platforms.ts";
 
 /** Directories and files embedded into the compiled binary. */
 const INCLUDES = [
@@ -87,6 +92,94 @@ export function compileArgs(envFile: string): string[] {
   return args;
 }
 
+/**
+ * `compileArgs` for one named release target. The output is the platform's
+ * binary name from the shared platform table, so `bin/` holds exactly the
+ * artifacts the npm packager later looks for.
+ */
+export function compileArgsForTarget(
+  envFile: string,
+  target: PlatformTarget,
+): string[] {
+  const args = [
+    "compile",
+    "-A",
+    `--env-file=${envFile}`,
+    `--target=${target.denoTarget}`,
+  ];
+  for (const path of INCLUDES) args.push("--include", path);
+  args.push("-o", `bin/${target.binary}`, ENTRY);
+  return args;
+}
+
+/** Compiles one platform and waits for it to finish. Returns the exit code. */
+async function compileTarget(
+  repoDir: string,
+  envFile: string,
+  target: PlatformTarget,
+): Promise<number> {
+  console.error(`Building ${target.npmPlatform} (${target.denoTarget})`);
+  const status = await new Deno.Command(Deno.execPath(), {
+    args: compileArgsForTarget(envFile, target),
+    cwd: repoDir,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  }).spawn().status;
+  if (!status.success) {
+    console.error(`Build failed for ${target.npmPlatform}`);
+  }
+  return status.code;
+}
+
+/**
+ * Compiles every platform in the shared table. Stops at the first failure so a
+ * partial `bin/` is never mistaken for a complete release.
+ */
+export async function buildAllTargets(
+  repoDir: string,
+  envFile: string,
+  targets: readonly PlatformTarget[] = PLATFORM_TARGETS,
+): Promise<void> {
+  await Deno.mkdir(resolve(repoDir, "bin"), { recursive: true });
+  for (const target of targets) {
+    const code = await compileTarget(repoDir, envFile, target);
+    if (code !== 0) Deno.exit(code);
+  }
+}
+
+/** Resolves `--target=<npm-platform>` to a release target, or undefined. */
+export function selectedTargets(
+  flag: string | undefined,
+): readonly PlatformTarget[] {
+  if (flag === undefined) return [hostTarget()];
+  const npmPlatform = flag.startsWith("--target=")
+    ? flag.slice("--target=".length)
+    : flag;
+  const target = PLATFORM_TARGETS.find((t) => t.npmPlatform === npmPlatform);
+  if (target === undefined) {
+    const known = PLATFORM_TARGETS.map((t) => t.npmPlatform).join(", ");
+    console.error(`Unknown --target=${npmPlatform}. Known platforms: ${known}`);
+    Deno.exit(1);
+  }
+  return [target];
+}
+
+/** The release target matching the current host, for a plain `deno task build`. */
+function hostTarget(): PlatformTarget {
+  const npmPlatform = npmPlatformFor(Deno.build.os, Deno.build.arch);
+  const target = npmPlatform === undefined
+    ? undefined
+    : PLATFORM_TARGETS.find((t) => t.npmPlatform === npmPlatform);
+  if (target === undefined) {
+    console.error(
+      `No release target for ${Deno.build.os}-${Deno.build.arch}`,
+    );
+    Deno.exit(1);
+  }
+  return target;
+}
+
 if (import.meta.main) {
   const repoDir = resolve(import.meta.dirname ?? ".", "..");
   const version = await resolveBuildVersion(repoDir);
@@ -110,14 +203,17 @@ if (import.meta.main) {
   });
   try {
     await Deno.writeTextFile(envFile, buildEnvFile(version));
-    const status = await new Deno.Command(Deno.execPath(), {
-      args: compileArgs(envFile),
-      cwd: repoDir,
-      stdin: "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
-    }).spawn().status;
-    if (!status.success) Deno.exit(status.code);
+    if (Deno.args.includes("--all")) {
+      await buildAllTargets(repoDir, envFile);
+    } else {
+      const targets = selectedTargets(
+        Deno.args.find((arg) => arg.startsWith("--target=")),
+      );
+      for (const target of targets) {
+        const code = await compileTarget(repoDir, envFile, target);
+        if (code !== 0) Deno.exit(code);
+      }
+    }
   } finally {
     await Deno.remove(envFile).catch(() => {});
   }
