@@ -28,6 +28,7 @@ import { CorePaths } from "../core/paths.ts";
 import { type CoreRegistration, CoreRegistry } from "../core/registry.ts";
 import { CORE_METHODS, type CoreShutdownResult } from "../core/protocol.ts";
 import type { CoreRuntimeHost } from "../core/runtime.ts";
+import type { CoreLockInspection } from "../core/lock.ts";
 import {
   CoreServer,
   type CoreServerHandle,
@@ -1433,6 +1434,129 @@ Deno.test("launchCoreCommand refuses to replace an incompatible registered Core"
     "incompatible",
   );
   assertEquals(probe.ensureStartedCalls, 0);
+});
+
+const orphanLock: CoreLockInspection = {
+  state: "orphan",
+  reason: "missing-metadata",
+  ageMs: 60_000,
+  reclaimableByConsent: true,
+  reclaimableAutomatically: false,
+};
+
+Deno.test("launchCoreCommand repairs a consented orphan lock before launching", async () => {
+  const probe = lifecycleProbe();
+  const started = readyDiscovery(registration(4096));
+  let confirmCalls = 0;
+  let reclaimCalls = 0;
+  const outcome = await launchCoreCommand(
+    lifecycleOptions(),
+    {
+      ...lifecycleDeps(probe, {
+        discoveries: [{ status: "missing" }],
+        started,
+      }),
+      inspectLock: () => orphanLock,
+      confirmLockRepair: () => {
+        confirmCalls++;
+        return true;
+      },
+      reclaimOrphanLock: () => {
+        reclaimCalls++;
+        return true;
+      },
+    },
+  );
+  assertEquals(confirmCalls, 1);
+  assertEquals(reclaimCalls, 1);
+  assertEquals(probe.ensureStartedCalls, 1);
+  assertEquals(outcome.status, "started");
+});
+
+Deno.test("launchCoreCommand declines the orphan repair without deleting or launching", async () => {
+  const probe = lifecycleProbe();
+  const started = readyDiscovery(registration(4096));
+  let reclaimCalls = 0;
+  await assertRejects(
+    () =>
+      launchCoreCommand(
+        lifecycleOptions(),
+        {
+          ...lifecycleDeps(probe, {
+            discoveries: [{ status: "missing" }],
+            started,
+          }),
+          inspectLock: () => orphanLock,
+          confirmLockRepair: () => false,
+          reclaimOrphanLock: () => {
+            reclaimCalls++;
+            return true;
+          },
+        },
+      ),
+    Error,
+    "stale Core lock",
+  );
+  assertEquals(reclaimCalls, 0);
+  assertEquals(probe.ensureStartedCalls, 0);
+});
+
+Deno.test("launchCoreCommand does not prompt or delete a lock when not interactive", async () => {
+  const probe = lifecycleProbe();
+  const started = readyDiscovery(registration(4096));
+  let reclaimCalls = 0;
+  const outcome = await launchCoreCommand(
+    lifecycleOptions(),
+    {
+      ...lifecycleDeps(probe, {
+        discoveries: [{ status: "missing" }],
+        started,
+      }),
+      inspectLock: () => orphanLock,
+      isInteractive: () => false,
+      reclaimOrphanLock: () => {
+        reclaimCalls++;
+        return true;
+      },
+    },
+  );
+  // Headless: no consent prompt, no deletion; the launch proceeds so
+  // CoreLock.acquire's own grace-gated self-heal (or busy error) decides.
+  assertEquals(reclaimCalls, 0);
+  assertEquals(probe.ensureStartedCalls, 1);
+  assertEquals(outcome.status, "started");
+});
+
+Deno.test("launchCoreCommand leaves a held lock untouched", async () => {
+  const probe = lifecycleProbe();
+  const started = readyDiscovery(registration(4096));
+  let confirmCalls = 0;
+  await launchCoreCommand(
+    lifecycleOptions(),
+    {
+      ...lifecycleDeps(probe, {
+        discoveries: [{ status: "missing" }],
+        started,
+      }),
+      inspectLock: () => ({
+        state: "held",
+        owner: {
+          token: "live-token",
+          pid: Deno.pid,
+          hostname: Deno.hostname(),
+          timestamp: 1,
+        },
+        reclaimableByConsent: false,
+        reclaimableAutomatically: false,
+      }),
+      confirmLockRepair: () => {
+        confirmCalls++;
+        return true;
+      },
+    },
+  );
+  assertEquals(confirmCalls, 0);
+  assertEquals(probe.ensureStartedCalls, 1);
 });
 
 Deno.test("restartCoreCommand stops the running Core before starting a replacement", async () => {

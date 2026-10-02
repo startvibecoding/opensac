@@ -11,7 +11,7 @@
     "build:darwin": "deno run -A scripts/build.ts --target=darwin-x64",
     "build:windows": "deno run -A scripts/build.ts --target=win32-x64",
     "build:version": "deno run -A scripts/build.ts --version",
-    "install": "deno install -g -A -n opensac --config deno.json src/main.ts",
+    "install": "deno install -g -A -n opensac -f --config deno.json src/main.ts",
     "test": "deno test -A",
     "test:architecture": "deno test -A src/architecture/",
     "check": "deno check src/ sdk/ examples/ scripts/ bootstrap.ts",

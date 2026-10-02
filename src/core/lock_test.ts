@@ -301,6 +301,106 @@ Deno.test("CoreLock fails closed when owner liveness cannot be established", asy
   });
 });
 
+async function seedOrphanLock(
+  paths: CorePaths,
+  ageMs = 0,
+): Promise<void> {
+  await Deno.mkdir(paths.lockFile, { mode: 0o700 });
+  if (ageMs > 0) {
+    const past = new Date(Date.now() - ageMs);
+    await Deno.utime(paths.lockFile, past, past);
+  }
+}
+
+Deno.test("CoreLock.inspect classifies free, held, and orphan locks", async () => {
+  await withStateDir(async (paths) => {
+    assertEquals((await CoreLock.inspect(paths)).state, "free");
+
+    const handle = await CoreLock.acquire(paths);
+    assertEquals((await CoreLock.inspect(paths)).state, "held");
+    await handle.release();
+
+    await seedOrphanLock(paths);
+    const orphan = await CoreLock.inspect(paths);
+    if (orphan.state !== "orphan") {
+      throw new Error(`expected orphan, got ${orphan.state}`);
+    }
+    assertEquals(orphan.reason, "missing-metadata");
+    assertEquals(orphan.reclaimableByConsent, true);
+    // A fresh orphan is inside the grace window, so headless recovery refuses.
+    assertEquals(orphan.reclaimableAutomatically, false);
+  });
+});
+
+Deno.test("CoreLock.acquire auto-heals a stale missing-metadata orphan", async () => {
+  await withStateDir(async (paths) => {
+    await seedOrphanLock(paths, 60_000);
+    const handle = await CoreLock.acquire(paths);
+    try {
+      assertEquals((await CoreLock.inspect(paths)).state, "held");
+    } finally {
+      await handle.release();
+    }
+    assertEquals(await exists(paths.lockFile), false);
+  });
+});
+
+Deno.test("CoreLock.acquire refuses a missing-metadata orphan inside the grace window", async () => {
+  await withStateDir(async (paths) => {
+    await seedOrphanLock(paths, 0);
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
+    assertEquals(await exists(paths.lockFile), true);
+  });
+});
+
+Deno.test("CoreLock.acquire will not auto-heal malformed metadata or a live registration", async () => {
+  await withStateDir(async (paths, registry) => {
+    // Malformed metadata is never auto-healed, even past the grace window: it
+    // is an unreadable-ownership signal that requires explicit human consent.
+    await Deno.mkdir(paths.lockFile, { mode: 0o700 });
+    const metaPath = path.join(paths.lockFile, "meta.json");
+    await Deno.writeTextFile(metaPath, "{not-json");
+    const past = new Date(Date.now() - 60_000);
+    await Deno.utime(metaPath, past, past);
+    await Deno.utime(paths.lockFile, past, past);
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
+    assertEquals(await exists(paths.lockFile), true);
+    await handleMalformedLock(paths);
+
+    // A live registration blocks recovery of a clear missing-metadata orphan.
+    await registry.write(registration("live-core"));
+    await seedOrphanLock(paths, 60_000);
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
+    assertEquals(await exists(paths.lockFile), true);
+  });
+});
+
+async function handleMalformedLock(paths: CorePaths): Promise<void> {
+  const removed = await CoreLock.reclaimOrphan(paths);
+  assertEquals(removed, true);
+  assertEquals(await exists(paths.lockFile), false);
+}
+
+Deno.test("CoreLock.reclaimOrphan removes a consented orphan even inside the grace window", async () => {
+  await withStateDir(async (paths) => {
+    await seedOrphanLock(paths, 0);
+    assertEquals(await CoreLock.reclaimOrphan(paths), true);
+    assertEquals(await exists(paths.lockFile), false);
+    // It then acquires cleanly.
+    const handle = await CoreLock.acquire(paths);
+    await handle.release();
+  });
+});
+
+Deno.test("CoreLock.reclaimOrphan refuses consent removal while a live Core is registered", async () => {
+  await withStateDir(async (paths, registry) => {
+    await registry.write(registration("live-core"));
+    await seedOrphanLock(paths, 0);
+    assertEquals(await CoreLock.reclaimOrphan(paths), false);
+    assertEquals(await exists(paths.lockFile), true);
+  });
+});
+
 async function waitForFile(filePath: string): Promise<void> {
   for (let attempt = 0; attempt < 1000; attempt++) {
     try {

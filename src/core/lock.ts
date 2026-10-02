@@ -14,23 +14,72 @@ const META_FILE = "meta.json";
 const RECLAIM_DIR = "reclaim";
 const RECLAIM_META_FILE = "owner.json";
 
+/**
+ * A lock directory whose owner metadata is absent is only treated as a crashed
+ * half-acquisition after this grace window. A healthy acquirer completes its
+ * metadata write in microseconds, so an empty lock directory older than this
+ * cannot be a live acquirer racing our own read.
+ */
+const ORPHAN_RECLAIM_GRACE_MS = 5_000;
+
+/** Why a `CoreLockBusyError` was raised, for actionable caller messaging. */
+export type CoreLockBusyDetail =
+  | "held"
+  | "missing-metadata"
+  | "unreadable-metadata"
+  | "unknown-owner"
+  | "reclaim-race";
+
 /** Raised when a lock cannot be acquired without risking a second owner. */
 export class CoreLockBusyError extends Error {
   readonly lockPath: string;
   readonly metadata?: CoreLockMetadata;
+  readonly detail: CoreLockBusyDetail;
 
   constructor(
     lockPath: string,
     metadata?: CoreLockMetadata,
     options?: ErrorOptions,
+    detail?: CoreLockBusyDetail,
   ) {
-    const owner = metadata === undefined
-      ? "an unknown owner"
-      : `pid ${metadata.pid} on ${metadata.hostname}`;
-    super(`Core lock is held by ${owner}`, options);
+    const resolved: CoreLockBusyDetail = detail ??
+      (metadata === undefined ? "unknown-owner" : "held");
+    super(coreLockBusyMessage(lockPath, metadata, resolved), options);
     this.name = "CoreLockBusyError";
     this.lockPath = lockPath;
     this.metadata = metadata;
+    this.detail = resolved;
+  }
+}
+
+function coreLockBusyMessage(
+  lockPath: string,
+  metadata: CoreLockMetadata | undefined,
+  detail: CoreLockBusyDetail,
+): string {
+  switch (detail) {
+    case "held":
+      return metadata === undefined
+        ? "Core lock is held by an unknown owner"
+        : `Core lock is held by pid ${metadata.pid} on ${metadata.hostname}`;
+    case "missing-metadata":
+      return (
+        "Core lock is a stale directory left by a Core that crashed before " +
+        `writing owner metadata (no owner is identifiable). Run ` +
+        "`opensac core restart` to repair it, or remove " +
+        `"${lockPath}" manually.`
+      );
+    case "unreadable-metadata":
+      return (
+        `Core lock owner metadata in "${lockPath}" is unreadable, so its ` +
+        "owner cannot be identified. Remove that lock directory only after " +
+        "confirming no Core is running."
+      );
+    case "reclaim-race":
+      return "Core lock was claimed by a competing acquirer during recovery";
+    case "unknown-owner":
+    default:
+      return "Core lock is held by an unknown owner";
   }
 }
 
@@ -113,12 +162,28 @@ export class CoreLock {
         try {
           existing = await readMetadata(lockDir);
         } catch (metadataError) {
-          throw new CoreLockBusyError(lockDir, undefined, {
-            cause: metadataError,
-          });
+          throw new CoreLockBusyError(
+            lockDir,
+            undefined,
+            { cause: metadataError },
+            "unreadable-metadata",
+          );
         }
         if (existing === undefined) {
-          throw new CoreLockBusyError(lockDir, undefined, { cause: error });
+          // The directory exists but carries no owner metadata: the only way
+          // to reach this is a Core that was hard-killed between the atomic
+          // mkdir and its metadata write. Reclaim it only when no live Core is
+          // registered and the directory is old enough that it cannot be a
+          // healthy acquirer mid-write; otherwise keep failing closed.
+          if (await reclaimOrphanLock(paths, lockDir, true)) {
+            continue;
+          }
+          throw new CoreLockBusyError(
+            lockDir,
+            undefined,
+            { cause: error },
+            "missing-metadata",
+          );
         }
 
         const stale = await canReclaim(paths, existing);
@@ -143,8 +208,242 @@ export class CoreLock {
 
     // A competing acquirer won the race after our stale removal. Do not loop
     // indefinitely or inspect/remove that owner's directory.
-    throw new CoreLockBusyError(lockDir);
+    throw new CoreLockBusyError(lockDir, undefined, undefined, "reclaim-race");
   }
+
+  /**
+   * Classifies the current lock state without acquiring or removing anything,
+   * so an interactive caller can decide whether to offer a repair. A lock
+   * directory with no readable owner metadata is reported as an `orphan` only
+   * when no live Core is registered; a registered live Core makes it `held`,
+   * even if the metadata file itself was lost.
+   */
+  static async inspect(
+    paths: CorePaths,
+    signal?: AbortSignal,
+  ): Promise<CoreLockInspection> {
+    throwIfAborted(signal);
+    if (!(paths instanceof CorePaths)) {
+      throw new TypeError("CoreLock.inspect requires CorePaths");
+    }
+    const lockDir = paths.lockFile;
+    let info: Deno.FileInfo;
+    try {
+      info = await Deno.lstat(lockDir);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) return { state: "free" };
+      throw error;
+    }
+    if (!info.isDirectory) {
+      return {
+        state: "orphan",
+        reason: "not-a-directory",
+        reclaimableByConsent: false,
+        reclaimableAutomatically: false,
+      };
+    }
+    let classification: MetadataClassification;
+    try {
+      classification = await classifyMetadata(lockDir);
+    } catch (error) {
+      throwIfAborted(signal);
+      throw error;
+    }
+    if (classification.status === "ok") {
+      return {
+        state: "held",
+        owner: classification.metadata,
+        reclaimableByConsent: false,
+        reclaimableAutomatically: false,
+      };
+    }
+    const reclaimableByConsent = await noLiveRegistration(paths);
+    let ageMs: number | undefined;
+    if (classification.status === "missing" && info.mtime !== null) {
+      ageMs = Math.max(0, Date.now() - info.mtime.getTime());
+    }
+    return {
+      state: "orphan",
+      reason: classification.status === "missing"
+        ? "missing-metadata"
+        : "unreadable-metadata",
+      ...(ageMs === undefined ? {} : { ageMs }),
+      reclaimableByConsent,
+      reclaimableAutomatically: classification.status === "missing" &&
+        reclaimableByConsent &&
+        (ageMs ?? 0) >= ORPHAN_RECLAIM_GRACE_MS,
+    };
+  }
+
+  /**
+   * Removes a demonstrably orphaned lock directory (no owner metadata, no
+   * live registered Core) after explicit user consent. The removal re-verifies
+   * the orphan condition and is serialized by the same reclaim claim used for
+   * stale-owner recovery, so it never displaces a live or in-flight owner.
+   */
+  static async reclaimOrphan(
+    paths: CorePaths,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    throwIfAborted(signal);
+    if (!(paths instanceof CorePaths)) {
+      throw new TypeError("CoreLock.reclaimOrphan requires CorePaths");
+    }
+    return await reclaimOrphanLock(paths, paths.lockFile, false, signal);
+  }
+}
+
+/** Result of `CoreLock.inspect`. */
+export type CoreLockInspection =
+  | { state: "free" }
+  | {
+    state: "held";
+    owner: CoreLockMetadata;
+    reclaimableByConsent: boolean;
+    reclaimableAutomatically: boolean;
+  }
+  | {
+    state: "orphan";
+    reason: "missing-metadata" | "unreadable-metadata" | "not-a-directory";
+    ageMs?: number;
+    reclaimableByConsent: boolean;
+    reclaimableAutomatically: boolean;
+  };
+
+type MetadataClassification =
+  | { status: "ok"; metadata: CoreLockMetadata }
+  | { status: "missing" }
+  | { status: "unreadable" };
+
+async function classifyMetadata(
+  lockDir: string,
+): Promise<MetadataClassification> {
+  try {
+    const metadata = await readMetadata(lockDir);
+    return metadata === undefined
+      ? { status: "missing" }
+      : { status: "ok", metadata };
+  } catch {
+    // readMetadata throws only for unreadable/invalid metadata; a missing file
+    // resolves to undefined above.
+    return { status: "unreadable" };
+  }
+}
+
+/**
+ * True when the registry proves no live Core exists. A malformed or unreadable
+ * registration fails closed (false) so an orphan is never removed while a
+ * healthy Core may be relying on it.
+ */
+async function noLiveRegistration(paths: CorePaths): Promise<boolean> {
+  let registration;
+  try {
+    registration = await new CoreRegistry(paths).read();
+  } catch {
+    return false;
+  }
+  if (registration === undefined) return true;
+  return processLiveness(registration.pid) === "dead";
+}
+
+/**
+ * Reclaims a lock directory whose owning Core is demonstrably gone.
+ * `auto` is the safe headless form used by `acquire`: it only heals the clear
+ * crashed half-acquisition (owner metadata absent), demands the grace window,
+ * and re-verifies no live Core is registered. Explicit user consent
+ * (`CoreLock.reclaimOrphan`) sets `auto` false, which additionally permits an
+ * unreadable/malformed lock directory but still re-verifies no live registered
+ * Core and never deletes a directory that gained valid owner metadata.
+ */
+async function reclaimOrphanLock(
+  paths: CorePaths,
+  lockDir: string,
+  auto: boolean,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const first = await orphanDecision(lockDir);
+  if (!first.isOrphan) return false;
+  if (auto && first.status !== "missing") return false;
+  if (!(await noLiveRegistration(paths))) return false;
+  if (auto) {
+    let info: Deno.FileInfo;
+    try {
+      info = await Deno.lstat(lockDir);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) return false;
+      throw error;
+    }
+    if (
+      info.mtime === null ||
+      Date.now() - info.mtime.getTime() < ORPHAN_RECLAIM_GRACE_MS
+    ) {
+      return false;
+    }
+  }
+
+  const claimDir = path.join(lockDir, RECLAIM_DIR);
+  const claim = await acquireReclaimClaim(claimDir);
+  if (claim === undefined) return false;
+
+  let moved = false;
+  try {
+    throwIfAborted(signal);
+    // Re-verify the orphan condition while the claim is held, exactly as stale
+    // recovery does before any rename.
+    const underClaim = await orphanDecision(lockDir);
+    if (!underClaim.isOrphan) return false;
+    if (auto && underClaim.status !== "missing") return false;
+    if (!(await noLiveRegistration(paths))) return false;
+
+    const quarantine = uniqueSibling(lockDir, "orphan");
+    try {
+      await Deno.rename(lockDir, quarantine);
+      moved = true;
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) return false;
+      throw error;
+    }
+    // Only the uniquely named quarantine is removed. If it unexpectedly gained
+    // valid owner metadata (a live acquirer), it is theirs, never ours to delete.
+    const movedDecision = await orphanDecision(quarantine);
+    if (movedDecision.status === "ok") {
+      return false;
+    }
+    await removeDirectoryBestEffort(quarantine);
+    return true;
+  } finally {
+    if (!moved) {
+      await releaseReclaimClaim(claimDir, claim.token);
+    }
+  }
+}
+
+interface OrphanDecision {
+  isOrphan: boolean;
+  status: "missing" | "unreadable" | "ok" | "absent" | "not-a-directory";
+}
+
+/**
+ * Classifies whether `lockDir` is an orphan: a directory whose owner metadata
+ * is absent or unreadable. A metadata-bearing lock is never an orphan here (it
+ * is handled by stale-owner recovery), and a non-directory path is never
+ * auto-removed.
+ */
+async function orphanDecision(lockDir: string): Promise<OrphanDecision> {
+  let info: Deno.FileInfo;
+  try {
+    info = await Deno.lstat(lockDir);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return { isOrphan: false, status: "absent" };
+    }
+    throw error;
+  }
+  if (!info.isDirectory) return { isOrphan: false, status: "not-a-directory" };
+  const classification = await classifyMetadata(lockDir);
+  return classification.status === "ok"
+    ? { isOrphan: false, status: "ok" }
+    : { isOrphan: true, status: classification.status };
 }
 
 async function claimStaleLock(

@@ -25,7 +25,11 @@ import {
   registrationConnectHost,
   registrationMatchesConfiguredEndpoint,
 } from "../core/endpoint.ts";
-import { CoreLock, CoreLockBusyError } from "../core/lock.ts";
+import {
+  CoreLock,
+  CoreLockBusyError,
+  type CoreLockInspection,
+} from "../core/lock.ts";
 import { CorePaths } from "../core/paths.ts";
 import { type CoreRegistration, CoreRegistry } from "../core/registry.ts";
 import { CoreEventStream } from "../core/event_stream.ts";
@@ -1055,6 +1059,23 @@ export interface CoreLifecycleDependencies {
   createClient?: (
     options: CoreLifecycleClientOptions,
   ) => MaybePromise<CoreLifecycleClient>;
+  /** Inspect the Core lock without acquiring it; defaults to CoreLock.inspect. */
+  inspectLock?: (
+    paths: CorePaths,
+    signal?: AbortSignal,
+  ) => MaybePromise<CoreLockInspection>;
+  /** Removes a demonstrably orphaned lock; defaults to CoreLock.reclaimOrphan. */
+  reclaimOrphanLock?: (
+    paths: CorePaths,
+    signal?: AbortSignal,
+  ) => MaybePromise<boolean>;
+  /** Confirms an orphan-lock repair; defaults to an interactive y/N prompt. */
+  confirmLockRepair?: (
+    info: CoreLockInspection,
+    message: string,
+  ) => MaybePromise<boolean>;
+  /** Reports whether interactive confirmation is available; defaults to TTY. */
+  isInteractive?: () => boolean;
   /** Signal used when options.signal is absent. */
   signal?: AbortSignal;
   /** Clock used for the `status` uptime projection. */
@@ -1206,6 +1227,8 @@ export async function launchCoreCommand(
       );
     }
 
+    throwIfAborted(signal);
+    await repairOrphanLockBeforeLaunch(context.paths, deps, signal);
     throwIfAborted(signal);
     const ensureStarted = client.ensureStarted;
     if (ensureStarted === undefined) {
@@ -1368,6 +1391,126 @@ function defaultLifecycleClient(
     config: options.config,
     ...(options.signal === undefined ? {} : { signal: options.signal }),
   });
+}
+
+/**
+ * Detects a stale Core lock left by a crashed Core before a `start`/`restart`
+ * launches a child that would only fail on it again. When the lock is provably
+ * orphaned (no owner metadata and no live registered Core) it asks the user to
+ * repair; on confirmation it removes the stale directory so the launch
+ * proceeds. Declining surfaces an actionable error. Headless callers are left
+ * to `CoreLock.acquire`'s own grace-gated self-heal, which never touches a lock
+ * that may belong to a live or in-flight owner.
+ */
+async function repairOrphanLockBeforeLaunch(
+  paths: CorePaths,
+  deps: CoreLifecycleDependencies,
+  signal?: AbortSignal,
+): Promise<void> {
+  const inspect = deps.inspectLock ?? ((p, s) => CoreLock.inspect(p, s));
+  const info = await inspect(paths, signal);
+  if (info.state !== "orphan" || !info.reclaimableByConsent) return;
+
+  const message = orphanLockPrompt(paths, info);
+  let accept: boolean;
+  if (deps.confirmLockRepair !== undefined) {
+    accept = await deps.confirmLockRepair(info, message);
+  } else if ((deps.isInteractive ?? defaultLockRepairInteractive)()) {
+    accept = await promptLockRepairConfirm(message);
+  } else {
+    // Headless: never delete user state without consent. `CoreLock.acquire`
+    // still self-heals a provably-crashed orphan past its grace window.
+    return;
+  }
+
+  if (accept) {
+    const reclaim = deps.reclaimOrphanLock ??
+      ((p, s) => CoreLock.reclaimOrphan(p, s));
+    const removed = await reclaim(paths, signal);
+    if (removed) {
+      await writeCoreStdout(
+        `Removed stale Core lock directory ${paths.lockFile}.\n`,
+      );
+    }
+    return;
+  }
+
+  throw new Error(
+    `A stale Core lock directory was left at ${paths.lockFile} with no live ` +
+      "Core using it. Repair it by running `opensac core restart` and " +
+      "confirming, or remove that directory manually.",
+  );
+}
+
+function orphanLockPrompt(
+  paths: CorePaths,
+  info: Extract<CoreLockInspection, { state: "orphan" }>,
+): string {
+  const what = info.reason === "missing-metadata"
+    ? "no owner metadata (a Core crashed before it could claim it)"
+    : info.reason === "unreadable-metadata"
+    ? "unreadable owner metadata"
+    : "is not a lock directory";
+  const age = info.ageMs === undefined
+    ? ""
+    : ` (left ${Math.round(info.ageMs / 1000)}s ago)`;
+  return (
+    `Detected a stale Core lock at ${paths.lockFile} with ${what}${age}, and ` +
+    "no running Core is registered. Remove it and continue starting the Core?"
+  );
+}
+
+function defaultLockRepairInteractive(): boolean {
+  try {
+    return Deno.stdin.isTerminal?.() === true;
+  } catch {
+    return false;
+  }
+}
+
+async function writeCoreStdout(text: string): Promise<void> {
+  try {
+    await Deno.stdout.write(new TextEncoder().encode(text));
+  } catch {
+    // A non-writable stdout must not fail the repair itself.
+  }
+}
+
+async function promptLockRepairConfirm(message: string): Promise<boolean> {
+  await writeCoreStdout(`${message} [y/N] `);
+  const answer = await readStdinLine();
+  const normalized = answer.trim().toLowerCase();
+  return normalized === "y" || normalized === "yes";
+}
+
+async function readStdinLine(): Promise<string> {
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = Deno.stdin.readable.getReader();
+  } catch {
+    return "";
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const newline = buffer.indexOf("\n");
+      if (newline >= 0) return buffer.slice(0, newline);
+      if (buffer.length > 4096) break;
+    }
+  } catch {
+    return "";
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // The stream may already be closed or cancelled.
+    }
+  }
+  return buffer;
 }
 
 function resolveRestartStopDeps(
