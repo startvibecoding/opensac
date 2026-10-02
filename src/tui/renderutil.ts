@@ -1,10 +1,20 @@
 // ANSI-aware text wrapping.
 // WrapPlainText hard-wraps model text to display-cell widths; WrapANSI wraps
 // styled text preserving escape sequences. Tabs normalize to three spaces.
+//
+// These helpers sit on the hottest path of the TUI (every transcript row and
+// every framed-panel block is wrapped), so each pass keeps an allocation-free
+// fast path for plain text and measures with an early exit instead of
+// stripping and re-measuring the whole line.
 
-import { displayWidth } from "./formatters.ts";
+import {
+  ansiSequenceEnd,
+  displayWidth,
+  displayWidthExceeds,
+  runeWidth,
+} from "./formatters.ts";
 
-const PATH_BREAKPOINTS = "/";
+const ESC = 0x1b;
 
 /** Terminal cell width of s after tab normalization (ANSI zero-width). */
 export function visibleWidth(s: string): number {
@@ -42,6 +52,11 @@ function wrapWith(
       wrapped.push("");
       continue;
     }
+    // A line that already fits never reaches the wrapper.
+    if (!displayWidthExceeds(trimmedLine, width)) {
+      wrapped.push(trimmedLine);
+      continue;
+    }
     for (const out of wrapLine(trimmedLine).split("\n")) {
       const trimmed = trimRightVisibleASCIIWhitespace(out);
       if (!isANSIBlankLine(trimmed)) {
@@ -53,10 +68,11 @@ function wrapWith(
 }
 
 function normalizeTabs(s: string): string {
-  return s.replaceAll("\t", "   ");
+  return s.includes("\t") ? s.replaceAll("\t", "   ") : s;
 }
 
 function trimRightVisibleASCIIWhitespace(s: string): string {
+  if (s.indexOf("\u001B") === -1) return s.replace(/[ \t]+$/, "");
   const plain = stripANSI(s);
   const trimmed = plain.replace(/[ \t]+$/, "");
   if (trimmed.length === plain.length) return s;
@@ -64,11 +80,14 @@ function trimRightVisibleASCIIWhitespace(s: string): string {
 }
 
 function isANSIBlankLine(s: string): boolean {
+  if (s.indexOf("\u001B") === -1) return s.trim() === "";
   return stripANSI(s).trim() === "";
 }
 
 /** Strips ANSI escape sequences. */
 export function stripANSI(s: string): string {
+  // Plain text is the common case: skip the regex copy entirely.
+  if (s.indexOf("\u001B") === -1) return s;
   // deno-lint-ignore no-control-regex
   return s.replace(/\u001B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\-_])/g, "");
 }
@@ -77,65 +96,80 @@ export function stripANSI(s: string): string {
  * so styles terminate correctly (Go xansi.Truncate). */
 export function truncateANSI(s: string, width: number): string {
   if (width <= 0) return "";
-  if (displayWidth(s) <= width) return s;
+  if (!displayWidthExceeds(s, width)) return s;
   let w = 0;
   let out = "";
   let i = 0;
-  const chars = Array.from(s);
-  while (i < chars.length) {
-    const ch = chars[i];
-    if (ch === "\u001B") {
-      const [seq, next] = consumeANSISeq(chars, i);
-      out += seq;
+  while (i < s.length) {
+    const code = s.charCodeAt(i);
+    if (code === ESC) {
+      const next = ansiSequenceEnd(s, i);
+      out += s.slice(i, next);
       i = next;
       continue;
     }
-    const rw = displayWidth(ch);
+    let cp = code;
+    let size = 1;
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < s.length) {
+      const low = s.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        cp = ((cp - 0xd800) << 10) + (low - 0xdc00) + 0x10000;
+        size = 2;
+      }
+    }
+    const rw = runeWidth(cp);
     if (w + rw > width) break;
-    out += ch;
+    out += s.slice(i, i + size);
     w += rw;
-    i++;
+    i += size;
   }
   // Preserve trailing SGR sequences from the unprinted remainder so color
   // state does not leak past the truncation point.
-  while (i < chars.length) {
-    const ch = chars[i];
-    if (ch === "\u001B") {
-      const [seq, next] = consumeANSISeq(chars, i);
-      if (seq.endsWith("m")) out += seq;
-      i = next;
+  while (i < s.length) {
+    if (s.charCodeAt(i) !== ESC) {
+      i++;
       continue;
     }
-    i++;
+    const next = ansiSequenceEnd(s, i);
+    const seq = s.slice(i, next);
+    if (seq.endsWith("m")) out += seq;
+    i = next;
   }
   return out;
 }
 
 /** Hard-wraps one line at exact cell boundaries, preserving ANSI. */
 function hardwrap(line: string, width: number): string {
-  if (displayWidth(line) <= width) return line;
   const out: string[] = [];
   let current = "";
   let w = 0;
   let i = 0;
-  const chars = Array.from(line);
-  while (i < chars.length) {
-    const ch = chars[i];
-    if (ch === "\u001B") {
-      const [seq, next] = consumeANSISeq(chars, i);
-      current += seq;
+  while (i < line.length) {
+    const code = line.charCodeAt(i);
+    if (code === ESC) {
+      const next = ansiSequenceEnd(line, i);
+      current += line.slice(i, next);
       i = next;
       continue;
     }
-    const rw = displayWidth(ch);
+    let cp = code;
+    let size = 1;
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < line.length) {
+      const low = line.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        cp = ((cp - 0xd800) << 10) + (low - 0xdc00) + 0x10000;
+        size = 2;
+      }
+    }
+    const rw = runeWidth(cp);
     if (w + rw > width) {
       out.push(current);
       current = "";
       w = 0;
     }
-    current += ch;
+    current += line.slice(i, i + size);
     w += rw;
-    i++;
+    i += size;
   }
   out.push(current);
   return out.join("\n");
@@ -143,12 +177,10 @@ function hardwrap(line: string, width: number): string {
 
 /** Word-aware wrap breaking after spaces and "/" (Go xansi.Wrap). */
 function wordWrap(line: string, width: number): string {
-  if (displayWidth(line) <= width) return line;
   const out: string[] = [];
   let current = "";
   let currentW = 0;
-  const words = splitKeepANSI(line);
-  for (const word of words) {
+  for (const word of splitKeepANSI(line)) {
     const wordW = displayWidth(word.text);
     const sepW = displayWidth(word.separator);
     if (currentW > 0 && currentW + sepW + wordW > width) {
@@ -171,54 +203,61 @@ interface Word {
 
 /** Splits a line into words at spaces and "/" breakpoints, keeping ANSI. */
 function splitKeepANSI(line: string): Word[] {
+  // Escape-free text (the bulk of tool output) splits with slices only.
+  if (line.indexOf("\u001B") === -1) return splitPlainWords(line);
   const words: Word[] = [];
   let text = "";
   let pendingSep = "";
   let i = 0;
-  const chars = Array.from(line);
-  while (i < chars.length) {
-    const ch = chars[i];
-    if (ch === "\u001B") {
-      const [seq, next] = consumeANSISeq(chars, i);
-      text += seq;
+  while (i < line.length) {
+    const code = line.charCodeAt(i);
+    if (code === ESC) {
+      const next = ansiSequenceEnd(line, i);
+      text += line.slice(i, next);
       i = next;
       continue;
     }
-    if (ch === " " || ch === PATH_BREAKPOINTS) {
+    if (code === 0x20 || code === 0x2f) {
       if (text !== "") {
         words.push({ text, separator: pendingSep });
         text = "";
-        pendingSep = ch;
+        pendingSep = line[i];
       } else {
-        pendingSep += ch;
+        pendingSep += line[i];
       }
       i++;
       continue;
     }
-    text += ch;
-    i++;
+    let size = 1;
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < line.length) {
+      const low = line.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low <= 0xdfff) size = 2;
+    }
+    text += line.slice(i, i + size);
+    i += size;
   }
   if (text !== "") words.push({ text, separator: pendingSep });
   return words;
 }
 
-function consumeANSISeq(chars: string[], start: number): [string, number] {
-  let seq = chars[start];
-  let i = start + 1;
-  if (i < chars.length && chars[i] === "[") {
-    seq += chars[i];
-    i++;
-    while (i < chars.length && !/[\x40-\x7E]/.test(chars[i])) {
-      seq += chars[i];
-      i++;
+/** Word split for a line that contains no escape sequence. */
+function splitPlainWords(line: string): Word[] {
+  const words: Word[] = [];
+  let pendingSep = "";
+  let start = 0;
+  for (let i = 0; i < line.length; i++) {
+    const code = line.charCodeAt(i);
+    if (code !== 0x20 && code !== 0x2f) continue;
+    if (i > start) {
+      words.push({ text: line.slice(start, i), separator: pendingSep });
+      pendingSep = line[i];
+    } else {
+      pendingSep += line[i];
     }
-    if (i < chars.length) {
-      seq += chars[i];
-      i++;
-    }
-  } else if (i < chars.length) {
-    seq += chars[i];
-    i++;
+    start = i + 1;
   }
-  return [seq, i];
+  if (start < line.length) {
+    words.push({ text: line.slice(start), separator: pendingSep });
+  }
+  return words;
 }

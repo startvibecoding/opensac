@@ -116,6 +116,39 @@ function ControllerApp({
   overlayOpen = false,
 }: AppProps & { controller: AppController }): ReactElement {
   const store = controller.store;
+  // Ink supports a single <Static>; header lines and committed transcript rows
+  // share it, header first. The admitted view is kept across renders so an
+  // open framed panel can be painted without re-walking the whole transcript.
+  const admissionRef = useRef<StaticAdmission>({
+    rows: [],
+    ids: new Set(),
+    view: [],
+    revision: 0,
+    viewRevision: -1,
+  });
+  const admission = admissionRef.current;
+
+  // A framed panel owns the managed region: live rows, activity rows, and new
+  // Static admissions are all suppressed while it is open, so the transcript
+  // walk (which formats every row) is skipped entirely instead of running its
+  // results into discarded arrays. Rows that completed meanwhile are released
+  // on the first frame after the panel closes.
+  if (overlayOpen) {
+    if (admission.viewRevision !== admission.revision) {
+      admission.view = admission.rows.slice();
+      admission.viewRevision = admission.revision;
+    }
+    return (
+      <Box flexDirection="column">
+        <Static items={admission.view}>
+          {(row) => renderRow(row, false)}
+        </Static>
+        {controller.shownApproval && renderApproval(controller)}
+        {controller.shownQuestion && renderQuestion(controller)}
+      </Box>
+    );
+  }
+
   // Rows with an index below the active streaming rows are committed; the
   // active assistant/think slot and running tool rows stay in the managed
   // view. The store's `messages` array is the source of truth: every row is
@@ -179,19 +212,16 @@ function ControllerApp({
   // Live per-turn activity timeline (running tools + thinking) tracked by
   // the controller from the agent event stream. Terminal tool rows belong to
   // <Static> once complete, so only running items remain in the managed view.
-  const activities = overlayOpen
-    ? []
-    : controller.activityManager.buildTimeline().filter((activity) =>
+  const activities = controller.activityManager.buildTimeline().filter(
+    (activity) =>
       activity.type !== "tool"
         // Grouped running calls are listed by the batch's tree block, so the
         // timeline keeps only the tools that are not part of a batch.
         ? true
         : activity.status === "running" &&
-          !groupedToolIds.has(activity.toolUseId ?? activity.id)
-    );
+          !groupedToolIds.has(activity.toolUseId ?? activity.id),
+  );
 
-  // Ink supports a single <Static>; header lines and committed transcript rows
-  // share it, header first.
   const headerLines = header
     ? renderHeader(
       width,
@@ -215,23 +245,11 @@ function ControllerApp({
   // back, which is how the Go TUI's printUnrenderedTranscript releases them.
   // A cleared transcript keeps its printed rows and admits the new ones under
   // their fresh generation ids.
-  const admissionRef = useRef<StaticAdmission>({
-    rows: [],
-    ids: new Set(),
-    view: [],
-    revision: 0,
-    viewRevision: -1,
-  });
-  const admission = admissionRef.current;
-  if (!overlayOpen) {
-    // While a framed panel is open no row is admitted, so nothing prints above
-    // it; the rows that completed meanwhile are released when it closes.
-    for (const row of committedAll) {
-      if (admission.ids.has(row.id)) continue;
-      admission.ids.add(row.id);
-      admission.rows.push(row);
-      admission.revision++;
-    }
+  for (const row of committedAll) {
+    if (admission.ids.has(row.id)) continue;
+    admission.ids.add(row.id);
+    admission.rows.push(row);
+    admission.revision++;
   }
   if (admission.viewRevision !== admission.revision) {
     admission.view = admission.rows.slice();
@@ -284,25 +302,8 @@ function ControllerApp({
       )}
 
       {!overlayOpen && streaming.map((row) => renderRow(row, true))}
-      {controller.shownApproval && (
-        <Box flexDirection="column" borderStyle="round">
-          <Text bold color="yellow">
-            {controller.translator.text("approval.required")}
-          </Text>
-          <Text>
-            {controller.shownApproval.toolName}{" "}
-            {JSON.stringify(controller.shownApproval.args ?? {})}
-          </Text>
-        </Box>
-      )}
-      {controller.shownQuestion && (
-        <Box flexDirection="column" borderStyle="round">
-          <Text bold>{controller.shownQuestion.question}</Text>
-          {(controller.shownQuestion.options ?? []).map((opt) => (
-            <Text key={opt}>- {opt}</Text>
-          ))}
-        </Box>
-      )}
+      {controller.shownApproval !== undefined && renderApproval(controller)}
+      {controller.shownQuestion !== undefined && renderQuestion(controller)}
       {!overlayOpen && controller.coreConnectionNotice !== "" && (
         controller.coreConnection === "reconnecting"
           ? <Text color="yellow">{controller.coreConnectionNotice}</Text>
@@ -313,6 +314,32 @@ function ControllerApp({
           ~ {controller.translator.text("thinking.in_progress")}
         </Text>
       )}
+    </Box>
+  );
+}
+
+/** Approval prompt panel (rendered outside the overlay-safe early return). */
+function renderApproval(controller: AppController): ReactElement {
+  const approval = controller.shownApproval!;
+  return (
+    <Box flexDirection="column" borderStyle="round">
+      <Text bold color="yellow">
+        {controller.translator.text("approval.required")}
+      </Text>
+      <Text>
+        {approval.toolName} {JSON.stringify(approval.args ?? {})}
+      </Text>
+    </Box>
+  );
+}
+
+/** Question prompt panel. */
+function renderQuestion(controller: AppController): ReactElement {
+  const question = controller.shownQuestion!;
+  return (
+    <Box flexDirection="column" borderStyle="round">
+      <Text bold>{question.question}</Text>
+      {(question.options ?? []).map((opt) => <Text key={opt}>- {opt}</Text>)}
     </Box>
   );
 }
@@ -411,7 +438,7 @@ function rowTextAt(
   index: number,
   compact: boolean,
 ): { text: string; kind: TranscriptRow["kind"] } | undefined {
-  const tool = store.toolResults.find((r) => r.msgIndex === index);
+  const tool = store.toolRowAt(index);
   if (tool) {
     const text = formatToolRow(
       storeTranslator(store),

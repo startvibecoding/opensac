@@ -155,25 +155,11 @@ export function TuiShell({
         overlayOpen,
       }) as ReactElement}
       {session.toolModalOpen && (
-        <Box flexDirection="column">
-          <Text>{session.toolModalView(spinnerFrame(spin))}</Text>
-        </Box>
+        <Panel text={session.toolModalView(spinnerFrame(spin))} />
       )}
-      {session.planModalOpen && (
-        <Box flexDirection="column">
-          <Text>{session.planModalView()}</Text>
-        </Box>
-      )}
-      {session.esmPanelOpen && (
-        <Box flexDirection="column">
-          <Text>{session.esmPanelView()}</Text>
-        </Box>
-      )}
-      {session.dialogOpen && (
-        <Box flexDirection="column">
-          <Text>{session.dialogView(width)}</Text>
-        </Box>
-      )}
+      {session.planModalOpen && <Panel text={session.planModalView()} />}
+      {session.esmPanelOpen && <Panel text={session.esmPanelView()} />}
+      {session.dialogOpen && <Panel text={session.dialogView(width)} />}
       {!session.dialogOpen && (
         <Box borderStyle="round" flexDirection="column">
           <Text>{input.editor.view()}</Text>
@@ -195,6 +181,24 @@ export function TuiShell({
     </Box>
   );
 }
+
+/**
+ * A framed panel string (tool modal, plan modal, ESM panel, dialog).
+ *
+ * The panels render as one pre-framed block, and every panel byte comes from
+ * the session's cached content. Memoizing on the string keeps an unchanged
+ * frame out of Ink's layout and output diff entirely, which matters while the
+ * spinner tick re-renders the whole shell.
+ */
+const Panel = React.memo(function Panel({ text }: {
+  text: string;
+}): ReactElement {
+  return (
+    <Box flexDirection="column">
+      <Text>{text}</Text>
+    </Box>
+  );
+});
 
 /**
  * Footer status suffix: context usage and cache hit line (mothx builtin footer

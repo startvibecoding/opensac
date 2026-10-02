@@ -31,10 +31,15 @@ import { TuiRun } from "./tui_run.ts";
 import { localTimeZone, Translator } from "./i18n.ts";
 import { InputState } from "./input_state.ts";
 import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
+import {
+  type ModalBlock,
+  ModalContentCache,
+  type ModalContentView,
+} from "./modal_content.ts";
 import { renderTaskPlanLines } from "./plan_view.ts";
-import { renderAgentActivity } from "./activity.ts";
+import { type AgentActivity, renderAgentActivity } from "./activity.ts";
+import type { TaskPlan } from "../tools/tool.ts";
 import { expandedToolRow } from "./tool_row_format.ts";
-import { wrapANSI } from "./renderutil.ts";
 import {
   esmObjectiveFromView,
   esmPanelLines,
@@ -165,6 +170,33 @@ export class TUISession implements CommandHost {
   /** Terminal size for modal/panel layouts (set by the CLI shell). */
   #termWidth = 100;
   #termHeight = 40;
+  /**
+   * Incremental wrapped-content cache per modal tab (Ctrl+O/Ctrl+T).
+   *
+   * The framed panels are windows over a large, mostly immutable body: the
+   * expanded transcript, one agent snapshot, or a plan. Re-wrapping the whole
+   * body on every keystroke and every 120 ms spinner tick made each frame
+   * O(conversation), which dominated TUI CPU. Each tab caches its wrapped
+   * blocks and only rebuilds the blocks whose cheap signature changed, and the
+   * frame materializes only the visible slice.
+   */
+  #modalCaches = new Map<string, ModalContentCache>();
+  /** Width/generation the current modal caches were built for. */
+  #modalCacheWidth = -1;
+  #modalCacheGenerationSeen = -1;
+  /** Memoized block list for the transcript tab (see #transcriptBlocks). */
+  #transcriptBlocksScope = "";
+  #transcriptBlocksCache: ModalBlock[] = [];
+  /** The spinner frame used by the last modal content build. */
+  #modalSpinner = "";
+  /** Live (running) rows of the memoized transcript body, in body order. */
+  #liveModalBlocks: LiveModalBlock[] = [];
+  /** Identity of the body the last modal frame rendered (see #toolModalContent). */
+  #lastModalFrameKey = "";
+  /** Blocks the last modal frame actually re-formatted (0 on a cache hit). */
+  #lastFrameRebuilt = 0;
+  /** The content cache used by the most recent frame (test/profiling aid). */
+  #lastModalCache: ModalContentCache | undefined;
 
   constructor(
     options: TUISessionOptions,
@@ -316,6 +348,11 @@ export class TUISession implements CommandHost {
   setTerminalSize(width: number, height: number): void {
     this.#termWidth = width;
     this.#termHeight = height;
+    // An open framed panel re-frames to the new size; its wrapped body is
+    // rebuilt by the content cache because the wrap width changed.
+    this.#toolModal?.setWidth(width).setHeight(height);
+    this.#planModal?.setWidth(width).setHeight(height);
+    if (width !== this.#modalCacheWidth) this.#transcriptBlocksScope = "";
   }
 
   get termWidth(): number {
@@ -1318,6 +1355,7 @@ export class TUISession implements CommandHost {
 
   closeToolModal(): void {
     this.#toolModal = undefined;
+    this.#releaseModalCaches();
   }
 
   // --- Plan modal (Ctrl+T) ----------------------------------------------------
@@ -1350,6 +1388,25 @@ export class TUISession implements CommandHost {
 
   closePlanModal(): void {
     this.#planModal = undefined;
+    this.#releaseModalCaches();
+  }
+
+  /**
+   * Releases the framed panels' held *text*. A panel is a transient view over a
+   * transcript that already keeps every tool output alive in the store, so the
+   * duplicated wrapped copy must not outlive the panel: closing drops it and the
+   * character budget stops it growing while open.
+   *
+   * The cheap layout (per-block signature and wrapped line count, roughly half a
+   * KB per transcript row — a fraction of the content the store itself holds)
+   * stays warm, because the scroll clamp and bottom pin need every block's line
+   * count: releasing it would turn a reopen into a full re-wrap of the whole
+   * conversation (measured ~160 ms per 5 MB, and seconds on a long session).
+   */
+  #releaseModalCaches(): void {
+    for (const cache of this.#modalCaches.values()) cache.dropText();
+    this.#lastModalFrameKey = "";
+    this.#lastFrameRebuilt = 0;
   }
 
   planModalPageSize(): number {
@@ -1362,7 +1419,7 @@ export class TUISession implements CommandHost {
     if (!modal) return;
     modal.scroll(
       delta,
-      this.#planModalLines().length,
+      this.#planModalContent().lineCount,
       this.planModalPageSize(),
     );
   }
@@ -1370,7 +1427,7 @@ export class TUISession implements CommandHost {
   planModalView(): string {
     const modal = this.#planModal;
     if (!modal) return "";
-    return modal.render(this.#planModalLines(), this.translator, {
+    return modal.render(this.#planModalContent(), this.translator, {
       availableHeight: this.#panelAvailableHeight(),
       title: this.translator.text("plan.modal.title"),
     });
@@ -1384,15 +1441,21 @@ export class TUISession implements CommandHost {
     return this.#planModal;
   }
 
-  #planModalLines(): string[] {
-    const modal = this.#planModal;
-    if (!modal) return [];
+  /** The cached plan body for the open plan modal (one block). */
+  #planModalContent(): ModalContentView {
     const plan = this.controller.currentPlan;
     const width = ToolModalState.contentWidthFor(this.#termWidth);
-    const lines = plan === undefined
-      ? [this.translator.text("plan.modal.no_plan")]
-      : renderTaskPlanLines(plan, this.translator);
-    return this.#wrapModalLines(lines, width);
+    this.#syncModalCacheScope(width);
+    const cache = this.#modalCacheFor("plan");
+    const text = plan === undefined
+      ? this.translator.text("plan.modal.no_plan")
+      : renderTaskPlanLines(plan, this.translator).join("\n");
+    const blocks: ModalBlock[] = [{
+      key: "plan",
+      sig: `${planSignature(plan)}@${width}`,
+      build: () => text,
+    }];
+    return cache.refresh(blocks, width, this.#modalCacheGenerationSeen);
   }
 
   toolModalPageSize(): number {
@@ -1406,7 +1469,7 @@ export class TUISession implements CommandHost {
     const modal = this.#toolModal;
     if (!modal) return;
     const page = this.toolModalPageSize();
-    modal.scroll(delta, this.#toolModalLines().length, page);
+    modal.scroll(delta, this.#toolModalContent().lineCount, page);
   }
 
   switchToolModalTarget(delta: number): void {
@@ -1420,10 +1483,16 @@ export class TUISession implements CommandHost {
   toolModalView(spinner = ""): string {
     const modal = this.#toolModal;
     if (!modal) return "";
-    const lines = this.#toolModalLines(spinner);
-    return modal.render(lines, this.translator, {
+    return modal.render(this.#toolModalContent(spinner), this.translator, {
       availableHeight: this.#panelAvailableHeight(),
     });
+  }
+
+  /** Wrapped characters held by every open panel's content cache. */
+  toolModalCachedCharsForTest(): number {
+    let chars = 0;
+    for (const cache of this.#modalCaches.values()) chars += cache.cachedChars;
+    return chars;
   }
 
   /** Test access to the active modal state. */
@@ -1432,59 +1501,228 @@ export class TUISession implements CommandHost {
     return this.#toolModal;
   }
 
-  #toolModalLines(spinner = ""): string[] {
+  /**
+   * Content-cache state of the frame that was rendered last: how many blocks
+   * it rebuilt, how many the body has, and its wrapped line count. The Ctrl+O
+   * performance contract is that a repeat frame with an unchanged body (a
+   * scroll, a key that only moves the window) rebuilds nothing.
+   */
+  toolModalCacheStatsForTest(): {
+    rebuiltBlocks: number;
+    blocks: number;
+    lineCount: number;
+  } {
+    const cache = this.#lastModalCache;
+    return {
+      rebuiltBlocks: this.#lastFrameRebuilt,
+      blocks: cache?.blockCount ?? 0,
+      lineCount: cache?.lineCount ?? 0,
+    };
+  }
+
+  /**
+   * The cached, windowed body for the active tool-modal tab. Only blocks whose
+   * cheap signature changed are rebuilt and re-wrapped; the frame render reads
+   * the visible slice, so a scroll or spinner tick is O(page) not O(history).
+   */
+  #toolModalContent(spinner = this.#modalSpinner): ModalContentView {
     const modal = this.#toolModal;
-    if (!modal) return [];
+    if (modal === undefined) return EMPTY_MODAL_CONTENT;
     const target = modal.targets[modal.active];
-    if (target === undefined) return [];
-    const width = ToolModalState.contentWidthFor(this.#termWidth);
-
-    // Sub-agent tabs render the full activity snapshot: latest tool with
-    // arguments, thinking, response, result, and the event timeline (Go
-    // renderAgentActivity).
-    if (target.id.startsWith("agent:")) {
-      const agentId = target.id.slice("agent:".length);
-      const act = this.controller.activities.get(agentId);
-      const lines = renderAgentActivity(act, agentId, this.translator).split(
-        "\n",
-      );
-      return this.#wrapModalLines(lines, width);
-    }
-
-    // Main tab: the expanded transcript (Go buildToolModalLines with
-    // active == 0 — assistant, thinking, plain rows, and every tool call
-    // expanded with args, full output, and diff).
-    return this.#wrapModalLines(this.#expandedTranscriptLines(spinner), width);
-  }
-
-  /** Wraps one block to the modal's content width (Go WrapANSI). */
-  #wrapModalLines(lines: string[], width: number): string[] {
-    return lines.flatMap((l) => wrapANSI(l, width).split("\n"));
-  }
-
-  /** The expanded conversation for the main tab (Go buildToolModalLines). */
-  #expandedTranscriptLines(spinner = ""): string[] {
+    if (target === undefined) return EMPTY_MODAL_CONTENT;
     const store = this.controller.store;
-    const parts: string[] = [];
+    const width = ToolModalState.contentWidthFor(this.#termWidth);
+    // Block signatures derive only from the transcript revision/generation, the
+    // wrap width, and the spinner frame, so that tuple fully identifies a body:
+    // repeating the frame inside it costs nothing at all (a scroll only changes
+    // the window the renderer asks the cache to slice).
+    const frameKey =
+      `${target.id}|${store.generation}|${store.revision}|${width}|${spinner}|${this.controller.activities.revision}`;
+    if (
+      frameKey === this.#lastModalFrameKey && this.#lastModalCache !== undefined
+    ) {
+      // The frame is served entirely from cache: nothing was rebuilt.
+      this.#lastFrameRebuilt = 0;
+      return this.#lastModalCache;
+    }
+    this.#syncModalCacheScope(width);
+    const cache = this.#modalCacheFor(target.id);
+    this.#lastModalCache = cache;
+    this.#lastModalFrameKey = frameKey;
+    const agentTab = target.id.startsWith("agent:");
+    const blocks = agentTab
+      ? this.#agentActivityBlock(target.id.slice("agent:".length), width)
+      : this.#transcriptBlocks(width);
+    if (!agentTab) this.#applyModalSpinner(spinner);
+    const view = cache.refresh(blocks, width, this.#modalCacheGenerationSeen);
+    this.#lastFrameRebuilt = cache.lastRebuiltBlocks;
+    return view;
+  }
+
+  /**
+   * Blocks for the expanded conversation (Go buildToolModalLines).
+   *
+   * Transcript rows are append-only and tool rows change only through store
+   * mutators that bump `revision`, so an unchanged
+   * (generation, revision, width) scope returns the memoized list. A running
+   * row's signature is a getter over the current spinner frame, so the spinner
+   * animation never rebuilds the block list or the stable rows — only the few
+   * live rows re-format, and only when they are actually visible.
+   */
+  #transcriptBlocks(width: number): ModalBlock[] {
+    const store = this.controller.store;
+    const scope = `${store.generation}|${store.revision}|${width}`;
+    if (scope === this.#transcriptBlocksScope) {
+      return this.#transcriptBlocksCache;
+    }
+    const blocks: ModalBlock[] = [];
+    const live: LiveModalBlock[] = [];
     for (let i = 0; i < store.messages.length; i++) {
-      const msg = this.#expandedMessageAt(i, spinner);
-      if (msg.trim() !== "") parts.push(msg);
+      const block = this.#modalBlockForRow(i, width, live);
+      if (block !== undefined) blocks.push(block);
     }
-    if (parts.length === 0) {
-      return [this.translator.text("tool.modal.no_conversation")];
+    if (blocks.length === 0) {
+      const text = this.translator.text("tool.modal.no_conversation");
+      blocks.push({ key: "empty", sig: `${text}@${width}`, build: () => text });
     }
-    const out: string[] = [];
-    parts.forEach((part, i) => {
-      if (i > 0) out.push("");
-      out.push(...part.split("\n"));
-    });
-    return out;
+    this.#transcriptBlocksScope = scope;
+    this.#transcriptBlocksCache = blocks;
+    this.#liveModalBlocks = live;
+    return blocks;
+  }
+
+  /**
+   * The cached block descriptor for transcript row `idx`, or undefined when the
+   * row renders nothing (an untouched streaming placeholder). Signatures read
+   * only lengths and state flags, never the row's content.
+   */
+  #modalBlockForRow(
+    idx: number,
+    width: number,
+    live: LiveModalBlock[],
+  ): ModalBlock | undefined {
+    const store = this.controller.store;
+    const tool = store.toolRowAt(idx);
+    if (tool !== undefined) {
+      const base = [
+        "t",
+        tool.toolName,
+        tool.status,
+        tool.fullContent.length,
+        tool.summary.length,
+        tool.toolError.length,
+        tool.executionState,
+        tool.diff === undefined
+          ? "-"
+          : `${tool.diff.added}/${tool.diff.deleted}/${
+            tool.diff.unified?.length ?? 0
+          }/${tool.diff.truncated === true}`,
+        tool.plan === undefined ? "-" : planSignature(tool.plan),
+        argsFingerprint(tool.toolArgs),
+        width,
+      ].join("|");
+      if (tool.status !== "running") {
+        return {
+          key: `row-${idx}`,
+          sig: base,
+          build: () => this.#expandedMessageAt(idx),
+        };
+      }
+      // A running row renders the spinner frame in its text. Register it so a
+      // spinner tick rewrites just these few signatures instead of rebuilding
+      // the memoized block list (and re-wrapping every stable row).
+      const block: ModalBlock = {
+        key: `row-${idx}`,
+        sig: `${base}|${this.#modalSpinner}`,
+        build: () => this.#expandedMessageAt(idx, this.#modalSpinner),
+      };
+      live.push({ block, base });
+      return block;
+    }
+    // Streaming slots only ever grow, so the raw length is a sound signature.
+    const assistant = store.assistantRaw(idx).length;
+    if (assistant > 0) {
+      return {
+        key: `row-${idx}`,
+        sig: `a|${assistant}|${width}`,
+        build: () => this.#expandedMessageAt(idx),
+      };
+    }
+    const think = store.thinkRaw(idx).length;
+    if (think > 0) {
+      return {
+        key: `row-${idx}`,
+        sig: `k|${think}|${width}`,
+        build: () => this.#expandedMessageAt(idx),
+      };
+    }
+    const message = store.messages[idx];
+    if (message !== undefined && message.trim() !== "") {
+      const text = message;
+      return {
+        key: `row-${idx}`,
+        sig: `m|${text.length}|${text.charCodeAt(0)}|${width}`,
+        build: () => text,
+      };
+    }
+    return undefined;
+  }
+
+  /** Applies the current spinner frame to the live rows of the cached body. */
+  #applyModalSpinner(spinner: string): void {
+    if (spinner === this.#modalSpinner) return;
+    this.#modalSpinner = spinner;
+    for (const live of this.#liveModalBlocks) {
+      live.block.sig = `${live.base}|${spinner}`;
+    }
+  }
+
+  /** Blocks for one sub-agent tab: the full activity snapshot as one block. */
+  #agentActivityBlock(
+    agentId: string,
+    width: number,
+  ): ModalBlock[] {
+    const act = this.controller.activities.get(agentId);
+    const sig = `${agentActivitySignature(act)}@${width}`;
+    return [{
+      key: "activity",
+      sig,
+      build: () => renderAgentActivity(act, agentId, this.translator),
+    }];
+  }
+
+  /**
+   * Drops every cached modal body when the wrap width or the transcript
+   * generation changed: cached lines were wrapped for the old layout and row
+   * indices are reused by a cleared transcript.
+   */
+  #syncModalCacheScope(width: number): void {
+    const generation = this.controller.store.generation;
+    if (
+      this.#modalCacheWidth === width &&
+      this.#modalCacheGenerationSeen === generation
+    ) return;
+    this.#modalCaches.clear();
+    this.#modalCacheWidth = width;
+    this.#modalCacheGenerationSeen = generation;
+    this.#transcriptBlocksScope = "";
+    this.#liveModalBlocks = [];
+    this.#lastModalFrameKey = "";
+  }
+
+  #modalCacheFor(key: string): ModalContentCache {
+    let cache = this.#modalCaches.get(key);
+    if (cache === undefined) {
+      cache = new ModalContentCache();
+      this.#modalCaches.set(key, cache);
+    }
+    return cache;
   }
 
   /** One transcript row expanded (Go renderExpandedMessageAt). */
   #expandedMessageAt(idx: number, spinner = ""): string {
     const store = this.controller.store;
-    const tool = store.toolResults.find((r) => r.msgIndex === idx);
+    const tool = store.toolRowAt(idx);
     if (tool !== undefined) {
       return expandedToolRow(this.translator, {
         toolName: tool.toolName,
@@ -1675,3 +1913,88 @@ function errorMessage(err: unknown): string {
 /** Re-exported for the shell/tests. */
 export { dispatchCommand };
 export type { KeyEvent };
+
+/**
+ * Cheap fingerprint of a tool row's arguments: key and value counts and string
+ * lengths only, never their text. A 100 KB `write` payload must not be
+ * re-serialized for every modal frame, and an argument change always arrives
+ * with a status/content change, which the signature also carries.
+ */
+function argsFingerprint(
+  args: Record<string, unknown> | undefined,
+): string {
+  if (args === undefined) return "-";
+  const names: string[] = [];
+  let lengths = 0;
+  for (const [key, value] of Object.entries(args)) {
+    names.push(key);
+    lengths += typeof value === "string"
+      ? value.length
+      : value === undefined
+      ? 0
+      : 1;
+  }
+  return `${names.join(",")}:${lengths}`;
+}
+
+/** A running modal row and the signature base its spinner is appended to. */
+interface LiveModalBlock {
+  block: ModalBlock;
+  base: string;
+}
+
+/**
+ * A content view with no lines, returned when a framed panel has no open
+ * state (the renderers treat it as an empty body).
+ */
+const EMPTY_MODAL_CONTENT: ModalContentView = {
+  lineCount: 0,
+  slice: () => [],
+};
+
+/**
+ * Cheap change signature of a task plan: lengths plus a small weighted sum of
+ * the step titles and statuses, never the rendered checklist itself.
+ */
+function planSignature(plan: TaskPlan | undefined): string {
+  if (plan === undefined) return "-";
+  let acc = 0;
+  for (const step of plan.steps) {
+    acc = (acc + step.title.length * 31 + step.status.length * 7 +
+      charCodeSum(step.status)) >>> 0;
+  }
+  return `${plan.title.length}|${plan.note.length}|${plan.steps.length}|${acc}`;
+}
+
+/** Cheap change signature of one agent activity snapshot. */
+function agentActivitySignature(act: AgentActivity | undefined): string {
+  if (act === undefined) return "none";
+  const updated = act.updatedAt?.getTime() ?? 0;
+  // The snapshot header renders a relative age, so it re-renders at most once
+  // per second even while the agent itself is idle.
+  const ageBucket = updated > 0 ? Math.round((Date.now() - updated) / 1000) : 0;
+  const lastEvent = act.events[act.events.length - 1];
+  return [
+    act.kind,
+    act.state,
+    act.lastTool.length,
+    act.lastThink.length,
+    act.lastText.length,
+    act.lastResult.length,
+    act.fullThink.length,
+    act.fullText.length,
+    act.fullResult.length,
+    act.events.length,
+    lastEvent === undefined
+      ? "-"
+      : `${lastEvent.text.length}:${lastEvent.time.getTime()}`,
+    ageBucket,
+  ].join("|");
+}
+
+/** Sum of a short string's character codes (a cheap content fingerprint). */
+function charCodeSum(s: string): number {
+  let sum = 0;
+  for (let i = 0; i < s.length; i++) sum += s.charCodeAt(i);
+  return sum;
+}

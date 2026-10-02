@@ -78,6 +78,12 @@ export {
 } from "./activity_manager.ts";
 export { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
 export {
+  type ModalBlock,
+  ModalContentCache,
+  type ModalContentView,
+  wrapBlockLines,
+} from "./modal_content.ts";
+export {
   stripANSI,
   truncateANSI,
   visibleWidth,

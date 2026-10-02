@@ -6,6 +6,7 @@
 
 import { displayWidth } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
+import type { ModalContentView } from "./modal_content.ts";
 // Style constants matching the Go toolModalStyle (rounded border + padding).
 import { ACCENT, BOLD, DIM, RESET } from "./theme.ts";
 
@@ -128,11 +129,13 @@ export class ToolModalState {
   }
 
   /**
-   * Renders the modal frame around the given content lines.
+   * Renders the modal frame around the given content. A plain array is the
+   * whole body; a {@link ModalContentView} is the cached, incremental body, and
+   * only the visible window is materialized so a frame stays O(page size).
    * `tr` supplies the localized title/hints.
    */
   render(
-    lines: string[],
+    content: string[] | ModalContentView,
     tr: Translator,
     options: { availableHeight?: number; title?: string } = {},
   ): string {
@@ -141,19 +144,25 @@ export class ToolModalState {
     const hasTabs = this.#targets.length > 1;
     const availableHeight = options.availableHeight ?? this.#height;
     const pageSize = this.pageSizeFor(hasTabs, availableHeight);
-    this.applyPin(lines.length, pageSize);
+    const lineCount = Array.isArray(content)
+      ? content.length
+      : content.lineCount;
+    this.applyPin(lineCount, pageSize);
 
-    const end = Math.min(this.#offset + pageSize, lines.length);
-    let visible = lines.slice(this.#offset, end).join("\n");
+    const end = Math.min(this.#offset + pageSize, lineCount);
+    const window = Array.isArray(content)
+      ? content.slice(this.#offset, end)
+      : content.slice(this.#offset, pageSize);
+    let visible = window.join("\n");
     if (visible === "") visible = " ";
 
     let position = tr.text(
       "tool.modal.position",
       this.#offset + 1,
       end,
-      lines.length,
+      lineCount,
     );
-    if (lines.length === 0) {
+    if (lineCount === 0) {
       position = tr.text("tool.modal.position_empty");
     }
     let title = `${options.title ?? tr.text("tool.modal.title")}  ${position}`;
@@ -169,9 +178,9 @@ export class ToolModalState {
     let header = title;
     if (tabs) header += "\n" + tabs;
     const separator = "─".repeat(Math.min(contentWidth, displayWidth(title)));
-    const content = `${header}\n${separator}\n${visible}`;
+    const body = `${header}\n${separator}\n${visible}`;
     const chrome = ToolModalState.chromeFor(hasTabs);
-    return frameBox(content, width, pageSize + chrome);
+    return frameBox(body, width, pageSize + chrome);
   }
 
   #renderTabs(width: number): string {

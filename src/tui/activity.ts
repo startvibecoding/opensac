@@ -74,6 +74,12 @@ export class AgentActivityStore {
   #activities = new Map<string, AgentActivity>();
   #order: string[] = [];
   /**
+   * Monotonic counter bumped whenever any snapshot changes. Renderers use it to
+   * decide in O(1) that a folded activity body (the Ctrl+O agent tab) is stale
+   * instead of re-deriving it.
+   */
+  #revision = 0;
+  /**
    * Resolves i18n-coupled lines (done/canceled/tool started/retry/…) at
    * record time, so snapshots carry display text for the session language
    * instead of raw message IDs or record-time English.
@@ -89,6 +95,11 @@ export class AgentActivityStore {
     return [...this.#order];
   }
 
+  /** Current snapshot revision (bumped by every fold and clear). */
+  get revision(): number {
+    return this.#revision;
+  }
+
   get(id: string): AgentActivity | undefined {
     return this.#activities.get(id);
   }
@@ -101,6 +112,7 @@ export class AgentActivityStore {
   clear(): void {
     this.#activities.clear();
     this.#order = [];
+    this.#revision++;
   }
 
   /** Whether this event belongs to a background/team agent (not the lead). */
@@ -124,6 +136,9 @@ export class AgentActivityStore {
   record(event: Event, now: Date = new Date()): void {
     const id = event.agentId;
     if (!id) return;
+    // Every folded event restamps `updatedAt` at minimum, so the snapshot body
+    // is always stale afterwards.
+    this.#revision++;
 
     let act = this.#activities.get(id);
     if (!act) {

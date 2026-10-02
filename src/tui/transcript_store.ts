@@ -105,6 +105,26 @@ export class TranscriptStore {
   #thinkRaw = new Map<number, string>();
   /** Monotonic id source for parallel tool-call groups (Go toolGroupSeq). */
   #toolGroupSeq = 0;
+  /**
+   * Monotonic content counter. Every transcript mutation bumps it, so render
+   * layers (the Ctrl+O block cache, overlay-safe row building) can detect a
+   * change in O(1) instead of re-deriving content.
+   */
+  #revision = 0;
+  /** msgIndex → tool row, kept alongside `toolResults` for O(1) row lookup. */
+  #rowsByMsgIndex = new Map<number, ToolResultEntry>();
+  /** Derived group tables, rebuilt at most once per `#revision`. */
+  #groupTablesRevision = -1;
+  #groupMembers = new Map<number, ToolResultEntry[]>();
+
+  /** Current content revision (bumped by every transcript mutation). */
+  get revision(): number {
+    return this.#revision;
+  }
+
+  #bump(): void {
+    this.#revision++;
+  }
 
   constructor(options: TranscriptStoreOptions) {
     this.#translator = options.translator;
@@ -122,6 +142,7 @@ export class TranscriptStore {
     this.messages.push(text);
     this.messageKinds.set(index, kind);
     if (fullOnly) this.fullOnlyRows.add(index);
+    this.#bump();
     return index;
   }
 
@@ -140,6 +161,7 @@ export class TranscriptStore {
     this.currentAssistantIdx = this.messages.length;
     this.#assistantRaw.set(this.currentAssistantIdx, "");
     this.messages.push("");
+    this.#bump();
   }
 
   /** Appends a text delta, opening a slot when none is active. */
@@ -156,6 +178,7 @@ export class TranscriptStore {
       this.messages.push("");
     }
     this.#assistantDirty.add(this.currentAssistantIdx);
+    this.#bump();
   }
 
   /**
@@ -189,6 +212,7 @@ export class TranscriptStore {
     }
     this.#thinkRaw.set(this.currentThinkIdx, "");
     this.#appendThinkDelta(this.currentThinkIdx, delta);
+    this.#bump();
   }
 
   /** Commits active streaming rows and clears the active indices. */
@@ -203,10 +227,9 @@ export class TranscriptStore {
       this.#assistantDirty.delete(this.currentAssistantIdx);
       this.currentAssistantIdx = -1;
     }
-    if (hadActive) {
-      // Go calls updateViewportContent here; the Ink layer derives that from
-      // store state, so no callback is needed.
-    }
+    // Go calls updateViewportContent here; the Ink layer derives that from
+    // store state, so no callback is needed.
+    if (hadActive) this.#bump();
   }
 
   /** Raw accumulated text of an assistant row. */
@@ -252,7 +275,7 @@ export class TranscriptStore {
     }
     this.commitActiveStream();
     const msgIdx = this.messages.length;
-    this.toolResults.push({
+    const row: ToolResultEntry = {
       toolCallID,
       toolName,
       toolArgs,
@@ -263,8 +286,11 @@ export class TranscriptStore {
       executionState: "",
       msgIndex: msgIdx,
       groupID: this.#assignToolGroup(),
-    });
+    };
+    this.toolResults.push(row);
+    this.#rowsByMsgIndex.set(msgIdx, row);
     this.messages.push("");
+    this.#bump();
   }
 
   /**
@@ -276,30 +302,54 @@ export class TranscriptStore {
   #assignToolGroup(): number {
     const last = this.toolResults[this.toolResults.length - 1];
     if (last !== undefined && last.status === "running") {
-      if (last.groupID === 0) last.groupID = ++this.#toolGroupSeq;
+      if (last.groupID === 0) {
+        last.groupID = ++this.#toolGroupSeq;
+        // The predecessor just joined a group, so the derived tables are stale.
+        this.#bump();
+      }
       return last.groupID;
     }
     return ++this.#toolGroupSeq;
   }
 
+  /** Derived per-group tables, rebuilt at most once per content revision. */
+  #groupTables(): Map<number, ToolResultEntry[]> {
+    if (this.#groupTablesRevision === this.#revision) return this.#groupMembers;
+    const members = new Map<number, ToolResultEntry[]>();
+    for (const row of this.toolResults) {
+      if (row.groupID <= 0) continue;
+      const list = members.get(row.groupID);
+      if (list === undefined) members.set(row.groupID, [row]);
+      else list.push(row);
+    }
+    this.#groupMembers = members;
+    this.#groupTablesRevision = this.#revision;
+    return members;
+  }
+
+  /** The tool row stored at transcript index `msgIndex`, when there is one. */
+  toolRowAt(msgIndex: number): ToolResultEntry | undefined {
+    return this.#rowsByMsgIndex.get(msgIndex);
+  }
+
   /** Parallel-group id of the tool row at `msgIndex`, or 0 when there is none. */
   toolGroupIDAt(msgIndex: number): number {
-    for (const row of this.toolResults) {
-      if (row.msgIndex === msgIndex) return row.groupID;
-    }
-    return 0;
+    return this.#rowsByMsgIndex.get(msgIndex)?.groupID ?? 0;
   }
 
   /** Rows of a parallel group in message order (Go toolGroupMembers). */
   toolGroupMembers(groupID: number): ToolResultEntry[] {
     if (groupID <= 0) return [];
-    return this.toolResults.filter((row) => row.groupID === groupID);
+    return this.#groupTables().get(groupID) ?? [];
   }
 
   /** Whether a group holds enough parallel calls to render as a tree block. */
   isMultiToolGroup(groupID: number): boolean {
-    return groupID > 0 &&
-      this.toolGroupMembers(groupID).length >= MIN_TOOL_GROUP_SIZE;
+    if (groupID <= 0) return false;
+    // A group can only render as a tree when it holds enough parallel calls,
+    // so the count check never allocates a member list.
+    return (this.#groupTables().get(groupID)?.length ?? 0) >=
+      MIN_TOOL_GROUP_SIZE;
   }
 
   /**
@@ -340,6 +390,7 @@ export class TranscriptStore {
       );
       row.toolError = event.toolError ? event.toolError.message : "";
       row.executionState = event.toolExecutionState ?? "";
+      this.#bump();
       return;
     }
 
@@ -348,7 +399,7 @@ export class TranscriptStore {
     }
 
     const msgIdx = this.messages.length;
-    this.toolResults.push({
+    const row: ToolResultEntry = {
       toolCallID: event.toolCallID,
       toolName: matchedName,
       toolArgs: matchedArgs,
@@ -369,8 +420,11 @@ export class TranscriptStore {
       // A result that opens its own row never raced a sibling, so it stays
       // ungrouped (Go leaves groupID at zero for straggler rows).
       groupID: 0,
-    });
+    };
+    this.toolResults.push(row);
+    this.#rowsByMsgIndex.set(msgIdx, row);
     this.messages.push("");
+    this.#bump();
   }
 
   /**
@@ -378,11 +432,14 @@ export class TranscriptStore {
    * outcome (Go finalizeInterruptedTools). Rows with results are untouched.
    */
   finalizeInterruptedTools(): void {
+    let changed = false;
     for (const row of this.toolResults) {
       if (row.status !== "running") continue;
       row.status = "interrupted";
       row.executionState = "interrupted";
+      changed = true;
     }
+    if (changed) this.#bump();
   }
 
   hasToolEntry(toolCallID: string, status: ToolResultStatus): boolean {
@@ -411,6 +468,8 @@ export class TranscriptStore {
     this.#assistantRaw.clear();
     this.#assistantDirty.clear();
     this.#thinkRaw.clear();
+    this.#rowsByMsgIndex.clear();
+    this.#bump();
   }
 }
 
