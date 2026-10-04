@@ -44,7 +44,8 @@ export interface CommandHost {
   setModel(modelID: string): Promise<CommandResult>;
   clearConversation(): void;
   compact(): Promise<CommandResult>;
-  listSkills(): Promise<string>;
+  /** Opens the framed /skillmgr panel (merged /skills listing + activation). */
+  openSkillMgrDialog(): Promise<CommandResult>;
   activateSkill(name: string): Promise<string>;
   listMCPServers(): string;
   initMCPConfig(scope: string, full: boolean, force: boolean): CommandResult;
@@ -151,7 +152,7 @@ export async function dispatchCommand(
   if (command.startsWith("/skill:")) {
     const name = command.slice("/skill:".length);
     return name === ""
-      ? { message: await host.listSkills() }
+      ? openSkillMgr(host)
       : { message: await host.activateSkill(name) };
   }
 
@@ -179,14 +180,13 @@ export async function dispatchCommand(
         return { message: tr.text("compact.running"), error: true };
       }
       return await host.compact();
+    case "/skillmgr":
     case "/skills":
-      return { message: await host.listSkills() };
+      return openSkillMgr(host);
     case "/skill":
-      return {
-        message: parts.length > 1
-          ? await host.activateSkill(parts[1])
-          : await host.listSkills(),
-      };
+      return parts.length > 1
+        ? { message: await host.activateSkill(parts[1]) }
+        : openSkillMgr(host);
     case "/mcps":
       return { message: host.listMCPServers() };
     case "/init_mcp":
@@ -261,6 +261,22 @@ export async function dispatchCommand(
     default:
       return { message: tr.text("commands.unknown", command), error: true };
   }
+}
+
+/**
+ * Opens the unified skill manager panel (mothx openSkillMgr): refused while a
+ * foreground run is active because activation rebuilds the session context.
+ */
+function openSkillMgr(
+  host: CommandHost,
+): CommandResult | Promise<CommandResult> {
+  if (host.running) {
+    return {
+      message: host.translator.text("skillmgr.busy"),
+      error: true,
+    };
+  }
+  return host.openSkillMgrDialog();
 }
 
 function cmdMode(host: CommandHost, parts: string[]): CommandResult {

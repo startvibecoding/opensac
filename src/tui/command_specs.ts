@@ -70,14 +70,14 @@ export const commandSpecs: CommandSpec[] = [
   {
     name: "/skillhub",
     value: "/skillhub",
-    usage: "/skillhub [search <q>]",
+    usage: "/skillhub [search <q>|detail|install|uninstall|installed]",
     description: "commands.skillhub.description",
   },
   {
-    name: "/skills",
-    value: "/skills",
-    usage: "/skills",
-    description: "commands.skills.description",
+    name: "/skillmgr",
+    value: "/skillmgr",
+    usage: "/skillmgr",
+    description: "commands.skillmgr.description",
   },
   {
     name: "/skill",
@@ -246,7 +246,8 @@ export interface ParsedInput {
 
 /**
  * Parses one input line for dispatch. Empty lines and non-slash text are
- * prompt text; "/skill:name" activates a skill ("/skill" alone lists skills).
+ * prompt text; "/skill:name" activates a skill ("/skill" alone opens the
+ * skill manager panel).
  * Unknown commands still parse as commands — the App owns the error message.
  */
 export function parseInputLine(line: string): ParsedInput {

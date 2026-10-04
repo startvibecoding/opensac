@@ -21,9 +21,14 @@ import type {
   TUIService,
   TUISessionView,
   TUISettingsView,
+  TUITranscriptMessage,
 } from "./service.ts";
 import { SOURCE_TUI } from "../agentruntime/source.ts";
-import { isDecisionNotFound } from "./service.ts";
+import {
+  isDecisionNotFound,
+  isSessionNotFound,
+  isSessionNotResident,
+} from "./service.ts";
 import { coreEventToAgentEvent } from "./run_event_projection.ts";
 import type { CoreRuntimeEvent } from "../core/runtime.ts";
 import { AppController } from "./app_controller.ts";
@@ -51,6 +56,22 @@ import {
   dispatchCommand,
 } from "./commands.ts";
 import { TuiCommands } from "./tui_commands.ts";
+import {
+  installedEntries,
+  SkillHubPanel,
+  type SkillHubPanelHost,
+} from "./skillhub_panel.ts";
+import { SkillMgrPanel, type SkillMgrPanelHost } from "./skillmgr_panel.ts";
+import {
+  clientsForSettings,
+  Service as SkillHubService,
+} from "../skillhub/mod.ts";
+import {
+  defaultSkillHubOfficialHandle,
+  getGlobalSkillsDir,
+  type Settings,
+} from "../config/settings.ts";
+import { projectSkillDirs } from "../skills/skills.ts";
 import { TuiSessionCommands } from "./tui_session_commands.ts";
 import {
   AuthDialog,
@@ -62,7 +83,8 @@ import {
   SettingsDialog,
   TuiLangDialog,
 } from "./dialogs.ts";
-import { Dialog } from "./dialog.ts";
+import { clampWidth, Dialog, frame } from "./dialog.ts";
+import { ACCENT, BOLD, DIM, RED, RESET } from "./theme.ts";
 import type { AppProps } from "./app.tsx";
 import type { Objective } from "../esm/state.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
@@ -83,10 +105,36 @@ export interface TUISessionOptions {
    * clears itself. Defaults to three seconds.
    */
   coreReconnectNoticeMs?: number;
+  /**
+   * Continue the most recent persisted session of this working directory
+   * (`-c`) instead of starting a fresh one.
+   */
+  continueLast?: boolean;
+  /**
+   * Resume one specific persisted session by id, session file, or directory
+   * (`-r` / `--session`). Wins over `continueLast`.
+   */
+  resumeSession?: string;
 }
 
 /** How long a confirmed Core reconnect stays in the live view. */
 const CORE_RECONNECT_NOTICE_MS = 3_000;
+
+/**
+ * Whether a `-r`/`--session` target names a directory rather than a session id.
+ *
+ * The flag documents both forms, so the entry has to tell them apart. A path
+ * separator or a leading `.`/`~` is decisive; a bare token is treated as an id,
+ * which is what `opensac -r abc123` means.
+ */
+export function isDirectoryTarget(target: string): boolean {
+  const value = target.trim();
+  if (value === "") return false;
+  if (value === "." || value === "..") return true;
+  if (value.startsWith("~/")) return true;
+  // Backslash counts too: a Windows path is the common case for this flag.
+  return value.includes("/") || value.includes("\\");
+}
 
 /** Resolves the session translator from settings (Go NewApp). */
 export function tuiTranslatorFromSettings(settings: {
@@ -119,6 +167,10 @@ export class TUISession implements CommandHost {
   #thinking: string;
   #workDir: string;
   #coreReconnectNoticeMs: number;
+  /** Continue the most recent persisted session on startup (`-c`). */
+  #continueLast = false;
+  /** Explicit resume target from `-r` / `--session`. */
+  #resumeSession = "";
   #busy = false;
   /** The front-end-neutral service owning session/run semantics. */
   readonly #service: TUIService;
@@ -142,6 +194,10 @@ export class TUISession implements CommandHost {
   #commands: TuiCommands;
   #sessionCommands: TuiSessionCommands;
   #dialog: Dialog | undefined;
+  /** The framed /skillhub marketplace panel (mothx popup style). */
+  #skillHubPanel: SkillHubPanel | undefined;
+  /** The framed /skillmgr skill manager panel (mothx popup style). */
+  #skillMgrPanel: SkillMgrPanel | undefined;
   /** Render hook installed by the shell for asynchronous state changes. */
   #renderScheduler: () => void = () => {};
   #toolModal: ToolModalState | undefined;
@@ -206,6 +262,8 @@ export class TUISession implements CommandHost {
     this.#workDir = options.workDir;
     this.#coreReconnectNoticeMs = options.coreReconnectNoticeMs ??
       CORE_RECONNECT_NOTICE_MS;
+    this.#continueLast = options.continueLast ?? false;
+    this.#resumeSession = (options.resumeSession ?? "").trim();
     this.#multiAgent = options.multiAgent ?? false;
     // Explicit CLI flags win; empty values resolve from the Core-owned
     // settings projection in start() (the Runtime re-resolves run policy).
@@ -267,7 +325,7 @@ export class TUISession implements CommandHost {
     }
     if (this.#thinking === "") this.#thinking = settingsView.thinkingLevel;
     this.refreshHeader();
-    await this.createFreshSession();
+    await this.#openInitialSession();
     this.#stopDecisions = this.#service.onDecisionRequest((request) =>
       this.#handleDecisionRequest(request)
     );
@@ -615,8 +673,10 @@ export class TUISession implements CommandHost {
     return await this.#commands.compact();
   }
 
-  async listSkills(): Promise<string> {
-    return await this.#commands.listSkills();
+  async openSkillMgrDialog(): Promise<CommandResult> {
+    await Promise.resolve();
+    this.openSkillMgrPanel();
+    return {};
   }
 
   async activateSkill(name: string): Promise<string> {
@@ -728,11 +788,219 @@ export class TUISession implements CommandHost {
   }
 
   async handleSkillHub(parts: string[]): Promise<CommandResult> {
+    // Bare /skillhub opens the framed marketplace browser (mothx popup style);
+    // subcommands keep the scripted text path for CLI/automation parity.
+    if (parts.length <= 1) {
+      this.openSkillHubPanel();
+      return {};
+    }
     return await this.#commands.handleSkillHub(parts);
+  }
+
+  // --- SkillHub marketplace panel --------------------------------------------
+
+  get skillHubPanelOpen(): boolean {
+    return this.#skillHubPanel !== undefined && !this.#skillHubPanel.closed;
+  }
+
+  /** Opens the framed /skillhub browser (mothx popup style). */
+  openSkillHubPanel(): void {
+    if (this.skillHubPanelOpen) return;
+    this.closeDialog();
+    this.closeSkillMgrPanel();
+    this.closeToolModal();
+    this.closePlanModal();
+    this.input.editor.reset();
+    this.#skillHubPanel = new SkillHubPanel(this.#skillHubPanelHost(), {
+      close: () => {
+        this.#skillHubPanel = undefined;
+        this.requestRender();
+      },
+    });
+    this.requestRender();
+  }
+
+  closeSkillHubPanel(): void {
+    this.#skillHubPanel?.close();
+    this.#skillHubPanel = undefined;
+    this.requestRender();
+  }
+
+  /** Routes one key event to the open panel; true when it consumed it. */
+  handleSkillHubKey(ev: KeyEvent): boolean {
+    const panel = this.#skillHubPanel;
+    if (panel === undefined || panel.closed) return false;
+    // Escape and q always close the popup, whatever view is active.
+    if (ev.type !== "text" && ev.name === "escape") {
+      this.closeSkillHubPanel();
+      return true;
+    }
+    if (ev.type === "text" && ev.text.toLowerCase() === "q") {
+      this.closeSkillHubPanel();
+      return true;
+    }
+    panel.handleKey(ev);
+    if (panel.closed) this.#skillHubPanel = undefined;
+    // The open panel owns the keyboard entirely: unconsumed keys are dropped
+    // rather than leaking into the editor underneath.
+    return true;
+  }
+
+  /** Renders the panel inside its rounded wire frame. */
+  skillHubPanelView(): string {
+    const panel = this.#skillHubPanel;
+    if (panel === undefined) return "";
+    const page = panel.page();
+    const lines = [
+      page.title,
+      "",
+      ...page.body ?? [],
+    ];
+    for (const item of page.items) {
+      const idx = Number.parseInt(item.value, 10);
+      const pointer = idx === panel.cursor
+        ? `${ACCENT}${BOLD}› ${RESET}`
+        : "  ";
+      lines.push(`${pointer}${item.label}`);
+      if (item.description !== undefined && item.description !== "") {
+        lines.push(`    ${DIM}${item.description}${RESET}`);
+      }
+    }
+    if (page.error !== undefined && page.error !== "") {
+      lines.push("", `${RED}${page.error}${RESET}`);
+    }
+    lines.push("", `${DIM}${page.hint}${RESET}`);
+    return frame(lines, clampWidth(this.#termWidth));
+  }
+
+  /** The panel host: shared SkillHub service calls plus session hooks. */
+  #skillHubPanelHost(): SkillHubPanelHost {
+    let cachedSettings: Settings | undefined;
+    const settings = async (): Promise<Settings> => {
+      cachedSettings ??= await this.#service.getSettings();
+      return cachedSettings;
+    };
+    const service = async (): Promise<SkillHubService> => {
+      const s = await settings();
+      return new SkillHubService(
+        getGlobalSkillsDir(s),
+        projectSkillDirs(this.#workDir),
+        s.skillHub?.officialHandles ?? [defaultSkillHubOfficialHandle],
+        ...clientsForSettings(s.skillHub ?? {}),
+      );
+    };
+    return {
+      translator: this.translator,
+      markets: () => service().then((s) => s.markets()),
+      search: (market, query) =>
+        service().then((s) => s.search(undefined, market, query)),
+      official: (query) => service().then((s) => s.official(undefined, query)),
+      categories: (market) =>
+        service().then((s) => s.categories(undefined, market)),
+      detail: (market, id) =>
+        service().then((s) => s.detail(undefined, market, id)),
+      install: (request) =>
+        service().then((s) => s.install(undefined, request)),
+      uninstall: async (market, id, scope) => {
+        (await service()).uninstall(market, id, scope);
+      },
+      listInstalled: () =>
+        installedEntries(
+          getGlobalSkillsDir(cachedSettings ?? {}),
+          projectSkillDirs(this.#workDir),
+        ),
+      activateSkill: (name) => this.activateSkill(name),
+      defaultScope: () => isProjectDir(this.#workDir) ? "project" : "global",
+      targetDir: (scope) =>
+        scope === "project"
+          ? projectSkillDirs(this.#workDir)[0]
+          : getGlobalSkillsDir(cachedSettings ?? {}),
+      settle: (message, error) =>
+        this.controller.addMessage(message, error === true ? "error" : "plain"),
+      requestRender: () => this.requestRender(),
+    };
   }
 
   async listStats(parts: string[]): Promise<CommandResult> {
     return await this.#commands.listStats(parts);
+  }
+
+  // --- Skill manager panel -----------------------------------------------------
+
+  get skillMgrPanelOpen(): boolean {
+    return this.#skillMgrPanel !== undefined && !this.#skillMgrPanel.closed;
+  }
+
+  /** Opens the framed /skillmgr manager (mothx popup style). */
+  openSkillMgrPanel(): void {
+    if (this.skillMgrPanelOpen) return;
+    this.closeDialog();
+    this.closeSkillHubPanel();
+    this.closeToolModal();
+    this.closePlanModal();
+    this.input.editor.reset();
+    this.#skillMgrPanel = new SkillMgrPanel(this.#skillMgrPanelHost(), {
+      close: () => {
+        this.#skillMgrPanel = undefined;
+        this.requestRender();
+      },
+    });
+    this.requestRender();
+  }
+
+  closeSkillMgrPanel(): void {
+    this.#skillMgrPanel?.close();
+    this.#skillMgrPanel = undefined;
+    this.requestRender();
+  }
+
+  /** Routes one key event to the open panel; true when it consumed it. */
+  handleSkillMgrKey(ev: KeyEvent): boolean {
+    const panel = this.#skillMgrPanel;
+    if (panel === undefined || panel.closed) return false;
+    // Escape and q always close the popup without applying pending toggles.
+    if (ev.type !== "text" && ev.name === "escape") {
+      this.closeSkillMgrPanel();
+      return true;
+    }
+    if (ev.type === "text" && ev.text.toLowerCase() === "q") {
+      this.closeSkillMgrPanel();
+      return true;
+    }
+    panel.handleKey(ev);
+    if (panel.closed) this.#skillMgrPanel = undefined;
+    // The open panel owns the keyboard entirely: unconsumed keys are dropped
+    // rather than leaking into the editor underneath.
+    return true;
+  }
+
+  /** Renders the panel inside its rounded wire frame. */
+  skillMgrPanelView(): string {
+    return this.#skillMgrPanel?.view(this.#termWidth) ?? "";
+  }
+
+  /** The panel host: Runtime-owned skill reads/toggles plus session hooks. */
+  #skillMgrPanelHost(): SkillMgrPanelHost {
+    return {
+      translator: this.translator,
+      // No feature-forced builtin skills in the Deno port yet: workflow and
+      // browser capabilities own tools, not skill activations. The locked
+      // projection stays available for parity with the mothx panel.
+      lockedNames: () => [],
+      listSkills: () =>
+        this.#service.listSkills({ sessionId: this.currentSessionID() }),
+      setSkillActive: (name, active) =>
+        this.#service
+          .setSkillActive({
+            sessionId: this.currentSessionID(),
+            name,
+            active,
+          })
+          .then(() => {}),
+      settle: (message, error) =>
+        this.controller.addMessage(message, error === true ? "error" : "plain"),
+      requestRender: () => this.requestRender(),
+    };
   }
 
   listAgents(): Promise<string> {
@@ -793,11 +1061,12 @@ export class TUISession implements CommandHost {
       reloadSettings: () => this.reloadSettings(),
       requestRender: () => this.requestRender(),
       switchSession: async (detail) => {
-        // The Core owns session identity: open it there and adopt the view.
-        this.adoptSession(
-          await this.#service.openSession({ sessionId: detail.sessionId }),
-        );
-        this.controller.store.resetTranscriptState();
+        // The Core owns session identity: open it there, scoped to the
+        // directory the listing found it in, and adopt the view.
+        // A switched-to session is a continuation, so it reprints its stored
+        // conversation exactly as `-c` does at startup; resumePersistedSession
+        // owns the reset-then-reprint order and the persisted mode.
+        await this.resumePersistedSession(detail.sessionId, detail.workDir);
       },
       newSession: async () => {
         // The Core mints the persisted identity; no client-side session row.
@@ -1130,6 +1399,223 @@ export class TUISession implements CommandHost {
     this.#sessionView = view;
     this.#workDir = view.workDir !== "" ? view.workDir : this.#workDir;
     this.refreshHeader();
+  }
+
+  /**
+   * Binds the session the TUI starts with: a resumed one when `-r`/`-c` asked
+   * for it, otherwise a fresh Core-owned session.
+   *
+   * A resume also reprints the durable conversation. An empty transcript is not
+   * a continuation: the Runtime replays the persisted branch into the Agent, so
+   * the visible history must come from the same source or the user is asked to
+   * trust a context they cannot see.
+   */
+  async #openInitialSession(): Promise<void> {
+    const target = this.#resumeSession;
+    if (target !== "") {
+      const {
+        sessionId,
+        workDir,
+        failure,
+        view,
+      } = await this.#resolveResumeTarget(target);
+      if (sessionId !== "") {
+        await this.resumePersistedSession(sessionId, workDir, view);
+        return;
+      }
+      // One row naming the target and why it failed, then a usable session:
+      // a bad `-r` must not leave the user with nothing.
+      this.controller.addMessage(
+        `${this.translator.text("session.resume_failed", target)}: ${failure}`,
+        "error",
+      );
+      await this.createFreshSession();
+      return;
+    }
+    if (this.#continueLast) {
+      const latest = await this.#newestPersistedSession(this.#workDir);
+      if (latest.sessionId !== "") {
+        // The listing was scoped to this directory, so the open must be too.
+        await this.resumePersistedSession(latest.sessionId, latest.workDir);
+        return;
+      }
+      // Nothing to continue yet is the normal first run in a fresh directory,
+      // so it starts a session rather than reporting a failure.
+    }
+    await this.createFreshSession();
+  }
+
+  /**
+   * Opens one persisted session in the Core and reprints its history.
+   *
+   * The open is scoped to `workDir` rather than left to the Core's startup
+   * directory: a shared Core may serve several front ends, so an unscoped open
+   * resolves against a directory that is not necessarily this one and fails for
+   * a session that does exist here. Resetting the live view first keeps a
+   * repeated resume from reprinting the same turns twice, and the persisted mode
+   * is applied exactly as the `/sessions` switch path applies it.
+   */
+  async resumePersistedSession(
+    sessionId: string,
+    workDir = this.#workDir,
+    resolvedView?: TUISessionView,
+  ): Promise<void> {
+    // A caller that already opened the session to resolve the target passes the
+    // view down rather than making the Core serve the same open twice.
+    const view = resolvedView ??
+      await this.#openScoped(sessionId, workDir);
+    this.adoptSession(view);
+    // A persisted session mode wins; an empty one falls back to the yolo
+    // product default (the Runtime re-resolves source-forced modes).
+    this.setMode(view.mode !== "" ? view.mode : "yolo");
+    this.controller.store.resetTranscriptState();
+    this.controller.resetContextUsage();
+    await this.replayDurableTranscript();
+  }
+
+  /**
+   * Reprints the resumed session's durable turns through the same transcript
+   * rows a live turn produces, so scrollback, the Ctrl+O panel, and a later
+   * `/clear` all treat history and new output identically.
+   */
+  async replayDurableTranscript(): Promise<void> {
+    const sessionId = this.currentSessionID();
+    if (sessionId === "") return;
+    let messages: TUITranscriptMessage[];
+    try {
+      messages = await this.#service.getTranscript({ sessionId });
+    } catch (error) {
+      // The reprint is presentation; a failed read must not make the resumed
+      // session unusable, so it says so and carries on with live turns.
+      this.controller.addMessage(
+        `${this.translator.text("session.history_unavailable")}: ${
+          errorMessage(error)
+        }`,
+        "warning",
+      );
+      this.requestRender();
+      return;
+    }
+    for (const message of messages) {
+      if (message.role === "user") {
+        this.controller.addMessage(`> ${message.text}`, "plain");
+      } else {
+        this.controller.addMessage(
+          `${
+            this.translator.text("transcript.assistant_prefix")
+          }\n${message.text}`,
+          "plain",
+        );
+      }
+    }
+    if (messages.length > 0) {
+      // One status row saying what was restored, so the reprint is never
+      // mistaken for a fresh empty session.
+      this.controller.addMessage(
+        this.translator.text(
+          "session.resumed",
+          sessionId,
+          messages.length,
+        ),
+        "status",
+      );
+    }
+    this.requestRender();
+  }
+
+  /**
+   * The newest persisted session of one working directory, with the directory
+   * it was found in so the caller can open it scoped to that same directory.
+   */
+  async #newestPersistedSession(
+    workDir: string,
+  ): Promise<{ sessionId: string; workDir: string }> {
+    const entries = await this.#service.listPersistedSessions({ workDir });
+    let bestId = "";
+    let bestTime = -1;
+    for (const entry of entries) {
+      const at = new Date(entry.modTime).getTime();
+      if (entry.sessionId === "" || !Number.isFinite(at)) continue;
+      if (at > bestTime) {
+        bestTime = at;
+        bestId = entry.sessionId;
+      }
+    }
+    return { sessionId: bestId, workDir };
+  }
+
+  /**
+   * Resolves `-r`/`--session`, which accepts a session id (optionally a prefix)
+   * or a directory path. A directory selects the newest session recorded there;
+   * anything else resolves as an id scoped to the starting working directory, so
+   * a session that belongs elsewhere is never adopted under the wrong cwd.
+   *
+   * It reports why a target could not be resolved. Transport and Core failures
+   * propagate instead of becoming "no such session": telling the user their id
+   * is unknown while the Core is merely unreachable would send them to retry a
+   * name that was fine.
+   */
+  async #resolveResumeTarget(
+    target: string,
+  ): Promise<{
+    sessionId: string;
+    workDir: string;
+    failure: string;
+    view?: TUISessionView;
+  }> {
+    if (isDirectoryTarget(target)) {
+      const latest = await this.#newestPersistedSession(target);
+      return latest.sessionId === ""
+        ? {
+          sessionId: "",
+          workDir: target,
+          failure: `no session recorded under ${target}`,
+        }
+        : { ...latest, failure: "" };
+    }
+    try {
+      // Resolve by opening it with its own scoping, so a session of another
+      // directory is rejected here rather than adopted later, and the view this
+      // call already produced is reused instead of opened a second time.
+      const view = await this.#openScoped(target, this.#workDir);
+      return {
+        sessionId: target,
+        workDir: this.#workDir,
+        failure: "",
+        view,
+      };
+    } catch (error) {
+      // Only a genuinely absent target is a user-correctable `-r`; a Core that
+      // is merely unreachable must propagate rather than be reported as a bad id.
+      if (!isSessionNotFound(error)) throw error;
+      return { sessionId: "", workDir: "", failure: errorMessage(error) };
+    }
+  }
+
+  /**
+   * Opens one session scoped to `workDir`, replaying it once when the Core
+   * answers "persisted but not resident here".
+   *
+   * The Core uses that answer for a session whose row exists but which the
+   * serving process has not bound yet (typically because the shared Core
+   * restarted). It replies before starting any work, so re-opening and sending
+   * the same request again is safe and is exactly what the dedicated protocol
+   * code asks the client to do. Treating it as a missing session instead would
+   * tell the user a perfectly good id was unresumable every time the Core came
+   * back up.
+   */
+  async #openScoped(
+    sessionId: string,
+    workDir: string,
+  ): Promise<TUISessionView> {
+    try {
+      return await this.#service.openSession({ sessionId, workDir });
+    } catch (error) {
+      if (!isSessionNotResident(error)) throw error;
+      // The answer arrives before any work starts, so re-opening and sending the
+      // same request again is safe and is what the dedicated code asks for.
+      return await this.#service.openSession({ sessionId, workDir });
+    }
   }
 
   /** Surfaces one Core-requested decision through the standard panel path. */

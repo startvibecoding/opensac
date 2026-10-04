@@ -143,7 +143,8 @@ export function TuiShell({
   // Include `version` so React re-renders when the store changes externally.
   void version;
   const overlayOpen = session.toolModalOpen || session.planModalOpen ||
-    session.esmPanelOpen;
+    session.esmPanelOpen || session.skillHubPanelOpen ||
+    session.skillMgrPanelOpen || session.dialogOpen;
 
   return (
     <Box flexDirection="column">
@@ -159,6 +160,16 @@ export function TuiShell({
       )}
       {session.planModalOpen && <Panel text={session.planModalView()} />}
       {session.esmPanelOpen && <Panel text={session.esmPanelView()} />}
+      {session.skillHubPanelOpen && (
+        <Panel
+          text={session.skillHubPanelView()}
+        />
+      )}
+      {session.skillMgrPanelOpen && (
+        <Panel
+          text={session.skillMgrPanelView()}
+        />
+      )}
       {session.dialogOpen && <Panel text={session.dialogView(width)} />}
       {!session.dialogOpen && (
         <Box borderStyle="round" flexDirection="column">
@@ -242,6 +253,16 @@ function processEvent(
   // An open dialog owns the keyboard first.
   if (session.dialogOpen) {
     session.handleDialogKey(ev);
+    return;
+  }
+  // The framed /skillhub popup owns the keyboard the same way.
+  if (session.skillHubPanelOpen) {
+    session.handleSkillHubKey(ev);
+    return;
+  }
+  // The framed /skillmgr popup owns the keyboard the same way.
+  if (session.skillMgrPanelOpen) {
+    session.handleSkillMgrKey(ev);
     return;
   }
   // Approval panel: y/n plus Enter/Escape.

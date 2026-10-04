@@ -37,8 +37,9 @@ function host(overrides: Partial<CommandHost> = {}): {
       calls.push("compact");
       return Promise.resolve({ message: "compacted" });
     },
-    listSkills() {
-      return Promise.resolve("skills");
+    openSkillMgrDialog(): Promise<CommandResult> {
+      calls.push("openSkillMgr");
+      return Promise.resolve({});
     },
     activateSkill(name) {
       calls.push(`activateSkill:${name}`);
@@ -292,6 +293,24 @@ Deno.test("skill commands activate by name and prefix form", async () => {
   await dispatchCommand("/skill myskill", h);
   await dispatchCommand("/skill:other", h);
   assertEquals(calls, ["activateSkill:myskill", "activateSkill:other"]);
+});
+
+Deno.test("skill manager commands open the merged panel", async () => {
+  const { host: h, calls } = host();
+  await dispatchCommand("/skillmgr", h);
+  await dispatchCommand("/skills", h);
+  await dispatchCommand("/skill", h);
+  await dispatchCommand("/skill:", h);
+  assertEquals(calls, [
+    "openSkillMgr",
+    "openSkillMgr",
+    "openSkillMgr",
+    "openSkillMgr",
+  ]);
+  // Refused while a foreground run is active.
+  const busy = host({ running: true });
+  const result = await dispatchCommand("/skillmgr", busy.host);
+  assertEquals(result.error, true);
 });
 
 Deno.test("expert and session subcommands route correctly", async () => {

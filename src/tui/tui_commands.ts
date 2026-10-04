@@ -100,23 +100,6 @@ export class TuiCommands {
 
   // --- Skills ---------------------------------------------------------------
 
-  async listSkills(): Promise<string> {
-    const tr = this.#tr();
-    const skills = await this.#host.service.listSkills({
-      sessionId: this.#host.currentSessionID(),
-    });
-    if (skills.length === 0) return tr.text("skills.empty");
-    const lines = [tr.text("skill.available_title")];
-    for (const skill of skills) {
-      const marker = skill.active ? "*" : " ";
-      lines.push(
-        `  [${marker}] ${skill.name} (${skill.source}): ${skill.description}`,
-      );
-    }
-    lines.push("", "Use /skill <name> or /skill:<name> to activate a skill.");
-    return lines.join("\n");
-  }
-
   async activateSkill(name: string): Promise<string> {
     const tr = this.#tr();
     const sessionId = this.#host.currentSessionID();
@@ -418,8 +401,11 @@ export class TuiCommands {
       return { message: tr.text("sessions.no_match", id), error: true };
     }
     try {
+      // Scope the open to the directory the listing found the session in, so a
+      // shared Core whose startup directory differs still resolves it.
       const view = await this.#host.service.openSession({
         sessionId: detail.sessionId,
+        workDir: detail.workDir,
       });
       this.#host.adoptSession(view);
       // A persisted session mode wins; an empty one falls back to the yolo

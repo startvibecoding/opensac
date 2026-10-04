@@ -24,7 +24,7 @@ Deno.test("commandSpecs keeps the Go spec table exactly", () => {
     "/defaultModel",
     "/env",
     "/skillhub",
-    "/skills",
+    "/skillmgr",
     "/skill",
     "/paste-image",
     "/clear",
