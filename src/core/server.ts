@@ -264,8 +264,16 @@ export class CoreServer {
         );
       }
       if (request.method !== "GET") return methodNotAllowed(["GET"]);
+      const clientId = request.headers.get("x-opensac-client-id")?.trim() ||
+        `event-${crypto.randomUUID()}`;
+      const forwarded = request.headers.get("x-forwarded-for")?.split(",")
+        .at(0)?.trim();
+      const remoteAddress = forwarded === undefined || forwarded === ""
+        ? undefined
+        : forwarded;
+      this.#events.registerClient(clientId, remoteAddress);
       const upgraded = Deno.upgradeWebSocket(request);
-      this.#attachEventSocket(upgraded.socket);
+      this.#attachEventSocket(upgraded.socket, clientId);
       return upgraded.response;
     }
 
@@ -345,6 +353,21 @@ export class CoreServer {
         };
         return "id" in message ? coreResult(id, result) : undefined;
       }
+      case CORE_METHODS.clientsList: {
+        const result = {
+          clients: this.#events.listClients().map((client) => ({
+            clientId: client.clientId,
+            ...(client.remoteAddress === undefined
+              ? {}
+              : { remoteAddress: client.remoteAddress }),
+            connectedAt: client.connectedAt,
+            subscriptions: client.subscriptions.map((subscription) => ({
+              ...subscription,
+            })),
+          })),
+        };
+        return "id" in message ? coreResult(id, result) : undefined;
+      }
       case CORE_METHODS.shutdown: {
         // JSON-RPC notifications are one-way and must never be able to stop
         // the shared Core; only a request with an id is acknowledged.
@@ -371,7 +394,7 @@ export class CoreServer {
     }
   }
 
-  #attachEventSocket(socket: WebSocket): void {
+  #attachEventSocket(socket: WebSocket, clientId: string): void {
     const send = (value: unknown): void => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(value));
@@ -391,6 +414,7 @@ export class CoreServer {
     socket.onclose = () => {
       stopEvents();
       stopRequests();
+      this.#events.unregisterClient(clientId);
     };
   }
 

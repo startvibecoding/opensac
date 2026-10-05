@@ -7,6 +7,7 @@
 // Deviation: `Chat(ctx, params) <-chan StreamEvent` maps to
 // `chat(params): AsyncIterable<StreamEvent>`; the abort channel maps to
 // `params.abort` (an AbortSignal) and is threaded into `fetch`.
+import { wrapError } from "../errors.ts";
 import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
 import { hostedToolType } from "../hosted_tools.ts";
@@ -1080,11 +1081,6 @@ export class Provider extends BaseProvider implements ProviderInterface {
     }
     return "";
   }
-}
-
-function wrapError(prefix: string, err: unknown): Error {
-  const msg = err instanceof Error ? err.message : String(err);
-  return new Error(`${prefix}: ${msg}`);
 }
 
 function cloneHeaders(

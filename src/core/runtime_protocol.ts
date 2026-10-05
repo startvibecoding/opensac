@@ -10,6 +10,7 @@ export const CORE_RUNTIME_METHODS = {
   sessionList: "session.list",
   sessionListPersisted: "session.listPersisted",
   sessionHistory: "session.history",
+  sessionTranscript: "session.transcript",
   sessionConfigGet: "session.config.get",
   sessionConfigSet: "session.config.set",
   sessionPrompt: "session.prompt",
@@ -271,6 +272,29 @@ export function parseSessionIdParams(
     ? undefined
     : requiredString(object, "sessionId");
   return sessionId === undefined ? undefined : { sessionId };
+}
+
+/**
+ * Parses one session-open request.
+ *
+ * `workDir` is optional: a caller that knows the session's own directory sends
+ * it so the Core resolves the session scoped to that directory, exactly like
+ * ACP's `session/load`. Omitting it keeps the previous behaviour of using the
+ * Core's startup directory.
+ */
+export function parseSessionOpenParams(
+  params: CoreRpcParams | undefined,
+): { sessionId: string; workDir?: string } | undefined {
+  const base = parseSessionIdParams(params);
+  if (base === undefined) return undefined;
+  const object = runtimeParamsObject(params)!;
+  const workDir = optionalString(object, "workDir");
+  if (workDir === null) return undefined;
+  // An empty or blank `workDir` means "not supplied", exactly like omitting the
+  // key: a front end that serializes an unset directory must not silently scope
+  // the open to a path that cannot match any session's cwd.
+  const trimmed = (workDir ?? "").trim();
+  return trimmed === "" ? base : { ...base, workDir: trimmed };
 }
 
 /** Parses one persisted-session listing request (optional work directory). */

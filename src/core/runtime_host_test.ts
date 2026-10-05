@@ -13,6 +13,7 @@ import {
   type Settings,
 } from "../config/settings.ts";
 import { CoreSessionNotResidentError } from "./runtime_protocol.ts";
+import { openOrCreateSession } from "../agentruntime/session_lifecycle.ts";
 import { SessionRecoveryRequiredError } from "../session/mod.ts";
 import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
 import { knowledgeBaseCronJobID } from "../agentruntime/knowledge_cron.ts";
@@ -49,7 +50,7 @@ import {
   type StreamEvent,
   streamTextDelta,
 } from "../provider/types.ts";
-import { SOURCE_ACP } from "../agentruntime/source.ts";
+import { SOURCE_ACP, SOURCE_TUI } from "../agentruntime/source.ts";
 import type { Service as SkillHubService } from "../skillhub/mod.ts";
 import { AttachmentService } from "../agentruntime/input.ts";
 import { defaultAttachmentPolicy } from "../agentruntime/attachment.ts";
@@ -2861,4 +2862,228 @@ test("production prompt holds the execution lease the ownership fence revalidate
   } finally {
     await Deno.remove(workDir, { recursive: true });
   }
+});
+
+test("transcript reprints the durable branch that the live event log cannot see", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({
+      prefix: "opensac-core-transcript-",
+    });
+    try {
+      const settings = defaultSettings();
+      const sessionDir = join(workDir, "sessions");
+      settings.sessionDir = sessionDir;
+      const sessionId = "transcript-resume";
+
+      // A conversation exactly as an earlier, finished run left it on disk.
+      const manager = openOrCreateSession({
+        workDir,
+        sessionDir,
+        id: sessionId,
+      });
+      manager.appendMessage({
+        timestamp: new Date(1000),
+        role: "user",
+        content: "why is the build red",
+      });
+      manager.appendMessage({
+        timestamp: new Date(2000),
+        role: "assistant",
+        contents: [{ type: "text", text: "because fmt failed" }],
+      });
+      // Runtime-injected guidance and tool traffic are not conversation turns
+      // the user spoke, so a reprint must not render them as such.
+      manager.appendMessage({
+        timestamp: new Date(3000),
+        role: "user",
+        content: "injected skill guidance",
+        systemInjected: true,
+      });
+      manager.appendMessage({
+        timestamp: new Date(4000),
+        role: "toolResult",
+        toolCallId: "call-1",
+        toolName: "bash",
+        content: "exit code 1",
+      });
+      manager.appendMessage({
+        timestamp: new Date(5000),
+        role: "assistant",
+        contents: [
+          { type: "text", text: "part one" },
+          { type: "thinking", thinking: "hidden reasoning" },
+          { type: "text", text: "part two" },
+        ],
+      });
+
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_ACP,
+        workDir,
+        settings,
+        providerName: "",
+        modelID: "",
+        dependencies: createProductionCoreRuntimeDependencies(settings),
+      });
+      try {
+        await host.openSession({ sessionId });
+        assertEquals(await host.transcript({ sessionId }), [
+          { role: "user", text: "why is the build red" },
+          { role: "assistant", text: "because fmt failed" },
+          { role: "assistant", text: "part one\npart two" },
+        ]);
+        // The distinguishing property: this process never ran the session, so
+        // the live log is empty and only the durable branch can reprint it.
+        assertEquals(
+          (await host.history({ sessionId })).length,
+          0,
+          "history is the live log, not the durable transcript",
+        );
+      } finally {
+        await host.close();
+      }
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
+});
+
+test("transcript of a session with no conversation is empty, not an error", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({
+      prefix: "opensac-core-transcript-empty-",
+    });
+    try {
+      const settings = defaultSettings();
+      settings.sessionDir = join(workDir, "sessions");
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_ACP,
+        workDir,
+        settings,
+        providerName: "",
+        modelID: "",
+        dependencies: createProductionCoreRuntimeDependencies(settings),
+      });
+      try {
+        const session = await host.createSession({ workDir });
+        assertEquals(
+          await host.transcript({ sessionId: session.sessionId }),
+          [],
+        );
+      } finally {
+        await host.close();
+      }
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
+});
+
+test("openSession scoped to another work directory does not adopt the session", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({
+      prefix: "opensac-core-open-scope-",
+    });
+    try {
+      const settings = defaultSettings();
+      settings.sessionDir = join(workDir, "sessions");
+      const otherCwd = join(workDir, "other-project");
+      await Deno.mkdir(otherCwd, { recursive: true });
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_ACP,
+        workDir,
+        settings,
+        providerName: "",
+        modelID: "",
+        dependencies: createProductionCoreRuntimeDependencies(settings),
+      });
+      try {
+        const session = await host.createSession({ workDir: otherCwd });
+        await host.closeSession({ sessionId: session.sessionId });
+        // The same id resolved against a different work directory must fail
+        // rather than be adopted under the wrong cwd.
+        await assertRejects(
+          () =>
+            host.openSession({
+              sessionId: session.sessionId,
+              workDir,
+            }),
+          Error,
+        );
+        // Scoped to its own directory it opens normally.
+        const reopened = await host.openSession({
+          sessionId: session.sessionId,
+          workDir: otherCwd,
+        });
+        assertEquals(reopened.sessionId, session.sessionId);
+        assertEquals(reopened.workDir, otherCwd);
+      } finally {
+        await host.close();
+      }
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
+});
+
+test("openSession scoped to the caller directory resolves a foreign Core startup dir", async () => {
+  await withIsolatedConfig(async () => {
+    const workDir = await Deno.makeTempDir({
+      prefix: "opensac-core-open-scoped-",
+    });
+    try {
+      const settings = defaultSettings();
+      settings.sessionDir = join(workDir, "sessions");
+      // The shared Core started in one directory while this front end's project
+      // is another: an unscoped open would resolve against the former and fail
+      // for a session that really does exist in the latter.
+      const coreStart = join(workDir, "core-start");
+      await Deno.mkdir(coreStart, { recursive: true });
+      const frontEndDir = join(workDir, "front-end");
+      await Deno.mkdir(frontEndDir, { recursive: true });
+
+      const manager = openOrCreateSession({
+        workDir: frontEndDir,
+        sessionDir: settings.sessionDir,
+        id: "front-end-session",
+      });
+      manager.appendMessage({
+        timestamp: new Date(1000),
+        role: "user",
+        content: "the turn made in the front end directory",
+      });
+
+      const host = await createCoreRuntimeHost({
+        source: SOURCE_TUI,
+        workDir: coreStart,
+        settings,
+        providerName: "",
+        modelID: "",
+        dependencies: createProductionCoreRuntimeDependencies(settings),
+      });
+      try {
+        // Scoped to the directory the listing found it in, it opens and its
+        // durable transcript is projected.
+        const view = await host.openSession({
+          sessionId: "front-end-session",
+          workDir: frontEndDir,
+        });
+        assertEquals(view.workDir, frontEndDir);
+        assertEquals(await host.transcript({ sessionId: view.sessionId }), [
+          { role: "user", text: "the turn made in the front end directory" },
+        ]);
+        // Left to the Core's own startup directory it correctly refuses rather
+        // than adopting the session under a cwd that is not its own.
+        await host.closeSession({ sessionId: view.sessionId });
+        await assertRejects(
+          () => host.openSession({ sessionId: "front-end-session" }),
+          Error,
+          "not found for cwd",
+        );
+      } finally {
+        await host.close();
+      }
+    } finally {
+      await Deno.remove(workDir, { recursive: true });
+    }
+  });
 });

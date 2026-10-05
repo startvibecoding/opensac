@@ -21,12 +21,14 @@ import { runACPCore, type RunOptions } from "../acp/run.ts";
 import { isStartupError } from "../acp/support.ts";
 import { executeDoctorCommand } from "./doctor.ts";
 import {
+  type CoreListOutcome,
   type CorePairOutcome,
   type CoreRestartOutcome,
   type CoreStartOutcome,
   type CoreStatusOutcome,
   type CoreStopOutcome,
   launchCoreCommand,
+  listCoreCommand,
   pairCoreCommand,
   restartCoreCommand,
   runCoreCommand,
@@ -256,6 +258,8 @@ export interface CoreCommandRunners {
     version: string,
     options: CorePairRunOptions,
   ) => Promise<CorePairOutcome>;
+  /** Lists clients connected to the running Core. */
+  list?: (version: string) => Promise<CoreListOutcome>;
 }
 
 /** Builds the shared Core lifecycle subcommand. */
@@ -280,6 +284,7 @@ export function createCoreCommand(
           ? {}
           : { password: options.password }),
       }));
+  const list = runners.list ?? ((v: string) => listCoreCommand({ version: v }));
   const command = new Command()
     .description(
       "Run the shared OpenSAC Core host in the foreground (manage it with status, start, restart, stop, pair)",
@@ -297,6 +302,7 @@ export function createCoreCommand(
   command.command("stop", createCoreStopCommand(stop, version));
   command.command("restart", createCoreRestartCommand(restart, version));
   command.command("pair", createCorePairCommand(pair, version));
+  command.command("list", createCoreListCommand(list, version));
   return command as unknown as Command;
 }
 
@@ -388,6 +394,23 @@ function createCorePairCommand(
     ) as unknown as Command;
 }
 
+/** Builds the `core list` lifecycle subcommand. */
+function createCoreListCommand(
+  list: (version: string) => Promise<CoreListOutcome>,
+  version: string,
+): Command {
+  return new Command()
+    .description("List clients currently connected to the shared OpenSAC Core")
+    .noExit()
+    .option("--json", "Print one machine-readable JSON result")
+    .action((flags: ParsedFlags) =>
+      runAndPrint(async () => {
+        console.log(formatCoreList(await list(version), flags.json === true));
+        return 0;
+      }, "opensac core list")
+    ) as unknown as Command;
+}
+
 /** Runs one lifecycle action, reporting failures without a stack trace. */
 async function runAndPrint(
   operation: () => Promise<number>,
@@ -475,6 +498,36 @@ export function formatCorePair(
     `  Version:  ${outcome.version} (protocol ${outcome.protocolVersion})`,
     `  Auth:     ${auth}`,
   ].join("\n");
+}
+
+/** Formats `opensac core list` for humans or machines. */
+export function formatCoreList(
+  outcome: CoreListOutcome,
+  json: boolean,
+): string {
+  if (json) return JSON.stringify(outcome);
+  if (outcome.clients.length === 0) {
+    return `OpenSAC Core at ${outcome.url} (PID ${outcome.pid}) has no connected clients.`;
+  }
+  const lines = [
+    `OpenSAC Core at ${outcome.url} (PID ${outcome.pid}) has ${outcome.clients.length} connected client(s):`,
+  ];
+  for (const client of outcome.clients) {
+    const remote = client.remoteAddress === undefined
+      ? ""
+      : ` from ${client.remoteAddress}`;
+    const subs = client.subscriptions.length === 0
+      ? "no subscriptions"
+      : client.subscriptions
+        .map((sub) => `${sub.sessionId}/${sub.runId}`)
+        .join(", ");
+    lines.push(
+      `  ${client.clientId}${remote} since ${
+        new Date(client.connectedAt).toISOString()
+      } (${subs})`,
+    );
+  }
+  return lines.join("\n");
 }
 
 /** Formats the shared `core stop` result for humans. */
@@ -759,6 +812,11 @@ export function createRootCommand(version = currentVersion()): Command {
           multiAgent: flags.multiAgent,
           delegate: flags.delegate,
           workflows: flags.workflows,
+          // The same resume flags the TUI honours: `opensac -p -c "..."` must
+          // continue this directory's session rather than a throwaway one.
+          continueSession: flags.continueSession,
+          resume: flags.resume,
+          session: flags.session,
         }, { settings: loadSettings() });
         Deno.exit(result.exitCode);
       }
@@ -774,6 +832,11 @@ export function createRootCommand(version = currentVersion()): Command {
           multiAgent: flags.multiAgent,
           delegate: flags.delegate,
           workflows: flags.workflows,
+          // Session selection is a Runtime resume, not a display hint: the
+          // TUI opens the persisted session and reprints its conversation.
+          continueSession: flags.continueSession,
+          resume: flags.resume,
+          session: flags.session,
         }, loadSettings());
       } catch (error) {
         // Startup errors (provider/config/session) surface as a clean message,

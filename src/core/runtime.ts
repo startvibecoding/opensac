@@ -222,6 +222,23 @@ export interface CoreSessionView {
   updatedAt: Date;
 }
 
+/**
+ * One rendered turn of a session's durable conversation, projected for a front
+ * end that must reprint a resumed session's history.
+ *
+ * This is a presentation projection of Runtime-owned session replay, not a
+ * second transcript store: the host derives it from the persisted branch, so it
+ * survives a Core restart and matches what the user saw originally. Providers,
+ * tool payloads, and secrets never appear; only the user's own text and the
+ * assistant's visible text.
+ */
+export interface CoreTranscriptMessage {
+  /** Whose turn this was, in the transcript's own vocabulary. */
+  role: "user" | "assistant";
+  /** The turn's text content; empty when the turn carried only tool calls. */
+  text: string;
+}
+
 /** The adapter-neutral summary of one persisted session row. */
 export interface CoreSessionListEntry {
   sessionId: string;
@@ -351,6 +368,11 @@ export interface CoreSessionRuntime {
   ): Promise<CoreTransientPromptResult>;
   /** Runs one forced conversation compaction as a canonical event run. */
   compact?(): Promise<CorePromptExecution>;
+  /**
+   * Projects the session's durable conversation turns for a resume-time
+   * reprint. Absent when the runtime has no persisted branch to replay.
+   */
+  transcriptMessages?(): CoreTranscriptMessage[];
 }
 
 /** Construction dependencies for the Core Runtime Host. */
@@ -414,11 +436,29 @@ export interface CoreRuntimeHostOptions {
 /** The shared Core-owned runtime facade. */
 export interface CoreRuntimeHost {
   createSession(input: CoreSessionCreateInput): Promise<CoreSessionView>;
-  openSession(input: { sessionId: string }): Promise<CoreSessionView>;
+  /**
+   * Binds one persisted session as a resident Core session.
+   *
+   * `workDir` scopes the lookup to the directory the caller believes the
+   * session belongs to, exactly like ACP's `session/load`. A session that does
+   * not belong to that directory is rejected rather than adopted under it.
+   */
+  openSession(input: {
+    sessionId: string;
+    workDir?: string;
+  }): Promise<CoreSessionView>;
   closeSession(input: { sessionId: string }): Promise<void>;
   /** Removes one persisted session (Core-owned session lifecycle). */
   deleteSession(input: { sessionId: string }): Promise<void>;
   history(input: { sessionId: string }): Promise<CoreRuntimeEvent[]>;
+  /**
+   * Projects the durable conversation of one session for resume-time reprint.
+   * Unlike `history` (the live event log of the current process), this reads
+   * the persisted branch, so it is non-empty after a Core restart.
+   */
+  transcript(input: {
+    sessionId: string;
+  }): Promise<CoreTranscriptMessage[]>;
   prompt(input: CorePromptInput): Promise<CorePromptAccepted>;
   cancelRun(input: { sessionId: string; runId: string }): Promise<CoreRunView>;
   getRun(

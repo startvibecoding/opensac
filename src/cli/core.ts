@@ -426,6 +426,7 @@ function createLazyProductionRuntimeHost(
     updateEnvDocument: (input) =>
       load().then((runtime) => runtime.updateEnvDocument(input)),
     history: (input) => load().then((runtime) => runtime.history(input)),
+    transcript: (input) => load().then((runtime) => runtime.transcript(input)),
     prompt: (input) => load().then((runtime) => runtime.prompt(input)),
     cancelRun: (input) => load().then((runtime) => runtime.cancelRun(input)),
     getRun: (input) => load().then((runtime) => runtime.getRun(input)),
@@ -1140,6 +1141,36 @@ export interface CorePairOptions extends CoreLifecycleOptions {
   password?: string;
 }
 
+/** One connected Core client row returned by `opensac core list`. */
+export interface CoreListClient {
+  clientId: string;
+  remoteAddress?: string;
+  connectedAt: number;
+  subscriptions: Array<{ sessionId: string; runId: string }>;
+}
+
+/** Result of `opensac core list`. */
+export interface CoreListOutcome {
+  url: string;
+  pid: number;
+  clients: CoreListClient[];
+}
+
+/** Options for `opensac core list`. */
+export type CoreListOptions = CoreLifecycleOptions;
+
+/** Injectable client surface used by `opensac core list`. */
+export interface CoreListClientSurface extends CoreLifecycleClient {
+  call<T>(method: string, params?: unknown, signal?: AbortSignal): Promise<T>;
+}
+
+/** Dependencies for `opensac core list`. */
+export interface CoreListDependencies extends CoreLifecycleDependencies {
+  createClient?: (
+    options: CoreLifecycleClientOptions,
+  ) => MaybePromise<CoreListClientSurface>;
+}
+
 /** Result of `opensac core pair`. */
 export interface CorePairOutcome {
   /** URL exposed by the paired Core. */
@@ -1324,6 +1355,48 @@ export async function pairCoreCommand(
   }
 }
 
+/**
+ * Lists clients currently connected to the running shared Core event stream.
+ * A non-running Core is reported by discovery errors, matching `pair`.
+ */
+export async function listCoreCommand(
+  options: CoreListOptions = {},
+  deps: CoreListDependencies = {},
+): Promise<CoreListOutcome> {
+  const signal = options.signal ?? deps.signal;
+  throwIfAborted(signal);
+  const context = await resolveLifecycleContext(options, deps, signal);
+  throwIfAborted(signal);
+
+  const client = await createListClient(context, deps, signal);
+  try {
+    const discovery = await client.discover(signal);
+    if (discovery.status !== "ready") {
+      const hint = discovery.status === "missing"
+        ? '; run "opensac core start" first'
+        : "";
+      throw new Error(
+        `Cannot list clients: OpenSAC Core is not ready (${discovery.status})${hint}`,
+        "error" in discovery && discovery.error instanceof Error
+          ? { cause: discovery.error }
+          : undefined,
+      );
+    }
+    const result = await client.call<unknown>(
+      "core.clients.list",
+      undefined,
+      signal,
+    );
+    return {
+      url: discovery.url,
+      pid: discovery.registration.pid,
+      clients: parseCoreClientsResult(result),
+    };
+  } finally {
+    await client.close();
+  }
+}
+
 /** Fails unless discovery proved a healthy Core the client can pair with. */
 function assertPairable(
   discovery: CoreDiscoveryResult,
@@ -1390,6 +1463,72 @@ function defaultLifecycleClient(
     protocolVersion: options.protocolVersion,
     config: options.config,
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
+}
+
+function createListClient(
+  context: CoreLifecycleContext,
+  deps: CoreListDependencies,
+  signal?: AbortSignal,
+): MaybePromise<CoreListClientSurface> {
+  const options: CoreLifecycleClientOptions = {
+    paths: context.paths,
+    config: context.config,
+    version: context.version,
+    protocolVersion: context.protocolVersion,
+    ...(signal === undefined ? {} : { signal }),
+  };
+  return (deps.createClient ?? defaultLifecycleClient)(options) as
+    | Promise<
+      CoreListClientSurface
+    >
+    | CoreListClientSurface;
+}
+
+function parseCoreClientsResult(value: unknown): CoreListClient[] {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Core clients response has an invalid shape");
+  }
+  const clients = (value as Record<string, unknown>).clients;
+  if (!Array.isArray(clients)) {
+    throw new Error("Core clients response has an invalid shape");
+  }
+  return clients.map((client) => {
+    if (
+      client === null || typeof client !== "object" || Array.isArray(client)
+    ) {
+      throw new Error("Core client entry has an invalid shape");
+    }
+    const record = client as Record<string, unknown>;
+    if (
+      typeof record.clientId !== "string" ||
+      typeof record.connectedAt !== "number" ||
+      !Number.isFinite(record.connectedAt) ||
+      !Array.isArray(record.subscriptions)
+    ) {
+      throw new Error("Core client entry has an invalid shape");
+    }
+    const subscriptions = record.subscriptions.map((subscription) => {
+      if (
+        subscription === null || typeof subscription !== "object" ||
+        Array.isArray(subscription)
+      ) {
+        throw new Error("Core client subscription entry has an invalid shape");
+      }
+      const sub = subscription as Record<string, unknown>;
+      if (typeof sub.sessionId !== "string" || typeof sub.runId !== "string") {
+        throw new Error("Core client subscription entry has an invalid shape");
+      }
+      return { sessionId: sub.sessionId, runId: sub.runId };
+    });
+    return {
+      clientId: record.clientId,
+      ...(typeof record.remoteAddress === "string"
+        ? { remoteAddress: record.remoteAddress }
+        : {}),
+      connectedAt: record.connectedAt,
+      subscriptions,
+    };
   });
 }
 

@@ -4,6 +4,7 @@
 // (Go `json.RawMessage`) are carried as strings for streaming buffers and as
 // decoded values for replay items.
 
+import { wrapError } from "../errors.ts";
 import type {
   ChatParams,
   ContentBlock,
@@ -1694,10 +1695,4 @@ async function waitOrAbort(
 
 function asError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
-}
-
-function wrapError(context: string, err: unknown): Error {
-  return new Error(
-    `${context}: ${err instanceof Error ? err.message : String(err)}`,
-  );
 }

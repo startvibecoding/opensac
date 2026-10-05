@@ -1,5 +1,5 @@
 // deno-lint-ignore-file require-await -- async fake host models the Promise-based Runtime seam
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { CoreRuntimeDispatcher } from "./dispatcher.ts";
 import { CoreEventStream } from "./event_stream.ts";
 import type { CoreRpcParams } from "./protocol.ts";
@@ -139,6 +139,9 @@ function testHost(
     async history() {
       return [];
     },
+    async transcript() {
+      return [];
+    },
     async prompt(input) {
       return { sessionId: input.sessionId, runId: "run-1", status: "running" };
     },
@@ -241,6 +244,29 @@ Deno.test("CoreRuntimeDispatcher dispatches session.listPersisted listings", asy
     method: "session.listPersisted",
   }, new AbortController().signal);
   assertEquals(seen[1], {});
+});
+
+Deno.test("CoreRuntimeDispatcher routes session.transcript to the durable projection", async () => {
+  const seen: Array<{ sessionId: string }> = [];
+  const host = {
+    ...testHost(),
+    async transcript(input: { sessionId: string }) {
+      seen.push({ ...input });
+      return [{ role: "user", text: "earlier turn" } as const];
+    },
+  };
+  const dispatcher = new CoreRuntimeDispatcher({
+    host,
+    events: new CoreEventStream(),
+  });
+  const response = await dispatcher.dispatch({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "session.transcript",
+    params: { sessionId: "session-9" },
+  }, new AbortController().signal);
+  assertEquals(seen, [{ sessionId: "session-9" }]);
+  assertEquals(response?.result, [{ role: "user", text: "earlier turn" }]);
 });
 
 Deno.test("CoreRuntimeDispatcher sends extension methods to the Core extension handler", async () => {
@@ -776,4 +802,45 @@ Deno.test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and
     },
     { method: "compact", input: { sessionId: "session-1" } },
   ]);
+});
+
+Deno.test("session.open tolerates a blank workDir and keeps a real one", async () => {
+  const seen: Array<{ sessionId: string; workDir?: string }> = [];
+  const dispatcher = new CoreRuntimeDispatcher({
+    host: {
+      ...testHost(),
+      async openSession(input: { sessionId: string; workDir?: string }) {
+        seen.push({ ...input });
+        return { sessionId: input.sessionId } as never;
+      },
+    },
+    events: new CoreEventStream(),
+  });
+  const call = (params: Record<string, unknown>) =>
+    dispatcher.dispatch({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.open",
+      params,
+    }, new AbortController().signal);
+
+  // A front end that serializes an unset directory must not silently scope the
+  // open to a path that cannot match any session's cwd.
+  await call({ sessionId: "s-1", workDir: "" });
+  await call({ sessionId: "s-1", workDir: "   " });
+  assertEquals(seen, [{ sessionId: "s-1" }, { sessionId: "s-1" }]);
+
+  // A real directory is passed through, trimmed.
+  await call({ sessionId: "s-1", workDir: " /workspace/app " });
+  assertEquals(seen[2], { sessionId: "s-1", workDir: "/workspace/app" });
+
+  // A present non-string is still a malformed request, not an absent one.
+  const before = seen.length;
+  const response = await call({ sessionId: "s-1", workDir: 42 });
+  assertEquals(
+    seen.length,
+    before,
+    "an invalid workDir must not reach the host",
+  );
+  assert(response?.error !== undefined, "a non-string workDir is rejected");
 });

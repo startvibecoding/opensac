@@ -12,7 +12,14 @@ import { resolveCoreConfig } from "../core/config.ts";
 import { CORE_PROTOCOL_VERSION } from "../core/server.ts";
 import { current as appVersionCurrent } from "../version/version.ts";
 import { createCoreClientTUIService } from "../tui/core_service.ts";
-import type { TUIDecisionRequest, TUIService } from "../tui/service.ts";
+import { tuiResumeOptions } from "./root_tui.ts";
+import { isDirectoryTarget } from "../tui/tui_session.ts";
+import { isSessionNotFound } from "../tui/service.ts";
+import type {
+  TUIDecisionRequest,
+  TUIService,
+  TUISessionView,
+} from "../tui/service.ts";
 import { coreEventToAgentEvent } from "../tui/run_event_projection.ts";
 import {
   EVENT_ERROR,
@@ -43,6 +50,16 @@ export interface PrintOptions {
   multiAgent?: boolean;
   delegate?: boolean;
   workflows?: boolean;
+  /**
+   * `-c` / `-r` / `--session`: continue the newest persisted session of this
+   * directory, or resume one specific id/path. Print must honour the same flags
+   * the TUI does, otherwise `opensac -p -c "..."` silently runs in a throwaway
+   * session and the scripted follow-up loses the conversation it was meant to
+   * continue.
+   */
+  continueSession?: boolean;
+  resume?: string;
+  session?: string;
   /** Stderr line writer (tests). */
   writeError?: (line: string) => void;
   /** Stdout writer (tests). */
@@ -97,6 +114,88 @@ async function openPrintService(
     service: createCoreClientTUIService(core, { workDir }),
     close: () => core.close(),
   };
+}
+
+/**
+ * Opens the session one print run executes in: resumed when `-c`/`-r` asked for
+ * it, otherwise freshly created by the Core.
+ *
+ * The resume target is resolved through the same listing-and-scoped-open rule the
+ * TUI uses, and an unresolvable target degrades to a fresh session with a report
+ * on stderr rather than failing the whole run: a script that passes a stale `-r`
+ * id still gets its answer, and the reason it did not continue is visible.
+ */
+async function openPrintSession(
+  service: TUIService,
+  options: PrintOptions,
+  resolved: {
+    workDir: string;
+    providerName: string;
+    modelID: string;
+    mode: string;
+    thinkingLevel: string;
+  },
+): Promise<TUISessionView> {
+  const create = () =>
+    service.createSession({
+      workDir: resolved.workDir,
+      providerName: resolved.providerName,
+      modelID: resolved.modelID,
+      mode: resolved.mode,
+      thinkingLevel: resolved.thinkingLevel,
+      source: "cli",
+      approvalPolicy: "print",
+      questionPolicy: "unattended",
+      ...(options.multiAgent === true
+        ? { capabilities: { multiAgent: true } }
+        : {}),
+    });
+  const target = tuiResumeOptions(options);
+  if (!target.continueLast && target.resumeSession === "") {
+    return await create();
+  }
+  // `-r`/`--session` names either a directory (whose newest session is chosen)
+  // or an id scoped to this working directory; `-c` always means "the newest of
+  // this directory".
+  const dirTarget = target.resumeSession !== "" &&
+      isDirectoryTarget(target.resumeSession)
+    ? target.resumeSession
+    : "";
+  const workDir = dirTarget !== "" ? dirTarget : resolved.workDir;
+  let picked;
+  try {
+    const entries = await service.listPersistedSessions({ workDir });
+    picked = dirTarget !== "" || target.continueLast
+      ? newestFirst(entries)
+      : entries.find((entry) => entry.sessionId === target.resumeSession);
+    if (picked === undefined) return await create();
+    return await service.openSession({
+      sessionId: picked.sessionId,
+      workDir,
+    });
+  } catch (error) {
+    // Only an absent target degrades to a fresh session, so a script passing a
+    // stale `-r` id still gets its answer. An unreachable or incompatible Core
+    // must propagate: silently starting a new session would make a scripted
+    // follow-up run against the wrong conversation with no indication why.
+    if (!isSessionNotFound(error)) throw error;
+    return await create();
+  }
+}
+
+/** The most recently modified session of one listing, if any. */
+function newestFirst<T extends { modTime: Date }>(
+  entries: readonly T[],
+): T | undefined {
+  let best: T | undefined;
+  for (const entry of entries) {
+    const at = new Date(entry.modTime).getTime();
+    if (!Number.isFinite(at)) continue;
+    if (best === undefined || at > new Date(best.modTime).getTime()) {
+      best = entry;
+    }
+  }
+  return best;
 }
 
 /**
@@ -162,21 +261,16 @@ export async function runPrintAction(
 
   const { service, close } = await openPrintService(deps, workDir);
   try {
-    // Session setup: one fresh Core-owned session per print run (Go
-    // setupSession default). The Core mints the persisted identity and records
-    // the canonical run with the print/unattended run policy.
-    const session = await service.createSession({
+    // Session setup: a resumed session when `-c`/`-r`/`--session` asked for one,
+    // otherwise one fresh Core-owned session per print run (Go setupSession
+    // default). Either way the Core mints the persisted identity and records the
+    // canonical run with the print/unattended run policy.
+    const session = await openPrintSession(service, options, {
       workDir,
       providerName,
       modelID,
       mode,
       thinkingLevel,
-      source: "cli",
-      approvalPolicy: "print",
-      questionPolicy: "unattended",
-      ...(options.multiAgent === true
-        ? { capabilities: { multiAgent: true } }
-        : {}),
     });
     const sessionId = session.sessionId;
     if (options.delegate === true) {

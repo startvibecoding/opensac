@@ -26,6 +26,7 @@ import {
   parseSessionCreateParams,
   parseSessionIdParams,
   parseSessionListPersistedParams,
+  parseSessionOpenParams,
   parseSettingsReadParams,
   parseSettingsUpdateParams,
   parseSkillParams,
@@ -118,7 +119,7 @@ export class CoreRuntimeDispatcher {
         return await this.#host.createSession(input);
       }
       case CORE_RUNTIME_METHODS.sessionOpen: {
-        const input = parseSessionIdParams(params);
+        const input = parseSessionOpenParams(params);
         if (input === undefined) throw invalidParams();
         return await this.#host.openSession(input);
       }
@@ -148,6 +149,11 @@ export class CoreRuntimeDispatcher {
         const input = parseSessionIdParams(params);
         if (input === undefined) throw invalidParams();
         return await this.#host.history(input);
+      }
+      case CORE_RUNTIME_METHODS.sessionTranscript: {
+        const input = parseSessionIdParams(params);
+        if (input === undefined) throw invalidParams();
+        return await this.#host.transcript(input);
       }
       case CORE_RUNTIME_METHODS.sessionConfigGet: {
         const input = parseSessionIdParams(params);

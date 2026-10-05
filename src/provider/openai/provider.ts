@@ -4,6 +4,7 @@
 // <-chan StreamEvent` maps to `chat(params): AsyncIterable<StreamEvent>` and
 // `context.Context`/the abort channel map to `params.abort` (AbortSignal).
 
+import { wrapError } from "../errors.ts";
 import { type ResponsesConfig } from "../../config/mod.ts";
 import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
@@ -1604,10 +1605,4 @@ async function waitOrAbort(
 
 function asError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
-}
-
-function wrapError(context: string, err: unknown): Error {
-  return new Error(
-    `${context}: ${err instanceof Error ? err.message : String(err)}`,
-  );
 }

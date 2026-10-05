@@ -34,6 +34,7 @@
       "docs/",
       ".opensac/",
       ".mothx/",
+      "skills/",
       "bin/",
       "dist/",
       "npm/packages/",
@@ -53,6 +54,7 @@
     "exclude": [
       ".opensac/",
       ".mothx/",
+      "skills/",
       "bin/",
       "dist/",
       "npm/packages/",

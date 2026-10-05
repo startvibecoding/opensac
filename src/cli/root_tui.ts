@@ -30,6 +30,36 @@ export interface TUIOptions {
   multiAgent?: boolean;
   delegate?: boolean;
   workflows?: boolean;
+  /** `-c`: continue the most recent persisted session of this directory. */
+  continueSession?: boolean;
+  /** `-r`: resume one session by id or path. */
+  resume?: string;
+  /** `--session`: use one specific session file or id. */
+  session?: string;
+}
+
+/**
+ * Maps the root command's session flags onto the Runtime resume options.
+ *
+ * Exported because "parsed then dropped" is exactly how `-c` used to fail: the
+ * flags existed, nothing consumed them. One named mapping keeps the seam
+ * testable without booting a terminal, and keeps the precedence rule in one
+ * place instead of inlined at the call site.
+ */
+export function tuiResumeOptions(flags: {
+  continueSession?: boolean;
+  resume?: string;
+  session?: string;
+}): { continueLast: boolean; resumeSession: string } {
+  // An explicit target wins over "the most recent one"; `-r` wins over
+  // `--session` because it names the session rather than a file to use.
+  const target = (flags.resume ?? "").trim() !== ""
+    ? (flags.resume ?? "").trim()
+    : (flags.session ?? "").trim();
+  return {
+    continueLast: target === "" && flags.continueSession === true,
+    resumeSession: target,
+  };
 }
 
 /** Best-effort terminal column count for layout. */
@@ -121,6 +151,9 @@ export async function runInteractiveAction(
       workDir,
       version: "dev",
       tuilang: settings.tuilang ?? "",
+      // `-c` / `-r` / `--session` reach the Runtime-owned resume path through
+      // the one named mapping, so no entry computes its own precedence.
+      ...tuiResumeOptions(options),
     },
     service,
   );

@@ -1,6 +1,10 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { defaultSettings } from "../config/settings.ts";
-import { refreshWhenBusy, runInteractiveAction } from "./root_tui.ts";
+import {
+  refreshWhenBusy,
+  runInteractiveAction,
+  tuiResumeOptions,
+} from "./root_tui.ts";
 
 Deno.test("interactive refresh skips idle redraws", () => {
   let rerenders = 0;
@@ -29,5 +33,37 @@ Deno.test("runInteractiveAction requires a terminal instead of crashing Ink", as
       ),
     Error,
     "interactive mode requires a terminal",
+  );
+});
+
+Deno.test("tuiResumeOptions maps the session flags the TUI resumes from", () => {
+  // The original defect: `-c` was parsed and never reached the TUI, so every
+  // launch opened a new empty session.
+  assertEquals(
+    tuiResumeOptions({ continueSession: true, resume: "", session: "" }),
+    { continueLast: true, resumeSession: "" },
+  );
+  // An explicit target wins, and `-c` must not also claim "most recent".
+  assertEquals(
+    tuiResumeOptions({
+      continueSession: true,
+      resume: "session-9",
+      session: "",
+    }),
+    { continueLast: false, resumeSession: "session-9" },
+  );
+  assertEquals(
+    tuiResumeOptions({ continueSession: false, resume: "", session: "s-7" }),
+    { continueLast: false, resumeSession: "s-7" },
+  );
+  // Whitespace-only values are "not provided", not an empty resume target.
+  assertEquals(
+    tuiResumeOptions({ continueSession: false, resume: "  ", session: "" }),
+    { continueLast: false, resumeSession: "" },
+  );
+  // No flags at all keeps the default fresh-session behaviour.
+  assertEquals(
+    tuiResumeOptions({}),
+    { continueLast: false, resumeSession: "" },
   );
 });

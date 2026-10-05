@@ -35,6 +35,7 @@ const EXPECTED_INFO: CoreInfo = {
     CORE_METHODS.health,
     CORE_METHODS.info,
     CORE_METHODS.shutdown,
+    CORE_METHODS.clientsList,
     ...Object.values(CORE_RUNTIME_METHODS),
   ],
 };
@@ -1732,6 +1733,41 @@ Deno.test("CoreClient does not replay a request that failed for another reason",
         // Only the failed request: no re-open was attempted for an ordinary
         // Core error.
         assertEquals(handled, before + 1);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await handle.stop();
+    }
+  });
+});
+
+Deno.test("CoreClient lists live event connections through core.clients.list", async () => {
+  await withStateDir(async (stateDir, paths) => {
+    const handle = await startServer();
+    try {
+      await writeRegistration(
+        paths,
+        registration(stateDir, handle.address.port),
+      );
+      const client = new CoreClient(clientOptions(stateDir));
+      try {
+        const events = await client.connectEvents();
+        const clients = await client.call<
+          { clients: Array<{ clientId: string }> }
+        >(
+          CORE_METHODS.clientsList,
+        );
+        assert(
+          clients.clients.some((client) => client.clientId.length > 0),
+          JSON.stringify(clients),
+        );
+        await events.close();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const afterClose = await client.call<{ clients: unknown[] }>(
+          CORE_METHODS.clientsList,
+        );
+        assertEquals(afterClose.clients.length, 0);
       } finally {
         await client.close();
       }

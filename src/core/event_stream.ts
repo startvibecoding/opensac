@@ -15,6 +15,7 @@ interface PendingEvent {
 }
 
 interface Subscription {
+  readonly clientId?: string;
   readonly sessionId: string;
   readonly runId: string;
   enqueue(event: CoreRuntimeEvent): void;
@@ -23,10 +24,22 @@ interface Subscription {
   [Symbol.asyncIterator](): AsyncIterableIterator<CoreRuntimeEvent>;
 }
 
+/** Observable state for one live Core event client. */
+export interface CoreEventClientState {
+  clientId: string;
+  remoteAddress?: string;
+  connectedAt: number;
+  subscriptions: Array<{ sessionId: string; runId: string }>;
+}
+
 /** In-memory ordered event and reverse-request transport for one Core host. */
 export class CoreEventStream {
   readonly #events = new Map<string, CoreRuntimeEvent[]>();
   readonly #subscriptions = new Set<Subscription>();
+  readonly #clients = new Map<
+    string,
+    { remoteAddress?: string; connectedAt: number }
+  >();
   readonly #requestListeners = new Set<CoreEventRequestListener>();
   readonly #eventListeners = new Set<(event: CoreRuntimeEvent) => void>();
   readonly #pendingRequests = new Map<string, PendingEvent>();
@@ -81,8 +94,12 @@ export class CoreEventStream {
     sessionId: string,
     runId: string,
     cursor = 0,
+    client?: { clientId: string; remoteAddress?: string },
   ): AsyncIterableIterator<CoreRuntimeEvent> {
     this.#assertOpen();
+    if (client !== undefined) {
+      this.registerClient(client.clientId, client.remoteAddress);
+    }
     const queue = this.replay(sessionId, runId, cursor);
     let resolveNext:
       | ((result: IteratorResult<CoreRuntimeEvent>) => void)
@@ -98,6 +115,7 @@ export class CoreEventStream {
     };
 
     const subscription: Subscription = {
+      ...(client === undefined ? {} : { clientId: client.clientId }),
       sessionId,
       runId,
       enqueue(event) {
@@ -131,6 +149,38 @@ export class CoreEventStream {
     };
     this.#subscriptions.add(subscription);
     return subscription;
+  }
+
+  registerClient(clientId: string, remoteAddress?: string): void {
+    this.#assertOpen();
+    const existing = this.#clients.get(clientId);
+    const nextRemoteAddress = remoteAddress ?? existing?.remoteAddress;
+    this.#clients.set(clientId, {
+      ...(nextRemoteAddress === undefined
+        ? {}
+        : { remoteAddress: nextRemoteAddress }),
+      connectedAt: existing?.connectedAt ?? Date.now(),
+    });
+  }
+
+  unregisterClient(clientId: string): void {
+    this.#clients.delete(clientId);
+  }
+
+  listClients(): CoreEventClientState[] {
+    return [...this.#clients.entries()].map(([clientId, client]) => ({
+      clientId,
+      ...(client.remoteAddress === undefined
+        ? {}
+        : { remoteAddress: client.remoteAddress }),
+      connectedAt: client.connectedAt,
+      subscriptions: [...this.#subscriptions]
+        .filter((subscription) => subscription.clientId === clientId)
+        .map((subscription) => ({
+          sessionId: subscription.sessionId,
+          runId: subscription.runId,
+        })),
+    }));
   }
 
   onRequest(listener: CoreEventRequestListener): () => void {
@@ -185,6 +235,7 @@ export class CoreEventStream {
       await subscription.return();
     }
     this.#events.clear();
+    this.#clients.clear();
     this.#requestListeners.clear();
     this.#eventListeners.clear();
   }

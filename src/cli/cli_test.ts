@@ -15,6 +15,7 @@ import {
   createACPCommand,
   createCoreCommand,
   createRootCommand,
+  formatCoreList,
   formatCorePair,
   formatCoreRestart,
   formatCoreStart,
@@ -235,13 +236,14 @@ Deno.test("root -P print action is wired (no longer a placeholder)", async () =>
   assert(help.includes("--print"), help);
 });
 
-Deno.test("core exposes status, start, stop, restart, and pair subcommands", () => {
+Deno.test("core exposes status, start, stop, restart, pair, and list subcommands", () => {
   // deno-lint-ignore no-explicit-any
   const command = createCoreCommand("test-version") as any;
   const names = command
     .getCommands()
     .map((sub: { getName(): string }) => sub.getName());
   assertEquals([...names].sort(), [
+    "list",
     "pair",
     "restart",
     "start",
@@ -250,7 +252,7 @@ Deno.test("core exposes status, start, stop, restart, and pair subcommands", () 
   ]);
 });
 
-Deno.test("core dispatches status, start, restart, and pair to their own runners", async () => {
+Deno.test("core dispatches status, start, restart, pair, and list to their own runners", async () => {
   const startOutcome: CoreStartOutcome = {
     status: "started",
     url: "http://127.0.0.1:1",
@@ -300,6 +302,18 @@ Deno.test("core dispatches status, start, restart, and pair to their own runners
         verified: false,
       });
     },
+    list: (version) => {
+      calls.push(`list:${version}`);
+      return Promise.resolve({
+        url: "http://127.0.0.1:1",
+        pid: 7,
+        clients: [{
+          clientId: "client-1",
+          connectedAt: 1_700_000_000_000,
+          subscriptions: [{ sessionId: "s1", runId: "r1" }],
+        }],
+      });
+    },
   };
 
   await createCoreCommand("test-version", runners).parse(["status"]);
@@ -317,6 +331,9 @@ Deno.test("core dispatches status, start, restart, and pair to their own runners
     "pw",
   ]);
   assertEquals(calls, ["pair:test-version:pw"]);
+  calls.length = 0;
+  await createCoreCommand("test-version", runners).parse(["list"]);
+  assertEquals(calls, ["list:test-version"]);
   calls.length = 0;
   await createCoreCommand("test-version", runners).parse([]);
   assertEquals(calls, ["foreground:test-version"]);
@@ -384,6 +401,27 @@ Deno.test("core lifecycle formatters project human and JSON output", () => {
     ),
     "OpenSAC Core stopped.\nOpenSAC Core started at http://127.0.0.1:1 (PID 7).",
   );
+
+  const listOutcome = {
+    url: "http://127.0.0.1:1",
+    pid: 7,
+    clients: [{
+      clientId: "client-1",
+      remoteAddress: "127.0.0.1",
+      connectedAt: 1_700_000_000_000,
+      subscriptions: [{ sessionId: "s1", runId: "r1" }],
+    }],
+  };
+  assertEquals(formatCoreList(listOutcome, true), JSON.stringify(listOutcome));
+  const listed = formatCoreList(listOutcome, false);
+  assert(
+    listed.includes(
+      "OpenSAC Core at http://127.0.0.1:1 (PID 7) has 1 connected client(s):",
+    ),
+    listed,
+  );
+  assert(listed.includes("client-1 from 127.0.0.1"), listed);
+  assert(listed.includes("s1/r1"), listed);
 
   const pairOutcome: CorePairOutcome = {
     url: "http://127.0.0.1:1",

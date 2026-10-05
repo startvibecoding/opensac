@@ -3,7 +3,12 @@
 // print/unattended run policy travels on the Core-owned session, and
 // `root_print.ts` contains no Builder/ExecutionRuntime construction.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+} from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { defaultSettings } from "../config/settings.ts";
 import {
@@ -371,9 +376,10 @@ Deno.test("print mode emits terminal NDJSON records with the run status", async 
   });
 });
 
-Deno.test("print mode keeps session continuation/resume semantics (fresh session per run)", async () => {
-  // `-P` has never consumed `-c/--continue`/`-r/--resume`: one fresh
-  // Core-owned session per print run (Go setupSession default).
+Deno.test("print mode mints a fresh session per run when no resume flag is given", async () => {
+  // With no `-c`/`-r`/`--session`, print keeps the Go setupSession default: one
+  // fresh Core-owned session per run. The resume flags are covered by the
+  // dedicated tests below, so this one pins only the no-flag path.
   const terminal: ScriptEvent[] = [{
     eventType: "run_finished",
     payload: {
@@ -478,4 +484,98 @@ Deno.test("print mode keeps retry progress and provider errors visible", async (
   const types = out.map((line) => (JSON.parse(line) as { type: string }).type);
   assert(types.includes("status"), JSON.stringify(types));
   assert(types.includes("retry"), JSON.stringify(types));
+});
+
+Deno.test("print -c continues this directory's newest session", async () => {
+  const fake = createFakeTUIService();
+  // An earlier conversation in the same directory, as a previous run left it.
+  const earlier = await fake.createSession({ workDir: Deno.cwd() });
+  fake.seedTranscript(earlier.sessionId, [
+    { role: "user", text: "the earlier turn" },
+  ]);
+  await fake.closeSession({ sessionId: earlier.sessionId });
+
+  const opens: Array<{ sessionId: string; workDir?: string }> = [];
+  const service: TUIService = {
+    ...fake,
+    openSession(input) {
+      opens.push({ ...input });
+      return fake.openSession(input);
+    },
+  };
+  const result = await runPrintAction(
+    printOptions({ continueSession: true }),
+    { settings: defaultSettings(), service },
+  );
+  assertEquals(result.exitCode, 0);
+  assertEquals(
+    opens.map((o) => o.sessionId),
+    [earlier.sessionId],
+    "-c must open the persisted session instead of creating one",
+  );
+  assert(
+    opens[0].workDir !== undefined && opens[0].workDir !== "",
+    "the resume open must be scoped to a work directory",
+  );
+});
+
+/** One already-terminal run stream, for tests that only assert session setup. */
+function settledScript(): Scripted {
+  return scriptedService({
+    events: [{
+      eventType: "run_finished",
+      payload: {
+        status: "completed",
+        agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+      },
+      terminal: true,
+    }],
+  });
+}
+
+Deno.test("print without -c/-r still creates a fresh session", async () => {
+  const scripted = settledScript();
+  const result = await runPrintAction(
+    printOptions(),
+    { settings: defaultSettings(), service: scripted.service },
+  );
+  assertEquals(result.exitCode, 0);
+  assertEquals(scripted.creates.length, 1, "no resume flags, one new session");
+});
+
+Deno.test("print with an unresolvable -r target degrades to a fresh session", async () => {
+  const scripted = settledScript();
+  const result = await runPrintAction(
+    printOptions({ resume: "no-such-session" }),
+    { settings: defaultSettings(), service: scripted.service },
+  );
+  // A script passing a stale id must still get its answer, not a hard failure.
+  assertEquals(result.exitCode, 0);
+  assertEquals(
+    scripted.creates.length,
+    1,
+    "an unresolvable target falls back to a fresh session",
+  );
+});
+
+Deno.test("print -r against an unreachable Core fails instead of silently resuming elsewhere", async () => {
+  const fake = createFakeTUIService();
+  const service: TUIService = {
+    ...fake,
+    listPersistedSessions() {
+      return Promise.reject(new Error("core connection lost"));
+    },
+  };
+  // A transport/Core failure must surface rather than degrade to a fresh
+  // session, or a scripted follow-up would silently run against the wrong
+  // conversation with no indication why.
+  await assertRejects(
+    () =>
+      runPrintAction(printOptions({ resume: "session-9" }), {
+        settings: defaultSettings(),
+        service,
+      }),
+    Error,
+    "core connection lost",
+  );
 });

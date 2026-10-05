@@ -58,6 +58,7 @@ import {
   TUISettingsWriteScope,
   TUISkillInput,
   TUISkillView,
+  TUITranscriptMessage,
 } from "./service.ts";
 
 /** Message for service methods the shared Core does not expose yet. */
@@ -203,11 +204,13 @@ export function createCoreClientTUIService(
     },
 
     async openSession(
-      input: { sessionId: string },
+      input: { sessionId: string; workDir?: string },
     ): Promise<TUISessionView> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionOpen,
-        { sessionId: input.sessionId },
+        input.workDir === undefined || input.workDir === ""
+          ? { sessionId: input.sessionId }
+          : { sessionId: input.sessionId, workDir: input.workDir },
       );
       return toSessionView(raw, now);
     },
@@ -235,6 +238,17 @@ export function createCoreClientTUIService(
       );
       if (!Array.isArray(raw)) throw invalidView("session list");
       return raw.map((entry) => toSessionListEntry(entry, now));
+    },
+
+    async getTranscript(
+      input: { sessionId: string },
+    ): Promise<TUITranscriptMessage[]> {
+      const raw = await client.call<unknown>(
+        CORE_RUNTIME_METHODS.sessionTranscript,
+        { sessionId: input.sessionId },
+      );
+      if (!Array.isArray(raw)) throw invalidView("session transcript");
+      return raw.map(toTranscriptMessage);
     },
 
     async prompt(input: TUIPromptInput): Promise<TUIPromptAccepted> {
@@ -918,6 +932,17 @@ function runEventStreamClosed(runId: string): TUIServiceError {
 }
 
 /** Projects one persisted session listing row. */
+function toTranscriptMessage(raw: unknown): TUITranscriptMessage {
+  const object = asRecord(raw, "transcript message");
+  const role = asString(object.role, "transcript message role");
+  // The transport is untrusted, so an unknown role is a broken projection
+  // rather than something to render verbatim.
+  if (role !== "user" && role !== "assistant") {
+    throw new Error(`invalid transcript message role: ${role}`);
+  }
+  return { role, text: asString(object.text, "transcript message text") };
+}
+
 function toSessionListEntry(
   raw: unknown,
   now: () => Date,

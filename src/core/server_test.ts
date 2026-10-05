@@ -127,6 +127,7 @@ Deno.test("CoreServer serves core.health and core.info without private configura
           CORE_METHODS.health,
           CORE_METHODS.info,
           CORE_METHODS.shutdown,
+          CORE_METHODS.clientsList,
           ...Object.values(CORE_RUNTIME_METHODS),
         ],
       },

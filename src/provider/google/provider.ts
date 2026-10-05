@@ -3,6 +3,7 @@
 // names. `Chat(ctx, params) <-chan StreamEvent` maps to
 // `chat(params): AsyncIterable<StreamEvent>` and `context.Context`/the abort
 // channel map to `params.abort` (AbortSignal).
+import { wrapError } from "../errors.ts";
 import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
 import {
@@ -860,11 +861,6 @@ export class Provider extends BaseProvider implements ProviderInterface {
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function wrapError(prefix: string, err: unknown): Error {
-  const msg = err instanceof Error ? err.message : String(err);
-  return new Error(`${prefix}: ${msg}`);
-}
 
 function cloneHeaders(
   headers: Record<string, string> | undefined,

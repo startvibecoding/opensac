@@ -26,7 +26,9 @@ import type {
   CoreSessionCreateInput,
   CoreSessionListEntry,
   CoreSessionView,
+  CoreTranscriptMessage,
 } from "../core/runtime.ts";
+import { CORE_ERROR_SESSION_NOT_RESIDENT } from "../core/runtime_protocol.ts";
 import type { Settings } from "../config/settings.ts";
 
 /** Session creation input: work directory plus optional resolved policy. */
@@ -37,6 +39,9 @@ export type TUISessionView = CoreSessionView;
 
 /** The adapter-neutral summary of one persisted session row. */
 export type TUISessionListEntry = CoreSessionListEntry;
+
+/** One reprinted conversation turn of a resumed session. */
+export type TUITranscriptMessage = CoreTranscriptMessage;
 
 /** Prompt input normalized for the Runtime. */
 export type TUIPromptInput = CorePromptInput;
@@ -221,6 +226,70 @@ export function sessionNotFoundError(sessionId: string): TUIServiceError {
   return new TUIServiceError(`TUI session not found: ${sessionId}`);
 }
 
+/**
+ * The persisted-store failure for a session row that does not exist.
+ *
+ * It mirrors the Core message shape (`session <id> not found for cwd <dir>`),
+ * which is what `isSessionNotFound` recognizes as a genuinely absent target.
+ */
+export function sessionMissingError(
+  sessionId: string,
+  workDir: string,
+): Error {
+  return new Error(`session ${sessionId} not found for cwd ${workDir}`);
+}
+
+/**
+ * The Core's replayable "persisted but not open here" answer.
+ *
+ * It carries the dedicated protocol code rather than relying on its message,
+ * because the message is deliberately identical to a missing-session text.
+ */
+export function sessionNotResidentError(sessionId: string): Error {
+  const error = new Error(`session not found: ${sessionId}`) as Error & {
+    code: number;
+  };
+  error.code = CORE_ERROR_SESSION_NOT_RESIDENT;
+  return error;
+}
+
+/**
+ * Whether one failure means "no such session" rather than an unavailable Core.
+ *
+ * Resume classification depends on this distinction: a missing session is a
+ * user-correctable target, while a transport or Core failure must propagate so
+ * the user does not retry an id that was perfectly good.
+ *
+ * A not-resident answer is deliberately *not* treated as missing. The Core uses
+ * one message shape (`session not found: <id>`) for a session that is persisted
+ * but not open in the serving process, and it signals that case with the
+ * dedicated protocol code precisely so a client re-opens and replays instead of
+ * concluding the id is bad. Reading it as "no such session" would report a good
+ * `-r` target as unresumable whenever the shared Core happens to restart.
+ */
+export function isSessionNotFound(error: unknown): boolean {
+  if (isSessionNotResident(error)) return false;
+  if (error instanceof TUIServiceError) {
+    return error.message.includes("session not found");
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  // The persisted-store failures are these two shapes; both mean the row is
+  // absent, and both carry a work directory or no directory at all.
+  return /session .*not found for cwd|not registered in DB/i.test(message);
+}
+
+/**
+ * Whether the Core rejected a call because the session is persisted but not
+ * resident in the serving process (the replayable `-32004` answer).
+ *
+ * It reads the dedicated protocol code, never the message, because the code is
+ * the only unambiguous signal across the transport.
+ */
+export function isSessionNotResident(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === CORE_ERROR_SESSION_NOT_RESIDENT;
+}
+
 /** The stable unknown-run error produced by every adapter. */
 export function runNotFoundError(
   sessionId: string,
@@ -275,13 +344,27 @@ export function isDecisionNotFound(error: unknown): boolean {
  */
 export interface TUIService {
   createSession(input: TUISessionInput): Promise<TUISessionView>;
-  openSession(input: { sessionId: string }): Promise<TUISessionView>;
+  /**
+   * Binds one persisted session. `workDir` scopes the lookup to the directory
+   * the caller believes it belongs to, so a foreign session is rejected rather
+   * than adopted under the wrong cwd.
+   */
+  openSession(input: {
+    sessionId: string;
+    workDir?: string;
+  }): Promise<TUISessionView>;
   closeSession(input: { sessionId: string }): Promise<void>;
   deleteSession(input: { sessionId: string }): Promise<void>;
   /** Lists the persisted sessions of one working directory. */
   listPersistedSessions(
     input?: { workDir?: string },
   ): Promise<TUISessionListEntry[]>;
+  /**
+   * Projects one session's durable conversation for a resume-time reprint.
+   * It is the persisted branch, not the live event log, so it still returns
+   * history after the shared Core has restarted.
+   */
+  getTranscript(input: { sessionId: string }): Promise<TUITranscriptMessage[]>;
   prompt(input: TUIPromptInput): Promise<TUIPromptAccepted>;
   subscribeRunEvents(
     sessionId: string,
@@ -450,6 +533,11 @@ export interface FakeTUIService extends TUIService {
     id: string;
     parent?: string;
   }): TUIAgentView;
+  /**
+   * Test-only: seeds one session's durable conversation so a resume/replay
+   * path can be exercised without a real Core restart.
+   */
+  seedTranscript(sessionId: string, messages: TUITranscriptMessage[]): void;
   /** Test-only: the answer returned by `askTransient`. */
   transientAnswer: string;
   /**
@@ -476,6 +564,8 @@ interface FakeSession {
   esmActiveAgentId: string;
   messageCount: number;
   preview: string;
+  /** The fake's durable conversation, replayed on resume. */
+  transcript: TUITranscriptMessage[];
 }
 
 interface FakeRun {
@@ -733,18 +823,28 @@ export function createFakeTUIService(): FakeTUIService {
         esmActiveAgentId: "",
         messageCount: 0,
         preview: "",
+        transcript: [],
       });
       return Promise.resolve(view);
     },
 
     openSession(
-      input: { sessionId: string },
+      input: { sessionId: string; workDir?: string },
     ): Promise<TUISessionView> {
       // Reopening a persisted session (the production host keeps the row
       // after `closeSession`) rebinds it instead of rejecting.
       const session = sessions.get(input.sessionId);
       if (session === undefined) {
         return Promise.reject(sessionNotFoundError(input.sessionId));
+      }
+      // The production host scopes an open to the caller's work directory so a
+      // session belonging elsewhere is never adopted under the wrong cwd, and it
+      // answers that case with the persisted-store text (`not found for cwd`)
+      // rather than the adapter-local unknown-session error; the fake mirrors
+      // both halves of that contract.
+      const workDir = (input.workDir ?? "").trim();
+      if (workDir !== "" && session.view.workDir !== workDir) {
+        return Promise.reject(sessionMissingError(input.sessionId, workDir));
       }
       session.closed = false;
       return Promise.resolve(session.view);
@@ -761,6 +861,18 @@ export function createFakeTUIService(): FakeTUIService {
         session.closed = true;
         sessions.delete(input.sessionId);
       });
+    },
+
+    getTranscript(
+      input: { sessionId: string },
+    ): Promise<TUITranscriptMessage[]> {
+      const session = sessions.get(input.sessionId);
+      if (session === undefined || session.closed) {
+        return Promise.reject(sessionNotFoundError(input.sessionId));
+      }
+      return Promise.resolve(
+        session.transcript.map((message) => ({ ...message })),
+      );
     },
 
     listPersistedSessions(
@@ -799,6 +911,11 @@ export function createFakeTUIService(): FakeTUIService {
       if (session !== undefined) {
         session.messageCount++;
         session.preview = input.text;
+        if (input.text !== "") {
+          // The fake's prompt path also owns durable turns, so a session
+          // resumed later within the same fake reprints what was said.
+          session.transcript.push({ role: "user", text: input.text });
+        }
       }
       appendEvent(run, "run_started", { text: input.text }, false);
       appendEvent(
@@ -1094,6 +1211,9 @@ export function createFakeTUIService(): FakeTUIService {
           esmActiveAgentId: "",
           messageCount: session.messageCount,
           preview: session.preview,
+          // A fork branches the same conversation, so it carries the source's
+          // durable turns.
+          transcript: session.transcript.map((message) => ({ ...message })),
         });
         return { ...view };
       });
@@ -1429,6 +1549,15 @@ export function createFakeTUIService(): FakeTUIService {
         session.agents.get(view.parent)?.children.push(view.id);
       }
       return { ...view, children: [...view.children] };
+    },
+
+    seedTranscript(
+      sessionId: string,
+      messages: TUITranscriptMessage[],
+    ): void {
+      requireSession(sessionId).transcript.push(
+        ...messages.map((message) => ({ ...message })),
+      );
     },
 
     get transientAnswer(): string {

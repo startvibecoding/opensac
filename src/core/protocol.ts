@@ -84,11 +84,25 @@ export interface CoreInfo {
   features: string[];
 }
 
+/** One client currently connected to the Core event stream. */
+export interface CoreClientConnection {
+  clientId: string;
+  remoteAddress?: string;
+  connectedAt: number;
+  subscriptions: Array<{ sessionId: string; runId: string }>;
+}
+
+/** Result of `core.clients.list`. */
+export interface CoreClientsResult {
+  clients: CoreClientConnection[];
+}
+
 /** Method names understood by the initial Core protocol. */
 export const CORE_METHODS = {
   health: "core.health",
   info: "core.info",
   shutdown: "core.shutdown",
+  clientsList: "core.clients.list",
 } as const;
 
 type CoreRpcObject = Record<string, unknown>;

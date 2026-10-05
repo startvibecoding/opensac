@@ -3,6 +3,10 @@
 deno.lock.bak
 coverage/
 
+# Leftover rule file from the Go source project this was ported from; it is
+# user-local context, not part of the OpenSAC tree.
+.mothx/
+
 # Build output
 bin/
 dist/

@@ -102,7 +102,11 @@ Deno.test("IsRetryable_NetworkErrors", () => {
     ],
     ["SSE HTTP 524 error", new Error("upstream returned HTTP 524"), 0, true],
     ["context canceled", abortError(), 0, false],
-    ["generic error", new Error("something"), 0, false],
+    // Retry is now the default: a fault no rule recognizes is treated as an
+    // availability problem and retried within the caller's bounded budget rather
+    // than terminalizing a live run. The genuine stops (cancellation, content
+    // rejection, context overflow, authentication) are still `false` above.
+    ["generic error", new Error("something"), 0, true],
   ];
   for (const [name, err, code, want] of tests) {
     assertEquals(isRetryable(err, code), want, name);
@@ -200,6 +204,45 @@ Deno.test("FormatRetryMessage_JSONErrorInvalid", () => {
   const invalidJSON = new Error("HTTP 400: not valid json {");
   const msg = formatRetryMessage(0, 3, 1000, invalidJSON);
   assert(msg.includes("error:"), msg);
+});
+
+Deno.test("RetryErrorDetailDoesNotFabricateHttpStatusFromUnrelatedNumber", () => {
+  // A bare `includes("500")` used to relabel any error whose text happened to
+  // contain those digits as an HTTP status, hiding the original fault behind a
+  // wrong category and pointing the user at the wrong fix. A number embedded in
+  // an unrelated value must fall through to the raw original text instead.
+  const tokens = new Error("used 1500 tokens in this request");
+  const detail = retryErrorDetail(tokens);
+  assert(!detail.includes("HTTP 500"), detail);
+  assert(detail.includes("1500 tokens"), detail);
+
+  const latency = new Error("request latency 4429ms exceeded budget");
+  assert(
+    !retryErrorDetail(latency).includes("HTTP 429"),
+    retryErrorDetail(latency),
+  );
+
+  // A real status token still classifies correctly at the word boundary.
+  assertEquals(
+    retryErrorDetail(new Error("HTTP 500 upstream")),
+    "internal server error (HTTP 500)",
+  );
+});
+
+Deno.test("RetryErrorDetailNeverThrowsOnHostileInput", () => {
+  // Classification runs inside the provider retry loop, so it must degrade to a
+  // best-effort line rather than throw and abort a live run that would otherwise
+  // keep retrying. Here `message` is a throwing getter, so the cause-chain walk
+  // itself raises: the classifier must catch it and still return a string.
+  const hostile = new Error("ok");
+  Object.defineProperty(hostile, "message", {
+    configurable: true,
+    get(): string {
+      throw new Error("boom");
+    },
+  });
+  const got = retryErrorDetail(hostile);
+  assert(typeof got === "string", "must return a string, not throw");
 });
 
 Deno.test("RetryErrorDetail", () => {

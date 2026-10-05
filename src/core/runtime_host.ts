@@ -34,6 +34,7 @@ import type {
   CoreSessionRuntime,
   CoreSessionView,
   CoreSkillView,
+  CoreTranscriptMessage,
   CoreTransientPromptInput,
   CoreTransientPromptResult,
 } from "./runtime.ts";
@@ -46,7 +47,7 @@ import {
   deleteSession as deletePersistedSession,
   listPersistedSessions as listPersistedSessionInfos,
   openOrCreateSession,
-  openSession as openPersistedSession,
+  openSessionForWorkDir,
 } from "../agentruntime/session_lifecycle.ts";
 import { DecisionService } from "../agentruntime/decision.ts";
 import { fork } from "../agentruntime/fork.ts";
@@ -3171,8 +3172,11 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
   #ensureManager(): Manager {
     if (this.#manager !== undefined) return this.#manager;
     const sessionDir = this.#settings.sessionDir ?? "";
+    // An existing session is resolved through its own work directory, exactly
+    // like ACP does: one that belongs elsewhere or does not exist must fail
+    // rather than be adopted under this front end's cwd or silently created.
     const manager = this.#openExisting
-      ? openPersistedSession(sessionDir, this.sessionId)
+      ? openSessionForWorkDir(this.#workDir, sessionDir, this.sessionId)
       : openOrCreateSession({
         workDir: this.#workDir,
         sessionDir,
@@ -3196,6 +3200,51 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
       workDir: header?.cwd ?? this.#workDir,
       ...(mode.trim() === "" ? {} : { mode }),
     };
+  }
+
+  /**
+   * Projects the durable conversation turns for a resume-time reprint.
+   *
+   * It reads the same compaction-aware replay branch the Runtime replays into
+   * the Agent, so a resumed front end reprinting this sees what the model
+   * actually has, not a pre-compaction transcript. Only the two roles a user
+   * recognises as conversation are projected: the user's own text and the
+   * assistant's visible text. Tool calls/results and Runtime-injected guidance
+   * (`systemInjected`) carry no conversation turn of their own and stay out,
+   * so a reprint never renders injected prompt text as something the user said.
+   */
+  transcriptMessages(): CoreTranscriptMessage[] {
+    const manager = this.#ensureManager();
+    const projected: CoreTranscriptMessage[] = [];
+    for (const message of manager.getReplayState().messages) {
+      if (message.role === "user") {
+        if (message.systemInjected === true) continue;
+        let text = message.content ?? "";
+        if (text === "") {
+          for (const block of message.contents ?? []) {
+            if (block.type === "text" && (block.text ?? "") !== "") {
+              text = block.text ?? "";
+              break;
+            }
+          }
+        }
+        if (text !== "") projected.push({ role: "user", text });
+        continue;
+      }
+      if (message.role === "assistant") {
+        // Assistant text is stored as content blocks; join the visible ones so
+        // one turn reprints as one block, matching the live streaming render.
+        const parts: string[] = [];
+        for (const block of message.contents ?? []) {
+          if (block.type === "text" && (block.text ?? "") !== "") {
+            parts.push(block.text ?? "");
+          }
+        }
+        const text = parts.join("\n").trim();
+        if (text !== "") projected.push({ role: "assistant", text });
+      }
+    }
+    return projected;
   }
 
   async #ensureRuntime(): Promise<{
@@ -4226,7 +4275,11 @@ export async function createCoreRuntimeHost(
       const existing = sessions.get(input.sessionId);
       if (existing !== undefined) return cloneSession(existing.view);
       return cloneSession(
-        createRecord({ workDir: options.workDir }, input.sessionId, true).view,
+        createRecord(
+          { workDir: input.workDir ?? options.workDir },
+          input.sessionId,
+          true,
+        ).view,
       );
     },
 
@@ -4252,6 +4305,15 @@ export async function createCoreRuntimeHost(
     async history(input) {
       await Promise.resolve();
       return requireSession(input.sessionId).events.map(cloneEvent);
+    },
+
+    async transcript(input) {
+      // Durable by construction: it reads the persisted branch through the
+      // runtime, so it survives the in-memory event log being empty after a
+      // Core restart.
+      await Promise.resolve();
+      const runtime = requireSession(input.sessionId).runtime;
+      return runtime.transcriptMessages?.() ?? [];
     },
 
     async prompt(input: CorePromptInput) {

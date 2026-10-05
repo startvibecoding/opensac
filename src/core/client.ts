@@ -51,6 +51,9 @@ export const DEFAULT_CORE_REPLACE_TIMEOUT_MS = 15_000;
 const START_POLL_INTERVAL_MS = 25;
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/** HTTP header used to identify a Core client across RPC and event sockets. */
+export const CORE_CLIENT_ID_HEADER = "x-opensac-client-id";
+
 /** Default wait for a replacement Core after the endpoint in use refused. */
 export const DEFAULT_CORE_TAKEOVER_WAIT_MS = 2_000;
 
@@ -353,6 +356,7 @@ type RpcOutcome = RpcSuccess | RpcFailure;
 interface CoreConnection {
   url: string;
   registration: CoreRegistration;
+  clientId: string;
 }
 
 /** A live WebSocket connection for Core events and reverse requests. */
@@ -399,6 +403,7 @@ export class CoreClient {
   readonly #signal?: AbortSignal;
   readonly #ignoreProcessLiveness: boolean;
 
+  readonly #clientId: string;
   #connection: CoreConnection | undefined;
   #discoveryPromise: Promise<CoreDiscoveryResult> | undefined;
   #startPromise: Promise<CoreDiscoveryResult> | undefined;
@@ -411,6 +416,7 @@ export class CoreClient {
       throw new TypeError("CoreClient options are required");
     }
 
+    this.#clientId = createClientId();
     this.#paths = CorePaths.fromStateDir(options.stateDir);
     if (typeof options.version !== "string" || options.version.trim() === "") {
       throw new TypeError("CoreClient version must be a non-empty string");
@@ -1258,6 +1264,7 @@ export class CoreClient {
         const connection: CoreConnection = {
           url: discovery.url,
           registration: discovery.registration,
+          clientId: this.#clientId,
         };
         this.#connection = connection;
         return connection;
@@ -1621,7 +1628,7 @@ export class CoreClient {
     }
 
     throwIfAborted(options.signal);
-    this.#connection = { url, registration };
+    this.#connection = { url, registration, clientId: this.#clientId };
     return {
       status: "ready",
       registration,
@@ -1681,6 +1688,7 @@ export class CoreClient {
     const headers = new Headers({
       accept: "application/json",
       "content-type": "application/json",
+      [CORE_CLIENT_ID_HEADER]: this.#clientId,
     });
     if (password !== undefined) {
       headers.set(CORE_AUTH_HEADER, `Bearer ${password}`);
@@ -1871,6 +1879,10 @@ export class CoreClient {
       actualCoreProtocolVersion,
     });
   }
+}
+
+function createClientId(): string {
+  return `core-client-${crypto.randomUUID()}`;
 }
 
 function validateMethod(method: string): void {

@@ -1,0 +1,54 @@
+name: CI
+
+# The release pipelines build straight from a tag, so without this gate a tag
+# can publish binaries, npm packages, and images that were never tested. This
+# workflow runs the same checks `make test-all check lint check-fmt` does on the
+# tree a release is cut from, so a red main is visible before anything is
+# published.
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DENO_VERSION: "2.9.7"
+
+jobs:
+  verify:
+    name: Check, lint, format, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      # Type check first: it is the cheapest signal and fails loudly on a broken
+      # import graph before the slower suites run.
+      - name: Type check
+        run: deno task check
+
+      - name: Lint
+        run: deno task lint
+
+      - name: Format
+        run: deno fmt --check
+
+      # Architecture guards live under src/ and therefore also run inside
+      # `deno task test`; they are named separately so a boundary regression
+      # points at the guard rather than at whichever runtime test caught it.
+      - name: Architecture guards
+        run: deno task test:architecture
+
+      - name: Test
+        run: deno task test

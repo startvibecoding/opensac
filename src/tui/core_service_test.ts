@@ -974,3 +974,31 @@ Deno.test("core TUIService reports a Core restart and the reconnect that follows
   client.eventConnections[1].drop();
   assertEquals(states.length, 3, "an unsubscribed listener hears nothing");
 });
+
+Deno.test("core TUIService projects session.transcript and rejects a broken role", async () => {
+  const service = createCoreClientTUIService(
+    fakeClient({
+      "session.transcript": [
+        { role: "user", text: "earlier turn" },
+        { role: "assistant", text: "earlier reply" },
+      ],
+    }),
+    { workDir: "/workspace/project" },
+  );
+  assertEquals(await service.getTranscript({ sessionId: "session-1" }), [
+    { role: "user", text: "earlier turn" },
+    { role: "assistant", text: "earlier reply" },
+  ]);
+
+  // The transport is untrusted: an unknown role is a broken projection, so it
+  // must fail loudly rather than render arbitrary text as a conversation turn.
+  const broken = createCoreClientTUIService(
+    fakeClient({ "session.transcript": [{ role: "toolResult", text: "x" }] }),
+    { workDir: "/workspace/project" },
+  );
+  await assertRejects(
+    () => broken.getTranscript({ sessionId: "session-1" }),
+    Error,
+    "invalid transcript message role",
+  );
+});

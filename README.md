@@ -5,12 +5,29 @@ target of a 1:1 migration from the Go implementation at `/home/free/src/mothx`.
 
 ## Status
 
-The migration is in progress. The dependency-ordered backlog and running status
-ledger live in
+The Go→Deno port is functionally complete for the shipping surface: `src/`
+holds the agent core, runtime, providers, tools, sessions, TUI, CLI, ACP, and
+Core host, and CI runs `check`, `lint`, `fmt --check`, `test`, and
+`test:architecture` on every push and pull request. The dependency-ordered
+backlog and migration ledger live in
 [`docs/proposal/go-to-deno-migration.md`](docs/proposal/go-to-deno-migration.md).
-`deno task check` type-checks `src/` and `sdk/` together.
 
-Ported so far (all type-checked, linted, and tested):
+Not yet in this repository: the planned `desktop/` Electron app, the `pypi/`
+installer, a WebUI, and the bilingual `docs/en`/`docs/zh` trees. `AGENTS.md`
+describes those as target architecture; treat them as planned rather than
+existing code.
+
+Local checks:
+
+```bash
+deno task check          # type-check src/, sdk/, examples/, scripts/
+deno task lint           # deno lint
+deno fmt --check         # formatting
+deno task test           # full suite (includes src/architecture guards)
+deno task test:architecture  # boundary guards alone
+```
+
+Ported packages (all type-checked, linted, and tested):
 
 | Go package | TS target | Notes |
 | --- | --- | --- |
