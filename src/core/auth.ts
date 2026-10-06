@@ -3,6 +3,15 @@ import type { ResolvedCoreConfig } from "./config.ts";
 /** The HTTP header carrying the Core password. */
 export const CORE_AUTH_HEADER = "Authorization" as const;
 
+/**
+ * The HTTP header identifying one Core client across RPC and event sockets.
+ *
+ * It is owned here rather than in `client.ts` because both the client that sets
+ * it and the server that reads it already depend on this module, and the server
+ * must not import the client (the client already imports the server).
+ */
+export const CORE_CLIENT_ID_HEADER = "x-opensac-client-id" as const;
+
 /** Extracts a password from the Core Bearer authentication header. */
 export function extractCorePassword(request: Request): string {
   const value = request.headers.get(CORE_AUTH_HEADER)?.trim() ?? "";

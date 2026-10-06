@@ -268,6 +268,48 @@ Deno.test("CoreRuntimeDispatcher routes session.transcript to the durable projec
   assertEquals(seen, [{ sessionId: "session-9" }]);
   assertEquals(response?.result, [{ role: "user", text: "earlier turn" }]);
 });
+Deno.test("run.events.subscribe attributes the subscription to the calling client", async () => {
+  // The `/events` upgrade registers the client identity, but the subscribe itself
+  // arrives as an RPC message. Without the caller's identity threaded through,
+  // `core.clients.list` reported every RPC-channel subscription as ownerless, so
+  // an operator could not tell which connection was watching which run.
+  const events = new CoreEventStream();
+  const dispatcher = new CoreRuntimeDispatcher({ host: testHost(), events });
+  events.registerClient("client-7");
+  await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "run.events.subscribe",
+      params: { sessionId: "session-1", runId: "run-1", cursor: 0 },
+    },
+    new AbortController().signal,
+    { clientId: "client-7" },
+  );
+  const listed = events.listClients();
+  assertEquals(listed.length, 1);
+  assertEquals(listed[0]?.clientId, "client-7");
+  assertEquals(listed[0]?.subscriptions, [{
+    sessionId: "session-1",
+    runId: "run-1",
+  }]);
+
+  // A caller that sends no identity still subscribes; it just cannot be
+  // attributed, which must not silently steal another client's subscription.
+  await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "run.events.subscribe",
+      params: { sessionId: "session-2", runId: "run-2", cursor: 0 },
+    },
+    new AbortController().signal,
+  );
+  assertEquals(
+    events.listClients().find((c) => c.clientId === "client-7")?.subscriptions,
+    [{ sessionId: "session-1", runId: "run-1" }],
+  );
+});
 
 Deno.test("CoreRuntimeDispatcher sends extension methods to the Core extension handler", async () => {
   const calls: string[] = [];

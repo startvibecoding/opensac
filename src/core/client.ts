@@ -1,5 +1,5 @@
 import { basename, fromFileUrl } from "@std/path";
-import { CORE_AUTH_HEADER } from "./auth.ts";
+import { CORE_AUTH_HEADER, CORE_CLIENT_ID_HEADER } from "./auth.ts";
 import {
   assertResolvedCoreConfig,
   type ResolvedCoreConfig,
@@ -51,8 +51,13 @@ export const DEFAULT_CORE_REPLACE_TIMEOUT_MS = 15_000;
 const START_POLL_INTERVAL_MS = 25;
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/** HTTP header used to identify a Core client across RPC and event sockets. */
-export const CORE_CLIENT_ID_HEADER = "x-opensac-client-id";
+/**
+ * HTTP header used to identify a Core client across RPC and event sockets.
+ * The constant is owned by `auth.ts` so the server can read it without
+ * importing this module (the client already imports the server); it is
+ * re-exported here because the client is the side that sets it.
+ */
+export { CORE_CLIENT_ID_HEADER };
 
 /** Default wait for a replacement Core after the endpoint in use refused. */
 export const DEFAULT_CORE_TAKEOVER_WAIT_MS = 2_000;

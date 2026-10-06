@@ -55,6 +55,7 @@ export class CoreRuntimeDispatcher {
   async dispatch(
     message: CoreRpcMessage,
     signal: AbortSignal,
+    context?: { clientId?: string },
   ): Promise<CoreRpcResponse | undefined> {
     if (signal.aborted) {
       return "method" in message
@@ -70,6 +71,7 @@ export class CoreRuntimeDispatcher {
         message.method,
         message.params,
         signal,
+        context,
       );
       return message.id === undefined ? undefined : coreResult(id, result);
     } catch (error) {
@@ -100,6 +102,7 @@ export class CoreRuntimeDispatcher {
     method: string,
     params: import("./protocol.ts").CoreRpcParams | undefined,
     signal: AbortSignal,
+    context?: { clientId?: string },
   ): Promise<unknown> {
     if (method === CORE_METHODS.health) {
       return { healthy: true, version: "", protocolVersion: 1 };
@@ -339,7 +342,17 @@ export class CoreRuntimeDispatcher {
       case CORE_RUNTIME_METHODS.runEventsSubscribe: {
         const input = parseEventParams(params);
         if (input === undefined) throw invalidParams();
-        this.#events.subscribe(input.sessionId, input.runId, input.cursor);
+        // Register the subscription against the calling client so
+        // `core.clients.list` reports what each connection actually watches.
+        // The WS upgrade already registered the client identity; an RPC-channel
+        // subscribe must attach the same identity to the subscription row.
+        const clientId = context?.clientId;
+        this.#events.subscribe(
+          input.sessionId,
+          input.runId,
+          input.cursor,
+          clientId === undefined || clientId === "" ? undefined : { clientId },
+        );
         return input;
       }
       case CORE_RUNTIME_METHODS.runEventsReplay: {

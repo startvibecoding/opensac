@@ -1,4 +1,4 @@
-import { CoreAuth } from "./auth.ts";
+import { CORE_CLIENT_ID_HEADER, CoreAuth } from "./auth.ts";
 import { assertResolvedCoreConfig } from "./config.ts";
 import {
   formatCoreHostForUrl,
@@ -264,16 +264,10 @@ export class CoreServer {
         );
       }
       if (request.method !== "GET") return methodNotAllowed(["GET"]);
-      const clientId = request.headers.get("x-opensac-client-id")?.trim() ||
-        `event-${crypto.randomUUID()}`;
-      const forwarded = request.headers.get("x-forwarded-for")?.split(",")
-        .at(0)?.trim();
-      const remoteAddress = forwarded === undefined || forwarded === ""
-        ? undefined
-        : forwarded;
-      this.#events.registerClient(clientId, remoteAddress);
+      const client = resolveClientIdentity(request);
+      this.#events.registerClient(client.clientId, client.remoteAddress);
       const upgraded = Deno.upgradeWebSocket(request);
-      this.#attachEventSocket(upgraded.socket, clientId);
+      this.#attachEventSocket(upgraded.socket, client.clientId);
       return upgraded.response;
     }
 
@@ -316,7 +310,11 @@ export class CoreServer {
       return jsonRpcErrorResponse(null, -32600, "Invalid Request", 400);
     }
 
-    const response = await this.#dispatch(message, request.signal);
+    const response = await this.#dispatch(
+      message,
+      request.signal,
+      { clientId: resolveClientIdentity(request).clientId },
+    );
     if (!("id" in message)) {
       // JSON-RPC notifications are one-way and must not receive a response
       // envelope. The method still runs so health/info remain useful to
@@ -329,6 +327,7 @@ export class CoreServer {
   async #dispatch(
     message: CoreRpcRequest | CoreRpcNotification,
     signal: AbortSignal,
+    context?: { clientId?: string },
   ): Promise<
     ReturnType<typeof coreResult> | ReturnType<typeof coreError> | undefined
   > {
@@ -389,7 +388,7 @@ export class CoreServer {
             ? coreError(id, -32601, "Method not found")
             : undefined;
         }
-        return await dispatcher.dispatch(message, signal);
+        return await dispatcher.dispatch(message, signal, context);
       }
     }
   }
@@ -409,7 +408,7 @@ export class CoreServer {
     });
     const stopRequests = this.#events.onRequest((request) => send(request));
     socket.onmessage = (event) => {
-      void this.#handleEventSocketMessage(event.data, socket);
+      void this.#handleEventSocketMessage(event.data, socket, clientId);
     };
     socket.onclose = () => {
       stopEvents();
@@ -421,6 +420,7 @@ export class CoreServer {
   async #handleEventSocketMessage(
     data: unknown,
     socket: WebSocket,
+    clientId: string,
   ): Promise<void> {
     if (typeof data !== "string") return;
     let input: unknown;
@@ -442,6 +442,7 @@ export class CoreServer {
     const response = await this.#dispatch(
       message,
       new AbortController().signal,
+      { clientId },
     );
     if (response !== undefined && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(response));
@@ -489,6 +490,30 @@ class CoreHttpServerHandle implements CoreServerHandle {
   }
 }
 
+/**
+ * Resolves the identity of one Core client from an incoming request.
+ *
+ * Both transports need it: the `/events` upgrade registers the client so
+ * `core.clients.list` can report it, and the `/rpc` path must attach the same
+ * identity to a `run.events.subscribe` so the subscription is attributed to the
+ * connection that created it rather than appearing ownerless. A caller that
+ * sends no header gets a generated id, which keeps a plain HTTP or legacy client
+ * observable for its own connection lifetime.
+ */
+function resolveClientIdentity(
+  request: Request,
+): { clientId: string; remoteAddress?: string } {
+  const clientId = request.headers.get(CORE_CLIENT_ID_HEADER)?.trim() ||
+    `event-${crypto.randomUUID()}`;
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",").at(0)
+    ?.trim();
+  return {
+    clientId,
+    ...(forwarded === undefined || forwarded === "" ? {} : {
+      remoteAddress: forwarded,
+    }),
+  };
+}
 function isRequestOrNotification(
   message: CoreRpcMessage,
 ): message is CoreRpcRequest | CoreRpcNotification {
