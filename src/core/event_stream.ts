@@ -40,6 +40,20 @@ export class CoreEventStream {
     string,
     { remoteAddress?: string; connectedAt: number }
   >();
+  // Identities that reached the Core over the stateless `/rpc` channel only.
+  // An HTTP request has no connection to watch, so a client row is kept while
+  // it can still own subscriptions and is dropped once it holds none: an RPC
+  // `run.events.subscribe` must stay attributable in `core.clients.list`, and
+  // a stateless caller must not leave a permanent ghost row behind.
+  readonly #rpcOnlyClients = new Set<string>();
+  // One attribution row per client: the RPC-channel `run.events.subscribe`
+  // record, keyed by the identity that issued it. Distinct from the socket
+  // subscriptions in `#subscriptions`, an attribution never receives events;
+  // it exists so `listClients` can report what each connection watches.
+  readonly #attributions = new Map<
+    string,
+    { key: string; sessionId: string; runId: string }
+  >();
   readonly #requestListeners = new Set<CoreEventRequestListener>();
   readonly #eventListeners = new Set<(event: CoreRuntimeEvent) => void>();
   readonly #pendingRequests = new Map<string, PendingEvent>();
@@ -141,6 +155,9 @@ export class CoreEventStream {
         await Promise.resolve();
         finish();
         this.#subscriptions.delete(subscription);
+        // A live socket iterator's release must not drop the client row if
+        // an attribution still references it; the conditional mark decides.
+        this.#releaseRpcOnlyClient(subscription.clientId);
         return { done: true, value: undefined };
       },
       [Symbol.asyncIterator]() {
@@ -153,6 +170,9 @@ export class CoreEventStream {
 
   registerClient(clientId: string, remoteAddress?: string): void {
     this.#assertOpen();
+    // A real connection (the `/events` upgrade) makes the row unconditional:
+    // the socket's own close path owns its removal from here on.
+    this.#rpcOnlyClients.delete(clientId);
     const existing = this.#clients.get(clientId);
     const nextRemoteAddress = remoteAddress ?? existing?.remoteAddress;
     this.#clients.set(clientId, {
@@ -163,24 +183,122 @@ export class CoreEventStream {
     });
   }
 
+  /**
+   * Registers one identity seen on the stateless `/rpc` channel. Unlike
+   * `registerClient`, this keeps the row conditional: it is removed as soon
+   * as it owns no subscription, so an operator never sees a dead RPC client
+   * listed forever. A later socket registration upgrades the row to
+   * unconditional (the socket's own close path then owns its removal).
+   */
+  registerRpcClient(clientId: string, remoteAddress?: string): void {
+    this.#assertOpen();
+    const existing = this.#clients.get(clientId);
+    const nextRemoteAddress = remoteAddress ?? existing?.remoteAddress;
+    this.#clients.set(clientId, {
+      ...(nextRemoteAddress === undefined
+        ? {}
+        : { remoteAddress: nextRemoteAddress }),
+      connectedAt: existing?.connectedAt ?? Date.now(),
+    });
+    this.#rpcOnlyClients.add(clientId);
+  }
+
+  /**
+   * Attaches one RPC-channel subscription to the calling client's identity.
+   * The row exists only for attribution — live events reach the client
+   * through its event socket's own subscription — so it carries no drain
+   * iterator and receives nothing from `publish`.
+   */
+  attributeSubscription(
+    sessionId: string,
+    runId: string,
+    clientId: string,
+  ): void {
+    this.#assertOpen();
+    if (this.#attributions.has(clientId)) {
+      throw new Error(`duplicate Core subscription attribution: ${clientId}`);
+    }
+    this.registerRpcClient(clientId);
+    const key = this.#key(sessionId, runId);
+    this.#attributions.set(clientId, { key, sessionId, runId });
+  }
+
+  /**
+   * Releases one client's attribution row. The conditional (rpc-only) client
+   * row drops with it unless a live socket subscription still references the
+   * identity; a socket-owned row survives until its socket closes. Returns
+   * false when the client holds no attribution.
+   */
+  releaseAttribution(clientId: string): boolean {
+    const attribution = this.#attributions.get(clientId);
+    if (attribution === undefined) return false;
+    this.#attributions.delete(clientId);
+    // Keep the row while the client still owns a live socket subscription;
+    // otherwise the last fact about it is gone.
+    for (const subscription of this.#subscriptions) {
+      if (subscription.clientId === clientId) return true;
+    }
+    this.#releaseRpcOnlyClient(clientId);
+    return true;
+  }
+
   unregisterClient(clientId: string): void {
+    this.#rpcOnlyClients.delete(clientId);
     this.#clients.delete(clientId);
   }
 
+  /** Drops an rpc-only row that no longer owns any subscription. */
+  #releaseRpcOnlyClient(clientId: string | undefined): void {
+    if (clientId === undefined) return;
+    if (!this.#rpcOnlyClients.has(clientId)) return;
+    for (const subscription of this.#subscriptions) {
+      if (subscription.clientId === clientId) return;
+    }
+    this.#clients.delete(clientId);
+    this.#rpcOnlyClients.delete(clientId);
+  }
+
   listClients(): CoreEventClientState[] {
-    return [...this.#clients.entries()].map(([clientId, client]) => ({
-      clientId,
-      ...(client.remoteAddress === undefined
-        ? {}
-        : { remoteAddress: client.remoteAddress }),
-      connectedAt: client.connectedAt,
-      subscriptions: [...this.#subscriptions]
-        .filter((subscription) => subscription.clientId === clientId)
-        .map((subscription) => ({
-          sessionId: subscription.sessionId,
-          runId: subscription.runId,
-        })),
-    }));
+    return [...this.#clients.entries()]
+      .filter(([clientId]) => !this.#isHiddenGhostRow(clientId))
+      .map(([clientId, client]) => ({
+        clientId,
+        ...(client.remoteAddress === undefined
+          ? {}
+          : { remoteAddress: client.remoteAddress }),
+        connectedAt: client.connectedAt,
+        subscriptions: [
+          ...[
+            ...this.#subscriptions,
+            ...this.#attributionRowsFor(clientId),
+          ].map((subscription) => ({
+            sessionId: subscription.sessionId,
+            runId: subscription.runId,
+          })),
+        ],
+      }));
+  }
+
+  /**
+   * An rpc-only identity with neither a live subscription nor an attribution
+   * is invisible: listing it would claim a connection that owns nothing.
+   */
+  #isHiddenGhostRow(clientId: string): boolean {
+    if (!this.#rpcOnlyClients.has(clientId)) return false;
+    if (this.#attributions.has(clientId)) return false;
+    for (const subscription of this.#subscriptions) {
+      if (subscription.clientId === clientId) return false;
+    }
+    return true;
+  }
+
+  #attributionRowsFor(
+    clientId: string,
+  ): Array<{ sessionId: string; runId: string }> {
+    const attribution = this.#attributions.get(clientId);
+    return attribution === undefined
+      ? []
+      : [{ sessionId: attribution.sessionId, runId: attribution.runId }];
   }
 
   onRequest(listener: CoreEventRequestListener): () => void {
@@ -236,6 +354,8 @@ export class CoreEventStream {
     }
     this.#events.clear();
     this.#clients.clear();
+    this.#rpcOnlyClients.clear();
+    this.#attributions.clear();
     this.#requestListeners.clear();
     this.#eventListeners.clear();
   }

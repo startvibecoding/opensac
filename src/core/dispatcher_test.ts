@@ -309,6 +309,37 @@ Deno.test("run.events.subscribe attributes the subscription to the calling clien
     events.listClients().find((c) => c.clientId === "client-7")?.subscriptions,
     [{ sessionId: "session-1", runId: "run-1" }],
   );
+  await events.close();
+});
+
+Deno.test("run.events.subscribe releases its attribution row when the client unsubscribes", async () => {
+  // The attribution marks the conditional rpc-only row. Releasing it (the
+  // socket's matching subscription ended, or the client explicitly went away)
+  // must drop the row again: a stateless HTTP caller must never linger in
+  // `core.clients.list` after it stopped watching.
+  const events = new CoreEventStream();
+  const dispatcher = new CoreRuntimeDispatcher({ host: testHost(), events });
+  await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "run.events.subscribe",
+      params: { sessionId: "session-1", runId: "run-1", cursor: 0 },
+    },
+    new AbortController().signal,
+    { clientId: "rpc-9" },
+  );
+  assertEquals(
+    events.listClients().find((c) => c.clientId === "rpc-9")?.subscriptions,
+    [{ sessionId: "session-1", runId: "run-1" }],
+  );
+  assertEquals(events.releaseAttribution("rpc-9"), true);
+  assertEquals(
+    events.listClients().find((c) => c.clientId === "rpc-9"),
+    undefined,
+    "the released attribution must not leave a ghost row",
+  );
+  await events.close();
 });
 
 Deno.test("CoreRuntimeDispatcher sends extension methods to the Core extension handler", async () => {

@@ -342,17 +342,21 @@ export class CoreRuntimeDispatcher {
       case CORE_RUNTIME_METHODS.runEventsSubscribe: {
         const input = parseEventParams(params);
         if (input === undefined) throw invalidParams();
-        // Register the subscription against the calling client so
+        // Attribute the subscription to the calling client so
         // `core.clients.list` reports what each connection actually watches.
         // The WS upgrade already registered the client identity; an RPC-channel
         // subscribe must attach the same identity to the subscription row.
+        // Attribution is a listing concern only: events reach this client
+        // through its event socket's own subscription, so the server must not
+        // hold a second iterator that buffers a duplicate queue per run.
         const clientId = context?.clientId;
-        this.#events.subscribe(
-          input.sessionId,
-          input.runId,
-          input.cursor,
-          clientId === undefined || clientId === "" ? undefined : { clientId },
-        );
+        if (clientId !== undefined && clientId !== "") {
+          this.#events.attributeSubscription(
+            input.sessionId,
+            input.runId,
+            clientId,
+          );
+        }
         return input;
       }
       case CORE_RUNTIME_METHODS.runEventsReplay: {

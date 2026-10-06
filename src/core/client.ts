@@ -744,6 +744,13 @@ export class CoreClient {
     >();
     const requests = new Set<(request: CoreRpcRequest) => void>();
     const drops = new Set<() => void>();
+    // Subscriptions this connection owns, so a reconnect onto a replacement
+    // Core re-establishes them before anyone has to notice they are gone.
+    const subscriptions = new Map<string, {
+      sessionId: string;
+      runId: string;
+      cursor: number;
+    }>();
     let closed = false;
     let nextId = 1;
 
@@ -794,12 +801,16 @@ export class CoreClient {
       return await result;
     };
 
-    socket.onmessage = (event) => {
-      if (typeof event.data !== "string") return;
+    // One frame handler serves both the initial socket and every reconnect,
+    // so a restored socket routes responses and reverse requests, not only
+    // notifications.
+    const handleFrame = (data: unknown): void => {
+      if (typeof data !== "string") return;
       let input: unknown;
       try {
-        input = JSON.parse(event.data);
+        input = JSON.parse(data);
       } catch {
+        // Ignore malformed frames; the next frame remains usable.
         return;
       }
       const message = parseCoreRpcMessage(input);
@@ -822,6 +833,7 @@ export class CoreClient {
         for (const listener of notifications) listener(message);
       }
     };
+    socket.onmessage = (event) => handleFrame(event.data);
 
     const connectionObject: CoreEventConnection = {
       get connected() {
@@ -829,6 +841,11 @@ export class CoreClient {
       },
       async subscribe(sessionId, runId, cursor = 0) {
         await request("run.events.subscribe", { sessionId, runId, cursor });
+        subscriptions.set(`${sessionId}\u0000${runId}`, {
+          sessionId,
+          runId,
+          cursor,
+        });
       },
       async replay(sessionId, runId, cursor = 0) {
         return await request("run.events.replay", { sessionId, runId, cursor });
@@ -871,20 +888,20 @@ export class CoreClient {
         socket = next;
         closed = false;
         watchSocket(next);
-        socket.onmessage = (event) => {
-          if (typeof event.data !== "string") return;
-          try {
-            const message = parseCoreRpcMessage(JSON.parse(event.data));
-            if (
-              message !== undefined && "method" in message &&
-              message.id === undefined
-            ) {
-              for (const listener of notifications) listener(message);
-            }
-          } catch {
-            // Ignore malformed reconnect frames; the next frame remains usable.
-          }
-        };
+        socket.onmessage = (event) => handleFrame(event.data);
+        // The subscription table lived in the dropped process. Re-establish
+        // every registered subscription on the replacement so a notification
+        // listener (the TUI decision bridge, a run event stream) keeps seeing
+        // events without knowing the socket underneath changed. The restore is
+        // not reported as a drop: an intentional reconnect must stay silent
+        // by the `onClose` contract, and the listeners were never removed.
+        for (const subscription of subscriptions.values()) {
+          await request("run.events.subscribe", {
+            sessionId: subscription.sessionId,
+            runId: subscription.runId,
+            cursor: subscription.cursor,
+          });
+        }
       },
     };
     return connectionObject;

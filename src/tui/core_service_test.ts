@@ -42,8 +42,17 @@ function event(
 
 class FakeEventConnection implements TUICoreEventConnection {
   subscribed: Array<{ sessionId: string; runId: string; cursor: number }> = [];
-  replayed: CoreRuntimeEvent[] = [];
+  replayed: CoreRuntimeEvent[] = [event(1, "run_started", false)];
+  /** Rows the NEXT replay call returns (a restarted Core's follow-up run). */
+  nextReplayed: CoreRuntimeEvent[] | undefined = undefined;
   #listeners = new Set<(notification: CoreRpcNotification) => void>();
+  #closeListeners = new Set<() => void>();
+  /** A dropped fake reports itself dead, like a real closed socket. */
+  #alive = true;
+
+  get connected(): boolean {
+    return this.#alive;
+  }
 
   subscribe(
     sessionId: string,
@@ -59,9 +68,9 @@ class FakeEventConnection implements TUICoreEventConnection {
     _runId: string,
     cursor = 0,
   ): Promise<unknown> {
-    return Promise.resolve(
-      this.replayed.filter((entry) => entry.sequence > cursor),
-    );
+    const rows = this.nextReplayed ?? this.replayed;
+    this.nextReplayed = undefined;
+    return Promise.resolve(rows.filter((entry) => entry.sequence > cursor));
   }
 
   onNotification(
@@ -77,8 +86,6 @@ class FakeEventConnection implements TUICoreEventConnection {
     return () => {};
   }
 
-  #closeListeners = new Set<() => void>();
-
   onClose(listener: () => void): () => void {
     this.#closeListeners.add(listener);
     return () => this.#closeListeners.delete(listener);
@@ -88,6 +95,7 @@ class FakeEventConnection implements TUICoreEventConnection {
 
   /** Stands in for a Core that dropped this socket on its own. */
   drop(): void {
+    this.#alive = false;
     for (const listener of [...this.#closeListeners]) listener();
   }
 
@@ -118,9 +126,12 @@ function fakeClient(
     failWith?: (method: string) => Error | undefined;
     /** Hand out a new event connection per dial, as a real client would. */
     freshEvents?: boolean;
+    /** Hook to configure each dialed connection (restart simulations). */
+    onEvents?: (connection: FakeEventConnection) => void;
   } = {},
 ): FakeClient {
   const events = new FakeEventConnection();
+  options.onEvents?.(events);
   const eventConnections: FakeEventConnection[] = [];
   return {
     calls: [],
@@ -142,6 +153,7 @@ function fakeClient(
       const connection = options.freshEvents === true
         ? new FakeEventConnection()
         : events;
+      if (options.freshEvents === true) options.onEvents?.(connection);
       eventConnections.push(connection);
       const failure = options.failWith?.("connectEvents");
       if (failure !== undefined) return Promise.reject(failure);
@@ -308,26 +320,78 @@ Deno.test("core TUIService starts event streams from the requested cursor", asyn
   ]);
 });
 
-Deno.test("core TUIService ends a run stream the Core drops instead of hanging", async () => {
-  const client = fakeClient();
-  client.events.replayed = [event(1, "run_started", false)];
+Deno.test("core TUIService redials a dropped run stream and finishes from the replacement", async () => {
+  // Fresh per dial, as a real client hands out one socket per connection.
+  const client = fakeClient({}, { freshEvents: true });
   const service = createCoreClientTUIService(client);
 
+  // The first connection replays one event, then the Core restarts.
   const iterator = service.subscribeRunEvents("session-1", "run-1", 0);
-  assertEquals((await iterator.next()).value?.sequence, 1);
+  assertEquals((await iterator.next()).value, event(1, "run_started", false));
 
-  // The Core restarted: the socket is gone and the run died with it. Waiting
-  // for a notification that can never arrive would leave the TUI spinning
-  // forever, so the stream has to end with an error instead.
-  const pending = iterator.next();
-  client.events.drop();
-  const error = await assertRejects(() => pending, TUIServiceError);
+  // Park the stream on the dying socket, drop it, and let the generator
+  // re-dial. The durable Run outlives the process that started it, so the
+  // projection resumes instead of ending.
+  const parked = iterator.next();
+  await settle();
+  client.eventConnections[0].drop();
+  await settle();
+  const replacement = client.eventConnections[1];
+  assert(replacement !== undefined, "the stream re-dialed");
+  // The replacement resumed from the cursor the stream reached, not zero.
+  assertEquals(replacement.subscribed, [
+    { sessionId: "session-1", runId: "run-1", cursor: 1 },
+  ]);
+  // Its replay was empty at dial time (the restarted Core had not caught up
+  // yet); the rest of the run arrives afterwards through the live path and
+  // drains without loss.
+  replacement.emit(event(2, "text_delta", false));
+  replacement.emit(event(3, "run_finished", true));
+  await settle();
+  assertEquals((await parked).value, event(2, "text_delta", false));
+  assertEquals((await iterator.next()).value, event(3, "run_finished", true));
+  assertEquals(await iterator.next(), { done: true, value: undefined });
+});
+
+Deno.test("core TUIService gives up on a run stream that keeps dropping", async () => {
+  // Every dial dies immediately with no events: an empty replay plus a drop
+  // right after it, which is what "the replacement Core died again" looks
+  // like from the stream's side.
+  const client = fakeClient(
+    {},
+    {
+      freshEvents: true,
+      onEvents: (connection) => {
+        connection.replayed = [];
+        queueMicrotask(() => connection.drop());
+      },
+    },
+  );
+  const service = createCoreClientTUIService(client);
+
+  const error = await assertRejects(async () => {
+    for await (
+      const _delivered of service.subscribeRunEvents("session-1", "run-1", 0)
+    ) {
+      // Unreachable: no connection ever delivers an event.
+      void _delivered;
+    }
+  }, TUIServiceError);
   assert(
     error.message.includes("run-1"),
     `the error must name the lost run, got ${error.message}`,
   );
-  assertEquals(client.events.listenerCount, 0);
+  // Bounded: the initial dial plus the allowed re-dials, no more.
+  assert(
+    client.eventConnections.length <= 4,
+    `re-dials must be bounded, got ${client.eventConnections.length}`,
+  );
 });
+
+/** Drains the macrotask queue so immediate-promise fakes can settle. */
+async function settle(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
 
 Deno.test("core TUIService reports missing capabilities explicitly", async () => {
   const client = fakeClient();

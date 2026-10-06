@@ -310,6 +310,10 @@ export class CoreServer {
       return jsonRpcErrorResponse(null, -32600, "Invalid Request", 400);
     }
 
+    // The client identity travels to the dispatcher for subscription
+    // attribution. It is registered conditionally (see `registerRpcClient`):
+    // the row survives while the client owns subscriptions and drops when its
+    // last one releases, so a stateless HTTP caller never leaves a ghost.
     const response = await this.#dispatch(
       message,
       request.signal,

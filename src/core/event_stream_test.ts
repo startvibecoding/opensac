@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { coreResult } from "./protocol.ts";
 import { type CoreEventRequest, CoreEventStream } from "./event_stream.ts";
 import type { CoreRuntimeEvent } from "./runtime.ts";
@@ -67,4 +67,87 @@ Deno.test("CoreEventStream correlates a reverse request with its response", asyn
     result: { approved: true },
   });
   await stream.close();
+});
+
+Deno.test("CoreEventStream keeps an RPC-channel attribution until its release", async () => {
+  const stream = new CoreEventStream();
+  try {
+    // A plain /rpc call must never leave a ghost row: the conditional mark
+    // drops the moment the client owns no subscription.
+    stream.registerRpcClient("rpc-1");
+    assertEquals(
+      stream.listClients().find((client) => client.clientId === "rpc-1"),
+      undefined,
+      "an empty rpc-only row is not listed",
+    );
+
+    stream.attributeSubscription("session-1", "run-1", "rpc-1");
+    const listed = stream.listClients().find((c) => c.clientId === "rpc-1");
+    assertEquals(listed?.subscriptions, [{
+      sessionId: "session-1",
+      runId: "run-1",
+    }]);
+
+    // Attribution rows receive no events: the client's live socket iterator
+    // is the only delivery path, so publish must not enqueue into them.
+    stream.publish({
+      sessionId: "session-1",
+      runId: "run-1",
+      sequence: 1,
+      eventType: "text_delta",
+      payload: {},
+      terminal: false,
+    });
+
+    // Releasing the attribution drops the conditional row again.
+    assertEquals(stream.releaseAttribution("rpc-1"), true);
+    assertEquals(
+      stream.listClients().find((client) => client.clientId === "rpc-1"),
+      undefined,
+      "the row must not outlive its last subscription",
+    );
+    assertEquals(stream.releaseAttribution("rpc-1"), false);
+  } finally {
+    await stream.close();
+  }
+});
+
+Deno.test("CoreEventStream keeps a socket-owned row after its attributions release", async () => {
+  const stream = new CoreEventStream();
+  try {
+    // The /events upgrade registers the identity unconditionally.
+    stream.registerClient("sock-1");
+    stream.attributeSubscription("session-1", "run-1", "sock-1");
+    assertEquals(
+      stream.listClients().find((c) => c.clientId === "sock-1")?.subscriptions,
+      [{ sessionId: "session-1", runId: "run-1" }],
+    );
+    // The socket also holds its own live subscription for the same run pair.
+    const live = stream.subscribe("session-1", "run-1", 0, {
+      clientId: "sock-1",
+    });
+    assertEquals(
+      stream.listClients().find((c) => c.clientId === "sock-1")?.subscriptions,
+      [
+        { sessionId: "session-1", runId: "run-1" },
+        { sessionId: "session-1", runId: "run-1" },
+      ],
+    );
+    await stream.releaseAttribution("sock-1");
+    // The socket row survives: its own close path owns removal.
+    assert(
+      stream.listClients().some((client) => client.clientId === "sock-1"),
+      "a socket-owned row must survive attribution release",
+    );
+    // Releasing the live iterator drops nothing else on its own either.
+    await live.return!();
+    assert(
+      stream.listClients().some((client) => client.clientId === "sock-1"),
+      "the socket row stays until unregisterClient",
+    );
+    stream.unregisterClient("sock-1");
+    assertEquals(stream.listClients().length, 0);
+  } finally {
+    await stream.close();
+  }
 });

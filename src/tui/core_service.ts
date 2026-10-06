@@ -70,6 +70,11 @@ const TUI_SETTINGS_METHOD = "manage.settings.get";
 
 /** The event-connection surface the adapter needs from `CoreClient`. */
 export interface TUICoreEventConnection {
+  /**
+   * Whether the underlying socket is still live. Optional: fakes and older
+   * connections may omit it, and a stream treats "unknown" as live.
+   */
+  readonly connected?: boolean;
   subscribe(sessionId: string, runId: string, cursor?: number): Promise<void>;
   replay(sessionId: string, runId: string, cursor?: number): Promise<unknown>;
   onNotification(
@@ -133,15 +138,55 @@ export function createCoreClientTUIService(
     { id: CoreRpcId; connection: TUICoreEventConnection }
   >();
   let decisionBridge: Promise<void> | undefined;
+  // Live-dial identity: a dropped bridge's late reconnect or retry timer must
+  // not revive a bridge the current generation already replaced.
+  let decisionBridgeGeneration = 0;
+  let decisionBridgeRedialTimer: ReturnType<typeof setTimeout> | undefined;
+  // Consecutive failed dials since the last successful bridge; drives the
+  // retry backoff and resets when one answers.
+  let decisionBridgeAttempts = 0;
+
+  // Re-dials the decision bridge after a drop with bounded backoff. Only the
+  // live generation may act, and only when nothing else is already dialing:
+  // an intentional close stays quiet by contract, and without this retry the
+  // `reconnecting` state would never clear on its own — the bridge used to
+  // come back only when the user sent the next prompt, so an idle TUI looked
+  // permanently disconnected after a Core restart.
+  const REDIAL_BASE_MS = 500;
+  const REDIAL_MAX_MS = 5_000;
+  const armDecisionBridgeRedial = (generation: number, delayMs: number) => {
+    if (generation !== decisionBridgeGeneration) return;
+    if (decisionBridge !== undefined) return;
+    if (decisionBridgeRedialTimer !== undefined) return;
+    decisionBridgeRedialTimer = setTimeout(() => {
+      decisionBridgeRedialTimer = undefined;
+      if (generation !== decisionBridgeGeneration) return;
+      if (decisionBridge !== undefined) return;
+      // The retry itself announces the outage again so a UI that missed the
+      // drop tick still shows "reconnecting" before this dial lands.
+      publishConnection("reconnecting");
+      ensureDecisionBridge();
+    }, delayMs);
+    // The timer is pure background recovery: it must never hold the process
+    // (or a test's event loop) open on its own.
+    decisionBridgeRedialTimer.unref?.();
+  };
 
   // One shared event connection carries Core reverse requests (human
   // decisions). It is established before the first prompt so a decision can
   // never be issued while no client is listening.
   const ensureDecisionBridge = (): Promise<void> => {
     if (decisionBridge !== undefined) return decisionBridge;
+    const generation = ++decisionBridgeGeneration;
+    // A deliberate dial supersedes any pending retry tick.
+    if (decisionBridgeRedialTimer !== undefined) {
+      clearTimeout(decisionBridgeRedialTimer);
+      decisionBridgeRedialTimer = undefined;
+    }
     const bridge = (async () => {
       const connection = await client.connectEvents();
       // The replacement endpoint answered, so the Core is reachable again.
+      decisionBridgeAttempts = 0;
       publishConnection("connected");
       connection.onRequest((request) => {
         const projected = projectDecisionRequest(request);
@@ -153,20 +198,39 @@ export function createCoreClientTUIService(
         });
         for (const listener of [...decisionListeners]) listener(projected);
       });
-      // A restarted Core drops this socket. Forget it so the next use re-dials
-      // the replacement endpoint, and drop the pending decisions it can no
-      // longer answer: the run that asked for them died with that process.
+      // A restarted Core drops this socket. Drop the pending decisions it can
+      // no longer answer — their ids die with that process — and report the
+      // outage. Unlike a lazy redial on the next prompt, the bridge dials the
+      // replacement itself: a run admitted right after the restart must find
+      // this listener already attached, or its approval hangs forever.
       connection.onClose(() => {
-        if (decisionBridge === bridge) decisionBridge = undefined;
+        if (generation !== decisionBridgeGeneration) return;
+        decisionBridge = undefined;
         pendingDecisions.clear();
         publishConnection("reconnecting");
+        armDecisionBridgeRedial(generation, REDIAL_BASE_MS);
       });
     })();
     decisionBridge = bridge;
     // A failed dial must not be cached, or every later prompt would reuse the
     // rejection and no decision could ever be received again.
     void bridge.catch(() => {
-      if (decisionBridge === bridge) decisionBridge = undefined;
+      if (
+        generation === decisionBridgeGeneration && decisionBridge === bridge
+      ) {
+        decisionBridge = undefined;
+        // The dial itself failed (the Core was still down): keep retrying with
+        // exponential backoff so a reconnect is noticed even when no prompt
+        // follows the restart.
+        decisionBridgeAttempts += 1;
+        armDecisionBridgeRedial(
+          generation,
+          Math.min(
+            REDIAL_BASE_MS * 2 ** decisionBridgeAttempts,
+            REDIAL_MAX_MS,
+          ),
+        );
+      }
     });
     return bridge;
   };
@@ -858,6 +922,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Streams one run's canonical events: replay from the cursor first, then live
  * `run.event` notifications in arrival order, de-duplicated by sequence and
  * finished after a terminal event.
+ *
+ * A Core restart is survivable, not fatal: the durable Run outlives the
+ * process that started it, and the restarted Core converges the orphan on its
+ * recovery sweep. So when the socket drops mid-stream the generator re-dials
+ * the replacement endpoint and replays from the local cursor instead of
+ * ending the projection. Only a replacement that cannot answer — or a stream
+ * that keeps dropping without progress — becomes an error.
  */
 async function* streamRunEvents(
   client: TUICoreClient,
@@ -865,7 +936,68 @@ async function* streamRunEvents(
   runId: string,
   cursor: number,
 ): AsyncGenerator<CoreRuntimeEvent> {
-  const connection = await client.connectEvents();
+  let lastSequence = cursor;
+  let consecutiveFailures = 0;
+  while (true) {
+    const outcome = yield* streamRunEventsOnce(client, sessionId, runId, () => {
+      return lastSequence;
+    }, (sequence) => {
+      lastSequence = sequence;
+    });
+    switch (outcome.kind) {
+      case "finished":
+        return;
+      case "redial":
+        // Count progress-free drops so a Core flap cannot loop forever.
+        consecutiveFailures = outcome.madeProgress
+          ? 0
+          : consecutiveFailures + 1;
+        if (consecutiveFailures >= MAX_EVENT_STREAM_REDIALS) {
+          throw runEventStreamUnrecoverable(runId, lastSequence);
+        }
+        continue;
+      case "failed":
+        throw outcome.error;
+    }
+  }
+}
+
+/** Redials allowed without any event progress between them. */
+const MAX_EVENT_STREAM_REDIALS = 3;
+
+type StreamOutcome =
+  | { kind: "finished" }
+  | { kind: "redial"; madeProgress: boolean }
+  | { kind: "failed"; error: TUIServiceError };
+
+/**
+ * Runs one connection attempt of a run event stream. Yields events as they
+ * arrive; on a socket drop returns so the caller can re-dial the replacement
+ * Core from the current cursor.
+ *
+ * The first replay snapshot is only the start: between the replay call and
+ * the live notification path taking over, the run keeps producing events.
+ * A restart — or any wake-up — landing inside that window must not lose
+ * them, so every drain point re-reads the durable replay past the local
+ * cursor before parking. On a real socket this costs one bounded RPC
+ * round-trip per wake, which is the price of an overlap-free hand-off
+ * between "replayed" and "live" instead of a race.
+ */
+async function* streamRunEventsOnce(
+  client: TUICoreClient,
+  sessionId: string,
+  runId: string,
+  readCursor: () => number,
+  advanceCursor: (sequence: number) => void,
+): AsyncGenerator<CoreRuntimeEvent, StreamOutcome> {
+  let connection: TUICoreEventConnection;
+  try {
+    connection = await client.connectEvents();
+  } catch (error) {
+    // No replacement answered at all. The prompt call already failed loudly
+    // when the run was admitted; here the honest outcome is a terminal error.
+    return failedStream(error);
+  }
   const buffered: CoreRuntimeEvent[] = [];
   let wake: (() => void) | undefined;
   const stopListening = connection.onNotification((notification) => {
@@ -875,48 +1007,73 @@ async function* streamRunEvents(
     buffered.push(event);
     wake?.();
   });
-  // A Core that restarts drops this socket, and the run it was streaming died
-  // with that process. Nothing will ever arrive on it again, so the stream has
-  // to end rather than wait for a notification that cannot come.
   let dropped = false;
   const stopWatchingClose = connection.onClose(() => {
     dropped = true;
     wake?.();
   });
-  try {
-    await connection.subscribe(sessionId, runId, cursor);
-    const replayed = toEventList(
-      await connection.replay(sessionId, runId, cursor),
-    );
-
-    let lastSequence = cursor;
-    for (const event of replayed) {
-      if (event.sequence <= lastSequence) continue;
-      lastSequence = event.sequence;
-      yield event;
-      if (event.terminal) return;
-    }
-
-    let index = 0;
-    while (true) {
-      while (index < buffered.length) {
-        const event = buffered[index++];
-        if (event.sequence <= lastSequence) continue;
-        lastSequence = event.sequence;
-        yield event;
-        if (event.terminal) return;
+  // A real socket that is already dead reports it; a fake whose drop landed
+  // before the listener existed (or one that died during the dial) must not
+  // park forever on a connection that can never wake it.
+  if (connection.connected === false) dropped = true;
+  // Pull the connection's durable replay past the local cursor into the
+  // pending buffer. Repeated calls are safe: sequences already yielded are
+  // filtered by the cursor check in the drain below, so the hand-off between
+  // "replayed" and "live" overlaps instead of racing — an event published
+  // while the stream was parked is recovered here rather than lost.
+  const refreshReplay = async (): Promise<void> => {
+    try {
+      const rows = toEventList(
+        await connection.replay(sessionId, runId, readCursor()),
+      );
+      for (const row of rows) {
+        if (row.sequence > readCursor()) buffered.push(row);
       }
-      if (dropped) throw runEventStreamClosed(runId);
+    } catch {
+      // A replay failure on a live socket surfaces through the next drop or
+      // the following park; the notification path remains the primary stream.
+    }
+  };
+  try {
+    await connection.subscribe(sessionId, runId, readCursor());
+
+    let madeProgress = false;
+    while (true) {
+      // Snapshot the pending buffer before yielding anything: a notification
+      // that arrives mid-drain must not be consumed out of order.
+      await refreshReplay();
+      const ready: CoreRuntimeEvent[] = [];
+      while (buffered.length > 0) {
+        const event = buffered.shift()!;
+        if (event.sequence > readCursor()) ready.push(event);
+      }
+      for (const event of ready) {
+        advanceCursor(event.sequence);
+        madeProgress = true;
+        yield event;
+        if (event.terminal) return { kind: "finished" };
+      }
+      // The drop check runs before every park: a socket that died during the
+      // drain or the replay must send the stream to the replacement on this
+      // pass, not after one more pointless wake-up cycle.
+      if (dropped) {
+        return { kind: "redial", madeProgress };
+      }
       await new Promise<void>((resolve) => {
         wake = resolve;
         // Re-check after registering to close the notify/await race.
-        if (index < buffered.length) {
+        if (buffered.length > 0 || dropped) {
           wake = undefined;
           resolve();
         }
       });
       wake = undefined;
     }
+  } catch (error) {
+    // A subscribe/replay request that failed on a live socket (an RPC error,
+    // not a drop) is the replacement rejecting us; surface it once.
+    if (!dropped) return failedStream(error);
+    return { kind: "redial", madeProgress: false };
   } finally {
     wake = undefined;
     stopListening();
@@ -924,10 +1081,25 @@ async function* streamRunEvents(
   }
 }
 
-/** The Core closed a run's event stream, which a restart is the only cause of. */
-function runEventStreamClosed(runId: string): TUIServiceError {
+function failedStream(error: unknown): StreamOutcome {
+  return {
+    kind: "failed",
+    error: error instanceof TUIServiceError ? error : new TUIServiceError(
+      `the Core event stream failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
+    ),
+  };
+}
+
+/** The event stream kept dropping without the run making progress. */
+function runEventStreamUnrecoverable(
+  runId: string,
+  cursor: number,
+): TUIServiceError {
   return new TUIServiceError(
-    `the Core closed the event stream for run ${runId}; it most likely restarted`,
+    `the Core repeatedly closed the event stream for run ${runId} at event ${cursor}; it most likely restarted without recovering the run`,
   );
 }
 

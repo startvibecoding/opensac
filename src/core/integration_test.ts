@@ -59,6 +59,7 @@ function clientOptions(
     launcher: CoreLauncher;
     password: string;
     startTimeoutMs: number;
+    config: ResolvedCoreConfig;
   }> = {},
 ) {
   return {
@@ -228,6 +229,94 @@ Deno.test("concurrent Core clients share one locked registration and server", as
     }
 
     assertEquals(await new CoreRegistry(paths).read(), undefined);
+  });
+});
+
+Deno.test("the client that started the shared Core can exit without disconnecting another client", async () => {
+  // TUI #1 auto-starts the shared Core; TUI #2 attaches as a plain client.
+  // Closing TUI #1 must not stop the Core or drop TUI #2's connections: the
+  // shared Core outlives every client, and only `core.shutdown`, a signal to
+  // the Core process itself, or an ownership-forced replacement stops it.
+  await withStateDir(async (stateDir, paths) => {
+    const handles: CoreCommandHandle[] = [];
+    let serverStarts = 0;
+    // Event sockets dial with a bare `new WebSocket(url)`, which cannot carry
+    // the bearer header, so this lifecycle scenario exercises the shared
+    // discovery/locking path with auth disabled. The authenticated RPC paths
+    // are covered by the other integration tests.
+    const openConfig: ResolvedCoreConfig = {
+      host: "127.0.0.1",
+      port: 0,
+      auth: false,
+      passwords: [],
+    };
+    const launch: CoreLauncher = async () => {
+      try {
+        const handle = await startCoreCommand({
+          ...commandOptions(stateDir),
+          config: openConfig,
+        }, {
+          createServer: (serverOptions: CoreServerOptions) => {
+            serverStarts++;
+            return new CoreServer(serverOptions);
+          },
+        });
+        handles.push(handle);
+      } catch (error) {
+        if (!(error instanceof CoreLockBusyError)) throw error;
+        await waitForRegistration(paths);
+      }
+    };
+    const launcherClient = new CoreClient(
+      clientOptions(stateDir, {
+        launcher: launch,
+        config: openConfig,
+      }),
+    );
+    // The survivor must never need to launch a second Core.
+    const survivorClient = new CoreClient(
+      clientOptions(stateDir, {
+        config: openConfig,
+        launcher: () =>
+          Promise.reject(
+            new Error("a live shared Core must not be relaunched"),
+          ),
+      }),
+    );
+    let survivorEvents:
+      | Awaited<ReturnType<CoreClient["connectEvents"]>>
+      | undefined;
+    try {
+      await launcherClient.ensureStarted();
+      assertEquals(serverStarts, 1);
+
+      // Both attach; the survivor holds an event socket as a TUI does.
+      await assertLiveCore(survivorClient);
+      survivorEvents = await survivorClient.connectEvents();
+      assertEquals(survivorEvents.connected, true);
+
+      // TUI #1 exits: its client drops all local state.
+      await launcherClient.close();
+
+      // The Core is untouched: still registered, still answering, and the
+      // survivor's RPC path and event socket both remain live.
+      const registration = await new CoreRegistry(paths).read();
+      assert(registration !== undefined, "the registration must survive");
+      assertEquals(await new CoreRegistry(paths).isCurrent(registration), true);
+      await assertLiveCore(survivorClient);
+      assertEquals(survivorEvents.connected, true);
+      assertEquals(serverStarts, 1);
+    } finally {
+      try {
+        await survivorEvents?.close();
+      } finally {
+        try {
+          await survivorClient.close();
+        } finally {
+          for (const handle of handles) await handle.stop();
+        }
+      }
+    }
   });
 });
 
