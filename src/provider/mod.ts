@@ -74,7 +74,11 @@ export {
 // The shared provider error wrapper. Providers must use this instead of a
 // private one: flattening an error drops the `cause` chain that retry
 // classification depends on.
-export { errorChainText, wrapError } from "./errors.ts";
+export {
+  errorChainText,
+  isProviderTransportFailure,
+  wrapError,
+} from "./errors.ts";
 export {
   formatRetryMessage,
   httpStatusOriginTimeout,

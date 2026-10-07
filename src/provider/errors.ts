@@ -90,3 +90,37 @@ export function wrapError(context: string, err: unknown): Error {
     : `${context}: ${message}`;
   return new Error(text, { cause: err });
 }
+
+/**
+ * Positive signatures of a provider network/transport fault, read from the
+ * cause chain a `wrapError` produced. Matched case-insensitively.
+ *
+ * This is the single owner of the phrase set. It keys on the stable underlying
+ * fault every provider preserves (`fetch failed`, the Deno socket/DNS/TLS
+ * reasons, the HTTP 4xx/5xx gateway framing) rather than the *stage prefix* a
+ * particular provider adds. The prefixes genuinely differ — `send request` for
+ * OpenAI/Google, `send` for Anthropic, `stream read error` for a mid-stream
+ * stall, `marshal request` for the Responses path — so a classifier that matched
+ * one provider's literal silently misroutes every other provider's transport
+ * stall onto the non-retryable path. A long task must keep its continuity
+ * budget for all of them.
+ */
+const providerTransportFaultPattern =
+  /\bfetch failed\b|\berror sending request\b|\bnetwork request failed\b|\bconnection (?:refused|reset|aborted|closed)\b|\bbroken pipe\b|\bstream read error\b|\beof\b|\btls handshake\b|\bcertificate\b|\bfailed to (?:lookup|resolve)\b|\bdns\b|\bname (?:resolution|lookup)\b|\btimed out\b|\btimeout\b|\bdeadline exceeded\b|\borigin timeout\b|\bbad gateway\b|\bservice unavailable\b|\bgateway timeout\b|\brate limited\b|\b(?:http|api error|status(?: code)?)\s*[:=]?\s*[45]\d\d\b|\bblocked reserved port\b|\binvalid url\b|\bunsupported url scheme\b|\bscheme '[^']*' not supported\b/;
+
+/**
+ * Reports whether an error carries a provider network/transport fault, for any
+ * provider and regardless of the stage prefix that provider added.
+ *
+ * It is a positive classifier: it confirms a transport fault actually happened,
+ * so a caller can tell a recoverable provider stall (keep the long task alive)
+ * apart from a genuine internal role failure that must not be replayed. It does
+ * *not* decide whether to retry — pairing it with `isRetryable` keeps the
+ * genuine boundaries (auth rejection, content refusal, oversized context,
+ * explicit cancellation) out of the recovery path, and `isRetryable` reads the
+ * whole cause chain, so a wrapped abort cannot be smuggled back onto the wire.
+ */
+export function isProviderTransportFailure(err: unknown): boolean {
+  if (err == null) return false;
+  return providerTransportFaultPattern.test(errorChainText(err).toLowerCase());
+}

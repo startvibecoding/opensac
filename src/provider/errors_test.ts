@@ -7,7 +7,11 @@
 // classifier readable rather than as the opaque "fetch failed".
 
 import { assert, assertEquals } from "@std/assert";
-import { errorChainText, wrapError } from "./errors.ts";
+import {
+  errorChainText,
+  isProviderTransportFailure,
+  wrapError,
+} from "./errors.ts";
 
 Deno.test("errorChainText joins every link, oldest last", () => {
   const root = new Error("Connection refused (os error 111)");
@@ -109,4 +113,50 @@ Deno.test("wrapError is idempotent over an already-wrapped chain", () => {
   assert(errorChainText(twice).includes("dns error"), errorChainText(twice));
   assertEquals(twice.cause, once);
   assertEquals(once.cause, raw);
+});
+
+Deno.test("isProviderTransportFailure recognizes every provider stage prefix", () => {
+  // A dead socket reached through each provider's distinct `wrapError` prefix.
+  const refused = new TypeError("fetch failed", {
+    cause: new Error("Connection refused (os error 111)"),
+  });
+  for (
+    const stage of [
+      "send request",
+      "send",
+      "stream read error",
+      "marshal request",
+    ]
+  ) {
+    assert(
+      isProviderTransportFailure(wrapError(stage, refused)),
+      `stage prefix "${stage}" must classify as a transport fault`,
+    );
+  }
+  // The original defect: an Anthropic `send:` and a mid-stream `stream read
+  // error:` stall carry the same fault but not the `send request:` literal the
+  // old ESM gate keyed on. They classify now.
+  assert(isProviderTransportFailure(wrapError("send", refused)));
+  assert(
+    isProviderTransportFailure(
+      wrapError("stream read error", wrapError("send request", refused)),
+    ),
+  );
+});
+
+Deno.test("isProviderTransportFailure names gateway and HTTP status faults", () => {
+  assert(isProviderTransportFailure(new Error("HTTP 502: bad gateway")));
+  assert(isProviderTransportFailure(new Error("upstream request timeout")));
+  assert(isProviderTransportFailure(new Error("broken pipe")));
+});
+
+Deno.test("isProviderTransportFailure is false for a non-transport fault", () => {
+  // A genuine internal role failure has no network signature and must NOT be
+  // routed onto the transport-recovery path.
+  assertEquals(
+    isProviderTransportFailure(new Error("role invariant broken")),
+    false,
+  );
+  assertEquals(isProviderTransportFailure(null), false);
+  assertEquals(isProviderTransportFailure(""), false);
 });

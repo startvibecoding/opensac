@@ -12,6 +12,8 @@
 // throw.
 
 import { isRetryable } from "../provider/retry.ts";
+import { isProviderTransportFailure } from "../provider/errors.ts";
+import { isAbortLike } from "../util/errors.ts";
 import { formatGuidanceSuffix } from "./guidance.ts";
 import {
   auditTaskPrompt,
@@ -657,10 +659,20 @@ function rolePrompt(obj: Objective, role: Role): string {
   }
 }
 
-/** Reports whether an error represents an explicit cancellation. */
+/**
+ * Reports whether an error represents an explicit cancellation.
+ *
+ * Cancellation must be detected across the whole `cause` chain, not only at the
+ * top level: a provider surfaces a user cancel as a `TypeError: fetch failed`
+ * whose `DOMException("AbortError")` or its own `new Error("aborted")` sentinel
+ * lives on `cause`. If only the top-level link were checked, a widened transport
+ * classifier would mistake a deliberate stop for a retryable stall and replay it.
+ * `isAbortLike` walks the chain with wording narrow enough to keep a transient
+ * "connection aborted" out of the cancellation path.
+ */
 export function isCanceled(err: unknown): boolean {
   if (err instanceof EsmCanceledError) return true;
-  return err instanceof DOMException && err.name === "AbortError";
+  return isAbortLike(err);
 }
 
 /** Reports whether an error represents a deadline/timeout. */
@@ -669,12 +681,25 @@ export function isDeadlineExceeded(err: unknown): boolean {
   return err instanceof DOMException && err.name === "TimeoutError";
 }
 
+/**
+ * Reports whether a role failure is a provider transport fault that keeps the
+ * long task alive instead of pausing it.
+ *
+ * The previous gate matched one provider's stage literal (`send request:`), so
+ * Anthropic's `send:`, the `stream read error:` a mid-stream stall produces, and
+ * the `marshal request:` the Responses path emits all slipped past it onto the
+ * non-retryable `statusPaused` branch. This now recognizes the underlying
+ * transport fault for any provider (shared `isProviderTransportFailure`), keeps
+ * the genuine boundaries out via `isRetryable` (which reads the whole cause
+ * chain), and excludes an explicit cancellation via the chain-walking
+ * `isCanceled`. An ESM observer's own deadline is handled by the caller before
+ * this check, so a provider idle timeout here is correctly a transport retry.
+ */
 function isRetryableTransportError(err: unknown): boolean {
   if (err == null) return false;
   if (isCanceled(err) || isDeadlineExceeded(err)) return false;
-  const message = err instanceof Error ? err.message : String(err);
-  if (!message.toLowerCase().includes("send request:")) return false;
-  return isRetryable(err, 0);
+  if (!isRetryable(err, 0)) return false;
+  return isProviderTransportFailure(err);
 }
 
 export function compactESMError(err: unknown): string {

@@ -1,7 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
+import { wrapError } from "../provider/errors.ts";
 import {
   createRoleIncompleteError,
   EsmDeadlineExceededError,
+  isCanceled,
   longTaskMaxIterations,
   recoveryObserverTimeout,
   roleAudit,
@@ -135,6 +137,67 @@ Deno.test("Supervisor incomplete role recovers and keeps objective active", asyn
     assertEquals(obj!.status, statusActive);
     assertEquals(obj!.recoveryCount, 1);
     assert(canAutoRun(obj!));
+  } finally {
+    cleanup();
+  }
+});
+
+Deno.test("Supervisor keeps the objective active for every provider transport prefix", async () => {
+  // Regression for the `send request:` literal gate: an Anthropic `send:` and a
+  // mid-stream `stream read error:` carry the same socket fault and must NOT
+  // terminalize a long task onto the paused branch.
+  const refused = new TypeError("fetch failed", {
+    cause: new Error("Connection refused (os error 111)"),
+  });
+  const cases: Array<[string, Error]> = [
+    ["anthropic send", wrapError("send", refused)],
+    [
+      "stream read",
+      wrapError("stream read error", wrapError("send request", refused)),
+    ],
+  ];
+  for (const [label, transportErr] of cases) {
+    const { store, sessionID } = makeStore("opensac-esm-rt-");
+    try {
+      store.create(sessionID, `finish: ${label}`);
+      const adapter = new RuntimeTestAdapter();
+      adapter.roleErr = transportErr;
+      const { objective: obj, error } = await new Supervisor({ store, adapter })
+        .run(sessionID, "run-transport", Deno.makeTempDirSync(), "yolo");
+      assertEquals(error, null, `${label}: transport fault must be recovered`);
+      assertEquals(obj!.status, statusActive, label);
+      assertEquals(obj!.recoveryCount, 1, label);
+      assert(canAutoRun(obj!), label);
+    } finally {
+      cleanup();
+    }
+  }
+});
+
+Deno.test("Supervisor does not retry an explicit cancellation hidden under fetch failed", async () => {
+  // Regression for the top-level-only isCanceled: a provider renames a user
+  // cancel into `fetch failed` with the AbortError on `cause`. The widened
+  // transport classifier must still recognize it as a stop, not a retry.
+  const { store, sessionID } = makeStore("opensac-esm-rt-");
+  try {
+    store.create(sessionID, "finish the objective");
+    const cancelErr = wrapError(
+      "send request",
+      new TypeError("fetch failed", {
+        cause: new DOMException("The operation was aborted.", "AbortError"),
+      }),
+    );
+    assert(
+      isCanceled(cancelErr),
+      "cause-chain abort must read as cancellation",
+    );
+    const adapter = new RuntimeTestAdapter();
+    adapter.roleErr = cancelErr;
+    const { objective: obj, error } = await new Supervisor({ store, adapter })
+      .run(sessionID, "run-cancel", Deno.makeTempDirSync(), "yolo");
+    assertEquals(error, cancelErr);
+    assertEquals(obj!.status, statusPaused, "a cancel is a stop, not a retry");
+    assert(!canAutoRun(obj!));
   } finally {
     cleanup();
   }
