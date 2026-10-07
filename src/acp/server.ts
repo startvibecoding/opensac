@@ -125,11 +125,7 @@ import { rawIDKey, RPCError } from "../mcp/rpc.ts";
 import { AttachmentService } from "../agentruntime/input.ts";
 import { defaultAttachmentPolicy } from "../agentruntime/attachment.ts";
 import { normalizeAdditionalDirectories } from "../agentruntime/session_directories.ts";
-import {
-  getActiveDurableRun,
-  listLatestDurableRunsBySessions,
-} from "../agentruntime/run_queries.ts";
-import type { SessionRun } from "../session/run_store.ts";
+import { getActiveDurableRun } from "../agentruntime/run_queries.ts";
 import type { SessionRuntime } from "../agentruntime/session_runtime.ts";
 import type { SessionConfigOption } from "../agentruntime/session_options.ts";
 import {
@@ -1281,36 +1277,6 @@ export class AcpServer {
       runId,
       status,
     });
-  }
-
-  /**
-   * Re-reads the canonical durable Run after an advisory cross-process
-   * lease-bus wake-up. UDP data never becomes projected state directly.
-   */
-  notifyExternalRunStatus(sessionId: string): void {
-    if (this.settings === null || sessionId.trim() === "") return;
-    const sessionDir = getSessionDir(this.settings);
-    let runs: Map<string, SessionRun>;
-    try {
-      runs = listLatestDurableRunsBySessions(sessionDir, [sessionId]);
-    } catch (error) {
-      console.error(`[acp] refresh external run ${sessionId}: ${error}`);
-      return;
-    }
-    const run = runs.get(sessionId);
-    if (run === undefined || run.id === "") return;
-    let status = acpRunStatus(run.status);
-    let runId = run.id;
-    try {
-      const active = getActiveDurableRun(sessionDir, sessionId);
-      if (active !== null) {
-        runId = active.id;
-        status = "running";
-      }
-    } catch {
-      // A read failure keeps the latest durable projection.
-    }
-    this.notifyRunStatus(sessionId, runId, status);
   }
 
   /**

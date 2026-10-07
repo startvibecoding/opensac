@@ -11,7 +11,6 @@ import {
   takeMigrationRecoveries,
 } from "../db/mod.ts";
 import { type Database, type Tx, wrapDatabase } from "../dao/mod.ts";
-import { takePeerDatabaseRebuilds } from "./database_recovery_notice.ts";
 import { ensureCurrentSchema } from "./schema.ts";
 import { openRootDB, rootDBPath } from "./root_db.ts";
 
@@ -57,12 +56,9 @@ export function takeDatabaseIndexRepairs(): DatabaseIndexRepair[] {
 /**
  * Returns the database recoveries recorded since the last call and clears them,
  * so a front-end can tell the user exactly once what was backed up and why.
- *
- * Rebuilds other opensac processes announced over the advisory runtime lease bus
- * are appended so a front-end drains local and peer notices through one API.
  */
 export function takeDatabaseRecoveries(): DatabaseRecovery[] {
-  return [...takeMigrationRecoveries(), ...takePeerDatabaseRebuilds()];
+  return [...takeMigrationRecoveries()];
 }
 
 /**

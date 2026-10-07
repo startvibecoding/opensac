@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { defaultSettings } from "../config/settings.ts";
 import {
+  blinkEditorCursor,
   refreshWhenBusy,
   runInteractiveAction,
   tuiResumeOptions,
@@ -15,6 +16,20 @@ Deno.test("interactive refresh skips idle redraws", () => {
 
   refreshWhenBusy(true, rerender);
   assertEquals(rerenders, 1);
+});
+
+Deno.test("cursor blink toggles the editor and repaints each frame", () => {
+  // The original defect: the blink timer toggled `cursorOn` but never
+  // repainted, so an idle editor showed a frozen (non-blinking) cursor.
+  let toggles = 0;
+  let rerenders = 0;
+  const editor = { blinkCursor: () => toggles++ };
+
+  blinkEditorCursor(editor, () => rerenders++);
+  blinkEditorCursor(editor, () => rerenders++);
+
+  assertEquals(toggles, 2);
+  assertEquals(rerenders, 2);
 });
 
 Deno.test("runInteractiveAction requires a terminal instead of crashing Ink", async () => {

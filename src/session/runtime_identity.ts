@@ -1,8 +1,8 @@
 // (process identity).
 //
-// The runtime owner identity names one OS process for lease ownership and
-// advisory notifications. It is computed once per process. Keeping it in its
-// own module avoids a runtime_lock <-> runtime_lease_bus import cycle.
+// The runtime owner identity names one OS process for lease ownership.
+// It is computed once per process. Keeping it in its own module avoids a
+// runtime_lock import cycle.
 
 let processID: string | null = null;
 

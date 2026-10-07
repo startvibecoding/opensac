@@ -89,6 +89,20 @@ export function refreshWhenBusy(busy: boolean, rerender: () => void): void {
   if (busy) rerender();
 }
 
+/**
+ * Advances one cursor-blink frame: toggles the editor cursor and repaints.
+ * The repaint is part of the blink because the busy refresh timer only runs
+ * during a run; without it an idle editor would toggle `cursorOn` invisibly
+ * and the cursor would never blink. Exported for tests.
+ */
+export function blinkEditorCursor(
+  editor: { blinkCursor(): void },
+  rerender: () => void,
+): void {
+  editor.blinkCursor();
+  rerender();
+}
+
 /** Applies one width change to the editor (Go WindowSizeMsg →
  * input.SetWidth). Returns the applied width, or null when unchanged.
  * Exported for tests. */
@@ -223,7 +237,7 @@ export async function runInteractiveAction(
   }, 100);
   // Cursor blink for the editor input box.
   const blinkTimer = setInterval(() => {
-    session.input.editor.blinkCursor();
+    blinkEditorCursor(session.input.editor, rerender);
   }, CURSOR_BLINK_INTERVAL_MS);
 
   const sessionEnded = Promise.withResolvers<void>();

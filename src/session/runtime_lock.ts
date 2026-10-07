@@ -19,7 +19,6 @@ import { CountedMutex, createLockRegistry } from "./lock_registry.ts";
 import { openRootDB, rootDBPath } from "./root_db.ts";
 import { nonTerminalSessionRunStatuses } from "./run_status.ts";
 import { runtimeOwnerID } from "./runtime_identity.ts";
-import { publishRuntimeLeaseNotification } from "./runtime_lease_bus.ts";
 
 const runtimeLeaseTTLSecs = 15;
 const runtimeHeartbeatEveryMs = 3_000;
@@ -146,7 +145,7 @@ class RuntimeLease {
     if (db === null) return;
     // Keep a released tombstone so a delayed write from an old owner is
     // distinguishable from a legacy cold write after the new owner released.
-    const count = new RuntimeLeaseDAO(db.db).release({
+    new RuntimeLeaseDAO(db.db).release({
       sessionId: this.sessionId,
       ownerId: this.ownerID,
       epoch: this.epoch,
@@ -161,15 +160,6 @@ class RuntimeLease {
       expiresAt: 0,
       updatedAt: 0,
     });
-    if (count === 1) {
-      publishRuntimeLeaseNotification({
-        type: "released",
-        sessionId: this.sessionId,
-        origin: this.purpose,
-        ownerInstanceId: this.ownerID,
-        epoch: this.epoch,
-      });
-    }
   }
 }
 
@@ -350,16 +340,8 @@ function acquireRuntimeLeaseWithOptions(
     return { lease: lease, expires };
   });
   if (acquired === null) return null;
-  const { lease, expires } = acquired;
+  const { lease } = acquired;
   rememberRuntimeLease(lease);
-  publishRuntimeLeaseNotification({
-    type: "acquired",
-    sessionId: lease.sessionId,
-    origin: lease.purpose,
-    ownerInstanceId: lease.ownerID,
-    epoch: lease.epoch,
-    expiresAt: expires,
-  });
   return lease;
 }
 
@@ -532,19 +514,12 @@ function markRuntimeLeaseLost(lease: RuntimeLease, reason: string): void {
   if (lease.released) return;
   lease.released = true;
   lease.refs = 0;
-  const { purpose, ownerID, epoch, sessionId } = lease;
+  const { ownerID, epoch, sessionId } = lease;
   console.error(
     `[session] runtime lease lost for ${sessionId} (owner=${ownerID} epoch=${epoch}): ${reason}`,
   );
   forgetRuntimeLease(lease);
   lease.lost.abort();
-  publishRuntimeLeaseNotification({
-    type: "lost",
-    sessionId,
-    origin: purpose,
-    ownerInstanceId: ownerID,
-    epoch,
-  });
 }
 
 /**

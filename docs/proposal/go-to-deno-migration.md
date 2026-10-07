@@ -834,13 +834,18 @@ of the pending #19/#26 runtime work.
   `src/session/runtime_lease_bus.ts` (the host-only UDP wake-up bus over
   `node:dgram`; Go's `x/sys` SO_REUSEADDR/SO_BROADCAST options map to the
   `reuseAddr`/`setBroadcast` socket options, and cross-process broadcast is
-  covered by a subprocess helper), `src/session/database_reset.ts` (the
+  covered by a subprocess helper; REMOVED once the shared Core host became the
+  default runtime owner: every projection (TUI/CLI/ACP) consumes Core's
+  JSON-RPC and canonical event stream, the durable Run outlives any single
+  Core process, and no production code kept a bus subscriber, so the advisory
+  wake-up had no consumer left), `src/session/database_reset.ts` (the
   recoverable sessions.db reset with sidecar archiving, rollback, and the
   left-behind report; `DatabaseMoveError` carries the restored files so the
   rollback contract stays testable), and
   `src/session/database_recovery_notice.ts` (the peer-rebuild hook wired into
   `ensureCurrentSchema`, retiring a replaced cached connection and merging peer
-  notices into `takeDatabaseRecoveries`). A later run added the Session runtime
+  notices into `takeDatabaseRecoveries`; removed together with the UDP bus —
+  peer notices had no remaining subscriber). A later run added the Session runtime
   lease subsystem: `src/session/runtime_lock.ts` (fenced owner/epoch/token
   `session_runtime_leases` acquire/release/bind/validate, admission/mutation/
   fork/recovery acquisition modes, the one-per-directory batched heartbeat

@@ -77,25 +77,6 @@ export {
   resetDatabase,
   type ResetReport,
 } from "./database_reset.ts";
-export {
-  ensureDatabaseRecoveryHook,
-  notifyDatabaseRebuilt,
-  takePeerDatabaseRebuilds,
-  watchDatabaseRebuilds,
-} from "./database_recovery_notice.ts";
-export {
-  notifyRuntimeStateChanged,
-  publishRuntimeLeaseNotification,
-  runtimeLeaseBusAddresses,
-  runtimeLeaseBusDatabaseRebuilt,
-  runtimeLeaseBusListening,
-  runtimeLeaseBusLogf,
-  type RuntimeLeaseNotification,
-  subscribeRuntimeLeaseLogs,
-  subscribeRuntimeLeaseNotifications,
-  waitForRuntimeLeaseBusListener,
-  waitForRuntimeLeaseBusStopped,
-} from "./runtime_lease_bus.ts";
 export { runtimeOwnerID } from "./runtime_identity.ts";
 export {
   acquireExecutionAdmission,

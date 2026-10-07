@@ -5,7 +5,6 @@
 
 import { type DB, runInTx, schemaIncompatible } from "../db/mod.ts";
 import { applySchemaMigrations } from "./migrations.ts";
-import { ensureDatabaseRecoveryHook } from "./database_recovery_notice.ts";
 import { nonTerminalSessionRunStatusSQL } from "./run_status.ts";
 
 const currentSchemaTemplate = `
@@ -912,7 +911,6 @@ const requiredSchema: Record<string, string[]> = {
  * a new empty one; every other failure is reported unchanged.
  */
 export function ensureCurrentSchema(db: DB): void {
-  ensureDatabaseRecoveryHook();
   const tableCount = countTables(db);
   if (tableCount === 0) {
     runInTx(db, (conn) => {

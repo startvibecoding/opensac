@@ -47,7 +47,6 @@ import {
   type RuntimeLeaseSnapshot,
   type SessionRun,
 } from "../session/mod.ts";
-import { notifyRuntimeStateChanged } from "../session/runtime_lease_bus.ts";
 import {
   runAssistantEntryID,
   runTerminalEventID,
@@ -497,13 +496,6 @@ export class ExecutionRuntime {
         );
       }
     }
-    this.notifyDurableStateChanged();
-  }
-
-  private notifyDurableStateChanged(): void {
-    const sessionId = this.durable?.sessionId ?? "";
-    const source = this.durable?.source ?? "";
-    if (sessionId !== "") notifyRuntimeStateChanged(sessionId, source);
   }
 
   activeLocked(runId: string): boolean {
@@ -1219,7 +1211,6 @@ export class ExecutionRuntime {
       if (this.events !== null && hasMethod(this.events, "project")) {
         projector.project(event, event.id ?? "");
       }
-      notifyRuntimeStateChanged(run.sessionId, run.source);
       return signal;
     }
     try {
@@ -1268,7 +1259,6 @@ export class ExecutionRuntime {
       }
       throw new Error(`record run start event: ${errorMessage(err)}`);
     }
-    notifyRuntimeStateChanged(run.sessionId, run.source);
     return signal;
   }
 
@@ -1440,7 +1430,6 @@ export class ExecutionRuntime {
     } catch (err) {
       throw new Error(`persist run cancellation: ${errorMessage(err)}`);
     }
-    this.notifyDurableStateChanged();
     if (!this.cancel()) return false;
     return true;
   }
@@ -1705,7 +1694,6 @@ export class ExecutionRuntime {
       }
       this.terminalPrepared = true;
       if (this.activeLocked(runId)) this.state = RUN_STATE_TERMINALIZING;
-      this.notifyDurableStateChanged();
     }
     const atomicFinisher =
       store as unknown as DurableConversationTurnEventFinisher;
@@ -1806,9 +1794,6 @@ export class ExecutionRuntime {
     this.terminalDone = null;
     if (wait !== null) wait.close();
     this.closeDone(done);
-    if (durableRun.sessionId !== "") {
-      notifyRuntimeStateChanged(durableRun.sessionId, durableRun.source);
-    }
     this.notifyTerminalObserver(runId, state);
   }
 
