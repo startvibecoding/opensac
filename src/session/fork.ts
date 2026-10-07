@@ -247,6 +247,17 @@ export function forkSession(
       err instanceof RuntimeLeaseBusyError ||
       err instanceof SessionRunActiveError
     ) {
+      // A concurrent fork carrying the same request ID may have committed
+      // between our initial lookup and lease acquisition. Prefer its durable
+      // child over reporting the source as active, so the idempotency contract
+      // holds under a race.
+      const raced = forkDao.findRequest(db.db!, requestHash, sourceId);
+      if (raced !== undefined) {
+        if (raced.requestFingerprint !== fingerprint) {
+          throw new ForkIdempotencyConflictError();
+        }
+        return forkResultByDB(db, raced.childSessionId);
+      }
       throw new ForkSessionActiveError();
     }
     throw err;

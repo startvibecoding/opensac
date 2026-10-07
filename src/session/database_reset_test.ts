@@ -1,6 +1,6 @@
 // Adapted from internal/session/database_reset_test.go
 //
-// The Go tests build a session through the (not yet ported) Manager; here the
+// The Go tests build a session through the Manager; here the
 // canonical session row is written directly through the DAO, which is the same
 // durable state the Manager persists.
 

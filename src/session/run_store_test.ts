@@ -1,6 +1,6 @@
 //
-// Deviation: the Go fixture creates a session through the (not yet ported)
-// Manager and acquires a runtime lease with `TryLockRuntime`. Foreign-key
+// Deviation: the Go fixture creates a session through the Manager and
+// acquires a runtime lease with `TryLockRuntime`. Foreign-key
 // enforcement is off and a session with no lease row skips lease validation, so
 // these tests use a literal session ID and reproduce the run lifecycle directly.
 

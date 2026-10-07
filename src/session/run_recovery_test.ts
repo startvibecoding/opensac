@@ -1,6 +1,6 @@
 //
-// Deviation: the Go fixture creates a session through the (not yet ported)
-// Manager; these tests persist a session/run through the DAO and acquire the
+// Deviation: the Go fixture creates a session through the Manager; these
+// tests persist a session/run through the DAO and acquire the
 // fenced recovery lease with `AcquireRecovery`. The `context.Context`
 // cancellation fixture is dropped because the DAO layer is synchronous.
 

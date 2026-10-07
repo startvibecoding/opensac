@@ -1,4 +1,4 @@
-// (run status sets).
+// Canonical durable Run status sets.
 //
 // nonTerminalSessionRunStatusList is the single source of truth for durable Run
 // statuses that keep a Session busy. Every other form of this set (SQL literals,

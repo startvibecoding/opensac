@@ -1,4 +1,4 @@
-// (process identity).
+// Process runtime-owner identity.
 //
 // The runtime owner identity names one OS process for lease ownership.
 // It is computed once per process. Keeping it in its own module avoids a

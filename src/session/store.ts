@@ -1,7 +1,7 @@
 //
 // The persistence-backend interface for session state plus the in-memory
-// implementation used by tests. The SQLite-backed `Manager` (session.go) is
-// still pending and will implement this interface.
+// implementation used by tests. The SQLite-backed `Manager` in `manager.ts`
+// provides the production implementation of this interface.
 
 import type { Message } from "../provider/types.ts";
 import type {

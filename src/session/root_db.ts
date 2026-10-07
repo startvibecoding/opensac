@@ -1,9 +1,9 @@
-// (root database helpers).
+// Root database helpers.
 //
 // These helpers own the shared sessions.db path rules and the DAO-owned root
 // database handle so adapters and DAOs never duplicate the session directory
-// layout. They are split out of the (not yet ported) Manager in session.go so
-// the session-level wrappers over the DAO layer can build on them.
+// layout. They are split out of the Manager so the session-level wrappers over
+// the DAO layer can build on them.
 
 import * as path from "@std/path";
 import {

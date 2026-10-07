@@ -1,9 +1,9 @@
-// (replay core).
+// The replay core.
 //
 // The current-branch reconstruction engine: it walks persisted entries,
 // applies message content overrides, and folds compaction summaries into the
-// live provider replay. It is split out of the (not yet ported) Manager so the
-// replay rules have one owner and can be exercised without a database.
+// live provider replay. It is split out of the Manager so the replay rules have
+// one owner and can be exercised without a database.
 //
 // Deviations from Go: entries are plain objects discriminated by their `type`
 // field rather than Go interface type switches; `json.RawMessage` tool-call
@@ -278,7 +278,6 @@ export function applySequencedCompactionEntry(
   state.entryIDs = nextEntryIDs;
 }
 
-/** A zero-valued compaction entry, mirroring Go's zero struct result. */
 /** Returns the newest compaction entry, or `null` when none exists. */
 export function latestCompactionLocked(
   entries: readonly unknown[],

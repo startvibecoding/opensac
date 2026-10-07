@@ -1,4 +1,4 @@
-// (the SQLite-backed Manager).
+// The SQLite-backed Manager.
 //
 // The Manager owns one session's state and persistence: it loads the session
 // header and entry log from the shared sessions.db, reconstructs the current

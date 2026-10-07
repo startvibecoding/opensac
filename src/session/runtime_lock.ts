@@ -17,7 +17,10 @@ import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
 import { BUSY_TIMEOUT_MS } from "../db/mod.ts";
 import { CountedMutex, createLockRegistry } from "./lock_registry.ts";
 import { openRootDB, rootDBPath } from "./root_db.ts";
-import { nonTerminalSessionRunStatuses } from "./run_status.ts";
+import {
+  nonTerminalSessionRunStatuses,
+  terminalSessionRunStatusList,
+} from "./run_status.ts";
 import { runtimeOwnerID } from "./runtime_identity.ts";
 
 const runtimeLeaseTTLSecs = 15;
@@ -701,19 +704,10 @@ export function validateRuntimeLease(
   });
 }
 
+/** Derives from the canonical set in `run_status.ts`, normalizing the stored value. */
 function isTerminalSessionRunStatus(status: string): boolean {
-  return terminalStatusSet.has(status.toLowerCase().trim());
+  return terminalSessionRunStatusList.includes(status.toLowerCase().trim());
 }
-
-const terminalStatusSet = new Set([
-  "completed",
-  "incomplete",
-  "expired",
-  "failed",
-  "cancelled",
-  "canceled",
-  "timed_out",
-]);
 
 /** The Runtime-owned identity of an acquired Session lease. */
 export interface RuntimeLeaseBinding {

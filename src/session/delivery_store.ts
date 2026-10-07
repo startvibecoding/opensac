@@ -108,6 +108,16 @@ function stringValue(value: string | null): string {
   return value ?? "";
 }
 
+/** Parses a stored JSON column, degrading to `undefined` on malformed input. */
+function decodeJSONColumn(value: string): unknown {
+  if (value === "") return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
 function requireConn(db: Database): NonNullable<Database["db"]> {
   if (db.db === null) {
     throw new Error("delivery database is not open");
@@ -766,9 +776,7 @@ function deliveryIntentFromRecord(
     platform: record.platform,
     targetId: record.targetId,
     replyMessageId: record.replyMessageId,
-    transportContext: record.transportContext === ""
-      ? undefined
-      : JSON.parse(record.transportContext),
+    transportContext: decodeJSONColumn(record.transportContext),
     status: record.status,
     createdAt: parseSessionTimestamp(record.createdAt),
     updatedAt: parseSessionTimestamp(record.updatedAt),
@@ -814,9 +822,7 @@ function deliveryOperationFromRecord(
     status: record.status,
     providerAssetId: record.providerAssetId,
     providerMessageId: record.providerMessageId,
-    providerState: record.providerState === ""
-      ? undefined
-      : JSON.parse(record.providerState),
+    providerState: decodeJSONColumn(record.providerState),
     attemptCount: record.attemptCount,
     nextAttemptAt: record.nextAttemptAt === null
       ? null

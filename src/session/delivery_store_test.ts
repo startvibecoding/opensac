@@ -1,6 +1,6 @@
 //
-// Deviation: the Go fixture creates a session through the (not yet ported)
-// Manager and a completed Run through `CreateSessionRun`. This port uses a
+// Deviation: the Go fixture creates a session through the Manager and a
+// completed Run through `CreateSessionRun`. This port uses a
 // literal session ID with the same completed Run.
 
 import { assert, assertEquals } from "@std/assert";

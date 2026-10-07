@@ -1,6 +1,6 @@
 //
-// Deviation: the Go fixture drives transcript writes through the (not yet
-// ported) Manager; these tests append entries/turns directly through the shared
+// Deviation: the Go fixture drives transcript writes through the Manager;
+// these tests append entries/turns directly through the shared
 // turn helpers and persist sessions/run rows through the DAO. The final
 // atomic-admission fixture is preserved with literal IDs and direct row counts.
 

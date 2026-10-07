@@ -1,10 +1,9 @@
-// (capability + event + sequenced
-// message projections).
+// Capability, event, and sequenced-message projections.
 //
 // These are the read/write projections adapters use to replay a session: the
 // persisted per-session capability snapshot, the run/capability lifecycle event
-// ledgers, and the cursor-paged message replay. The SQLite-backed `Manager`
-// (session.go) is still pending; these functions talk to the DAO directly.
+// ledgers, and the cursor-paged message replay. The SQLite-backed `Manager` in
+// `manager.ts` owns session state; these functions talk to the DAO directly.
 //
 // Deviations from Go: `json.RawMessage` maps to decoded `unknown` (parsed on
 // read, serialized on write), and `context.Context` is dropped because the DAO

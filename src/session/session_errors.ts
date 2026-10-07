@@ -1,7 +1,7 @@
-// (shared session error sentinels).
+// Shared session error sentinels.
 //
-// Only the sentinels needed by currently ported modules live here; the
-// remaining session.go errors move in with the Manager port.
+// The typed sentinels thrown by the session layer so callers can classify a
+// failure without matching on message text.
 
 /** Reports that a session was modified by another process since it was read. */
 export class SessionModifiedError extends Error {

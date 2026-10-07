@@ -1,5 +1,5 @@
 //
-// The Go tests create the session through the (not yet ported) Manager; the
+// The Go tests create the session through the Manager; the
 // tests here use direct DAO session/Run persistence plus the portable lease
 // surface, mirroring runtime_lock_test.ts.
 
