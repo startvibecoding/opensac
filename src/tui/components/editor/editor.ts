@@ -130,6 +130,15 @@ export class Editor {
   }
 
   /**
+   * Restores a solid (visible) caret. Used when a run ends and the blink stops:
+   * the idle editor keeps showing a steady caret without repainting to animate
+   * it, so the caret never stays stuck in the hidden blink phase.
+   */
+  showCursor(): void {
+    this.#cursorOn = true;
+  }
+
+  /**
    * Handles one key event by name; rune input goes through {@link insertText}.
    * Key names: enter, backspace, delete, left, right, up, down, home, end,
    * tab, ctrl+a, ctrl+e, ctrl+j, ctrl+k, ctrl+u, ctrl+w, alt+enter,

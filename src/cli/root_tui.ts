@@ -90,17 +90,34 @@ export function refreshWhenBusy(busy: boolean, rerender: () => void): void {
 }
 
 /**
- * Advances one cursor-blink frame: toggles the editor cursor and repaints.
- * The repaint is part of the blink because the busy refresh timer only runs
- * during a run; without it an idle editor would toggle `cursorOn` invisibly
- * and the cursor would never blink. Exported for tests.
+ * Advances one editor-caret frame and returns whether the caret is now in the
+ * blinking state.
+ *
+ * The caret blinks only while a run streams: the 100ms busy refresh timer
+ * already repaints the managed region during a run, so toggling `cursorOn` is
+ * enough to reveal the blink without scheduling a separate repaint. While idle
+ * the caret stays solid and nothing is repainted — forcing a periodic full
+ * repaint to animate an idle caret erased and redrew the whole managed block,
+ * which flashed on terminals without DEC 2026 synchronized output (the product
+ * does not need a cursor that blinks all the time). The single repaint on the
+ * busy→idle edge only restores a solid caret so it never stays hidden; after
+ * that the idle editor emits no repaint at all. Exported for tests.
  */
-export function blinkEditorCursor(
-  editor: { blinkCursor(): void },
-  rerender: () => void,
-): void {
-  editor.blinkCursor();
-  rerender();
+export function advanceEditorCaret(
+  editor: { blinkCursor(): void; showCursor(): void },
+  busy: boolean,
+  wasBlinking: boolean,
+  repaint: () => void,
+): boolean {
+  if (busy) {
+    editor.blinkCursor();
+    return true;
+  }
+  if (wasBlinking) {
+    editor.showCursor();
+    repaint();
+  }
+  return false;
 }
 
 /** Applies one width change to the editor (Go WindowSizeMsg →
@@ -235,9 +252,18 @@ export async function runInteractiveAction(
   const refreshTimer = setInterval(() => {
     refreshWhenBusy(session.busy, rerender);
   }, 100);
-  // Cursor blink for the editor input box.
+  // Cursor caret. It blinks only while a run streams (the 100ms refresh timer
+  // above repaints and reveals the toggle); an idle caret stays solid without a
+  // repaint, so it never flashes the whole managed block. `caretBlinking`
+  // tracks the busy→idle edge so the caret is restored solid exactly once.
+  let caretBlinking = false;
   const blinkTimer = setInterval(() => {
-    blinkEditorCursor(session.input.editor, rerender);
+    caretBlinking = advanceEditorCaret(
+      session.input.editor,
+      session.busy,
+      caretBlinking,
+      rerender,
+    );
   }, CURSOR_BLINK_INTERVAL_MS);
 
   const sessionEnded = Promise.withResolvers<void>();
