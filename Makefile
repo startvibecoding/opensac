@@ -19,11 +19,9 @@ DIST_DIR := dist
 NODE_DIR := $(DIST_DIR)/node
 DOCKER_TAG ?= local
 
-# GitHub Packages only accepts a package inside the owner's scope, so the scoped
-# build names the package `@owner/opensac` and publishes to that registry.
-# npmjs.org also needs a scope: the bare name `opensac` is rejected as too
-# similar to the existing `openai`, so `NODE_SCOPE=@<your-npm-username>` publishes
-# `@<your-npm-username>/opensac` there too.
+# The package publishes unscoped as `opensac-installer` (the bare `opensac` is
+# rejected by npm as too similar to `openai`). `NODE_SCOPE=@owner` is optional and
+# publishes `@owner/opensac-installer` instead; GitHub Packages requires it.
 NODE_SCOPE ?=
 
 # The product version follows the newest `v*` git tag, falling back to the
@@ -43,7 +41,7 @@ help:
 	@echo "  node-publish          Publish $(NODE_DIR) under the latest tag"
 	@echo "  node-publish-pre      Publish $(NODE_DIR) under the next tag"
 	@echo "  node-publish-github   Publish a scoped build to GitHub Packages (NODE_SCOPE=@owner)"
-	@echo "  (npmjs.org requires NODE_SCOPE=@you: the bare name collides with 'openai')"
+	@echo "  (npmjs publishes opensac-installer; the bare name 'opensac' collides with 'openai')"
 	@echo ""
 	@echo "Development targets:"
 	@echo "  install          Install the CLI globally from source"

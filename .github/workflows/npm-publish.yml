@@ -1,15 +1,15 @@
 name: Build and Publish npm Packages
 
 # A tag publishes the single platform-independent package to both registries an
-# opensac install can come from: GitHub Packages as `@<owner>/opensac`, and
-# npmjs.org as `@<NPM_SCOPE>/opensac`. Both are built from the same
-# `scripts/build_node.ts` the `make node-publish*` targets use. npmjs.org needs a
-# scope because the bare name `opensac` is rejected as too similar to `openai`.
+# opensac install can come from: GitHub Packages as `@<owner>/opensac-installer`,
+# and npmjs.org as the unscoped `opensac-installer` (the bare `opensac` is
+# rejected by npm as too similar to `openai`). Both are built from the same
+# `scripts/build_node.ts` the `make node-publish*` targets use.
 #
 # GitHub Packages needs no secret (it authenticates with GITHUB_TOKEN), so it
 # runs on every tag. The npmjs job is gated on the `PUBLISH_NPMJS` repository
-# variable (and requires `NPM_SCOPE` and the `NPM_TOKEN` secret), so a fork
-# without those still gets a working GitHub Packages release.
+# variable and the `NPM_TOKEN` secret, so a fork without those still gets a
+# working GitHub Packages release.
 
 on:
   push:
@@ -72,17 +72,11 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - name: Require the npm scope and token
-        env:
-          NPM_SCOPE: ${{ vars.NPM_SCOPE }}
+      - name: Require the npm token
         run: |
           set -euo pipefail
           if [ -z "${NODE_AUTH_TOKEN}" ]; then
             echo "::error::PUBLISH_NPMJS is enabled but the NPM_TOKEN secret is empty"
-            exit 1
-          fi
-          if [ -z "${NPM_SCOPE}" ]; then
-            echo "::error::PUBLISH_NPMJS is enabled but the NPM_SCOPE repository variable is empty (set it to @<your-npm-username>)"
             exit 1
           fi
 

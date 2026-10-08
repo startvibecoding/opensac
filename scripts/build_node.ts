@@ -15,8 +15,12 @@ import * as esbuild from "npm:esbuild@^0.28.2";
 import { dirname, fromFileUrl, join, resolve } from "@opensac/path";
 import { resolveBuildVersion, toPackageVersion } from "./version.ts";
 
-/** npm package name of the universal (platform-independent) package. */
-export const NODE_PACKAGE_NAME = "opensac";
+/**
+ * npm package name of the platform-independent package. The bare `opensac` is
+ * rejected by npm as too similar to `openai`, so the name stays
+ * `opensac-installer`; the installed command is still `opensac` (see `bin`).
+ */
+export const NODE_PACKAGE_NAME = "opensac-installer";
 
 /** Prefixes a package name with an npm scope (`@owner`), or returns it as-is. */
 export function scopedPackageName(name: string, scope?: string): string {
