@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { lookPathSync } from "../platform/platform.ts";
 import { normalizeTmpSize, pathsOverlap } from "./policy.ts";
 import { protectedGitPaths, uniquePaths } from "./git_paths.ts";

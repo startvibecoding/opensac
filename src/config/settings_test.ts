@@ -1,7 +1,7 @@
 // settings_sparse_test.go, settings_maintenance_test.go, manage_additions_test.go.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   defaultProviderConfig,
   defaultSettings,
@@ -153,13 +153,13 @@ Deno.test("defaultSettings", () => {
   assertEquals(s.retry, { enabled: true, maxRetries: 5, baseDelayMs: 3000 });
   assertEquals(s.core, {
     host: "127.0.0.1",
-    port: 4096,
+    port: 27183,
     auth: false,
     passwords: [],
   });
   assertEquals(resolveCoreConfig(s), {
     host: "127.0.0.1",
-    port: 4096,
+    port: 27183,
     auth: false,
     passwords: [],
   });

@@ -1,9 +1,9 @@
 // Focused tests for the ported cmd/mothx surface: ACP timeout resolution,
-// flag→RunOptions mapping, doctor projection, and the Cliffy command tree
+// flag→RunOptions mapping, doctor projection, and the command tree
 // dispatch. Subprocess/stdio behavior is covered by the ACP process test
 // (run_process_test.ts) which spawns `deno run src/main.ts acp`.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   defaultCLIOptions,
   parseGoDurationMs,
@@ -128,9 +128,8 @@ Deno.test("core dispatches bare start and the stop subcommand to their own runne
       });
     },
   };
-  // Regression: Cliffy resolves subcommands only when the parent action is
-  // registered before the subcommands. With the wrong order, `core stop`
-  // started a Core and bare `core` printed help.
+  // Regression: a bare `core` runs the host while `core stop` dispatches to
+  // the `stop` subcommand; the registration order must keep both working.
   await createCoreCommand("test-version", runners).parse([]);
   assertEquals(calls, ["start:test-version"]);
   calls.length = 0;

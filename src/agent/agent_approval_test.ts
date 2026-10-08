@@ -2,7 +2,7 @@
 // logic). The Agent-construction helpers are replaced with the minimal
 // ApprovalConfig view the decision now takes.
 
-import { assert } from "@std/assert";
+import { assert } from "@opensac/assert";
 import type { AllowConfig } from "../config/allow.ts";
 import type { ApprovalSettings, Settings } from "../config/settings.ts";
 import { needsApproval } from "./agent_approval.ts";

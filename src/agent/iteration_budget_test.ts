@@ -1,6 +1,6 @@
 // (pure cases).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import {
   contextWithIterationBudget,
   createIterationBudget,

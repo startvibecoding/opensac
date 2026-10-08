@@ -7,7 +7,7 @@
 // as the Core's OPENSAC_DIR, so its registration, lock, sessions, and database
 // stay isolated from the shared Core's state.
 
-import { join } from "@std/path";
+import { join } from "@opensac/path";
 import {
   CoreClient,
   type CoreClientOptions,

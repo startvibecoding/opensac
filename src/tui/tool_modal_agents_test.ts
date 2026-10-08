@@ -2,7 +2,11 @@
 // agent with the full activity snapshot (latest tool, thinking, response,
 // result, event timeline), mirroring the Go renderAgentActivity.
 
-import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
+import {
+  assertEquals,
+  assertStringIncludes,
+  assertThrows,
+} from "@opensac/assert";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";

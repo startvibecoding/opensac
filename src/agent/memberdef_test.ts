@@ -1,6 +1,6 @@
 // (pure cases).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { createMemberDefRegistry, type MemberDef } from "./memberdef.ts";
 
 function def(id: string, displayName = ""): MemberDef {

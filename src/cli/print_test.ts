@@ -8,8 +8,8 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
+} from "@opensac/assert";
+import { fromFileUrl, join } from "@opensac/path";
 import { defaultSettings } from "../config/settings.ts";
 import {
   createFakeTUIService,

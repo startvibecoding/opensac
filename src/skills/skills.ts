@@ -2,8 +2,8 @@
 // Go's io/fs + go:embed is replaced by a small `SkillFS` interface (used for
 // embedded built-in skills) plus direct Deno FS access for project/global dirs.
 
-import * as path from "@std/path";
-import * as posix from "@std/path/posix";
+import * as path from "@opensac/path";
+import * as posix from "@opensac/path/posix";
 import { loadGlobalSettingsSparse, skillsDisabled } from "../config/mod.ts";
 import { builtinFS as defaultBuiltinFS } from "./builtin.ts";
 

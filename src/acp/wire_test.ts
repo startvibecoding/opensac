@@ -1,7 +1,7 @@
 // Translated tests from internal/acp/acp_mcp_test.go for the ACP JSON-RPC
 // transport, plus focused coverage for the raw-id preservation helpers.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { RPCError } from "../mcp/rpc.ts";
 import {
   ACPLineReader,

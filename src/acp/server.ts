@@ -24,7 +24,7 @@
 
 import { createHash } from "node:crypto";
 import { isAbortError, isTimeoutError } from "../util/errors.ts";
-import { isAbsolute, normalize } from "@std/path";
+import { isAbsolute, normalize } from "@opensac/path";
 import {
   calculateCost,
   createUserMessage,

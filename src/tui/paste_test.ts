@@ -1,6 +1,6 @@
 // Focused tests for paste folding/expansion (Go handlePaste / expandPasteMarkers).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { PasteStore } from "./paste.ts";
 
 Deno.test("small pastes insert directly without a marker", () => {

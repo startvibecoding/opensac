@@ -1,7 +1,7 @@
 // (non-session
 // cases) and the Responses API cases in provider_test.go.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createProvider } from "../registry.ts";
 import {
   type ChatParams,

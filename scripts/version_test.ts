@@ -1,13 +1,11 @@
-import { assertEquals } from "@std/assert";
-import { join } from "@std/path";
+import { assertEquals } from "@opensac/assert";
+import { join } from "@opensac/path";
 import {
-  buildEnvFile,
-  compileArgs,
-  explicitBuildVersion,
   packageVersion,
   pickLatestVersionTag,
   resolveBuildVersion,
-} from "./build.ts";
+  toPackageVersion,
+} from "./version.ts";
 
 Deno.test("PickLatestVersionTagTakesNewestFirst", () => {
   assertEquals(
@@ -78,38 +76,10 @@ Deno.test("ResolveBuildVersionFallsBackToPackageVersion", async () => {
   }
 });
 
-Deno.test("BuildEnvFileCarriesBuildVersion", () => {
-  assertEquals(buildEnvFile("v1.2.3"), "OPENSAC_BUILD_VERSION=v1.2.3\n");
-});
-
-Deno.test("ExplicitBuildVersionOverridesTheGitTag", () => {
-  assertEquals(explicitBuildVersion(["--build-version=v9.9.9"]), "v9.9.9");
-  assertEquals(
-    explicitBuildVersion(["--target=linux-x64", "--build-version= v1.0.0 "]),
-    "v1.0.0",
-  );
-  // Absent means "resolve it the usual way", which the container image build
-  // relies on when it does not pass a tag.
-  assertEquals(explicitBuildVersion(["--all"]), undefined);
-  assertEquals(explicitBuildVersion([]), undefined);
-});
-
-Deno.test("ExplicitBuildVersionRejectsAnEmptyValue", () => {
-  let message = "";
-  try {
-    explicitBuildVersion(["--build-version="]);
-  } catch (error) {
-    message = error instanceof Error ? error.message : String(error);
-  }
-  assertEquals(message.includes("requires a version"), true, message);
-});
-
-Deno.test("CompileArgsEmbedEnvFileBeforeEntry", () => {
-  const args = compileArgs("/tmp/opensac-build.env");
-  assertEquals(args[0], "compile");
-  assertEquals(args[1], "-A");
-  assertEquals(args[2], "--env-file=/tmp/opensac-build.env");
-  assertEquals(args.at(-3), "-o");
-  assertEquals(args.at(-2), "bin/opensac");
-  assertEquals(args.at(-1), "src/main.ts");
+Deno.test("ToPackageVersionStripsTheVPrefixAndDirtySuffix", () => {
+  assertEquals(toPackageVersion("v1.2.3"), "1.2.3");
+  assertEquals(toPackageVersion("v1.2.3-dirty"), "1.2.3");
+  assertEquals(toPackageVersion("0.1.0"), "0.1.0");
+  assertEquals(toPackageVersion("  v2.0.0  "), "2.0.0");
+  assertEquals(toPackageVersion(""), "");
 });

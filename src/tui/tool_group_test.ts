@@ -3,7 +3,7 @@
 // count title, one indented branch per call, and a single scrollback commit
 // once the whole batch reaches a terminal state.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { render } from "ink";
 import type { Event } from "../agent/events.ts";
 import {

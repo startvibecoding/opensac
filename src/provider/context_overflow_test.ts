@@ -1,4 +1,4 @@
-import { assert } from "@std/assert";
+import { assert } from "@opensac/assert";
 import { isContextOverflowError } from "./mod.ts";
 
 Deno.test("IsContextOverflowError", () => {

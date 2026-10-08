@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreClient, type CoreLauncher } from "./client.ts";
 import { CoreLockBusyError } from "./lock.ts";

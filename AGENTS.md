@@ -19,12 +19,12 @@ Guidance for AI coding agents working in this repository. Read this file before 
 
 ## Project snapshot
 
-> **Scope note (verified against the tree).** This file describes the target architecture plus planned surfaces. As of the current checkout, only the Deno core ships: `src/`, `sdk/`, `examples/`, `bin/`, `npm/`, `scripts/`, `docs/proposal/`, and `docs/provider-model-list.md` exist. The following are **planned, not present**, and must not be treated as existing code to preserve or extend: the `desktop/` Electron app and every `desktop-*` task/target, the `pypi/` installer package, the WebUI front-end, and the bilingual `docs/en/`, `docs/zh/`, and `docs/changelog_online_*.md` trees. Where a rule below says "keep bilingual docs in sync" or "run `desktop` checks", it applies once those surfaces land; today the required checks are `deno task check`, `lint`, `fmt --check`, `test`, and `test:architecture`.
+> **Scope note (verified against the tree).** This file describes the target architecture plus planned surfaces. As of the current checkout, only the Deno core ships: `src/`, `sdk/`, `examples/`, `scripts/`, `docs/proposal/`, and `docs/provider-model-list.md` exist. The following are **planned, not present**, and must not be treated as existing code to preserve or extend: the `desktop/` Electron app and every `desktop-*` task/target, the `pypi/` installer package, the WebUI front-end, and the bilingual `docs/en/`, `docs/zh/`, and `docs/changelog_online_*.md` trees. Where a rule below says "keep bilingual docs in sync" or "run `desktop` checks", it applies once those surfaces land; today the required checks are `deno task check`, `lint`, `fmt --check`, `test`, and `test:architecture`, plus `deno task build:node`.
 
-- **Primary language:** Deno 2.9+ executing TypeScript 6 directly — no build step, no `tsconfig.json`, no bundler. `deno.json` holds tasks, formatter, linter, and compiler options; resolved dependency versions are pinned in `deno.lock` (commit it). The CLI is built with Cliffy (`@cliffy/command`); the TUI is built with Ink plus a terminal styling library.
+- **Primary language:** Deno 2.9+ executing TypeScript 6 directly — no build step and no `tsconfig.json` for development; releases are bundled to a single ESM file with esbuild (`scripts/build_node.ts`). `deno.json` holds tasks, formatter, linter, and compiler options; resolved dependency versions are pinned in `deno.lock` (commit it). The CLI parser is project-owned (`src/cli/command_parser.ts`); the TUI is built with Ink plus a terminal styling library.
 - **Frontend:** there is no bundled WebUI in this foundation; the current interactive surfaces are the Ink TUI and ACP clients. A future WebUI is a Core projection, not a backend.
 - **Desktop:** Electron + TypeScript in `desktop/`; this is a first-class, **pure ACP** client. It packages a source-built `opensac acp` runtime (a `deno compile` binary) and has its own React 19 + shadcn/ui + Tailwind CSS renderer (Vite-built classic scripts for `file://`); it neither starts an HTTP server nor embeds a web UI.
-- **Packaging:** npm installer packages under `npm/` (one package per platform, generated from `bin/` by `make npm-packages`) and a Python installer package under `pypi/`. `scripts/platforms.ts` is the single owner of the release platform table (Deno target triple, binary name, npm `os`/`cpu`); `scripts/build.ts` compiles from it and `scripts/build_npm_packages.ts` generates packages from it, so a platform can never be buildable but unpublishable. The `Makefile` is the release interface and `deno task` the development one.
+- **Packaging:** a single **platform-independent npm package** (plain JavaScript, one ESM bundle, no per-platform binaries). `scripts/build_node.ts` bundles `src/main.ts` with [esbuild](https://esbuild.github.io/) into `dist/node/bin/opensac.js`, `scripts/pack_node.ts` packs a tarball for inspection, and `scripts/npm_publish_if_needed.ts` publishes that directory; `scripts/version.ts` resolves the release version. The published CLI runs on **Node >= 22.5** (for `node:sqlite`). There are no `jsr:` dependencies and no per-platform binary pipeline (the earlier `dnt` build, `scripts/platforms.ts`, `scripts/build.ts` compile, `scripts/build_npm_packages.ts`, the `npm/` wrapper assets, and the `opensac-installer-*` packages were removed). The `Makefile` is the release interface (`node-build`/`node-pack`/`node-publish*`) and `deno task` the development one.
 - **Purpose:** OpenSAC (`opensac`) is a terminal AI coding assistant with provider adapters, streaming agent execution, tools, sessions, sandboxing, skills, workflows, and SDK support. The default shared runtime host is `opensac core`; ACP (`opensac acp`), the TUI, and CLI remain entry projections, and utility subcommands such as `doctor`, `stats`, `speedtest`, and `knowledge-mcp` remain available. Direct TUI/CLI/ACP runtime migration is a later phase.
 
 ## Important directories
@@ -52,9 +52,11 @@ Guidance for AI coding agents working in this repository. Read this file before 
 - `desktop/` — the primary desktop product: Electron main process (`main/`), restricted preload bridge (`preload/`), separate React/shadcn renderer (`renderer/`: `core/` DOM-free state + ACP actions bridged to React via `useSyncExternalStore`, `components/ui/` shadcn primitives, `views/` screens and settings panels), tests, runtime-vendoring/build scripts, and packaging configuration. `main/acp-client.ts` is the only ACP client; renderer code only uses `window.opensac` through the preload bridge.
 - `src/session/knowledge_*.ts`, `src/dao/knowledge_bases.ts`, and `src/agentruntime/knowledge_*.ts` — Runtime-owned managed knowledge bases: one private SQLite graph/FTS snapshot store per knowledge-base ID, DAO-only persistence, index orchestration, and bounded MCP evidence querying. See `docs/proposal/desktop-knowledge-base-agent-proposal.md`.
 - `docs/en/` and `docs/zh/` — bilingual documentation; `docs/en/changelog.md` and `docs/zh/changelog.md` accumulate release notes for all versions, while `docs/changelog_online_en.md` and `docs/changelog_online_zh.md` hold only the current version's changes.
-- `scripts/`, `npm/`, `pypi/`, `packaging/` — build and distribution tooling. `scripts/platforms.ts` owns the release platform table; `scripts/build.ts` compiles, `scripts/build_npm_packages.ts` generates npm packages, `scripts/npm_pack.ts` packs, and `scripts/npm_publish_if_needed.ts` / `scripts/npm_verify_platforms.ts` guard publication. Only `npm/package.json`, `npm/.npmignore`, and `npm/README.md` are tracked under `npm/`; `npm/packages/`, `npm/bin/`, and `npm/scripts/` are generated by `make npm-packages` and must not be hand-edited.
+- `scripts/` — build and release tooling. `scripts/build_node.ts` bundles the platform-independent npm package with esbuild → `dist/node/`, `scripts/pack_node.ts` packs it, `scripts/npm_publish_if_needed.ts` publishes it (skipping a version already on the registry), `scripts/version.ts` resolves the release version, and `scripts/gen_worker_sources.ts` regenerates the inlined worker sources. There is no per-platform binary pipeline anymore.
 - `bin/`, `dist/`, and generated package artifacts are build output; do not hand-edit them.
-- `src/platform/busybox_assets/` and `src/context/tokenizerdata/` — vendored third-party assets embedded into the compiled binary via `deno compile --include` (`busybox{32,64}u.exe` from [`rmyorston/busybox-w32`](https://github.com/rmyorston/busybox-w32); the DeepSeek V3 tokenizer JSON/conf from DeepSeek's official download). Each directory has a `README.md` describing its source, use, and update procedure; refresh both files of a pair together and rerun the owning module's tests (`deno test src/platform`, `deno test src/context`). Do not hand-edit the binary or JSON.
+- `src/compat/` — project-owned, Node-backed replacements for the JSR `@std/*` modules this repo used (`@opensac/path`, `@opensac/assert`, `@opensac/encoding/*`). They re-export `node:path`/`node:url`, `node:assert/strict`, and `node:buffer`, and are wired through the `deno.json` `imports` map. Add a member here (backed by a Node builtin) rather than reintroducing a JSR import.
+- `src/platform/node_compat.ts` — installs the Deno runtime APIs that `@deno/shim-deno` omits (`Deno.Command`, `Deno.serve`, `Deno.upgradeWebSocket`, `Deno.connect`, `Deno.createHttpClient`, `Deno.SeekMode`, `Deno.unrefTimer`, `Deno.resolveDns`, corrected `makeTemp{File,Dir}`, and the Web `Worker` global) so the same sources run under Node. It is imported for its side effect from `src/main.ts` and is a no-op on Deno; when adding a Deno API the shim does not cover, extend it here rather than branching per adapter.
+- `src/platform/busybox_assets/` and `src/context/tokenizerdata/` — vendored third-party assets (`busybox{32,64}u.exe` from [`rmyorston/busybox-w32`](https://github.com/rmyorston/busybox-w32); the DeepSeek V3 tokenizer JSON/conf from DeepSeek's official download). `scripts/build_node.ts` copies them beside the emitted JS so `new URL("./x", import.meta.url)` resolves under Node exactly as `deno compile --include` did. Each directory has a `README.md` describing its source, use, and update procedure; refresh both files of a pair together and rerun the owning module's tests (`deno test src/platform`, `deno test src/context`). Do not hand-edit the binary or JSON.
 
 ## Architecture notes
 
@@ -118,8 +120,10 @@ When a proposed change appears to require a new runtime, manager, lifecycle, res
 ## Build, test, run, and lint
 
 ```bash
-deno task build                     # deno compile -> bin/opensac for the current platform
-deno task run                       # build and run the TUI
+deno task start                     # run the CLI/TUI from source
+deno task run                       # alias of start
+deno task build:node                # esbuild -> dist/node (platform-independent npm package)
+deno task pack:node                 # build + npm pack into dist/npm/
 deno task install                   # deno install -g the CLI (passes --config; see below)
 deno task test                      # deno test
 deno test src/tools/                # focused module tests
@@ -130,17 +134,17 @@ deno task check                     # deno check (type check)
 deno task fuzz                      # property-based tests for src/esm, src/mcp, src/util
 ```
 
-Release work goes through the `Makefile`, which wraps the same commands and adds the multi-step targets (`make help` lists them):
+Release work goes through the `Makefile`, which wraps the same commands (`make help` lists them):
 
 ```bash
-make build                       # deno task build, for the current platform
-make build-linux                 # cross-compile linux-x64 + linux-arm64
-make build-all                   # every published platform into bin/
+make node-build                  # esbuild -> dist/node
+make node-pack                   # build + pack a tarball into dist/npm/ (publishes nothing)
+make node-publish                # build + publish dist/node under the latest tag
+make node-publish-pre            # same under the next tag
+make node-publish-github         # scoped build to GitHub Packages (NODE_SCOPE=@owner)
 make test                        # deno task test
 make check / lint / fmt          # same checks as the deno tasks
 make version                     # the version a build would embed
-make npm-packages                # generate npm/packages/ from bin/
-make npm-pack                    # pack tarballs into dist/npm/, publishing nothing
 ```
 
 `deno task install` must pass `--config deno.json`. `deno install -g` copies the entrypoint into the global bin directory, so without `--config` the local `deno.json` (and with it the `imports` map backing `@cliffy/command`, `ink`, `react`, and every other bare specifier) is not carried over, and the install fails with `Import "@cliffy/command" not a dependency`. Do not drop that flag.
@@ -161,12 +165,13 @@ deno task desktop-dist-dev-linux    # analogous mac/win targets exist
 
 Use focused tests first, then `deno task test` when the change crosses modules or affects concurrency. Run Desktop's `typecheck` plus focused `npm test` for Electron/renderer changes; use the Electron smoke test when modifying an ACP end-to-end flow. Run provider tests (`deno test src/provider/`) after provider/vendor changes. Run `deno task test:architecture` after moving production call sites of Agent construction or Run persistence. Knowledge-base changes require the focused `src/session`, `src/agentruntime`, `src/acp`, and `src/mcp` tests, plus the architecture guard when persistence/runtime boundaries move. Real process-boundary tests live with their modules (e.g. `src/agentruntime`, `src/acp`) and use the subprocess-helper pattern; keep them isolated with temp dirs and localhost addresses.
 
-Release and publishing targets (`make build-all`, `make npm-packages`, `make npm-pack`, `make npm-publish-all`, `make npm-publish-pre`, and the `deno task build:all` / `deno task npm:*` equivalents) are not normal development commands; run them only when explicitly requested. `make npm-publish-*` publishes to a shared registry and is irreversible: never run it without an explicit instruction, and prefer `make npm-pack` when you only need to inspect the artifacts.
+Release and publishing targets (`make node-build`, `make node-pack`, `make node-publish*`) are not normal development commands; run them only when explicitly requested. `make node-publish*` publishes to a shared registry and is irreversible: never run it without an explicit instruction, and prefer `make node-pack` when you only need to inspect the artifacts.
 
-The npm publish order is load-bearing and must not be rearranged: platform packages publish first, `npm-verify-platforms` then confirms every `optionalDependencies` entry exists on the registry, and only then does the entry package publish. npm resolves a missing optional dependency by silently skipping it, so publishing the entry package early yields an install that breaks on first run with no clear cause. `scripts/npm_publish_if_needed.ts` skips a version already on the registry so a re-run after a partial failure resumes instead of erroring, and it treats a non-404 registry response as a failure rather than as "not published".
+The npm package is a single platform-independent artifact, so the old platform-package publish ordering no longer applies. `scripts/npm_publish_if_needed.ts` skips a version already on the registry so a re-run after a partial failure resumes instead of erroring, and it treats a non-404 registry response as a failure rather than as "not published".
 
 ## Coding conventions and working rules
 
+- Imports must not add a `jsr:` dependency: this repository targets the Node runtime and uses `node:` builtins, npm packages, and the `src/compat/` shims. There are no `jsr:` imports left; do not add any, and prefer an npm/`node:` equivalent.
 - Read relevant files and nearby tests before editing; preserve unrelated user changes.
 - Prefer small, maintainable changes over broad refactors. Follow nearby naming, layout, and error-handling patterns.
 - In TypeScript, throw or return typed errors instead of exiting the process for normal control flow, thread `AbortSignal` through cancellable paths, keep exported interfaces stable, and format with `deno fmt`; `deno lint` must pass.
@@ -178,7 +183,7 @@ The npm publish order is load-bearing and must not be rearranged: platform packa
 - When changing Expert Teams, resolve bundles and decide forced multi-agent capability in `src/agentruntime`; persist only the session expert binding, test the bind/unbind/fork transition, and preserve the child-event/lead-run boundary.
 - When changing a knowledge base, keep all SQL and graph/FTS queries in `src/dao`, session APIs and per-base database ownership in `src/session`, and orchestration/MCP handlers in `src/agentruntime`. Add evidence, snapshot isolation, failure/cancellation, and bounded-result tests; update the ACP/Desktop capability projection only after the shared service exists.
 - Keep bilingual user-facing docs synchronized. While `docs/en/` and `docs/zh/` remain unplanned surfaces, the only bilingual contract in this tree is the TUI catalog: every message ID added to `src/tui/i18n.ts` must be present in both `catalogs.en` and `catalogs.zh`, because a missing key silently falls back to English and ships an untranslated string rather than failing. Once those doc trees land, append changelog entries for all versions to `docs/en/changelog.md` and `docs/zh/changelog.md`; keep `docs/changelog_online_en.md` and `docs/changelog_online_zh.md` holding only the current version's changes (replace their content with each new release).
-- When changing the release platform set, edit `scripts/platforms.ts` only, then run `deno test scripts/` and `make npm-packages`. Do not hardcode a platform list in a script, a manifest, or the npm wrapper's `PLATFORM_PACKAGES` map by hand; `make npm-packages` regenerates the wrapper's table and the entry manifest's `optionalDependencies` from the one table.
+- The release is one platform-independent npm package; do not reintroduce a platform matrix. Do not hand-edit `dist/node/` or `dist/npm/` (they are build output); change `scripts/build_node.ts` and rebuild.
 - Do not add license headers unless the surrounding file/project already uses them.
 - Do not create commits, tags, or pushes unless explicitly requested.
 
@@ -188,7 +193,7 @@ The npm publish order is load-bearing and must not be rearranged: platform packa
 - Do not rewrite shared remote history or use force-push equivalents.
 - Do not use privilege escalation (`sudo`, `su`, `doas`, `pkexec`).
 - Do not run destructive cleanup, resets, database drops, or bulk deletion without explicit approval.
-- Do not hand-edit generated output under `bin/`, `dist/`, `node_modules/`, `npm/packages/`, or `pypi/.venv-build/`.
+- Do not hand-edit generated output under `dist/` or `node_modules/`.
 - Do not change the `settings.json` schema or existing field semantics without a deliberate compatibility change.
 - Do not bypass `src/provider/factory` or put vendor behavior in CLI/ACP glue.
 - Do not open raw SQLite connections in new code; use the shared DB/session helpers.

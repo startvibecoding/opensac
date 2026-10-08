@@ -1,7 +1,7 @@
 // Focused unit tests for the parallel tool-launch start-order primitive. The Go
 // tool_launch_test.go exercises the same contract through the agent loop.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createToolLaunchOrder } from "./tool_launch.ts";
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | "timeout"> {

@@ -17,7 +17,7 @@
 // `session_events.ts`; and the conversation-turn boundary is owned by
 // `conversation_turn.ts`. This file wires them together behind the Manager.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   BindingDAO,
   type Database,

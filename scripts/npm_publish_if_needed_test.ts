@@ -1,5 +1,5 @@
-import { assertEquals, assertRejects, assertThrows } from "@std/assert";
-import { join } from "@std/path";
+import { assertEquals, assertRejects, assertThrows } from "@opensac/assert";
+import { join } from "@opensac/path";
 import {
   authHeader,
   isPublished,
@@ -32,8 +32,8 @@ function recordingFetch(
 
 Deno.test("PackumentUrlEncodesScopedNames", () => {
   assertEquals(
-    packumentUrl("https://registry.npmjs.org", "opensac-installer"),
-    "https://registry.npmjs.org/opensac-installer",
+    packumentUrl("https://registry.npmjs.org", "opensac"),
+    "https://registry.npmjs.org/opensac",
   );
   assertEquals(
     packumentUrl("https://registry.npmjs.org/", "@scope/pkg"),
@@ -52,13 +52,13 @@ Deno.test("RegistryCheckUsesThePackumentNotTheVersionRoute", async () => {
   const seen: { url?: string } = {};
   await isPublished(
     "https://npm.pkg.github.com",
-    "@scope/opensac-installer-linux-x64",
+    "@scope/opensac-linux-x64",
     "0.0.3",
     recordingFetch(404, {}, seen),
   );
   assertEquals(
     seen.url,
-    "https://npm.pkg.github.com/%40scope%2Fopensac-installer-linux-x64",
+    "https://npm.pkg.github.com/%40scope%2Fopensac-linux-x64",
   );
   if ((seen.url ?? "").includes("/0.0.3")) {
     throw new Error("the version route is not supported by GitHub Packages");
@@ -84,16 +84,16 @@ Deno.test("ReadPackageJsonRequiresNameAndVersion", async () => {
   try {
     await Deno.writeTextFile(
       join(dir, "package.json"),
-      JSON.stringify({ name: "opensac-installer", version: "1.0.0" }),
+      JSON.stringify({ name: "opensac", version: "1.0.0" }),
     );
     assertEquals(await readPackageJson(dir), {
-      name: "opensac-installer",
+      name: "opensac",
       version: "1.0.0",
     });
 
     await Deno.writeTextFile(
       join(dir, "package.json"),
-      JSON.stringify({ name: "opensac-installer" }),
+      JSON.stringify({ name: "opensac" }),
     );
     await assertRejects(
       () => readPackageJson(dir),
@@ -111,7 +111,7 @@ Deno.test("IsPublishedReadsTheVersionOutOfThePackument", async () => {
   assertEquals(
     await isPublished(
       registry,
-      "opensac-installer",
+      "opensac",
       "1.0.0",
       stubFetch(200, packument),
     ),
@@ -121,14 +121,14 @@ Deno.test("IsPublishedReadsTheVersionOutOfThePackument", async () => {
   assertEquals(
     await isPublished(
       registry,
-      "opensac-installer",
+      "opensac",
       "3.0.0",
       stubFetch(200, packument),
     ),
     false,
   );
   assertEquals(
-    await isPublished(registry, "opensac-installer", "1.0.0", stubFetch(404)),
+    await isPublished(registry, "opensac", "1.0.0", stubFetch(404)),
     false,
   );
 });
@@ -141,7 +141,7 @@ Deno.test("IsPublishedRejectsAPackumentWithoutAVersionsMap", async () => {
     () =>
       isPublished(
         "https://registry.npmjs.org",
-        "opensac-installer",
+        "opensac",
         "1.0.0",
         stubFetch(200, { error: "unauthorized" }),
       ),
@@ -158,7 +158,7 @@ Deno.test("IsPublishedRefusesToGuessOnAServerError", async () => {
     () =>
       isPublished(
         "https://registry.npmjs.org",
-        "opensac-installer",
+        "opensac",
         "1.0.0",
         stubFetch(500),
       ),
@@ -169,7 +169,7 @@ Deno.test("IsPublishedRefusesToGuessOnAServerError", async () => {
     () =>
       isPublished(
         "https://npm.pkg.github.com",
-        "@scope/opensac-installer",
+        "@scope/opensac",
         "1.0.0",
         stubFetch(405),
       ),

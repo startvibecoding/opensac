@@ -8,7 +8,7 @@
 // parameter schemas map to plain JSON values; and `Execute` is uniformly
 // `async` so filesystem/child-process tools share one signature.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import type { IterationBudget } from "../agent/iteration_budget.ts";
 import type { EventSink, RunContext } from "../agent/run_context.ts";

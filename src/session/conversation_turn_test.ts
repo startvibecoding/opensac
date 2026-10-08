@@ -4,7 +4,7 @@
 // Manager is replaced with direct function calls against a temp session
 // database.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import {
   ConversationTurnNotOpenError,

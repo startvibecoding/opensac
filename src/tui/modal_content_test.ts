@@ -3,7 +3,7 @@
 // window. These are the primitives behind the Ctrl+O/Ctrl+T performance
 // contract asserted in tool_modal_perf_test.ts.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   type ModalBlock,
   ModalContentCache,

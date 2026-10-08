@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import { boundedParallel } from "./parallel.ts";
 

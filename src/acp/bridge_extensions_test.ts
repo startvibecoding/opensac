@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import type { ACPRPCRequest } from "./wire.ts";
 import {
   type ACPBridgeContext,

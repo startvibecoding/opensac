@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { coreResult } from "../core/protocol.ts";
 import type { CoreRuntimeEvent } from "../core/runtime.ts";
 import type { ACPRPCRequest } from "./wire.ts";

@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { isGitDeniedPath } from "./git.ts";
 import type { Options } from "./sandbox.ts";
 

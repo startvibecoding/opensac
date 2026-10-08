@@ -5,8 +5,8 @@
 // test belongs to the CLI slice. Fixtures bind a mock provider catalog so a
 // session runtime is fully configured and call the handlers directly.
 
-import { assert, assertEquals, assertStrictEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertStrictEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   AcpServer,
   type AcpServerSink,

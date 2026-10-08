@@ -5,7 +5,7 @@
 // layout. They are split out of the Manager so the session-level wrappers over
 // the DAO layer can build on them.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   closeAll,
   type DB,

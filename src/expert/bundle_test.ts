@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   type Bundle,
   createMemoryFS,

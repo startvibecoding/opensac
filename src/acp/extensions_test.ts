@@ -1,7 +1,7 @@
 // Tests for the pure ACP extension projections
 // (internal/acp/extensions.go).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import type { Project } from "../session/projects.ts";
 import {
   acpProjectResult,

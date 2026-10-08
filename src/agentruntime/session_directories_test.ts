@@ -1,6 +1,6 @@
 // Focused tests for internal/agentruntime/session_directories.go.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { normalizeAdditionalDirectories } from "./session_directories.ts";
 
 Deno.test("NormalizeAdditionalDirectories cleans, dedupes, and sorts", () => {

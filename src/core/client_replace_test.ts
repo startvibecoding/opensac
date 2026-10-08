@@ -4,7 +4,7 @@
 // fixtures, and the behavior they cover (stopping a Core the client cannot
 // talk to) is a distinct policy from ordinary startup.
 
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects } from "@opensac/assert";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";

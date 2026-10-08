@@ -1,5 +1,10 @@
-import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "@opensac/assert";
+import * as path from "@opensac/path";
 import { CoreAuth } from "./auth.ts";
 import { type CoreCommandDependencies, startCoreCommand } from "../cli/core.ts";
 import { resolveCoreConfig } from "./config.ts";

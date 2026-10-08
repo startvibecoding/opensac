@@ -3,7 +3,7 @@
 // tables directly in the terminal. The browser opener is best-effort and
 // never fatal, matching the Go command.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   type Aggregate,
   DB,

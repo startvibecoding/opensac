@@ -1,7 +1,8 @@
 //
 // Package platform provides cross-platform compatibility utilities.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
+import { resourceUrl } from "./resources.ts";
 
 const APP_DIR_NAME = "opensac";
 
@@ -725,14 +726,14 @@ function busyboxAssetForArch(): { name: string; data: Uint8Array } | undefined {
       return {
         name: "busybox64u.exe",
         data: Deno.readFileSync(
-          new URL("./busybox_assets/busybox64u.exe", import.meta.url),
+          resourceUrl("platform/busybox_assets/busybox64u.exe"),
         ),
       };
     case "386":
       return {
         name: "busybox32u.exe",
         data: Deno.readFileSync(
-          new URL("./busybox_assets/busybox32u.exe", import.meta.url),
+          resourceUrl("platform/busybox_assets/busybox32u.exe"),
         ),
       };
     default:

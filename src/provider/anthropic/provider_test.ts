@@ -3,7 +3,7 @@
 // This port injects a fake `HttpClient` and builds plain Response-like objects
 // (the provider only reads `status`, `body`, and `text()`).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { HttpClient } from "../http_client.ts";
 import {
   cacheInfo,

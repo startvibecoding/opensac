@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { DecisionService } from "./decision.ts";
 import { RuntimeRun } from "./run_handle.ts";
 

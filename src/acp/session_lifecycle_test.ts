@@ -5,8 +5,8 @@
 // internal/acp/acp.go). Fixtures create real persisted sessions in a temp
 // session directory and call the handlers directly.
 
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   acpFailureRPCError,
   AcpServer,

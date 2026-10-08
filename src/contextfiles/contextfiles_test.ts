@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertFalse } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertFalse } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   buildContextString,
   defaultRuleContent,

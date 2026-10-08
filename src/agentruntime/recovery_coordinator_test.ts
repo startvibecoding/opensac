@@ -4,7 +4,7 @@
 // coordinator's startup scan, wake-driven convergence, idempotent start, and
 // coordinated stop over the shared recovery path.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
 import { getSessionRun, getSessionRunRecovery } from "../session/mod.ts";

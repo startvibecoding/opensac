@@ -4,7 +4,7 @@
 // Manager is replaced with direct entry slices so the portable replay engine is
 // exercised on its own.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   entryCompaction,
   entryContentOverride,

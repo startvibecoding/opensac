@@ -5,7 +5,7 @@
 // loss), and a fenced epoch bump blocks. Raw SQL lease fixtures are allowed in
 // tests (the DAO/DB rule governs production code).
 
-import { assert } from "@std/assert";
+import { assert } from "@opensac/assert";
 import type { BeforeToolExecuteContext } from "../agent/mod.ts";
 import type { ToolCallBlock } from "../provider/types.ts";
 import { createManager } from "../session/manager.ts";

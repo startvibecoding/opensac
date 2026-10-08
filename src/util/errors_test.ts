@@ -6,7 +6,7 @@
 // path), and a real cancel buried under a provider's `fetch failed` rename must
 // still be found (it would otherwise replay a stopped request).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   isAbortError,
   isAbortLike,

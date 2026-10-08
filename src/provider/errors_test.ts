@@ -6,7 +6,7 @@
 // point is that the real socket reason survives every wrap and reaches the
 // classifier readable rather than as the opaque "fetch failed".
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   errorChainText,
   isProviderTransportFailure,

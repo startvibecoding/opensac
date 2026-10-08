@@ -3,7 +3,7 @@
 // `Deno.writeTextFile({ createNew: true })`. The bundled skill and progressive
 // reference content is copied verbatim so authoring guidance stays in sync.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 
 /** The workflow authoring skill slug. */
 export const skillName = "workflow-javascript";

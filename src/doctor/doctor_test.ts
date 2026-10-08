@@ -1,5 +1,5 @@
-import { assertEquals, assertStrictEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assertEquals, assertStrictEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   defaultSettings,
   type ModelConfig,

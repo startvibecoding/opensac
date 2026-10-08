@@ -5,7 +5,12 @@
 // The tests isolated under a temp OPENSAC_DIR so default-session creation never
 // touches the developer's real config directory.
 
-import { assert, assertEquals, assertFalse, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertFalse,
+  assertThrows,
+} from "@opensac/assert";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import type { Model } from "../provider/types.ts";
 import { createMockProvider, type MockProvider } from "../provider/mock.ts";

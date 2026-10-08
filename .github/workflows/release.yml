@@ -1,9 +1,8 @@
 name: Build and Publish Release
 
-# A `v*` tag is the release: every artifact below is built from that tag's
-# commit and carries the tag as its version, so a release can only be cut from
-# a tagged commit and the GitHub Release, the binaries, and the npm tarballs
-# can never describe different code.
+# A `v*` tag is the release. The only product artifact is the single
+# platform-independent npm package built from that tag's commit, so the GitHub
+# Release and the npm package can never describe different code.
 
 on:
   push:
@@ -23,86 +22,11 @@ env:
   # Pinned so a release is reproducible and matches the version this repository
   # is developed against; setup-deno also caches DENO_DIR between runs.
   DENO_VERSION: "2.9.7"
+  NODE_VERSION: "22"
 
 jobs:
-  # The platform matrix comes from scripts/platforms.ts, the one owner of the
-  # release platform table, so adding a platform there is enough to have it
-  # built and attached to the release.
-  plan:
-    name: Plan release platforms
-    runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-    outputs:
-      platforms: ${{ steps.plan.outputs.platforms }}
-    steps:
-      - name: Checkout the tag
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ env.RELEASE_TAG }}
-
-      - name: Set up Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-
-      - name: Read the platform table
-        id: plan
-        run: |
-          set -euo pipefail
-          echo "platforms=$(deno eval --quiet 'import { PLATFORM_TARGETS } from "./scripts/platforms.ts"; console.log(JSON.stringify(PLATFORM_TARGETS.map((t) => t.npmPlatform)));')" \
-            >> "${GITHUB_OUTPUT}"
-
-  build:
-    name: Build ${{ matrix.platform }}
-    needs: plan
-    runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-    strategy:
-      # One platform failing must not cancel the others: a partial bin/ is
-      # detected by the release job, not by losing five finished builds.
-      fail-fast: false
-      matrix:
-        platform: ${{ fromJson(needs.plan.outputs.platforms) }}
-    steps:
-      - name: Checkout the tag
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ env.RELEASE_TAG }}
-
-      - name: Set up Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-
-      - name: Verify the tag is the version a build embeds
-        run: |
-          set -euo pipefail
-          version="$(deno run -A scripts/build.ts --version)"
-          echo "tag=${RELEASE_TAG} build version=${version}"
-          if [ "${version}" != "${RELEASE_TAG}" ]; then
-            echo "::error::the newest v* tag (${version}) is not ${RELEASE_TAG};" \
-              "publishing this tag would ship another version's number"
-            exit 1
-          fi
-
-      - name: Compile ${{ matrix.platform }}
-        run: deno run -A scripts/build.ts --target=${{ matrix.platform }}
-
-      - name: Upload the binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: bin-${{ matrix.platform }}
-          path: bin/
-          if-no-files-found: error
-          retention-days: 1
-
   release:
-    name: Create the GitHub Release
-    needs: [build]
+    name: Build the npm package and cut the release
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -121,44 +45,29 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Collect every platform binary
-        uses: actions/download-artifact@v4
-        with:
-          pattern: bin-*
-          merge-multiple: true
-          path: bin
-
-      - name: Fail unless every published platform was built
+      - name: Verify the tag is the version a build embeds
         run: |
           set -euo pipefail
-          deno eval --quiet \
-            'import { PLATFORM_TARGETS } from "./scripts/platforms.ts";
-             const missing = [];
-             for (const t of PLATFORM_TARGETS) {
-               try {
-                 const info = await Deno.stat(`bin/${t.binary}`);
-                 if (!info.isFile || info.size === 0) missing.push(t.binary);
-               } catch {
-                 missing.push(t.binary);
-               }
-             }
-             if (missing.length > 0) {
-               console.error(`Missing build output: ${missing.join(", ")}`);
-               Deno.exit(1);
-             }'
+          version="$(deno run -A scripts/version.ts)"
+          echo "tag=${RELEASE_TAG} build version=${version}"
+          if [ "${version}" != "${RELEASE_TAG}" ]; then
+            echo "::error::the newest v* tag (${version}) is not ${RELEASE_TAG};" \
+              "publishing this tag would ship another version's number"
+            exit 1
+          fi
 
-      - name: Generate the npm packages
-        run: make npm-packages
+      - name: Build the platform-independent npm package
+        run: deno task build:node
 
-      - name: Pack the npm tarballs
-        run: make npm-pack
+      - name: Pack the npm tarball
+        run: deno task pack:node
 
-      - name: Checksum every artifact
+      - name: Checksum the artifact
         run: |
           set -euo pipefail
-          find bin dist/npm -type f | LC_ALL=C sort | xargs sha256sum > checksums.txt
+          find dist/npm -type f | LC_ALL=C sort | xargs sha256sum > checksums.txt
           cat checksums.txt
 
       - name: Create the GitHub Release
@@ -166,10 +75,9 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_TAG }}
-          # A dash in the tag marks a pre-release, matching `make npm-publish-pre`.
+          # A dash in the tag marks a pre-release, matching `make node-publish-pre`.
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           generate_release_notes: true
           files: |
-            bin/*
             dist/npm/*.tgz
             checksums.txt

@@ -12,7 +12,7 @@
 // with the `SessionRuntime` slice.
 
 import { createHash } from "node:crypto";
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
 import { generateID } from "../session/entry.ts";
 import { queryRootDatabase, writeRootDatabase } from "../session/database.ts";

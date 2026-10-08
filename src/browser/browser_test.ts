@@ -1,6 +1,6 @@
 // for the ported protocol/client surface.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { Image } from "imagescript";
 import { createManager } from "../skills/mod.ts";
 import { createRegistry } from "../tools/tool.ts";

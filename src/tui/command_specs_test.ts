@@ -3,7 +3,7 @@
 // parser reproduces handleCommand's dispatch prologue (strings.Fields,
 // /skill: prefix, slash commands, plain text).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   commandSpecs,
   findCommandSpec,

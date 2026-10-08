@@ -4,8 +4,8 @@
 // listing/detail projection, open/reload, sub-agent table isolation, deletion,
 // content overrides, and additional-directory bindings.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { closeAll } from "../db/mod.ts";
 import {
   type ContentBlock,

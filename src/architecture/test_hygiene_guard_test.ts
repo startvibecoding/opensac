@@ -1,5 +1,5 @@
-import { assertEquals } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { assertEquals } from "@opensac/assert";
+import { fromFileUrl } from "@opensac/path";
 import { legacyTestAllowlist, legacyTestBoundaryViolations } from "./guard.ts";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));

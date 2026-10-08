@@ -1,7 +1,7 @@
 // (the deterministic
 // accuracy test; the Go benchmarks were not translated).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { deepSeekTokenCount } from "./deepseek_tokenizer.ts";
 import type { Message } from "../provider/types.ts";
 import { GenericTokenEstimator } from "./mod.ts";

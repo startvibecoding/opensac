@@ -4,8 +4,8 @@
 // temp OPENSAC_DIR and verifies the initialize handshake over real stdio, the
 // startup error line for an unconfigured provider, and clean EOF shutdown.
 
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { CorePaths } from "../core/paths.ts";
 import { CoreRegistry } from "../core/registry.ts";
 
@@ -244,7 +244,7 @@ Deno.test("acp subprocess routes project extensions through Core", async () => {
   assertEquals(listed?.result?.projects?.[0]?.name, "CoreProject");
 });
 
-Deno.test("acp subprocess --help is served by cliffy", async () => {
+Deno.test("acp subprocess --help is served by the CLI parser", async () => {
   const result = await runAcp([], {}, undefined);
   // Empty stdin with no provider is the startup path; --help is checked via a
   // direct command instead to avoid the ACP preflight.

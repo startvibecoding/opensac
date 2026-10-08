@@ -1,4 +1,4 @@
-import { assert, assertRejects } from "@std/assert";
+import { assert, assertRejects } from "@opensac/assert";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import {
   defaultMaintenancePolicy,

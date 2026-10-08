@@ -1,7 +1,7 @@
 // internal/agentruntime/delivery_coordinator_test.go, plus focused coverage for
 // `deliveryOperationText`.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   ATTACHMENT_AUDIO,
   ATTACHMENT_IMAGE,

@@ -6,7 +6,7 @@
 // saw only "send request: fetch failed", which no rule matched, so a plain
 // connection blip terminalized a live run instead of reporting and retrying.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { isAbortLike } from "../util/errors.ts";
 import { errorChainText, wrapError } from "./errors.ts";
 import { isRetryable, retryErrorDetail } from "./retry.ts";

@@ -2,10 +2,10 @@
 // Real stdio MCP handshakes against shell fixtures (Unix only), plus the
 // command-resolution and environment helpers.
 
-import { assert, assertEquals } from "@std/assert";
-import { encodeBase64 } from "@std/encoding/base64";
+import { assert, assertEquals } from "@opensac/assert";
+import { encodeBase64 } from "@opensac/encoding/base64";
 import { Image } from "imagescript";
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
 import {

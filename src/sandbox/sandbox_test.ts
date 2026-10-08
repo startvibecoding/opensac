@@ -1,6 +1,6 @@
 // (bwrap cases live in bwrap_test.ts).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import {
   createManager,
   createNoneSandbox,

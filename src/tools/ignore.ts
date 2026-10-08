@@ -6,7 +6,7 @@
 // probe runs through `Deno.Command` and silently falls back to the well-known
 // paths when git is unavailable.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { GlobSet } from "./globset.ts";
 
 /** The compiled ignore patterns for a single directory. */

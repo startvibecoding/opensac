@@ -1,8 +1,8 @@
 name: Build and Push GHCR Images
 
-# The image is built from the same Dockerfile as `make docker-build` and from the
-# same platform table, so a tag exists in three places at once: the GitHub
-# Release binaries, the npm packages, and the container image.
+# The image is built from the same Dockerfile as `make docker-build`, and the
+# runtime image installs the same platform-independent npm package a tag
+# publishes, so an image and an npm install of one tag report the same version.
 
 on:
   push:

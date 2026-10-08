@@ -7,7 +7,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue } from "node:sqlite";
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   isSQLiteBusy,
   isSQLiteReadOnly,

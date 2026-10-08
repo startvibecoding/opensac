@@ -5,7 +5,7 @@
 // retained as a detached remote execution. `context.Context` maps to
 // `AbortSignal`, so `context.DeadlineExceeded` maps to a `TimeoutError` reason.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission as sessionAcquireExecutionAdmission,

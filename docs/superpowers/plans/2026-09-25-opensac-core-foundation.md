@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Core is unique per user, machine, and `OPENSAC_DIR` state root.
-- Default Core host is `127.0.0.1`; default port is `4096`; port `0` requests an OS-selected port.
+- Default Core host is `127.0.0.1`; default port is `27183`; port `0` requests an OS-selected port.
 - `auth: false` disables password validation; `auth: true` requires a non-empty `passwords` array; any configured password matches.
 - Passwords never appear in the registration file or URL.
 - Use JSON-RPC 2.0; do not add HTTP/3, WebTransport, or an external HTTP framework.
@@ -56,13 +56,13 @@ Add tests that assert:
 const settings = defaultSettings();
 assertEquals(settings.core, {
   host: "127.0.0.1",
-  port: 4096,
+  port: 27183,
   auth: false,
   passwords: [],
 });
 assertEquals(resolveCoreConfig(settings), {
   host: "127.0.0.1",
-  port: 4096,
+  port: 27183,
   auth: false,
   passwords: [],
 });
@@ -102,7 +102,7 @@ export interface ResolvedCoreConfig {
 
 export const defaultCoreConfig = (): ResolvedCoreConfig => ({
   host: "127.0.0.1",
-  port: 4096,
+  port: 27183,
   auth: false,
   passwords: [],
 });

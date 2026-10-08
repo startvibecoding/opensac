@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@opensac/assert";
 import { createClawHubClient } from "./clawhub.ts";
 import { clientsForSettings } from "./factory.ts";
 import { jsonResponse, startServer } from "./test_helpers.ts";

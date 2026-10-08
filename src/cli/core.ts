@@ -67,7 +67,7 @@ export interface CoreCommandOptions {
   signal?: AbortSignal;
 }
 
-/** The small lifecycle surface used by callers and by the Cliffy action. */
+/** The small lifecycle surface used by callers and by the CLI action. */
 export interface CoreCommandHandle {
   /** The URL exposed by the running Core HTTP server. */
   readonly url: string;

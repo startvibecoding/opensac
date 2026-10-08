@@ -5,7 +5,7 @@ import {
   assertNotStrictEquals,
   assertStrictEquals,
   assertThrows,
-} from "@std/assert";
+} from "@opensac/assert";
 import type { Message, ToolCallBlock } from "../provider/types.ts";
 import type { Settings } from "../config/settings.ts";
 import { createMockProvider } from "../provider/mock.ts";

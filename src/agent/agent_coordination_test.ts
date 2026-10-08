@@ -8,7 +8,7 @@
 // are projected as "the context-aware send refuses to deliver to a cancelled
 // run", which is the observable guarantee that unblocks a cancelled run.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { AllowConfig } from "../config/allow.ts";
 import type { ApprovalSettings } from "../config/settings.ts";
 import { EventChannel } from "./event_channel.ts";

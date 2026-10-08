@@ -1,6 +1,6 @@
 // Test for the ported internal/session/input_resources.go public surface.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import {
   listInputResourceEvents,

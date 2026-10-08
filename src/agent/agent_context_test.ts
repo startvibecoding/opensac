@@ -6,7 +6,7 @@ import {
   assertEquals,
   assertNotStrictEquals,
   assertStrictEquals,
-} from "@std/assert";
+} from "@opensac/assert";
 import type {
   ContentBlock,
   Message,

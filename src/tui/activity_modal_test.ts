@@ -2,7 +2,7 @@
 // its renderers, and the tool-modal state/geometry (scrolling, target
 // switching, chrome math, framed rendering).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   AgentActivityStore,
   formatActivityAge,

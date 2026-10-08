@@ -3,7 +3,7 @@
 // canonical runs directly (foreign-key enforcement is off and a session with no
 // lease row skips lease validation), matching the session run-store tests.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { createSessionRun, type SessionRun } from "../session/run_store.ts";
 import { saveSessionRunEvent } from "../session/session_events.ts";

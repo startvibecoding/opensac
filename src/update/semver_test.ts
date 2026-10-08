@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { canonical, compare, isValid } from "./semver.ts";
 
 // TestSemverIsValid pins the x/mod/semver parse rules the update package relies

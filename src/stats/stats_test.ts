@@ -2,8 +2,8 @@
 // Raw INSERTs in the Go tests map to StatsDAO.insert over the shared
 // connection; the test never constructs SQL itself.
 
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { StatsDAO, type StatsRecord } from "../dao/mod.ts";
 import { closeDatabases, openBunDatabase } from "../session/mod.ts";
 import { dashboardHTML, opensacSmallICO } from "./assets.ts";

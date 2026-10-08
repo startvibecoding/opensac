@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import type { SessionRunEvent } from "../session/session_events.ts";
 import { replayRunEvents, replayRunEventsJSON } from "./run_replay.ts";
 import { RUN_STATE_COMPLETED, RUN_STATE_RUNNING } from "./run_state.ts";

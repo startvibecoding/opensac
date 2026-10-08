@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { withIsolatedConfig } from "./test_helpers.ts";
 
 Deno.test("isolated config restores the caller's config directory", async () => {

@@ -3,7 +3,7 @@
 // `AcpServer`, bind an in-memory sink, and call `handleAgentEvent` directly,
 // mirroring the Go fixture server.
 
-import { assert, assertEquals, assertStrictEquals } from "@std/assert";
+import { assert, assertEquals, assertStrictEquals } from "@opensac/assert";
 import {
   AcpServer,
   type AcpServerSink,

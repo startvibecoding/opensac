@@ -4,7 +4,7 @@
 // single-threaded: the claim is atomic at the SQL level, so a second claim in the
 // same thread must lose exactly as a racing goroutine would.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { createCronID, runningLeaseTimeoutMs } from "./cron.ts";
 import { createSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
 

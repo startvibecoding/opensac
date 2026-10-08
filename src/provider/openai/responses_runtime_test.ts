@@ -6,7 +6,7 @@
 // Manager; foreign-key enforcement is off and a session with no lease row skips
 // lease validation, so these tests use a literal session ID.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../../db/mod.ts";
 import { getResponseTurn } from "../../session/mod.ts";
 import { type ResponseRun } from "../../session/mod.ts";

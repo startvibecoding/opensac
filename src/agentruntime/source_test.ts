@@ -3,7 +3,12 @@
 // The Go `TestSessionRuntimeRejectsMutationAfterClose` case is deferred until
 // the `SessionRuntime`/`Builder` port lands later in backlog #26.
 
-import { assert, assertEquals, assertFalse, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertFalse,
+  assertThrows,
+} from "@opensac/assert";
 import type { Binding } from "../session/bindings.ts";
 import type { Header } from "../session/entry.ts";
 import {

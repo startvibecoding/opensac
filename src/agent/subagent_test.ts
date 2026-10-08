@@ -1,6 +1,11 @@
 // (the tool-surface, status/send/destroy, and parameter-validation cases).
 
-import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "@opensac/assert";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import type { Tool } from "../tools/tool.ts";
 import { createRegistry } from "../tools/tool.ts";

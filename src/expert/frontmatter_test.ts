@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import { createFrontmatter, type Frontmatter } from "./expert.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
 

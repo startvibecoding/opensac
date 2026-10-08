@@ -1,6 +1,6 @@
 // (package dao internal test).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   knowledgeFTSHasTokenRune,
   knowledgeFTSIndexText,

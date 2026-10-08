@@ -1,6 +1,6 @@
 // delivery-event coverage from delivery_events.go.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   createDeliveryPendingEvent,
   deliveryPendingData,

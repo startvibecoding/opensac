@@ -1,5 +1,5 @@
-import { assert } from "@std/assert";
-import * as path from "@std/path";
+import { assert } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   addBashCommand,
   addBashPrefix,

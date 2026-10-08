@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { defaultSettings, type Settings } from "../../config/mod.ts";
 import { MockProvider } from "../mock.ts";
 import type { Model } from "../types.ts";

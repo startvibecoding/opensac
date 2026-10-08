@@ -1,13 +1,13 @@
 // Publishes one npm package, skipping it when that version already exists.
 //
-// A release publishes the platform packages, the entry package, and sometimes
-// both again for a pre-release tag. Re-running must not fail on the versions
-// that already landed, so each package is checked against the registry first.
+// A release publishes the single platform-independent package, and often again
+// for a pre-release tag. Re-running must not fail on a version that already
+// landed, so the package is checked against the registry first.
 //
-// This script is a release tool: `make npm-publish*` is the only intended
+// This script is a release tool: `make node-publish*` is the only intended
 // entry point, and it publishes to the configured registry.
 
-import { join, resolve } from "@std/path";
+import { join, resolve } from "@opensac/path";
 
 export interface NpmPackageJson {
   name: string;

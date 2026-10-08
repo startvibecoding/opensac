@@ -6,7 +6,7 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
+} from "@opensac/assert";
 import type { ToolResult } from "../tools/tool.ts";
 import {
   createMemberMailbox,

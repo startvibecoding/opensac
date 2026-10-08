@@ -1,7 +1,7 @@
 // decision_replay_test.go, decision_resolver_test.go, decision_contract_test.go,
 // and decision_rehydrate_test.go.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import {
   DECISION_APPROVAL,
   DECISION_QUESTION,

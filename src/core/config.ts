@@ -19,7 +19,9 @@ export interface ResolvedCoreConfig {
 /** Returns a fresh Core configuration with the product defaults. */
 export const defaultCoreConfig = (): ResolvedCoreConfig => ({
   host: "127.0.0.1",
-  port: 4096,
+  // Deliberately uncommon: 4096 collides with other tools. 27183 is unassigned
+  // in IANA's service list and sits below the usual ephemeral range.
+  port: 27183,
   auth: false,
   passwords: [],
 });

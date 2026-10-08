@@ -5,7 +5,7 @@
 // success, and a run cancelled during the member wait terminalizes as
 // canceled).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { Provider } from "../provider/provider.ts";
 import {
   type ChatParams,

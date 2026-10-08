@@ -1,17 +1,17 @@
 // (`createRootCommand`, `createACPCommand`,
 // `registerRootFlags`, `registerACPFlags`, and the root action dispatch).
 //
-// The Cliffy command tree is thin: it maps flags into `CLIOptions` and calls
+// The command tree is thin: it maps flags into `CLIOptions` and calls
 // the shared runtime/doctor/Core/MCP entry points. The entry modes are ACP
 // (`opensac acp`), the shared Core host (`opensac core`), the interactive TUI
 // (the root action), and CLI print mode (`-P`); serve, channel, and A2A modes
 // are not part of this product.
 //
-// Cliffy 1.3 invokes an option `action` with a single parsed-options argument
-// (`{ camelCaseFlag: value }`), so every action below reads from that object
-// rather than treating the value as a positional parameter.
+// `command_parser.ts` invokes an option `action` with a single parsed-options
+// argument (`{ camelCaseFlag: value }`), so every action below reads from that
+// object rather than treating the value as a positional parameter.
 
-import { Command } from "@cliffy/command";
+import { Command } from "./command_parser.ts";
 import {
   type CLIOptions,
   defaultCLIOptions,
@@ -103,7 +103,7 @@ export function acpRunOptions(
   };
 }
 
-/** Adds the shared provider flags to a Cliffy command. */
+/** Adds the shared provider flags to a command. */
 // deno-lint-ignore no-explicit-any
 function sharedProviderFlags(cmd: any, flags: CLIOptions): any {
   return cmd
@@ -290,9 +290,8 @@ export function createCoreCommand(
       "Run the shared OpenSAC Core host in the foreground (manage it with status, start, restart, stop, pair)",
     )
     .noExit();
-  // Cliffy 1.3.x resolves subcommands only when the action is registered
-  // before the subcommands; registering `stop` first would run this action
-  // for `opensac core stop` and show help for bare `opensac core`.
+  // Register the bare action before the subcommands: `opensac core` runs the
+  // host while `opensac core stop` dispatches to `stop`.
   command.action(async () => {
     const exitCode = await start(version);
     if (exitCode !== 0) Deno.exit(exitCode);
@@ -603,6 +602,11 @@ function createKnowledgeMCPCommand(): any {
         action: (flags: ParsedFlags) => {
           const value = flags["knowledgeBase"];
           if (typeof value === "string") knowledgeBases.push(value);
+          else if (Array.isArray(value)) {
+            for (const item of value) {
+              if (typeof item === "string") knowledgeBases.push(item);
+            }
+          }
         },
       },
     )
@@ -794,8 +798,9 @@ export function createRootCommand(version = currentVersion()): Command {
   root
     .arguments("[prompt...]")
     .action(async (...args: unknown[]) => {
-      // Cliffy passes (options, ...args) to action; the last positional here
-      // is the flags object, preceding entries are the prompt words.
+      // The parser passes (options, ...positionals) to the action; the last
+      // positional here is the flags object, preceding entries are the prompt
+      // words.
       const values = args.filter((a) => typeof a === "string") as string[];
       const prompt = values.join(" ");
       if (flags.print) {

@@ -6,7 +6,7 @@
 // deferred to the execution-snapshot slice, and `context.DeadlineExceeded`
 // maps to a `TimeoutError` reason.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
 import {

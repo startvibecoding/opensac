@@ -1,5 +1,5 @@
 // deno-lint-ignore-file require-await -- async fake driver models the Promise-based executor seam
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   EVENT_QUESTION_REQUEST,
   EVENT_RUN_FINISHED,

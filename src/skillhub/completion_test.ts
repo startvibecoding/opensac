@@ -1,5 +1,5 @@
-import { assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { LocalIndex } from "./local.ts";
 import { Service } from "./service.ts";
 import { CountingClient, emptyDetail } from "./test_helpers.ts";

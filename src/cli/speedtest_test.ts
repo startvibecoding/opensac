@@ -2,7 +2,7 @@
 // parsing, target collection, token estimation, averaging/sorting, the table
 // projection, and the command path with an injected fake provider (no network).
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import {
   averageSpeedtestResults,
   collectSpeedtestTargets,

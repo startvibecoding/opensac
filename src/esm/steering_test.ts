@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { SteeringSource } from "./steering.ts";
 import { cleanup, makeStore } from "./test_helpers.ts";
 

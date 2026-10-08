@@ -3,7 +3,7 @@
 // records durable overrides so replay never re-sends them, and heals a turn
 // that already streamed visible output without duplicating it.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { Message } from "../provider/types.ts";
 import { createManager } from "../session/manager.ts";
 import type { Manager } from "../session/manager.ts";

@@ -1,6 +1,6 @@
 // Focused tests for the ported net/http DetectContentType sniffing subset.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { detectAttachmentMediaType, detectContentType } from "./media_type.ts";
 
 function decodeBase64(value: string): Uint8Array {

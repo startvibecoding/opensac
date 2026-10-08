@@ -3,7 +3,7 @@
 // *exec.Cmd and removes them from CleanupCommand. Deno has no such handle, so
 // the removal is attached to the returned CommandSpec's `cleanup` hook instead.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { lookPathSync, shellArgs, tempDir } from "../platform/platform.ts";
 import type { CommandSpec, ExecOpts, Options, Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";

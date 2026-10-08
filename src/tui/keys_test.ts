@@ -2,7 +2,7 @@
 // from Delete (Ink collapses both onto DEL), arrows/ctrl/alt decode, and
 // bracketed paste folds to one event.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { coalesceSplitPaste, splitInputChunk } from "./keys.ts";
 
 Deno.test("plain text chunk becomes one text event", () => {

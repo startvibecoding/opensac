@@ -1,7 +1,7 @@
 // Focused shell tests: raw stdin → editor/backspace/submit and a split paste.
 // Ink input requires a TTY, so the shell is mounted over a fake stdin/stdout.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import React from "react";
 import { EventEmitter } from "node:events";
 import { render } from "ink";

@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { projectDirName, projectPath, projectPathFor } from "./paths.ts";
 
 Deno.test("project directory name stays stable", () => {

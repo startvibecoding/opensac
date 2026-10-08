@@ -3,7 +3,7 @@
 // result state machine (dedup, matching, late stragglers, interruption
 // finalization), and per-tool summaries.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   formatLineRangesForDisplay,
   summarizeFileDiff,

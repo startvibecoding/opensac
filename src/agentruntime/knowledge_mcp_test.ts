@@ -6,8 +6,8 @@
 // Deno process. `TestKnowledgeMCPHandlerReturnsBoundedCitedSnapshotEvidence`
 // is translated directly.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { mcpProtocolVersion } from "../mcp/rpc.ts";
 import { serveStdio } from "../mcp/server.ts";
 import { createKnowledgeBase } from "../session/mod.ts";

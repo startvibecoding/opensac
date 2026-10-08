@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { roleWorker, Supervisor } from "./runtime_core.ts";
 import { statusActive } from "./state.ts";
 import { cleanup, makeStore, RuntimeTestAdapter } from "./test_helpers.ts";

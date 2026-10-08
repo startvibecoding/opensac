@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   hostedToolImageGeneration,
   hostedToolType,

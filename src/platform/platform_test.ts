@@ -2,7 +2,7 @@
 // and the system prompt must resolve the same shell. These cover the resolver
 // policy directly, on any host, by injecting the platform-dependent inputs.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   defaultShellForOS,
   isValidShell,

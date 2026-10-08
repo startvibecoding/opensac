@@ -2,7 +2,7 @@
 // rounded wire frame, list/detail/scope views, inline filter, pagination, and
 // install flow all run against a fake host with no network access.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { SkillHubPanel, type SkillHubPanelHost } from "./skillhub_panel.ts";
 import { Translator } from "./i18n.ts";
 import type { KeyEvent } from "./keys.ts";

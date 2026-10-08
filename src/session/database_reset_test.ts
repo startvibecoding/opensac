@@ -4,8 +4,8 @@
 // canonical session row is written directly through the DAO, which is the same
 // durable state the Manager persists.
 
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { SessionDAO } from "../dao/mod.ts";
 import { closeAll } from "../db/mod.ts";
 import {

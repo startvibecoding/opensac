@@ -5,7 +5,7 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
+} from "@opensac/assert";
 import { Runner } from "./runner.ts";
 import { createFileStore, FileStore } from "./store.ts";
 import {

@@ -5,7 +5,7 @@
 // SessionRuntime slice; here we cover the dependency guards that do not build an
 // Agent.
 
-import { assertThrows } from "@std/assert";
+import { assertThrows } from "@opensac/assert";
 import { defaultSettings } from "../config/settings.ts";
 import type { Provider } from "../provider/provider.ts";
 import {

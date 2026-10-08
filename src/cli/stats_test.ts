@@ -2,8 +2,8 @@
 // projection (tabwriter alignment), formatter helpers, and the web-server
 // path with an injected serve function (no real browser or listener).
 
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   defaultStatsOptions,
   executeStatsCommand,

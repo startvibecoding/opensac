@@ -3,8 +3,8 @@
 // Manager is replaced with direct DAO session/Run persistence so the portable
 // lease surface can be exercised on its own.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { closeAll } from "../db/mod.ts";
 import { RunDAO, RuntimeLeaseDAO, SessionDAO } from "../dao/mod.ts";
 import {

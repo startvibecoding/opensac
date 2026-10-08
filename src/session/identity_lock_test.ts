@@ -1,7 +1,7 @@
 // Tests for src/session/identity_lock.ts (no dedicated Go test file; this pins
 // serialization and eviction for one channel identity).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { createIdentityLocks } from "./identity_lock.ts";
 
 Deno.test("IdentityLocksSerializesOneIdentity", async () => {

@@ -1,6 +1,6 @@
 // Tests for the transcript/scrollback streaming skeleton.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { ReactElement } from "react";
 import { render } from "ink";
 import { MarkdownBlock, renderMarkdown, Transcript } from "./mod.ts";

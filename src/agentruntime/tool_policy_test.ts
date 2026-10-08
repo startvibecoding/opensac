@@ -1,6 +1,6 @@
 // for the `.EvaluateToolCall` method projection.
 
-import { assert, assertEquals, assertFalse } from "@std/assert";
+import { assert, assertEquals, assertFalse } from "@opensac/assert";
 import type { BeforeToolCallContext } from "../agent/agent.ts";
 import {
   type ExecutionPolicy,

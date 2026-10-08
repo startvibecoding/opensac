@@ -1,4 +1,9 @@
-import { assert, assertEquals, assertMatch, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertMatch,
+  assertThrows,
+} from "@opensac/assert";
 import {
   CORE_METHODS,
   coreError,

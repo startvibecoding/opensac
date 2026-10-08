@@ -1,6 +1,6 @@
 // Focused tests for the event-loop consumer (port of eventloop.go).
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import { type Event, EVENT_AGENT_END, EVENT_AGENT_START } from "./events.ts";
 import { consumeEvents, eventHandlerFunc } from "./eventloop.ts";
 

@@ -1,6 +1,6 @@
 // Translated/focused tests for the ACP request-metadata projections.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   formatEditorContext,
   requestEditorContext,

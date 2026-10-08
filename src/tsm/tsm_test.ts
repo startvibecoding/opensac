@@ -3,7 +3,7 @@
 // testing); see the note at the end of this file for the one intentional
 // deviation.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   computeIDs,
   createStream,

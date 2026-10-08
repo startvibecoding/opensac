@@ -4,7 +4,7 @@
 // continuation worker's canonical run events after /esm create and resume, and
 // Ctrl+O / Ctrl+E layouts must adapt to the terminal size.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService, type FakeTUIService } from "./service.ts";

@@ -5,8 +5,8 @@
 // `createAgentManager`, `createSession`, `DecisionService`). The canonical event
 // vocabulary arrives through `src/agentruntime/events.ts` instead.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import { fromFileUrl, join } from "@opensac/path";
 import {
   importSpecifiers,
   isTuiFrontendPath,

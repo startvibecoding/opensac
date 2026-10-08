@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects } from "@opensac/assert";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreAuth } from "./auth.ts";
 import { CORE_METHODS } from "./protocol.ts";

@@ -2,7 +2,7 @@
 // fed by the AppController (tools, thinking, nesting, interruption) plus its
 // module-level singleton helpers.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   ActivityManager,
   formatElapsed,

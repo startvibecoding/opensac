@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { ThinkSplitter } from "./think_split.ts";
 
 const open = "\u003cthink\u003e";

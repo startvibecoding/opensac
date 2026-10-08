@@ -1,6 +1,6 @@
 // Focused tests for the system-prompt builder.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { resolveBashShell } from "../platform/platform.ts";
 import { createBashTool } from "../tools/bash.ts";
 import { createRegistry, createRegistryWithConfig } from "../tools/tool.ts";

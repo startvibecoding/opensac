@@ -1,7 +1,7 @@
 // Focused tests for plan_view.ts: the checklist projection shared by the
 // transcript plan row and the Ctrl+T plan modal.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { Translator } from "./i18n.ts";
 import {
   planProgress,

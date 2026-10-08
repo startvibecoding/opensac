@@ -1,5 +1,5 @@
-import { decodeBase64, encodeBase64 } from "@std/encoding/base64";
-import * as path from "@std/path";
+import { decodeBase64, encodeBase64 } from "@opensac/encoding/base64";
+import * as path from "@opensac/path";
 import { AttachmentService } from "../agentruntime/input.ts";
 import {
   ATTACHMENT_AUDIO,

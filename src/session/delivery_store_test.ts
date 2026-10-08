@@ -3,7 +3,7 @@
 // completed Run through `CreateSessionRun`. This port uses a
 // literal session ID with the same completed Run.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { createSessionRun, type SessionRun } from "./run_store.ts";
 import {

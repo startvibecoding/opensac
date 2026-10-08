@@ -3,7 +3,7 @@
 // the image-admission cases from agent_test.go (ToolResultImageCapabilityGate,
 // ValidateImageRequestBudget*, SupportsImages).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { ContentBlock, Model } from "../provider/types.ts";
 import {
   createAssistantMessage,

@@ -2,7 +2,7 @@
 // errors), the RunHandle contract over DecisionService, terminal decision
 // status mapping, and resolve persistence commits.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import { decisionTerminalStatus, TuiRun } from "./tui_run.ts";
 import { DecisionService } from "../agentruntime/decision.ts";
 

@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { ensureProjectSkill, skillName } from "./skill.ts";
 
 Deno.test("ensureProjectSkill creates workflow skill", async () => {

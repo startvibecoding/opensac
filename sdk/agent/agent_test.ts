@@ -2,7 +2,7 @@
 // plus focused coverage for the pure helpers added by agent/types.go,
 // agent/provider.go, and agent/builder.go.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import {
   type Agent,
   boolPtr,

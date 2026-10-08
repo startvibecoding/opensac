@@ -1,9 +1,9 @@
 // Translated tests from internal/acp/acp_artifact_test.go and
 // internal/acp/acp_mcp_test.go for the ACP prompt/input conversion layer.
 
-import { assertEquals, assertThrows } from "@std/assert";
-import { encodeBase64 } from "@std/encoding/base64";
-import { join } from "@std/path";
+import { assertEquals, assertThrows } from "@opensac/assert";
+import { encodeBase64 } from "@opensac/encoding/base64";
+import { join } from "@opensac/path";
 import {
   acpAttachmentKind,
   ACPPromptContentError,

@@ -8,8 +8,8 @@ import {
   assertEquals,
   assertInstanceOf,
   assertThrows,
-} from "@std/assert";
-import * as path from "@std/path";
+} from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,

@@ -2,8 +2,8 @@
 // Faithful port except that `imageproc.prepareFile` is async, so `execute`
 // awaits it. Go's `encoding/base64` maps to `@std/encoding`.
 
-import { encodeBase64 } from "@std/encoding/base64";
-import * as path from "@std/path";
+import { encodeBase64 } from "@opensac/encoding/base64";
+import * as path from "@opensac/path";
 import {
   type Crop,
   type Mode,

@@ -4,8 +4,8 @@
 // the file-diff and atomic-write helpers, the file-lock manager, the globset/
 // ignore helpers, and the job manager.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import * as path from "@opensac/path";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
   BashTool,

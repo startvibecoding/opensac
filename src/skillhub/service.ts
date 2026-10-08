@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { projectSkillDirs } from "../skills/skills.ts";
 import { createMemoryCache, MemoryCache } from "./cache.ts";
 import { createClawHubClient } from "./clawhub.ts";

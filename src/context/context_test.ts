@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse } from "@std/assert";
+import { assert, assertEquals, assertFalse } from "@opensac/assert";
 import { createMockProvider, MockProvider } from "../provider/mock.ts";
 import type { Provider } from "../provider/provider.ts";
 import {

@@ -10,8 +10,8 @@ import {
   assertEquals,
   assertNotStrictEquals,
   assertStrictEquals,
-} from "@std/assert";
-import * as path from "@std/path";
+} from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   acpDecisionDeadlineMarks,
   AcpServer,

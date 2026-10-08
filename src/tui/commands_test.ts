@@ -2,7 +2,7 @@
 // mode/model/clear flows, session and expert routing, and help text. The host
 // is a recording stub so the dispatcher's routing is verified without a session.
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@opensac/assert";
 import {
   type CommandHost,
   type CommandResult,

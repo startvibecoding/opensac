@@ -78,7 +78,8 @@ deno task test    # deno test -A
 deno task lint    # deno lint
 deno task fmt     # deno fmt
 deno task start   # run src/main.ts
-deno task build   # deno compile -> bin/opensac (version = newest v* git tag)
+deno task build:node  # esbuild -> dist/node (platform-independent npm package)
+ deno task pack:node   # build + npm pack into dist/npm/
 ```
 
 Configuration lives in `deno.json` — tasks, formatter, linter, compiler options,
@@ -87,41 +88,31 @@ directly.
 
 ## Releases
 
-A `v*` git tag is the release. `.github/workflows/` turns one tag into the four
-artifacts a user can install from, all built from that tag's commit and all
-carrying the tag as their version:
-
-| Workflow | Result |
-| --- | --- |
-| `release.yml` | GitHub Release with the six platform binaries, the npm tarballs, and `checksums.txt` |
-| `npm-publish.yml` | `@<owner>/opensac-installer` on GitHub Packages, and `opensac-installer` on npmjs.org |
-| `ghcr-publish.yml` | `ghcr.io/<owner>/opensac` images (`ubuntu`, `debian`, and `alpine` variants) for `linux/amd64` and `linux/arm64` |
-
-The platform list is never written into a workflow: each one reads
-`scripts/platforms.ts`, the single owner of the release platform table, so adding
-a platform there is enough to have it built, published, and attached.
-
-`make` is the same interface locally, including the container image:
+A `v*` git tag is the release. It is published as a **single,
+platform-independent npm package** (plain JavaScript, no per-platform
+binaries), bundled with [esbuild](https://esbuild.github.io/) and run on Node >= 22.5:
 
 ```sh
-make build-all                     # every published platform into bin/
-make npm-packages                  # generate the npmjs package tree
-make npm-packages-github NPM_SCOPE=@owner   # the scoped GitHub Packages tree
-make npm-pack                      # tarballs into dist/npm/, publishing nothing
-make docker-build                  # build the image locally
+make node-build                    # esbuild -> dist/node
+make node-pack                     # tarball into dist/npm/, publishing nothing
+make node-publish                  # publish dist/node under the latest tag
 ```
 
-GitHub Packages authenticates with the workflow's own `GITHUB_TOKEN`, so it needs
-no configuration. Publishing to npmjs.org is opt-in: set the `PUBLISH_NPMJS`
-repository variable to `true` and add an `NPM_TOKEN` secret.
+The pushed tag produces a GitHub Release, the npm package, and the container
+image. `ghcr-publish.yml` still ships `ghcr.io/<owner>/opensac` for the shared
+Core host.
+
+> The earlier per-platform `opensac-installer-*` packages, their platform
+table (`scripts/platforms.ts`), and the `deno compile` binary pipeline have
+been removed; the single npm package is the only release artifact.
 
 ### Container image
 
 The image runs the shared Core host rather than the TUI, which has no terminal to
-draw in, and exposes the Core HTTP API on port 4096:
+draw in, and exposes the Core HTTP API on port 27183:
 
 ```sh
-docker run --rm -p 4096:4096 -v "$PWD:/workspace" -v opensac-state:/opensac \
+docker run --rm -p 27183:27183 -v "$PWD:/workspace" -v opensac-state:/opensac \
   ghcr.io/startvibecoding/opensac:v0.1.0
 ```
 
@@ -142,10 +133,14 @@ construction and row mapping belongs to `src/dao` (not yet ported).
 
 ## Permissions
 
-Deno programs are sandboxed. The compiled binary declares only the permissions
-it needs rather than using `-A` in production; development tasks use `-A` for
-convenience.
+Deno programs are sandboxed. Development tasks use `-A` for convenience; the
+published Node package runs on the Node runtime and needs no Deno permission
+flags.
 
 ## Dependencies
 
-Imports are pinned in `deno.lock`, which should be committed.
+The project targets the **Node runtime**: it depends on `node:` builtins, npm
+packages, and the project-owned `src/compat/` shims that replaced JSR `@std/*`.
+There are no `jsr:` imports; the CLI parser is the project-owned
+`src/cli/command_parser.ts` and the package is bundled with esbuild. Imports are
+pinned in `deno.lock`, which should be committed.

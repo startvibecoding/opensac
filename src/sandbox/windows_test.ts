@@ -1,7 +1,7 @@
 // (the Go package ships no Windows test,
 // so these cover the ported behaviour directly).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createWinSandbox, Level } from "./mod.ts";
 
 Deno.test("win sandbox reports unavailable", () => {

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file require-await -- async fake host models the Promise-based Runtime seam
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { CoreRuntimeDispatcher } from "./dispatcher.ts";
 import { CoreEventStream } from "./event_stream.ts";
 import type { CoreRpcParams } from "./protocol.ts";

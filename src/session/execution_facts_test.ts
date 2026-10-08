@@ -3,7 +3,7 @@
 // tests here use direct DAO session/Run persistence plus the portable lease
 // surface, mirroring runtime_lock_test.ts.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { RunDAO, SessionDAO } from "../dao/mod.ts";
 import {

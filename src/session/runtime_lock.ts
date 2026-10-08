@@ -12,7 +12,7 @@
 //   `setInterval` scheduler per session directory, unref'd so it never keeps
 //   the process alive on its own.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
 import { BUSY_TIMEOUT_MS } from "../db/mod.ts";
 import { CountedMutex, createLockRegistry } from "./lock_registry.ts";

@@ -1,7 +1,7 @@
 // Focused tests for the interactive dialog framework and the concrete panels:
 // cursor/search/input handling, and that each dialog mutates real state.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
 import { Dialog } from "./dialog.ts";
 import {
   AuthDialog,

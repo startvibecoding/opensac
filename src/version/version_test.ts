@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals } from "@std/assert";
+import { assertEquals, assertNotEquals } from "@opensac/assert";
 import { current, setVersion } from "./version.ts";
 
 Deno.test("CurrentUsesBuildVersion", () => {

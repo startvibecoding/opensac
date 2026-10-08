@@ -1,7 +1,7 @@
 // the workflow
 // AgentHost binding to AgentManager and the end-to-end workflow_run tool.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { defaultSettings } from "../config/settings.ts";
 import { createMockProvider } from "../provider/mock.ts";
 import {

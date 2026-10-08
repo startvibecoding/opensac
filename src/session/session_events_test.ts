@@ -5,7 +5,7 @@
 // Manager is replaced with direct DAO entry persistence and the portable
 // session_events functions.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { ConversationTurnDAO } from "../dao/mod.ts";
 import { createUserMessage } from "../provider/types.ts";

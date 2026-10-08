@@ -8,7 +8,7 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
+} from "@opensac/assert";
 import {
   createCancelTool,
   createLintTool,

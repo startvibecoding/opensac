@@ -1,8 +1,8 @@
 // (the large-file streaming case)
 // plus focused extras for the bash timeout and registry sandbox.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { BashTool, createRegistry, InsertTool } from "./mod.ts";
 import { createJobManager } from "./jobmanager.ts";
 import { createBashTool } from "./bash.ts";

@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import { defaultCoreConfig, resolveCoreConfig } from "./config.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 
@@ -12,13 +12,13 @@ function settingsWithCore(core: unknown): Settings {
 Deno.test("core configuration defaults", () => {
   assertEquals(defaultCoreConfig(), {
     host: "127.0.0.1",
-    port: 4096,
+    port: 27183,
     auth: false,
     passwords: [],
   });
   assertEquals(resolveCoreConfig(defaultSettings()), {
     host: "127.0.0.1",
-    port: 4096,
+    port: 27183,
     auth: false,
     passwords: [],
   });
@@ -58,7 +58,7 @@ Deno.test("core configuration rejects invalid values", () => {
       { port: -1 },
       { port: 65536 },
       { port: 1.5 },
-      { port: "4096" },
+      { port: "27183" },
       { port: null },
       { auth: "true" },
       { auth: 1 },

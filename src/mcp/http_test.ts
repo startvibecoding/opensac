@@ -1,7 +1,7 @@
 //
 // `net/http/httptest` maps to `Deno.serve` on an ephemeral localhost port.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
 import type { RPCRequest } from "./rpc.ts";

@@ -3,7 +3,7 @@
 // persistence so the portable binding surface is exercised without the
 // not-yet-ported session Manager.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
 import {

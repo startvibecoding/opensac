@@ -2,8 +2,8 @@
 // (`acquirePromptAdmission`). Fixtures construct an `AcpServer`, bind an
 // in-memory sink, and call the handlers directly.
 
-import { assertEquals, assertRejects } from "@std/assert";
-import * as path from "@std/path";
+import { assertEquals, assertRejects } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   ACPActiveSessionRunError,
   AcpServer,

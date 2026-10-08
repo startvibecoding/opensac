@@ -4,7 +4,7 @@
 // The Core-side delegate tool registration is covered by
 // `src/core/runtime_host_test.ts`.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService, type FakeTUIService } from "./service.ts";
 import { dispatchCommand } from "./commands.ts";

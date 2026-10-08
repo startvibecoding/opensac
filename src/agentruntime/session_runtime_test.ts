@@ -4,7 +4,12 @@
 // construction uses the ported camelCase API; `t.TempDir()` maps to
 // `Deno.makeTempDirSync`.
 
-import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "@opensac/assert";
 import type { Model } from "../provider/types.ts";
 import { thinkingHigh, thinkingMedium } from "../provider/types.ts";
 import { createMockProvider } from "../provider/mock.ts";

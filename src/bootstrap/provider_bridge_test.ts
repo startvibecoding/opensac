@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals } from "@std/assert";
+import { assertEquals, assertNotEquals } from "@opensac/assert";
 import {
   type ChatParams as PublicChatParams,
   type StreamEvent as PublicStreamEvent,

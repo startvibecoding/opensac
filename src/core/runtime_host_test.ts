@@ -4,9 +4,9 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
-import { encodeBase64 } from "@std/encoding/base64";
-import { join } from "@std/path";
+} from "@opensac/assert";
+import { encodeBase64 } from "@opensac/encoding/base64";
+import { join } from "@opensac/path";
 import {
   defaultSettings,
   getSessionDir,

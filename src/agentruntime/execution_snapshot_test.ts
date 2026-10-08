@@ -4,7 +4,7 @@
 // and verified-remote snapshot states. Raw SQL lease fixtures are allowed in
 // tests (the DAO/DB rule governs production code). `time.Time` maps to `Date`.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission,

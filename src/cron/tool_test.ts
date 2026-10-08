@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import type { CronJob } from "./cron.ts";
 import { createSessionScopedStore } from "./session_store.ts";
 import { createSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";

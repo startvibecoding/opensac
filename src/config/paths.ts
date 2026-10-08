@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 
 /** Project-level configuration directory name. */
 export const projectDirName = ".opensac";

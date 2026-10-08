@@ -3,7 +3,7 @@
 // public `Builder` constructs a real Agent, and the built agent must run one
 // full turn against a scripted public Provider through the bridge.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   eventAgentEnd,
   eventTextDelta,

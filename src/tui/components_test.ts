@@ -3,7 +3,7 @@
 // (logo + rounded info panel, responsive collapse), and the agent tab bar
 // (state icons, active highlighting, truncation, hidden when ≤1 agent).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   catalogs,
   parseConfigured,

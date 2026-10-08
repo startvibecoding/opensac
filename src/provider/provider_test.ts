@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists } from "@std/assert";
+import { assert, assertEquals, assertExists } from "@opensac/assert";
 import {
   BaseProvider,
   calculateCost,

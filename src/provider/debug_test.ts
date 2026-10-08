@@ -4,7 +4,7 @@
 // fallback path is exercised here with a BigInt argument (which JSON.stringify
 // cannot serialize), preserving the same fallback contract.
 
-import { assert } from "@std/assert";
+import { assert } from "@opensac/assert";
 import {
   debugCompleteResponse,
   debugJSON,

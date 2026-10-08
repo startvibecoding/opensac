@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { type MCPServer, saveMCPConfig } from "../config/mcp.ts";
 import { isTemplateServer, loadConfiguredServers } from "./config.ts";
 

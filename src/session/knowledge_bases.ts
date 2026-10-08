@@ -4,7 +4,7 @@
 // rebuildable graph/FTS SQLite store (see knowledge_database.ts); the source
 // directory is read-only and canonical Runs remain in sessions.db.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   KnowledgeBaseDAO,
   type KnowledgeBaseRecord,

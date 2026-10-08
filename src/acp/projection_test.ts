@@ -5,7 +5,7 @@
 // Deviations: `json.RawMessage` maps to decoded `unknown`; `nil` slices map to
 // empty arrays (both serialize identically under Go's `omitempty`).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import {
   type Event,
   EVENT_COMPACTION_END,

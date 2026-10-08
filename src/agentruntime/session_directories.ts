@@ -2,7 +2,7 @@
 // Validates the ACP directory-root contract: absolute, cleaned, deterministic
 // and duplicate-free paths. `path/filepath` maps to `@std/path`.
 
-import { isAbsolute, normalize } from "@std/path";
+import { isAbsolute, normalize } from "@opensac/path";
 
 /**
  * Validates the ACP directory-root contract: absolute, cleaned, deterministic

@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import type { Model } from "../provider/types.ts";
 import { resolveMaxTokens, resolveMaxTokensValue } from "./max_tokens.ts";
 

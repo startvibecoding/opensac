@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { type Family, type Hint, inferFamily, policyForHint } from "./mod.ts";
 
 Deno.test("inferFamily from default vision model IDs", () => {

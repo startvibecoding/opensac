@@ -3,8 +3,8 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
-import * as path from "@std/path";
+} from "@opensac/assert";
+import * as path from "@opensac/path";
 import { createClawHubClient } from "./clawhub.ts";
 import {
   installSkill,

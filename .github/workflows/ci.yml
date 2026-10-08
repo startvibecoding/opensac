@@ -33,6 +33,11 @@ jobs:
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       # Type check first: it is the cheapest signal and fails loudly on a broken
       # import graph before the slower suites run.
       - name: Type check
@@ -52,3 +57,8 @@ jobs:
 
       - name: Test
         run: deno task test
+
+      # The published artifact is a platform-independent Node package; build it
+      # here so a broken build pipeline fails CI rather than a release.
+      - name: Build the Node package
+        run: deno task build:node

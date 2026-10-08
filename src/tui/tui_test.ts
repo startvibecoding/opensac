@@ -1,6 +1,6 @@
 // Toolchain smoke test for the Ink + React TUI target.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { render } from "ink";
 import { App } from "./mod.ts";
 

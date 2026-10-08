@@ -1,6 +1,6 @@
 // Focused tests for the public ExternalTool -> internal Tool adapter.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import type {
   ExternalTool,
   ExternalToolPromptInfo,

@@ -5,7 +5,7 @@
 // `utf8.Valid` maps to `TextDecoder({fatal:true})` and `io` copy loops map to
 // `readSync`/`writeSync`.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   buildFileDiff,
   formatFileDiffSummary,

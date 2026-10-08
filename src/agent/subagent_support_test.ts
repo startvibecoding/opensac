@@ -1,7 +1,7 @@
 // Focused tests for the stateless subagent/manager helpers ported from
 // internal/agent (backlog #19).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import type { MemberDef } from "./memberdef.ts";
 import {
   appendUniqueAgentID,

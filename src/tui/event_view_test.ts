@@ -3,7 +3,7 @@
 // view replays the rows the simple view withheld — each row released to
 // terminal scrollback exactly once through Ink's append-only <Static>.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { render } from "ink";
 import { App } from "./app.tsx";
 import { AppController } from "./app_controller.ts";

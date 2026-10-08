@@ -5,7 +5,7 @@
 // semantics (late pushes are dropped while buffered events still drain), and
 // the AsyncIterable projection.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { EventChannel } from "./event_channel.ts";
 import { EVENT_AGENT_END, EVENT_AGENT_START } from "./events.ts";
 

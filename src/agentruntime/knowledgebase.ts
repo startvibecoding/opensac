@@ -21,7 +21,7 @@
 // a fixed extension table.
 
 import { createHash } from "node:crypto";
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import type { Settings } from "../config/settings.ts";
 import type { Provider } from "../provider/provider.ts";
 import type { Model, ThinkingLevel } from "../provider/types.ts";

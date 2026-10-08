@@ -4,7 +4,7 @@
 // local-time calendar arithmetic production uses (`cron` schedules from
 // `time.Now()`).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { parseSchedule } from "./schedule.ts";
 
 Deno.test("ParseScheduleEmpty", () => {

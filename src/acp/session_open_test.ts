@@ -7,8 +7,8 @@
 // constructs a provider catalog, `configureSessionBindings` deliberately leaves
 // those runtimes unbound (the documented unit-fixture behavior).
 
-import { assert, assertEquals } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { AcpServer, type AcpServerSink, ACPSessionRuntime } from "./server.ts";
 import { type ACPRPCRequest } from "./mod.ts";
 import type { Settings } from "../config/settings.ts";

@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 import { CoreLock, CoreLockBusyError } from "./lock.ts";

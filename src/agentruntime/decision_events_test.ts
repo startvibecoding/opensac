@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse } from "@std/assert";
+import { assert, assertEquals, assertFalse } from "@opensac/assert";
 import { DECISION_APPROVAL, DECISION_QUESTION } from "./decision.ts";
 import {
   buildDecisionEvent,

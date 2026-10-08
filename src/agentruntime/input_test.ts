@@ -3,7 +3,7 @@
 // (`AcceptProviderAttachment`, artifact collection) land with the
 // `SessionRuntime` slice; these cover the Runtime-owned private store directly.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import {
   ATTACHMENT_FILE,
   ATTACHMENT_IMAGE,

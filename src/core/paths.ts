@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 
 /**
  * Filesystem locations owned by the Core discovery/lock subsystem.

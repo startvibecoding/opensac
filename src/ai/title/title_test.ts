@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { Generator, maxTitleRunes, normalizeTitle } from "./title.ts";
 import {
   type ChatParams,

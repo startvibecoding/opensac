@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { presetModelConfig } from "./model_preset.ts";
 import { defaultProviderConfigsAll } from "./settings.ts";
 

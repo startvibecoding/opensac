@@ -2,7 +2,7 @@
 // provider: provider listing, default-model persistence, TUI language, cron
 // gating, and the clipboard reader's fallback behavior.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
 import { defaultSettings } from "../config/settings.ts";
 import { Translator } from "./i18n.ts";
 import { createFakeTUIService } from "./service.ts";

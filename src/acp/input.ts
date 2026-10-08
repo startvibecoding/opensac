@@ -11,8 +11,8 @@
 // maps to the optional `AbortSignal` threaded by `InputIngress.open`.
 
 import { createHash } from "node:crypto";
-import { isAbsolute, join, relative, resolve, SEPARATOR } from "@std/path";
-import { decodeBase64 } from "@std/encoding/base64";
+import { isAbsolute, join, relative, resolve, SEPARATOR } from "@opensac/path";
+import { decodeBase64 } from "@opensac/encoding/base64";
 import {
   ATTACHMENT_AUDIO,
   ATTACHMENT_FILE,

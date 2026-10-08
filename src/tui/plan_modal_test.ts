@@ -1,7 +1,7 @@
 // Ctrl+T plan modal: shows the current task plan in the same framed box as
 // the Ctrl+O tool modal.
 
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";

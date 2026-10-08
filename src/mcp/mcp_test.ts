@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { RPCError } from "./rpc.ts";
 import {
   type Callbacks,
@@ -236,7 +236,7 @@ Deno.test("classifyMCPBlock", () => {
 // display required). The Go tests embed a fixture PNG that the npm image codec
 // used by this port cannot decode, so the equivalent image is produced here.
 import { Image } from "imagescript";
-import { encodeBase64 } from "@std/encoding/base64";
+import { encodeBase64 } from "@opensac/encoding/base64";
 
 async function makeTestPNG(): Promise<Uint8Array> {
   const img = new Image(1, 1);

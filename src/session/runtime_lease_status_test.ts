@@ -2,7 +2,7 @@
 // The Manager-based holder setup is replaced with a direct lease row so the
 // preflight itself is exercised without the not-yet-ported session Manager.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
 import { openRootDB, rootDBPath } from "./root_db.ts";

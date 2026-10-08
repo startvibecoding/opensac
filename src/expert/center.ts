@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { projectPathFor } from "../config/mod.ts";
 import { configDir } from "../platform/platform.ts";
 import { builtinFS } from "./builtin.ts";

@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "@opensac/path";
 import { CoreClient } from "../core/client.ts";
 import { resolveCoreConfig } from "../core/config.ts";
 import {

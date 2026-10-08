@@ -3,7 +3,7 @@
 // runs through the session layer directly (the `RunStore` wrapper lands with the
 // `ExecutionRuntime` slice).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import {
   createSessionRun,

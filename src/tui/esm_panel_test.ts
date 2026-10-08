@@ -2,7 +2,7 @@
 // ESM panel rendering pipeline (phase/pipeline/progress math, field
 // wrapping, live activity lines, full panel assembly).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   stripANSI,
   truncateANSI,

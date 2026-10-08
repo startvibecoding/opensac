@@ -2,7 +2,7 @@
 // The legacy HTTP+SSE transport maps `httptest` + `http.Flusher` to a
 // `Deno.serve` response backed by a manually-driven `ReadableStream`.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
 import type { RPCRequest } from "./rpc.ts";

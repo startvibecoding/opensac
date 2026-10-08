@@ -1,8 +1,8 @@
 // (the Go package ships no env test, so these
 // cover the ported behaviour directly).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import * as path from "@opensac/path";
 import {
   applyEnvPatch,
   clearEnv,

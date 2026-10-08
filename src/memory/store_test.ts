@@ -1,5 +1,5 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
-import * as path from "@std/path";
+import { assertEquals, assertStringIncludes } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { extractSection, Store } from "./store.ts";
 
 Deno.test("StoreReadWrite", () => {

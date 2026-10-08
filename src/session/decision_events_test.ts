@@ -1,4 +1,4 @@
-import { assert, assertFalse } from "@std/assert";
+import { assert, assertFalse } from "@opensac/assert";
 import { decisionEventType, isDecisionEventType } from "./decision_events.ts";
 
 Deno.test("is decision event type", () => {

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file require-await -- async fake methods model Promise-returning seams
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { coreResult } from "../core/protocol.ts";
 import type { CoreClient, CoreEventConnection } from "../core/client.ts";
 import { ACPBridgeClient } from "./bridge_client.ts";

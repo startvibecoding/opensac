@@ -5,12 +5,13 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@std/assert";
+} from "@opensac/assert";
 import {
   createUserRegExpMatcher,
   RegExpMatchTimeoutError,
   userRegExpMatchBudgetMs,
 } from "./regex_match.ts";
+import { regexWorkerSource } from "./regex_worker_source.ts";
 
 function referenceMatches(
   pattern: string,
@@ -137,4 +138,11 @@ Deno.test("UserRegExpMatcher rejects use after close and tolerates double close"
 Deno.test("UserRegExpMatcher default budget constant stays positive", () => {
   assert(userRegExpMatchBudgetMs > 0);
   assertStringIncludes("regex matching timed out", "timed out");
+});
+
+Deno.test("inlined regex worker source stays in sync with regex_worker.js", async () => {
+  const onDisk = await Deno.readTextFile(
+    new URL("./regex_worker.js", import.meta.url),
+  );
+  assertEquals(regexWorkerSource, onDisk);
 });

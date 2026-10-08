@@ -2,7 +2,7 @@
 // require the agent loop). The Go tests also cover the loop wake path; that
 // lands with the core loop port.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { Message } from "../provider/types.ts";
 import {
   createMemberCompletion,

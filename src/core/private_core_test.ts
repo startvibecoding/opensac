@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
-import { basename, join } from "@std/path";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { basename, join } from "@opensac/path";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 import { coreResult, type CoreRpcRequest } from "./protocol.ts";

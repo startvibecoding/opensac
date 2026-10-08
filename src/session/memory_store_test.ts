@@ -3,7 +3,7 @@
 // The Go tree has no dedicated MemoryStore test; these cases exercise the
 // interface contract the agent and TUI layers rely on.
 
-import { assert, assertEquals, assertNotEquals } from "@std/assert";
+import { assert, assertEquals, assertNotEquals } from "@opensac/assert";
 import {
   createAssistantMessage,
   createUserMessage,

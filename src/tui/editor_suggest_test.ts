@@ -3,7 +3,7 @@
 // suggestion dropdown (filter/wrap/scroll), and the command-suggest wiring
 // (spec-driven items, argument tables).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { Buffer } from "./components/editor/buffer.ts";
 import { Editor, wrapLineSegments } from "./components/editor/editor.ts";
 import { Suggest, type SuggestItem } from "./components/suggest/suggest.ts";

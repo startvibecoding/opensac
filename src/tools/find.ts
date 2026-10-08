@@ -6,7 +6,7 @@
 // lexicographically. This is registered as a deliberate deviation from the
 // external SDK dependency.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { compileGeneratedRegExp } from "../util/regex.ts";
 import { globToRegex } from "./globset.ts";
 import { IgnoreStack } from "./ignore.ts";

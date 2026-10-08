@@ -2,7 +2,7 @@
 // navigation tree ported from the Go TUI: provider groups, field toggles,
 // headers, model add, and draft → config persistence.
 
-import { assert, assertEquals } from "jsr:@std/assert@1";
+import { assert, assertEquals } from "@opensac/assert";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import { AuthDialog } from "./auth_dialog.ts";
 import type { AuthHost, AuthPanel } from "./auth_dialog.ts";

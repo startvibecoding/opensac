@@ -1,7 +1,7 @@
 // Focused tests for sync_output.ts: every string write must leave the stream
 // as one DEC 2026 synchronized-output frame; other traffic passes through.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { atomicStdout } from "./sync_output.ts";
 
 interface Call {

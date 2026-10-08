@@ -2,7 +2,7 @@
 // Package stats provides usage-statistics queries over the request_stats table
 // and an HTTP dashboard that renders them.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import type { DB as RawDB } from "../db/mod.ts";
 import {
   type Database,

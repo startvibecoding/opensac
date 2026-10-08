@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { Attachment } from "../types.ts";
 import {
   resolveAttachment,

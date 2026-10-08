@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { RuntimeSubmissionDAO, type RuntimeSubmissionRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
 

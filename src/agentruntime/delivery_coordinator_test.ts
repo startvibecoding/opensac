@@ -4,7 +4,7 @@
 // the `SessionRuntime` slice), matching `delivery_store_test.ts`. Go's
 // `(DeliveryResult, error)` executor returns map to `DeliveryExecutorOutcome`.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import {
   createDeliveryPlan,

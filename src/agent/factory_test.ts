@@ -1,7 +1,7 @@
 // (AgentFactory runtime-config inheritance, provider-name propagation, and the
 // compile-time AgentAdapter interface assertion).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import type { Agent as PublicAgent } from "../../sdk/agent/types.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";

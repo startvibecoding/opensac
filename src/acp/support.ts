@@ -11,7 +11,7 @@
 // `Date`; Go's `(value, error)` returns throw typed errors.
 
 import { createHash } from "node:crypto";
-import { decodeBase64Url, encodeBase64Url } from "@std/encoding/base64url";
+import { decodeBase64Url, encodeBase64Url } from "@opensac/encoding/base64url";
 import {
   type Response as DoctorResponse,
   STATUS_ERROR,

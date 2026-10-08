@@ -10,8 +10,8 @@
 // Core-owned transient side query, and cron goes through the shared SQLite
 // store.
 
-import * as path from "@std/path";
-import { encodeBase64 } from "@std/encoding/base64";
+import * as path from "@opensac/path";
+import { encodeBase64 } from "@opensac/encoding/base64";
 import {
   getSessionDir,
   isProjectDir,

@@ -2,7 +2,7 @@
 // single-line call it is about to run after the tool name
 // (`bash: cd src & ls`, `read: src/main.ts`).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { toolCallLabel } from "./tool_execution_display.tsx";
 
 Deno.test("toolCallLabel shows the whole bash command, not just its first word", () => {

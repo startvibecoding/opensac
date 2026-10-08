@@ -2,7 +2,7 @@
 // truncation (CJK=2 cells, ANSI=0), bash output compaction, and duration
 // formatting, all mirroring internal/tui/formatters.go semantics.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import {
   cacheHitPercent,
   compactBashOutput,

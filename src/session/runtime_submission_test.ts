@@ -1,6 +1,6 @@
 // Test for the ported internal/session/runtime_submission.go admission surface.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { writeRootDatabase } from "./database.ts";
 import {

@@ -4,7 +4,7 @@
 // reindexed in place so Chinese phrase queries match afterwards, without
 // touching graph rows or the active snapshot.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import {
   KNOWLEDGE_GRAPH_SCHEMA_VERSION,

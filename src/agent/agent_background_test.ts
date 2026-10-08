@@ -3,7 +3,7 @@
 // Protocols) and tool_launch_test.go
 // (TestExecuteBackgroundToolCallOrderedReleasesQueuedCalls).
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createMockProvider, type MockProvider } from "../provider/mock.ts";
 import { createUserMessage, type ToolCallBlock } from "../provider/types.ts";
 import { createManager } from "../session/manager.ts";

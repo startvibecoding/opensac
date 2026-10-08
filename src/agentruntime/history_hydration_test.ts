@@ -2,7 +2,7 @@
 // with the replayed conversation history before the next user message, or the
 // follow-up turn loses all prior context.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { Builder, SessionRuntime } from "./session_runtime.ts";
 import { SOURCE_TUI } from "./source.ts";
 import { createSession } from "./session_lifecycle.ts";

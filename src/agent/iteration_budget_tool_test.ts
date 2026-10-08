@@ -2,7 +2,7 @@
 // ExtendBudgetTool + tool-context cases; the loop-driven cases move with the
 // core loop).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import type { ToolContext } from "../tools/tool.ts";
 import {
   createIterationBudget,

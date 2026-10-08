@@ -3,7 +3,7 @@
 // emitted before the legacy terminal events and followed by EVENT_AGENT_END; the
 // terminal status distinguishes success/failed/incomplete/canceled.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { Model, StreamEvent, Usage } from "../provider/types.ts";
 import {
   streamDone,

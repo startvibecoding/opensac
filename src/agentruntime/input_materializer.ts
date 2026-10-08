@@ -11,7 +11,7 @@
 // to `Date`; SHA-256/HMAC use `node:crypto`.
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import {
   type Database,
   InputResourceDAO,

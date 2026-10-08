@@ -10,7 +10,7 @@
 // `reconcileAttachmentStorage` function because TS classes cannot be split
 // across modules.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { AttachmentDAO } from "../dao/mod.ts";
 import { queryRootDatabase, rootDatabasePath } from "../session/database.ts";
 import type { AttachmentPolicy } from "./attachment.ts";

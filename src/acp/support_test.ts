@@ -1,7 +1,7 @@
 // Translated tests from internal/acp/acp_mcp_test.go and focused coverage for
 // the ACP server-support helpers (startup errors, cursors, titles, paging).
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import type { Message } from "../provider/types.ts";
 import type { Manager } from "../session/manager.ts";
 import {

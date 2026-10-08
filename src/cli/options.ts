@@ -1,7 +1,7 @@
 // (shared CLI flag/options surface).
 //
 // This module owns the options carried by the root command and shared
-// subcommands. It deliberately stays free of Cliffy types so focused tests can
+// subcommands. It deliberately stays free of CLI-parser types so focused tests can
 // validate flag/env mapping without a full parse. Deviations: Go's
 // `time.Duration` strings map to milliseconds via `parseGoDuration`; Go's
 // pflag booleans map to plain `boolean` options; and the ACP timeout flags

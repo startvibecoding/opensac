@@ -6,7 +6,7 @@
 // runtime or at type-check time. This test is the only thing that turns that
 // convention into an enforced check.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { catalogs } from "./i18n.ts";
 
 Deno.test("the TUI catalogs define exactly the same message IDs", () => {

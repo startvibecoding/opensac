@@ -3,7 +3,7 @@
 // `resolveManagerPolicy`). Go exercises these only through the agent-manager
 // integration cases; these cover the precedence and conflict rules directly.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import {

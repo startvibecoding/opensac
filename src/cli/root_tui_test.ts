@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects } from "@opensac/assert";
 import { defaultSettings } from "../config/settings.ts";
 import {
   advanceEditorCaret,

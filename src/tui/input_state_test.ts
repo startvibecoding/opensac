@@ -1,7 +1,7 @@
 // Focused tests for the TUI input state: backspace/delete, history, suggestions,
 // paste folding on submit, and the shortcut action map.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { InputState } from "./input_state.ts";
 import { Translator } from "./i18n.ts";
 

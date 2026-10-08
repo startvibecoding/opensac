@@ -8,7 +8,7 @@
 // streaming. The cache can therefore never drop, duplicate, reorder, or
 // stale-serve content.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService } from "./service.ts";
 import { expandedToolRow } from "./tool_row_format.ts";

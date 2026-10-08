@@ -4,7 +4,7 @@
 // exact-ID open, workdir-scoped open, and lease-guarded deletion contracts that
 // the Go callers rely on.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import {
   createSession,
   deleteSession,

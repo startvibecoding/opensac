@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
+import { assert, assertEquals } from "@opensac/assert";
+import { fromFileUrl, join } from "@opensac/path";
 import {
   coreBoundaryAllowlist,
   foreignKeyEnforcementPattern,

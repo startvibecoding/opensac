@@ -1,7 +1,7 @@
 // Focused tests for tool_row_format.ts: verifies the Ink tool rows match the
 // Go TUI's renderToolResult behavior per tool type/status/compact mode.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { Translator } from "./i18n.ts";
 import {
   formatToolRow,

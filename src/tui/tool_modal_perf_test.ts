@@ -8,7 +8,7 @@
 // streaming row rebuilds one block, a spinner tick touches only live rows, and
 // the cached window equals a body rebuilt from scratch.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   EVENT_STATUS,
   EVENT_TEXT_DELTA,

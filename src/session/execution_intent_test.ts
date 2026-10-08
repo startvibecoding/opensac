@@ -4,7 +4,7 @@
 // durable intent round trip and the atomic intent/Run/event/turn admission
 // contract against the ported implementation.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import {
   createExecutionIntentAndSessionRun,

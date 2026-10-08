@@ -2,13 +2,14 @@
 // The goja-specific `TestGojaUndefinedAndNullExportAsNil` is dropped (no goja
 // equivalent): the Deno worker already normalizes undefined/null to null.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import {
   evalJsWorkflow,
   evalJsWorkflowWithin,
   isJsExpr,
   JsEvaluationTimeoutError,
 } from "./js.ts";
+import { jsWorkerSource } from "./js_worker_source.ts";
 import { resolveJsValue, Runner, WorkflowRuntime } from "./runner.ts";
 import { isCanceled, type RunState, statusRunning } from "./types.ts";
 
@@ -167,4 +168,11 @@ Deno.test("results and logs are deterministically ordered", async () => {
   });
   assertEquals(rt.state.logs!.length, 1);
   assertEquals(rt.state.logs![0].message, "hello world");
+});
+
+Deno.test("inlined workflow worker source stays in sync with js_worker.js", async () => {
+  const onDisk = await Deno.readTextFile(
+    new URL("./js_worker.js", import.meta.url),
+  );
+  assertEquals(jsWorkerSource, onDisk);
 });

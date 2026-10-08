@@ -2,7 +2,7 @@
 // The Go package had no dedicated test file; these pin the observable catalog
 // contract that ACP serializes.
 
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertThrows } from "@opensac/assert";
 import type { Model } from "../provider/types.ts";
 import {
   thinkingHigh,

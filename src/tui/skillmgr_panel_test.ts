@@ -2,7 +2,7 @@
 // manager (checkbox list over the former /skills listing + /skill activation)
 // runs against a fake host with no session or Core access.
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@opensac/assert";
 import { SkillMgrPanel, type SkillMgrPanelHost } from "./skillmgr_panel.ts";
 import { Translator } from "./i18n.ts";
 import type { KeyEvent } from "./keys.ts";

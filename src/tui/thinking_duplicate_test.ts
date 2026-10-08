@@ -2,7 +2,7 @@
 // ThinkDelta was previously written both into the transcript-store streaming
 // row and into the activity timeline, producing two identical lines.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { App } from "./app.tsx";
 import { AppController } from "./app_controller.ts";
 import { EVENT_THINK_DELTA, EVENT_TURN_START } from "../agent/events.ts";

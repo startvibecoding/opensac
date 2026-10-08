@@ -2,7 +2,7 @@
 // Test images are generated with the same npm codec used by the implementation;
 // the assertions mirror the Go tests (geometry/limits/MIME, not exact bytes).
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
 import { Image } from "imagescript";
 import { defaultPolicy, prepareBytes } from "./mod.ts";
 

@@ -2,7 +2,7 @@
 // the transcript store, background-activity routing, approval/question
 // queues with decision registration, and run-finished terminalization.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { AppController, type RunHandle } from "./app_controller.ts";
 import type { Event } from "../agent/events.ts";
 import {

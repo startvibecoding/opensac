@@ -3,7 +3,7 @@
 // unchecked cast), keep failure at the boundary for bad JSON and shape
 // garbage, and stay open to unknown event types and fields.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { decodeAnthropicStreamEvent } from "./anthropic/provider.ts";
 import { decodeGoogleStreamChunk } from "./google/provider.ts";
 import { decodeOpenAIStreamChunk } from "./openai/provider.ts";

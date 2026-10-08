@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { wrapError } from "../provider/errors.ts";
 import {
   createRoleIncompleteError,

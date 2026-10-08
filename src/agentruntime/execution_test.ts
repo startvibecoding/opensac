@@ -5,7 +5,12 @@
 // because the port relies on the single-threaded event loop instead of explicit
 // mutexes (see execution.ts).
 
-import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "@opensac/assert";
 import {
   type Event as AgentEvent,
   EVENT_RETRY,

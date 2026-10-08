@@ -1,5 +1,5 @@
-import { assert } from "@std/assert";
-import * as path from "@std/path";
+import { assert } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { gitAccessRequired, isGitDeniedPath } from "./git.ts";
 
 Deno.test("gitAccessRequired", () => {

@@ -4,7 +4,7 @@
 // fenced recovery lease with `AcquireRecovery`. The `context.Context`
 // cancellation fixture is dropped because the DAO layer is synchronous.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
 import {

@@ -1,7 +1,7 @@
 // (no dedicated Go test).
 // Unknown handlers are routed; global handlers receive every event.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import type { Event } from "../../sdk/agent/types.ts";
 import { createEventRouter, RouterEventHandlerFunc } from "./router.ts";
 

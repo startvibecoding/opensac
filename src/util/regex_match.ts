@@ -9,7 +9,7 @@
 // worker and surfaces as `RegExpMatchTimeoutError` instead of hanging the
 // event loop (the caller can then fall back to a literal search).
 
-import workerSource from "./regex_worker.js" with { type: "text" };
+import { regexWorkerSource as workerSource } from "./regex_worker_source.ts";
 
 import { UserRegExpError } from "./regex.ts";
 

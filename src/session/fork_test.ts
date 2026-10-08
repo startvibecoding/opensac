@@ -4,7 +4,7 @@
 // turn helpers and persist sessions/run rows through the DAO. The final
 // atomic-admission fixture is preserved with literal IDs and direct row counts.
 
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
 import {

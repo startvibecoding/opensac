@@ -4,7 +4,7 @@
 // enforcement is off and a session with no lease row skips lease validation, so
 // these tests use a literal session ID and reproduce the run lifecycle directly.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { closeAll } from "../db/mod.ts";
 import { createAssistantMessage } from "../provider/types.ts";
 import {

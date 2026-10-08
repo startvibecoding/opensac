@@ -2,8 +2,10 @@
 // DeepSeek V3's tokenizer is a byte-level BPE tokenizer. The vocabulary and
 // merge ranks are loaded from the vendored tokenizer JSON so token estimates
 // are deterministic and do not require Python or a network connection at
-// runtime. The JSON is embedded into the compiled binary via
-// `deno compile --include src/context/tokenizerdata`.
+// runtime. The JSON is vendored under `src/context/tokenizerdata` and copied
+// beside the published bundle by `scripts/build_node.ts`.
+
+import { resourceUrl } from "../platform/resources.ts";
 
 /** DeepSeek V3 applies regex splitting before byte-level BPE. */
 const DEEPSEEK_PRE_TOKEN_PATTERN =
@@ -67,7 +69,7 @@ function rememberTokenCount(text: string, total: number): void {
 }
 
 function tokenizerDataURL(): URL {
-  return new URL("./tokenizerdata/deepseek_v3_tokenizer.json", import.meta.url);
+  return resourceUrl("context/tokenizerdata/deepseek_v3_tokenizer.json");
 }
 
 function loadDeepSeekTokenizer(): DeepSeekTokenizer | null {

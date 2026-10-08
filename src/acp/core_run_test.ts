@@ -1,5 +1,5 @@
 // deno-lint-ignore-file require-await -- async fake client models the Core seam
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { coreResult } from "../core/protocol.ts";
 import { privateCoreConfig } from "../core/private_core.ts";
 import { type CoreCommandHandle, startCoreCommand } from "../cli/core.ts";

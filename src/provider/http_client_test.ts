@@ -3,7 +3,7 @@
 // ForceAttemptHTTP2). Deno has no pluggable transport, so the port exposes the
 // normalized proxy URL and HTTP/1.1 flag on the client and asserts on those.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { createHttpClient } from "./mod.ts";
 
 Deno.test("NewHTTPClientDefaultProxy", () => {

@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import { coreResult } from "./protocol.ts";
 import { type CoreEventRequest, CoreEventStream } from "./event_stream.ts";
 import type { CoreRuntimeEvent } from "./runtime.ts";

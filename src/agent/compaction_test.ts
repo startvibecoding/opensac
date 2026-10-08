@@ -1,6 +1,6 @@
 // Focused tests for the compaction settings bridge (port of compaction.go).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { compactionSettingsFromConfig } from "./compaction.ts";
 
 Deno.test("compactionSettingsFromConfig copies every field", () => {

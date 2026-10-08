@@ -7,7 +7,7 @@
 // expires. The worker only builds the node graph; worker agents run natively
 // afterwards via the runner.
 
-import workerSource from "./js_worker.js" with { type: "text" };
+import { jsWorkerSource as workerSource } from "./js_worker_source.ts";
 import { abortError } from "./types.ts";
 
 /** Caps one workflow-run evaluation. */

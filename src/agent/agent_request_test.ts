@@ -6,7 +6,7 @@
 // (TestBuildRequestMessagesRetainsImagesForUnsupportedModel), plus focused
 // tests for the newly ported request-assembly helpers.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import type { ContentBlock, Message, Model } from "../provider/types.ts";
 import {
   createAssistantMessage,

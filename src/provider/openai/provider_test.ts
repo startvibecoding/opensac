@@ -2,7 +2,7 @@
 // Go's httptest-based mock client is replaced by an injected fetch client
 // (see test_helpers.ts) that returns prepared Response objects.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   cacheInfo,
   type ChatParams,

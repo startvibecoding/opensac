@@ -4,9 +4,9 @@
 // covered by session_runtime_test.ts; the manifest assertion here exercises
 // the materializer's own deterministic `buildManifest` instead.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
-import { decodeBase64 } from "@std/encoding/base64";
-import * as path from "@std/path";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { decodeBase64 } from "@opensac/encoding/base64";
+import * as path from "@opensac/path";
 import { InputResourceDAO } from "../dao/mod.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases, openRootDB } from "../session/root_db.ts";

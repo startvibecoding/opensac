@@ -3,7 +3,7 @@
 // `AbortError` / `TimeoutError` named errors because Deno has no `context`
 // package.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@opensac/assert";
 import {
   classifyError,
   displayErrorMessage,

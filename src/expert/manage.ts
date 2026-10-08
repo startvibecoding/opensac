@@ -1,4 +1,4 @@
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { type Manifest, sourceGlobal, sourceProject } from "./expert.ts";
 import { agentsDirName, loadBundle, manifestFileName } from "./bundle.ts";
 import {

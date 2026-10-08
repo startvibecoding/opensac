@@ -12,7 +12,7 @@
 // running `deno info`; the whole-repo tests call the same functions against the
 // real tree.
 
-import { dirname, join, relative } from "@std/path";
+import { dirname, join, relative } from "@opensac/path";
 
 export interface Violation {
   file: string;
@@ -93,7 +93,10 @@ const CORE_ALLOWED_LOCAL_FILES = new Set([
   "src/memory/store.ts",
   "src/stats/stats.ts",
 ]);
-const CORE_ALLOWED_EXTERNAL_PREFIXES = ["@std/", "jsr:", "npm:"];
+// The Node-backed `@opensac/*` compat modules plus npm packages are the
+// external dependencies a reviewed Core file may carry; JSR and `@std/*` are
+// no longer used, so a reintroduction is flagged.
+const CORE_ALLOWED_EXTERNAL_PREFIXES = ["@opensac/", "npm:"];
 
 // Every SQLite spelling that turns foreign key enforcement ON: `foreign_keys(1)`
 // /`(ON)`/`(TRUE)` DSN pragmas and `PRAGMA foreign_keys = 1/ON/TRUE`,

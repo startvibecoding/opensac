@@ -5,7 +5,7 @@
 // binding to `internal/agent`.
 
 import { configDir } from "../config/settings.ts";
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import type { AgentID } from "../../sdk/agent/types.ts";
 import {
   type Event as PublicEvent,

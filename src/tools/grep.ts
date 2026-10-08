@@ -8,7 +8,7 @@
 // skipped instead of being buffered whole into memory. This is registered as
 // a deliberate deviation from the external SDK dependency.
 
-import * as path from "@std/path";
+import * as path from "@opensac/path";
 import { compileUserRegExp } from "../util/regex.ts";
 import {
   createUserRegExpMatcher,

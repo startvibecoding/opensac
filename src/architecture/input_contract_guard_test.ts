@@ -1,5 +1,5 @@
-import { assert } from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
+import { assert } from "@opensac/assert";
+import { fromFileUrl, join } from "@opensac/path";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 

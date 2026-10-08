@@ -1,4 +1,4 @@
-import { assert } from "@std/assert";
+import { assert } from "@opensac/assert";
 import { createLockRegistry } from "./lock_registry.ts";
 
 // Pins the M4 fix: per-key mutexes must be removed once no caller references

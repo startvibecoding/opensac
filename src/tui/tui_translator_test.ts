@@ -3,7 +3,7 @@
 // Resolve over settings.TUILang) and the editor width tracking applied on
 // terminal resize (Go tea.WindowSizeMsg → input.SetWidth).
 
-import { assertEquals } from "@std/assert";
+import { assertEquals } from "@opensac/assert";
 import { localTimeZone, resolveLanguage } from "./i18n.ts";
 import { tuiTranslatorFromSettings } from "./tui_session.ts";
 import { applyEditorWidth } from "../cli/root_tui.ts";

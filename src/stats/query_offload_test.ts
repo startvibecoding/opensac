@@ -2,8 +2,8 @@
 // worker and in-process paths must produce identical results, transport
 // failures fall back in-process, and query failures surface unchanged.
 
-import { assert, assertEquals, assertRejects } from "@std/assert";
-import * as path from "@std/path";
+import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import * as path from "@opensac/path";
 import { openStandalone } from "../db/mod.ts";
 import {
   StatsDAO,

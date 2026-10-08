@@ -1,4 +1,4 @@
-import { assertEquals, assertFalse } from "@std/assert";
+import { assertEquals, assertFalse } from "@opensac/assert";
 import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
 import { closeAll } from "../db/mod.ts";
 import { listGeneratedArtifacts, listSessionAttachments } from "./artifacts.ts";
