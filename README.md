@@ -95,8 +95,13 @@ binaries), bundled with [esbuild](https://esbuild.github.io/) and run on Node >=
 ```sh
 make node-build                    # esbuild -> dist/node
 make node-pack                     # tarball into dist/npm/, publishing nothing
-make node-publish                  # publish dist/node under the latest tag
+make node-publish NODE_SCOPE=@you  # publish @you/opensac under the latest tag
 ```
+
+npmjs.org requires a scope: the bare name `opensac` is rejected by npm's
+name-similarity guard (too close to `openai`), so `NODE_SCOPE=@<your-npm-username>`
+is required and publishes `@<your-npm-username>/opensac` with public access.
+GitHub Packages (`make node-publish-github NODE_SCOPE=@owner`) is scoped the same way.
 
 The pushed tag produces a GitHub Release, the npm package, and the container
 image. `ghcr-publish.yml` still ships `ghcr.io/<owner>/opensac` for the shared

@@ -21,6 +21,9 @@ DOCKER_TAG ?= local
 
 # GitHub Packages only accepts a package inside the owner's scope, so the scoped
 # build names the package `@owner/opensac` and publishes to that registry.
+# npmjs.org also needs a scope: the bare name `opensac` is rejected as too
+# similar to the existing `openai`, so `NODE_SCOPE=@<your-npm-username>` publishes
+# `@<your-npm-username>/opensac` there too.
 NODE_SCOPE ?=
 
 # The product version follows the newest `v*` git tag, falling back to the
@@ -40,6 +43,7 @@ help:
 	@echo "  node-publish          Publish $(NODE_DIR) under the latest tag"
 	@echo "  node-publish-pre      Publish $(NODE_DIR) under the next tag"
 	@echo "  node-publish-github   Publish a scoped build to GitHub Packages (NODE_SCOPE=@owner)"
+	@echo "  (npmjs.org requires NODE_SCOPE=@you: the bare name collides with 'openai')"
 	@echo ""
 	@echo "Development targets:"
 	@echo "  install          Install the CLI globally from source"
@@ -72,14 +76,24 @@ node-pack:
 	$(DENO) task pack:node
 
 node-publish:
-	$(DENO) task build:node
+	@if [ -n "$(NODE_SCOPE)" ]; then \
+		$(DENO) run -A scripts/build_node.ts --scope=$(NODE_SCOPE); \
+	else \
+		$(DENO) task build:node; \
+	fi
 	$(DENO) run -A scripts/npm_publish_if_needed.ts \
-		--tag latest --registry $(NPM_REGISTRY) $(NODE_DIR)
+		--tag latest --registry $(NPM_REGISTRY) $(NODE_DIR) \
+		$(if $(NODE_SCOPE),-- --access public)
 
 node-publish-pre:
-	$(DENO) task build:node
+	@if [ -n "$(NODE_SCOPE)" ]; then \
+		$(DENO) run -A scripts/build_node.ts --scope=$(NODE_SCOPE); \
+	else \
+		$(DENO) task build:node; \
+	fi
 	$(DENO) run -A scripts/npm_publish_if_needed.ts \
-		--tag next --registry $(NPM_REGISTRY) $(NODE_DIR)
+		--tag next --registry $(NPM_REGISTRY) $(NODE_DIR) \
+		$(if $(NODE_SCOPE),-- --access public)
 
 node-publish-github:
 	@if [ -z "$(NODE_SCOPE)" ]; then \
