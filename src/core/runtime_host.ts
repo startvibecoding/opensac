@@ -1,4 +1,5 @@
 import { decodeBase64, encodeBase64 } from "@opensac/encoding/base64";
+import { fileURLToPath } from "@opensac/path";
 import * as path from "@opensac/path";
 import { AttachmentService } from "../agentruntime/input.ts";
 import {
@@ -1543,11 +1544,18 @@ function knowledgeBaseMCPApply(
     if (!(err instanceof Deno.errors.NotFound)) throw err;
     config = {};
   }
+  const launcher = openSACLauncherCommand();
   const entry: MCPServer = {
     name: `knowledge-${id}`,
     type: "stdio",
-    command: Deno.execPath(),
-    args: ["knowledge-mcp", "serve", "--knowledge-base", id],
+    command: launcher.command,
+    args: [
+      ...launcher.args,
+      "knowledge-mcp",
+      "serve",
+      "--knowledge-base",
+      id,
+    ],
     enabled,
   };
   const servers = config.mcpServers ?? [];
@@ -1558,6 +1566,18 @@ function knowledgeBaseMCPApply(
   normalizeMCPConfig(config);
   saveMCPConfig(globalMCPPath(), config);
   return { id, name: entry.name, enabled };
+}
+
+function openSACLauncherCommand(): { command: string; args: string[] } {
+  const executable = Deno.execPath();
+  const name = path.basename(executable).toLowerCase();
+  if (name === "node" || name.startsWith("node.")) {
+    return {
+      command: process.execPath,
+      args: [fileURLToPath(new URL("../main.ts", import.meta.url))],
+    };
+  }
+  return { command: executable, args: [] };
 }
 
 function knowledgeBaseQuery(

@@ -1,4 +1,4 @@
-import { basename, fromFileUrl } from "@opensac/path";
+import { basename, fileURLToPath, fromFileUrl } from "@opensac/path";
 import { CORE_AUTH_HEADER, CORE_CLIENT_ID_HEADER } from "./auth.ts";
 import {
   assertResolvedCoreConfig,
@@ -2676,11 +2676,15 @@ export function defaultLauncherArgs(executable: string): string[] {
   const executableName = basename(executable).toLowerCase();
   const isDeno = executableName === "deno" ||
     executableName.startsWith("deno.");
-  if (!isDeno) return ["core"];
-
-  return [
-    ...DENO_SOURCE_PERMISSION_ARGS,
-    fromFileUrl(new URL("./main.ts", import.meta.url)),
-    "core",
-  ];
+  if (isDeno) {
+    return [
+      ...DENO_SOURCE_PERMISSION_ARGS,
+      fromFileUrl(new URL("./main.ts", import.meta.url)),
+      "core",
+    ];
+  }
+  if (executableName === "node" || executableName.startsWith("node.")) {
+    return [fileURLToPath(new URL("../main.ts", import.meta.url)), "core"];
+  }
+  return ["core"];
 }

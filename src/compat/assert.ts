@@ -11,6 +11,7 @@
 //     and return the caught error, inferring its type from `ErrorClass`.
 
 import nodeAssert from "node:assert/strict";
+import { inspect } from "node:util";
 
 /** An error constructor or a `RegExp` matched against the error message. */
 type ErrorClass = (new (...args: never[]) => Error) | RegExp;
@@ -86,6 +87,18 @@ function deepEqual(
   return true;
 }
 
+function inspectFailure(actual: unknown, expected: unknown): string {
+  const options = {
+    depth: 8,
+    colors: false,
+    compact: false,
+    sorted: true,
+  } as const;
+  return `Values have different structure:\n\`\`\`\n${
+    inspect(actual, options)
+  }\n\`\`\` expected\n\`\`\`\n${inspect(expected, options)}\n\`\`\``;
+}
+
 /** Asserts that `expr` is truthy. */
 export function assert(expr: unknown, message?: string): asserts expr {
   if (message === undefined) nodeAssert.ok(expr);
@@ -99,8 +112,8 @@ export function assertEquals<T>(
   message?: string,
 ): void {
   if (deepEqual(actual, expected)) return;
-  if (message === undefined) nodeAssert.deepStrictEqual(actual, expected);
-  else nodeAssert.deepStrictEqual(actual, expected, message);
+  const detail = inspectFailure(actual, expected);
+  nodeAssert.fail(message === undefined ? detail : `${message}: ${detail}`);
 }
 
 /** Asserts that two values are not deeply equal. */

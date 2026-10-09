@@ -11,7 +11,7 @@
 // separator constant.
 
 import * as nodePath from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import * as nodeUrl from "node:url";
 
 export const join = nodePath.join;
 export const resolve = nodePath.resolve;
@@ -29,6 +29,8 @@ export const win32 = nodePath.win32;
 export const sep = nodePath.sep;
 export const delimiter = nodePath.delimiter;
 
-export const fromFileUrl = fileURLToPath;
-export const toFileUrl = pathToFileURL;
+export const fromFileUrl = nodeUrl.fileURLToPath;
+export const fileURLToPath = nodeUrl.fileURLToPath;
+export const toFileUrl = nodeUrl.pathToFileURL;
+export const pathToFileURL = nodeUrl.pathToFileURL;
 export const SEPARATOR: string = nodePath.sep;

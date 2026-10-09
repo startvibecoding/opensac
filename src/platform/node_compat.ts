@@ -1,8 +1,9 @@
 // Node runtime compatibility for the Deno APIs that `@deno/shim-deno` omits.
 //
 // `@deno/shim-deno` covers only the file/env/process surface.
-// The product also uses `Deno.Command`, `Deno.serve`, `Deno.upgradeWebSocket`,
-// `Deno.connect`, `Deno.createHttpClient`, `Deno.SeekMode`, `Deno.unrefTimer`,
+// The product also uses `Deno.Command`, `Deno.execPath`, `Deno.args`,
+// `Deno.exit`, `Deno.serve`, `Deno.upgradeWebSocket`, `Deno.connect`,
+// `Deno.createHttpClient`, `Deno.SeekMode`, `Deno.unrefTimer`,
 // `Deno.resolveDns`, and the Web `Worker` global. This module installs those on
 // top of Node built-ins so the same sources run unmodified under Node.
 //
@@ -72,6 +73,13 @@ function override(target: AnyDeno, key: string, value: unknown): void {
 }
 
 // ─── Deno.Command ──────────────────────────────────────────────────────────
+
+function currentArgs(): string[] {
+  const scriptIndex = process.argv.findIndex((arg, index) =>
+    index > 1 && (arg.endsWith(".js") || arg.endsWith(".mjs"))
+  );
+  return scriptIndex >= 0 ? process.argv.slice(scriptIndex + 1) : [];
+}
 
 function normalizeMode(mode: unknown): string | undefined {
   if (mode === undefined) return undefined;
@@ -614,6 +622,15 @@ export function installNodeDenoCompat(): void {
   }
 
   override(deno, "Command", NodeCommand);
+  override(deno, "execPath", () => process.execPath);
+  override(deno, "args", currentArgs());
+  override(deno, "exit", (code?: number | string) => {
+    if (typeof code === "string") {
+      console.error(code);
+      process.exit(1);
+    }
+    process.exit(code ?? 0);
+  });
   override(deno, "makeTempFile", makeTempFile);
   override(deno, "makeTempFileSync", makeTempFileSync);
   override(deno, "makeTempDir", makeTempDir);

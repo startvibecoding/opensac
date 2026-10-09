@@ -9,6 +9,7 @@
 import React from "react";
 import { render } from "ink";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import { atomicStdout } from "../tui/sync_output.ts";
 import { TuiShell } from "../tui/tui_shell.tsx";
 import { TUISession } from "../tui/tui_session.ts";
@@ -302,11 +303,15 @@ export async function runInteractiveAction(
   }
 }
 
-/** Re-executes the current binary with the same arguments (/reload). */
+/** Re-executes the current CLI entrypoint with the same arguments (/reload). */
 async function reloadProcess(): Promise<void> {
   const executable = Deno.execPath();
-  const command = new Deno.Command(executable, {
-    args: Deno.args,
+  const name = executable.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+  const isNode = name === "node" || name.startsWith("node.");
+  const command = new Deno.Command(isNode ? process.execPath : executable, {
+    args: isNode
+      ? [fileURLToPath(new URL("../main.ts", import.meta.url)), ...Deno.args]
+      : Deno.args,
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",

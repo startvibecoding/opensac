@@ -24,6 +24,21 @@ import {
   CoreLauncherError,
   CoreStartupError,
 } from "./client.ts";
+import { defaultLauncherArgs } from "./client.ts";
+
+Deno.test("Core launcher resolves Deno and Node entrypoints", () => {
+  const coreEntrypoint = new URL("./main.ts", import.meta.url).pathname;
+  const nodeEntrypoint = new URL("../main.ts", import.meta.url).pathname;
+  assertEquals(defaultLauncherArgs("/usr/local/bin/deno")[0], "--allow-read");
+  assertEquals(defaultLauncherArgs("/usr/local/bin/deno").slice(-2), [
+    coreEntrypoint,
+    "core",
+  ]);
+  assertEquals(defaultLauncherArgs("/usr/local/bin/node"), [
+    nodeEntrypoint,
+    "core",
+  ]);
+});
 
 const TEST_VERSION = "0.1.0-client-test";
 const TEST_PROTOCOL_VERSION = 17;
