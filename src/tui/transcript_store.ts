@@ -17,8 +17,15 @@ import { MIN_TOOL_GROUP_SIZE } from "./tool_row_format.ts";
 
 export type ToolResultStatus = "running" | "completed" | "interrupted";
 
-/** Presentation kind of a plain message row (status rows render dim). */
-export type MessageKind = "status" | "error" | "warning" | "plain";
+/** Presentation kind of a plain message row (status rows render dim). An
+ * "assistant" row carries raw Markdown source and renders through the same
+ * Markdown projection as a live assistant turn. */
+export type MessageKind =
+  | "status"
+  | "error"
+  | "warning"
+  | "plain"
+  | "assistant";
 
 export interface ToolResultEntry {
   toolCallID: string;

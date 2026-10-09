@@ -482,6 +482,13 @@ test("production Core dependencies execute a prompt with a provider", async () =
       collected.find((event) => event.eventType === "text_delta")?.payload.text,
       "hello",
     );
+    // The terminal assistant message is durable: the Runtime-owned turn end
+    // stages it through the shared execution observation, so a resumed front
+    // end reprints the reply instead of only the user turns.
+    assertEquals(await host.transcript({ sessionId: session.sessionId }), [
+      { role: "user", text: "hi" },
+      { role: "assistant", text: "hello" },
+    ]);
     await host.close();
   } finally {
     await Deno.remove(workDir, { recursive: true });

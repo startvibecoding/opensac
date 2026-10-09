@@ -285,10 +285,50 @@ Deno.test("visualWidth", () => {
 });
 
 Deno.test("wrapANSI word boundary", () => {
-  assertEquals(wrapANSI("one two three", 7, "", 0), "one two \nthree");
-  assertEquals(wrapANSI("one two three", 7, "", 1), "one two \n\nthree");
+  assertEquals(wrapANSI("one two three", 7, "", 0), "one two\nthree");
+  assertEquals(wrapANSI("one two three", 7, "", 1), "one two\n\nthree");
   assertEquals(wrapANSI("hello", 80, "", 0), "hello");
   assertEquals(wrapANSI("", 80, "", 0), "");
+});
+
+Deno.test("wrapANSI splits overlong words instead of overflowing", () => {
+  // A space-free CJK run and a single long styled span are both wider than
+  // the wrap width; every produced line must fit inside it.
+  for (
+    const text of [
+      "这是一段中文里没有空格换行的长句子需要按单元格切开",
+      "\x1b[1m这是一个很长的加粗span跨越多个换行宽度才结束\x1b[0m尾",
+    ]
+  ) {
+    for (const line of wrapANSI(text, 10, "", 0).split("\n")) {
+      assert(visualWidth(line) <= 10, `overflow: ${JSON.stringify(line)}`);
+    }
+  }
+});
+
+Deno.test("wrapANSI re-opens the style state at each continuation line", () => {
+  // The trailing reset belongs to the end of the code span, so the line that
+  // starts with "width" must still re-open the span's colour; a snapshot
+  // taken after the word's escapes were consumed used to render it plain.
+  const text =
+    "text with \x1b[91ma very long inline code span that itself exceeds the wrap width\x1b[0m tail";
+  const lines = wrapANSI(text, 20, "", 0).split("\n");
+  const widthLine = lines.find((l) => l.includes("width"));
+  assert(widthLine !== undefined && widthLine.startsWith("\x1b[91m"));
+  // Mid-span continuations keep the bold state too.
+  const boldLines = wrapANSI(
+    "plain \x1b[1mbold words that must stay bold across the wrap\x1b[0m end",
+    20,
+    "",
+    0,
+  ).split("\n");
+  for (const line of boldLines) {
+    if (visualWidth(stripANSI(line)) === 0) continue;
+    const isMidSpan = /\b(words|must|stay|bold|across|the|wrap)\b/.test(
+      stripANSI(line),
+    ) && !stripANSI(line).startsWith("plain");
+    if (isMidSpan) assert(line.includes("\x1b[1m"), JSON.stringify(line));
+  }
 });
 
 // ── gsm streaming facade ────────────────────────────────────────────────────

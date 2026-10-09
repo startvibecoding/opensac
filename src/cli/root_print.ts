@@ -183,14 +183,19 @@ async function openPrintSession(
   }
 }
 
-/** The most recently modified session of one listing, if any. */
-function newestFirst<T extends { modTime: Date }>(
+/**
+ * The most recently modified session of one listing that actually has a
+ * conversation. Aborted or never-used startups persist empty rows; "newest"
+ * must mean the newest conversation, matching the TUI's `-c` selection.
+ */
+function newestFirst<T extends { modTime: Date; messageCount: number }>(
   entries: readonly T[],
 ): T | undefined {
   let best: T | undefined;
   for (const entry of entries) {
     const at = new Date(entry.modTime).getTime();
     if (!Number.isFinite(at)) continue;
+    if (entry.messageCount <= 0) continue;
     if (best === undefined || at > new Date(best.modTime).getTime()) {
       best = entry;
     }

@@ -159,12 +159,16 @@ Deno.test("resumeSession wins over continueLast and reprints in order", async ()
       rendered.slice(0, 3),
       [
         "> first turn",
-        `${
-          resumed.translator.text("transcript.assistant_prefix")
-        }\nfirst reply`,
+        "first reply",
         "> second turn",
       ],
-      "history reprints in its original order through the normal rows",
+      "history reprints in its original order, assistant rows carrying raw " +
+        "Markdown through the assistant projection",
+    );
+    assertEquals(
+      resumed.controller.store.messageKinds.get(1),
+      "assistant",
+      "a reprinted assistant turn must render as Markdown, not raw source",
     );
     await resumed.close();
   } finally {
@@ -427,6 +431,131 @@ Deno.test("a not-resident Core answer is retried, not reported as a bad id", asy
       );
     } finally {
       service.openSession = original;
+    }
+  } finally {
+    guard.restore();
+  }
+});
+
+Deno.test("continueLast skips an abandoned empty session", async () => {
+  // Every startup persists its session row, so the newest row is often a
+  // never-used empty one. `-c` must continue the newest conversation, not the
+  // newest file, or it reprints nothing and looks like it never resumed.
+  const guard = isolateConfigDir();
+  try {
+    const service = createFakeTUIService();
+    const conversation = newSession(service);
+    await conversation.start();
+    const conversationId = conversation.currentSessionID();
+    service.seedTranscript(conversationId, [
+      { role: "user", text: "the real question" },
+      { role: "assistant", text: "the real answer" },
+    ]);
+    await conversation.close();
+
+    // A later, abandoned startup leaves a newer but empty session.
+    const abandoned = newSession(service);
+    await abandoned.start();
+    await abandoned.close();
+    assert(
+      abandoned.currentSessionID() !== conversationId,
+      "the abandoned session is a distinct newer row",
+    );
+
+    const resumed = newSession(service, { continueLast: true });
+    await resumed.start();
+    try {
+      assertEquals(
+        resumed.currentSessionID(),
+        conversationId,
+        "-c continues the newest session that has a conversation",
+      );
+      const rendered = rows(resumed).join("\n");
+      assertStringIncludes(rendered, "> the real question");
+      assertStringIncludes(rendered, "the real answer");
+    } finally {
+      await resumed.close();
+    }
+  } finally {
+    guard.restore();
+  }
+});
+
+Deno.test("a resumed assistant turn reprints as an assistant row", async () => {
+  // The reprint keeps the raw Markdown source on an assistant-kind row so the
+  // history renders through the same Markdown projection as a live turn.
+  const guard = isolateConfigDir();
+  try {
+    const service = createFakeTUIService();
+    const first = newSession(service);
+    await first.start();
+    const id = first.currentSessionID();
+    service.seedTranscript(id, [
+      { role: "user", text: "use **bold** and `code`" },
+      { role: "assistant", text: "a **rendered** reply" },
+    ]);
+    await first.close();
+
+    const resumed = newSession(service, { resumeSession: id });
+    await resumed.start();
+    try {
+      const store = resumed.controller.store;
+      const rowIndex = store.messages.findIndex((row) =>
+        row === "a **rendered** reply"
+      );
+      assert(rowIndex >= 0, "the raw Markdown reprint is stored");
+      assertEquals(
+        store.messageKinds.get(rowIndex),
+        "assistant",
+        "the row renders through the assistant Markdown projection",
+      );
+    } finally {
+      await resumed.close();
+    }
+  } finally {
+    guard.restore();
+  }
+});
+
+Deno.test("a /sessions switch reprints the durable conversation", async () => {
+  // The switch command used to adopt the session and reset the transcript
+  // without reprinting it, so the conversation the Runtime replayed into the
+  // Agent stayed invisible.
+  const guard = isolateConfigDir();
+  try {
+    const service = createFakeTUIService();
+    const target = newSession(service);
+    await target.start();
+    const targetId = target.currentSessionID();
+    service.seedTranscript(targetId, [
+      { role: "user", text: "earlier question" },
+      { role: "assistant", text: "earlier **answer**" },
+    ]);
+    await target.close();
+
+    const live = newSession(service);
+    await live.start();
+    const ownId = live.currentSessionID();
+    const result = await live.switchSession(targetId);
+    try {
+      assertEquals(result.error, undefined, JSON.stringify(result));
+      assertEquals(live.currentSessionID(), targetId);
+      const rendered = rows(live).join("\n");
+      assertStringIncludes(rendered, "> earlier question");
+      assertStringIncludes(rendered, "earlier **answer**");
+      assert(
+        !rendered.includes(ownId),
+        "only the switched-to session's conversation prints",
+      );
+      const rowIndex = live.controller.store.messages.findIndex((row) =>
+        row === "earlier **answer**"
+      );
+      assertEquals(
+        live.controller.store.messageKinds.get(rowIndex),
+        "assistant",
+      );
+    } finally {
+      await live.close();
     }
   } finally {
     guard.restore();

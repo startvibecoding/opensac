@@ -1500,12 +1500,10 @@ export class TUISession implements CommandHost {
       if (message.role === "user") {
         this.controller.addMessage(`> ${message.text}`, "plain");
       } else {
-        this.controller.addMessage(
-          `${
-            this.translator.text("transcript.assistant_prefix")
-          }\n${message.text}`,
-          "plain",
-        );
+        // The row keeps the raw Markdown source and the assistant kind, so a
+        // reprinted history renders through the same Markdown projection as a
+        // live turn instead of showing literal ** and ` markers.
+        this.controller.addMessage(message.text, "assistant");
       }
     }
     if (messages.length > 0) {
@@ -1524,8 +1522,11 @@ export class TUISession implements CommandHost {
   }
 
   /**
-   * The newest persisted session of one working directory, with the directory
-   * it was found in so the caller can open it scoped to that same directory.
+   * The newest persisted session of one working directory that actually has a
+   * conversation, with the directory it was found in so the caller can open it
+   * scoped to that same directory. Sessions with no messages are skipped: every
+   * aborted or never-used startup persists an empty row, and "continue" means
+   * the newest conversation, not the newest file.
    */
   async #newestPersistedSession(
     workDir: string,
@@ -1536,6 +1537,7 @@ export class TUISession implements CommandHost {
     for (const entry of entries) {
       const at = new Date(entry.modTime).getTime();
       if (entry.sessionId === "" || !Number.isFinite(at)) continue;
+      if ((entry.messageCount ?? 0) <= 0) continue;
       if (at > bestTime) {
         bestTime = at;
         bestId = entry.sessionId;

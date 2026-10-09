@@ -3235,6 +3235,11 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
    */
   transcriptMessages(): CoreTranscriptMessage[] {
     const manager = this.#ensureManager();
+    // The terminal assistant entry is committed by the run store directly to
+    // the shared session database, so a manager retained across runs can be
+    // behind it. Reload before projecting: a reprint must show what the
+    // durable branch actually has, not a stale in-memory branch.
+    manager.reload();
     const projected: CoreTranscriptMessage[] = [];
     for (const message of manager.getReplayState().messages) {
       if (message.role === "user") {
@@ -3955,6 +3960,27 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
         for await (
           const event of agent.runWithUserMessage(userMessage, signal)
         ) {
+          // The durable Run's facts and its terminal assistant message are
+          // staged by the shared execution observation (the same contract ACP
+          // uses). Without it `FinishDurable` has no assistant message to
+          // append, and a resumed front end reprints only the user turns.
+          // A child agent's terminal events must not mutate the parent Run.
+          if (
+            (event.agentId ?? "") === "" ||
+            (event.type !== EVENT_RUN_FINISHED && event.type !== EVENT_ERROR)
+          ) {
+            try {
+              execution.observeAgentEvent(event);
+            } catch (observeErr) {
+              console.error(
+                `[core] observe agent event for ${runId}: ${
+                  observeErr instanceof Error
+                    ? observeErr.message
+                    : String(observeErr)
+                }`,
+              );
+            }
+          }
           if (
             reverseRequest !== undefined &&
             (event.type === EVENT_TOOL_APPROVAL_REQUEST ||
@@ -4015,7 +4041,6 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
           };
           if (event.type === EVENT_ERROR) payload.status = "failed";
           if (shared.terminal) {
-            terminal = true;
             const status = payload.status;
             terminalState = status === "cancelled" || status === "canceled"
               ? "cancelled"
@@ -4024,6 +4049,15 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
               : status === "timed_out"
               ? "timed_out"
               : "completed";
+            // Commit the durable terminal transition *before* the terminal
+            // event becomes visible to subscribers. A front end that reprints
+            // on the terminal event (or reads the transcript right after the
+            // run it just hosted finished) must see the finalized assistant
+            // entry, not a half-committed branch. The flag is raised only
+            // after the commit, so a failed commit still takes the existing
+            // failure path below.
+            execution.finishWithState(runId, terminalState);
+            terminal = true;
           }
           yield {
             sessionId,
@@ -4037,7 +4071,6 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
         if (!terminal) {
           throw new Error("agent event stream ended without terminal event");
         }
-        execution.finishWithState(runId, terminalState);
       } catch (error) {
         execution.finishWithState(runId, "failed");
         yield {

@@ -255,6 +255,15 @@ export function stripANSI(s: string): string {
 /**
  * Wraps ANSI-styled text at word boundaries. `lineSpacing` controls blank lines
  * between wrapped segments.
+ *
+ * Two invariants keep styled text aligned:
+ * - A word wider than the available cells (a space-free CJK run, or one long
+ *   bold/code span) is hard-split at cell boundaries. Without this the line
+ *   overflows the render width and the terminal re-wraps it mid-style, which
+ *   shifts every following row.
+ * - A new line re-opens the style state as of the *start* of the word that was
+ *   pushed onto it, not the state after the word's own escapes were consumed.
+ *   Otherwise the first wrapped continuation loses the span's color/bold.
  */
 export function wrapANSI(
   text: string,
@@ -267,7 +276,7 @@ export function wrapANSI(
   if (segs.length === 0) return "";
   const indentW = visualWidth(indent);
   let availWidth = maxWidth - indentW;
-  if (availWidth < 10) availWidth = 10;
+  if (availWidth < 1) availWidth = 1;
 
   let out = "";
   let line = "";
@@ -275,31 +284,57 @@ export function wrapANSI(
   let activeStyles = "";
   let lineHasContent = false;
 
-  const flushLine = () => {
+  const flushLine = (startStyles: string) => {
     out += line + "\n";
     for (let i = 0; i < lineSpacing; i++) out += "\n";
     line = "";
     col = 0;
     lineHasContent = false;
     line += indent;
-    if (activeStyles !== "") line += activeStyles;
+    if (startStyles !== "") line += startStyles;
   };
 
   let word = "";
   let wordCol = 0;
+  // Style state when the pending word started. Escapes already collected into
+  // `word` have advanced `activeStyles`, so a break before the word must
+  // restore this snapshot instead.
+  let wordStartStyles = "";
+
+  const beginWord = () => {
+    if (word === "") wordStartStyles = activeStyles;
+  };
 
   const flushWord = () => {
     if (wordCol === 0) return;
-    if (lineHasContent && col + wordCol > availWidth) flushLine();
-    line += word;
-    col += wordCol;
-    lineHasContent = true;
+    if (wordCol > availWidth) {
+      for (const chunk of splitStyledWord(word, availWidth, wordStartStyles)) {
+        if (chunk.width === 0) {
+          line += chunk.text;
+          continue;
+        }
+        if (lineHasContent && col + chunk.width > availWidth) {
+          flushLine(chunk.startStyles);
+        }
+        line += chunk.text;
+        col += chunk.width;
+        lineHasContent = true;
+      }
+    } else {
+      if (lineHasContent && col + wordCol > availWidth) {
+        flushLine(wordStartStyles);
+      }
+      line += word;
+      col += wordCol;
+      lineHasContent = true;
+    }
     word = "";
     wordCol = 0;
   };
 
   for (const seg of segs) {
     if (!seg.visible) {
+      beginWord();
       word += seg.text;
       if (seg.text === ansiReset) activeStyles = "";
       else activeStyles += seg.text;
@@ -310,13 +345,14 @@ export function wrapANSI(
         flushWord();
         const chW = runeVisualWidth(ch);
         if (col + chW > availWidth && lineHasContent) {
-          flushLine();
+          flushLine(activeStyles);
         } else {
           line += ch;
           col += chW;
           lineHasContent = true;
         }
       } else {
+        beginWord();
         word += ch;
         wordCol += runeVisualWidth(ch);
       }
@@ -325,6 +361,55 @@ export function wrapANSI(
   flushWord();
   out += line;
   return out;
+}
+
+interface WordChunk {
+  text: string;
+  width: number;
+  startStyles: string;
+}
+
+/**
+ * Splits one overlong word into lines of at most `availWidth` visible cells.
+ * Escape sequences stay attached to the chunk that carries the text they
+ * first apply to, and each chunk records the style state at its start so the
+ * wrapper can re-open it after a break.
+ */
+function splitStyledWord(
+  word: string,
+  availWidth: number,
+  wordStartStyles: string,
+): WordChunk[] {
+  const chunks: WordChunk[] = [];
+  let text = "";
+  let width = 0;
+  let styles = wordStartStyles;
+  let chunkStyles = wordStartStyles;
+  const push = () => {
+    if (text === "") return;
+    chunks.push({ text, width, startStyles: chunkStyles });
+    text = "";
+    width = 0;
+    chunkStyles = styles;
+  };
+  for (const seg of parseANSI(word)) {
+    if (!seg.visible) {
+      text += seg.text;
+      if (seg.text === ansiReset) styles = "";
+      else styles += seg.text;
+      continue;
+    }
+    for (const ch of seg.text) {
+      const chW = runeVisualWidth(ch);
+      // A single wide cell can legitimately exceed availWidth (availWidth 1);
+      // never split before the first cell, or the chunk loop makes no progress.
+      if (width > 0 && width + chW > availWidth) push();
+      text += ch;
+      width += chW;
+    }
+  }
+  push();
+  return chunks;
 }
 
 function hardWrapANSI(text: string, maxWidth: number): string[] {
@@ -663,7 +748,7 @@ export class Renderer {
         const lines = wrapped.split("\n");
         lines.forEach((line, i) => {
           if (i === 0) this.#buf += line;
-          else this.#buf += "\n" + contIndent + line;
+          else this.#buf += "\n" + (line === "" ? "" : contIndent + line);
         });
       } else {
         this.#renderNode(child);

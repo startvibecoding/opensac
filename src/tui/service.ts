@@ -1555,9 +1555,11 @@ export function createFakeTUIService(): FakeTUIService {
       sessionId: string,
       messages: TUITranscriptMessage[],
     ): void {
-      requireSession(sessionId).transcript.push(
+      const session = requireSession(sessionId);
+      session.transcript.push(
         ...messages.map((message) => ({ ...message })),
       );
+      session.messageCount += messages.length;
     },
 
     get transientAnswer(): string {

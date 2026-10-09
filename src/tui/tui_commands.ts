@@ -68,6 +68,15 @@ interface TUIHost {
   adoptSession(view: TUISessionView): void;
   /** Creates one fresh Core-owned session and adopts its view. */
   createFreshSession(): Promise<TUISessionView>;
+  /**
+   * Opens one persisted session, adopts it, and reprints its durable
+   * conversation (the shared `-c`/`-r`/`/sessions` resume projection).
+   */
+  resumePersistedSession(
+    sessionId: string,
+    workDir?: string,
+    resolvedView?: TUISessionView,
+  ): Promise<void>;
   setMode(mode: string): void;
   /** Starts (or reports) the Core-owned ESM continuation worker. */
   startESMContinuationIfIdle(): Promise<void>;
@@ -402,17 +411,19 @@ export class TuiCommands {
     }
     try {
       // Scope the open to the directory the listing found the session in, so a
-      // shared Core whose startup directory differs still resolves it.
+      // shared Core whose startup directory differs still resolves it. The
+      // switch then reprints the durable conversation through the same
+      // resume projection as `-c`/`-r`: an adopted session whose history stays
+      // invisible is not a continuation.
       const view = await this.#host.service.openSession({
         sessionId: detail.sessionId,
         workDir: detail.workDir,
       });
-      this.#host.adoptSession(view);
-      // A persisted session mode wins; an empty one falls back to the yolo
-      // product default (the Runtime re-resolves source-forced modes).
-      this.#host.setMode(view.mode !== "" ? view.mode : "yolo");
-      this.#host.controller.store.resetTranscriptState();
-      this.#host.controller.resetContextUsage();
+      await this.#host.resumePersistedSession(
+        detail.sessionId,
+        detail.workDir,
+        view,
+      );
       return {
         message: tr.text(
           "sessions.switched",

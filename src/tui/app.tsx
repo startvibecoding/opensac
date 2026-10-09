@@ -29,6 +29,7 @@ import { formatToolGroup, formatToolRow } from "./tool_row_format.ts";
 import { CompactThinkingRow } from "./thinking_display.tsx";
 import { CompactToolRow } from "./tool_execution_display.tsx";
 import { stripANSI } from "./renderutil.ts";
+import { renderMarkdown, renderStreamingMarkdown } from "./markdown.ts";
 
 export interface AppProps {
   /** The event-dispatch controller owning the transcript. */
@@ -141,7 +142,7 @@ function ControllerApp({
     return (
       <Box flexDirection="column">
         <Static items={admission.view}>
-          {(row) => renderRow(row, false, store)}
+          {(row) => renderRow(row, false, store, width)}
         </Static>
         {controller.shownApproval && renderApproval(controller)}
         {controller.shownQuestion && renderQuestion(controller)}
@@ -260,7 +261,7 @@ function ControllerApp({
   return (
     <Box flexDirection="column">
       <Static items={staticItems}>
-        {(row) => renderRow(row, false, store)}
+        {(row) => renderRow(row, false, store, width)}
       </Static>
 
       {
@@ -301,7 +302,8 @@ function ControllerApp({
         </Box>
       )}
 
-      {!overlayOpen && streaming.map((row) => renderRow(row, true, store))}
+      {!overlayOpen &&
+        streaming.map((row) => renderRow(row, true, store, width))}
       {controller.shownApproval !== undefined && renderApproval(controller)}
       {controller.shownQuestion !== undefined && renderQuestion(controller)}
       {!overlayOpen && controller.coreConnectionNotice !== "" && (
@@ -349,6 +351,7 @@ function renderRow(
   row: TranscriptRow,
   streaming: boolean,
   store?: TranscriptStore,
+  width = 80,
 ): ReactElement {
   if (row.kind === "header") {
     return <Text key={row.id}>{row.text}</Text>;
@@ -377,15 +380,10 @@ function renderRow(
     return <Text key={row.id} color="yellow">{row.text}</Text>;
   }
   if (row.kind === "assistant") {
-    const prefix = store
-      ? storeTranslator(store).text("transcript.assistant_display_prefix")
-      : "[assistant]: ";
-    return (
-      <Text key={row.id}>
-        {prefix}
-        {streaming ? stripANSI(clip(row.text, 6)) : row.text}
-      </Text>
-    );
+    const markdown = streaming
+      ? clip(renderStreamingMarkdown(row.text, width), 6)
+      : renderMarkdown(row.text, width);
+    return <Text key={row.id}>{markdown}</Text>;
   }
   return (
     <Text key={row.id}>
@@ -415,6 +413,8 @@ function messageRowKind(
       return "warning";
     case "status":
       return "status";
+    case "assistant":
+      return "assistant";
     default:
       return "plain";
   }
@@ -509,7 +509,7 @@ function store_end(controller: AppController): number {
 }
 
 function clip(text: string, maxLines = 6): string {
-  const lines = stripANSI(text).split("\n");
+  const lines = text.split("\n");
   if (lines.length <= maxLines) return text;
   return lines.slice(lines.length - maxLines).join("\n") + "\n";
 }
