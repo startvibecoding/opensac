@@ -247,10 +247,10 @@ function emptyDash(s: string): string {
 /** Best-effort cross-platform URL opener; rejects when no candidate exists. */
 export async function openInDefaultBrowser(url: string): Promise<void> {
   const candidates = browserCommands();
-  for (const [command, ...args] of candidates) {
-    const found = await commandExists(command);
-    if (!found) continue;
-    const child = new Deno.Command(command, { args: [...args, url] }).spawn();
+  for (const [program, ...args] of candidates) {
+    const resolved = resolveOpener(program);
+    if (resolved === null) continue;
+    const child = new Deno.Command(resolved, { args: [...args, url] }).spawn();
     await child.status;
     return;
   }
@@ -262,23 +262,52 @@ function browserCommands(): string[][] {
     case "darwin":
       return [["open"]];
     case "windows":
-      return [["rundll32", "url.dll,FileProtocolHandler"]];
+      // `cmd /c start` is the canonical default-handler path; rundll32 stays
+      // as a fallback for hosts where START is unavailable.
+      return [["cmd.exe", "/c", "start", ""], [
+        "rundll32.exe",
+        "url.dll,FileProtocolHandler",
+      ]];
     default:
       return [["xdg-open"], ["gio", "open"], ["sensible-browser"]];
   }
 }
 
-async function commandExists(command: string): Promise<boolean> {
+/**
+ * Resolves an opener program to an absolute path without shelling out to
+ * `which`/`where`. On Windows the lookup honours PATHEXT, so a bare
+ * `rundll32`/`cmd` name resolves the same way the shell would, and a missing
+ * helper returns null instead of failing the spawn.
+ */
+function resolveOpener(program: string): string | null {
+  if (program.includes("/") || program.includes("\\")) {
+    return isFile(program) ? program : null;
+  }
+  const pathEnv = Deno.env.get("PATH") ?? "";
+  const windows = Deno.build.os === "windows";
+  const sep = windows ? ";" : ":";
+  const exts = windows
+    ? [
+      "",
+      ...(Deno.env.get("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
+        .split(";")
+        .map((e) => e.trim())
+        .filter((e) => e !== ""),
+    ]
+    : [""];
+  for (const dir of pathEnv.split(sep)) {
+    if (dir === "") continue;
+    for (const ext of exts) {
+      const candidate = path.join(dir, program + ext);
+      if (isFile(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+function isFile(p: string): boolean {
   try {
-    const args = Deno.build.os === "windows"
-      ? ["where", command]
-      : ["which", command];
-    const result = await new Deno.Command(args[0], {
-      args: args.slice(1),
-      stdout: "null",
-      stderr: "null",
-    }).output();
-    return result.success;
+    return Deno.statSync(p).isFile;
   } catch {
     return false;
   }

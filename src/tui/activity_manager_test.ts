@@ -107,6 +107,11 @@ Deno.test("format helpers render compact labels", () => {
     getToolDisplayName("read", { file_path: "/tmp/a.txt" }),
     "Read a.txt",
   );
+  // Windows backslash paths render their file name, not the whole path.
+  assertEquals(
+    getToolDisplayName("read", { file_path: "C:\\Users\\dev\\a.txt" }),
+    "Read a.txt",
+  );
   assertEquals(
     getToolDisplayName("write", { file_path: "/tmp/b.txt" }),
     "Write b.txt",

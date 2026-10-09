@@ -382,6 +382,15 @@ export function isParentTool(toolName: string): boolean {
 }
 
 /**
+ * Extracts the final path segment. Tool input paths arrive in the host's own
+ * syntax, so a Windows backslash path must not render as one long "file name";
+ * accept either separator regardless of the platform this process runs on.
+ */
+function pathBaseName(p: string): string {
+  const separator = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return separator >= 0 ? (p.slice(separator + 1) || p) : p;
+}
+/**
  * Generates a display-friendly tool name.
  */
 export function getToolDisplayName(
@@ -402,8 +411,7 @@ export function getToolDisplayName(
     case "read": {
       const filePath = toolInput?.file_path as string | undefined;
       if (filePath) {
-        const fileName = filePath.split("/").pop() || filePath;
-        return `Read ${fileName}`;
+        return `Read ${pathBaseName(filePath)}`;
       }
       return "Read file";
     }
@@ -411,8 +419,7 @@ export function getToolDisplayName(
     case "write": {
       const writePath = toolInput?.file_path as string | undefined;
       if (writePath) {
-        const fileName = writePath.split("/").pop() || writePath;
-        return `Write ${fileName}`;
+        return `Write ${pathBaseName(writePath)}`;
       }
       return "Write file";
     }
@@ -420,8 +427,7 @@ export function getToolDisplayName(
     case "edit": {
       const editPath = toolInput?.file_path as string | undefined;
       if (editPath) {
-        const fileName = editPath.split("/").pop() || editPath;
-        return `Edit ${fileName}`;
+        return `Edit ${pathBaseName(editPath)}`;
       }
       return "Edit file";
     }

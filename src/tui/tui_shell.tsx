@@ -70,9 +70,34 @@ export function TuiShell({
         current.onExit();
       }
     };
-    Deno.addSignalListener("SIGINT", onSignal);
-    return () => Deno.removeSignalListener("SIGINT", onSignal);
-  }, []);
+    // `Deno.addSignalListener("SIGINT")` throws on Windows, where the shim has
+    // no POSIX signal delivery to hook. In raw mode Ctrl+C arrives as the bare
+    // 0x03 byte on stdin instead (Ink's own exit-on-Ctrl+C watch for the same
+    // byte), so parse the emitted chunks and run the same handler. Signal
+    // listening stays the primary path everywhere that supports it.
+    let listening = false;
+    try {
+      Deno.addSignalListener("SIGINT", onSignal);
+      listening = true;
+    } catch {
+      // Signal listeners are unsupported on this host (e.g. Windows).
+    }
+    const decoder = new TextDecoder();
+    const onInputChunk = (chunk: unknown): void => {
+      const text = chunk instanceof Uint8Array
+        ? decoder.decode(chunk)
+        : String(chunk ?? "");
+      if (text === "\x03") onSignal();
+    };
+    const emitter = internal_eventEmitter;
+    if (!listening && emitter !== undefined) {
+      emitter.on("input", onInputChunk);
+    }
+    return () => {
+      if (listening) Deno.removeSignalListener("SIGINT", onSignal);
+      emitter?.off("input", onInputChunk);
+    };
+  }, [internal_eventEmitter]);
 
   useEffect(() => {
     setRawMode(true);
