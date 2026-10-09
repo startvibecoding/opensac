@@ -9,6 +9,7 @@ import {
   assert,
   assertEquals,
   assertRejects,
+  assertStringIncludes,
   assertThrows,
 } from "@opensac/assert";
 import {
@@ -373,6 +374,40 @@ Deno.test("execution runtime durable begin compensates create failure", () => {
   );
   assert(!runtime.active().active);
   assertEquals(runtime.stateValue(), RUN_STATE_FAILED);
+});
+
+Deno.test("a one-active-run conflict surfaces as a busy session, not raw SQL", () => {
+  // The partial unique index enforces at most one non-terminal run per
+  // session. When `-c`/`-r` resume a session that is live in another window,
+  // the insert collision must reach the user as an actionable busy state.
+  const store = new RecordingDurableRunStore();
+  store.createErr = new Error(
+    "UNIQUE constraint failed: session_runs.session_id",
+  );
+  const runtime = new ExecutionRuntime();
+  runtime.setRunStore(store);
+  const err = assertThrows(() =>
+    runtime.beginDurable(
+      undefined,
+      makeRun({ id: "run-2", sessionId: "session-busy" }),
+      {
+        sessionId: "",
+        runId: "",
+        eventType: "started",
+        status: "",
+        source: "",
+        model: "",
+        mode: "",
+      },
+    )
+  );
+  assertStringIncludes(err.message, "session session-busy");
+  assertStringIncludes(err.message, "already has an active run");
+  assert(
+    !err.message.includes("UNIQUE constraint"),
+    "the raw SQL constraint must not leak to the user",
+  );
+  assert(!runtime.active().active);
 });
 
 Deno.test("execution runtime intent admission and linked retry", () => {

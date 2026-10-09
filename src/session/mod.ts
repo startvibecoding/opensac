@@ -306,6 +306,7 @@ export {
   finishSessionRunAndConversationTurn,
   getActiveSessionRun,
   getSessionRun,
+  isActiveRunConflictError,
   latestSessionRunForIntent,
   listLatestSessionRuns,
   listOrphanedSessionRuns,

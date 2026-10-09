@@ -57,6 +57,8 @@ export interface SessionDetailAggregates {
   messageCounts: Map<string, number>;
   firstMessages: Map<string, string>;
   latestInfos: Map<string, string>;
+  /** Newest entry timestamp per session (ISO string, lexicographic = chronological). */
+  latestEntryTimestamps: Map<string, string>;
 }
 
 const sessionColumns = `id, cwd, timestamp, parent_session AS parentSession,
@@ -84,6 +86,7 @@ export class SessionDAO {
       messageCounts: new Map(),
       firstMessages: new Map(),
       latestInfos: new Map(),
+      latestEntryTimestamps: new Map(),
     };
     if (sessionIds.length === 0) return result;
     const db = this.requireDb();
@@ -97,6 +100,20 @@ export class SessionDAO {
     );
     for (const row of counts) {
       result.messageCounts.set(row.sessionId, Number(row.messageCount));
+    }
+    // Any entry is activity: a session's "modified" time is its newest entry,
+    // not its creation row, so continuation picks the conversation last used.
+    const latest = queryAll<{ sessionId: string; ts: string }>(
+      db,
+      `SELECT session_id AS sessionId, MAX(timestamp) AS ts
+       FROM entries WHERE session_id IN (${sql})
+       GROUP BY session_id`,
+      params,
+    );
+    for (const row of latest) {
+      if (typeof row.ts === "string" && row.ts !== "") {
+        result.latestEntryTimestamps.set(row.sessionId, row.ts);
+      }
     }
     const first = queryAll<{ sessionId: string; data: string }>(
       db,

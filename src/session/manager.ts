@@ -1600,6 +1600,21 @@ function buildSessionDetails(sessions: SessionInfo[]): SessionDetail[] {
     }
   }
 
+  // A session's modification time is its newest entry, not its creation row:
+  // `-c` and every "most recent session" surface must pick the conversation
+  // last used, which a freshly created but abandoned session is not. The
+  // creation timestamp stays the floor (an empty session was modified when
+  // it was created) and the identity path keeps embedding it.
+  for (const [sessionID, ts] of aggregates.latestEntryTimestamps) {
+    const idx = idPos.get(sessionID);
+    if (idx === undefined) continue;
+    const latest = parseSessionTimestamp(ts);
+    if (isNaN(latest.getTime())) continue;
+    if (latest.getTime() > details[idx].modTime.getTime()) {
+      details[idx].modTime = latest;
+    }
+  }
+
   details.sort((a, b) => b.modTime.getTime() - a.modTime.getTime());
   return details;
 }

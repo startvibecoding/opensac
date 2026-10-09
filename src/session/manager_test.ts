@@ -642,6 +642,45 @@ Deno.test("session manager: list for dir detailed", () => {
   });
 });
 
+Deno.test("session manager: detailed list orders by last activity, not creation", () => {
+  // `-c` continues "the most recent session" through this ordering. A freshly
+  // created but abandoned startup must not outrank the conversation that was
+  // actually used last, so modTime is the newest entry, floored by creation.
+  const sleepSync = (ms: number) =>
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  withTempDir((_dir, sessionDir) => {
+    const usedLast = createManager("/tmp/test", sessionDir);
+    usedLast.init();
+    usedLast.appendMessage(createUserMessage("first created"));
+    sleepSync(5);
+    const createdLast = createManager("/tmp/test", sessionDir);
+    createdLast.init();
+    sleepSync(5);
+    const before = new Date();
+    usedLast.appendMessage(createUserMessage("used last"));
+
+    const details = listForDirDetailed("/tmp/test", sessionDir);
+    assertEquals(details.length, 2);
+    assertEquals(details[0].id, usedLast.getHeader()!.id);
+    assertEquals(details[1].id, createdLast.getHeader()!.id);
+    assert(
+      details[0].modTime.getTime() >= before.getTime(),
+      `modTime ${details[0].modTime.toISOString()} predates the last append`,
+    );
+    // A session without later activity keeps its creation-time floor and
+    // never claims the newer activity of the other session.
+    assert(
+      details[1].modTime.getTime() >=
+        createdLast.getHeader()!.timestamp.getTime(),
+      "creation time is the modTime floor",
+    );
+    assert(
+      details[1].modTime.getTime() < before.getTime(),
+      "an unused session must not look newer than the last append",
+    );
+  });
+});
+
 Deno.test("session manager: list all detailed across work dirs with search and count", () => {
   withTempDir((_dir, sessionDir) => {
     const a = createManager("/tmp/alpha", sessionDir);

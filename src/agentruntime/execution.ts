@@ -44,6 +44,7 @@ import {
 } from "../session/runtime_lock.ts";
 import {
   type ExecutionIntent,
+  isActiveRunConflictError,
   type RuntimeLeaseSnapshot,
   type SessionRun,
 } from "../session/mod.ts";
@@ -1195,7 +1196,7 @@ export class ExecutionRuntime {
         } catch {
           // best effort compensation
         }
-        throw new Error(`${operation}: ${errorMessage(err)}`);
+        throw beginDurableError(operation, run, err);
       }
       event.id = startId;
       if (this.activeLocked(run.id)) {
@@ -1221,7 +1222,7 @@ export class ExecutionRuntime {
       } catch {
         // best effort compensation
       }
-      throw new Error(`${operation}: ${errorMessage(err)}`);
+      throw beginDurableError(operation, run, err);
     }
     if (this.activeLocked(run.id)) {
       this.durablePersisted = true;
@@ -2660,6 +2661,25 @@ function hasMethod(obj: unknown, name: string): boolean {
 function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+/**
+ * Maps a durable-run creation failure onto an adapter-neutral error. The
+ * one-active-run-per-session unique index rejecting an insert means the
+ * session is busy elsewhere (another window, or a run still terminalizing);
+ * that is an actionable state to report, not a raw SQL constraint failure.
+ */
+function beginDurableError(
+  operation: string,
+  run: { sessionId: string },
+  err: unknown,
+): Error {
+  if (isActiveRunConflictError(err)) {
+    return new Error(
+      `session ${run.sessionId} already has an active run; wait for it to finish or cancel it from the entry that started it`,
+    );
+  }
+  return new Error(`${operation}: ${errorMessage(err)}`);
 }
 
 function toError(err: unknown): Error {

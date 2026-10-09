@@ -108,6 +108,20 @@ function requireConn(db: Database): NonNullable<Database["db"]> {
   return conn;
 }
 
+/**
+ * Reports whether an error is the one-active-run-per-session unique index
+ * (`idx_session_runs_active_session`) rejecting a Run insert because the
+ * session already has a non-terminal Run. The raw SQLite message is a schema
+ * detail; callers must classify through this predicate instead of
+ * string-matching SQL, and must surface it as "the session is busy", never as
+ * an opaque constraint failure.
+ */
+export function isActiveRunConflictError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err))
+    .toLowerCase();
+  return message.includes("unique constraint failed: session_runs.session_id");
+}
+
 /** Reports whether a run status is a valid terminal predecessor transition. */
 export function allowedRunPredecessors(status: string): string[] {
   switch (status) {
