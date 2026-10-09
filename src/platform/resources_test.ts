@@ -8,6 +8,24 @@ Deno.test("resourceUrl resolves the source layout", () => {
   );
 });
 
+Deno.test("resourceUrl resolves every bundled resource in the source layout", () => {
+  // The DeepSeek tokenizer, the stats assets, and the BusyBox binaries each
+  // live under a different src/ subtree. A regression that resolves one level
+  // too high silently disabled every estimate and asset (the tokenizer load
+  // failure is swallowed), so each bundled family must stat here.
+  for (
+    const rel of [
+      "context/tokenizerdata/deepseek_v3_tokenizer.json",
+      "stats/dashboard.html",
+      "stats/opensac.png",
+      "platform/busybox_assets/busybox64u.exe",
+    ]
+  ) {
+    const url = resourceUrl(rel);
+    assert(Deno.statSync(url).size > 0, `missing resource: ${url.href}`);
+  }
+});
+
 Deno.test("resourceUrl recognizes an installed package layout", () => {
   const dir = Deno.realPathSync(Deno.makeTempDirSync());
   try {
