@@ -141,7 +141,7 @@ function ControllerApp({
     return (
       <Box flexDirection="column">
         <Static items={admission.view}>
-          {(row) => renderRow(row, false)}
+          {(row) => renderRow(row, false, store)}
         </Static>
         {controller.shownApproval && renderApproval(controller)}
         {controller.shownQuestion && renderQuestion(controller)}
@@ -260,7 +260,7 @@ function ControllerApp({
   return (
     <Box flexDirection="column">
       <Static items={staticItems}>
-        {(row) => renderRow(row, false)}
+        {(row) => renderRow(row, false, store)}
       </Static>
 
       {
@@ -301,7 +301,7 @@ function ControllerApp({
         </Box>
       )}
 
-      {!overlayOpen && streaming.map((row) => renderRow(row, true))}
+      {!overlayOpen && streaming.map((row) => renderRow(row, true, store))}
       {controller.shownApproval !== undefined && renderApproval(controller)}
       {controller.shownQuestion !== undefined && renderQuestion(controller)}
       {!overlayOpen && controller.coreConnectionNotice !== "" && (
@@ -345,13 +345,21 @@ function renderQuestion(controller: AppController): ReactElement {
 }
 
 /** Renders one transcript row; streaming rows are clipped and stripped. */
-function renderRow(row: TranscriptRow, streaming: boolean): ReactElement {
+function renderRow(
+  row: TranscriptRow,
+  streaming: boolean,
+  store?: TranscriptStore,
+): ReactElement {
   if (row.kind === "header") {
     return <Text key={row.id}>{row.text}</Text>;
   }
   if (row.kind === "think") {
+    const prefix = store
+      ? storeTranslator(store).text("transcript.think_prefix")
+      : "[think]: ";
     return (
       <Text key={row.id} dimColor italic>
+        {prefix}
         {streaming ? clip(row.text, 4) : row.text}
       </Text>
     );
@@ -367,6 +375,17 @@ function renderRow(row: TranscriptRow, streaming: boolean): ReactElement {
   }
   if (row.kind === "warning") {
     return <Text key={row.id} color="yellow">{row.text}</Text>;
+  }
+  if (row.kind === "assistant") {
+    const prefix = store
+      ? storeTranslator(store).text("transcript.assistant_display_prefix")
+      : "[assistant]: ";
+    return (
+      <Text key={row.id}>
+        {prefix}
+        {streaming ? stripANSI(clip(row.text, 6)) : row.text}
+      </Text>
+    );
   }
   return (
     <Text key={row.id}>
