@@ -190,6 +190,12 @@ export class RuntimeLeaseDAO {
     return row !== undefined;
   }
 
+  /**
+   * Transitions the caller's lease to purpose=execution. Ownership is proven by
+   * the exact owner/epoch/token fence, not wall-clock expiry: a lapsed heartbeat
+   * on a row we still own is an availability problem, so an expired-but-owned
+   * lease may still bind (a fenced takeover changes the epoch instead).
+   */
   bind(
     executor: DB,
     sessionId: string,
@@ -206,7 +212,6 @@ export class RuntimeLeaseDAO {
          run_id = ?, purpose = ?, updated_at = CAST(strftime('%s','now') AS INTEGER)
        WHERE session_id = ? AND owner_instance_id = ? AND epoch = ?
          AND lease_token_hash = ? AND state = ?
-         AND expires_at > CAST(strftime('%s','now') AS INTEGER)
          AND purpose IN (${sql}) AND (run_id = '' OR run_id = ?)`,
       [
         runId,

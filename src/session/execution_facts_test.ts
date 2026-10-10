@@ -104,6 +104,66 @@ test("ReadSessionExecutionFactsUsesCanonicalRunAndLease", () => {
   }
 });
 
+test("ReadSessionExecutionFactsKeepsLapsedOwnLeaseValid", () => {
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-facts-" });
+  try {
+    const sessionId = "execution-facts-lapsed";
+    makeSession(sessionDir, sessionId);
+    const guard = acquireExecutionAdmission(sessionDir, sessionId);
+    try {
+      // Lapse the heartbeat without a fenced takeover: the row is still ours.
+      const db = openRootDB(sessionDir);
+      db.db!.run(
+        "UPDATE session_runtime_leases SET expires_at = CAST(strftime('%s','now') AS INTEGER) - 1 WHERE session_id = ?",
+        sessionId,
+      );
+
+      const facts = readSessionExecutionFacts(sessionDir, sessionId);
+      assert(facts.lease !== null);
+      assertEquals(facts.lease!.state, "active");
+      assert(
+        facts.lease!.valid,
+        "a lapsed lease that still carries our identity is still ours",
+      );
+    } finally {
+      guard.release();
+    }
+  } finally {
+    closeAll();
+  }
+});
+
+test("BindRuntimeLeaseKeepsLapsedOwnLeaseBindable", () => {
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-facts-" });
+  try {
+    const sessionId = "execution-facts-bind-lapsed";
+    makeSession(sessionDir, sessionId);
+    const guard = acquireExecutionAdmission(sessionDir, sessionId);
+    try {
+      makeRun(sessionDir, sessionId, "run-bind-lapsed", "running");
+      // Lapse the heartbeat without a fenced takeover: the row is still ours,
+      // so binding the Run must not be rejected on wall-clock expiry alone.
+      const db = openRootDB(sessionDir);
+      db.db!.run(
+        "UPDATE session_runtime_leases SET expires_at = CAST(strftime('%s','now') AS INTEGER) - 1 WHERE session_id = ?",
+        sessionId,
+      );
+
+      const binding = bindRuntimeLeaseToExistingRun(
+        sessionDir,
+        sessionId,
+        "run-bind-lapsed",
+      );
+      assertEquals(binding.purpose, "execution");
+      assertEquals(binding.runId, "run-bind-lapsed");
+    } finally {
+      guard.release();
+    }
+  } finally {
+    closeAll();
+  }
+});
+
 test("ReadSessionExecutionFactsPreservesReleasedLeaseTombstone", () => {
   const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-facts-" });
   try {

@@ -13,6 +13,7 @@ import { nonTerminalSessionRunStatuses } from "./run_status.ts";
 import { type SessionRun, sessionRunFromRecord } from "./run_store.ts";
 import { runtimeDatabaseIdentityFor } from "./runtime_lock.ts";
 import { type RuntimeLeasePurpose } from "./runtime_lock.ts";
+import { runtimeOwnerID } from "./runtime_identity.ts";
 
 /**
  * An immutable database view of one Session lease. `tokenHash` is an internal
@@ -33,6 +34,13 @@ export interface RuntimeLeaseSnapshot {
   heartbeatAt: Date;
   expiresAt: Date;
   updatedAt: Date;
+  /**
+   * Reports whether the lease is still a live claim: active and either not yet
+   * expired or still carrying this process's identity. A lapsed heartbeat on a
+   * row we still own is an availability problem, not ownership loss, so it must
+   * not be treated as orphaned; only a fenced takeover or an explicit release
+   * makes the row recoverable.
+   */
   valid: boolean;
 }
 
@@ -55,7 +63,9 @@ export interface SessionExecutionFacts {
 
 /**
  * Reads the durable execution facts for one Session from a single transaction.
- * It deliberately does not consult process-local runtime state.
+ * It never consults in-memory runtime state: the only process-local input is the
+ * stable `runtimeOwnerID()` it compares against the row's durable owner
+ * identity, which decides whether a lapsed lease is still our live claim.
  */
 export function readSessionExecutionFacts(
   sessionDir: string,
@@ -114,7 +124,9 @@ export function readSessionExecutionFacts(
         heartbeatAt: new Date(record.heartbeatAt * 1000),
         expiresAt: new Date(record.expiresAt * 1000),
         updatedAt: new Date(record.updatedAt * 1000),
-        valid: record.state === "active" && record.expiresAt > now,
+        valid:
+          record.state === "active" &&
+          (record.expiresAt > now || record.ownerId === runtimeOwnerID()),
       };
     }
     return facts;

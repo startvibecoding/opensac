@@ -319,8 +319,10 @@ async function recoverOrphanedRun(
   }
   if (facts.lease !== null && facts.lease.valid) {
     // The lease may be external execution, an admission hand-off, or another
-    // recovery worker. None can be overridden merely because this process has
-    // no matching in-memory runtime.
+    // recovery worker, and it may be ours after a transient heartbeat lapse
+    // (`valid` keeps an expired row that still carries our identity). None can
+    // be overridden merely because this process has no matching in-memory
+    // runtime: only a fenced takeover or an explicit release makes it valid.
     return "";
   }
   if (

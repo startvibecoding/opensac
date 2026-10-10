@@ -180,6 +180,56 @@ test("inspectSessionExecutionTracksLocalLifecycle", () => {
   }
 });
 
+test("inspectSessionExecutionKeepsLapsedLiveLeaseLocal", () => {
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-snapshot-" });
+  try {
+    initSession(sessionDir, "snapshot-lapsed");
+    const lease = acquireExecutionAdmission(sessionDir, "snapshot-lapsed");
+    const execution = new ExecutionRuntime();
+    execution.setRunStore(new RunStore(sessionDir));
+    try {
+      const now = new Date();
+      execution.beginDurable(
+        undefined,
+        makeRun({
+          id: "run-lapsed",
+          sessionId: "snapshot-lapsed",
+          status: RUN_STATE_RUNNING,
+          startedAt: now,
+        }),
+        runEvent("snapshot-lapsed", "run-lapsed", "started"),
+      );
+      // The Runtime retains the lease, so the adapter releases its admission
+      // guard exactly as every entry point does once the durable run exists.
+      lease.release();
+      // Lapse the heartbeat without any fenced takeover: the row is still ours,
+      // so the run is not orphaned and must remain locally cancellable.
+      const db = openRootDB(sessionDir);
+      db.db!.run(
+        "UPDATE session_runtime_leases SET expires_at = CAST(strftime('%s','now') AS INTEGER) - 1 WHERE session_id = ?",
+        "snapshot-lapsed",
+      );
+
+      const snapshot = inspectSessionExecution(sessionDir, "snapshot-lapsed");
+      assertEquals(snapshot.state, SESSION_EXECUTION_LOCAL);
+      assert(snapshot.running, "a lapsed live run must still report running");
+      assert(
+        snapshot.canCancelLocal,
+        "a lapsed live run must still be cancellable locally",
+      );
+    } finally {
+      try {
+        execution.finishWithState("run-lapsed", "cancelled");
+      } catch {
+        // The run may already be terminal; nothing to unwind.
+      }
+      lease.release();
+    }
+  } finally {
+    closeDatabases();
+  }
+});
+
 test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () => {
   const cases: {
     name: string;

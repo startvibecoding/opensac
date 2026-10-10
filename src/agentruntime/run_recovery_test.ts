@@ -8,7 +8,7 @@
 
 import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
-import { closeDatabases } from "../session/root_db.ts";
+import { closeDatabases, openRootDB } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission,
@@ -16,16 +16,19 @@ import {
   getSessionRunRecovery,
   saveResponseRun,
   type SessionRun,
+  validateRuntimeLeaseTx,
 } from "../session/mod.ts";
 import {
   defaultRunRecoveryPolicy,
   type DurableRun,
+  ExecutionRuntime,
   recoverOrphanedRuns,
   recoverOrphanedRunsWithTrigger,
   recoverOrphanedSessionRun,
   RECOVERY_FAIL_LOCAL,
   RECOVERY_KEEP_REMOTE,
   recoveryWorkerLimit,
+  RUN_STATE_RUNNING,
   RunStore,
 } from "./mod.ts";
 import { test } from "#testing";
@@ -317,6 +320,71 @@ test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
       );
     } finally {
       guard.release();
+    }
+  } finally {
+    closeDatabases();
+  }
+});
+
+test("RecoverOrphanedRunsSkipsExpiredLeaseHeldByLiveProcess", async () => {
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
+  try {
+    initRecoveryTestSession(sessionDir, "session-live-owned");
+    const guard = acquireExecutionAdmission(sessionDir, "session-live-owned");
+    const store = new RunStore(sessionDir);
+    const execution = new ExecutionRuntime();
+    execution.setRunStore(store);
+    try {
+      const now = new Date();
+      execution.beginDurable(
+        undefined,
+        durableRun({
+          id: "live-owned",
+          sessionId: "session-live-owned",
+          source: "acp",
+          status: RUN_STATE_RUNNING,
+          startedAt: now,
+        }),
+        {
+          sessionId: "session-live-owned",
+          runId: "live-owned",
+          eventType: "started",
+          source: "acp",
+          status: RUN_STATE_RUNNING,
+          model: "",
+          mode: "",
+          timestamp: now,
+        },
+      );
+      // The Runtime now retains the lease, so the adapter releases its
+      // admission guard (and the process-local mutex) exactly as every entry
+      // point does once the durable run exists.
+      guard.release();
+      // Lapse the heartbeat. The row is still active and still carries this
+      // process's identity, so the live run must not be failed: expiry alone is
+      // not ownership loss.
+      const db = openRootDB(sessionDir);
+      db.db!.run(
+        "UPDATE session_runtime_leases SET expires_at = CAST(strftime('%s','now') AS INTEGER) - 1 WHERE session_id = ?",
+        "session-live-owned",
+      );
+
+      const result = await recoverOrphanedRuns(sessionDir, null, null);
+      assertEquals(result.failed.length, 0);
+      assertEquals(
+        result.skipped.map((r) => r.id),
+        ["live-owned"],
+      );
+      assertEquals(getSessionRun(sessionDir, "live-owned")!.status, "running");
+      // The expired-but-owned lease must still accept the owner's writes.
+      validateRuntimeLeaseTx(db.db!, sessionDir, "session-live-owned");
+    } finally {
+      guard.release();
+      try {
+        execution.finishWithState("live-owned", "cancelled");
+      } catch {
+        // The run may already be terminal; nothing to unwind.
+      }
     }
   } finally {
     closeDatabases();
