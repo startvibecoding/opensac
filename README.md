@@ -88,7 +88,8 @@ and a small loader (`scripts/loader/ts_loader.mjs`) transpiles the Ink `.tsx`
 sources. The toolchain lives in `package.json`, `tsconfig.json`, and
 `.prettierrc.json`; the Node runtime helpers every module imports live in
 `src/platform/runtime.ts` (with `runtime_core.ts`/`runtime_net.ts`), loaded by
-`scripts/test/preload.mjs` for tests and by `src/main.ts` for the CLI.
+`scripts/test/preload.mjs`, which `npm start` and the test runner register with
+`node --import`.
 
 ## Releases
 

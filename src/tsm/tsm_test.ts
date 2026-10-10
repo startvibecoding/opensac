@@ -223,6 +223,25 @@ test("render unordered list with task golden", () => {
   );
 });
 
+test("list continuations stay compact when Markdown wraps", () => {
+  const out = stripANSI(
+    gsmRender(
+      "- a long list item that wraps onto continuation lines without gaps",
+      20,
+    ),
+  );
+  const lines = out.trimEnd().split("\n");
+  assert(lines.length > 1, out);
+  assertEquals(
+    lines.some((line) => line === ""),
+    false,
+    out,
+  );
+  for (const line of lines) {
+    assert(visualWidth(line) <= 20, `line too wide: ${JSON.stringify(line)}`);
+  }
+});
+
 test("render ordered list has no trailing blank line (Go quirk)", () => {
   const out = gsmRender("3. third\n4. fourth", 20);
   assertEquals(

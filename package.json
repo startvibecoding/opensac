@@ -12,14 +12,14 @@
     "#testing/*": "./src/testing/*.ts"
   },
   "scripts": {
-    "start": "node src/main.ts",
+    "start": "node --import ./scripts/test/preload.mjs src/main.ts",
     "run": "npm run start",
     "version": "node scripts/version.ts",
     "gen:worker-sources": "node scripts/gen_worker_sources.ts",
     "build:node": "node scripts/build_node.ts",
     "pack:node": "npm run build:node && node scripts/pack_node.ts",
     "publish:node": "node scripts/npm_publish_if_needed.ts --tag latest dist/node",
-    "install:cli": "npm link",
+    "install:cli": "npm run build:node && npm install -g --install-links ./dist/node",
     "test": "node --import ./scripts/test/preload.mjs --test",
     "test:architecture": "node --import ./scripts/test/preload.mjs --test src/architecture/*_test.ts",
     "check": "tsc -p tsconfig.json",

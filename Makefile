@@ -44,7 +44,7 @@ help:
 	@echo "  (npmjs publishes opensac-installer; the bare name 'opensac' collides with 'openai')"
 	@echo ""
 	@echo "Development targets:"
-	@echo "  install          Link the CLI globally from source"
+	@echo "  install          Build the Node package and install the CLI globally"
 	@echo "  run              Start the TUI from source"
 	@echo "  test             Run the test suite"
 	@echo "  test-arch        Run the architecture guard tests"
@@ -104,8 +104,14 @@ node-publish-github:
 
 # Development
 
+# The root package.json is a private workspace without a `bin` entry, so
+# `npm link` installs no command. Build the platform-independent package
+# into $(NODE_DIR) and install that globally. `--install-links` makes npm
+# copy the tree and fetch its declared dependencies instead of symlinking
+# back into dist/, so the CLI survives `make clean` and repo changes.
 install:
-	$(NPM) link
+	$(NPM) run build:node
+	$(NPM) install -g --install-links ./$(NODE_DIR)
 
 run:
 	$(NPM) start

@@ -748,7 +748,10 @@ export class Renderer {
           tmp,
           this.width - markerW,
           "",
-          this.theme.lineSpacing,
+          // A list item's continuation is one logical row. Paragraph spacing
+          // between wrapped lines leaves an empty, unindented spacer after
+          // every marker and makes Markdown lists look broken in the TUI.
+          0,
         );
         const lines = wrapped.split("\n");
         lines.forEach((line, i) => {

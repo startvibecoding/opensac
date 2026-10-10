@@ -1,9 +1,10 @@
 // Tests for the transcript/scrollback streaming skeleton.
 
 import { assert, assertEquals } from "../compat/assert.ts";
-import type { ReactElement } from "react";
+import React, { type ReactElement } from "react";
 import { render } from "ink";
 import { MarkdownBlock, renderMarkdown, Transcript } from "./mod.ts";
+import { admitCompletedTranscriptBlocks } from "./transcript.tsx";
 import { type TranscriptBlock } from "./mod.ts";
 import { test } from "#testing";
 
@@ -54,7 +55,7 @@ function tick(): Promise<void> {
 }
 
 function view(blocks: TranscriptBlock[]): ReactElement {
-  return Transcript({ blocks, width: 40 });
+  return React.createElement(Transcript, { blocks, width: 40 });
 }
 
 test("markdown helpers delegate to tsm", () => {
@@ -97,6 +98,31 @@ test({
     assert(stdout.output.includes("hello"));
     assert(stdout.output.includes("item"));
   },
+});
+
+test("out-of-order completion appends instead of reordering Static items", () => {
+  const ids = new Set<string>();
+  let admitted: TranscriptBlock[] = [];
+  admitted = admitCompletedTranscriptBlocks(admitted, ids, [
+    { id: "first", text: "first finished", done: false },
+    { id: "second", text: "second finished", done: true },
+  ]);
+  assertEquals(
+    admitted.map((block) => block.id),
+    ["second"],
+  );
+
+  // `first` inserts before `second` in source order. Ink's Static indexes
+  // its input rather than its React keys, so the second admission must append
+  // `first` instead of handing Ink a reordered array that reprints `second`.
+  admitted = admitCompletedTranscriptBlocks(admitted, ids, [
+    { id: "first", text: "first finished", done: true },
+    { id: "second", text: "second finished", done: true },
+  ]);
+  assertEquals(
+    admitted.map((block) => block.id),
+    ["second", "first"],
+  );
 });
 
 test({

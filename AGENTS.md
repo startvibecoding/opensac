@@ -123,7 +123,7 @@ When a proposed change appears to require a new runtime, manager, lifecycle, res
 npm start                           # run the CLI/TUI from source
 npm run build:node                  # esbuild -> dist/node (platform-independent npm package)
 npm run pack:node                   # build + npm pack into dist/npm/
-npm link                            # link the CLI globally from source
+npm install -g ./dist/node          # build, then install the CLI globally
 npm test                            # node --test (full suite)
 node --import ./scripts/test/preload.mjs --test src/tools/*_test.ts   # focused module tests
 node --import ./scripts/test/preload.mjs --test --test-name-pattern=Foo src/tools/*_test.ts  # focused test
@@ -147,7 +147,7 @@ make check / lint / fmt / check-fmt  # same checks as the npm scripts
 make version                     # the version a build would embed
 ```
 
-`npm link` publishes the CLI to the global bin directory through the package `bin` field. The package's bare specifiers (`ink`, `react`, the project-owned `src/compat/` modules through their relative paths, and `node:` builtins) resolve from `node_modules`, so run it after `npm install`.
+The root package is a private workspace without a `bin` entry, so `npm link` installs no command; `make install` (or `npm run install:cli`) builds the platform-independent package into `dist/node` and installs it globally via `npm install -g ./dist/node`. The published package's bare specifiers (`ink`, `react`, and `node:` builtins) resolve from the global install's `node_modules`, so run `npm install` before building.
 
 Node ships the `node:test` runner but no built-in fuzzer and no race detector: `npm run fuzz` runs property-based tests (for example `fast-check`) rather than `go test -fuzz`, and concurrency correctness comes from the single-threaded event loop plus explicit tests — use `node:worker_threads` (or the `Worker` global installed by `src/platform/runtime.ts`) when genuine parallelism is required. Node has no permission sandbox, so the published package needs no `--allow-*` flags.
 
