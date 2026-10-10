@@ -1,8 +1,9 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { CronDAO, type CronJobRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
-Deno.test("cron DAO CRUD and claim", () => {
+test("cron DAO CRUD and claim", () => {
   const database = openTestDb();
   try {
     const cronDAO = new CronDAO(database);

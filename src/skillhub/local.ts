@@ -1,5 +1,5 @@
-import * as path from "@opensac/path";
-import type { InstalledState, Market, SkillSummary } from "./types.ts";
+import * as path from "../compat/path.ts";
+import { type InstalledState, type Market, type SkillSummary } from "./types.ts";
 
 /** Name of the per-skill install metadata file. */
 export const metadataFileName = ".opensac-skillhub.json";

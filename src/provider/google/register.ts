@@ -5,7 +5,7 @@ import {
   type ProviderConfig,
 } from "../../config/mod.ts";
 import { register } from "../registry.ts";
-import type { Model, ModelCompat, ModelPricing } from "../types.ts";
+import { type Model, type ModelCompat, type ModelPricing } from "../types.ts";
 import {
   createGeminiProvider,
   createVertexProvider,

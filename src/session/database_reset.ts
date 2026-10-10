@@ -3,7 +3,7 @@
 // its place. The previous database and its sidecars are renamed (never deleted)
 // next to the new file, so the old sessions remain recoverable.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { closeAll } from "../db/mod.ts";
 import { sessionDir as platformSessionDir } from "../platform/platform.ts";
 import { closeDatabases, openRootDB, rootDBPath } from "./root_db.ts";

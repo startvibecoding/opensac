@@ -3,7 +3,7 @@
 // (`AcceptProviderAttachment`, artifact collection) land with the
 // `SessionRuntime` slice; these cover the Runtime-owned private store directly.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   ATTACHMENT_FILE,
   ATTACHMENT_IMAGE,
@@ -14,6 +14,7 @@ import { AttachmentService } from "./input.ts";
 import { writeRootDatabase } from "../session/database.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
+import { test } from "#testing";
 
 function inputTestSession(): {
   root: string;
@@ -67,7 +68,7 @@ async function readAll(file: Deno.FsFile): Promise<Uint8Array> {
   return out;
 }
 
-Deno.test("AcceptArtifactStoresPrivateContentAndReopensIt", async () => {
+test("AcceptArtifactStoresPrivateContentAndReopensIt", async () => {
   const { root, sessionId } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());
@@ -95,7 +96,7 @@ Deno.test("AcceptArtifactStoresPrivateContentAndReopensIt", async () => {
   }
 });
 
-Deno.test("ArtifactOpenRejectsPrivateStoreTampering", async () => {
+test("ArtifactOpenRejectsPrivateStoreTampering", async () => {
   const { root, sessionId } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());
@@ -115,7 +116,7 @@ Deno.test("ArtifactOpenRejectsPrivateStoreTampering", async () => {
   }
 });
 
-Deno.test("ArtifactCleanupExpiresPrivateContent", async () => {
+test("ArtifactCleanupExpiresPrivateContent", async () => {
   const { root, sessionId } = inputTestSession();
   try {
     const service = new AttachmentService(root, {
@@ -155,7 +156,7 @@ Deno.test("ArtifactCleanupExpiresPrivateContent", async () => {
   }
 });
 
-Deno.test("AcceptArtifactRejectsUnsupportedKindAndKindMismatch", async () => {
+test("AcceptArtifactRejectsUnsupportedKindAndKindMismatch", async () => {
   const { root, sessionId } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());
@@ -187,7 +188,7 @@ Deno.test("AcceptArtifactRejectsUnsupportedKindAndKindMismatch", async () => {
   }
 });
 
-Deno.test("SetStatusRejectsUnknownStatusAndMissingRow", () => {
+test("SetStatusRejectsUnknownStatusAndMissingRow", () => {
   const { root, sessionId } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());

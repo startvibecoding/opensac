@@ -1,6 +1,6 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { isGitDeniedPath } from "./git.ts";
-import type { Options } from "./sandbox.ts";
+import { type Options } from "./sandbox.ts";
 
 /**
  * Resolves sandbox path rules against `projectDir` and rejects ambiguous

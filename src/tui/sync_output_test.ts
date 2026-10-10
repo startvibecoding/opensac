@@ -1,8 +1,9 @@
 // Focused tests for sync_output.ts: every string write must leave the stream
 // as one DEC 2026 synchronized-output frame; other traffic passes through.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { atomicStdout } from "./sync_output.ts";
+import { test } from "#testing";
 
 interface Call {
   chunk: unknown;
@@ -24,7 +25,7 @@ function fakeStream() {
   return { calls, inner };
 }
 
-Deno.test("string writes are framed as one atomic frame", () => {
+test("string writes are framed as one atomic frame", () => {
   const { calls, inner } = fakeStream();
   const out = atomicStdout(inner);
   out.write("hello");
@@ -32,7 +33,7 @@ Deno.test("string writes are framed as one atomic frame", () => {
   assertEquals(calls[0].chunk, "\u001B[?2026hhello\u001B[?2026l");
 });
 
-Deno.test("callbacks and binary chunks pass through unwrapped", () => {
+test("callbacks and binary chunks pass through unwrapped", () => {
   const { calls, inner } = fakeStream();
   const out = atomicStdout(inner);
   const done = () => {};
@@ -42,7 +43,7 @@ Deno.test("callbacks and binary chunks pass through unwrapped", () => {
   assertEquals(calls[0].args, [done]);
   assertEquals(calls[1].chunk, bytes);
   // Members stay live: methods see the wrapped target as `this`.
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyOut = out as any;
   assertEquals(anyOut.describe(), 42);
   assert(anyOut.marker === 42);

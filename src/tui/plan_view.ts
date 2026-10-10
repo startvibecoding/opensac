@@ -3,7 +3,7 @@
 // building; no Ink/React here (like tool_row_format.ts).
 
 import type { Translator } from "./i18n.ts";
-import type { TaskPlan } from "../tools/tool.ts";
+import { type TaskPlan } from "../tools/tool.ts";
 
 /** Status glyph for one plan step. */
 export function planStatusGlyph(status: string): string {

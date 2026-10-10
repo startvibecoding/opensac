@@ -1,16 +1,16 @@
 // Shared test fixtures for the src/agent ports of internal/agent. Not a test
 // file itself (the name does not match Deno's test discovery patterns).
 
-import type { Model } from "../provider/types.ts";
+import { type Model } from "../provider/types.ts";
 import { createMockProvider, MockProvider } from "../provider/mock.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { Level, Manager as SandboxManager } from "../sandbox/sandbox.ts";
 import { createManager } from "../sandbox/sandbox.ts";
 import { AgentFactory, createAgentFactory } from "./factory.ts";
 import { AgentManager, createAgentManager } from "./manager.ts";
-import type { CompactionSettings } from "../context/compaction.ts";
+import { type CompactionSettings } from "../context/compaction.ts";
 import { streamDone, type StreamEvent, streamStart } from "../provider/mod.ts";
-import type { MemberDef } from "./memberdef.ts";
+import { type MemberDef } from "./memberdef.ts";
 
 /** Builds a full Model value with empty pricing. */
 export function testModel(id: string, name: string, provider = ""): Model {

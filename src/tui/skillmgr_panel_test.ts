@@ -2,11 +2,12 @@
 // manager (checkbox list over the former /skills listing + /skill activation)
 // runs against a fake host with no session or Core access.
 
-import { assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import { SkillMgrPanel, type SkillMgrPanelHost } from "./skillmgr_panel.ts";
 import { Translator } from "./i18n.ts";
-import type { KeyEvent } from "./keys.ts";
-import type { TUISkillView } from "./service.ts";
+import { type KeyEvent } from "./keys.ts";
+import { type TUISkillView } from "./service.ts";
+import { test } from "#testing";
 
 const tr = new Translator("en");
 
@@ -72,7 +73,7 @@ async function press(panel: SkillMgrPanel, ev: KeyEvent): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-Deno.test("skillmgr seeds the pending selection from the active skills", async () => {
+test("skillmgr seeds the pending selection from the active skills", async () => {
   const host = new FakeHost();
   host.skills = [
     skill({ name: "a", active: true }),
@@ -88,7 +89,7 @@ Deno.test("skillmgr seeds the pending selection from the active skills", async (
   assertStringIncludes(view, "1/2 active");
 });
 
-Deno.test("skillmgr moves the cursor with arrows and j/k without wrapping", async () => {
+test("skillmgr moves the cursor with arrows and j/k without wrapping", async () => {
   const host = new FakeHost();
   host.skills = [skill({ name: "a" }), skill({ name: "b" })];
   const panel = await open(host);
@@ -104,7 +105,7 @@ Deno.test("skillmgr moves the cursor with arrows and j/k without wrapping", asyn
   assertEquals(panel.cursor, 1);
 });
 
-Deno.test("skillmgr space toggles and enter applies the diff once", async () => {
+test("skillmgr space toggles and enter applies the diff once", async () => {
   const host = new FakeHost();
   host.skills = [
     skill({ name: "a", active: true }),
@@ -128,7 +129,7 @@ Deno.test("skillmgr space toggles and enter applies the diff once", async () => 
   assertStringIncludes(host.settled[0].message, "a");
 });
 
-Deno.test("skillmgr enter without changes settles no_change", async () => {
+test("skillmgr enter without changes settles no_change", async () => {
   const host = new FakeHost();
   host.skills = [skill({ name: "a", active: true })];
   const panel = await open(host);
@@ -138,7 +139,7 @@ Deno.test("skillmgr enter without changes settles no_change", async () => {
   assertEquals(host.settled[0].message, tr.text("skillmgr.no_change"));
 });
 
-Deno.test("skillmgr locked skills render builtin and refuse toggles", async () => {
+test("skillmgr locked skills render builtin and refuse toggles", async () => {
   const host = new FakeHost();
   host.skills = [skill({ name: "vibe-browser", source: "builtin" })];
   host.locked = ["vibe-browser"];
@@ -154,7 +155,7 @@ Deno.test("skillmgr locked skills render builtin and refuse toggles", async () =
   assertEquals(host.settled[0].message, tr.text("skillmgr.no_change"));
 });
 
-Deno.test("skillmgr esc/q close without applying pending toggles", async () => {
+test("skillmgr esc/q close without applying pending toggles", async () => {
   const host = new FakeHost();
   host.skills = [skill({ name: "a" })];
   const panel = await open(host);
@@ -173,7 +174,7 @@ Deno.test("skillmgr esc/q close without applying pending toggles", async () => {
   assertEquals(host2.toggles, []);
 });
 
-Deno.test("skillmgr closes with skills.empty when nothing is found", async () => {
+test("skillmgr closes with skills.empty when nothing is found", async () => {
   const host = new FakeHost();
   host.skills = [];
   const panel = await open(host);
@@ -181,7 +182,7 @@ Deno.test("skillmgr closes with skills.empty when nothing is found", async () =>
   assertEquals(host.settled[0].message, tr.text("skills.empty"));
 });
 
-Deno.test("skillmgr reports a list failure as an error settle", async () => {
+test("skillmgr reports a list failure as an error settle", async () => {
   const host = new FakeHost();
   host.listError = new Error("core down");
   const panel = await open(host);
@@ -189,7 +190,7 @@ Deno.test("skillmgr reports a list failure as an error settle", async () => {
   assertEquals(host.settled[0], { message: "core down", error: true });
 });
 
-Deno.test("skillmgr windows long lists around the cursor", async () => {
+test("skillmgr windows long lists around the cursor", async () => {
   const host = new FakeHost();
   host.skills = Array.from(
     { length: 30 },

@@ -3,14 +3,16 @@
 // `CommandSpec` descriptor is returned instead and the caller spawns it.
 
 /** Defines the sandbox restriction level. */
-export enum Level {
+export const Level = {
+
   /** Required sandbox: read-only project. */
-  Strict = 0,
+  Strict: 0,
   /** Best-effort sandbox: read-write project. */
-  Standard = 1,
+  Standard: 1,
   /** Direct execution. */
-  None = 2,
-}
+  None: 2,
+} as const;
+export type Level = (typeof Level)[keyof typeof Level];
 
 /** Returns the string representation of a Level. */
 export function levelString(level: Level): string {

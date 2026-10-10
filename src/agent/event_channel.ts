@@ -11,7 +11,7 @@
 // with the run. Go's `seal()` (wake blocked senders, then wait for in-flight
 // sends) collapses to `close()` because there are no blocking sends.
 
-import type { Event } from "./events.ts";
+import { type Event } from "./events.ts";
 
 /** An in-process async event channel implementing the Go `chan<- Event` sink. */
 export class EventChannel implements AsyncIterable<Event> {

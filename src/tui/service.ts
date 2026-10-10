@@ -8,28 +8,27 @@
 // plain values, dates, and canonical `CoreRuntimeEvent` events, so every
 // adapter projects the same session/run semantics.
 
-import type {
-  CoreAgentView,
-  CoreEsmCommandInput,
-  CoreEsmObjectiveView,
-  CoreEsmView,
-  CoreExpertBundleView,
-  CoreExpertStateView,
-  CoreExpertSummaryView,
-  CorePreparedInput,
-  CorePromptAccepted,
-  CorePromptInput,
-  CoreProviderCatalogView,
-  CoreRuntimeEvent,
-  CoreRunView,
-  CoreSessionContextView,
-  CoreSessionCreateInput,
-  CoreSessionListEntry,
-  CoreSessionView,
-  CoreTranscriptMessage,
-} from "../core/runtime.ts";
+import {
+  type CoreAgentView,
+  type CoreEsmCommandInput,
+  type CoreEsmObjectiveView,
+  type CoreEsmView,
+  type CoreExpertBundleView,
+  type CoreExpertStateView,
+  type CoreExpertSummaryView,
+  type CorePreparedInput,
+  type CorePromptAccepted,
+  type CorePromptInput,
+  type CoreProviderCatalogView,
+  type CoreRuntimeEvent,
+  type CoreRunView,
+  type CoreSessionContextView,
+  type CoreSessionCreateInput,
+  type CoreSessionListEntry,
+  type CoreSessionView,
+  type CoreTranscriptMessage} from "../core/runtime.ts";
 import { CORE_ERROR_SESSION_NOT_RESIDENT } from "../core/runtime_protocol.ts";
-import type { Settings } from "../config/settings.ts";
+import { type Settings } from "../config/settings.ts";
 
 /** Session creation input: work directory plus optional resolved policy. */
 export type TUISessionInput = CoreSessionCreateInput;

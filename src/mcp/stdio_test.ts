@@ -2,10 +2,10 @@
 // Real stdio MCP handshakes against shell fixtures (Unix only), plus the
 // command-resolution and environment helpers.
 
-import { assert, assertEquals } from "@opensac/assert";
-import { encodeBase64 } from "@opensac/encoding/base64";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { encodeBase64 } from "../compat/encoding.ts";
 import { Image } from "imagescript";
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
 import {
@@ -15,6 +15,7 @@ import {
   mergeMCPEnvironment,
   resolveMCPCommand,
 } from "./mcp.ts";
+import { test } from "#testing";
 
 const isWindows = Deno.build.os === "windows";
 
@@ -23,7 +24,7 @@ function writeExecutable(filePath: string, content: string): void {
   Deno.chmodSync(filePath, 0o755);
 }
 
-Deno.test("resolveMCPCommand uses configured PATH", () => {
+test("resolveMCPCommand uses configured PATH", () => {
   if (isWindows) return;
   const dir = Deno.makeTempDirSync();
   const command = path.join(dir, "mcp-test-command");
@@ -32,7 +33,7 @@ Deno.test("resolveMCPCommand uses configured PATH", () => {
   assertEquals(resolved, command);
 });
 
-Deno.test("mergeMCPEnvironment overrides inherited values", () => {
+test("mergeMCPEnvironment overrides inherited values", () => {
   if (isWindows) return;
   const prev = Deno.env.get("MCP_TEST_INHERITED");
   Deno.env.set("MCP_TEST_INHERITED", "old");
@@ -49,7 +50,7 @@ Deno.test("mergeMCPEnvironment overrides inherited values", () => {
   }
 });
 
-Deno.test("MCP stdio command from PATH receives configured environment", async () => {
+test("MCP stdio command from PATH receives configured environment", async () => {
   if (isWindows) return;
   const commandDir = Deno.makeTempDirSync();
   const commandPath = path.join(commandDir, "mcp-stdio-fixture");
@@ -107,7 +108,7 @@ done
   }
 });
 
-Deno.test("MCP stdio image tool result carries image content", async () => {
+test("MCP stdio image tool result carries image content", async () => {
   if (isWindows) return;
   const img = new Image(1, 1);
   img.bitmap[0] = 5;

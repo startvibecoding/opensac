@@ -9,7 +9,7 @@
 // maps to decoded `unknown`, `time.Time` maps to `Date`, and Go's multiple
 // `(binding, ok, error)` returns map to a value object plus typed throws.
 
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import { readSessionExecutionFacts } from "../session/execution_facts.ts";
 import {
   bindRuntimeLeaseToExistingRun,
@@ -20,7 +20,7 @@ import {
   RuntimeLeaseLostError,
   RuntimeLeaseRunMismatchError,
 } from "../session/runtime_lock.ts";
-import type { ConversationTurn, ExecutionIntent } from "../session/mod.ts";
+import { type ConversationTurn, type ExecutionIntent } from "../session/mod.ts";
 import {
   createExecutionIntentAndSessionRun,
   createExecutionIntentAndSessionRunEvent,
@@ -36,13 +36,12 @@ import {
   updateSessionRunStatus,
   updateSessionRunUsage,
 } from "../session/mod.ts";
-import type {
-  DeliveryIntent as SessionDeliveryIntent,
-  DeliveryOperation as SessionDeliveryOperation,
-  DeliveryPlan as SessionDeliveryPlan,
-} from "../session/delivery_store.ts";
-import type { DeliveryPlan } from "./delivery.ts";
-import type { ErrorInfo, RetryInfo } from "./error_info.ts";
+import {
+  type DeliveryIntent as SessionDeliveryIntent,
+  type DeliveryOperation as SessionDeliveryOperation,
+  type DeliveryPlan as SessionDeliveryPlan} from "../session/delivery_store.ts";
+import { type DeliveryPlan } from "./delivery.ts";
+import { type ErrorInfo, type RetryInfo } from "./error_info.ts";
 import { type RunEvent } from "./run_event.ts";
 import { isTerminalRunState, type RunState } from "./run_state.ts";
 

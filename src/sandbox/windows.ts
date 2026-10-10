@@ -1,6 +1,6 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { shellArgs } from "../platform/platform.ts";
-import type { CommandSpec, ExecOpts, Sandbox } from "./sandbox.ts";
+import { type CommandSpec, type ExecOpts, type Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
 
 /**

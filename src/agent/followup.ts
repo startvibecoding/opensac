@@ -1,4 +1,4 @@
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import type { MemberMailbox } from "./mailbox.ts";
 
 const minute = 60 * 1000;

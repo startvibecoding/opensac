@@ -1,6 +1,7 @@
-import { assertEquals } from "@opensac/assert";
-import { fromFileUrl } from "@opensac/path";
+import { assertEquals } from "../compat/assert.ts";
+import { fromFileUrl } from "../compat/path.ts";
 import { legacyTestAllowlist, legacyTestBoundaryViolations } from "./guard.ts";
+import { test } from "#testing";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
@@ -12,7 +13,7 @@ const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 // the file is listed in `legacyTestAllowlist` with a reason. Owner packages
 // (`src/agentruntime`, `src/session`, `src/dao`, `src/db`, `src/agent`) and the
 // guard itself are exempt: they test the APIs they own.
-Deno.test("adapter tests use canonical run boundaries", () => {
+test("adapter tests use canonical run boundaries", () => {
   const violations = legacyTestBoundaryViolations(projectRoot);
   assertEquals(
     violations,

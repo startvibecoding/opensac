@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   beginWaitStats,
   busyRetryStats,
@@ -10,10 +10,11 @@ import {
   sleepSync,
   sqliteResultCode,
 } from "./busy.ts";
+import { test } from "#testing";
 
 // TestSQLiteResultCodeClassification pins the busy/read-only classification
 // that turns a transient SQLITE_BUSY into a retry instead of a hard failure.
-Deno.test("sqliteResultCode masks extended result codes", () => {
+test("sqliteResultCode masks extended result codes", () => {
   assertEquals(sqliteResultCode({ errcode: 5 }), 5);
   assertEquals(sqliteResultCode({ errcode: 6 }), 6);
   // SQLITE_BUSY_SNAPSHOT (261) shares the primary code in its low byte.
@@ -27,7 +28,7 @@ Deno.test("sqliteResultCode masks extended result codes", () => {
   assertEquals(sqliteResultCode({}), undefined);
 });
 
-Deno.test("isSQLiteBusy accepts busy and locked only", () => {
+test("isSQLiteBusy accepts busy and locked only", () => {
   assert(isSQLiteBusy({ errcode: 5 }), "SQLITE_BUSY is busy");
   assert(isSQLiteBusy({ errcode: 6 }), "SQLITE_LOCKED is busy");
   assert(!isSQLiteBusy({ errcode: 8 }), "SQLITE_READONLY is not busy");
@@ -35,14 +36,14 @@ Deno.test("isSQLiteBusy accepts busy and locked only", () => {
   assert(!isSQLiteBusy(new Error("disk full")), "plain errors are not busy");
 });
 
-Deno.test("isSQLiteReadOnly recognizes SQLITE_READONLY only", () => {
+test("isSQLiteReadOnly recognizes SQLITE_READONLY only", () => {
   assert(isSQLiteReadOnly({ errcode: 8 }));
   assert(isSQLiteReadOnly({ errcode: 8 | (1 << 8) }), "extended code masks");
   assert(!isSQLiteReadOnly({ errcode: 5 }));
   assert(!isSQLiteReadOnly({}));
 });
 
-Deno.test("sleepSync waits for a positive duration only", () => {
+test("sleepSync waits for a positive duration only", () => {
   const zeroStart = performance.now();
   sleepSync(0);
   sleepSync(-5);
@@ -59,7 +60,7 @@ Deno.test("sleepSync waits for a positive duration only", () => {
 
 // The counters are process-wide, so the assertions are deltas: they must not
 // depend on how many other tests ran before this one.
-Deno.test("begin wait stats accumulate count, total, and max", () => {
+test("begin wait stats accumulate count, total, and max", () => {
   const before = beginWaitStats();
   recordBeginWait(3);
   recordBeginWait(11);
@@ -71,7 +72,7 @@ Deno.test("begin wait stats accumulate count, total, and max", () => {
   assert(after.maxMs >= before.maxMs);
 });
 
-Deno.test("busy retry stats expose a stable snapshot shape", () => {
+test("busy retry stats expose a stable snapshot shape", () => {
   const before = busyRetryStats();
   assertEquals(Object.keys(before).sort(), ["hits", "totalWaitMs"]);
   assert(before.hits >= 0 && before.totalWaitMs >= 0);
@@ -85,7 +86,7 @@ Deno.test("busy retry stats expose a stable snapshot shape", () => {
 
 // The recorders are what keeps the published contention metrics live; the
 // begin path in src/db/db.ts calls them on every transaction begin.
-Deno.test("busy retry recorders accumulate hits and slept backoff", () => {
+test("busy retry recorders accumulate hits and slept backoff", () => {
   const before = busyRetryStats();
   recordBusyRetryHit();
   recordBusyRetryWait(200);

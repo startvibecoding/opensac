@@ -54,7 +54,11 @@ export interface StatsRecord {
 
 /** SQL-backed access to request_stats. */
 export class StatsDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   /**
    * Records one provider request in the supplied transaction so usage and

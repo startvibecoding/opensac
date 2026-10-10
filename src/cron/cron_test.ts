@@ -1,16 +1,17 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   asDueJobClaimer,
   createCronID,
   runningLeaseTimeoutMs,
 } from "./cron.ts";
-import type { CronJob, CronStore } from "./cron.ts";
+import { type CronJob, type CronStore } from "./cron.ts";
+import { test } from "#testing";
 
-Deno.test("running lease timeout is one day", () => {
+test("running lease timeout is one day", () => {
   assertEquals(runningLeaseTimeoutMs, 24 * 60 * 60 * 1000);
 });
 
-Deno.test("createCronID produces unique hex identifiers", () => {
+test("createCronID produces unique hex identifiers", () => {
   const first = createCronID();
   const second = createCronID();
   assert(/^cron-[0-9a-f]{32}$/.test(first), `unexpected id ${first}`);
@@ -18,7 +19,7 @@ Deno.test("createCronID produces unique hex identifiers", () => {
   assert(first !== second, "identifiers must not repeat");
 });
 
-Deno.test("asDueJobClaimer detects an atomic claimer", () => {
+test("asDueJobClaimer detects an atomic claimer", () => {
   const claimer = { claimDue: (_id: string, _now: Date) => true };
   const store: CronStore & { claimDue: (id: string, now: Date) => boolean } = {
     list: (): CronJob[] => [],

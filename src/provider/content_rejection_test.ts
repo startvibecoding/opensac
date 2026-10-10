@@ -1,7 +1,8 @@
-import { assert } from "@opensac/assert";
+import { assert } from "../compat/assert.ts";
 import { isContentRejectionError, isRetryable } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("IsContentRejectionError", () => {
+test("IsContentRejectionError", () => {
   const cases: Array<[string, unknown, boolean]> = [
     ["nil", null, false],
     [
@@ -30,7 +31,7 @@ Deno.test("IsContentRejectionError", () => {
   }
 });
 
-Deno.test("IsRetryableSkipsContentRejection", () => {
+test("IsRetryableSkipsContentRejection", () => {
   const rejected = new Error(
     `API error 400: {"message":"Input image data may contain inappropriate content"}`,
   );

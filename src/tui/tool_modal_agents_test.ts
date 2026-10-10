@@ -6,7 +6,7 @@ import {
   assertEquals,
   assertStringIncludes,
   assertThrows,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
@@ -19,6 +19,7 @@ import {
   EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
 } from "../agent/events.ts";
+import { test } from "#testing";
 
 function makeSession(controller: AppController): TUISession {
   const settings = defaultSettings();
@@ -36,12 +37,12 @@ function makeSession(controller: AppController): TUISession {
     createFakeTUIService(),
   );
   // Swap in the controller with recorded activity.
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (session as any).controller = controller;
   return session;
 }
 
-Deno.test("tool modal lists sub-agent targets with detailed progress", () => {
+test("tool modal lists sub-agent targets with detailed progress", () => {
   const tr = new Translator("en");
   const controller = new AppController(tr, {
     onMessage: () => {},
@@ -88,7 +89,7 @@ Deno.test("tool modal lists sub-agent targets with detailed progress", () => {
   assertStringIncludes(view, "started scan");
 });
 
-Deno.test("tool modal refuses to open when there is nothing to show", () => {
+test("tool modal refuses to open when there is nothing to show", () => {
   const tr = new Translator("en");
   const controller = new AppController(tr, {
     onMessage: () => {},
@@ -99,7 +100,7 @@ Deno.test("tool modal refuses to open when there is nothing to show", () => {
   assertThrows(() => session.toolModalForTest());
 });
 
-Deno.test(
+test(
   "main tab expands tool calls without one tab per tool",
   () => {
     const tr = new Translator("en");

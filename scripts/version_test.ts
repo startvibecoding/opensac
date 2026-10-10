@@ -1,29 +1,30 @@
-import { assertEquals } from "@opensac/assert";
-import { join } from "@opensac/path";
+import { assertEquals } from "../src/compat/assert.ts";
+import { join } from "../src/compat/path.ts";
 import {
+import { test } from "#testing";
   packageVersion,
   pickLatestVersionTag,
   resolveBuildVersion,
   toPackageVersion,
 } from "./version.ts";
 
-Deno.test("PickLatestVersionTagTakesNewestFirst", () => {
+test("PickLatestVersionTagTakesNewestFirst", () => {
   assertEquals(
     pickLatestVersionTag("v0.3.0\nv0.2.1\nv0.2.0\n"),
     "v0.3.0",
   );
 });
 
-Deno.test("PickLatestVersionTagSkipsBlankLines", () => {
+test("PickLatestVersionTagSkipsBlankLines", () => {
   assertEquals(pickLatestVersionTag("\n  \nv1.0.0\n"), "v1.0.0");
 });
 
-Deno.test("PickLatestVersionTagIsEmptyWithoutTags", () => {
+test("PickLatestVersionTagIsEmptyWithoutTags", () => {
   assertEquals(pickLatestVersionTag(""), "");
   assertEquals(pickLatestVersionTag("\n \n"), "");
 });
 
-Deno.test("PackageVersionReadsDenoJson", async () => {
+test("PackageVersionReadsDenoJson", async () => {
   const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
   try {
     await Deno.writeTextFile(
@@ -36,7 +37,7 @@ Deno.test("PackageVersionReadsDenoJson", async () => {
   }
 });
 
-Deno.test("PackageVersionIsEmptyWithoutManifest", async () => {
+test("PackageVersionIsEmptyWithoutManifest", async () => {
   const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
   try {
     assertEquals(await packageVersion(dir), "");
@@ -45,7 +46,7 @@ Deno.test("PackageVersionIsEmptyWithoutManifest", async () => {
   }
 });
 
-Deno.test("ResolveBuildVersionPrefersGitTag", async () => {
+test("ResolveBuildVersionPrefersGitTag", async () => {
   const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
   try {
     await Deno.writeTextFile(
@@ -62,7 +63,7 @@ Deno.test("ResolveBuildVersionPrefersGitTag", async () => {
   }
 });
 
-Deno.test("ResolveBuildVersionFallsBackToPackageVersion", async () => {
+test("ResolveBuildVersionFallsBackToPackageVersion", async () => {
   const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
   try {
     await Deno.writeTextFile(
@@ -76,7 +77,7 @@ Deno.test("ResolveBuildVersionFallsBackToPackageVersion", async () => {
   }
 });
 
-Deno.test("ToPackageVersionStripsTheVPrefixAndDirtySuffix", () => {
+test("ToPackageVersionStripsTheVPrefixAndDirtySuffix", () => {
   assertEquals(toPackageVersion("v1.2.3"), "1.2.3");
   assertEquals(toPackageVersion("v1.2.3-dirty"), "1.2.3");
   assertEquals(toPackageVersion("0.1.0"), "0.1.0");

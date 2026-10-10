@@ -1,12 +1,13 @@
 // (the deterministic
 // accuracy test; the Go benchmarks were not translated).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { deepSeekTokenCount } from "./deepseek_tokenizer.ts";
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import { GenericTokenEstimator } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("TokenEstimationCJKAccuracy", () => {
+test("TokenEstimationCJKAccuracy", () => {
   const tests: Array<[string, string, number, number, string]> = [
     [
       "Chinese_8chars",
@@ -55,7 +56,7 @@ Deno.test("TokenEstimationCJKAccuracy", () => {
   }
 });
 
-Deno.test("deepSeekTokenCount memoizes without changing counts", () => {
+test("deepSeekTokenCount memoizes without changing counts", () => {
   const samples = [
     "Hello world this is a test message here!",
     "你好世界测试消息",
@@ -78,7 +79,7 @@ Deno.test("deepSeekTokenCount memoizes without changing counts", () => {
   );
 });
 
-Deno.test("deepSeekTokenCount stays correct after cache eviction", () => {
+test("deepSeekTokenCount stays correct after cache eviction", () => {
   const keep = "Hello world this is a test message here!";
   const first = deepSeekTokenCount(keep);
   // Push far more distinct entries through than the cache caps allow.

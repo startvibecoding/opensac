@@ -3,7 +3,7 @@
 // This table is mechanically converted from the Go source map literal; do not
 // edit by hand. Field names follow the settings.json JSON schema (camelCase).
 
-import type { ProviderConfig } from "./settings.ts";
+import { type ProviderConfig } from "./settings.ts";
 
 export const defaultProviderConfigs: Record<string, ProviderConfig> = {
   "anthropic": {

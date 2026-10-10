@@ -8,7 +8,7 @@ import {
   DecisionService,
 } from "./decision.ts";
 import { recordDecisionEvent } from "./decision_events.ts";
-import type { RunState } from "./run_state.ts";
+import { type RunState } from "./run_state.ts";
 
 export const decisionSourceRuntime = "runtime";
 

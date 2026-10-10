@@ -1,6 +1,6 @@
 // Focused tests for the system-prompt builder.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { resolveBashShell } from "../platform/platform.ts";
 import { createBashTool } from "../tools/bash.ts";
 import { createRegistry, createRegistryWithConfig } from "../tools/tool.ts";
@@ -9,8 +9,9 @@ import {
   buildSystemPrompt,
   buildSystemPromptWithOptions,
 } from "./system_prompt.ts";
+import { test } from "#testing";
 
-Deno.test("system prompt includes identity, mode, tools and guidelines", () => {
+test("system prompt includes identity, mode, tools and guidelines", () => {
   const prompt = buildSystemPrompt(
     "yolo",
     ["read", "grep"],
@@ -33,7 +34,7 @@ Deno.test("system prompt includes identity, mode, tools and guidelines", () => {
   assert(prompt.includes("Local execution policy: parallel mode"));
 });
 
-Deno.test("system prompt orders project rules before expert and context", () => {
+test("system prompt orders project rules before expert and context", () => {
   const prompt = buildSystemPrompt(
     "agent",
     ["read"],
@@ -54,7 +55,7 @@ Deno.test("system prompt orders project rules before expert and context", () => 
   assert(prompt.includes("EXTRA_CONTEXT"));
 });
 
-Deno.test("system prompt renders sub-agent section only in multi-agent mode", () => {
+test("system prompt renders sub-agent section only in multi-agent mode", () => {
   const single = buildSystemPrompt(
     "yolo",
     ["read"],
@@ -83,13 +84,13 @@ Deno.test("system prompt renders sub-agent section only in multi-agent mode", ()
   assert(multi.includes("## Sub-Agent Tools"));
 });
 
-Deno.test("sub-agent context includes the operating contract", () => {
+test("sub-agent context includes the operating contract", () => {
   const ctx = buildSubAgentContext();
   assertEquals(ctx.includes("## Sub-Agent Operating Contract"), true);
   assertEquals(ctx.includes("**Result:**"), true);
 });
 
-Deno.test("the advertised shell is the shell the bash tool runs", () => {
+test("the advertised shell is the shell the bash tool runs", () => {
   // Regression: the prompt used to override the shell on Windows (advertising
   // the extracted BusyBox) while `bash` executed powershell/cmd, so the model
   // wrote POSIX syntax that then failed. Both sides must share one resolver.
@@ -113,7 +114,7 @@ Deno.test("the advertised shell is the shell the bash tool runs", () => {
   assertEquals(tool.resolveShell(), resolveBashShell());
 });
 
-Deno.test("a configured settings.shellPath reaches the tool and the prompt", () => {
+test("a configured settings.shellPath reaches the tool and the prompt", () => {
   // Regression: `settings.shellPath` was dead config. It was persisted and shown
   // in the TUI, but nothing ever read it, so the user's chosen shell was
   // silently ignored.

@@ -2,7 +2,7 @@
 // mode/model/clear flows, session and expert routing, and help text. The host
 // is a recording stub so the dispatcher's routing is verified without a session.
 
-import { assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import {
   type CommandHost,
   type CommandResult,
@@ -10,6 +10,7 @@ import {
   helpText,
 } from "./commands.ts";
 import { Translator } from "./i18n.ts";
+import { test } from "#testing";
 
 function host(overrides: Partial<CommandHost> = {}): {
   host: CommandHost;
@@ -221,14 +222,14 @@ function host(overrides: Partial<CommandHost> = {}): {
   return { host: { ...base, ...overrides }, calls };
 }
 
-Deno.test("unknown command reports an error", async () => {
+test("unknown command reports an error", async () => {
   const { host: h } = host();
   const result = await dispatchCommand("/nope", h);
   assertEquals(result.error, true);
   assertStringIncludes(result.message ?? "", "/nope");
 });
 
-Deno.test("dialog commands open interactive panels", async () => {
+test("dialog commands open interactive panels", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/auth", h);
   await dispatchCommand("/settings", h);
@@ -246,7 +247,7 @@ Deno.test("dialog commands open interactive panels", async () => {
   ]);
 });
 
-Deno.test("argument forms keep the non-interactive paths", async () => {
+test("argument forms keep the non-interactive paths", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/model gpt", h);
   await dispatchCommand("/env set KEY VALUE", h);
@@ -254,12 +255,12 @@ Deno.test("argument forms keep the non-interactive paths", async () => {
   assertEquals(calls, ["setModel:gpt", "setEnv:KEY"]);
 });
 
-Deno.test("/quit requests exit", async () => {
+test("/quit requests exit", async () => {
   const { host: h } = host();
   assertEquals((await dispatchCommand("/quit", h)).quit, true);
 });
 
-Deno.test("/mode validates and mutates", async () => {
+test("/mode validates and mutates", async () => {
   const { host: h, calls } = host();
   const ok = await dispatchCommand("/mode plan", h);
   assertEquals(ok.error, undefined);
@@ -271,13 +272,13 @@ Deno.test("/mode validates and mutates", async () => {
   assertStringIncludes(status.message ?? "", "YOLO");
 });
 
-Deno.test("/model delegates to the host", async () => {
+test("/model delegates to the host", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/model gpt", h);
   assertEquals(calls, ["setModel:gpt"]);
 });
 
-Deno.test("/clear and /compact route to the host", async () => {
+test("/clear and /compact route to the host", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/clear", h);
   await dispatchCommand("/compact", h);
@@ -288,14 +289,14 @@ Deno.test("/clear and /compact route to the host", async () => {
   assertEquals(result.error, true);
 });
 
-Deno.test("skill commands activate by name and prefix form", async () => {
+test("skill commands activate by name and prefix form", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/skill myskill", h);
   await dispatchCommand("/skill:other", h);
   assertEquals(calls, ["activateSkill:myskill", "activateSkill:other"]);
 });
 
-Deno.test("skill manager commands open the merged panel", async () => {
+test("skill manager commands open the merged panel", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/skillmgr", h);
   await dispatchCommand("/skills", h);
@@ -313,7 +314,7 @@ Deno.test("skill manager commands open the merged panel", async () => {
   assertEquals(result.error, true);
 });
 
-Deno.test("expert and session subcommands route correctly", async () => {
+test("expert and session subcommands route correctly", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/expert bind exp1", h);
   await dispatchCommand("/expert switch exp2", h);
@@ -336,27 +337,27 @@ Deno.test("expert and session subcommands route correctly", async () => {
   ]);
 });
 
-Deno.test("workflows cancel routes to the host", async () => {
+test("workflows cancel routes to the host", async () => {
   const { host: h, calls } = host();
   const result = await dispatchCommand("/workflows cancel wf1", h);
   assertEquals(calls, ["cancelWorkflow:wf1"]);
   assertEquals(result.message, "cancelled wf1");
 });
 
-Deno.test("/settings with a provider deep-links into auth", async () => {
+test("/settings with a provider deep-links into auth", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/settings anthropic", h);
   assertEquals(calls, ["openSettingsDialog:anthropic"]);
 });
 
-Deno.test("/esm and /btw pass the raw command line through", async () => {
+test("/esm and /btw pass the raw command line through", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/esm pause", h);
   await dispatchCommand("/btw what is x", h);
   assertEquals(calls, ["esm:/esm pause", "btw:/btw what is x"]);
 });
 
-Deno.test("/agent respects multi-agent gating", async () => {
+test("/agent respects multi-agent gating", async () => {
   const { host: h } = host();
   const ok = await dispatchCommand("/agent list", h);
   assertEquals(ok.message, "agents");
@@ -365,7 +366,7 @@ Deno.test("/agent respects multi-agent gating", async () => {
   assertStringIncludes(result.message ?? "", "disabled");
 });
 
-Deno.test("/agent switch and destroy route to the host", async () => {
+test("/agent switch and destroy route to the host", async () => {
   const { host: h, calls } = host();
   await dispatchCommand("/agent switch sub1", h);
   await dispatchCommand("/agent destroy sub2", h);
@@ -374,7 +375,7 @@ Deno.test("/agent switch and destroy route to the host", async () => {
   assertEquals(bare.error, true);
 });
 
-Deno.test("dialog commands refuse to open while running", async () => {
+test("dialog commands refuse to open while running", async () => {
   const busy = host({ running: true });
   const model = await dispatchCommand("/model", busy.host);
   assertEquals(model.error, true);
@@ -390,7 +391,7 @@ Deno.test("dialog commands refuse to open while running", async () => {
   assertEquals(argForm.calls, ["setModel:gpt"]);
 });
 
-Deno.test("help text lists commands and shortcuts", () => {
+test("help text lists commands and shortcuts", () => {
   const text = helpText(new Translator("en"));
   assertStringIncludes(text, "/mode");
   assertStringIncludes(text, "Keyboard shortcuts");

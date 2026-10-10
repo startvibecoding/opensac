@@ -6,12 +6,11 @@
 // session, run, or decision state and never fills policy defaults — effective
 // mode and related policy stay Core-owned.
 
-import type {
-  CoreRuntimeEvent,
-  CoreRunView,
-  CoreSessionView,
-} from "../core/runtime.ts";
-import type { Settings } from "../config/settings.ts";
+import {
+  type CoreRuntimeEvent,
+  type CoreRunView,
+  type CoreSessionView} from "../core/runtime.ts";
+import { type Settings } from "../config/settings.ts";
 import { CORE_RUNTIME_METHODS } from "../core/runtime_protocol.ts";
 import {
   coreResult,
@@ -22,44 +21,43 @@ import {
 import {
   decisionNotFoundError,
   type TUIAgentView,
-  TUIAskInput,
-  TUIAskResult,
-  TUIAttachmentInput,
-  TUIAttachmentView,
-  TUICancelInput,
-  TUICapabilityView,
-  TUICompactAccepted,
+  type TUIAskInput,
+  type TUIAskResult,
+  type TUIAttachmentInput,
+  type TUIAttachmentView,
+  type TUICancelInput,
+  type TUICapabilityView,
+  type TUICompactAccepted,
   type TUICoreConnectionState,
-  TUIDecisionAnswer,
-  TUIDecisionRequest,
-  TUIEsmCommandInput,
-  TUIEsmContinuation,
-  TUIEsmObjectiveView,
-  TUIEsmView,
-  TUIExpertBundleView,
-  TUIExpertStateView,
-  TUIExpertSummaryView,
-  TUIPreparedInput,
-  TUIPrepareInput,
-  TUIPromptAccepted,
-  TUIPromptInput,
-  TUIProviderCatalogEntry,
-  TUIProviderView,
-  TUIRunView,
-  TUIService,
+  type TUIDecisionAnswer,
+  type TUIDecisionRequest,
+  type TUIEsmCommandInput,
+  type TUIEsmContinuation,
+  type TUIEsmObjectiveView,
+  type TUIEsmView,
+  type TUIExpertBundleView,
+  type TUIExpertStateView,
+  type TUIExpertSummaryView,
+  type TUIPreparedInput,
+  type TUIPrepareInput,
+  type TUIPromptAccepted,
+  type TUIPromptInput,
+  type TUIProviderCatalogEntry,
+  type TUIProviderView,
+  type TUIRunView,
+  type TUIService,
   TUIServiceError,
-  TUISessionConfig,
-  TUISessionContextView,
-  TUISessionInput,
-  TUISessionListEntry,
-  TUISessionView,
-  TUISettingsReadScope,
-  TUISettingsView,
-  TUISettingsWriteScope,
-  TUISkillInput,
-  TUISkillView,
-  TUITranscriptMessage,
-} from "./service.ts";
+  type TUISessionConfig,
+  type TUISessionContextView,
+  type TUISessionInput,
+  type TUISessionListEntry,
+  type TUISessionView,
+  type TUISettingsReadScope,
+  type TUISettingsView,
+  type TUISettingsWriteScope,
+  type TUISkillInput,
+  type TUISkillView,
+  type TUITranscriptMessage} from "./service.ts";
 
 /** Message for service methods the shared Core does not expose yet. */
 export const TUI_CAPABILITY_UNAVAILABLE =

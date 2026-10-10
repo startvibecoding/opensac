@@ -2,7 +2,7 @@
 // Routes public `sdk/agent` events from agents to consumers (UI, parent
 // agents). Concurrency guards are dropped (Deno is single-threaded).
 
-import type { AgentID, Event } from "../../sdk/agent/types.ts";
+import { type AgentID, type Event } from "../../sdk/agent/types.ts";
 
 /** RouterEventHandler receives public agent events for routing purposes. */
 export interface RouterEventHandler {

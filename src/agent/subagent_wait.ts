@@ -4,7 +4,7 @@ import {
   type ToolContext,
   type ToolResult,
 } from "../tools/tool.ts";
-import type { MemberCompletion, MemberMailbox } from "./mailbox.ts";
+import { type MemberCompletion, MemberMailbox } from "./mailbox.ts";
 
 // Bounded wait window for subagent_wait. These are tool ergonomics, not user
 // configuration: they intentionally stay package constants and must not enter

@@ -3,11 +3,12 @@
 // Resolve over settings.TUILang) and the editor width tracking applied on
 // terminal resize (Go tea.WindowSizeMsg → input.SetWidth).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { localTimeZone, resolveLanguage } from "./i18n.ts";
 import { tuiTranslatorFromSettings } from "./tui_session.ts";
 import { applyEditorWidth } from "../cli/root_tui.ts";
-import type { Settings } from "../config/mod.ts";
+import { type Settings } from "../config/mod.ts";
+import { test } from "#testing";
 
 function settingsWith(tuilang?: string): Settings {
   return { tuilang } as Settings;
@@ -27,7 +28,7 @@ function captureConsoleError(): { errors: string[]; restore(): void } {
   };
 }
 
-Deno.test("tuiTranslatorFromSettings honors an explicit tuilang", () => {
+test("tuiTranslatorFromSettings honors an explicit tuilang", () => {
   const capture = captureConsoleError();
   try {
     assertEquals(tuiTranslatorFromSettings(settingsWith("zh")).language, "zh");
@@ -39,7 +40,7 @@ Deno.test("tuiTranslatorFromSettings honors an explicit tuilang", () => {
   }
 });
 
-Deno.test("tuiTranslatorFromSettings falls back to auto with a warning on invalid values", () => {
+test("tuiTranslatorFromSettings falls back to auto with a warning on invalid values", () => {
   const capture = captureConsoleError();
   try {
     const translator = tuiTranslatorFromSettings(settingsWith("fr"));
@@ -54,7 +55,7 @@ Deno.test("tuiTranslatorFromSettings falls back to auto with a warning on invali
   }
 });
 
-Deno.test("tuiTranslatorFromSettings treats a missing tuilang as auto without warning", () => {
+test("tuiTranslatorFromSettings treats a missing tuilang as auto without warning", () => {
   const capture = captureConsoleError();
   try {
     const translator = tuiTranslatorFromSettings(settingsWith(undefined));
@@ -66,12 +67,12 @@ Deno.test("tuiTranslatorFromSettings treats a missing tuilang as auto without wa
   }
 });
 
-Deno.test("localTimeZone resolves the host IANA zone or null", () => {
+test("localTimeZone resolves the host IANA zone or null", () => {
   const zone = localTimeZone();
   assertEquals(zone === null || zone.length > 0, true);
 });
 
-Deno.test("applyEditorWidth tracks terminal resize with the frame offset", () => {
+test("applyEditorWidth tracks terminal resize with the frame offset", () => {
   const widths: number[] = [];
   const editor = {
     setWidth(w: number) {

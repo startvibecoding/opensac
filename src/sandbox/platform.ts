@@ -3,7 +3,7 @@
 // selected here. Platforms without a dedicated backend fall back to the no-op
 // sandbox so commands run without sandbox restrictions.
 
-import type { Options, Sandbox } from "./sandbox.ts";
+import { type Options, type Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
 import { createBwrapSandbox } from "./bwrap.ts";
 import { createMacSandbox } from "./mac.ts";

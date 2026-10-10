@@ -35,7 +35,8 @@ export function workerSourceModule(
   return header + `export const ${exportName} = ${JSON.stringify(js)};\n`;
 }
 
-if (import.meta.main) {
+import { isMainModule } from "../src/platform/node_compat.ts";
+if (isMainModule(import.meta.url)) {
   const repoDir = new URL("..", import.meta.url);
   for (const [src, out, name] of PAIRS) {
     const js = await Deno.readTextFile(new URL(src, repoDir));

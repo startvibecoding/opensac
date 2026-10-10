@@ -3,15 +3,16 @@
 // result state machine (dedup, matching, late stragglers, interruption
 // finalization), and per-tool summaries.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   formatLineRangesForDisplay,
   summarizeFileDiff,
   summarizeToolResult,
   TranscriptStore,
 } from "./transcript_store.ts";
-import type { FileDiff } from "../tools/io_helpers.ts";
+import { type FileDiff } from "../tools/io_helpers.ts";
 import { Translator } from "./i18n.ts";
+import { test } from "#testing";
 
 const tr = new Translator("en");
 
@@ -21,7 +22,7 @@ function store(): TranscriptStore {
 
 // ─── streaming slots ────────────────────────────────────────────────────────
 
-Deno.test("assistant slot opens on first delta and accumulates", () => {
+test("assistant slot opens on first delta and accumulates", () => {
   const s = store();
   s.appendAssistantDelta("Hel");
   s.appendAssistantDelta("lo");
@@ -33,7 +34,7 @@ Deno.test("assistant slot opens on first delta and accumulates", () => {
   assertEquals(s.isAssistantDirty(0), false);
 });
 
-Deno.test("turn start reserves the slot before deltas", () => {
+test("turn start reserves the slot before deltas", () => {
   const s = store();
   s.beginAssistantSlot();
   assertEquals(s.currentAssistantIdx, 0);
@@ -43,7 +44,7 @@ Deno.test("turn start reserves the slot before deltas", () => {
   assertEquals(s.messages.length, 1); // reused the reserved slot
 });
 
-Deno.test("commit clears active indices and allows a new slot", () => {
+test("commit clears active indices and allows a new slot", () => {
   const s = store();
   s.appendAssistantDelta("first");
   s.commitActiveStream();
@@ -54,7 +55,7 @@ Deno.test("commit clears active indices and allows a new slot", () => {
   assertEquals(s.assistantRaw(0), "first");
 });
 
-Deno.test("think deltas convert an untouched assistant slot", () => {
+test("think deltas convert an untouched assistant slot", () => {
   const s = store();
   s.beginAssistantSlot(); // reserved but empty
   s.appendThinkDelta("thinking...");
@@ -66,7 +67,7 @@ Deno.test("think deltas convert an untouched assistant slot", () => {
   assertEquals(s.messages.length, 2);
 });
 
-Deno.test("think deltas open their own slot after committed assistant", () => {
+test("think deltas open their own slot after committed assistant", () => {
   const s = store();
   s.appendAssistantDelta("visible text");
   s.commitActiveStream();
@@ -77,7 +78,7 @@ Deno.test("think deltas open their own slot after committed assistant", () => {
 
 // ─── tool rows ──────────────────────────────────────────────────────────────
 
-Deno.test("tool start opens one running row; duplicate starts dedup", () => {
+test("tool start opens one running row; duplicate starts dedup", () => {
   const s = store();
   s.appendToolExecutionStart("call-1", "bash", { cmd: "ls" });
   assertEquals(s.toolResults.length, 1);
@@ -89,7 +90,7 @@ Deno.test("tool start opens one running row; duplicate starts dedup", () => {
   assertEquals(s.toolResults.length, 1);
 });
 
-Deno.test("tool result terminalizes the running row in place", () => {
+test("tool result terminalizes the running row in place", () => {
   const s = store();
   s.appendToolExecutionStart("call-1", "bash", { cmd: "ls" });
   s.appendToolResult({
@@ -104,7 +105,7 @@ Deno.test("tool result terminalizes the running row in place", () => {
   assertEquals(s.messages.length, 1); // no extra row opened
 });
 
-Deno.test("tool result without a running row opens its own row", () => {
+test("tool result without a running row opens its own row", () => {
   const s = store();
   s.appendToolResult({
     toolCallID: "call-9",
@@ -117,7 +118,7 @@ Deno.test("tool result without a running row opens its own row", () => {
   assertEquals(s.toolResults[0].summary, "2 lines");
 });
 
-Deno.test("completed results dedup and interrupted rows block stragglers", () => {
+test("completed results dedup and interrupted rows block stragglers", () => {
   const s = store();
   s.appendToolResult({ toolCallID: "c1", toolName: "edit", toolResult: "ok" });
   s.appendToolResult({
@@ -140,7 +141,7 @@ Deno.test("completed results dedup and interrupted rows block stragglers", () =>
   assertEquals(s.toolResults.length, 2);
 });
 
-Deno.test("finalizeInterruptedTools touches only running rows", () => {
+test("finalizeInterruptedTools touches only running rows", () => {
   const s = store();
   s.appendToolResult({
     toolCallID: "done-1",
@@ -153,7 +154,7 @@ Deno.test("finalizeInterruptedTools touches only running rows", () => {
   assertEquals(s.toolResults[1].status, "interrupted");
 });
 
-Deno.test("hasToolEntry and msgIndexOf track states", () => {
+test("hasToolEntry and msgIndexOf track states", () => {
   const s = store();
   s.appendToolExecutionStart("c1", "bash");
   assertEquals(s.hasToolEntry("c1", "running"), true);
@@ -165,7 +166,7 @@ Deno.test("hasToolEntry and msgIndexOf track states", () => {
   assertEquals(s.msgIndexOf("c1"), undefined === s.msgIndexOf("c1") ? 0 : 0);
 });
 
-Deno.test("resetTranscriptState clears everything", () => {
+test("resetTranscriptState clears everything", () => {
   const s = store();
   s.appendAssistantDelta("hi");
   s.appendToolExecutionStart("c1", "bash");
@@ -190,7 +191,7 @@ const diff: FileDiff = {
   truncated: false,
 };
 
-Deno.test("summarizeToolResult picks per-tool forms", () => {
+test("summarizeToolResult picks per-tool forms", () => {
   assertEquals(
     summarizeToolResult("bash", "a\n\n\nb", undefined, tr),
     "a\n\nb",
@@ -215,7 +216,7 @@ Deno.test("summarizeToolResult picks per-tool forms", () => {
   );
 });
 
-Deno.test("summarizeFileDiff renders ranges and large suffix", () => {
+test("summarizeFileDiff renders ranges and large suffix", () => {
   assertEquals(summarizeFileDiff(undefined), "");
   assertEquals(summarizeFileDiff(diff), "+3 -1 (-7 +1-3)");
   assertEquals(
@@ -234,7 +235,7 @@ Deno.test("summarizeFileDiff renders ranges and large suffix", () => {
   );
 });
 
-Deno.test("formatLineRangesForDisplay compresses runs", () => {
+test("formatLineRangesForDisplay compresses runs", () => {
   assertEquals(formatLineRangesForDisplay([]), "none");
   assertEquals(formatLineRangesForDisplay([1]), "1");
   assertEquals(formatLineRangesForDisplay([1, 2, 3, 5]), "1-3,5");

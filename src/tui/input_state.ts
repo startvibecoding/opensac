@@ -14,7 +14,7 @@ import {
   commandSuggestionItemsForInput,
 } from "./command_suggest.ts";
 import { Translator } from "./i18n.ts";
-import type { KeyName } from "./keys.ts";
+import { type KeyName } from "./keys.ts";
 import { PasteStore } from "./paste.ts";
 
 /** What the shell should do after the input state handled a key event. */

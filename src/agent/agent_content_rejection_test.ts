@@ -3,13 +3,14 @@
 // records durable overrides so replay never re-sends them, and heals a turn
 // that already streamed visible output without duplicating it.
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { Message } from "../provider/types.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type Message } from "../provider/types.ts";
 import { createManager } from "../session/manager.ts";
 import type { Manager } from "../session/manager.ts";
 import { type Agent, createAgentWithLoopConfig } from "./agent.ts";
-import type { LoopRecoveryState } from "./agent.ts";
-import type { Event } from "./events.ts";
+import { type LoopRecoveryState } from "./agent.ts";
+import { type Event } from "./events.ts";
+import { test } from "#testing";
 
 function imageMessage(role: string, text: string): Message {
   const msg: Message = {
@@ -72,7 +73,7 @@ function defaultMessages(): Message[] {
   ];
 }
 
-Deno.test("content rejection recovery strips in two stages", () => {
+test("content rejection recovery strips in two stages", () => {
   const { agent, sess } = createContentRejectionAgent(defaultMessages());
   const { sink } = collectSink();
   const state = createRecoveryState();
@@ -101,7 +102,7 @@ Deno.test("content rejection recovery strips in two stages", () => {
   }
 });
 
-Deno.test("content rejection recovery ignores other errors", () => {
+test("content rejection recovery ignores other errors", () => {
   const { agent } = createContentRejectionAgent(defaultMessages());
   const { sink } = collectSink();
   const state = createRecoveryState();
@@ -116,7 +117,7 @@ Deno.test("content rejection recovery ignores other errors", () => {
   assert(hasImage(agent.getMessages()[3]));
 });
 
-Deno.test("content rejection recovery heals without retry after partial output", () => {
+test("content rejection recovery heals without retry after partial output", () => {
   const { agent, sess } = createContentRejectionAgent(defaultMessages());
   const { sink } = collectSink();
   const state = createRecoveryState();
@@ -131,7 +132,7 @@ Deno.test("content rejection recovery heals without retry after partial output",
   }
 });
 
-Deno.test("content rejection recovery escalates when turn has no images", () => {
+test("content rejection recovery escalates when turn has no images", () => {
   const messages: Message[] = [
     imageMessage("toolResult", "historical"),
     { role: "user", content: "text only current turn", timestamp: new Date() },

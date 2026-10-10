@@ -33,7 +33,11 @@ const columns = `id, session_id AS sessionId, name, prompt, schedule,
 
 /** SQL-backed access to cron_jobs. */
 export class CronDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   list(): CronJobRecord[] {
     return queryAll<Record<string, unknown>>(

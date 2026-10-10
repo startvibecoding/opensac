@@ -1,6 +1,6 @@
 // (bwrap cases live in bwrap_test.ts).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   createManager,
   createNoneSandbox,
@@ -10,29 +10,30 @@ import {
   Manager,
   parseLevel,
 } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("levelString", () => {
+test("levelString", () => {
   assertEquals(levelString(Level.Strict), "strict");
   assertEquals(levelString(Level.Standard), "standard");
   assertEquals(levelString(Level.None), "none");
   assertEquals(levelString(99 as Level), "unknown");
 });
 
-Deno.test("parseLevel", () => {
+test("parseLevel", () => {
   assertEquals(parseLevel("strict"), Level.Strict);
   assertEquals(parseLevel("standard"), Level.Standard);
   assertEquals(parseLevel("none"), Level.None);
   assertThrows(() => parseLevel("invalid"));
 });
 
-Deno.test("createNoneSandbox", () => {
+test("createNoneSandbox", () => {
   const sb = createNoneSandbox();
   assertEquals(sb.name(), "none");
   assertEquals(sb.level(), Level.None);
   assert(sb.isAvailable());
 });
 
-Deno.test("noneSandbox wrapCommand uses platform shell args", () => {
+test("noneSandbox wrapCommand uses platform shell args", () => {
   const sb = createNoneSandbox();
 
   const bash = sb.wrapCommand(undefined, "/bin/bash", "echo hello", {
@@ -54,7 +55,7 @@ Deno.test("noneSandbox wrapCommand uses platform shell args", () => {
   ]);
 });
 
-Deno.test("createManager and default active level", () => {
+test("createManager and default active level", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const m = createManager(project);
   // Default active sandbox is direct execution.
@@ -63,14 +64,14 @@ Deno.test("createManager and default active level", () => {
   assertEquals(m.getActive().level(), Level.None);
 });
 
-Deno.test("manager getForLevel", () => {
+test("manager getForLevel", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const m = createManager(project);
   assertEquals(m.getForLevel(Level.None).level(), Level.None);
   assertThrows(() => m.getForLevel(99 as Level));
 });
 
-Deno.test("manager standard falls back on invalid policy", () => {
+test("manager standard falls back on invalid policy", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   // A denied path that contains the project makes the policy invalid.
   const m = new Manager(project, { deniedPaths: [project] });
@@ -79,13 +80,13 @@ Deno.test("manager standard falls back on invalid policy", () => {
   assert(m.fallbackError() !== undefined);
 });
 
-Deno.test("manager strict does not fall back on invalid policy", () => {
+test("manager strict does not fall back on invalid policy", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const m = new Manager(project, { deniedPaths: [project] });
   assertThrows(() => m.setLevel(Level.Strict));
 });
 
-Deno.test("manager with invalid policy still allows none", () => {
+test("manager with invalid policy still allows none", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const m = new Manager(project, { deniedPaths: [project] });
   m.setLevel(Level.None);
@@ -93,7 +94,7 @@ Deno.test("manager with invalid policy still allows none", () => {
   assertThrows(() => m.getForLevel(Level.Strict));
 });
 
-Deno.test("formatSandboxInfo", () => {
+test("formatSandboxInfo", () => {
   assert(formatSandboxInfo(createNoneSandbox()).includes("No sandbox"));
   assert(formatSandboxInfo(undefined).includes("No sandbox"));
 });

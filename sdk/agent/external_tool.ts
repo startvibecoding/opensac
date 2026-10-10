@@ -3,7 +3,7 @@
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`.
 
-import type { ContentBlock } from "./types.ts";
+import { type ContentBlock } from "./types.ts";
 
 /**
  * ExternalTool is a custom tool supplied by an embedding application (for

@@ -5,7 +5,7 @@ import {
   type CoreRpcRequest,
   type CoreRpcResponse,
 } from "./protocol.ts";
-import type { CoreRuntimeEvent } from "./runtime.ts";
+import { type CoreRuntimeEvent } from "./runtime.ts";
 
 export type CoreEventRequest = CoreRpcRequest;
 export type CoreEventRequestListener = (request: CoreEventRequest) => void;

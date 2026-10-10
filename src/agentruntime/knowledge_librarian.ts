@@ -12,7 +12,7 @@
 // `node:crypto`; `time`-free.
 
 import { createHash } from "node:crypto";
-import type { KnowledgeBase } from "../session/mod.ts";
+import { type KnowledgeBase } from "../session/mod.ts";
 import {
   createManager,
   openByIDExact,

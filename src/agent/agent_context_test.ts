@@ -6,18 +6,17 @@ import {
   assertEquals,
   assertNotStrictEquals,
   assertStrictEquals,
-} from "@opensac/assert";
-import type {
-  ContentBlock,
-  Message,
-  ToolDefinition,
-} from "../provider/types.ts";
+} from "../compat/assert.ts";
+import {
+  type ContentBlock,
+  type Message,
+  type ToolDefinition} from "../provider/types.ts";
 import {
   createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
 } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   applyCacheMarkers,
   clampMaxTokensToContext,
@@ -40,6 +39,7 @@ import {
   toolResultImages,
   waitForStreamRecoveryRetry,
 } from "./agent_context.ts";
+import { test } from "#testing";
 
 function userMessage(text: string, systemInjected = false): Message {
   const msg = createUserMessage(text);
@@ -64,7 +64,7 @@ function imageBlock(data = "AAAA", mimeType = "image/png"): ContentBlock {
 
 // --- selectCacheMarkers / applyCacheMarkers (cache_test.go) ---
 
-Deno.test("selectCacheMarkers", () => {
+test("selectCacheMarkers", () => {
   const cases: Array<
     { name: string; messages: Message[]; want: [number, number] }
   > = [
@@ -111,7 +111,7 @@ Deno.test("selectCacheMarkers", () => {
   }
 });
 
-Deno.test("applyCacheMarkers", () => {
+test("applyCacheMarkers", () => {
   const cases: Array<{
     name: string;
     messages: Message[];
@@ -174,7 +174,7 @@ Deno.test("applyCacheMarkers", () => {
   }
 });
 
-Deno.test("system injected messages are skipped by cache markers", () => {
+test("system injected messages are skipped by cache markers", () => {
   const messages = [
     userMessage("Session context", true),
     userMessage("Message 1"),
@@ -198,7 +198,7 @@ Deno.test("system injected messages are skipped by cache markers", () => {
 
 // --- repairDanglingToolCalls (agent_test.go) ---
 
-Deno.test("repairDanglingToolCalls", async (t) => {
+test("repairDanglingToolCalls", async (t) => {
   await t.step("no tool calls returns input unchanged", () => {
     const msgs = [
       userMessage("hi"),
@@ -295,25 +295,25 @@ Deno.test("repairDanglingToolCalls", async (t) => {
 
 // --- clampMaxTokensToContext (max_tokens_test.go) ---
 
-Deno.test("clampMaxTokensToContext", () => {
+test("clampMaxTokensToContext", () => {
   assertEquals(clampMaxTokensToContext(10000, 12000, 3000), 8488);
 });
 
-Deno.test("clampMaxTokensToContext reserves safety margin", () => {
+test("clampMaxTokensToContext reserves safety margin", () => {
   assertEquals(clampMaxTokensToContext(262144, 262144, 6523 + 1565), 253544);
 });
 
-Deno.test("clampMaxTokensToContext keeps value when it fits", () => {
+test("clampMaxTokensToContext keeps value when it fits", () => {
   assertEquals(clampMaxTokensToContext(4000, 12000, 3000), 4000);
 });
 
-Deno.test("clampMaxTokensToContext keeps zero fallback", () => {
+test("clampMaxTokensToContext keeps zero fallback", () => {
   assertEquals(clampMaxTokensToContext(0, 12000, 3000), 0);
 });
 
 // --- focused stateless-helper tests ---
 
-Deno.test("containsImageContent", () => {
+test("containsImageContent", () => {
   assertEquals(containsImageContent([]), false);
   assertEquals(containsImageContent([{ type: "text", text: "hi" }]), false);
   assertEquals(containsImageContent([imageBlock()]), true);
@@ -326,14 +326,14 @@ Deno.test("containsImageContent", () => {
   );
 });
 
-Deno.test("toolResultImages extracts only image payloads", () => {
+test("toolResultImages extracts only image payloads", () => {
   assertEquals(toolResultImages([{ type: "text", text: "hi" }]), undefined);
   assertEquals(toolResultImages([imageBlock("QUJD", "image/jpeg")]), [
     { mimeType: "image/jpeg", data: "QUJD" },
   ]);
 });
 
-Deno.test("encodedImagePayloadBytes accounts for data URI overhead", () => {
+test("encodedImagePayloadBytes accounts for data URI overhead", () => {
   assertEquals(encodedImagePayloadBytes(null), 0);
   // 4 data chars + 9 mime chars + 13 prefix chars + 128
   assertEquals(
@@ -342,7 +342,7 @@ Deno.test("encodedImagePayloadBytes accounts for data URI overhead", () => {
   );
 });
 
-Deno.test("providerImageRequestBudget applies known provider limits", () => {
+test("providerImageRequestBudget applies known provider limits", () => {
   const base: Provider = {
     chat: () => (async function* () {})(),
     name: () => "anthropic",
@@ -366,7 +366,7 @@ Deno.test("providerImageRequestBudget applies known provider limits", () => {
   assertEquals(unknown.maxImages, 0);
 });
 
-Deno.test("estimateChatRequestTokens grows with input", () => {
+test("estimateChatRequestTokens grows with input", () => {
   const tools: ToolDefinition[] = [{
     name: "bash",
     description: "run a command",
@@ -385,7 +385,7 @@ Deno.test("estimateChatRequestTokens grows with input", () => {
   assertEquals(withTools > empty, true);
 });
 
-Deno.test("estimateGuardRequestTokens floors tool-result token counts", () => {
+test("estimateGuardRequestTokens floors tool-result token counts", () => {
   const repeated = "a".repeat(400);
   const msg = createToolResultMessage("c", "bash", repeated, false);
   const guard = estimateGuardRequestTokens("sys", [msg], [], null);
@@ -395,7 +395,7 @@ Deno.test("estimateGuardRequestTokens floors tool-result token counts", () => {
   assertEquals(estimateGuardToolResultTokens(msg, null) >= 100, true);
 });
 
-Deno.test("estimateProviderUsage / completeProviderUsage", () => {
+test("estimateProviderUsage / completeProviderUsage", () => {
   const estimated = estimateProviderUsage(
     "sys",
     [userMessage("hi")],
@@ -427,7 +427,7 @@ Deno.test("estimateProviderUsage / completeProviderUsage", () => {
   );
 });
 
-Deno.test("contentRejectionPlaceholder names the removal and reason", () => {
+test("contentRejectionPlaceholder names the removal and reason", () => {
   const withDetail = contentRejectionPlaceholder(2, "blocked");
   assertEquals(withDetail.includes("2 image(s)"), true);
   assertEquals(withDetail.includes("(blocked)"), true);
@@ -436,7 +436,7 @@ Deno.test("contentRejectionPlaceholder names the removal and reason", () => {
   assertEquals(noDetail.includes("(  )"), false);
 });
 
-Deno.test("stripImagesFromMessage removes images and appends placeholder", () => {
+test("stripImagesFromMessage removes images and appends placeholder", () => {
   const [keptText, countText] = stripImagesFromMessage(
     { role: "user", content: "look", timestamp: new Date() },
     "",
@@ -466,7 +466,7 @@ Deno.test("stripImagesFromMessage removes images and appends placeholder", () =>
   assertEquals((emptied.content ?? "").includes("image unavailable"), true);
 });
 
-Deno.test("lastUserTurnIndex finds the newest real user message", () => {
+test("lastUserTurnIndex finds the newest real user message", () => {
   assertEquals(lastUserTurnIndex([]), 0);
   assertEquals(
     lastUserTurnIndex([
@@ -487,7 +487,7 @@ Deno.test("lastUserTurnIndex finds the newest real user message", () => {
   );
 });
 
-Deno.test("isContextGuardToolResult / contextGuardToolResult", () => {
+test("isContextGuardToolResult / contextGuardToolResult", () => {
   const plain = createToolResultMessage("c", "bash", "ok", false);
   assertEquals(isContextGuardToolResult(plain), false);
   const guard = contextGuardToolResult(plain, 100, 50, 1000, 200);
@@ -498,13 +498,13 @@ Deno.test("isContextGuardToolResult / contextGuardToolResult", () => {
   assertEquals(isContextGuardToolResult(guard), true);
 });
 
-Deno.test("streamRecoveryRetryDelay follows provider backoff", () => {
+test("streamRecoveryRetryDelay follows provider backoff", () => {
   assertEquals(streamRecoveryRetryDelay(1), 1000);
   assertEquals(streamRecoveryRetryDelay(2), 2000);
   assertEquals(streamRecoveryRetryDelay(0), 1000);
 });
 
-Deno.test("waitForStreamRecoveryRetry resolves and honors abort", async () => {
+test("waitForStreamRecoveryRetry resolves and honors abort", async () => {
   assertEquals(await waitForStreamRecoveryRetry(null, 0), true);
   assertEquals(await waitForStreamRecoveryRetry(null, 1), true);
 
@@ -516,7 +516,7 @@ Deno.test("waitForStreamRecoveryRetry resolves and honors abort", async () => {
   assertEquals(performance.now() - started < 2000, true);
 });
 
-Deno.test("applyCacheMarkers returns new objects", () => {
+test("applyCacheMarkers returns new objects", () => {
   const original = [userMessage("hello")];
   const result = applyCacheMarkers(original, [0, 0]);
   assertNotStrictEquals(result[0], original[0]);

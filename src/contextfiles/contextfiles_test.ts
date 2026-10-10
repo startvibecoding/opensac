@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertFalse } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertFalse } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   buildContextString,
   defaultRuleContent,
@@ -9,12 +9,13 @@ import {
   loadRuleFile,
   ruleFile,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function contains(s: string, substr: string): boolean {
   return s.includes(substr);
 }
 
-Deno.test("loadContextFiles", () => {
+test("loadContextFiles", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     const projectDir = path.join(tmpDir, "project");
@@ -42,7 +43,7 @@ Deno.test("loadContextFiles", () => {
   }
 });
 
-Deno.test("buildContextString", () => {
+test("buildContextString", () => {
   const result = {
     globalFiles: [] as FileContent[],
     parentFiles: [] as FileContent[],
@@ -58,12 +59,12 @@ Deno.test("buildContextString", () => {
   assert(contains(context, "# Test Content"));
 });
 
-Deno.test("buildContextString empty", () => {
+test("buildContextString empty", () => {
   const result = { globalFiles: [], parentFiles: [], projectFiles: [] };
   assertEquals(buildContextString(result), "");
 });
 
-Deno.test("extraFiles", () => {
+test("extraFiles", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     Deno.writeTextFileSync(path.join(tmpDir, "CUSTOM.md"), "# Custom");
@@ -77,7 +78,7 @@ Deno.test("extraFiles", () => {
   }
 });
 
-Deno.test("extraFiles cannot escape base dir", () => {
+test("extraFiles cannot escape base dir", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     const projectDir = path.join(tmpDir, "project");
@@ -99,7 +100,7 @@ Deno.test("extraFiles cannot escape base dir", () => {
   }
 });
 
-Deno.test("loadRuleFile missing does not create file", () => {
+test("loadRuleFile missing does not create file", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     assertEquals(loadRuleFile(tmpDir), "");
@@ -117,7 +118,7 @@ Deno.test("loadRuleFile missing does not create file", () => {
   }
 });
 
-Deno.test("loadRuleFile reads project rule", () => {
+test("loadRuleFile reads project rule", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     const rulePath = path.join(tmpDir, ruleFile);
@@ -130,7 +131,7 @@ Deno.test("loadRuleFile reads project rule", () => {
   }
 });
 
-Deno.test("ensureRuleFile creates default", () => {
+test("ensureRuleFile creates default", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     const { path: p, content, written } = ensureRuleFile(tmpDir, false);
@@ -143,7 +144,7 @@ Deno.test("ensureRuleFile creates default", () => {
   }
 });
 
-Deno.test("ensureRuleFile preserves existing unless forced", () => {
+test("ensureRuleFile preserves existing unless forced", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     const rulePath = path.join(tmpDir, ruleFile);
@@ -162,7 +163,7 @@ Deno.test("ensureRuleFile preserves existing unless forced", () => {
   }
 });
 
-Deno.test("parent files", () => {
+test("parent files", () => {
   const tmpDir = Deno.makeTempDirSync();
   try {
     const parentDir = path.join(tmpDir, "parent");
@@ -184,7 +185,7 @@ Deno.test("parent files", () => {
   }
 });
 
-Deno.test("defaultRuleContent matches project rule template", () => {
+test("defaultRuleContent matches project rule template", () => {
   assert(defaultRuleContent.startsWith("# Project Rules\n"));
   assert(defaultRuleContent.endsWith("\n"));
 });

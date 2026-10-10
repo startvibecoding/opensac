@@ -29,7 +29,11 @@ const columns = `run_id AS runId, session_id AS sessionId, state,
   completed_at AS completedAt`;
 
 export class RecoveryDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   upsert(executor: DB, record: RecoveryRecord): void {
     execChanges(

@@ -21,11 +21,11 @@ import {
   type ToolCallBlockResult,
 } from "../agent/mod.ts";
 import { createAgentManager as buildAgentManagerImpl } from "../agent/manager.ts";
-import type { AgentFactoryOptions } from "../agent/factory.ts";
-import type { AllowConfig } from "../config/allow.ts";
-import type { Settings } from "../config/settings.ts";
-import type { Model } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type AgentFactoryOptions } from "../agent/factory.ts";
+import { type AllowConfig } from "../config/allow.ts";
+import { type Settings } from "../config/settings.ts";
+import { type Model } from "../provider/types.ts";
+import { type Provider } from "../provider/provider.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import type { Manager as SandboxManager } from "../sandbox/sandbox.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";

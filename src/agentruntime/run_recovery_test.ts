@@ -6,7 +6,7 @@
 // deferred to the execution-snapshot slice, and `context.DeadlineExceeded`
 // maps to a `TimeoutError` reason.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
 import {
@@ -27,6 +27,7 @@ import {
   recoveryWorkerLimit,
   RunStore,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function durableRun(overrides: Partial<DurableRun>): DurableRun {
   return {
@@ -68,7 +69,7 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-Deno.test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
+test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
@@ -106,7 +107,7 @@ Deno.test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
   }
 });
 
-Deno.test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
+test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
@@ -147,7 +148,7 @@ Deno.test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
   }
 });
 
-Deno.test("RecoverOrphanedRunsSlowAttemptDoesNotBlockOtherSessions", async () => {
+test("RecoverOrphanedRunsSlowAttemptDoesNotBlockOtherSessions", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
@@ -221,7 +222,7 @@ async function recoverOrphanedRunsWithSlowPolicy(
   }
 }
 
-Deno.test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
+test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
@@ -262,7 +263,7 @@ Deno.test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => 
   }
 });
 
-Deno.test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
+test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-owned");
@@ -289,7 +290,7 @@ Deno.test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
   }
 });
 
-Deno.test("DefaultRunRecoveryPolicyDoesNotTrustSourceAlone", () => {
+test("DefaultRunRecoveryPolicyDoesNotTrustSourceAlone", () => {
   assertEquals(
     defaultRunRecoveryPolicy(
       { source: "responses_background" } as SessionRun,
@@ -298,7 +299,7 @@ Deno.test("DefaultRunRecoveryPolicyDoesNotTrustSourceAlone", () => {
   );
 });
 
-Deno.test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
+test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-remote-record");
@@ -335,7 +336,7 @@ Deno.test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
   }
 });
 
-Deno.test("RecoveryFailureIsDurableAndRetryable", async () => {
+test("RecoveryFailureIsDurableAndRetryable", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-retry");
@@ -375,6 +376,6 @@ Deno.test("RecoveryFailureIsDurableAndRetryable", async () => {
   }
 });
 
-Deno.test("RecoveryWorkerLimitIsPositive", () => {
+test("RecoveryWorkerLimitIsPositive", () => {
   assert(recoveryWorkerLimit > 0);
 });

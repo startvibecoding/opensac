@@ -2,7 +2,7 @@
 // Session entry types and the shared ID generator. Timestamps map from Go
 // `time.Time` to `Date`.
 
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 
 /** Identifies the type of a session entry. */
 export type EntryType = string;

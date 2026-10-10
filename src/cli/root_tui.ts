@@ -14,7 +14,7 @@ import { atomicStdout } from "../tui/sync_output.ts";
 import { TuiShell } from "../tui/tui_shell.tsx";
 import { TUISession } from "../tui/tui_session.ts";
 import { createCoreClientTUIService } from "../tui/core_service.ts";
-import type { Settings } from "../config/mod.ts";
+import { type Settings } from "../config/mod.ts";
 import { configDir } from "../config/mod.ts";
 import { CoreClient } from "../core/client.ts";
 import { resolveCoreConfig } from "../core/config.ts";

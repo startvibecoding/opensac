@@ -3,8 +3,8 @@
 // This port injects a fake `HttpClient` and builds plain Response-like objects
 // (the provider only reads `status`, `body`, and `text()`).
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { HttpClient } from "../http_client.ts";
+import { assert, assertEquals } from "../../compat/assert.ts";
+import { type HttpClient } from "../http_client.ts";
 import {
   cacheInfo,
   type ChatParams,
@@ -35,6 +35,7 @@ import {
   type Provider,
 } from "./provider.ts";
 import { resolveAnthropicModels } from "./register.ts";
+import { test } from "#testing";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ const abortParams = (): ChatParams => ({
 
 // ─── retry / transport ───────────────────────────────────────────────────────
 
-Deno.test("AnthropicRetriesEarlyStreamReadError", async () => {
+test("AnthropicRetriesEarlyStreamReadError", async () => {
   const streamErr = new Error(
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
@@ -212,7 +213,7 @@ Deno.test("AnthropicRetriesEarlyStreamReadError", async () => {
   assertEquals(retryEvent!.retryAfterMs, 1);
 });
 
-Deno.test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
+test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   const streamErr = new Error(
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
@@ -255,7 +256,7 @@ Deno.test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => 
   assert(sawText && sawError);
 });
 
-Deno.test("AnthropicProviderHTTPProxy", () => {
+test("AnthropicProviderHTTPProxy", () => {
   const p = createAnthropicProvider(
     "fake-key",
     "https://api.anthropic.com",
@@ -271,7 +272,7 @@ Deno.test("AnthropicProviderHTTPProxy", () => {
 
 // ─── tool_choice / tool calls ────────────────────────────────────────────────
 
-Deno.test("AnthropicParallelToolUseRequest", async () => {
+test("AnthropicParallelToolUseRequest", async () => {
   const tools: ToolDefinition[] = [{
     name: "read",
     description: "",
@@ -358,12 +359,12 @@ Deno.test("AnthropicParallelToolUseRequest", async () => {
   assertEquals(req.tool_choice, undefined);
 });
 
-Deno.test("MergeToolCallInputPreservesInitialOnMalformedStream", () => {
+test("MergeToolCallInputPreservesInitialOnMalformedStream", () => {
   const got = mergeToolCallInput('{"path":"a"}', '{"path":"b"');
   assertEquals(got, '{"path":"a"}');
 });
 
-Deno.test("AnthropicStreamMultipleToolCallsWithInitialInput", async () => {
+test("AnthropicStreamMultipleToolCallsWithInitialInput", async () => {
   const sse = [
     'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":"read","input":{"path":"a"}}}',
     'data: {"type":"content_block_stop","index":0}',
@@ -391,7 +392,7 @@ Deno.test("AnthropicStreamMultipleToolCallsWithInitialInput", async () => {
   assertEquals(calls[1].arguments, { path: "b" });
 });
 
-Deno.test("AnthropicCustomHeaders", async () => {
+test("AnthropicCustomHeaders", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockAnthropicProvider(
     [m("claude-test")],
@@ -415,7 +416,7 @@ Deno.test("AnthropicCustomHeaders", async () => {
 
 // ─── convertMessages / cache_control ─────────────────────────────────────────
 
-Deno.test("ConvertMessagesPreservesCacheControlOnSingleTextBlock", () => {
+test("ConvertMessagesPreservesCacheControlOnSingleTextBlock", () => {
   const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   p.setCacheControlEnabled(boolPtr(true));
   const msgs = p.convertMessages({
@@ -436,7 +437,7 @@ Deno.test("ConvertMessagesPreservesCacheControlOnSingleTextBlock", () => {
   assertEquals(blocks[0].cache_control, { type: "ephemeral" });
 });
 
-Deno.test("ConvertMessagesOmitsCacheControlWhenDisabled", () => {
+test("ConvertMessagesOmitsCacheControlWhenDisabled", () => {
   const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   p.setCacheControlEnabled(boolPtr(false));
   const msgs = p.convertMessages({
@@ -453,7 +454,7 @@ Deno.test("ConvertMessagesOmitsCacheControlWhenDisabled", () => {
   assertEquals(msgs[0].content, "cached text");
 });
 
-Deno.test("ChatRequestPreservesCacheControlOnSingleTextBlock", async () => {
+test("ChatRequestPreservesCacheControlOnSingleTextBlock", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockAnthropicProvider(
     [m("claude-test")],
@@ -483,7 +484,7 @@ Deno.test("ChatRequestPreservesCacheControlOnSingleTextBlock", async () => {
   assertEquals(blocks[0].cache_control, { type: "ephemeral" });
 });
 
-Deno.test("ChatRequestUsesExplicitMaxTokens", async () => {
+test("ChatRequestUsesExplicitMaxTokens", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockAnthropicProvider(
     [m("claude-test")],
@@ -500,7 +501,7 @@ Deno.test("ChatRequestUsesExplicitMaxTokens", async () => {
   assertEquals(req.max_tokens, 4096);
 });
 
-Deno.test("ChatRequestExplicitZeroMaxTokensFallsBackToDefault", async () => {
+test("ChatRequestExplicitZeroMaxTokensFallsBackToDefault", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockAnthropicProvider(
     [m("claude-test", { maxTokens: 0, maxTokensSet: true })],
@@ -516,7 +517,7 @@ Deno.test("ChatRequestExplicitZeroMaxTokensFallsBackToDefault", async () => {
   assertEquals(req.max_tokens, 16384);
 });
 
-Deno.test("ChatRequestHostedWebSearchTool", async () => {
+test("ChatRequestHostedWebSearchTool", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockAnthropicProvider(
     [m("claude-test")],
@@ -542,7 +543,7 @@ Deno.test("ChatRequestHostedWebSearchTool", async () => {
   assertEquals(tools[0].name, undefined);
 });
 
-Deno.test("ConvertMessagesAnthropicToolResultEmptyContentFallback", () => {
+test("ConvertMessagesAnthropicToolResultEmptyContentFallback", () => {
   const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   const msgs = p.convertMessages({
     messages: [createToolResultMessage("toolu_1", "bash", "", false)],
@@ -557,7 +558,7 @@ Deno.test("ConvertMessagesAnthropicToolResultEmptyContentFallback", () => {
   assertEquals(blocks[0].content, "Tool completed with no output.");
 });
 
-Deno.test("ConvertMessagesAnthropicGroupsConsecutiveToolResults", () => {
+test("ConvertMessagesAnthropicGroupsConsecutiveToolResults", () => {
   const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   const contents: ContentBlock[] = [
     { type: "text", text: "second" },
@@ -609,7 +610,7 @@ async function captureThinking(
   return JSON.parse(bodies[0].body) as Record<string, unknown>;
 }
 
-Deno.test("AnthropicThinkingFormatDeepSeek", async () => {
+test("AnthropicThinkingFormatDeepSeek", async () => {
   const req = await captureThinking(
     [m("deepseek-test", { reasoning: true })],
     "deepseek",
@@ -625,7 +626,7 @@ Deno.test("AnthropicThinkingFormatDeepSeek", async () => {
   assertEquals((req.output_config as Record<string, unknown>).effort, "max");
 });
 
-Deno.test("AnthropicThinkingFormatDeepSeekHigh", async () => {
+test("AnthropicThinkingFormatDeepSeekHigh", async () => {
   const req = await captureThinking(
     [m("deepseek-v4-pro", { reasoning: true })],
     "deepseek",
@@ -639,7 +640,7 @@ Deno.test("AnthropicThinkingFormatDeepSeekHigh", async () => {
   assertEquals((req.output_config as Record<string, unknown>).effort, "high");
 });
 
-Deno.test("AnthropicThinkingOmittedForNonReasoningModel", async () => {
+test("AnthropicThinkingOmittedForNonReasoningModel", async () => {
   const req = await captureThinking(
     [m("claude-opus-test", { reasoning: false })],
     "",
@@ -653,7 +654,7 @@ Deno.test("AnthropicThinkingOmittedForNonReasoningModel", async () => {
   assertEquals(req.output_config, undefined);
 });
 
-Deno.test("AnthropicThinkingAdaptiveForOpus47", async () => {
+test("AnthropicThinkingAdaptiveForOpus47", async () => {
   const req = await captureThinking(
     [m("claude-opus-4-7", { reasoning: true })],
     "",
@@ -669,7 +670,7 @@ Deno.test("AnthropicThinkingAdaptiveForOpus47", async () => {
   assertEquals((req.output_config as Record<string, unknown>).effort, "high");
 });
 
-Deno.test("AnthropicThinkingAdaptiveFromModelCompat", async () => {
+test("AnthropicThinkingAdaptiveFromModelCompat", async () => {
   const req = await captureThinking(
     [m("custom-adaptive", {
       reasoning: true,
@@ -698,7 +699,7 @@ async function usageFor(sse: string): Promise<Usage> {
   );
 }
 
-Deno.test("AnthropicCache_FirstTurn", async () => {
+test("AnthropicCache_FirstTurn", async () => {
   const sse =
     'data: {"type":"message_start","message":{"id":"msg_1","content":[],"stop_reason":null,"usage":{"input_tokens":1000,"output_tokens":0,"cache_creation_input_tokens":5000,"cache_read_input_tokens":0}}}\n' +
     'data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}\n' +
@@ -715,7 +716,7 @@ Deno.test("AnthropicCache_FirstTurn", async () => {
   assertEquals(cacheInfo(u), "CacheWrite: 5000");
 });
 
-Deno.test("AnthropicCache_CachedTurn", async () => {
+test("AnthropicCache_CachedTurn", async () => {
   const sse =
     'data: {"type":"message_start","message":{"id":"msg_2","content":[],"stop_reason":null,"usage":{"input_tokens":1000,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":750}}}\n' +
     'data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}\n' +
@@ -732,7 +733,7 @@ Deno.test("AnthropicCache_CachedTurn", async () => {
   assertEquals(cacheInfo(u), "Cache: 43%");
 });
 
-Deno.test("AnthropicCache_NoCache", async () => {
+test("AnthropicCache_NoCache", async () => {
   const sse =
     'data: {"type":"message_start","message":{"id":"msg_3","content":[],"stop_reason":null,"usage":{"input_tokens":200,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}\n' +
     'data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}\n' +
@@ -748,7 +749,7 @@ Deno.test("AnthropicCache_NoCache", async () => {
   assertEquals(cacheInfo(u), "Cache: 0%");
 });
 
-Deno.test("AnthropicCache_ProxyAllUsageInMessageDelta", async () => {
+test("AnthropicCache_ProxyAllUsageInMessageDelta", async () => {
   const sse =
     'data: {"type":"message_start","message":{"id":"msg_4","content":[],"stop_reason":null}}\n' +
     'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hey"}}\n' +
@@ -762,7 +763,7 @@ Deno.test("AnthropicCache_ProxyAllUsageInMessageDelta", async () => {
   assertEquals(cacheInfo(u), "Cache: 43%");
 });
 
-Deno.test("AnthropicCache_ProxySplitUsage", async () => {
+test("AnthropicCache_ProxySplitUsage", async () => {
   const sse =
     'data: {"type":"message_start","message":{"id":"msg_5","content":[],"stop_reason":null,"usage":{"input_tokens":500,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":500}}}\n' +
     'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"OK"}}\n' +
@@ -776,7 +777,7 @@ Deno.test("AnthropicCache_ProxySplitUsage", async () => {
   assertEquals(cacheInfo(u), "Cache: 50%");
 });
 
-Deno.test("AnthropicCache_FirstWinsOnConflict", async () => {
+test("AnthropicCache_FirstWinsOnConflict", async () => {
   const sse =
     'data: {"type":"message_start","message":{"id":"msg_6","content":[],"stop_reason":null,"usage":{"input_tokens":1000,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":750}}}\n' +
     'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Done"}}\n' +
@@ -790,7 +791,7 @@ Deno.test("AnthropicCache_FirstWinsOnConflict", async () => {
 
 // ─── sampling params suppression ─────────────────────────────────────────────
 
-Deno.test("AnthropicThinkingDropsSamplingParams", async () => {
+test("AnthropicThinkingDropsSamplingParams", async () => {
   const req = await captureThinking(
     [m("mock", { reasoning: true })],
     "",
@@ -807,7 +808,7 @@ Deno.test("AnthropicThinkingDropsSamplingParams", async () => {
   assertEquals(req.top_p, undefined);
 });
 
-Deno.test("AnthropicDisableSamplingParamsCompat", async () => {
+test("AnthropicDisableSamplingParamsCompat", async () => {
   const req = await captureThinking(
     [m("mock", { compat: { disableSamplingParams: true } })],
     "",
@@ -824,7 +825,7 @@ Deno.test("AnthropicDisableSamplingParamsCompat", async () => {
   assertEquals(req.top_p, undefined);
 });
 
-Deno.test("AnthropicSamplingParamsDroppedByDefault", async () => {
+test("AnthropicSamplingParamsDroppedByDefault", async () => {
   const req = await captureThinking([m("mock")], "", {
     modelId: "mock",
     messages: [createUserMessage("hi")],
@@ -836,7 +837,7 @@ Deno.test("AnthropicSamplingParamsDroppedByDefault", async () => {
   assertEquals(req.top_p, undefined);
 });
 
-Deno.test("AnthropicSamplingParamsPassThrough", async () => {
+test("AnthropicSamplingParamsPassThrough", async () => {
   const req = await captureThinking(
     [m("mock", { compat: { disableSamplingParams: false } })],
     "",
@@ -854,14 +855,14 @@ Deno.test("AnthropicSamplingParamsPassThrough", async () => {
 
 // ─── register ────────────────────────────────────────────────────────────────
 
-Deno.test("ResolveAnthropicModelsDefaults", () => {
+test("ResolveAnthropicModelsDefaults", () => {
   const models = resolveAnthropicModels(null);
   assertEquals(models.length, 4);
   assertEquals(models[0].id, "claude-sonnet-4-20250514");
   assertEquals(models[0].provider, "anthropic");
 });
 
-Deno.test("ResolveAnthropicModelsFromConfig", () => {
+test("ResolveAnthropicModelsFromConfig", () => {
   const models = resolveAnthropicModels({
     models: [{ id: "custom", name: "Custom", reasoning: true }],
   });

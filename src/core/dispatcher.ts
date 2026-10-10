@@ -34,7 +34,7 @@ import {
   parseWorkDirParams,
   runtimeParamsObject,
 } from "./runtime_protocol.ts";
-import type { CoreRuntimeHost } from "./runtime.ts";
+import { type CoreRuntimeHost } from "./runtime.ts";
 import { CoreEventStream } from "./event_stream.ts";
 
 export interface CoreRuntimeDispatcherOptions {
@@ -383,13 +383,14 @@ export class CoreRuntimeDispatcher {
 }
 
 class CoreDispatchError extends Error {
-  constructor(
-    readonly code: number,
-    message: string,
-    readonly data?: unknown,
-  ) {
+    readonly code: number;
+  readonly data?: unknown;
+
+  constructor(code: number, message: string, data?: unknown) {
     super(message);
     this.name = "CoreDispatchError";
+    this.code = code;
+    this.data = data;
   }
 }
 

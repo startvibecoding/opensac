@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 import { CoreRegistry } from "./registry.ts";
 

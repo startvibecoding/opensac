@@ -1,6 +1,6 @@
 // (pure cases).
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   createMemberCompletion,
   createMemberMailbox,
@@ -8,12 +8,13 @@ import {
   MEMBER_STATUS_ERROR,
   type MemberCompletion,
 } from "./mailbox.ts";
+import { test } from "#testing";
 
 function completion(partial: Partial<MemberCompletion>): MemberCompletion {
   return { ...createMemberCompletion(), ...partial };
 }
 
-Deno.test("member mailbox drain steering order and format", () => {
+test("member mailbox drain steering order and format", () => {
   const m = createMemberMailbox();
   assert(!m.hasPending());
   assertEquals(m.drainSteering(), null);
@@ -61,7 +62,7 @@ Deno.test("member mailbox drain steering order and format", () => {
   assertEquals(m.drainSteering(), null);
 });
 
-Deno.test("member mailbox drain truncates done payload runes", () => {
+test("member mailbox drain truncates done payload runes", () => {
   const m = createMemberMailbox();
   const payload = "测".repeat(4000);
   m.enqueue(
@@ -74,7 +75,7 @@ Deno.test("member mailbox drain truncates done payload runes", () => {
   assert(!content.includes("测".repeat(3501)));
 });
 
-Deno.test("member mailbox drain error truncation and next step", () => {
+test("member mailbox drain error truncation and next step", () => {
   const m = createMemberMailbox();
   const payload = "e".repeat(3500);
   m.enqueue(
@@ -96,7 +97,7 @@ Deno.test("member mailbox drain error truncation and next step", () => {
   assert(content.includes("status: error\n"));
 });
 
-Deno.test("member mailbox drain error short payload keeps next step", () => {
+test("member mailbox drain error short payload keeps next step", () => {
   const m = createMemberMailbox();
   m.enqueue(
     completion({
@@ -110,7 +111,7 @@ Deno.test("member mailbox drain error short payload keeps next step", () => {
   assert(content.includes('subagent_spawn(member:"qa", task:…)'));
 });
 
-Deno.test("member mailbox pending summary does not drain", () => {
+test("member mailbox pending summary does not drain", () => {
   const m = createMemberMailbox();
   assertEquals(m.pendingSummary(), null);
   m.enqueue(
@@ -135,7 +136,7 @@ Deno.test("member mailbox pending summary does not drain", () => {
   assertEquals(m.drainSteering()!.length, 2);
 });
 
-Deno.test("member mailbox wait for activity signal", async () => {
+test("member mailbox wait for activity signal", async () => {
   const m = createMemberMailbox();
   setTimeout(
     () => m.enqueue(completion({ memberId: "pm", status: MEMBER_STATUS_DONE })),
@@ -147,13 +148,13 @@ Deno.test("member mailbox wait for activity signal", async () => {
   assert(Date.now() - start < 5_000);
 });
 
-Deno.test("member mailbox wait for activity timeout", async () => {
+test("member mailbox wait for activity timeout", async () => {
   const m = createMemberMailbox();
   const timedOut = await m.waitForActivity(undefined, 30);
   assert(timedOut);
 });
 
-Deno.test("member mailbox wait for activity aborts", async () => {
+test("member mailbox wait for activity aborts", async () => {
   const m = createMemberMailbox();
   const controller = new AbortController();
   controller.abort();
@@ -163,7 +164,7 @@ Deno.test("member mailbox wait for activity aborts", async () => {
   );
 });
 
-Deno.test("member mailbox drain clears activity signal", async () => {
+test("member mailbox drain clears activity signal", async () => {
   const m = createMemberMailbox();
   m.enqueue(completion({ memberId: "pm", status: MEMBER_STATUS_DONE }));
   assertEquals(m.drainSteering()!.length, 1);
@@ -171,7 +172,7 @@ Deno.test("member mailbox drain clears activity signal", async () => {
   assert(timedOut);
 });
 
-Deno.test("member mailbox running predicate", () => {
+test("member mailbox running predicate", () => {
   const m = createMemberMailbox();
   assert(!m.runningChildrenRunning());
   m.setRunningPredicate(() => true);

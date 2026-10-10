@@ -1,5 +1,5 @@
 import { type RunContext } from "./run_context.ts";
-import type { ToolContext } from "../tools/tool.ts";
+import { type ToolContext } from "../tools/tool.ts";
 
 /**
  * ITERATION_BUDGET_TOOL_NAME is the model-facing renewal tool for the main loop's

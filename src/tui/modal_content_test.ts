@@ -3,12 +3,13 @@
 // window. These are the primitives behind the Ctrl+O/Ctrl+T performance
 // contract asserted in tool_modal_perf_test.ts.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   type ModalBlock,
   ModalContentCache,
   wrapBlockLines,
 } from "./modal_content.ts";
+import { test } from "#testing";
 
 function blocks(
   texts: Record<string, string>,
@@ -24,7 +25,7 @@ function blocks(
   }));
 }
 
-Deno.test("modal cache rebuilds only blocks whose signature changed", () => {
+test("modal cache rebuilds only blocks whose signature changed", () => {
   const cache = new ModalContentCache();
   const rebuilt: string[] = [];
   cache.refresh(blocks({ a: "first\nline", b: "second" }, rebuilt), 40);
@@ -41,7 +42,7 @@ Deno.test("modal cache rebuilds only blocks whose signature changed", () => {
   assertEquals(rebuilt, []);
 });
 
-Deno.test("modal cache invalidates every block on width or generation change", () => {
+test("modal cache invalidates every block on width or generation change", () => {
   const cache = new ModalContentCache();
   const rebuilt: string[] = [];
   cache.refresh(blocks({ a: "aaaa", b: "bbbb" }, rebuilt), 40);
@@ -53,7 +54,7 @@ Deno.test("modal cache invalidates every block on width or generation change", (
   assertEquals(rebuilt, ["a", "b"], "a cleared transcript drops stale rows");
 });
 
-Deno.test("modal cache slices the window with one separator between blocks", () => {
+test("modal cache slices the window with one separator between blocks", () => {
   const cache = new ModalContentCache();
   cache.refresh(
     [
@@ -73,7 +74,7 @@ Deno.test("modal cache slices the window with one separator between blocks", () 
   assertEquals(cache.slice(1, 0), []);
 });
 
-Deno.test("modal cache keeps block layout stable for empty blocks", () => {
+test("modal cache keeps block layout stable for empty blocks", () => {
   const cache = new ModalContentCache();
   cache.refresh(
     [
@@ -88,7 +89,7 @@ Deno.test("modal cache keeps block layout stable for empty blocks", () => {
   assertEquals(cache.slice(0, 5), ["only", "", "", "", "tail"]);
 });
 
-Deno.test("modal cache patches the same block array in place", () => {
+test("modal cache patches the same block array in place", () => {
   const cache = new ModalContentCache();
   const rebuilt: string[] = [];
   const list = blocks({ a: "aaaa", b: "bbbb" }, rebuilt);
@@ -124,7 +125,7 @@ Deno.test("modal cache patches the same block array in place", () => {
   assertEquals(cache.blockCount, 2);
 });
 
-Deno.test("modal cache bounds its retained text and re-wraps on demand", () => {
+test("modal cache bounds its retained text and re-wraps on demand", () => {
   // Well over the enforced minimum budget (4096 chars): the cold blocks must
   // give up their wrapped text while the layout keeps every line count.
   const cache = new ModalContentCache(5000);
@@ -160,7 +161,7 @@ Deno.test("modal cache bounds its retained text and re-wraps on demand", () => {
   assertEquals(cache.slice(0, 20), unbounded.slice(0, 20));
 });
 
-Deno.test("wrapBlockLines wraps per input line and keeps blank lines", () => {
+test("wrapBlockLines wraps per input line and keeps blank lines", () => {
   const width = 10;
   assertEquals(
     wrapBlockLines("one two three four five", width),
@@ -171,6 +172,6 @@ Deno.test("wrapBlockLines wraps per input line and keeps blank lines", () => {
   // ANSI styling survives the wrap.
   const styled = wrapBlockLines("\u001b[31mred word another\u001b[0m", width);
   assert(styled.length > 1, "styled text wrapped");
-  // deno-lint-ignore no-control-regex
+  // eslint-disable-next-line no-control-regex
   assert(/\u001B\[31m/.test(styled[0]), "style kept on the first segment");
 });

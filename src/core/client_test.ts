@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
@@ -25,8 +25,9 @@ import {
   CoreStartupError,
 } from "./client.ts";
 import { defaultLauncherArgs } from "./client.ts";
+import { test } from "#testing";
 
-Deno.test("Core launcher resolves Deno and Node entrypoints", () => {
+test("Core launcher resolves Deno and Node entrypoints", () => {
   const coreEntrypoint = new URL("./main.ts", import.meta.url).pathname;
   const nodeEntrypoint = new URL("../main.ts", import.meta.url).pathname;
   assertEquals(defaultLauncherArgs("/usr/local/bin/deno")[0], "--allow-read");
@@ -154,7 +155,7 @@ async function startProbe(
   };
 }
 
-Deno.test("CoreClient discovers a registered live Core and calls core.info", async () => {
+test("CoreClient discovers a registered live Core and calls core.info", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer();
     try {
@@ -180,7 +181,7 @@ Deno.test("CoreClient discovers a registered live Core and calls core.info", asy
   });
 });
 
-Deno.test("CoreClient returns an incompatible result for a version or protocol mismatch", async () => {
+test("CoreClient returns an incompatible result for a version or protocol mismatch", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer(
       "other-version",
@@ -215,7 +216,7 @@ Deno.test("CoreClient returns an incompatible result for a version or protocol m
   });
 });
 
-Deno.test("CoreClient does not contact a demonstrably dead registration", async () => {
+test("CoreClient does not contact a demonstrably dead registration", async () => {
   await withStateDir(async (stateDir, paths) => {
     let requests = 0;
     const handle = await startProbe(() => {
@@ -238,7 +239,7 @@ Deno.test("CoreClient does not contact a demonstrably dead registration", async 
   });
 });
 
-Deno.test("CoreClient validates the endpoint even when a registration PID was reused", async () => {
+test("CoreClient validates the endpoint even when a registration PID was reused", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer();
     try {
@@ -266,7 +267,7 @@ Deno.test("CoreClient validates the endpoint even when a registration PID was re
   });
 });
 
-Deno.test("CoreClient selects one configured password and never retries a call", async () => {
+test("CoreClient selects one configured password and never retries a call", async () => {
   await withStateDir(async (stateDir, paths) => {
     const requests: Array<{ method: string; authorization: string | null }> =
       [];
@@ -340,7 +341,7 @@ Deno.test("CoreClient selects one configured password and never retries a call",
   });
 });
 
-Deno.test("CoreClient uses a deterministic default password until explicitly changed", async () => {
+test("CoreClient uses a deterministic default password until explicitly changed", async () => {
   await withStateDir(async (stateDir, paths) => {
     const requests: string[] = [];
     const handle = await startProbe(async (request) => {
@@ -391,7 +392,7 @@ Deno.test("CoreClient uses a deterministic default password until explicitly cha
   });
 });
 
-Deno.test("CoreClient reports an unauthenticated registration without leaking passwords", async () => {
+test("CoreClient reports an unauthenticated registration without leaking passwords", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer(
       TEST_VERSION,
@@ -420,7 +421,7 @@ Deno.test("CoreClient reports an unauthenticated registration without leaking pa
   });
 });
 
-Deno.test("CoreClient reports malformed registration as stale", async () => {
+test("CoreClient reports malformed registration as stale", async () => {
   await withStateDir(async (stateDir, paths) => {
     await Deno.mkdir(stateDir, { recursive: true });
     await Deno.writeTextFile(paths.registrationFile, "{not-json");
@@ -430,7 +431,7 @@ Deno.test("CoreClient reports malformed registration as stale", async () => {
   });
 });
 
-Deno.test("CoreClient uses the configured Bearer header for authenticated discovery", async () => {
+test("CoreClient uses the configured Bearer header for authenticated discovery", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer(
       TEST_VERSION,
@@ -459,7 +460,7 @@ Deno.test("CoreClient uses the configured Bearer header for authenticated discov
   });
 });
 
-Deno.test("CoreClient surfaces JSON-RPC errors as a typed call error", async () => {
+test("CoreClient surfaces JSON-RPC errors as a typed call error", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer();
     try {
@@ -483,7 +484,7 @@ Deno.test("CoreClient surfaces JSON-RPC errors as a typed call error", async () 
   });
 });
 
-Deno.test("CoreClient rejects a response whose JSON-RPC ID does not match", async () => {
+test("CoreClient rejects a response whose JSON-RPC ID does not match", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startProbe(async (request) => {
       await request.json();
@@ -509,7 +510,7 @@ Deno.test("CoreClient rejects a response whose JSON-RPC ID does not match", asyn
   });
 });
 
-Deno.test("CoreClient allows a null auth ID but rejects a non-null mismatch", async () => {
+test("CoreClient allows a null auth ID but rejects a non-null mismatch", async () => {
   await withStateDir(async (stateDir, paths) => {
     let authId: string | null = null;
     const handle = await startProbe(async (request) => {
@@ -566,7 +567,7 @@ Deno.test("CoreClient allows a null auth ID but rejects a non-null mismatch", as
   });
 });
 
-Deno.test("CoreClient sends one non-batched JSON-RPC request", async () => {
+test("CoreClient sends one non-batched JSON-RPC request", async () => {
   await withStateDir(async (stateDir, paths) => {
     const bodies: unknown[] = [];
     const handle = await startProbe(async (request) => {
@@ -613,7 +614,7 @@ Deno.test("CoreClient sends one non-batched JSON-RPC request", async () => {
   });
 });
 
-Deno.test("CoreClient reports malformed core.info without inventing actual values", async () => {
+test("CoreClient reports malformed core.info without inventing actual values", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startProbe(async (request) => {
       const body = await request.json() as {
@@ -647,7 +648,7 @@ Deno.test("CoreClient reports malformed core.info without inventing actual value
   });
 });
 
-Deno.test("CoreClient rechecks registration currency before caching discovery", async () => {
+test("CoreClient rechecks registration currency before caching discovery", async () => {
   await withStateDir(async (stateDir, paths) => {
     let requests = 0;
     const handle = await startProbe(async (request) => {
@@ -690,7 +691,7 @@ Deno.test("CoreClient rechecks registration currency before caching discovery", 
   });
 });
 
-Deno.test("CoreClient ensureStarted coalesces concurrent launches and reuses a healthy Core", async () => {
+test("CoreClient ensureStarted coalesces concurrent launches and reuses a healthy Core", async () => {
   await withStateDir(async (stateDir, paths) => {
     let launches = 0;
     let handle: CoreServerHandle | undefined;
@@ -718,7 +719,7 @@ Deno.test("CoreClient ensureStarted coalesces concurrent launches and reuses a h
   });
 });
 
-Deno.test("CoreClient polls after a launcher resolves before registration is ready", async () => {
+test("CoreClient polls after a launcher resolves before registration is ready", async () => {
   await withStateDir(async (stateDir, paths) => {
     let launches = 0;
     let handle: CoreServerHandle | undefined;
@@ -744,7 +745,7 @@ Deno.test("CoreClient polls after a launcher resolves before registration is rea
   });
 });
 
-Deno.test("CoreClient bounds a response body that never completes", async () => {
+test("CoreClient bounds a response body that never completes", async () => {
   await withStateDir(async (stateDir, paths) => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -789,7 +790,7 @@ Deno.test("CoreClient bounds a response body that never completes", async () => 
   });
 });
 
-Deno.test("CoreClient aborts a late launcher and ignores its completion", async () => {
+test("CoreClient aborts a late launcher and ignores its completion", async () => {
   await withStateDir(async (stateDir) => {
     let launchSignal: AbortSignal | undefined;
     let resolveLate!: () => void;
@@ -818,7 +819,7 @@ Deno.test("CoreClient aborts a late launcher and ignores its completion", async 
   });
 });
 
-Deno.test("CoreClient clears the request timer after fetch failure", async () => {
+test("CoreClient clears the request timer after fetch failure", async () => {
   await withStateDir(async (stateDir, paths) => {
     await writeRegistration(paths, registration(stateDir, 4096));
     const client = new CoreClient(clientOptions(stateDir));
@@ -842,7 +843,7 @@ Deno.test("CoreClient clears the request timer after fetch failure", async () =>
   });
 });
 
-Deno.test("CoreClient bounds a launcher that never resolves", async () => {
+test("CoreClient bounds a launcher that never resolves", async () => {
   await withStateDir(async (stateDir) => {
     const launcher: CoreLauncher = () => new Promise<void>(() => {});
     const client = new CoreClient(
@@ -856,7 +857,7 @@ Deno.test("CoreClient bounds a launcher that never resolves", async () => {
   });
 });
 
-Deno.test("CoreClient clears a failed startup so a later ensureStarted can retry", async () => {
+test("CoreClient clears a failed startup so a later ensureStarted can retry", async () => {
   await withStateDir(async (stateDir) => {
     let launches = 0;
     const launcher: CoreLauncher = () => {
@@ -873,7 +874,7 @@ Deno.test("CoreClient clears a failed startup so a later ensureStarted can retry
   });
 });
 
-Deno.test("CoreClient close clears discovered state without stopping the server", async () => {
+test("CoreClient close clears discovered state without stopping the server", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer();
     try {
@@ -917,7 +918,7 @@ async function waitForShutdownCall(
   throw new Error("timed out waiting for the core.shutdown hook");
 }
 
-Deno.test("CoreClient shutdown sends core.shutdown and validates the acknowledgement", async () => {
+test("CoreClient shutdown sends core.shutdown and validates the acknowledgement", async () => {
   await withStateDir(async (stateDir, paths) => {
     const { server, calls } = shutdownServer();
     const handle = await server.start();
@@ -939,7 +940,7 @@ Deno.test("CoreClient shutdown sends core.shutdown and validates the acknowledge
   });
 });
 
-Deno.test("CoreClient shutdown works against a version-incompatible registered Core", async () => {
+test("CoreClient shutdown works against a version-incompatible registered Core", async () => {
   await withStateDir(async (stateDir, paths) => {
     const { server, calls } = shutdownServer();
     const handle = await server.start();
@@ -968,7 +969,7 @@ Deno.test("CoreClient shutdown works against a version-incompatible registered C
   });
 });
 
-Deno.test("CoreClient shutdown surfaces a method-not-found RPC error", async () => {
+test("CoreClient shutdown surfaces a method-not-found RPC error", async () => {
   await withStateDir(async (stateDir, paths) => {
     // A Core server without a shutdown hook behaves like an older build.
     const handle = await startServer();
@@ -993,7 +994,7 @@ Deno.test("CoreClient shutdown surfaces a method-not-found RPC error", async () 
   });
 });
 
-Deno.test("CoreClient shutdown rejects an invalid acknowledgement shape", async () => {
+test("CoreClient shutdown rejects an invalid acknowledgement shape", async () => {
   await withStateDir(async (stateDir, paths) => {
     const probe = await startProbe(async (request) => {
       const body = await request.json() as { id?: unknown };
@@ -1027,7 +1028,7 @@ Deno.test("CoreClient shutdown rejects an invalid acknowledgement shape", async 
   });
 });
 
-Deno.test("CoreClient shutdown fails when no Core is registered", async () => {
+test("CoreClient shutdown fails when no Core is registered", async () => {
   await withStateDir(async (stateDir) => {
     const client = new CoreClient(clientOptions(stateDir));
     try {
@@ -1042,7 +1043,7 @@ Deno.test("CoreClient shutdown fails when no Core is registered", async () => {
   });
 });
 
-Deno.test("CoreEventConnection correlates WebSocket requests with their responses", async () => {
+test("CoreEventConnection correlates WebSocket requests with their responses", async () => {
   await withStateDir(async (stateDir, paths) => {
     // Regression: the pending map once stored raw ids but matched responses
     // through JSON.stringify(message.id), so subscribe/replay hung forever.
@@ -1272,7 +1273,7 @@ async function startCoreProbe(): Promise<CoreServerHandle> {
   };
 }
 
-Deno.test("CoreClient adopts a peer Core that registers after its own launcher exits", async () => {
+test("CoreClient adopts a peer Core that registers after its own launcher exits", async () => {
   await withStateDir(async (stateDir, paths) => {
     let launches = 0;
     let handle: CoreServerHandle | undefined;
@@ -1310,7 +1311,7 @@ Deno.test("CoreClient adopts a peer Core that registers after its own launcher e
   });
 });
 
-Deno.test("CoreClient reports a launcher failure once the adoption window closes", async () => {
+test("CoreClient reports a launcher failure once the adoption window closes", async () => {
   await withStateDir(async (stateDir) => {
     const launcher: CoreLauncher = () =>
       Promise.reject(
@@ -1332,7 +1333,7 @@ Deno.test("CoreClient reports a launcher failure once the adoption window closes
   });
 });
 
-Deno.test("CoreClient reports a launcher failure that is not an Error", async () => {
+test("CoreClient reports a launcher failure that is not an Error", async () => {
   await withStateDir(async (stateDir) => {
     // A launcher is caller-supplied, so its rejection value is arbitrary.
     // A missing failure signal must not degrade into a deadline report that
@@ -1350,7 +1351,7 @@ Deno.test("CoreClient reports a launcher failure that is not an Error", async ()
   });
 });
 
-Deno.test("late launch cleanup keeps a registration whose process is still alive", async () => {
+test("late launch cleanup keeps a registration whose process is still alive", async () => {
   await withStateDir(async (stateDir, paths) => {
     let releaseLauncher!: () => void;
     const launcher: CoreLauncher = () =>
@@ -1378,7 +1379,7 @@ Deno.test("late launch cleanup keeps a registration whose process is still alive
   });
 });
 
-Deno.test("CoreClient reports a real cancellation ahead of a launcher failure", async () => {
+test("CoreClient reports a real cancellation ahead of a launcher failure", async () => {
   await withStateDir(async (stateDir) => {
     const controller = new AbortController();
     // A launcher that fails immediately, the way a child that lost the Core
@@ -1408,7 +1409,7 @@ Deno.test("CoreClient reports a real cancellation ahead of a launcher failure", 
   });
 });
 
-Deno.test("CoreClient call re-resolves a replacement Core after the endpoint refuses", async () => {
+test("CoreClient call re-resolves a replacement Core after the endpoint refuses", async () => {
   await withStateDir(async (stateDir, paths) => {
     const servers: CoreServerHandle[] = [];
     try {
@@ -1447,7 +1448,7 @@ Deno.test("CoreClient call re-resolves a replacement Core after the endpoint ref
   });
 });
 
-Deno.test("CoreClient does not replay a request the Core may have received", async () => {
+test("CoreClient does not replay a request the Core may have received", async () => {
   await withStateDir(async (stateDir, paths) => {
     let handled = 0;
     const handle = await startProbe(async (request) => {
@@ -1498,7 +1499,7 @@ Deno.test("CoreClient does not replay a request the Core may have received", asy
   });
 });
 
-Deno.test("CoreClient drops the cached endpoint when a Core vanishes mid-request", async () => {
+test("CoreClient drops the cached endpoint when a Core vanishes mid-request", async () => {
   await withStateDir(async (stateDir, paths) => {
     const vanishing = startVanishingCore();
     const replacement = await startCoreProbe();
@@ -1632,7 +1633,7 @@ async function startRestartingCoreProbe(
   };
 }
 
-Deno.test("CoreClient re-opens a session the Core restarted and replays the request", async () => {
+test("CoreClient re-opens a session the Core restarted and replays the request", async () => {
   await withStateDir(async (stateDir, paths) => {
     const resident = new Set<string>();
     const handle = await startRestartingCoreProbe(resident);
@@ -1666,7 +1667,7 @@ Deno.test("CoreClient re-opens a session the Core restarted and replays the requ
   });
 });
 
-Deno.test("CoreClient re-opens a not-resident session only once per call", async () => {
+test("CoreClient re-opens a not-resident session only once per call", async () => {
   await withStateDir(async (stateDir, paths) => {
     // A Core that keeps reporting the session as not resident even after the
     // client re-opened it. The replay must be bounded, not a loop.
@@ -1697,7 +1698,7 @@ Deno.test("CoreClient re-opens a not-resident session only once per call", async
   });
 });
 
-Deno.test("CoreClient does not replay a request that failed for another reason", async () => {
+test("CoreClient does not replay a request that failed for another reason", async () => {
   await withStateDir(async (stateDir, paths) => {
     let handled = 0;
     const handle = await startProbe(async (request) => {
@@ -1757,7 +1758,7 @@ Deno.test("CoreClient does not replay a request that failed for another reason",
   });
 });
 
-Deno.test("CoreClient lists live event connections through core.clients.list", async () => {
+test("CoreClient lists live event connections through core.clients.list", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startServer();
     try {
@@ -1792,7 +1793,7 @@ Deno.test("CoreClient lists live event connections through core.clients.list", a
   });
 });
 
-Deno.test("CoreClient event sockets survive a Core restart onto a new endpoint", async () => {
+test("CoreClient event sockets survive a Core restart onto a new endpoint", async () => {
   await withStateDir(async (stateDir, paths) => {
     const servers: CoreServerHandle[] = [];
     try {

@@ -1,4 +1,4 @@
-import type { ImageContent } from "./types.ts";
+import { type ImageContent } from "./types.ts";
 
 /**
  * Maps a point in the sent image coordinate space back to the original source

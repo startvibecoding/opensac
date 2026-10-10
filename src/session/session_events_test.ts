@@ -5,7 +5,7 @@
 // Manager is replaced with direct DAO entry persistence and the portable
 // session_events functions.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { ConversationTurnDAO } from "../dao/mod.ts";
 import { createUserMessage } from "../provider/types.ts";
@@ -23,6 +23,7 @@ import {
   saveSessionCapabilityEvent,
   saveSessionRunEvent,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function tempDir(): string {
   return Deno.makeTempDirSync({ prefix: "opensac-session-" });
@@ -53,7 +54,7 @@ function appendMessageEntry(
   });
 }
 
-Deno.test("session capabilities round trip and default to not-found", () => {
+test("session capabilities round trip and default to not-found", () => {
   const sessionDir = tempDir();
   try {
     assertEquals(loadSessionCapabilities(sessionDir, "s-1"), null);
@@ -96,7 +97,7 @@ Deno.test("session capabilities round trip and default to not-found", () => {
   }
 });
 
-Deno.test("session run events persist, list, and expose the replay cursor", () => {
+test("session run events persist, list, and expose the replay cursor", () => {
   const sessionDir = tempDir();
   try {
     const id = saveSessionRunEvent(sessionDir, {
@@ -140,7 +141,7 @@ Deno.test("session run events persist, list, and expose the replay cursor", () =
   }
 });
 
-Deno.test("session run event normalizes invalid data to an empty object", () => {
+test("session run event normalizes invalid data to an empty object", () => {
   const sessionDir = tempDir();
   try {
     saveSessionRunEvent(sessionDir, {
@@ -162,7 +163,7 @@ Deno.test("session run event normalizes invalid data to an empty object", () => 
   }
 });
 
-Deno.test("session capability events persist and list with identity", () => {
+test("session capability events persist and list with identity", () => {
   const sessionDir = tempDir();
   try {
     saveSessionCapabilityEvent(sessionDir, {
@@ -188,7 +189,7 @@ Deno.test("session capability events persist and list with identity", () => {
   }
 });
 
-Deno.test("sequenced messages apply overrides and compaction boundaries", () => {
+test("sequenced messages apply overrides and compaction boundaries", () => {
   const sessionDir = tempDir();
   try {
     appendMessageEntry(sessionDir, "s-1", "e1", null, "hello");
@@ -238,7 +239,7 @@ Deno.test("sequenced messages apply overrides and compaction boundaries", () => 
   }
 });
 
-Deno.test("sequenced message helpers return empty for a missing session", () => {
+test("sequenced message helpers return empty for a missing session", () => {
   const sessionDir = tempDir();
   try {
     assertEquals(listSessionMessagesWithSeq(sessionDir, ""), []);

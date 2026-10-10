@@ -5,7 +5,7 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import { Runner } from "./runner.ts";
 import { createFileStore, FileStore } from "./store.ts";
 import {
@@ -17,6 +17,7 @@ import {
   statusError,
   statusRunning,
 } from "./types.ts";
+import { test } from "#testing";
 
 function fixedClock(): () => Date {
   let t = new Date(Date.UTC(2026, 5, 18, 10, 0, 0, 0));
@@ -84,7 +85,7 @@ class PromptHost implements Host {
   }
 }
 
-Deno.test("runner executes JavaScript workflow", async () => {
+test("runner executes JavaScript workflow", async () => {
   const host = new FakeHost({
     api: "api findings",
     channels: "channels findings",
@@ -98,7 +99,7 @@ Deno.test("runner executes JavaScript workflow", async () => {
   assert(host.maxRunning <= 2, `max=${host.maxRunning}`);
 });
 
-Deno.test("runner rejects invalid JavaScript agent option", async () => {
+test("runner rejects invalid JavaScript agent option", async () => {
   const r = new Runner({ host: new FakeHost(), now: fixedClock() });
   const err = await assertRejects(
     () =>
@@ -109,7 +110,7 @@ Deno.test("runner rejects invalid JavaScript agent option", async () => {
   assertStringIncludes((err as Error).message, "unknown agent option");
 });
 
-Deno.test("runner reports missing result", async () => {
+test("runner reports missing result", async () => {
   const r = new Runner({ host: new FakeHost(), now: fixedClock() });
   await assertRejects(
     () =>
@@ -119,7 +120,7 @@ Deno.test("runner reports missing result", async () => {
   );
 });
 
-Deno.test("runner concurrency limit and semaphore reuse", async () => {
+test("runner concurrency limit and semaphore reuse", async () => {
   const host = new FakeHost();
   const r = new Runner({ host, concurrency: 1, now: fixedClock() });
   const state = await r.run(
@@ -137,7 +138,7 @@ Deno.test("runner concurrency limit and semaphore reuse", async () => {
   assertEquals(host2.maxRunning, 2);
 });
 
-Deno.test("runner keyed results and fan-in", async () => {
+test("runner keyed results and fan-in", async () => {
   const host = new PromptHost();
   const r = new Runner({ host, concurrency: 2, now: fixedClock() });
   const state = await r.run(
@@ -150,7 +151,7 @@ Deno.test("runner keyed results and fan-in", async () => {
   assertStringIncludes(prompt, "scan.worker[r1]:");
 });
 
-Deno.test("parallel aggregates failures and cancels siblings", async () => {
+test("parallel aggregates failures and cancels siblings", async () => {
   let failOnce = false;
   const host: Host = {
     async runAgent(
@@ -183,7 +184,7 @@ Deno.test("parallel aggregates failures and cancels siblings", async () => {
   assert(failOnce);
 });
 
-Deno.test("file store persists loads and lists workflow state", async () => {
+test("file store persists loads and lists workflow state", async () => {
   const dir = await Deno.makeTempDir();
   try {
     const store = createFileStore(dir);
@@ -225,12 +226,12 @@ Deno.test("file store persists loads and lists workflow state", async () => {
   }
 });
 
-Deno.test("file store instance exposes the class", () => {
+test("file store instance exposes the class", () => {
   const store = new FileStore("/tmp/x");
   assert(store instanceof FileStore);
 });
 
-Deno.test("results status constants are stable", () => {
+test("results status constants are stable", () => {
   assertEquals(statusRunning, "running");
   assertEquals(statusError, "error");
 });

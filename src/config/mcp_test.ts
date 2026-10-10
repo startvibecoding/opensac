@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   defaultMCPConfig,
   fullMCPConfigTemplate,
@@ -13,8 +13,9 @@ import {
   projectMCPPath,
   saveMCPConfig,
 } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("MCP path helpers", () => {
+test("MCP path helpers", () => {
   const prevWd = Deno.cwd();
   const tmp = Deno.makeTempDirSync({ prefix: "mcp-" });
   Deno.chdir(tmp);
@@ -26,7 +27,7 @@ Deno.test("MCP path helpers", () => {
   }
 });
 
-Deno.test("save/load MCP config", () => {
+test("save/load MCP config", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "mcp-" });
   const p = path.join(tmp, "mcp.json");
   const cfg: MCPConfig = {
@@ -43,14 +44,14 @@ Deno.test("save/load MCP config", () => {
   assertEquals(loadMCPConfig(p).mcpServers![0].name, "updated");
 });
 
-Deno.test("normalize MCP config", () => {
+test("normalize MCP config", () => {
   const cfg: MCPConfig = { mcpServers: [{ name: " a ", type: "" }] };
   normalizeMCPConfig(cfg);
   assertEquals(cfg.mcpServers![0].name, "a");
   assertEquals(cfg.mcpServers![0].type, "stdio");
 });
 
-Deno.test("full MCP config template", () => {
+test("full MCP config template", () => {
   const cfg = fullMCPConfigTemplate();
   assert(cfg.mcpServers && cfg.mcpServers.length >= 3);
   const types = new Set(cfg.mcpServers.map((s) => s.type));
@@ -58,7 +59,7 @@ Deno.test("full MCP config template", () => {
   assert(defaultMCPConfig().mcpServers!.length === 1);
 });
 
-Deno.test("load MCP config not found", () => {
+test("load MCP config not found", () => {
   let threw = false;
   try {
     loadMCPConfig(
@@ -71,7 +72,7 @@ Deno.test("load MCP config not found", () => {
   assert(threw);
 });
 
-Deno.test("MCP server enabled additive field", () => {
+test("MCP server enabled additive field", () => {
   const legacy: MCPServer = {
     name: "legacy",
     type: "stdio",

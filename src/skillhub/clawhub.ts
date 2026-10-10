@@ -9,20 +9,19 @@ import {
   getWithStatus,
   type HttpClient,
 } from "./http.ts";
-import type {
-  Category,
-  DownloadResult,
-  DownloadSource,
-  MarketClient,
-  MarketInfo,
-  SearchPage,
-  SearchQuery,
-  SkillDetail,
-  SkillFile,
-  SkillId,
-  SkillSummary,
-  UserSkillsQuery,
-} from "./types.ts";
+import {
+  type Category,
+  type DownloadResult,
+  type DownloadSource,
+  type MarketClient,
+  type MarketInfo,
+  type SearchPage,
+  type SearchQuery,
+  type SkillDetail,
+  type SkillFile,
+  type SkillId,
+  type SkillSummary,
+  type UserSkillsQuery} from "./types.ts";
 
 export const clawHubDefaultURL = "https://clawhub.ai";
 

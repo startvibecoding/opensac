@@ -5,17 +5,16 @@
 
 import { createHash } from "node:crypto";
 import { parseJsonRecord } from "../../util/json.ts";
-import type { Attachment } from "../types.ts";
+import { type Attachment } from "../types.ts";
 import {
   hostedToolDescriptorForType,
   type ResponsesHostedPolicy,
 } from "./hosted_registry.ts";
-import type {
-  ResponsesCompletedObject,
-  ResponsesOutputItem,
-  ResponsesSSEEvent,
-  ResponsesUsage,
-} from "./responses.ts";
+import {
+  type ResponsesCompletedObject,
+  type ResponsesOutputItem,
+  type ResponsesSSEEvent,
+  type ResponsesUsage} from "./responses.ts";
 
 export const responsesMaxCanonicalItemBytes = 128 * 1024;
 export const responsesMaxMetadataBytes = 16 * 1024;

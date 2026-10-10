@@ -6,7 +6,7 @@
 // answers from the same canonical state. This test drives the TUI and ACP
 // projections over one restarted Core so only the wire shape differs.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { ACPBridgeClient } from "../acp/bridge_client.ts";
 import { SOURCE_ACP } from "../agentruntime/source.ts";
 import { defaultSettings } from "../config/settings.ts";
@@ -21,7 +21,7 @@ import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
 import { CoreRegistry } from "./registry.ts";
 import { CoreServer, type CoreServerHandle } from "./server.ts";
-import type { CoreRuntimeHost } from "./runtime.ts";
+import { type CoreRuntimeHost } from "./runtime.ts";
 import {
   createCoreRuntimeHost,
   createProductionCoreRuntimeDependencies,

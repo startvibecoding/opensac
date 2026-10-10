@@ -4,7 +4,7 @@
 // enforcement is off and a session with no lease row skips lease validation, so
 // these tests use a literal session ID and reproduce the run lifecycle directly.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { createAssistantMessage } from "../provider/types.ts";
 import {
@@ -22,7 +22,8 @@ import {
 import { finishSessionRunAndConversationTurn } from "./run_store.ts";
 import { endConversationTurn } from "./conversation_turn.ts";
 import { openRootDB } from "./root_db.ts";
-import type { DeliveryPlan } from "./delivery_store.ts";
+import { type DeliveryPlan } from "./delivery_store.ts";
+import { test } from "#testing";
 
 function baseRun(overrides: Partial<SessionRun>): SessionRun {
   return {
@@ -67,7 +68,7 @@ function statusOf(sessionDir: string, sql: string, params: string[]): string {
   return row?.status ?? "";
 }
 
-Deno.test("create session run rejects duplicate and status rollback", () => {
+test("create session run rejects duplicate and status rollback", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
@@ -102,7 +103,7 @@ Deno.test("create session run rejects duplicate and status rollback", () => {
   }
 });
 
-Deno.test("update session run status allows waiting resume and cancellation", () => {
+test("update session run status allows waiting resume and cancellation", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     createSessionRun(
@@ -137,7 +138,7 @@ Deno.test("update session run status allows waiting resume and cancellation", ()
   }
 });
 
-Deno.test("next session run attempt uses highest existing attempt", () => {
+test("next session run attempt uses highest existing attempt", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
@@ -177,7 +178,7 @@ Deno.test("next session run attempt uses highest existing attempt", () => {
   }
 });
 
-Deno.test("finish session run and conversation turn commits assistant idempotently", () => {
+test("finish session run and conversation turn commits assistant idempotently", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
@@ -340,7 +341,7 @@ Deno.test("finish session run and conversation turn commits assistant idempotent
   }
 });
 
-Deno.test("finish session run commits when turn already closed", () => {
+test("finish session run commits when turn already closed", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
@@ -442,7 +443,7 @@ Deno.test("finish session run commits when turn already closed", () => {
   }
 });
 
-Deno.test("finish session run rolls back invalid delivery plan", () => {
+test("finish session run rolls back invalid delivery plan", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const started = new Date();
@@ -596,7 +597,7 @@ Deno.test("finish session run rolls back invalid delivery plan", () => {
   }
 });
 
-Deno.test("list session runs does not deadlock pool", () => {
+test("list session runs does not deadlock pool", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-list-runs-pool";
@@ -625,7 +626,7 @@ Deno.test("list session runs does not deadlock pool", () => {
   }
 });
 
-Deno.test("annotate session run error only fills empty error", () => {
+test("annotate session run error only fills empty error", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const now = new Date();

@@ -6,8 +6,8 @@
 // bag is an antipattern even there, so this module carries the caller's
 // `AbortSignal` plus explicit typed fields. It is internal to `src/agent`.
 
-import type { AgentID } from "../../sdk/agent/types.ts";
-import type { Event } from "./events.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
+import { type Event } from "./events.ts";
 import type { IterationBudget } from "./iteration_budget.ts";
 
 /**

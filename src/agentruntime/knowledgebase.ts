@@ -21,10 +21,10 @@
 // a fixed extension table.
 
 import { createHash } from "node:crypto";
-import * as path from "@opensac/path";
-import type { Settings } from "../config/settings.ts";
-import type { Provider } from "../provider/provider.ts";
-import type { Model, ThinkingLevel } from "../provider/types.ts";
+import * as path from "../compat/path.ts";
+import { type Settings } from "../config/settings.ts";
+import { type Provider } from "../provider/provider.ts";
+import { type Model, type ThinkingLevel } from "../provider/types.ts";
 import { create as createProvider } from "../provider/factory/factory.ts";
 import {
   appendKnowledgeFileGraph,
@@ -95,7 +95,7 @@ import {
 } from "./run_state.ts";
 import { attachSessionResources } from "./attach.ts";
 import { displayErrorMessage } from "./error_info.ts";
-import type { InputSubmission } from "./input_materializer.ts";
+import { type InputSubmission } from "./input_materializer.ts";
 import type { SessionRuntime } from "./session_runtime.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";

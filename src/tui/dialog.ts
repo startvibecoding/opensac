@@ -9,7 +9,7 @@
 // message, so the panel is a real editor rather than a status display.
 
 import { displayWidth, truncateDisplay } from "./formatters.ts";
-import type { KeyEvent } from "./keys.ts";
+import { type KeyEvent } from "./keys.ts";
 import { ACCENT, BOLD, DIM, RED, RESET } from "./theme.ts";
 
 /** Max selectable rows shown at once (Go authMaxVisibleOptions). */

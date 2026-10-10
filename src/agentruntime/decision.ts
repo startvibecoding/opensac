@@ -5,7 +5,7 @@
 // the `(DecisionRequest, error)` multiple return maps to a returned request
 // that throws on failure.
 
-import type { DecisionRecord } from "./decision_record.ts";
+import { type DecisionRecord } from "./decision_record.ts";
 import { replayDecisions } from "./decision_replay.ts";
 
 /** Identifies an interactive decision that can pause a run. */

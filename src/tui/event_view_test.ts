@@ -3,7 +3,7 @@
 // view replays the rows the simple view withheld — each row released to
 // terminal scrollback exactly once through Ink's append-only <Static>.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { render } from "ink";
 import { App } from "./app.tsx";
 import { AppController } from "./app_controller.ts";
@@ -11,6 +11,7 @@ import { Translator } from "./i18n.ts";
 import { stripANSI } from "./renderutil.ts";
 import { createFakeTUIService } from "./service.ts";
 import { TUISession } from "./tui_session.ts";
+import { test } from "#testing";
 
 /** Minimal duck-typed stdout so Ink can render without a real TTY. */
 class FakeStdout {
@@ -76,7 +77,7 @@ function session(tuilang: string): TUISession {
   );
 }
 
-Deno.test({
+test({
   name: "Ctrl+G reports the event view in the configured language",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -104,7 +105,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "simple view withholds lifecycle rows until the full view replays",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -151,7 +152,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "a cleared transcript admits its new rows exactly once",
   sanitizeOps: false,
   sanitizeResources: false,

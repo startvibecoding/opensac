@@ -17,12 +17,11 @@ import {
   formatAge,
 } from "./dialog.ts";
 import type { Translator } from "./i18n.ts";
-import type {
-  TUIProviderCatalogEntry,
-  TUISessionListEntry,
-  TUISettingsReadScope,
-  TUISettingsWriteScope,
-} from "./service.ts";
+import {
+  type TUIProviderCatalogEntry,
+  type TUISessionListEntry,
+  type TUISettingsReadScope,
+  type TUISettingsWriteScope} from "./service.ts";
 
 /** The session surface a dialog may read and mutate. */
 export interface DialogHost {
@@ -354,7 +353,7 @@ export class EnvDialog implements DialogController {
     const tr = this.#host.translator;
     if (this.#editKind === "key") {
       const key = value.trim();
-      // deno-lint-ignore no-control-regex
+      // eslint-disable-next-line no-control-regex
       if (key === "" || /[=\u0000\r\n]/.test(key)) {
         this.#error = tr.text("dialog.env.invalid_name");
         return;

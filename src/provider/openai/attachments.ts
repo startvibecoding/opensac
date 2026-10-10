@@ -1,6 +1,6 @@
-import type { AttachmentContent } from "../attachments.ts";
+import { type AttachmentContent } from "../attachments.ts";
 import { validateAttachmentReferenceForResolver } from "../attachments.ts";
-import type { Attachment } from "../types.ts";
+import { type Attachment } from "../types.ts";
 
 export const maxResolvedAttachmentBytes = 32 << 20;
 

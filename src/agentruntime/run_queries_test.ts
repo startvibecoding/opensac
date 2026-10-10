@@ -3,7 +3,7 @@
 // runs through the session layer directly (the `RunStore` wrapper lands with the
 // `ExecutionRuntime` slice).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   createSessionRun,
@@ -16,6 +16,7 @@ import {
   getDurableRun,
   listLatestDurableRunsBySessions,
 } from "./run_queries.ts";
+import { test } from "#testing";
 
 function baseRun(overrides: Partial<SessionRun>): SessionRun {
   return {
@@ -47,7 +48,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
   };
 }
 
-Deno.test("AnnotateDurableRunError only terminalizes empty errors", () => {
+test("AnnotateDurableRunError only terminalizes empty errors", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     createSessionRun(
@@ -103,7 +104,7 @@ Deno.test("AnnotateDurableRunError only terminalizes empty errors", () => {
   }
 });
 
-Deno.test("ListLatestDurableRunsBySessions projects newest run per session", () => {
+test("ListLatestDurableRunsBySessions projects newest run per session", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     const now = Date.now();

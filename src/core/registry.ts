@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 
 /** Discovery data for the currently running shared Core process. */

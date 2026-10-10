@@ -8,20 +8,19 @@
 // the shared SkillHub service surface, and results report back as panel status
 // lines rather than transcript spam.
 
-import type {
-  Category,
-  InstallRequest,
-  InstallResult,
-  Market,
-  MarketInfo,
-  SearchPage,
-  SkillDetail,
-  SkillSummary,
-  UserSkillsQuery,
-} from "../skillhub/mod.ts";
+import {
+  type Category,
+  type InstallRequest,
+  type InstallResult,
+  type Market,
+  type MarketInfo,
+  type SearchPage,
+  type SkillDetail,
+  type SkillSummary,
+  type UserSkillsQuery} from "../skillhub/mod.ts";
 import { createLocalIndex } from "../skillhub/local.ts";
-import type { DialogController, DialogItem, DialogPage } from "./dialog.ts";
-import type { KeyEvent } from "./keys.ts";
+import { type DialogController, type DialogItem, type DialogPage } from "./dialog.ts";
+import { type KeyEvent } from "./keys.ts";
 import type { Translator } from "./i18n.ts";
 import { ACCENT, BOLD, DIM, RESET } from "./theme.ts";
 

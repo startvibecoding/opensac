@@ -3,9 +3,9 @@
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`.
 
-import type { Agent } from "./types.ts";
-import type { ExternalTool } from "./external_tool.ts";
-import type { Provider, ThinkingLevel } from "./provider.ts";
+import { type Agent } from "./types.ts";
+import { type ExternalTool } from "./external_tool.ts";
+import { type Provider, type ThinkingLevel } from "./provider.ts";
 import { thinkingMedium } from "./provider.ts";
 
 /**

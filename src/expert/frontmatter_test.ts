@@ -1,6 +1,7 @@
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { createFrontmatter, type Frontmatter } from "./expert.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
+import { test } from "#testing";
 
 interface Case {
   name: string;
@@ -15,7 +16,7 @@ function fm(overrides: Partial<Frontmatter> = {}): Frontmatter {
   return { ...createFrontmatter(""), ...overrides };
 }
 
-Deno.test("parseFrontmatter", () => {
+test("parseFrontmatter", () => {
   const tests: Case[] = [
     {
       name: "basic string fields",

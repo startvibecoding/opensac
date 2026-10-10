@@ -13,12 +13,12 @@ import {
   TOOL_EXECUTION_FAILED,
   type ToolExecutionState,
 } from "../agentruntime/events.ts";
-import type { FileDiff } from "../tools/io_helpers.ts";
+import { type FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import type { Translator } from "./i18n.ts";
 import { formatDetailedActivityTool } from "./activity.ts";
 import { planProgress, planTitle, renderTaskPlanLines } from "./plan_view.ts";
-import type { TaskPlan } from "../tools/tool.ts";
+import { type TaskPlan } from "../tools/tool.ts";
 
 export type ToolRowStatus = "running" | "completed" | "interrupted";
 

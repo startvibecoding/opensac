@@ -1,7 +1,7 @@
 // Translated tests from internal/acp/acp_mcp_test.go for the ACP JSON-RPC
 // transport, plus focused coverage for the raw-id preservation helpers.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { RPCError } from "../mcp/rpc.ts";
 import {
   ACPLineReader,
@@ -13,6 +13,7 @@ import {
   validRPCID,
   writeACPResponse,
 } from "./wire.ts";
+import { test } from "#testing";
 
 function readerFor(input: string): ACPLineReader {
   return new ACPLineReader(
@@ -22,7 +23,7 @@ function readerFor(input: string): ACPLineReader {
   );
 }
 
-Deno.test("validRPCID rejects non-scalar ids", () => {
+test("validRPCID rejects non-scalar ids", () => {
   for (const raw of ['{"x":1}', "[1]", "true", "1.5", "1e3"]) {
     assertEquals(validRPCID(raw), false, `validRPCID(${raw})`);
   }
@@ -32,12 +33,12 @@ Deno.test("validRPCID rejects non-scalar ids", () => {
   assertEquals(validRPCID(null), true);
 });
 
-Deno.test("readRequest rejects an oversized message", async () => {
+test("readRequest rejects an oversized message", async () => {
   const reader = readerFor("x".repeat(acpMaxRequestBytes + 1) + "\n");
   await assertThrowsAsync(() => readRequest(reader));
 });
 
-Deno.test("readRequest preserves raw ids and decodes params", async () => {
+test("readRequest preserves raw ids and decodes params", async () => {
   const reader = readerFor(
     '{"jsonrpc":"2.0","id":12,"method":"session/list","params":{"x":1}}\n',
   );
@@ -60,7 +61,7 @@ Deno.test("readRequest preserves raw ids and decodes params", async () => {
   assertEquals(notification?.method, "notify");
 });
 
-Deno.test("readRequest returns null at EOF and throws on a blank line", async () => {
+test("readRequest returns null at EOF and throws on a blank line", async () => {
   assertEquals(await readRequest(readerFor("")), null);
   await assertThrowsAsync(
     () => readRequest(readerFor("\n")),
@@ -68,11 +69,11 @@ Deno.test("readRequest returns null at EOF and throws on a blank line", async ()
   );
 });
 
-Deno.test("readRequest throws on invalid JSON", async () => {
+test("readRequest throws on invalid JSON", async () => {
   await assertThrowsAsync(() => readRequest(readerFor("{not json}\n")));
 });
 
-Deno.test("writeACPResponse echoes the raw id and encodes errors", async () => {
+test("writeACPResponse echoes the raw id and encodes errors", async () => {
   const chunks: string[] = [];
   const sink = { write: (data: string) => void chunks.push(data) };
 
@@ -91,7 +92,7 @@ Deno.test("writeACPResponse echoes the raw id and encodes errors", async () => {
   assertEquals(chunks.length, 2);
 });
 
-Deno.test("topLevelRawField extracts nested-safe raw values", () => {
+test("topLevelRawField extracts nested-safe raw values", () => {
   const line =
     '{"jsonrpc":"2.0","id":{"a":1},"params":{"id":"nested"},"method":"x"}';
   assertEquals(topLevelRawField(line, "id"), '{"a":1}');
@@ -99,7 +100,7 @@ Deno.test("topLevelRawField extracts nested-safe raw values", () => {
   assertEquals(topLevelRawField(line, "missing"), undefined);
 });
 
-Deno.test("ACPRequestIDCounter increments", () => {
+test("ACPRequestIDCounter increments", () => {
   const counter = new ACPRequestIDCounter();
   assertEquals(counter.next(), "acp-1");
   assertEquals(counter.next(), "acp-2");

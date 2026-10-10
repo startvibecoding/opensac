@@ -1,5 +1,6 @@
-import { assert } from "@opensac/assert";
-import { fromFileUrl, join } from "@opensac/path";
+import { assert } from "../compat/assert.ts";
+import { fromFileUrl, join } from "../compat/path.ts";
+import { test } from "#testing";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
@@ -48,7 +49,7 @@ const checks: ContractCheck[] = [
   },
 ];
 
-Deno.test("frontend input contract guard", async (t) => {
+test("frontend input contract guard", async (t) => {
   for (const check of checks) {
     await t.step(check.path, () => {
       let src: string;

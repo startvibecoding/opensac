@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   auditVerdictPass,
   parseAuditReport,
@@ -7,8 +7,9 @@ import {
   recoveryDecisionResume,
   workerStatusCompleteCandidate,
 } from "./report.ts";
+import { test } from "#testing";
 
-Deno.test("ParseWorkerReport extracts JSON", () => {
+test("ParseWorkerReport extracts JSON", () => {
   const report = parseWorkerReport(
     '```json\n{"status":"complete_candidate","summary":"done","evidence":["test passed"],"remaining_work":[],"blockers":[]}\n```',
   );
@@ -17,14 +18,14 @@ Deno.test("ParseWorkerReport extracts JSON", () => {
   assertEquals(report.evidence.length, 1);
 });
 
-Deno.test("ParseWorkerReport accepts missing_work alias", () => {
+test("ParseWorkerReport accepts missing_work alias", () => {
   const report = parseWorkerReport(
     '{"status":"continue","summary":"working","missing_work":[" add tests ","  "]}',
   );
   assertEquals(report.remainingWork, ["add tests"]);
 });
 
-Deno.test("ParseWorkerReport merges and deduplicates remaining work", () => {
+test("ParseWorkerReport merges and deduplicates remaining work", () => {
   const report = parseWorkerReport(
     '{"status":"continue","summary":"working","remaining_work":[" implement fix ","run tests"],"missing_work":["implement fix"," update docs ","run tests"]}',
   );
@@ -35,7 +36,7 @@ Deno.test("ParseWorkerReport merges and deduplicates remaining work", () => {
   ]);
 });
 
-Deno.test("ParseAuditReport rejects invalid verdict", () => {
+test("ParseAuditReport rejects invalid verdict", () => {
   let threw = false;
   try {
     parseAuditReport('{"verdict":"maybe","review":"unclear"}');
@@ -45,7 +46,7 @@ Deno.test("ParseAuditReport rejects invalid verdict", () => {
   assert(threw, "ParseAuditReport accepted invalid verdict");
 });
 
-Deno.test("ParseAuditReport pass", () => {
+test("ParseAuditReport pass", () => {
   const report = parseAuditReport(
     '{"verdict":"pass","review":"verified","requirements_checked":["req -> ok"],"missing_work":[],"evidence":["deno test"]}',
   );
@@ -54,7 +55,7 @@ Deno.test("ParseAuditReport pass", () => {
   assertEquals(report.requirementsChecked.length, 1);
 });
 
-Deno.test("ParseRecoveryReport", () => {
+test("ParseRecoveryReport", () => {
   const report = parseRecoveryReport(
     '{"decision":"resume","summary":"tests show the partial change is valid","evidence":["deno test ./..."],"remaining_work":["finish docs"],"blockers":[]}',
   );

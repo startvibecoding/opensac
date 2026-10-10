@@ -1,6 +1,7 @@
-import { assertEquals, assertRejects, assertThrows } from "@opensac/assert";
-import { join } from "@opensac/path";
+import { assertEquals, assertRejects, assertThrows } from "../src/compat/assert.ts";
+import { join } from "../src/compat/path.ts";
 import {
+import { test } from "#testing";
   authHeader,
   isPublished,
   packumentUrl,
@@ -30,7 +31,7 @@ function recordingFetch(
   }) as unknown as typeof fetch;
 }
 
-Deno.test("PackumentUrlEncodesScopedNames", () => {
+test("PackumentUrlEncodesScopedNames", () => {
   assertEquals(
     packumentUrl("https://registry.npmjs.org", "opensac"),
     "https://registry.npmjs.org/opensac",
@@ -45,7 +46,7 @@ Deno.test("PackumentUrlEncodesScopedNames", () => {
   );
 });
 
-Deno.test("RegistryCheckUsesThePackumentNotTheVersionRoute", async () => {
+test("RegistryCheckUsesThePackumentNotTheVersionRoute", async () => {
   // Regression: `GET /{package}/{version}` works on npmjs but GitHub Packages
   // answers 405, which aborted every `make npm-publish-github` on the first
   // platform package. The packument route is implemented by both.
@@ -65,7 +66,7 @@ Deno.test("RegistryCheckUsesThePackumentNotTheVersionRoute", async () => {
   }
 });
 
-Deno.test("AuthHeaderUsesTheWorkflowTokenWhenPresent", () => {
+test("AuthHeaderUsesTheWorkflowTokenWhenPresent", () => {
   assertEquals(
     authHeader({ get: (k) => (k === "NODE_AUTH_TOKEN" ? "t" : undefined) }),
     { Authorization: "Bearer t" },
@@ -79,7 +80,7 @@ Deno.test("AuthHeaderUsesTheWorkflowTokenWhenPresent", () => {
   assertEquals(authHeader({ get: () => "" }), {});
 });
 
-Deno.test("ReadPackageJsonRequiresNameAndVersion", async () => {
+test("ReadPackageJsonRequiresNameAndVersion", async () => {
   const dir = await Deno.makeTempDir({ prefix: "opensac-publish-test-" });
   try {
     await Deno.writeTextFile(
@@ -105,7 +106,7 @@ Deno.test("ReadPackageJsonRequiresNameAndVersion", async () => {
   }
 });
 
-Deno.test("IsPublishedReadsTheVersionOutOfThePackument", async () => {
+test("IsPublishedReadsTheVersionOutOfThePackument", async () => {
   const registry = "https://registry.npmjs.org";
   const packument = { versions: { "1.0.0": {}, "2.0.0": {} } };
   assertEquals(
@@ -133,7 +134,7 @@ Deno.test("IsPublishedReadsTheVersionOutOfThePackument", async () => {
   );
 });
 
-Deno.test("IsPublishedRejectsAPackumentWithoutAVersionsMap", async () => {
+test("IsPublishedRejectsAPackumentWithoutAVersionsMap", async () => {
   // A 200 that is not a usable packument must not read as "not published",
   // or a registry returning an error page with 200 would republish a version
   // that is already live.
@@ -150,7 +151,7 @@ Deno.test("IsPublishedRejectsAPackumentWithoutAVersionsMap", async () => {
   );
 });
 
-Deno.test("IsPublishedRefusesToGuessOnAServerError", async () => {
+test("IsPublishedRefusesToGuessOnAServerError", async () => {
   // A 500 must not read as "not published", or a registry outage would
   // republish a version that is already live. GitHub Packages answers the
   // unsupported version route with 405, which is the same class of failure.
@@ -178,7 +179,7 @@ Deno.test("IsPublishedRefusesToGuessOnAServerError", async () => {
   );
 });
 
-Deno.test("ParseArgsReadsTagRegistryAndPackageDir", () => {
+test("ParseArgsReadsTagRegistryAndPackageDir", () => {
   const defaults = { registry: "https://registry.npmjs.org", tag: "latest" };
   assertEquals(parseArgs(["--tag", "next", "npm"], defaults), {
     registry: "https://registry.npmjs.org",
@@ -203,7 +204,7 @@ Deno.test("ParseArgsReadsTagRegistryAndPackageDir", () => {
   });
 });
 
-Deno.test("ParseArgsForwardsEverythingAfterTheSeparator", () => {
+test("ParseArgsForwardsEverythingAfterTheSeparator", () => {
   const parsed = parseArgs(
     ["--tag", "next", "--", "--provenance", "--access", "public"],
     { registry: "https://registry.npmjs.org", tag: "latest" },
@@ -212,7 +213,7 @@ Deno.test("ParseArgsForwardsEverythingAfterTheSeparator", () => {
   assertEquals(parsed.tag, "next");
 });
 
-Deno.test("ParseArgsRejectsAMissingFlagValue", () => {
+test("ParseArgsRejectsAMissingFlagValue", () => {
   const defaults = { registry: "https://registry.npmjs.org", tag: "latest" };
   // parseArgs throws synchronously, so assertThrows is the matching assertion.
   assertThrows(
@@ -227,7 +228,7 @@ Deno.test("ParseArgsRejectsAMissingFlagValue", () => {
   );
 });
 
-Deno.test("ParseArgsRejectsUnknownOptionsAndExtraDirectories", () => {
+test("ParseArgsRejectsUnknownOptionsAndExtraDirectories", () => {
   const defaults = { registry: "https://registry.npmjs.org", tag: "latest" };
   assertThrows(
     () => parseArgs(["--provenance"], defaults),

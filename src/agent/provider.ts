@@ -3,12 +3,11 @@
 // protocol-neutral `src/provider` interfaces (the Go source does too) and is
 // retained for 1:1 fidelity. New code should prefer `src/provider`.
 
-import type {
-  Message,
-  ToolCallBlock,
-  ToolDefinition,
-  Usage,
-} from "../provider/types.ts";
+import {
+  type Message,
+  type ToolCallBlock,
+  type ToolDefinition,
+  type Usage} from "../provider/types.ts";
 
 /** Provider is the interface that all LLM providers must implement. */
 export interface Provider {

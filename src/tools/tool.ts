@@ -8,12 +8,12 @@
 // parameter schemas map to plain JSON values; and `Execute` is uniformly
 // `async` so filesystem/child-process tools share one signature.
 
-import * as path from "@opensac/path";
-import type { AgentID } from "../../sdk/agent/types.ts";
+import * as path from "../compat/path.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import type { IterationBudget } from "../agent/iteration_budget.ts";
-import type { EventSink, RunContext } from "../agent/run_context.ts";
+import { type EventSink, type RunContext } from "../agent/run_context.ts";
 import { envList, loadEnv } from "../config/env.ts";
-import type { Settings } from "../config/settings.ts";
+import { type Settings } from "../config/settings.ts";
 import {
   type Hint,
   type Mode,
@@ -21,11 +21,10 @@ import {
   policyForHint,
 } from "../imageproc/mod.ts";
 import { homeDir } from "../platform/platform.ts";
-import type {
-  ContentBlock,
-  ImageContent,
-  ToolDefinition,
-} from "../provider/types.ts";
+import {
+  type ContentBlock,
+  type ImageContent,
+  type ToolDefinition} from "../provider/types.ts";
 import { type Sandbox } from "../sandbox/mod.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import { createBashTool } from "./bash.ts";
@@ -33,14 +32,14 @@ import { EditTool } from "./edit.ts";
 import { FindTool } from "./find.ts";
 import { defaultFileLockManager, FileLockManager } from "./file_lock.ts";
 import { InsertTool } from "./insert.ts";
-import type { FileDiff } from "./io_helpers.ts";
+import { type FileDiff } from "./io_helpers.ts";
 import { GrepTool } from "./grep.ts";
 import { createJobManager, type JobManager } from "./jobmanager.ts";
 import { JobsTool } from "./jobstool.ts";
 import { KillTool } from "./killtool.ts";
 import { LsTool } from "./ls.ts";
 import { PlanTool } from "./plan.ts";
-import type { QuestionAsker } from "./question.ts";
+import { type QuestionAsker } from "./question.ts";
 import { ReadTool } from "./read.ts";
 import { SkillRefTool } from "./skill_ref.ts";
 import { WriteTool } from "./write.ts";

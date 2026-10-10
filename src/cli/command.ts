@@ -104,7 +104,7 @@ export function acpRunOptions(
 }
 
 /** Adds the shared provider flags to a command. */
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sharedProviderFlags(cmd: any, flags: CLIOptions): any {
   return cmd
     .option("-p, --provider <name>", "Provider name", {
@@ -143,11 +143,11 @@ function sharedProviderFlags(cmd: any, flags: CLIOptions): any {
 
 /** Adds the shared execution capability flags. */
 function sharedExecutionFlags(
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cmd: any,
   flags: CLIOptions,
   webSearchDescription: string,
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
   const target = flags as unknown as Record<string, unknown>;
   return cmd
@@ -572,7 +572,7 @@ function createCoreStopCommand(
 }
 
 /** Builds the `doctor` subcommand. */
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createDoctorCommand(version: string): any {
   return new Command()
     .description("Check environment, configuration, and provider status")
@@ -587,7 +587,7 @@ function createDoctorCommand(version: string): any {
 }
 
 /** Builds the `knowledge-mcp` parent with its `serve` subcommand. */
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createKnowledgeMCPCommand(): any {
   const knowledgeBases: string[] = [];
   let sessionDir = "";
@@ -623,7 +623,7 @@ function createKnowledgeMCPCommand(): any {
     .action(async () => {
       await executeKnowledgeMCPCommand({ knowledgeBases, sessionDir });
     }) as unknown as Command;
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (new Command() as any)
     .description("Expose managed knowledge bases as MCP tools")
     .noExit()
@@ -631,7 +631,7 @@ function createKnowledgeMCPCommand(): any {
 }
 
 /** Builds the `stats` subcommand. */
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createStatsCommand(): any {
   const opts: StatsCommandOptions = defaultStatsOptions();
   return new Command()
@@ -667,7 +667,7 @@ function createStatsCommand(): any {
 }
 
 /** Builds the `speedtest` subcommand. */
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createSpeedtestCommand(): any {
   const flags = {
     provider: "",
@@ -851,7 +851,7 @@ export function createRootCommand(version = currentVersion()): Command {
       }
     });
 
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyRoot = root as any;
   anyRoot
     .command("acp", createACPCommand(version))

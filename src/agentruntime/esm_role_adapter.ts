@@ -6,7 +6,7 @@
 
 import type { AgentAdapter } from "../agent/bridge.ts";
 import type { AgentManager } from "../agent/manager.ts";
-import type { AgentOptions } from "../agent/factory.ts";
+import { type AgentOptions } from "../agent/factory.ts";
 import {
   type Event as PublicEvent,
   eventDone,
@@ -20,14 +20,13 @@ import {
   taskIncomplete,
 } from "../../sdk/agent/mod.ts";
 import {
-  Event,
+  type Event,
   EVENT_RUN_FINISHED,
   EVENT_TEXT_DELTA,
   EVENT_THINK_DELTA,
   EVENT_TOOL_CALL,
   EVENT_TOOL_EXECUTION_END,
-  type TaskStatus,
-} from "../agent/events.ts";
+  type TaskStatus} from "../agent/events.ts";
 import {
   createRoleIncompleteError,
   EvidenceTracker,

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   compileGeneratedRegExp,
   compileUserRegExp,
@@ -6,8 +6,9 @@ import {
   UserRegExpError,
 } from "./regex.ts";
 import { globToRegex } from "../tools/globset.ts";
+import { test } from "#testing";
 
-Deno.test("compileUserRegExp compiles ordinary patterns", () => {
+test("compileUserRegExp compiles ordinary patterns", () => {
   assertEquals(compileUserRegExp("a(b)c").source, "a(b)c");
   assertEquals(compileUserRegExp("foo", "i").flags, "i");
   // Bounded quantifiers stay legal.
@@ -15,7 +16,7 @@ Deno.test("compileUserRegExp compiles ordinary patterns", () => {
   assertEquals(compileUserRegExp("(ab)+").source, "(ab)+");
 });
 
-Deno.test("compileUserRegExp rejects oversized patterns", () => {
+test("compileUserRegExp rejects oversized patterns", () => {
   const err = assertThrows(
     () => compileUserRegExp("a".repeat(maxUserRegExpLength + 1)),
     UserRegExpError,
@@ -23,7 +24,7 @@ Deno.test("compileUserRegExp rejects oversized patterns", () => {
   assert(err.message.includes("exceeds"));
 });
 
-Deno.test("compileUserRegExp rejects nested unbounded quantifiers", () => {
+test("compileUserRegExp rejects nested unbounded quantifiers", () => {
   for (
     const evil of [
       "(a+)+",
@@ -42,14 +43,14 @@ Deno.test("compileUserRegExp rejects nested unbounded quantifiers", () => {
   }
 });
 
-Deno.test("compileUserRegExp keeps escapes and classes legal", () => {
+test("compileUserRegExp keeps escapes and classes legal", () => {
   assertEquals(compileUserRegExp("\\(a\\+\\)\\+").source, "\\(a\\+\\)\\+");
   assertEquals(compileUserRegExp("[(+*]").source, "[(+*]");
   // `?` and bounded repeats are not unbounded.
   assertEquals(compileUserRegExp("(a*)?").source, "(a*)?");
 });
 
-Deno.test("compileUserRegExp reports JS syntax errors as UserRegExpError", () => {
+test("compileUserRegExp reports JS syntax errors as UserRegExpError", () => {
   const err = assertThrows(
     () => compileUserRegExp("(unclosed"),
     UserRegExpError,
@@ -57,7 +58,7 @@ Deno.test("compileUserRegExp reports JS syntax errors as UserRegExpError", () =>
   assert(err.message.includes("invalid regex"));
 });
 
-Deno.test("glob-generated patterns compile unchanged and skip user limits", () => {
+test("glob-generated patterns compile unchanged and skip user limits", () => {
   for (
     const glob of ["**/*.ts", "src/**/mod.ts", "*.js", "!node_modules/**"]
   ) {

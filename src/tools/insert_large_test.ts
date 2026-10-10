@@ -1,15 +1,16 @@
 // (the large-file streaming case)
 // plus focused extras for the bash timeout and registry sandbox.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { BashTool, createRegistry, InsertTool } from "./mod.ts";
 import { createJobManager } from "./jobmanager.ts";
 import { createBashTool } from "./bash.ts";
+import { test } from "#testing";
 
 const insertInMemoryLimit = 32 * 1024 * 1024;
 
-Deno.test("InsertTool streams a large file insertion", async () => {
+test("InsertTool streams a large file insertion", async () => {
   const dir = Deno.makeTempDirSync();
   try {
     const file = path.join(dir, "large.txt");
@@ -37,7 +38,7 @@ Deno.test("InsertTool streams a large file insertion", async () => {
   }
 });
 
-Deno.test("BashTool applies a sync timeout", async () => {
+test("BashTool applies a sync timeout", async () => {
   const tool = new BashTool(
     createRegistry("/tmp", undefined),
     createJobManager(),
@@ -51,7 +52,7 @@ Deno.test("BashTool applies a sync timeout", async () => {
   assertStringIncludes(result.text, "[exit_code]\n");
 });
 
-Deno.test("BashTool executes an & command asynchronously", async () => {
+test("BashTool executes an & command asynchronously", async () => {
   const jm = createJobManager();
   const bash = createBashTool(
     createRegistry("/tmp", undefined),

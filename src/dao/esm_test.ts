@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   ESMDAO,
   ESMGuidanceDAO,
@@ -6,6 +6,7 @@ import {
   type ESMObjectiveRecord,
 } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 function objective(
   overrides: Partial<ESMObjectiveRecord> = {},
@@ -64,7 +65,7 @@ function assertThrows(fn: () => void, message: string): void {
   throw new Error(`expected a throw: ${message}`);
 }
 
-Deno.test("ESM DAO round-trips an objective and preserves creation time", () => {
+test("ESM DAO round-trips an objective and preserves creation time", () => {
   const db = openTestDb();
   try {
     const dao = new ESMDAO(db);
@@ -117,7 +118,7 @@ Deno.test("ESM DAO round-trips an objective and preserves creation time", () => 
   }
 });
 
-Deno.test("ESM DAO rejects invalid records", () => {
+test("ESM DAO rejects invalid records", () => {
   const db = openTestDb();
   try {
     const dao = new ESMDAO(db);
@@ -136,7 +137,7 @@ Deno.test("ESM DAO rejects invalid records", () => {
   }
 });
 
-Deno.test("ESM DAO lists only runnable objectives", () => {
+test("ESM DAO lists only runnable objectives", () => {
   const db = openTestDb();
   try {
     const dao = new ESMDAO(db);
@@ -155,7 +156,7 @@ Deno.test("ESM DAO lists only runnable objectives", () => {
   }
 });
 
-Deno.test("ESM guidance DAO lists by status and consumes pending rows", () => {
+test("ESM guidance DAO lists by status and consumes pending rows", () => {
   const db = openTestDb();
   try {
     const dao = new ESMGuidanceDAO(db);

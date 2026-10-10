@@ -1,4 +1,4 @@
-import type { ChatParams, Model, StreamEvent } from "./types.ts";
+import { type ChatParams, type Model, type StreamEvent } from "./types.ts";
 
 /** Provider is the interface that all LLM providers must implement. */
 export interface Provider {

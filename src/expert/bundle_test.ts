@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   type Bundle,
   createMemoryFS,
@@ -9,6 +9,7 @@ import {
   roleMember,
   typeAgent,
 } from "./mod.ts";
+import { test } from "#testing";
 
 const validTeamManifest = `{
   "schemaVersion": 1,
@@ -82,7 +83,7 @@ function withTempDir(fn: (dir: string) => void): void {
   }
 }
 
-Deno.test("loadBundle valid team", () => {
+test("loadBundle valid team", () => {
   withTempDir((tmp) => {
     const files = teamFiles();
     files["agents/extra.md"] =
@@ -115,7 +116,7 @@ Deno.test("loadBundle valid team", () => {
   });
 });
 
-Deno.test("loadBundle valid agent", () => {
+test("loadBundle valid agent", () => {
   withTempDir((tmp) => {
     const dir = writeBundle(tmp, "agent-x", agentFiles());
     const b = loadBundle(dir);
@@ -144,7 +145,7 @@ function replaceInManifest(
   };
 }
 
-Deno.test("loadBundle invalid cases", () => {
+test("loadBundle invalid cases", () => {
   interface InvalidCase {
     name: string;
     dirName?: string;
@@ -337,7 +338,7 @@ Deno.test("loadBundle invalid cases", () => {
   }
 });
 
-Deno.test("loadBundleFS", () => {
+test("loadBundleFS", () => {
   const mapFiles: Record<string, string> = {
     "pkg-a/expert.json": validTeamManifest.replaceAll("team-x", "pkg-a"),
     "pkg-a/agents/lead-x.md": "---\nname: lead-x\nrole: lead\n---\nlead body\n",

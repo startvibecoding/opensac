@@ -1,4 +1,4 @@
-import type { ExpertFS } from "./fs.ts";
+import { type ExpertFS } from "./fs.ts";
 
 // Supported expertType values in expert.json.
 /** A single-persona bundle (manifest agentName points at the only agents/*.md). */

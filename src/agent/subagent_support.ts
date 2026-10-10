@@ -10,8 +10,8 @@
 // the `SubAgentPolicy.Validate` method maps to a free `validateSubAgentPolicy`
 // function over the policy value.
 
-import type { AgentID } from "../../sdk/agent/types.ts";
-import type { MemberDef } from "./memberdef.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
+import { type MemberDef } from "./memberdef.ts";
 
 /** Returns the canonical async sub-agent toolset, in registration order. */
 export function subAgentToolNames(): string[] {

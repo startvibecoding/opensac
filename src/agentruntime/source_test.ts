@@ -8,9 +8,9 @@ import {
   assertEquals,
   assertFalse,
   assertThrows,
-} from "@opensac/assert";
-import type { Binding } from "../session/bindings.ts";
-import type { Header } from "../session/entry.ts";
+} from "../compat/assert.ts";
+import { type Binding } from "../session/bindings.ts";
+import { type Header } from "../session/entry.ts";
 import {
   ExecutionPolicy,
   isValidMode,
@@ -19,7 +19,7 @@ import {
   MODE_PLAN,
   MODE_YOLO,
   ModeResolver,
-  Policy,
+  type Policy,
   resolvePolicy,
   resolveSource,
   resolveSourceFromSession,
@@ -33,10 +33,10 @@ import {
   SOURCE_WE_CHAT,
   SourceConflictError,
   sourceFromSessionHeader,
-  sourceWaitsForMembers,
-} from "./source.ts";
+  sourceWaitsForMembers} from "./source.ts";
+import { test } from "#testing";
 
-Deno.test("ResolveSource prefers persisted binding and reports conflicts", () => {
+test("ResolveSource prefers persisted binding and reports conflicts", () => {
   const resolved = resolveSource({
     binding: {
       sessionId: "s",
@@ -52,13 +52,13 @@ Deno.test("ResolveSource prefers persisted binding and reports conflicts", () =>
   assertEquals(resolved.diagnostics.length, 3);
 });
 
-Deno.test("ResolveSource falls back for a new session", () => {
+test("ResolveSource falls back for a new session", () => {
   const resolved = resolveSource({ requested: SOURCE_ACP });
   assertEquals(resolved.source, SOURCE_ACP);
   assertFalse(resolved.conflicted);
 });
 
-Deno.test("ResolveSource binding wins over request and runtime", () => {
+test("ResolveSource binding wins over request and runtime", () => {
   const resolved = resolveSource({
     binding: {
       sessionId: "s",
@@ -71,7 +71,7 @@ Deno.test("ResolveSource binding wins over request and runtime", () => {
   assertEquals(resolved.source, SOURCE_WE_CHAT);
 });
 
-Deno.test("ResolvePolicy uses resolved channel source", () => {
+test("ResolvePolicy uses resolved channel source", () => {
   const { resolution, mode, error } = resolvePolicy(
     {
       sessionHeader: { channelType: "feishu" } as Header,
@@ -86,7 +86,7 @@ Deno.test("ResolvePolicy uses resolved channel source", () => {
   assertEquals(mode, MODE_YOLO);
 });
 
-Deno.test("ResolvePolicy bound channel cannot downgrade mode", () => {
+test("ResolvePolicy bound channel cannot downgrade mode", () => {
   const { resolution, mode, error } = resolvePolicy(
     {
       binding: {
@@ -105,7 +105,7 @@ Deno.test("ResolvePolicy bound channel cannot downgrade mode", () => {
   assertEquals(mode, MODE_YOLO);
 });
 
-Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
+test("ResolvePolicy rejects persisted runtime source conflict", () => {
   const { error } = resolvePolicy(
     {
       binding: {
@@ -123,7 +123,7 @@ Deno.test("ResolvePolicy rejects persisted runtime source conflict", () => {
   assert(error instanceof SourceConflictError);
 });
 
-Deno.test("ResolvePolicy unbound CLI uses requested mode", () => {
+test("ResolvePolicy unbound CLI uses requested mode", () => {
   const { mode, error } = resolvePolicy(
     {
       current: SOURCE_CLI,
@@ -137,7 +137,7 @@ Deno.test("ResolvePolicy unbound CLI uses requested mode", () => {
   assertEquals(mode, MODE_YOLO);
 });
 
-Deno.test("ResolvePolicy rejects unknown source candidates", () => {
+test("ResolvePolicy rejects unknown source candidates", () => {
   for (
     const input of [
       { requested: "adapter-without-policy" as RuntimeSource },
@@ -149,7 +149,7 @@ Deno.test("ResolvePolicy rejects unknown source candidates", () => {
   }
 });
 
-Deno.test("Policy ResolveMode table", () => {
+test("Policy ResolveMode table", () => {
   const tests: Array<{
     name: string;
     policy: Policy;
@@ -227,14 +227,14 @@ Deno.test("Policy ResolveMode table", () => {
   }
 });
 
-Deno.test("ModeResolver", () => {
+test("ModeResolver", () => {
   const got = new ModeResolver(
     new ExecutionPolicy({ source: SOURCE_FEISHU, defaultMode: MODE_AGENT }),
   ).resolve(MODE_PLAN, MODE_AGENT);
   assertEquals(got, MODE_YOLO);
 });
 
-Deno.test("SourceFromSessionHeader", () => {
+test("SourceFromSessionHeader", () => {
   assertEquals(
     sourceFromSessionHeader({ channelType: "feishu" } as Header),
     SOURCE_FEISHU,
@@ -245,7 +245,7 @@ Deno.test("SourceFromSessionHeader", () => {
   );
 });
 
-Deno.test("ResolveUnattendedMode", () => {
+test("ResolveUnattendedMode", () => {
   const tests: Array<[string, string]> = [
     ["", MODE_YOLO],
     [MODE_PLAN, MODE_YOLO],
@@ -260,7 +260,7 @@ Deno.test("ResolveUnattendedMode", () => {
   }
 });
 
-Deno.test("IsValidMode and member waiting", () => {
+test("IsValidMode and member waiting", () => {
   assert(isValidMode("yolo"));
   assertFalse(isValidMode("bogus"));
   assert(sourceWaitsForMembers(SOURCE_TUI));
@@ -268,7 +268,7 @@ Deno.test("IsValidMode and member waiting", () => {
   assertFalse(sourceWaitsForMembers(SOURCE_CLI));
 });
 
-Deno.test("ResolveSourceFromSession rejects an empty session ID", () => {
+test("ResolveSourceFromSession rejects an empty session ID", () => {
   assertThrows(
     () => resolveSourceFromSession("/tmp", "", { requested: SOURCE_ACP }),
     Error,

@@ -4,22 +4,23 @@
 // local-time calendar arithmetic production uses (`cron` schedules from
 // `time.Now()`).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { parseSchedule } from "./schedule.ts";
+import { test } from "#testing";
 
-Deno.test("ParseScheduleEmpty", () => {
+test("ParseScheduleEmpty", () => {
   const { next, isOneShot } = parseSchedule("", new Date());
   assert(isOneShot, "expected one-shot for empty schedule");
   assertEquals(next, null);
 });
 
-Deno.test("ParseScheduleOnce", () => {
+test("ParseScheduleOnce", () => {
   const { next, isOneShot } = parseSchedule("@once", new Date());
   assert(isOneShot, "expected one-shot for @once");
   assertEquals(next, null);
 });
 
-Deno.test("ParseScheduleEveryDuration", () => {
+test("ParseScheduleEveryDuration", () => {
   const now = new Date();
   const cases: [string, number][] = [
     ["@every 30m", 30 * 60 * 1000],
@@ -33,7 +34,7 @@ Deno.test("ParseScheduleEveryDuration", () => {
   }
 });
 
-Deno.test("ParseScheduleNamed", () => {
+test("ParseScheduleNamed", () => {
   const now = new Date(2026, 4, 29, 15, 30, 0, 0);
   const cases: [string, Date][] = [
     ["@hourly", new Date(2026, 4, 29, 16, 30, 0, 0)],
@@ -47,7 +48,7 @@ Deno.test("ParseScheduleNamed", () => {
   }
 });
 
-Deno.test("ParseScheduleWeekly", () => {
+test("ParseScheduleWeekly", () => {
   // 2026-05-29 is a Friday; the next Monday is 2026-06-01.
   const from = new Date(2026, 4, 29, 15, 30, 0, 0);
   const { next, isOneShot } = parseSchedule("@weekly", from);
@@ -55,13 +56,13 @@ Deno.test("ParseScheduleWeekly", () => {
   assertEquals(next!.getTime(), new Date(2026, 5, 1, 0, 0, 0, 0).getTime());
 });
 
-Deno.test("ParseScheduleInvalid", () => {
+test("ParseScheduleInvalid", () => {
   assertThrows(() => parseSchedule("invalid", new Date()));
   assertThrows(() => parseSchedule("@every xyz", new Date()));
   assertThrows(() => parseSchedule("@every 0s", new Date()));
 });
 
-Deno.test("ParseScheduleFiveFields", () => {
+test("ParseScheduleFiveFields", () => {
   const from = new Date(2026, 4, 29, 10, 30, 0, 0);
   const cases: [string, Date][] = [
     ["5 * * * *", new Date(2026, 4, 29, 11, 5, 0, 0)],
@@ -76,7 +77,7 @@ Deno.test("ParseScheduleFiveFields", () => {
   }
 });
 
-Deno.test("ParseScheduleRejectsInvalidCronFields", () => {
+test("ParseScheduleRejectsInvalidCronFields", () => {
   for (
     const expr of ["0 99 * * *", "0 9 32 * *", "0 9 * 13 *", "0 9 * * 8"]
   ) {

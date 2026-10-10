@@ -67,7 +67,11 @@ const intentColumns = `id, session_id AS sessionId, source, model, mode,
   created_at AS createdAt`;
 
 export class RunDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   insertIntent(executor: DB, record: ExecutionIntentRecord): void {
     execChanges(

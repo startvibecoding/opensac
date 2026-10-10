@@ -28,7 +28,7 @@ import {
   type ToolDefinition as PublicToolDefinition,
   type Usage as PublicUsage,
 } from "../../sdk/agent/mod.ts";
-import type { ProviderConfig } from "../config/mod.ts";
+import { type ProviderConfig } from "../config/mod.ts";
 import {
   type Attachment as InternalAttachment,
   type ChatParams as InternalChatParams,
@@ -58,7 +58,11 @@ import {
  * interface.
  */
 export class ProviderAdapter implements PublicProvider {
-  constructor(private readonly inner: InternalProvider) {}
+    private readonly inner: InternalProvider;
+
+  constructor(inner: InternalProvider) {
+    this.inner = inner;
+  }
 
   async *chat(params: PublicChatParams): AsyncIterable<PublicStreamEvent> {
     const internalParams: InternalChatParams = {

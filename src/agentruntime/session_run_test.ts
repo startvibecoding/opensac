@@ -1,10 +1,11 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   createSessionExecutionRuntime,
   createSessionRunDescriptor,
 } from "./session_run.ts";
+import { test } from "#testing";
 
-Deno.test("createSessionRunDescriptor builds the canonical durable Run inputs", async () => {
+test("createSessionRunDescriptor builds the canonical durable Run inputs", async () => {
   const startedAt = new Date("2026-09-25T00:00:00.000Z");
   const userMessage = { role: "user", content: "hello", timestamp: startedAt };
   const descriptor = await createSessionRunDescriptor({
@@ -44,7 +45,7 @@ Deno.test("createSessionRunDescriptor builds the canonical durable Run inputs", 
   assertEquals(descriptor.startEvent.sessionId, "session-1");
 });
 
-Deno.test("createSessionRunDescriptor preserves adapter policy", async () => {
+test("createSessionRunDescriptor preserves adapter policy", async () => {
   const descriptor = await createSessionRunDescriptor({
     sessionId: "session-1",
     runId: "run-1",
@@ -69,7 +70,7 @@ Deno.test("createSessionRunDescriptor preserves adapter policy", async () => {
   });
 });
 
-Deno.test("createSessionExecutionRuntime wires the shared run persistence", () => {
+test("createSessionExecutionRuntime wires the shared run persistence", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "session-run-" });
   try {
     const execution = createSessionExecutionRuntime(sessionDir);

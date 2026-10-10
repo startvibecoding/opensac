@@ -1,9 +1,10 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { formatTime } from "./store.ts";
 import { roleWorker, Supervisor } from "./runtime_core.ts";
 import { cleanup, makeStore, RuntimeTestAdapter } from "./test_helpers.ts";
+import { test } from "#testing";
 
-Deno.test("Store addGuidance stamps objective version", () => {
+test("Store addGuidance stamps objective version", () => {
   const { store, sessionID } = makeStore("opensac-esm-guidance-");
   try {
     const obj = store.create(sessionID, "finish the objective");
@@ -34,7 +35,7 @@ Deno.test("Store addGuidance stamps objective version", () => {
   }
 });
 
-Deno.test("Supervisor injects and consumes guidance for worker", async () => {
+test("Supervisor injects and consumes guidance for worker", async () => {
   const { store, sessionID } = makeStore("opensac-esm-guidance-");
   try {
     store.create(sessionID, "finish the objective");
@@ -63,7 +64,7 @@ Deno.test("Supervisor injects and consumes guidance for worker", async () => {
   }
 });
 
-Deno.test("Supervisor keeps guidance when role fails", async () => {
+test("Supervisor keeps guidance when role fails", async () => {
   const { store, sessionID } = makeStore("opensac-esm-guidance-");
   try {
     store.create(sessionID, "finish the objective");

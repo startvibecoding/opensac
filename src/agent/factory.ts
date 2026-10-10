@@ -10,7 +10,7 @@
 // single-threaded); `provider.ThinkingLevel(...)` maps to the `thinkingMedium`
 // constant.
 
-import type { Agent as PublicAgent, AgentID } from "../../sdk/agent/types.ts";
+import { type Agent as PublicAgent, type AgentID } from "../../sdk/agent/types.ts";
 import {
   type Builder,
   type BuilderConfig,
@@ -26,10 +26,10 @@ import {
 } from "../config/settings.ts";
 import { type AllowConfig, loadAllow } from "../config/allow.ts";
 import { envList, loadEnv } from "../config/env.ts";
-import type { CompactionSettings } from "../context/compaction.ts";
-import type { Model } from "../provider/types.ts";
+import { type CompactionSettings } from "../context/compaction.ts";
+import { type Model } from "../provider/types.ts";
 import { type ThinkingLevel, thinkingMedium } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import { createManager, createSubAgentManager } from "../session/manager.ts";
 import {

@@ -10,8 +10,8 @@
 // `io.ReadCloser` map to `Uint8Array`/`ReadableStream`; `context.Context` maps
 // to an `AbortSignal`; `filepath` maps to `@std/path` plus `Deno.realPathSync`.
 
-import * as path from "@opensac/path";
-import type { AttachmentKind, SessionAttachment } from "./attachment.ts";
+import * as path from "../compat/path.ts";
+import { type AttachmentKind, type SessionAttachment } from "./attachment.ts";
 import {
   ATTACHMENT_AUDIO,
   ATTACHMENT_FILE,

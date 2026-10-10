@@ -1,7 +1,7 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 import {
   type ACPBridgeContext,
   mapACPRequestToCore,
@@ -9,13 +9,14 @@ import {
   mapCoreResponseToACP,
   mapCoreReverseRequestToACP,
 } from "./bridge_protocol.ts";
+import { test } from "#testing";
 
 const context: ACPBridgeContext = {
   source: "acp",
   workDir: "/tmp/project",
 };
 
-Deno.test("mapACPRequestToCore preserves session/new and raw request id", () => {
+test("mapACPRequestToCore preserves session/new and raw request id", () => {
   const request: ACPRPCRequest = {
     jsonrpc: "2.0",
     idRaw: '"request-1"',
@@ -33,7 +34,7 @@ Deno.test("mapACPRequestToCore preserves session/new and raw request id", () => 
   });
 });
 
-Deno.test("mapCoreResponseToACP uses the original raw ACP id", () => {
+test("mapCoreResponseToACP uses the original raw ACP id", () => {
   const request: ACPRPCRequest = {
     jsonrpc: "2.0",
     idRaw: "null",
@@ -47,7 +48,7 @@ Deno.test("mapCoreResponseToACP uses the original raw ACP id", () => {
   assertEquals(response.result, { runId: "run-1" });
 });
 
-Deno.test("mapCoreEventToACP preserves canonical IDs and terminal state", () => {
+test("mapCoreEventToACP preserves canonical IDs and terminal state", () => {
   const event: CoreRuntimeEvent = {
     sessionId: "session-1",
     runId: "run-1",
@@ -89,7 +90,7 @@ Deno.test("mapCoreEventToACP preserves canonical IDs and terminal state", () => 
   });
 });
 
-Deno.test("mapCoreReverseRequestToACP maps approval and question requests", () => {
+test("mapCoreReverseRequestToACP maps approval and question requests", () => {
   const approval = mapCoreReverseRequestToACP({
     jsonrpc: "2.0",
     id: "core-approval",

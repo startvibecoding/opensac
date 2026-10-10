@@ -15,7 +15,7 @@ import {
   prepareBytes,
   type Result as ImageResult,
 } from "../imageproc/mod.ts";
-import type { ImageContent } from "../provider/types.ts";
+import { type ImageContent } from "../provider/types.ts";
 import {
   createImageToolResult,
   createTextToolResult,
@@ -25,7 +25,7 @@ import {
   type ToolResult,
 } from "../tools/tool.ts";
 import { Client, type Options } from "./client.ts";
-import type { Cookie, HTMLOptions, ScreenshotOptions } from "./protocol.ts";
+import { type Cookie, type HTMLOptions, type ScreenshotOptions } from "./protocol.ts";
 
 /** The tool name registered with the shared registry. */
 export const TOOL_NAME = "browser";

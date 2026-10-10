@@ -3,7 +3,7 @@
 // records. It is intentionally protocol-neutral; adapters remain responsible
 // for decoding their payload fields.
 
-import type { DecisionRecord } from "./decision_record.ts";
+import { type DecisionRecord } from "./decision_record.ts";
 
 /** Reconstructs the latest pending decision set at the current clock instant. */
 export function replayDecisions(

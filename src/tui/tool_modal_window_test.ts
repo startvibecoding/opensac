@@ -8,7 +8,7 @@
 // streaming. The cache can therefore never drop, duplicate, reorder, or
 // stale-serve content.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService } from "./service.ts";
 import { expandedToolRow } from "./tool_row_format.ts";
@@ -20,6 +20,7 @@ import {
   EVENT_TEXT_DELTA,
   EVENT_TOOL_EXECUTION_START,
 } from "../agentruntime/events.ts";
+import { test } from "#testing";
 
 function makeSession(): TUISession {
   return new TUISession(
@@ -144,7 +145,7 @@ function panelHeight(session: TUISession): number {
   return Math.max(session.termHeight - 6 - editorRows, 6);
 }
 
-Deno.test("tool modal window equals a naive full recomputation", () => {
+test("tool modal window equals a naive full recomputation", () => {
   const session = makeSession();
   session.setTerminalSize(72, 24);
   fillTranscript(session);
@@ -175,7 +176,7 @@ Deno.test("tool modal window equals a naive full recomputation", () => {
   );
 });
 
-Deno.test("tool modal matches the reference while the transcript streams", () => {
+test("tool modal matches the reference while the transcript streams", () => {
   const session = makeSession();
   session.setTerminalSize(80, 26);
   fillTranscript(session);
@@ -211,7 +212,7 @@ Deno.test("tool modal matches the reference while the transcript streams", () =>
   );
 });
 
-Deno.test("tool modal sub-agent tab matches the reference body", () => {
+test("tool modal sub-agent tab matches the reference body", () => {
   const session = makeSession();
   session.setTerminalSize(80, 26);
   fillTranscript(session);

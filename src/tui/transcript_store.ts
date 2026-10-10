@@ -5,10 +5,10 @@
 // resetTranscriptState). Rendering stays in the Ink layer; this module owns
 // indices, matching, dedup, and terminalization exactly as the Go App does.
 
-import type { FileDiff } from "../tools/io_helpers.ts";
+import { type FileDiff } from "../tools/io_helpers.ts";
 import { compactBashOutput } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
-import type { TaskPlan } from "../tools/tool.ts";
+import { type TaskPlan } from "../tools/tool.ts";
 import {
   TOOL_EXECUTION_INTERRUPTED,
   type ToolExecutionState,

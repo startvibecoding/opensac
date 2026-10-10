@@ -1,11 +1,12 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   modelsEndpoint,
   parseDiscoveredModels,
   resolveSecretRef,
 } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("ModelsEndpoint", () => {
+test("ModelsEndpoint", () => {
   const tests: Array<[string, string]> = [
     ["https://api.example.test/v1", "https://api.example.test/v1/models"],
     ["https://api.example.test/v1/", "https://api.example.test/v1/models"],
@@ -32,7 +33,7 @@ Deno.test("ModelsEndpoint", () => {
   }
 });
 
-Deno.test("ParseDiscoveredModels", () => {
+test("ParseDiscoveredModels", () => {
   const got = parseDiscoveredModels(
     `{"models":[{"name":"models/gemini-2.0-flash","displayName":"Gemini 2.0 Flash"},{"name":"models/gemini-2.0-flash"},{"id":"gpt-4o","context_length":128000,"max_output_tokens":4096,"input_modalities":["text","image"]}]}`,
   );
@@ -45,7 +46,7 @@ Deno.test("ParseDiscoveredModels", () => {
   assertEquals(got[1].input?.length, 2);
 });
 
-Deno.test("ParseDiscoveredModelsBareArray", () => {
+test("ParseDiscoveredModelsBareArray", () => {
   const got = parseDiscoveredModels(
     `[{"id":"a"},{"id":"b","reasoning":true},{"id":"a"}]`,
   );
@@ -57,7 +58,7 @@ Deno.test("ParseDiscoveredModelsBareArray", () => {
   assertEquals(got[0].input, ["text"]);
 });
 
-Deno.test("ResolveSecretRef", () => {
+test("ResolveSecretRef", () => {
   Deno.env.set("OPENSAC_DISCOVER_TEST_KEY", "from-env");
   try {
     assertEquals(resolveSecretRef("${OPENSAC_DISCOVER_TEST_KEY}"), "from-env");

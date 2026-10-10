@@ -1,10 +1,11 @@
 // Tests for src/session/entry.ts (GenerateID has no Go test file; this pins the
 // documented 16-character hex contract and uniqueness).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { generateID } from "./entry.ts";
+import { test } from "#testing";
 
-Deno.test("generateID returns 16 lowercase hex chars and is unique", () => {
+test("generateID returns 16 lowercase hex chars and is unique", () => {
   const seen = new Set<string>();
   for (let i = 0; i < 1000; i++) {
     const id = generateID();

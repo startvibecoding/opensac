@@ -1,10 +1,11 @@
 // Toolchain smoke test for the Ink + React TUI target.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { render } from "ink";
 import { App } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("ink and react load under Deno", () => {
+test("ink and react load under Deno", () => {
   assertEquals(typeof render, "function");
   assertEquals(typeof App, "function");
 });
@@ -52,7 +53,7 @@ class FakeStdout {
   }
 }
 
-Deno.test({
+test({
   name: "App renders through Ink",
   sanitizeOps: false,
   sanitizeResources: false,

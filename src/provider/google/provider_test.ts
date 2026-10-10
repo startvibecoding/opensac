@@ -3,8 +3,8 @@
 // This port injects a fake `HttpClient` and builds plain Response-like objects
 // (the provider only reads `status`, `body`, and `text()`).
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { HttpClient } from "../http_client.ts";
+import { assert, assertEquals } from "../../compat/assert.ts";
+import { type HttpClient } from "../http_client.ts";
 import {
   type ChatParams,
   type ContentBlock,
@@ -36,6 +36,7 @@ import {
   vertexAPIKeyBaseURL,
 } from "./provider.ts";
 import { resolveAPIKey } from "./register.ts";
+import { test } from "#testing";
 
 const emptyCost: ModelPricing = {
   input: 0,
@@ -166,7 +167,7 @@ const okSSE =
 
 // ─── retry / transport ───────────────────────────────────────────────────────
 
-Deno.test("GoogleRetriesEarlyStreamReadError", async () => {
+test("GoogleRetriesEarlyStreamReadError", async () => {
   const streamErr = new Error(
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
@@ -210,7 +211,7 @@ Deno.test("GoogleRetriesEarlyStreamReadError", async () => {
   assertEquals(retryEvent!.retryAfterMs, 1);
 });
 
-Deno.test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
+test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   const streamErr = new Error(
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
@@ -256,7 +257,7 @@ Deno.test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   assert(sawText && sawError);
 });
 
-Deno.test("GoogleProviderHTTPProxy", () => {
+test("GoogleProviderHTTPProxy", () => {
   const p = createGeminiProvider(
     "fake-key",
     "https://generativelanguage.googleapis.com/v1beta/models",
@@ -270,7 +271,7 @@ Deno.test("GoogleProviderHTTPProxy", () => {
   }
 });
 
-Deno.test("ResolveAPIKeyShellCommandRequiresOptIn", () => {
+test("ResolveAPIKeyShellCommandRequiresOptIn", () => {
   const prev = Deno.env.get("VIBECODING_ALLOW_SHELL_CONFIG");
   try {
     Deno.env.set("VIBECODING_ALLOW_SHELL_CONFIG", "");
@@ -306,7 +307,7 @@ function bareProvider(): Provider {
   );
 }
 
-Deno.test("ConvertMessagesToolResultUsesTextContents", () => {
+test("ConvertMessagesToolResultUsesTextContents", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [{
@@ -328,7 +329,7 @@ Deno.test("ConvertMessagesToolResultUsesTextContents", () => {
   assertEquals(fr.response.content, "bash output from content block");
 });
 
-Deno.test("ConvertMessagesGroupsConsecutiveToolResults", () => {
+test("ConvertMessagesGroupsConsecutiveToolResults", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [
@@ -363,7 +364,7 @@ Deno.test("ConvertMessagesGroupsConsecutiveToolResults", () => {
   assertEquals(contents[2].parts[0].text, "next");
 });
 
-Deno.test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
+test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [
@@ -399,7 +400,7 @@ Deno.test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
   assert(!fallback[1].parts[0].functionResponse?.id);
 });
 
-Deno.test("GoogleAssistantToolCallIncludesThoughtSignature", () => {
+test("GoogleAssistantToolCallIncludesThoughtSignature", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
     messages: [
@@ -430,7 +431,7 @@ Deno.test("GoogleAssistantToolCallIncludesThoughtSignature", () => {
 
 // ─── streaming ───────────────────────────────────────────────────────────────
 
-Deno.test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
+test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
   const sse = 'data: {"candidates":[{"content":{"parts":[' +
     '{"functionCall":{"id":"call-1","name":"lookup","args":{"key":"a"}}},' +
     '{"functionCall":{"id":"call-2","name":"lookup","args":{"key":"b"}}}]},' +
@@ -476,7 +477,7 @@ Deno.test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
   }
 });
 
-Deno.test("GoogleStreamTextThinkToolCallAndUsage", async () => {
+test("GoogleStreamTextThinkToolCallAndUsage", async () => {
   const sse =
     'data: {"candidates":[{"content":{"parts":[{"text":"thinking","thought":true,"thoughtSignature":"sig-1"},{"text":"Hello "}]}}]}\n' +
     'data: {"candidates":[{"content":{"parts":[{"thoughtSignature":"tool-sig","functionCall":{"name":"read","args":{"path":"main.go"}}}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"thoughtsTokenCount":2,"cachedContentTokenCount":7,"totalTokenCount":17}}\n';
@@ -540,7 +541,7 @@ Deno.test("GoogleStreamTextThinkToolCallAndUsage", async () => {
 
 // ─── requests ────────────────────────────────────────────────────────────────
 
-Deno.test("GoogleCustomHeaders", async () => {
+test("GoogleCustomHeaders", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockGoogleProvider(
     createGeminiProvider(
@@ -566,7 +567,7 @@ Deno.test("GoogleCustomHeaders", async () => {
   });
 });
 
-Deno.test("GoogleGeminiRequest", async () => {
+test("GoogleGeminiRequest", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockGoogleProvider(
     createGeminiProvider(
@@ -632,7 +633,7 @@ Deno.test("GoogleGeminiRequest", async () => {
   );
 });
 
-Deno.test("GoogleGeminiOmitsMaxOutputTokensByDefault", async () => {
+test("GoogleGeminiOmitsMaxOutputTokensByDefault", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockGoogleProvider(
     createGeminiProvider(
@@ -653,7 +654,7 @@ Deno.test("GoogleGeminiOmitsMaxOutputTokensByDefault", async () => {
   assert(!("maxOutputTokens" in gc));
 });
 
-Deno.test("GoogleImageMediaResolution", async () => {
+test("GoogleImageMediaResolution", async () => {
   const tests = [
     { detail: "detail", want: "MEDIA_RESOLUTION_HIGH" },
     { detail: "raw", want: "MEDIA_RESOLUTION_HIGH" },
@@ -691,7 +692,7 @@ Deno.test("GoogleImageMediaResolution", async () => {
   }
 });
 
-Deno.test("GoogleRequestCachedContent", async () => {
+test("GoogleRequestCachedContent", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createGeminiProvider(
     "fake-key",
@@ -708,7 +709,7 @@ Deno.test("GoogleRequestCachedContent", async () => {
   assertEquals(req.cachedContent, "cachedContents/test-cache");
 });
 
-Deno.test("GoogleVertexAPIKeyHeaderAndEndpoint", async () => {
+test("GoogleVertexAPIKeyHeaderAndEndpoint", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockGoogleProvider(
     createVertexProvider(
@@ -734,7 +735,7 @@ Deno.test("GoogleVertexAPIKeyHeaderAndEndpoint", async () => {
   });
 });
 
-Deno.test("GoogleVertexOAuthAuthorizationHeader", async () => {
+test("GoogleVertexOAuthAuthorizationHeader", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockGoogleProvider(
     createVertexProvider(
@@ -763,7 +764,7 @@ Deno.test("GoogleVertexOAuthAuthorizationHeader", async () => {
   assert(bodies.length === 1);
 });
 
-Deno.test("GoogleDisableSamplingParamsCompat", async () => {
+test("GoogleDisableSamplingParamsCompat", async () => {
   const bodies: CapturedRequest[] = [];
   const p = createMockGoogleProvider(
     createGeminiProvider(
@@ -789,7 +790,7 @@ Deno.test("GoogleDisableSamplingParamsCompat", async () => {
 
 // ─── helpers / register ──────────────────────────────────────────────────────
 
-Deno.test("VertexAPIKeyBaseURL", () => {
+test("VertexAPIKeyBaseURL", () => {
   assertEquals(
     vertexAPIKeyBaseURL("https://aiplatform.googleapis.com/v1/projects/x"),
     "https://aiplatform.googleapis.com/v1/publishers/google/models",

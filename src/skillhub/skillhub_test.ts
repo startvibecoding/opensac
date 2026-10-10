@@ -3,8 +3,8 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
-import * as path from "@opensac/path";
+} from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { createClawHubClient } from "./clawhub.ts";
 import {
   installSkill,
@@ -22,9 +22,10 @@ import {
   jsonResponse,
   makeArchive,
 } from "./test_helpers.ts";
-import type { MarketClient, SkillSummary } from "./types.ts";
+import { type MarketClient, type SkillSummary } from "./types.ts";
+import { test } from "#testing";
 
-Deno.test("SkillHubSearchAndUserSkills", async () => {
+test("SkillHubSearchAndUserSkills", async () => {
   const client = fakeHttpClient((url) => {
     const u = new URL(url);
     switch (u.pathname) {
@@ -57,7 +58,7 @@ Deno.test("SkillHubSearchAndUserSkills", async () => {
   assertEquals(page2.items[0].id, "go-expert");
 });
 
-Deno.test("SkillHubDetailAcceptsCurrentVersionTagsAndStatsShape", async () => {
+test("SkillHubDetailAcceptsCurrentVersionTagsAndStatsShape", async () => {
   const client = fakeHttpClient(() =>
     jsonResponse(
       `{"latestVersion":{"version":"1.0.0","createdAt":1774758863165},"owner":{"displayName":"claudiodrusus","handle":"claudiodrusus"},"skill":{"slug":"skill-1","displayName":"Skill 1","summary":"Generate QR codes","tags":{"latest":"1.0.0"},"stats":{"downloads":1238,"installs":43,"stars":2}}}`,
@@ -75,7 +76,7 @@ Deno.test("SkillHubDetailAcceptsCurrentVersionTagsAndStatsShape", async () => {
   assertEquals(detail.tags, ["latest=1.0.0"]);
 });
 
-Deno.test("ClawHubSearchUsesCursorAndNormalizes", async () => {
+test("ClawHubSearchUsesCursorAndNormalizes", async () => {
   const client = fakeHttpClient((url) => {
     const u = new URL(url);
     assertEquals(u.pathname, "/api/v1/skills");
@@ -95,7 +96,7 @@ Deno.test("ClawHubSearchUsesCursorAndNormalizes", async () => {
   assertEquals(page.nextCursor, "later");
 });
 
-Deno.test("ClawHubFullTextSearchUsesSearchEndpointAndOwnerRef", async () => {
+test("ClawHubFullTextSearchUsesSearchEndpointAndOwnerRef", async () => {
   const client = fakeHttpClient((url) => {
     const u = new URL(url);
     assertEquals(u.pathname, "/api/v1/search");
@@ -114,7 +115,7 @@ Deno.test("ClawHubFullTextSearchUsesSearchEndpointAndOwnerRef", async () => {
   assertEquals(page.items[0].downloads, 1266);
 });
 
-Deno.test("ClawHubDetailAcceptsRootObject", async () => {
+test("ClawHubDetailAcceptsRootObject", async () => {
   const client = fakeHttpClient((url) => {
     assertEquals(new URL(url).pathname, "/api/v1/skills/openclaw/git");
     return jsonResponse(
@@ -129,7 +130,7 @@ Deno.test("ClawHubDetailAcceptsRootObject", async () => {
   assertEquals(detail.version, "1.0.0");
 });
 
-Deno.test("ClawHubDetailAcceptsSlugEnvelope", async () => {
+test("ClawHubDetailAcceptsSlugEnvelope", async () => {
   const client = fakeHttpClient(() =>
     jsonResponse(
       `{"skill":{"slug":"drivethru-operations","displayName":"Drivethru Operations","summary":"Operations","updatedAt":1784072685483},"latestVersion":{"version":"0.1.0"},"owner":{"displayName":"zmtucker"},"moderation":{"verdict":"clean"}}`,
@@ -145,7 +146,7 @@ Deno.test("ClawHubDetailAcceptsSlugEnvelope", async () => {
   assertEquals(detail.author, "zmtucker");
 });
 
-Deno.test("ClawHubOwnerRefUsesOwnerQueryForDetail", async () => {
+test("ClawHubOwnerRefUsesOwnerQueryForDetail", async () => {
   const client = fakeHttpClient((url) => {
     const u = new URL(url);
     assertEquals(u.pathname, "/api/v1/skills/photo");
@@ -163,7 +164,7 @@ Deno.test("ClawHubOwnerRefUsesOwnerQueryForDetail", async () => {
   assertEquals(detail.author, "AGIstack");
 });
 
-Deno.test("InstallValidatesArchiveAndWritesMetadata", async () => {
+test("InstallValidatesArchiveAndWritesMetadata", async () => {
   const archive = await makeArchive({
     "wrapped/SKILL.md": "# Test\n",
     "wrapped/references/a.md": "reference",
@@ -205,7 +206,7 @@ Deno.test("InstallValidatesArchiveAndWritesMetadata", async () => {
   assertEquals(state?.scope, "project");
 });
 
-Deno.test("InstallRejectsTraversalAndLocalSkill", async () => {
+test("InstallRejectsTraversalAndLocalSkill", async () => {
   const target = await Deno.makeTempDir();
   const traversal = await makeArchive({ "../outside/SKILL.md": "# bad" });
   const client = new FakeMarketClient();
@@ -260,7 +261,7 @@ Deno.test("InstallRejectsTraversalAndLocalSkill", async () => {
   );
 });
 
-Deno.test("InstallUpdatesManagedSkillAndRejectsDifferentOwner", async () => {
+test("InstallUpdatesManagedSkillAndRejectsDifferentOwner", async () => {
   const target = await Deno.makeTempDir();
   const client = new FakeMarketClient();
   client.detailValue = emptyDetail({
@@ -319,7 +320,7 @@ Deno.test("InstallUpdatesManagedSkillAndRejectsDifferentOwner", async () => {
   assertStringIncludes((error as Error).message, "managed by");
 });
 
-Deno.test("LocalIndexMarksAvailableUpdate", async () => {
+test("LocalIndexMarksAvailableUpdate", async () => {
   const root = await Deno.makeTempDir();
   const dir = path.join(root, "go");
   await Deno.mkdir(dir, { recursive: true });
@@ -335,7 +336,7 @@ Deno.test("LocalIndexMarksAvailableUpdate", async () => {
   assertEquals(items[0].installed?.updateAvailable, true);
 });
 
-Deno.test("ServiceOfficialAggregatesAndAppliesInstalled", async () => {
+test("ServiceOfficialAggregatesAndAppliesInstalled", async () => {
   const global = await Deno.makeTempDir();
   const dir = path.join(global, "go-expert");
   await Deno.mkdir(dir, { recursive: true });
@@ -374,7 +375,7 @@ Deno.test("ServiceOfficialAggregatesAndAppliesInstalled", async () => {
   assertEquals(page.total, 2);
 });
 
-Deno.test("SkillHubBrowseSendsDownloadSortAndParsesCertification", async () => {
+test("SkillHubBrowseSendsDownloadSortAndParsesCertification", async () => {
   const client = fakeHttpClient((url) => {
     const u = new URL(url);
     assertEquals(u.searchParams.get("sortBy"), "downloads");
@@ -401,7 +402,7 @@ Deno.test("SkillHubBrowseSendsDownloadSortAndParsesCertification", async () => {
   assertEquals(item.certifiedName, "Tencent");
 });
 
-Deno.test("SkillHubCategories", async () => {
+test("SkillHubCategories", async () => {
   const client = fakeHttpClient((url) => {
     assertEquals(new URL(url).pathname, "/api/v1/categories");
     return jsonResponse(
@@ -414,7 +415,7 @@ Deno.test("SkillHubCategories", async () => {
   assertEquals(categories[0].key, "dev-programming");
 });
 
-Deno.test("ClawHubCurrentListShapeParsesDownloadsAndVersion", async () => {
+test("ClawHubCurrentListShapeParsesDownloadsAndVersion", async () => {
   const client = fakeHttpClient(() =>
     jsonResponse(
       `{"items":[{"slug":"tool","displayName":"Tool","tags":{"latest":"1.2.0"},"stats":{"downloads":1562,"installs":6,"stars":3},"latestVersion":{"version":"1.2.0"},"updatedAt":1784072685483}]}`,
@@ -430,7 +431,7 @@ Deno.test("ClawHubCurrentListShapeParsesDownloadsAndVersion", async () => {
   assert(page.items[0].updatedAt !== undefined);
 });
 
-Deno.test("ServiceDetailIncludesFiles", async () => {
+test("ServiceDetailIncludesFiles", async () => {
   const client = new FakeMarketClient();
   client.detailValue = emptyDetail({
     market: "skillhub.cn",
@@ -450,7 +451,7 @@ Deno.test("ServiceDetailIncludesFiles", async () => {
   assertEquals(detail.downloadSources?.[0].kind, "test");
 });
 
-Deno.test("ServiceDetailIncludesEvaluation", async () => {
+test("ServiceDetailIncludesEvaluation", async () => {
   const client = new FakeMarketClient();
   client.detailValue = emptyDetail({
     market: "skillhub.cn",

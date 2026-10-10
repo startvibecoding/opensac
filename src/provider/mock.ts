@@ -1,5 +1,5 @@
-import type { Provider } from "./provider.ts";
-import type { ChatParams, Model, StreamEvent } from "./types.ts";
+import { type Provider } from "./provider.ts";
+import { type ChatParams, type Model, type StreamEvent } from "./types.ts";
 import { streamError } from "./types.ts";
 
 /** Converts an abort signal into the error surfaced by a cancelled stream. */

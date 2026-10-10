@@ -3,8 +3,8 @@
 // intentionally read-only: adapters decide how to render or recover protocol
 // state from the event data.
 
-import type { SessionRunEvent } from "../session/session_events.ts";
-import type { RunEvent } from "./run_event.ts";
+import { type SessionRunEvent } from "../session/session_events.ts";
+import { type RunEvent } from "./run_event.ts";
 import {
   isTerminalRunState,
   RUN_STATE_CANCELLED,

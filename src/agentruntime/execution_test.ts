@@ -11,7 +11,7 @@ import {
   assertRejects,
   assertStringIncludes,
   assertThrows,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import {
   type Event as AgentEvent,
   EVENT_RETRY,
@@ -33,6 +33,7 @@ import {
   RUN_STATE_WAITING_APPROVAL,
   type RunState,
 } from "./run_state.ts";
+import { test } from "#testing";
 
 function makeRun(partial: Partial<DurableRun>): DurableRun {
   return {
@@ -143,7 +144,7 @@ class IntentRunStore extends RecordingDurableRunStore {
   }
 }
 
-Deno.test("execution runtime exclusive begin and finish", () => {
+test("execution runtime exclusive begin and finish", () => {
   const runtime = new ExecutionRuntime();
   const ctx = runtime.begin(undefined, "run-1");
   assert(ctx !== undefined);
@@ -158,7 +159,7 @@ Deno.test("execution runtime exclusive begin and finish", () => {
   runtime.begin(undefined, "run-2");
 });
 
-Deno.test("execution runtime cancel needs explicit terminal state", () => {
+test("execution runtime cancel needs explicit terminal state", () => {
   const runtime = new ExecutionRuntime();
   const ctx = runtime.begin(undefined, "run-1");
   assert(runtime.cancel());
@@ -168,7 +169,7 @@ Deno.test("execution runtime cancel needs explicit terminal state", () => {
   assertEquals(runtime.stateValue(), RUN_STATE_CANCELLED);
 });
 
-Deno.test("execution runtime wait and resume", () => {
+test("execution runtime wait and resume", () => {
   const runtime = new ExecutionRuntime();
   runtime.begin(undefined, "run-1");
   assertEquals(runtime.stateValue(), RUN_STATE_RUNNING);
@@ -180,7 +181,7 @@ Deno.test("execution runtime wait and resume", () => {
   runtime.finish("run-1");
 });
 
-Deno.test("execution runtime explicit terminal states", () => {
+test("execution runtime explicit terminal states", () => {
   const runtime = new ExecutionRuntime();
   runtime.begin(undefined, "run-1");
   runtime.finishWithState("run-1", RUN_STATE_FAILED);
@@ -188,7 +189,7 @@ Deno.test("execution runtime explicit terminal states", () => {
   assertThrows(() => runtime.finishWithState("run-1", RUN_STATE_COMPLETED));
 });
 
-Deno.test("execution runtime finish ignores different run", () => {
+test("execution runtime finish ignores different run", () => {
   const runtime = new ExecutionRuntime();
   runtime.begin(undefined, "run-1");
   runtime.finish("other");
@@ -196,7 +197,7 @@ Deno.test("execution runtime finish ignores different run", () => {
   assert(active.active && active.runId === "run-1");
 });
 
-Deno.test("execution runtime begin and finish with events", () => {
+test("execution runtime begin and finish with events", () => {
   const sink = new RecordingRunEventSink();
   const runtime = new ExecutionRuntime();
   runtime.setEventSink(sink);
@@ -225,7 +226,7 @@ Deno.test("execution runtime begin and finish with events", () => {
   assertEquals(sink.events[1].runId, "run-1");
 });
 
-Deno.test("execution runtime wait sees terminal transition", async () => {
+test("execution runtime wait sees terminal transition", async () => {
   const runtime = new ExecutionRuntime();
   runtime.begin(undefined, "run-wait");
   const finished = (async () => {
@@ -237,7 +238,7 @@ Deno.test("execution runtime wait sees terminal transition", async () => {
   assertEquals(runtime.stateValue(), RUN_STATE_COMPLETED);
 });
 
-Deno.test("execution runtime begin durable uses atomic start store", () => {
+test("execution runtime begin durable uses atomic start store", () => {
   const store = new AtomicStartRunStore();
   const runtime = new ExecutionRuntime();
   runtime.setRunStore(store);
@@ -265,7 +266,7 @@ Deno.test("execution runtime begin durable uses atomic start store", () => {
   assertEquals(store.atomicEvent?.id ?? "", "");
 });
 
-Deno.test("execution runtime durable lifecycle", () => {
+test("execution runtime durable lifecycle", () => {
   const store = new RecordingDurableRunStore();
   const sink = new RecordingRunEventSink();
   const runtime = new ExecutionRuntime();
@@ -302,7 +303,7 @@ Deno.test("execution runtime durable lifecycle", () => {
   assertEquals(sink.events[1].status, RUN_STATE_COMPLETED);
 });
 
-Deno.test("execution runtime update durable persists running", () => {
+test("execution runtime update durable persists running", () => {
   const store = new RecordingDurableRunStore();
   const runtime = new ExecutionRuntime();
   runtime.setRunStore(store);
@@ -325,12 +326,12 @@ Deno.test("execution runtime update durable persists running", () => {
   assertEquals(store.finished[0].state, RUN_STATE_RUNNING);
 });
 
-Deno.test("execution runtime update durable rejects terminal state", () => {
+test("execution runtime update durable rejects terminal state", () => {
   const runtime = new ExecutionRuntime();
   assertThrows(() => runtime.updateDurable("run-1", RUN_STATE_COMPLETED, ""));
 });
 
-Deno.test("execution runtime cancel durable persists cancelling", () => {
+test("execution runtime cancel durable persists cancelling", () => {
   const store = new RecordingDurableRunStore();
   const runtime = new ExecutionRuntime();
   runtime.setRunStore(store);
@@ -352,7 +353,7 @@ Deno.test("execution runtime cancel durable persists cancelling", () => {
   assertEquals(store.finished[0].state, RUN_STATE_CANCELLING);
 });
 
-Deno.test("execution runtime durable begin compensates create failure", () => {
+test("execution runtime durable begin compensates create failure", () => {
   const store = new RecordingDurableRunStore();
   store.createErr = new Error("write failed");
   const runtime = new ExecutionRuntime();
@@ -376,7 +377,7 @@ Deno.test("execution runtime durable begin compensates create failure", () => {
   assertEquals(runtime.stateValue(), RUN_STATE_FAILED);
 });
 
-Deno.test("a one-active-run conflict surfaces as a busy session, not raw SQL", () => {
+test("a one-active-run conflict surfaces as a busy session, not raw SQL", () => {
   // The partial unique index enforces at most one non-terminal run per
   // session. When `-c`/`-r` resume a session that is live in another window,
   // the insert collision must reach the user as an actionable busy state.
@@ -410,7 +411,7 @@ Deno.test("a one-active-run conflict surfaces as a busy session, not raw SQL", (
   assert(!runtime.active().active);
 });
 
-Deno.test("execution runtime intent admission and linked retry", () => {
+test("execution runtime intent admission and linked retry", () => {
   const store = new IntentRunStore();
   const runtime = new ExecutionRuntime();
   runtime.setRunStore(store);
@@ -475,7 +476,7 @@ Deno.test("execution runtime intent admission and linked retry", () => {
   assertEquals(store.created[1].retryOf, "run-1");
 });
 
-Deno.test("execution runtime observe agent event persists retry and safe terminal error", () => {
+test("execution runtime observe agent event persists retry and safe terminal error", () => {
   const store = new ObservationRunStore();
   const sink = new RecordingRunEventSink();
   const runtime = new ExecutionRuntime();
@@ -556,7 +557,7 @@ Deno.test("execution runtime observe agent event persists retry and safe termina
   assertEquals(JSON.stringify(store.progress[1]), "{}");
 });
 
-Deno.test("execution runtime shutdown persists terminal event and is idempotent", async () => {
+test("execution runtime shutdown persists terminal event and is idempotent", async () => {
   const store = new ObservationRunStore();
   const sink = new RecordingRunEventSink();
   const runtime = new ExecutionRuntime();
@@ -598,7 +599,7 @@ Deno.test("execution runtime shutdown persists terminal event and is idempotent"
   assertEquals(store.errors[0].code, data.errorInfo.code);
 });
 
-Deno.test("execution runtime shutdown waits for bound agent loop", async () => {
+test("execution runtime shutdown waits for bound agent loop", async () => {
   const runtime = new ExecutionRuntime();
   const ctx = runtime.begin(undefined, "run-shutdown");
   runtime.setAgent({ abort: () => {} });

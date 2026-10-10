@@ -1,8 +1,8 @@
 // Shared helpers for the openai subprovider tests (ported from the Go
 // provider_test.go helper section).
 
-import type { HttpClient } from "../http_client.ts";
-import type { ChatParams, Model, StreamEvent } from "../types.ts";
+import { type HttpClient } from "../http_client.ts";
+import { type ChatParams, type Model, type StreamEvent } from "../types.ts";
 import { parseJsonRecord } from "../../util/json.ts";
 import { createOpenAIProvider, type Provider } from "./provider.ts";
 

@@ -1,7 +1,7 @@
 // the workflow
 // AgentHost binding to AgentManager and the end-to-end workflow_run tool.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
 import { createMockProvider } from "../provider/mock.ts";
 import {
@@ -10,7 +10,7 @@ import {
   streamStart,
   streamTextDelta,
 } from "../provider/mod.ts";
-import type { Model } from "../provider/types.ts";
+import { type Model } from "../provider/types.ts";
 import {
   createManager as newSandboxManager,
   Level,
@@ -20,7 +20,7 @@ import {
   createAgentFactory,
 } from "../agent/factory.ts";
 import { createAgentManager } from "../agent/manager.ts";
-import type { Event } from "../agent/events.ts";
+import { type Event } from "../agent/events.ts";
 import { emptyCompaction } from "../agent/agent_testutil.ts";
 import { AgentHost, workflowAgentID } from "./agent_host.ts";
 import { createRunTool } from "./tools.ts";
@@ -31,6 +31,7 @@ import {
   statusDone,
   type Store,
 } from "./types.ts";
+import { test } from "#testing";
 
 function probeModel(): Model {
   return {
@@ -105,7 +106,7 @@ class MemoryStore implements Store {
   }
 }
 
-Deno.test("AgentHost uses the DSL name for the agent id", async () => {
+test("AgentHost uses the DSL name for the agent id", async () => {
   const manager = buildManager();
   const events: Event[] = [];
   const sink = (ev: Event) => {
@@ -131,7 +132,7 @@ Deno.test("AgentHost uses the DSL name for the agent id", async () => {
   );
 });
 
-Deno.test("workflowAgentID includes the instance key", () => {
+test("workflowAgentID includes the instance key", () => {
   assertEquals(
     workflowAgentID("handler-audit", "r1"),
     "agent-handler-audit[r1]",
@@ -140,7 +141,7 @@ Deno.test("workflowAgentID includes the instance key", () => {
   assertEquals(workflowAgentID("", "r1"), "");
 });
 
-Deno.test("workflow_run tool executes a read-only audit end to end", async () => {
+test("workflow_run tool executes a read-only audit end to end", async () => {
   const manager = buildManager();
   const store = new MemoryStore();
   const active = createActiveRegistry();
@@ -166,7 +167,7 @@ Deno.test("workflow_run tool executes a read-only audit end to end", async () =>
   assertEquals(state.phases!.length, 2);
 });
 
-Deno.test("workflow_run rejects an empty source", async () => {
+test("workflow_run rejects an empty source", async () => {
   const manager = buildManager();
   const tool = createRunTool(
     manager,

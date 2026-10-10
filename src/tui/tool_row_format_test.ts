@@ -1,7 +1,7 @@
 // Focused tests for tool_row_format.ts: verifies the Ink tool rows match the
 // Go TUI's renderToolResult behavior per tool type/status/compact mode.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { Translator } from "./i18n.ts";
 import {
   formatToolRow,
@@ -9,6 +9,7 @@ import {
   type ToolRowInput,
   toolSectionValue,
 } from "./tool_row_format.ts";
+import { test } from "#testing";
 
 const tr = new Translator("en");
 
@@ -25,7 +26,7 @@ function input(partial: Partial<ToolRowInput>): ToolRowInput {
   };
 }
 
-Deno.test("plan rows render the checklist and compact progress", () => {
+test("plan rows render the checklist and compact progress", () => {
   const planData = {
     title: "My plan",
     note: "",
@@ -48,7 +49,7 @@ Deno.test("plan rows render the checklist and compact progress", () => {
   assertEquals(compact, "[plan] My plan (1/2)");
 });
 
-Deno.test("header includes the path argument", () => {
+test("header includes the path argument", () => {
   assertEquals(
     toolHeader(input({ toolName: "read", toolArgs: { path: "src/a.ts" } })),
     "[read] src/a.ts",
@@ -56,7 +57,7 @@ Deno.test("header includes the path argument", () => {
   assertEquals(toolHeader(input({ toolName: "bash" })), "[bash]");
 });
 
-Deno.test("bash running shows the command and running state", () => {
+test("bash running shows the command and running state", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -69,7 +70,7 @@ Deno.test("bash running shows the command and running state", () => {
   assert(row.includes("[bash] npm run build (running)"), row);
 });
 
-Deno.test("bash multiline command is flattened with semicolons", () => {
+test("bash multiline command is flattened with semicolons", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -84,7 +85,7 @@ Deno.test("bash multiline command is flattened with semicolons", () => {
   assert(row.includes("(succeeded)"), row);
 });
 
-Deno.test("bash failed exit code is reflected", () => {
+test("bash failed exit code is reflected", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -97,7 +98,7 @@ Deno.test("bash failed exit code is reflected", () => {
   assert(row.includes("(exit 2)"), row);
 });
 
-Deno.test("grep running shows the pattern", () => {
+test("grep running shows the pattern", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -111,7 +112,7 @@ Deno.test("grep running shows the pattern", () => {
   assert(row.includes("TODO"), row);
 });
 
-Deno.test("edit shows path and diff stat", () => {
+test("edit shows path and diff stat", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -134,7 +135,7 @@ Deno.test("edit shows path and diff stat", () => {
   assert(row.includes("Edited src/a.ts (+3 -1)"), row);
 });
 
-Deno.test("unified diff excerpt carries line numbers", () => {
+test("unified diff excerpt carries line numbers", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -158,7 +159,7 @@ Deno.test("unified diff excerpt carries line numbers", () => {
   assert(row.includes("1   +done"), row);
 });
 
-Deno.test("interrupted non-bash row shows canceled state", () => {
+test("interrupted non-bash row shows canceled state", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -171,7 +172,7 @@ Deno.test("interrupted non-bash row shows canceled state", () => {
   assertEquals(row, "[write] x canceled");
 });
 
-Deno.test("failed non-bash rows show canonical error state", () => {
+test("failed non-bash rows show canonical error state", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -183,7 +184,7 @@ Deno.test("failed non-bash rows show canonical error state", () => {
   assertEquals(row, "[read] error\n---\ntool output");
 });
 
-Deno.test("compact mode forces a single-line summary", () => {
+test("compact mode forces a single-line summary", () => {
   const row = formatToolRow(
     tr,
     input({
@@ -196,12 +197,12 @@ Deno.test("compact mode forces a single-line summary", () => {
   assertEquals(row, "[read] x line1");
 });
 
-Deno.test("toolSectionValue reads the line after a marker", () => {
+test("toolSectionValue reads the line after a marker", () => {
   assertEquals(toolSectionValue("a\n[exit_code]\n7\nb", "[exit_code]"), "7");
   assertEquals(toolSectionValue("nothing", "[exit_code]"), "");
 });
 
-Deno.test("empty summary falls back to ellipsis", () => {
+test("empty summary falls back to ellipsis", () => {
   const row = formatToolRow(tr, input({ toolName: "ls" }), false);
   assertEquals(row, "[ls] ...");
 });
@@ -226,7 +227,7 @@ const bashResult = (
     String(exitCode),
   ].join("\n");
 
-Deno.test("compact bash row excerpts stdout, never the section markers", () => {
+test("compact bash row excerpts stdout, never the section markers", () => {
   const full = bashResult("hello from stdout\nmore");
   const row = formatToolRow(
     tr,
@@ -243,7 +244,7 @@ Deno.test("compact bash row excerpts stdout, never the section markers", () => {
   assert(!row.includes("[stdout]"), row);
 });
 
-Deno.test("compact bash row falls back to stderr when stdout is empty", () => {
+test("compact bash row falls back to stderr when stdout is empty", () => {
   const full = bashResult("(no output)", "boom: things broke", 1);
   const row = formatToolRow(
     tr,
@@ -258,7 +259,7 @@ Deno.test("compact bash row falls back to stderr when stdout is empty", () => {
   assertEquals(row, "[bash] false (exit 1) boom: things broke");
 });
 
-Deno.test("compact bash row omits the summary when there is no output", () => {
+test("compact bash row omits the summary when there is no output", () => {
   const full = bashResult("(no output)");
   const row = formatToolRow(
     tr,
@@ -273,7 +274,7 @@ Deno.test("compact bash row omits the summary when there is no output", () => {
   assertEquals(row, "[bash] true (succeeded)");
 });
 
-Deno.test("compact bash row drops the marker text of a started job", () => {
+test("compact bash row drops the marker text of a started job", () => {
   const started =
     "[runtime]\nbash\n[command]\nnpm run dev\nUse 'jobs' tool to check status or 'kill' to stop.";
   const row = formatToolRow(
@@ -289,7 +290,7 @@ Deno.test("compact bash row drops the marker text of a started job", () => {
   assertEquals(row, "[bash] npm run dev (started)");
 });
 
-Deno.test("compact bash excerpt truncates a single long stdout line", () => {
+test("compact bash excerpt truncates a single long stdout line", () => {
   const full = bashResult("x".repeat(400));
   const row = formatToolRow(
     tr,
@@ -306,7 +307,7 @@ Deno.test("compact bash excerpt truncates a single long stdout line", () => {
   assertEquals(excerpt.slice(-3), "...");
 });
 
-Deno.test("full bash row keeps the whole structured result", () => {
+test("full bash row keeps the whole structured result", () => {
   const full = bashResult("hello from stdout\nmore");
   const row = formatToolRow(
     tr,
@@ -321,7 +322,7 @@ Deno.test("full bash row keeps the whole structured result", () => {
   assertEquals(row, `[bash] deno task check (succeeded)\n${full}`);
 });
 
-Deno.test("running rows prefix the spinner before the running label", () => {
+test("running rows prefix the spinner before the running label", () => {
   const bash = formatToolRow(
     tr,
     input({

@@ -1,11 +1,12 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   describeIndexRepair,
   recordIndexRepair,
   takeIndexRepairs,
 } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("describeIndexRepair names the path and quotes the cause", () => {
+test("describeIndexRepair names the path and quotes the cause", () => {
   assertEquals(
     describeIndexRepair({
       path: "/data/sessions.db",
@@ -28,7 +29,7 @@ Deno.test("describeIndexRepair names the path and quotes the cause", () => {
 
 // TestTakeIndexRepairsDrainsOnce guards the "never silent, never twice"
 // contract headless entry points rely on.
-Deno.test("takeIndexRepairs drains the log exactly once", () => {
+test("takeIndexRepairs drains the log exactly once", () => {
   takeIndexRepairs();
 
   recordIndexRepair({

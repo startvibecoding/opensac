@@ -1,11 +1,12 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 // TestRuntimeLeaseRenewKeepsOwnExpiredRow guards the heartbeat fencing rules:
 // an expired row that still carries the owner's identity stays renewable, while
 // a displaced owner (epoch bumped by Acquire) can never renew again.
-Deno.test("runtime lease renew keeps own expired row", () => {
+test("runtime lease renew keeps own expired row", () => {
   const database = openTestDb();
   try {
     const leaseDAO = new RuntimeLeaseDAO(database);

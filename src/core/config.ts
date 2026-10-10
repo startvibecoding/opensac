@@ -1,4 +1,4 @@
-import type { Settings } from "../config/settings.ts";
+import { type Settings } from "../config/settings.ts";
 
 /** User-configurable settings for the shared Core process. */
 export interface CoreSettings {

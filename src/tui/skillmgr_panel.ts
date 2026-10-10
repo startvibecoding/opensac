@@ -10,8 +10,8 @@
 // own. Feature-forced builtin skills are shown as locked because their
 // activation is owned by feature flags, not this panel.
 
-import type { TUISkillView } from "./service.ts";
-import type { KeyEvent } from "./keys.ts";
+import { type TUISkillView } from "./service.ts";
+import { type KeyEvent } from "./keys.ts";
 import type { Translator } from "./i18n.ts";
 import { truncateDisplay } from "./formatters.ts";
 import { clampWidth, frame, visibleRange } from "./dialog.ts";

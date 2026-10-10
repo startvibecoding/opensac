@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { projectSkillDirs } from "../skills/skills.ts";
 import { createMemoryCache, MemoryCache } from "./cache.ts";
 import { createClawHubClient } from "./clawhub.ts";
@@ -10,19 +10,18 @@ import {
 } from "./install.ts";
 import { LocalIndex, readMetadata, versionsDiffer } from "./local.ts";
 import { createSkillHubClient } from "./skillhubcn.ts";
-import type {
-  Category,
-  InstalledState,
-  Market,
-  MarketClient,
-  MarketInfo,
-  SearchPage,
-  SearchQuery,
-  SkillDetail,
-  SkillId,
-  SkillSummary,
-  UserSkillsQuery,
-} from "./types.ts";
+import {
+  type Category,
+  type InstalledState,
+  type Market,
+  type MarketClient,
+  type MarketInfo,
+  type SearchPage,
+  type SearchQuery,
+  type SkillDetail,
+  type SkillId,
+  type SkillSummary,
+  type UserSkillsQuery} from "./types.ts";
 
 /** Re-exported installer request/result types. */
 export type { InstallRequest, InstallResult };

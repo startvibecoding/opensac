@@ -12,7 +12,7 @@ import {
   type ToolResult,
 } from "../tools/tool.ts";
 import { truncateWithSuffix } from "../util/truncate.ts";
-import type { CronJob, CronStore } from "./cron.ts";
+import { type CronJob, type CronStore } from "./cron.ts";
 import { userVisibleJobs } from "./maintenance.ts";
 import { parseSchedule } from "./schedule.ts";
 

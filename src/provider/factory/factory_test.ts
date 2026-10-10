@@ -1,7 +1,7 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../../compat/assert.ts";
 import { defaultSettings, type Settings } from "../../config/mod.ts";
 import { MockProvider } from "../mock.ts";
-import type { Model } from "../types.ts";
+import { type Model } from "../types.ts";
 import {
   convertModelConfigs,
   create,
@@ -10,6 +10,7 @@ import {
   resolveModel,
   sortProviderIDs,
 } from "./factory.ts";
+import { test } from "#testing";
 
 function model(id: string, provider = "openai"): Model {
   return {
@@ -24,7 +25,7 @@ function model(id: string, provider = "openai"): Model {
   };
 }
 
-Deno.test("ParseQualifiedModel", () => {
+test("ParseQualifiedModel", () => {
   const parsed = parseQualifiedModel("openai/gpt-5/coding");
   assert(parsed !== undefined);
   assertEquals(parsed!.providerName, "openai");
@@ -32,7 +33,7 @@ Deno.test("ParseQualifiedModel", () => {
   assertEquals(parseQualifiedModel("gpt-5"), undefined);
 });
 
-Deno.test("ResolveModelRejectsInvalidAndForeignModels", () => {
+test("ResolveModelRejectsInvalidAndForeignModels", () => {
   const p = new MockProvider("openai", [model("valid", "openai")], []);
   let error: Error | undefined;
   try {
@@ -54,7 +55,7 @@ Deno.test("ResolveModelRejectsInvalidAndForeignModels", () => {
   assertEquals(resolved.id, "valid");
 });
 
-Deno.test("ConvertModelConfigsPreservesCompat", () => {
+test("ConvertModelConfigsPreservesCompat", () => {
   const models = convertModelConfigs("test", [{
     id: "m1",
     name: "M1",
@@ -73,7 +74,7 @@ Deno.test("ConvertModelConfigsPreservesCompat", () => {
   assertEquals(compat!.maxTokensField, "max_completion_tokens");
 });
 
-Deno.test("CreateOpenAIResponsesProvider", () => {
+test("CreateOpenAIResponsesProvider", () => {
   const settings: Settings = {
     providers: {
       "openai-responses-test": {
@@ -93,7 +94,7 @@ Deno.test("CreateOpenAIResponsesProvider", () => {
   assertEquals(result.model.id, "gpt-test");
 });
 
-Deno.test("CreateFallbackToFirstModel", () => {
+test("CreateFallbackToFirstModel", () => {
   const settings: Settings = {
     providers: {
       "custom-provider": {
@@ -116,7 +117,7 @@ Deno.test("CreateFallbackToFirstModel", () => {
   assert(available.length > 0);
 });
 
-Deno.test("CreatePreservesUnknownModelID", () => {
+test("CreatePreservesUnknownModelID", () => {
   const settings: Settings = {
     providers: {
       "custom-provider": {
@@ -133,7 +134,7 @@ Deno.test("CreatePreservesUnknownModelID", () => {
   );
 });
 
-Deno.test("CreateRejectsUnknownProvider", () => {
+test("CreateRejectsUnknownProvider", () => {
   const settings = defaultSettings();
   let error: Error | undefined;
   try {
@@ -145,7 +146,7 @@ Deno.test("CreateRejectsUnknownProvider", () => {
   assert(error!.message.includes("unknown provider"));
 });
 
-Deno.test("ResolvedModelsMatchesFactoryProviderList", () => {
+test("ResolvedModelsMatchesFactoryProviderList", () => {
   const settings = defaultSettings();
   settings.providers = {
     anthropic: { apiKey: "fake-key", models: [] },
@@ -172,7 +173,7 @@ Deno.test("ResolvedModelsMatchesFactoryProviderList", () => {
   assertEquals(resolvedModels(settings, "unknown-no-preset"), []);
 });
 
-Deno.test("SortProviderIDsUsesSharedPriority", () => {
+test("SortProviderIDsUsesSharedPriority", () => {
   const ids = ["zz-custom", "openai", "moark", "anthropic", "aa-custom"];
   sortProviderIDs(ids);
   assertEquals(ids, ["moark", "openai", "anthropic", "aa-custom", "zz-custom"]);

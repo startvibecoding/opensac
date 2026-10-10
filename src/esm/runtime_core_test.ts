@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { wrapError } from "../provider/errors.ts";
 import {
   createRoleIncompleteError,
@@ -26,6 +26,7 @@ import {
   RuntimeTestAdapter,
   RuntimeTestEvents,
 } from "./test_helpers.ts";
+import { test } from "#testing";
 
 const continueResponse =
   '{"status":"continue","summary":"progress","evidence":["inspection"],"remaining_work":["finish"],"blockers":[]}';
@@ -34,19 +35,19 @@ const completeWorkerResponse =
 const passReview = (review: string) =>
   `{"verdict":"pass","review":"${review}","requirements_checked":["objective -> covered"],"missing_work":[],"evidence":["read source"]}`;
 
-Deno.test("RoleContext leaves long-running roles without a deadline", () => {
+test("RoleContext leaves long-running roles without a deadline", () => {
   const scope = roleContext(undefined, roleWorker);
   assertEquals(scope.timeoutMs, 0);
   assert(!scope.signal.aborted);
 });
 
-Deno.test("RoleContext bounds the recovery observer", () => {
+test("RoleContext bounds the recovery observer", () => {
   const scope = roleContext(undefined, roleRecovery);
   assertEquals(scope.timeoutMs, recoveryObserverTimeout);
   scope.cancel();
 });
 
-Deno.test("Supervisor worker continue stops at active", async () => {
+test("Supervisor worker continue stops at active", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -61,7 +62,7 @@ Deno.test("Supervisor worker continue stops at active", async () => {
   }
 });
 
-Deno.test("Supervisor completion uses critic then audit", async () => {
+test("Supervisor completion uses critic then audit", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -83,7 +84,7 @@ Deno.test("Supervisor completion uses critic then audit", async () => {
   }
 });
 
-Deno.test("Supervisor publishes lifecycle events", async () => {
+test("Supervisor publishes lifecycle events", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -103,7 +104,7 @@ Deno.test("Supervisor publishes lifecycle events", async () => {
   }
 });
 
-Deno.test("Supervisor repeated recovery stays active and uses observer", async () => {
+test("Supervisor repeated recovery stays active and uses observer", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -125,7 +126,7 @@ Deno.test("Supervisor repeated recovery stays active and uses observer", async (
   }
 });
 
-Deno.test("Supervisor incomplete role recovers and keeps objective active", async () => {
+test("Supervisor incomplete role recovers and keeps objective active", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -142,7 +143,7 @@ Deno.test("Supervisor incomplete role recovers and keeps objective active", asyn
   }
 });
 
-Deno.test("Supervisor keeps the objective active for every provider transport prefix", async () => {
+test("Supervisor keeps the objective active for every provider transport prefix", async () => {
   // Regression for the `send request:` literal gate: an Anthropic `send:` and a
   // mid-stream `stream read error:` carry the same socket fault and must NOT
   // terminalize a long task onto the paused branch.
@@ -174,7 +175,7 @@ Deno.test("Supervisor keeps the objective active for every provider transport pr
   }
 });
 
-Deno.test("Supervisor does not retry an explicit cancellation hidden under fetch failed", async () => {
+test("Supervisor does not retry an explicit cancellation hidden under fetch failed", async () => {
   // Regression for the top-level-only isCanceled: a provider renames a user
   // cancel into `fetch failed` with the AbortError on `cause`. The widened
   // transport classifier must still recognize it as a stop, not a retry.
@@ -203,7 +204,7 @@ Deno.test("Supervisor does not retry an explicit cancellation hidden under fetch
   }
 });
 
-Deno.test("Supervisor roles use unbounded long-task iterations", async () => {
+test("Supervisor roles use unbounded long-task iterations", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -229,7 +230,7 @@ Deno.test("Supervisor roles use unbounded long-task iterations", async () => {
   }
 });
 
-Deno.test("Supervisor non-retryable failure pauses until explicit resume", async () => {
+test("Supervisor non-retryable failure pauses until explicit resume", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -247,7 +248,7 @@ Deno.test("Supervisor non-retryable failure pauses until explicit resume", async
   }
 });
 
-Deno.test("Supervisor shared store persists across runtime instances", async () => {
+test("Supervisor shared store persists across runtime instances", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -274,7 +275,7 @@ Deno.test("Supervisor shared store persists across runtime instances", async () 
   }
 });
 
-Deno.test("Supervisor rejected completions continue across continuations", async () => {
+test("Supervisor rejected completions continue across continuations", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");
@@ -297,7 +298,7 @@ Deno.test("Supervisor rejected completions continue across continuations", async
   }
 });
 
-Deno.test("Supervisor blocked audit accumulates across continuations", async () => {
+test("Supervisor blocked audit accumulates across continuations", async () => {
   const { store, sessionID } = makeStore("opensac-esm-rt-");
   try {
     store.create(sessionID, "finish the objective");

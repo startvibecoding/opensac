@@ -4,7 +4,7 @@
 // Manager is replaced with direct entry slices so the portable replay engine is
 // exercised on its own.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   entryCompaction,
   entryContentOverride,
@@ -12,13 +12,14 @@ import {
   type MessageEntry,
 } from "./entry.ts";
 import { createCost, createUserMessage } from "../provider/types.ts";
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import {
   buildReplayState,
   getEntryMetadata,
   lastSummarizedEntryIDLocked,
   latestCompactionLocked,
 } from "./replay.ts";
+import { test } from "#testing";
 
 function messageEntry(
   id: string,
@@ -34,7 +35,7 @@ function messageEntry(
   };
 }
 
-Deno.test("buildReplayState returns messages with entry IDs", () => {
+test("buildReplayState returns messages with entry IDs", () => {
   const entries = [
     messageEntry("e1", null, createUserMessage("hello")),
     messageEntry("e2", "e1", createUserMessage("world")),
@@ -45,7 +46,7 @@ Deno.test("buildReplayState returns messages with entry IDs", () => {
   assertEquals(state.entryIDs, ["e1", "e2"]);
 });
 
-Deno.test("content override replaces message but preserves the target entry ID", () => {
+test("content override replaces message but preserves the target entry ID", () => {
   const original: Message = {
     role: "toolResult",
     content: "[Image file: /tmp/x.png]",
@@ -86,7 +87,7 @@ Deno.test("content override replaces message but preserves the target entry ID",
   assertEquals(state.entryIDs, ["e1", "e2"]);
 });
 
-Deno.test("compaction with empty first-kept entry collapses to the summary", () => {
+test("compaction with empty first-kept entry collapses to the summary", () => {
   const entries = [
     messageEntry("e1", null, createUserMessage("a")),
     messageEntry("e2", "e1", createUserMessage("b")),
@@ -107,7 +108,7 @@ Deno.test("compaction with empty first-kept entry collapses to the summary", () 
   assertEquals(state.entryIDs, [""]);
 });
 
-Deno.test("compaction keeps the tail after first-kept and drops usage", () => {
+test("compaction keeps the tail after first-kept and drops usage", () => {
   const used = createUserMessage("kept");
   used.usage = {
     input: 5,
@@ -140,7 +141,7 @@ Deno.test("compaction keeps the tail after first-kept and drops usage", () => {
   assertEquals(state.entryIDs, ["", "e2", "e3"]);
 });
 
-Deno.test("compaction with a missing first-kept entry keeps the full history", () => {
+test("compaction with a missing first-kept entry keeps the full history", () => {
   const entries = [
     messageEntry("e1", null, createUserMessage("a")),
     {
@@ -165,7 +166,7 @@ Deno.test("compaction with a missing first-kept entry keeps the full history", (
   }
 });
 
-Deno.test("replay isolates cloned messages from stored entries", () => {
+test("replay isolates cloned messages from stored entries", () => {
   const stored = createUserMessage("hello");
   stored.contents = [{ type: "text", text: "hello" }];
   const state = buildReplayState([messageEntry("e1", null, stored)]);
@@ -173,7 +174,7 @@ Deno.test("replay isolates cloned messages from stored entries", () => {
   assertEquals(stored.contents![0].text, "hello");
 });
 
-Deno.test("latestCompactionLocked returns the newest compaction entry", () => {
+test("latestCompactionLocked returns the newest compaction entry", () => {
   const entries = [
     {
       type: entryCompaction,
@@ -201,7 +202,7 @@ Deno.test("latestCompactionLocked returns the newest compaction entry", () => {
   assertEquals(latestCompactionLocked([]), null);
 });
 
-Deno.test("lastSummarizedEntryIDLocked resolves the boundary message", () => {
+test("lastSummarizedEntryIDLocked resolves the boundary message", () => {
   const entries = [
     messageEntry("e1", null, createUserMessage("a")),
     messageEntry("e2", "e1", createUserMessage("b")),
@@ -214,7 +215,7 @@ Deno.test("lastSummarizedEntryIDLocked resolves the boundary message", () => {
   assertEquals(lastSummarizedEntryIDLocked(entries, ""), "e3");
 });
 
-Deno.test("getEntryMetadata reads id/type/parent/time from a plain entry", () => {
+test("getEntryMetadata reads id/type/parent/time from a plain entry", () => {
   const ts = new Date("2026-02-03T04:05:06Z");
   const meta = getEntryMetadata({
     type: "message",

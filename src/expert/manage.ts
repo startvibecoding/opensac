@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { type Manifest, sourceGlobal, sourceProject } from "./expert.ts";
 import { agentsDirName, loadBundle, manifestFileName } from "./bundle.ts";
 import {
@@ -7,7 +7,7 @@ import {
   listOSLayer,
   validateBundleNameOrThrow,
 } from "./center.ts";
-import type { Summary } from "./expert.ts";
+import { type Summary } from "./expert.ts";
 
 /**
  * Identifies the writable expert layer. Builtin bundles deliberately do not

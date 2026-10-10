@@ -5,7 +5,8 @@
 //
 // Prints the resolved version with `deno task version` / `deno run scripts/version.ts`.
 
-import { fromFileUrl, join, resolve } from "@opensac/path";
+import { fromFileUrl, join, resolve } from "../src/compat/path.ts";
+import { isMainModule } from "../src/platform/node_compat.ts";
 
 /**
  * Picks the newest tag from `git tag --list 'v*' --sort=-v:refname` output.
@@ -66,7 +67,7 @@ export function toPackageVersion(buildVersion: string): string {
     .replace(/-dirty$/, "");
 }
 
-if (import.meta.main) {
+if (isMainModule(import.meta.url)) {
   const repoDir = resolve(fromFileUrl(new URL("..", import.meta.url)));
   console.log(await resolveBuildVersion(repoDir));
 }

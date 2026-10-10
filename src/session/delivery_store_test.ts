@@ -3,7 +3,7 @@
 // completed Run through `CreateSessionRun`. This port uses a
 // literal session ID with the same completed Run.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { createSessionRun, type SessionRun } from "./run_store.ts";
 import {
@@ -23,6 +23,7 @@ import {
 import { openRootDB } from "./root_db.ts";
 import { writeRootDatabase } from "./database.ts";
 import { DeliveryDAO } from "../dao/mod.ts";
+import { test } from "#testing";
 
 function baseRun(overrides: Partial<SessionRun>): SessionRun {
   return {
@@ -168,7 +169,7 @@ function intentStatus(sessionDir: string, intentId: string): string {
   return row?.status ?? "";
 }
 
-Deno.test("delivery claim fences expired worker and honors dependency", () => {
+test("delivery claim fences expired worker and honors dependency", () => {
   const { sessionDir, sessionId } = deliveryFixture();
   try {
     const plan = createDeliveryFixturePlan(sessionDir, sessionId);
@@ -259,7 +260,7 @@ Deno.test("delivery claim fences expired worker and honors dependency", () => {
   }
 });
 
-Deno.test("delivery claim can recover expired lease", () => {
+test("delivery claim can recover expired lease", () => {
   const { sessionDir, sessionId } = deliveryFixture();
   try {
     const plan = createDeliveryFixturePlan(sessionDir, sessionId);
@@ -300,7 +301,7 @@ Deno.test("delivery claim can recover expired lease", () => {
   }
 });
 
-Deno.test("uploaded phase counts as terminal after dependent send", () => {
+test("uploaded phase counts as terminal after dependent send", () => {
   const { sessionDir, sessionId } = deliveryFixture();
   try {
     const plan = createDeliveryFixturePlan(sessionDir, sessionId);
@@ -363,7 +364,7 @@ Deno.test("uploaded phase counts as terminal after dependent send", () => {
   }
 });
 
-Deno.test("delivery failure cascades to dependent operation", () => {
+test("delivery failure cascades to dependent operation", () => {
   const { sessionDir, sessionId } = deliveryFixture();
   try {
     const plan = createDeliveryFixturePlan(sessionDir, sessionId);
@@ -399,7 +400,7 @@ Deno.test("delivery failure cascades to dependent operation", () => {
   }
 });
 
-Deno.test("uncertain delivery cascades uncertain dependent", () => {
+test("uncertain delivery cascades uncertain dependent", () => {
   const { sessionDir, sessionId } = deliveryFixture();
   try {
     const plan = createDeliveryFixturePlan(sessionDir, sessionId);
@@ -435,7 +436,7 @@ Deno.test("uncertain delivery cascades uncertain dependent", () => {
   }
 });
 
-Deno.test("reopen failed delivery operation restarts retry window", () => {
+test("reopen failed delivery operation restarts retry window", () => {
   const { sessionDir } = deliveryFixture();
   try {
     createDeliveryFixturePlan(sessionDir, "delivery-session");
@@ -494,7 +495,7 @@ Deno.test("reopen failed delivery operation restarts retry window", () => {
   }
 });
 
-Deno.test("list failed transient delivery operations", () => {
+test("list failed transient delivery operations", () => {
   const { sessionDir } = deliveryFixture();
   try {
     createDeliveryFixturePlan(sessionDir, "delivery-session");
@@ -547,7 +548,7 @@ Deno.test("list failed transient delivery operations", () => {
   }
 });
 
-Deno.test("reopen failed delivery operation recovers dependent failures", () => {
+test("reopen failed delivery operation recovers dependent failures", () => {
   const { sessionDir } = deliveryFixture();
   try {
     createDeliveryFixturePlan(sessionDir, "delivery-session");
@@ -588,7 +589,7 @@ Deno.test("reopen failed delivery operation recovers dependent failures", () => 
   }
 });
 
-Deno.test("reopen failed delivery operation refuses permanent failures", () => {
+test("reopen failed delivery operation refuses permanent failures", () => {
   const { sessionDir } = deliveryFixture();
   try {
     createDeliveryFixturePlan(sessionDir, "delivery-session");

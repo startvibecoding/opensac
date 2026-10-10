@@ -4,9 +4,9 @@
 // points: a `RunHandle` for the ExecutionRuntime/DecisionService bridge and
 // callbacks for messages/spinner. The Ink layer subscribes and renders.
 
-import type { Event } from "../agentruntime/events.ts";
-import type { TaskPlan } from "../tools/tool.ts";
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type Event } from "../agentruntime/events.ts";
+import { type TaskPlan } from "../tools/tool.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import {
   EVENT_DONE,
   EVENT_ERROR,
@@ -30,8 +30,8 @@ import {
   TASK_SUCCESS,
   type TaskStatus,
 } from "../agentruntime/events.ts";
-import type { RunState } from "../agentruntime/run_state.ts";
-import type { ContextUsage } from "../context/context.ts";
+import { type RunState } from "../agentruntime/run_state.ts";
+import { type ContextUsage } from "../context/context.ts";
 import {
   DECISION_APPROVAL,
   DECISION_QUESTION,
@@ -40,7 +40,7 @@ import {
 import { AgentActivityStore } from "./activity.ts";
 import { ActivityManager } from "./activity_manager.ts";
 import { type MessageKind, TranscriptStore } from "./transcript_store.ts";
-import type { TUICoreConnectionState } from "./service.ts";
+import { type TUICoreConnectionState } from "./service.ts";
 import { Translator } from "./i18n.ts";
 
 export type { MessageKind };

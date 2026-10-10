@@ -6,7 +6,7 @@
 // this codec carries raw JSON documents as strings and exposes
 // `toJSON()`/parse helpers where a decoded value is required.
 
-import type { ContentBlock, Message } from "../types.ts";
+import { type ContentBlock, type Message } from "../types.ts";
 
 /** Clones a string map (undefined stays undefined). */
 export function cloneStringMap(

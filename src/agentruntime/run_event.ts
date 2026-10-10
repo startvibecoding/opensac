@@ -4,7 +4,7 @@
 // by this runtime boundary. Go's `json.RawMessage` maps to decoded `unknown`;
 // `time.Time` maps to `Date`.
 //
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import {
   saveSessionRunEvent,
   type SessionRunEvent,

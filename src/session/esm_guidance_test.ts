@@ -1,12 +1,13 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   consumeESMGuidance,
   listESMGuidance,
   saveESMGuidance,
 } from "./esm_guidance.ts";
+import { test } from "#testing";
 
-Deno.test("ESM guidance lifecycle", () => {
+test("ESM guidance lifecycle", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-esm-guidance-" });
   try {
     // Ensures the schema exists before querying.

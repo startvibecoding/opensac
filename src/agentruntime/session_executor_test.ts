@@ -1,5 +1,5 @@
 // deno-lint-ignore-file require-await -- async fake driver models the Promise-based executor seam
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   EVENT_QUESTION_REQUEST,
   EVENT_RUN_FINISHED,
@@ -12,6 +12,7 @@ import {
   SessionExecutor,
   type SessionExecutorEvent,
 } from "./session_executor.ts";
+import { test } from "#testing";
 
 class FakeDriver implements SessionExecutionDriver {
   released = 0;
@@ -56,7 +57,7 @@ class FakeDriver implements SessionExecutionDriver {
   }
 }
 
-Deno.test("fromAgentEvent preserves stream deltas and terminal status", () => {
+test("fromAgentEvent preserves stream deltas and terminal status", () => {
   const delta = fromAgentEvent({
     type: EVENT_TEXT_DELTA,
     textDelta: "hello",
@@ -72,7 +73,7 @@ Deno.test("fromAgentEvent preserves stream deltas and terminal status", () => {
   assertEquals(finished.terminal, true);
   assertEquals(finished.payload.status, "success");
 });
-Deno.test("fromAgentEvent preserves interactive approval and question fields", () => {
+test("fromAgentEvent preserves interactive approval and question fields", () => {
   const approval = fromAgentEvent({
     type: EVENT_TOOL_APPROVAL_REQUEST,
     approvalId: "approval-1",
@@ -94,7 +95,7 @@ Deno.test("fromAgentEvent preserves interactive approval and question fields", (
   assertEquals(question.payload.questionOptions, ["yes", "no"]);
 });
 
-Deno.test("SessionExecutor consumes one terminal event and releases admission", async () => {
+test("SessionExecutor consumes one terminal event and releases admission", async () => {
   const driver = new FakeDriver();
   const events: SessionExecutorEvent[] = [];
   const executor = new SessionExecutor({

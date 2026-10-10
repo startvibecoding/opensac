@@ -1,9 +1,10 @@
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { type MCPServer, saveMCPConfig } from "../config/mcp.ts";
 import { isTemplateServer, loadConfiguredServers } from "./config.ts";
+import { test } from "#testing";
 
-Deno.test("isTemplateServer", () => {
+test("isTemplateServer", () => {
   const cases: Array<{ name: string; srv: MCPServer; want: boolean }> = [
     {
       name: "real stdio",
@@ -40,7 +41,7 @@ Deno.test("isTemplateServer", () => {
   }
 });
 
-Deno.test("loadConfiguredServers skips disabled entries", () => {
+test("loadConfiguredServers skips disabled entries", () => {
   const configDir = Deno.makeTempDirSync();
   const projectDir = Deno.makeTempDirSync();
   const prev = Deno.env.get("OPENSAC_DIR");

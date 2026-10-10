@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 
 const gitAccessStore = new WeakMap<AbortSignal, boolean>();
 

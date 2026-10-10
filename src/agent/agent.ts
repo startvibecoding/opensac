@@ -38,7 +38,7 @@ import {
   type ToolDefinition,
   type Usage,
 } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   defaultToolExecutionMaxConcurrency,
   getProviderConfig,
@@ -46,7 +46,7 @@ import {
   toolExecutionEffectiveMaxConcurrency,
   toolExecutionEffectiveMode,
 } from "../config/settings.ts";
-import type { AllowConfig } from "../config/allow.ts";
+import { type AllowConfig } from "../config/allow.ts";
 import {
   type CompactionSettings,
   hasCompactableMessages,
@@ -58,9 +58,9 @@ import {
   contextUsageFromMessages,
 } from "../context/context.ts";
 import { resolveTokenEstimator } from "../context/tokenizer.ts";
-import type { Hint } from "../imageproc/mod.ts";
+import { type Hint } from "../imageproc/mod.ts";
 import { type Registry, type ToolContext } from "../tools/tool.ts";
-import type { Sandbox } from "../sandbox/sandbox.ts";
+import { type Sandbox } from "../sandbox/sandbox.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
 import { type IterationBudgetPolicy } from "./iteration_budget.ts";
@@ -101,7 +101,7 @@ import {
   EVENT_QUESTION_REQUEST,
   EVENT_TOOL_APPROVAL_REQUEST,
 } from "./events.ts";
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import {
   contextWithSignal,
   createRunContext,
@@ -190,7 +190,7 @@ import {
   createRegistry,
   type Tool,
 } from "../tools/tool.ts";
-import type { FileDiff, QuestionAsker, TaskPlan } from "../tools/mod.ts";
+import { type FileDiff, type QuestionAsker, type TaskPlan } from "../tools/mod.ts";
 import { createNoneSandbox } from "../sandbox/none.ts";
 import { contextWithGitAccess, gitAccessRequired } from "../sandbox/git.ts";
 import { Level } from "../sandbox/sandbox.ts";

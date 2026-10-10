@@ -9,7 +9,7 @@ import {
   RuntimeSubmissionConflictError,
 } from "../session/runtime_submission.ts";
 import { listSessionRunEvents } from "../session/session_events.ts";
-import type { SessionRun } from "../session/run_store.ts";
+import { type SessionRun } from "../session/run_store.ts";
 import { getDurableRun } from "./run_queries.ts";
 
 /**

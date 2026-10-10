@@ -12,7 +12,7 @@ import {
   RunDAO,
   RuntimeLeaseDAO,
 } from "../dao/mod.ts";
-import type { Tx } from "../dao/mod.ts";
+import { type Tx } from "../dao/mod.ts";
 import { entryTurnEnd, generateID, type TurnEndEntry } from "./entry.ts";
 import {
   appendTurnEntryTx,
@@ -24,7 +24,7 @@ import { isNonTerminalSessionRunStatus } from "./run_status.ts";
 import { allowedRunPredecessors, type SessionRun } from "./run_store.ts";
 import { normalizedRunJSON } from "./run_json.ts";
 import { validateRuntimeLeaseBindingTx } from "./runtime_lock.ts";
-import type { SessionRunEvent } from "./session_events.ts";
+import { type SessionRunEvent } from "./session_events.ts";
 
 /** The lifecycle state of a durable recovery attempt. */
 export type SessionRunRecoveryState =

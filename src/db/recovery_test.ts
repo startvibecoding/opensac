@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   closeAll,
   describeMigrationRecovery,
@@ -12,8 +12,9 @@ import {
   takeMigrationRecoveries,
 } from "./mod.ts";
 import { recordMigrationRecovery } from "./recovery.ts";
+import { test } from "#testing";
 
-Deno.test("describeMigrationRecovery covers peer, fresh, and backup rebuilds", () => {
+test("describeMigrationRecovery covers peer, fresh, and backup rebuilds", () => {
   assertEquals(
     describeMigrationRecovery({
       path: "/data/sessions.db",
@@ -58,7 +59,7 @@ Deno.test("describeMigrationRecovery covers peer, fresh, and backup rebuilds", (
 
 // TestSchemaIncompatibleSurvivesWrapping pins the errors.As-style marker walk:
 // the rebuild decision must still be visible through %w-style wrapping.
-Deno.test("isSchemaIncompatible walks the wrapped cause chain", () => {
+test("isSchemaIncompatible walks the wrapped cause chain", () => {
   assertEquals(isSchemaIncompatible(schemaIncompatible(undefined)), false);
   assertEquals(isSchemaIncompatible(undefined), false);
   assertEquals(isSchemaIncompatible(null), false);
@@ -79,7 +80,7 @@ Deno.test("isSchemaIncompatible walks the wrapped cause chain", () => {
 
 // TestMigrationRecoveryLogDrainsOnce guards the "tell the user exactly once"
 // contract: migrationRecoveries observes without draining, take drains.
-Deno.test("migration recovery log observes and drains", () => {
+test("migration recovery log observes and drains", () => {
   takeMigrationRecoveries();
   const seen: string[] = [];
   setMigrationRecoveryNotifier((recovery) => seen.push(recovery.path));
@@ -105,7 +106,7 @@ Deno.test("migration recovery log observes and drains", () => {
   }
 });
 
-Deno.test("removeDatabaseFiles removes the database and its sidecars", () => {
+test("removeDatabaseFiles removes the database and its sidecars", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-db-remove-test-" });
   const path = `${dir}/sessions.db`;
   try {
@@ -135,7 +136,7 @@ Deno.test("removeDatabaseFiles removes the database and its sidecars", () => {
 // TestRecoverFromMigrationFailureSnapshotsAndClears exercises the real rebuild
 // path: the connection is snapshotted with VACUUM INTO, closed, and the
 // unrecoverable file set is deleted so the next open starts clean.
-Deno.test("recoverFromMigrationFailure snapshots and clears the database", () => {
+test("recoverFromMigrationFailure snapshots and clears the database", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-db-recovery-test-" });
   const path = `${dir}/sessions.db`;
   try {

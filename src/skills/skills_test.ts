@@ -1,7 +1,7 @@
 // (representative subset).
 
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   builtinFS,
   createManager,
@@ -13,6 +13,7 @@ import {
   projectSkillDirs,
   type SkillFS,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function writeSkill(
   dir: string,
@@ -50,7 +51,7 @@ function memoryFS(files: Record<string, string>): SkillFS {
   };
 }
 
-Deno.test("projectSkillDirs includes agents skills", () => {
+test("projectSkillDirs includes agents skills", () => {
   const root = "/tmp/proj";
   assertEquals(projectSkillDirs(root), [
     path.join(root, ".opensac", "skills"),
@@ -61,14 +62,14 @@ Deno.test("projectSkillDirs includes agents skills", () => {
   assertEquals(projectSkillDirs(""), []);
 });
 
-Deno.test("load discovers built-in skills", () => {
+test("load discovers built-in skills", () => {
   const m = createManager("", []);
   m.load();
   assert(m.get(expertCreaterSkillName));
   assertEquals(m.listBySource("builtin").length >= 2, true);
 });
 
-Deno.test("loadFromDir loads skill and its references", () => {
+test("loadFromDir loads skill and its references", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(
@@ -90,7 +91,7 @@ Deno.test("loadFromDir loads skill and its references", () => {
   assertEquals(s.references[0].path, "references/a.md");
 });
 
-Deno.test("project dirs precedence overrides same name", () => {
+test("project dirs precedence overrides same name", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const globalDir = path.join(tmp, "global");
   const projDir = path.join(tmp, "proj");
@@ -101,7 +102,7 @@ Deno.test("project dirs precedence overrides same name", () => {
   assertEquals(m.get("dup")!.content.includes("Project"), true);
 });
 
-Deno.test("get/list/listBySource/names", () => {
+test("get/list/listBySource/names", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(dir, "b", "# B\n");
@@ -115,7 +116,7 @@ Deno.test("get/list/listBySource/names", () => {
   assertEquals(m.list().map((s) => s.name).includes("a"), true);
 });
 
-Deno.test("loadFS validates directory", () => {
+test("loadFS validates directory", () => {
   const m = new Manager("", []);
   const fsys = memoryFS({ "skills/x/SKILL.md": "# X\n" });
   // A missing dir is tolerated.
@@ -132,7 +133,7 @@ Deno.test("loadFS validates directory", () => {
   });
 });
 
-Deno.test("loadFS loads embedded skill and reference", () => {
+test("loadFS loads embedded skill and reference", () => {
   const fsys = memoryFS({
     "skills/alpha/SKILL.md": "# Alpha\n\n- [基础](references/base.md)\n",
     "skills/alpha/references/base.md": "BASE",
@@ -144,13 +145,13 @@ Deno.test("loadFS loads embedded skill and reference", () => {
   assertEquals(m.loadReference("alpha", "references/base.md"), "BASE");
 });
 
-Deno.test("extractDescription", () => {
+test("extractDescription", () => {
   assertEquals(extractDescription("# Title\n\nbody"), "Title");
   assertEquals(extractDescription("\n\nplain line\n"), "plain line");
   assertEquals(extractDescription(""), "(no description)");
 });
 
-Deno.test("parseReferences", () => {
+test("parseReferences", () => {
   const content = [
     "### 1. 基础 (references/base.md) [已加载]",
     "",
@@ -174,7 +175,7 @@ Deno.test("parseReferences", () => {
   assertEquals(parseReferences("no refs here", "/skill", undefined).length, 0);
 });
 
-Deno.test("buildSkillContext with references", () => {
+test("buildSkillContext with references", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(
@@ -201,7 +202,7 @@ Deno.test("buildSkillContext with references", () => {
   assertEquals(m.buildSkillContext("missing"), "");
 });
 
-Deno.test("loadReference direct file and path escape", () => {
+test("loadReference direct file and path escape", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(dir, "d", "# D\n", { "references/extra.md": "EXTRA" });
@@ -212,7 +213,7 @@ Deno.test("loadReference direct file and path escape", () => {
   assertEquals(m.loadReference("nope", "x.md"), undefined);
 });
 
-Deno.test("buildAllSkillsContext includes built-ins", () => {
+test("buildAllSkillsContext includes built-ins", () => {
   const m = createManager("", []);
   m.load();
   const ctx = m.buildAllSkillsContext();
@@ -220,13 +221,13 @@ Deno.test("buildAllSkillsContext includes built-ins", () => {
   assert(ctx.includes(expertCreaterSkillName));
 });
 
-Deno.test("createProjectSkillsDir", () => {
+test("createProjectSkillsDir", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   createProjectSkillsDir(tmp);
   assert(Deno.statSync(path.join(tmp, ".skills")).isDirectory);
 });
 
-Deno.test("load applies global disabled skills", () => {
+test("load applies global disabled skills", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
   const configDir = path.join(tmp, "config");
   Deno.mkdirSync(configDir, { recursive: true });
@@ -256,7 +257,7 @@ Deno.test("load applies global disabled skills", () => {
   }
 });
 
-Deno.test("builtinFS readDir/readFile", () => {
+test("builtinFS readDir/readFile", () => {
   const entries = builtinFS.readDir("builtin")!;
   assert(entries.some((e) => e.name === expertCreaterSkillName && e.isDir));
   assert(builtinFS.readFile("builtin/missing/SKILL.md") === undefined);

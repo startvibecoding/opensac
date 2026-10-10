@@ -12,7 +12,7 @@ import {
 import { nonTerminalSessionRunStatuses } from "./run_status.ts";
 import { type SessionRun, sessionRunFromRecord } from "./run_store.ts";
 import { runtimeDatabaseIdentityFor } from "./runtime_lock.ts";
-import type { RuntimeLeasePurpose } from "./runtime_lock.ts";
+import { type RuntimeLeasePurpose } from "./runtime_lock.ts";
 
 /**
  * An immutable database view of one Session lease. `tokenHash` is an internal

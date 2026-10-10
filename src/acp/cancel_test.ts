@@ -2,17 +2,18 @@
 // (`acquirePromptAdmission`). Fixtures construct an `AcpServer`, bind an
 // in-memory sink, and call the handlers directly.
 
-import { assertEquals, assertRejects } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assertEquals, assertRejects } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   ACPActiveSessionRunError,
   AcpServer,
   type AcpServerSink,
   ACPSessionRuntime,
 } from "./server.ts";
-import type { ACPRPCRequest } from "./wire.ts";
-import type { Settings } from "../config/settings.ts";
+import { type ACPRPCRequest } from "./wire.ts";
+import { type Settings } from "../config/settings.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
+import { test } from "#testing";
 
 class SyncBuffer implements AcpServerSink {
   #buf = "";
@@ -49,7 +50,7 @@ function parseMessages(output: string): Record<string, unknown>[] {
   return messages;
 }
 
-Deno.test("$/cancel_request cancels the matching prompt", () => {
+test("$/cancel_request cancels the matching prompt", () => {
   let cancelled = false;
   const server = new AcpServer();
   const rt = new ACPSessionRuntime();
@@ -64,7 +65,7 @@ Deno.test("$/cancel_request cancels the matching prompt", () => {
   assertEquals(cancelled, true);
 });
 
-Deno.test("$/cancel_request releases a pending reverse request", () => {
+test("$/cancel_request releases a pending reverse request", () => {
   const server = new AcpServer();
   let payload: unknown;
   server.pending.set("prompt-1", (value) => {
@@ -77,7 +78,7 @@ Deno.test("$/cancel_request releases a pending reverse request", () => {
   assertEquals(server.pending.has("prompt-1"), false);
 });
 
-Deno.test("session/cancel rejects invalid and unknown sessions", () => {
+test("session/cancel rejects invalid and unknown sessions", () => {
   const output = new SyncBuffer();
   const server = new AcpServer();
   server.sink = output;
@@ -93,7 +94,7 @@ Deno.test("session/cancel rejects invalid and unknown sessions", () => {
   assertEquals(err.code, -32000);
 });
 
-Deno.test("session/cancel aborts the session's cancel handle", () => {
+test("session/cancel aborts the session's cancel handle", () => {
   const output = new SyncBuffer();
   const server = new AcpServer();
   server.sink = output;
@@ -110,7 +111,7 @@ Deno.test("session/cancel aborts the session's cancel handle", () => {
   assertEquals(message.result, {});
 });
 
-Deno.test("acquirePromptAdmission fences concurrent local runs", async () => {
+test("acquirePromptAdmission fences concurrent local runs", async () => {
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-admission-" });
   const sessionDir = path.join(root, "sessions");
   Deno.mkdirSync(sessionDir, { recursive: true });
@@ -133,7 +134,7 @@ Deno.test("acquirePromptAdmission fences concurrent local runs", async () => {
   Deno.removeSync(root, { recursive: true });
 });
 
-Deno.test("acquirePromptAdmission rejects an unbound runtime", async () => {
+test("acquirePromptAdmission rejects an unbound runtime", async () => {
   const server = new AcpServer();
   const rt = new ACPSessionRuntime();
   await assertRejects(

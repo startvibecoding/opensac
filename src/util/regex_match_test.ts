@@ -5,13 +5,14 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import {
   createUserRegExpMatcher,
   RegExpMatchTimeoutError,
   userRegExpMatchBudgetMs,
 } from "./regex_match.ts";
 import { regexWorkerSource } from "./regex_worker_source.ts";
+import { test } from "#testing";
 
 function referenceMatches(
   pattern: string,
@@ -27,7 +28,7 @@ function referenceMatches(
   return out;
 }
 
-Deno.test("UserRegExpMatcher matches exactly like an in-process RegExp", async () => {
+test("UserRegExpMatcher matches exactly like an in-process RegExp", async () => {
   const lines = [
     "package main",
     "func Hello() {}",
@@ -55,7 +56,7 @@ Deno.test("UserRegExpMatcher matches exactly like an in-process RegExp", async (
   }
 });
 
-Deno.test("UserRegExpMatcher spans multiple chunks and returns local indices", async () => {
+test("UserRegExpMatcher spans multiple chunks and returns local indices", async () => {
   const lines: string[] = [];
   for (let i = 0; i < 1300; i++) {
     lines.push(i % 7 === 0 ? `hit ${i}` : `miss ${i}`);
@@ -70,7 +71,7 @@ Deno.test("UserRegExpMatcher spans multiple chunks and returns local indices", a
   }
 });
 
-Deno.test("UserRegExpMatcher times out a catastrophic pattern instead of hanging", async () => {
+test("UserRegExpMatcher times out a catastrophic pattern instead of hanging", async () => {
   // `(a|a)+$` passes the compileUserRegExp shape screen but backtracks
   // exponentially against a long non-matching line.
   const matcher = createUserRegExpMatcher("(a|a)+$", "", { timeoutMs: 100 });
@@ -89,7 +90,7 @@ Deno.test("UserRegExpMatcher times out a catastrophic pattern instead of hanging
   await assertRejects(() => matcher.match(["abc"]), RegExpMatchTimeoutError);
 });
 
-Deno.test("UserRegExpMatcher rejects when the signal is already aborted", async () => {
+test("UserRegExpMatcher rejects when the signal is already aborted", async () => {
   const controller = new AbortController();
   controller.abort();
   const matcher = createUserRegExpMatcher("abc", "", {
@@ -102,7 +103,7 @@ Deno.test("UserRegExpMatcher rejects when the signal is already aborted", async 
   }
 });
 
-Deno.test("UserRegExpMatcher aborts an in-flight match via the signal", async () => {
+test("UserRegExpMatcher aborts an in-flight match via the signal", async () => {
   const controller = new AbortController();
   // A slow-but-finite pattern keeps the request in flight while we abort.
   const matcher = createUserRegExpMatcher("(a|a)+$", "", {
@@ -115,7 +116,7 @@ Deno.test("UserRegExpMatcher aborts an in-flight match via the signal", async ()
   matcher.close();
 });
 
-Deno.test("UserRegExpMatcher reports invalid patterns like compileUserRegExp", async () => {
+test("UserRegExpMatcher reports invalid patterns like compileUserRegExp", async () => {
   const matcher = createUserRegExpMatcher("(unclosed", "");
   try {
     await assertRejects(
@@ -128,19 +129,19 @@ Deno.test("UserRegExpMatcher reports invalid patterns like compileUserRegExp", a
   }
 });
 
-Deno.test("UserRegExpMatcher rejects use after close and tolerates double close", async () => {
+test("UserRegExpMatcher rejects use after close and tolerates double close", async () => {
   const matcher = createUserRegExpMatcher("abc");
   matcher.close();
   matcher.close();
   await assertRejects(() => matcher.match(["abc"]), Error, "closed");
 });
 
-Deno.test("UserRegExpMatcher default budget constant stays positive", () => {
+test("UserRegExpMatcher default budget constant stays positive", () => {
   assert(userRegExpMatchBudgetMs > 0);
   assertStringIncludes("regex matching timed out", "timed out");
 });
 
-Deno.test("inlined regex worker source stays in sync with regex_worker.js", async () => {
+test("inlined regex worker source stays in sync with regex_worker.js", async () => {
   const onDisk = await Deno.readTextFile(
     new URL("./regex_worker.js", import.meta.url),
   );

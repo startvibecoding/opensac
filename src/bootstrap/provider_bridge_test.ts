@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals } from "@opensac/assert";
+import { assertEquals, assertNotEquals } from "../compat/assert.ts";
 import {
   type ChatParams as PublicChatParams,
   type StreamEvent as PublicStreamEvent,
@@ -16,6 +16,7 @@ import {
   streamUsage as internalStreamUsage,
 } from "../provider/mod.ts";
 import { ProviderAdapter, streamEventTypeToPublic } from "./provider_bridge.ts";
+import { test } from "#testing";
 
 class ModelCaptureInternalProvider implements InternalProvider {
   modelId = "";
@@ -61,7 +62,7 @@ function publicParams(modelId: string): PublicChatParams {
   };
 }
 
-Deno.test("ProviderBridgePreservesModelID", async () => {
+test("ProviderBridgePreservesModelID", async () => {
   const internal = new ModelCaptureInternalProvider();
   const adapter = new ProviderAdapter(internal);
   for await (const _ev of adapter.chat(publicParams("Kimi-K2.5"))) {
@@ -86,7 +87,7 @@ class RetryMetadataInternalProvider extends ModelCaptureInternalProvider {
   }
 }
 
-Deno.test("ProviderBridgePreservesRetryMetadata", async () => {
+test("ProviderBridgePreservesRetryMetadata", async () => {
   const internal = new RetryMetadataInternalProvider();
   const adapter = new ProviderAdapter(internal);
   let retry: PublicStreamEvent | undefined;
@@ -101,7 +102,7 @@ Deno.test("ProviderBridgePreservesRetryMetadata", async () => {
   assertEquals(retry!.retryAfterMs, 1250);
 });
 
-Deno.test("ProviderBridgeMapsToolCallEvent", () => {
+test("ProviderBridgeMapsToolCallEvent", () => {
   assertEquals(
     streamEventTypeToPublic(internalStreamToolCall),
     publicStreamToolCall,

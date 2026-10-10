@@ -1,9 +1,10 @@
 // Focused tests for the compaction settings bridge (port of compaction.go).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { compactionSettingsFromConfig } from "./compaction.ts";
+import { test } from "#testing";
 
-Deno.test("compactionSettingsFromConfig copies every field", () => {
+test("compactionSettingsFromConfig copies every field", () => {
   assertEquals(
     compactionSettingsFromConfig({
       enabled: true,
@@ -24,7 +25,7 @@ Deno.test("compactionSettingsFromConfig copies every field", () => {
   );
 });
 
-Deno.test("compactionSettingsFromConfig keeps zero limits for later normalization", () => {
+test("compactionSettingsFromConfig keeps zero limits for later normalization", () => {
   assertEquals(
     compactionSettingsFromConfig({
       enabled: false,

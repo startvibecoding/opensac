@@ -7,7 +7,7 @@
 // loop to call next repeatedly and emits each persisted objective version at
 // most once.
 
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import { steeringMessage } from "./prompt.ts";
 import { type Objective, statusActive } from "./state.ts";
 import type { Store } from "./store.ts";

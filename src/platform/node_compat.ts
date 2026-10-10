@@ -1,15 +1,15 @@
-// Node runtime compatibility for the Deno APIs that `@deno/shim-deno` omits.
+// The single owner of the `Deno.*` API vocabulary for this repository.
 //
-// `@deno/shim-deno` covers only the file/env/process surface.
-// The product also uses `Deno.Command`, `Deno.execPath`, `Deno.args`,
-// `Deno.exit`, `Deno.serve`, `Deno.upgradeWebSocket`, `Deno.connect`,
-// `Deno.createHttpClient`, `Deno.SeekMode`, `Deno.unrefTimer`,
-// `Deno.resolveDns`, and the Web `Worker` global. This module installs those on
-// top of Node built-ins so the same sources run unmodified under Node.
+// There is no Deno runtime or registry dependency here: `src/platform/deno_shim.ts`
+// provides the file/env/process namespace backed by Node built-ins, and this
+// module adds the richer APIs the product uses — `Deno.Command`, `Deno.execPath`,
+// `Deno.args`, `Deno.exit`, `Deno.serve`, `Deno.upgradeWebSocket`, `Deno.connect`,
+// `Deno.createHttpClient`, `Deno.SeekMode`, `Deno.unrefTimer`, `Deno.resolveDns`,
+// and the Web `Worker` global — then installs the result as a process global
+// before any application module loads.
 //
-// It is imported for its side effect from the CLI entry. Under Deno every
-// needed API already exists, so installation returns immediately and this file
-// is a no-op there.
+// Every entry point must import it first: the whole source tree reads `Deno.*`
+// as a global, and under Node only this module makes that true.
 //
 // Known deviations from Deno under Node:
 //   * A `Deno.serve` bind failure (e.g. port in use) surfaces asynchronously
@@ -40,9 +40,9 @@ import { connect as netConnect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
-// The Deno global the sources read at runtime. esbuild leaves `Deno` as a
-// global reference; this module assigns it (from the shim) and extends it.
-import { Deno as denoGlobal } from "@deno/shim-deno";
+// The Deno namespace the sources read at runtime. esbuild leaves `Deno` as a
+// global reference; this module installs the shim object globally and extends it.
+import { denoNamespace } from "./deno_shim.ts";
 
 type AnyDeno = Record<string, any> & { serve?: unknown };
 
@@ -53,10 +53,6 @@ const upgradeContext = Symbol("opensacNodeUpgrade");
 /** Symbol marking a client produced by the `createHttpClient` shim. */
 const httpClientMarker = Symbol("opensacHttpClient");
 
-/** True when running under Node rather than Deno (no native `Deno.serve`). */
-function isNodeRuntime(deno: AnyDeno | undefined): boolean {
-  return deno === undefined || typeof deno.serve !== "function";
-}
 
 /**
  * Overwrites a member on the shim's `Deno` object. The shim defines most
@@ -611,15 +607,12 @@ function decodeDataURL(url: string): string {
 
 // ─── Install ───────────────────────────────────────────────────────────────
 
-/** Installs the missing Deno APIs onto the shim's `Deno` global. No-op on Deno. */
+/** Installs the Deno namespace (shim + extensions) as a process global. */
 export function installNodeDenoCompat(): void {
-  const deno = denoGlobal as AnyDeno;
-  if (!isNodeRuntime(deno)) return;
+  const deno = denoNamespace as AnyDeno;
 
-  // Expose it globally too, for code that reaches `globalThis.Deno`.
-  if (typeof (globalThis as any).Deno === "undefined") {
-    (globalThis as any).Deno = deno;
-  }
+  // Expose it globally, for code that reaches `Deno.*` as a global reference.
+  (globalThis as any).Deno = deno;
 
   override(deno, "Command", NodeCommand);
   override(deno, "execPath", () => process.execPath);
@@ -672,6 +665,4 @@ export function installNodeDenoCompat(): void {
   installFetchBridge();
 }
 
-if (isNodeRuntime(denoGlobal as AnyDeno)) {
-  installNodeDenoCompat();
-}
+installNodeDenoCompat();

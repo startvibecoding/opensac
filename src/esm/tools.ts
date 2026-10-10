@@ -2,7 +2,7 @@
 // The model-facing get_esm / update_esm tools plus the compact plain-text
 // objective renderer shared by TUI and tools.
 
-import type { Tool, ToolContext, ToolResult } from "../tools/mod.ts";
+import { type Tool, type ToolContext, type ToolResult } from "../tools/mod.ts";
 import { createTextToolResult } from "../tools/mod.ts";
 import {
   blockedAuditLimit,
@@ -36,10 +36,13 @@ export function createUpdateTool(
 }
 
 class GetTool implements Tool {
-  constructor(
-    private readonly store: Store | null,
-    private readonly sessionID: SessionIDFunc,
-  ) {}
+    private readonly store: Store | null;
+  private readonly sessionID: SessionIDFunc;
+
+  constructor(store: Store | null, sessionID: SessionIDFunc) {
+    this.store = store;
+    this.sessionID = sessionID;
+  }
 
   name(): string {
     return "get_esm";
@@ -85,11 +88,15 @@ class GetTool implements Tool {
 }
 
 class UpdateTool implements Tool {
-  constructor(
-    private readonly store: Store | null,
-    private readonly sessionID: SessionIDFunc,
-    private readonly runID: RunIDFunc | null,
-  ) {}
+    private readonly store: Store | null;
+  private readonly sessionID: SessionIDFunc;
+  private readonly runID: RunIDFunc | null;
+
+  constructor(store: Store | null, sessionID: SessionIDFunc, runID: RunIDFunc | null) {
+    this.store = store;
+    this.sessionID = sessionID;
+    this.runID = runID;
+  }
 
   name(): string {
     return "update_esm";

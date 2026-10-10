@@ -3,7 +3,7 @@
 // The Go tree has no dedicated MemoryStore test; these cases exercise the
 // interface contract the agent and TUI layers rely on.
 
-import { assert, assertEquals, assertNotEquals } from "@opensac/assert";
+import { assert, assertEquals, assertNotEquals } from "../compat/assert.ts";
 import {
   createAssistantMessage,
   createUserMessage,
@@ -11,8 +11,9 @@ import {
 import { MemoryStore } from "./store.ts";
 import { currentVersion } from "./store.ts";
 import { entrySession } from "./entry.ts";
+import { test } from "#testing";
 
-Deno.test("MemoryStore init generates a header at the current version", () => {
+test("MemoryStore init generates a header at the current version", () => {
   const store = new MemoryStore();
   store.init();
   const header = store.getHeader();
@@ -23,7 +24,7 @@ Deno.test("MemoryStore init generates a header at the current version", () => {
   assertEquals(store.getLeafID(), null);
 });
 
-Deno.test("MemoryStore initWithID keeps or generates the id", () => {
+test("MemoryStore initWithID keeps or generates the id", () => {
   const store = new MemoryStore();
   store.initWithID("fixed-id");
   assertEquals(store.getHeader()!.id, "fixed-id");
@@ -31,7 +32,7 @@ Deno.test("MemoryStore initWithID keeps or generates the id", () => {
   assertNotEquals(store.getHeader()!.id, "");
 });
 
-Deno.test("MemoryStore appends build a linked replay branch", () => {
+test("MemoryStore appends build a linked replay branch", () => {
   const store = new MemoryStore();
   store.initWithID("s-1");
   const first = store.appendMessage(createUserMessage("hello"));
@@ -47,7 +48,7 @@ Deno.test("MemoryStore appends build a linked replay branch", () => {
   assertEquals(state.entryIDs, [first, second]);
 });
 
-Deno.test("MemoryStore replays a compaction summary", () => {
+test("MemoryStore replays a compaction summary", () => {
   const store = new MemoryStore();
   store.initWithID("s-1");
   store.appendMessage(createUserMessage("dropped"));
@@ -64,7 +65,7 @@ Deno.test("MemoryStore replays a compaction summary", () => {
   assertEquals(compaction.firstKeptEntryId, kept);
 });
 
-Deno.test("MemoryStore latest bindings track the newest change", () => {
+test("MemoryStore latest bindings track the newest change", () => {
   const store = new MemoryStore();
   store.initWithID("s-1");
   store.appendModelChange("anthropic", "m1");
@@ -96,7 +97,7 @@ Deno.test("MemoryStore latest bindings track the newest change", () => {
   assertEquals(again.directories, ["/a", "/b"]);
 });
 
-Deno.test("MemoryStore reports no latest binding on an empty session", () => {
+test("MemoryStore reports no latest binding on an empty session", () => {
   const store = new MemoryStore();
   store.init();
   assertEquals(store.getLatestCompaction(), null);

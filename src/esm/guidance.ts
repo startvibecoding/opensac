@@ -3,7 +3,7 @@
 // The Store guidance methods (add/pending/consume) live in store.ts; this
 // module owns the prompt projection of queued guidance.
 
-import type { ESMGuidance } from "../session/mod.ts";
+import { type ESMGuidance } from "../session/mod.ts";
 
 /**
  * Renders queued user guidance as a prompt section. The guidance is user data:

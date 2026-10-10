@@ -15,11 +15,11 @@ import {
   createVertexProvider,
 } from "../google/provider.ts";
 import { createOpenAIProvider } from "../openai/provider.ts";
-import type { Provider } from "../provider.ts";
-import type { HTTPClientOptions } from "../http_client.ts";
-import type { RetryConfig } from "../retry.ts";
+import { type Provider } from "../provider.ts";
+import { type HTTPClientOptions } from "../http_client.ts";
+import { type RetryConfig } from "../retry.ts";
 import { resolveAdapterConfig } from "../vendor.ts";
-import type { Model, ModelCompat, ModelPricing } from "../types.ts";
+import { type Model, type ModelCompat, type ModelPricing } from "../types.ts";
 
 export type { RetryConfig };
 

@@ -2,20 +2,20 @@
 // rounded wire frame, list/detail/scope views, inline filter, pagination, and
 // install flow all run against a fake host with no network access.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { SkillHubPanel, type SkillHubPanelHost } from "./skillhub_panel.ts";
 import { Translator } from "./i18n.ts";
-import type { KeyEvent } from "./keys.ts";
-import type {
-  Category,
-  InstallRequest,
-  InstallResult,
-  Market,
-  MarketInfo,
-  SearchPage,
-  SkillDetail,
-  SkillSummary,
-} from "../skillhub/mod.ts";
+import { type KeyEvent } from "./keys.ts";
+import {
+  type Category,
+  type InstallRequest,
+  type InstallResult,
+  type Market,
+  type MarketInfo,
+  type SearchPage,
+  type SkillDetail,
+  type SkillSummary} from "../skillhub/mod.ts";
+import { test } from "#testing";
 
 const tr = new Translator("en");
 
@@ -129,7 +129,7 @@ async function flush(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-Deno.test("skillhub panel renders a framed list after loading", async () => {
+test("skillhub panel renders a framed list after loading", async () => {
   const host = new FakeHost();
   const panel = new SkillHubPanel(host, { close: () => {} });
   await flush();
@@ -144,7 +144,7 @@ Deno.test("skillhub panel renders a framed list after loading", async () => {
   );
 });
 
-Deno.test("skillhub panel filters with typed text after '/'", async () => {
+test("skillhub panel filters with typed text after '/'", async () => {
   const host = new FakeHost();
   const panel = new SkillHubPanel(host, { close: () => {} });
   await flush();
@@ -160,7 +160,7 @@ Deno.test("skillhub panel filters with typed text after '/'", async () => {
   assertEquals(panel.page().items.length, 1);
 });
 
-Deno.test("skillhub panel opens detail on Enter and installs via scope picker", async () => {
+test("skillhub panel opens detail on Enter and installs via scope picker", async () => {
   const host = new FakeHost();
   const panel = new SkillHubPanel(host, { close: () => {} });
   await flush();
@@ -194,7 +194,7 @@ Deno.test("skillhub panel opens detail on Enter and installs via scope picker", 
   );
 });
 
-Deno.test("skillhub panel escapes back through views and closes", async () => {
+test("skillhub panel escapes back through views and closes", async () => {
   const host = new FakeHost();
   let closed = false;
   const panel = new SkillHubPanel(host, { close: () => (closed = true) });

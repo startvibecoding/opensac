@@ -1,5 +1,5 @@
-import type { ProviderConfig } from "../config/mod.ts";
-import type { Provider } from "./provider.ts";
+import { type ProviderConfig } from "../config/mod.ts";
+import { type Provider } from "./provider.ts";
 import {
   getVendorAdapter,
   listVendorAdapters,

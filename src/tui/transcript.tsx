@@ -7,7 +7,7 @@
 
 import React from "react";
 import { Box, Static, Text } from "ink";
-import type { Theme } from "../tsm/mod.ts";
+import { type Theme } from "../tsm/mod.ts";
 import { renderMarkdown, renderStreamingMarkdown } from "./markdown.ts";
 
 /** One transcript entry: an assistant message or tool output block. */

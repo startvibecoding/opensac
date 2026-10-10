@@ -1,8 +1,9 @@
-import { assertEquals, assertStringIncludes } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { extractSection, Store } from "./store.ts";
+import { test } from "#testing";
 
-Deno.test("StoreReadWrite", () => {
+test("StoreReadWrite", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -21,7 +22,7 @@ Deno.test("StoreReadWrite", () => {
   assertStringIncludes(res.content, "- prefers Go");
 });
 
-Deno.test("StoreReadSection", () => {
+test("StoreReadSection", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -54,7 +55,7 @@ Deno.test("StoreReadSection", () => {
   assertEquals(section, "");
 });
 
-Deno.test("StoreAdd", () => {
+test("StoreAdd", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -76,7 +77,7 @@ Deno.test("StoreAdd", () => {
   assertStringIncludes(content, "- likes Go");
 });
 
-Deno.test("StoreUpdate", () => {
+test("StoreUpdate", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -96,7 +97,7 @@ Deno.test("StoreUpdate", () => {
   assertEquals(content.includes("v0.1.26"), false);
 });
 
-Deno.test("StoreUpdateOnlyWithinSection", () => {
+test("StoreUpdateOnlyWithinSection", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -120,7 +121,7 @@ Deno.test("StoreUpdateOnlyWithinSection", () => {
   assertStringIncludes(content, "## Working Memory\n\n- working fact");
 });
 
-Deno.test("StoreDelete", () => {
+test("StoreDelete", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -143,7 +144,7 @@ Deno.test("StoreDelete", () => {
   assertStringIncludes(content, "fact three");
 });
 
-Deno.test("StoreDeleteOnlyWithinSection", () => {
+test("StoreDeleteOnlyWithinSection", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -168,7 +169,7 @@ Deno.test("StoreDeleteOnlyWithinSection", () => {
   assertEquals(working.includes("shared fact"), false);
 });
 
-Deno.test("StoreWriteAllUsesReadPath", () => {
+test("StoreWriteAllUsesReadPath", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
   Deno.writeTextFileSync(p, "# old", { mode: 0o600 });
@@ -180,7 +181,7 @@ Deno.test("StoreWriteAllUsesReadPath", () => {
   assertEquals(got, "# new");
 });
 
-Deno.test("StoreAddNewSection", () => {
+test("StoreAddNewSection", () => {
   const dir = Deno.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
@@ -200,7 +201,7 @@ Deno.test("StoreAddNewSection", () => {
   assertStringIncludes(content, "- custom fact");
 });
 
-Deno.test("ExtractSection", () => {
+test("ExtractSection", () => {
   const content = `# Memory
 
 ## First

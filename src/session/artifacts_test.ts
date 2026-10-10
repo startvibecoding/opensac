@@ -1,8 +1,9 @@
-import { assertEquals, assertFalse } from "@opensac/assert";
+import { assertEquals, assertFalse } from "../compat/assert.ts";
 import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
 import { closeAll } from "../db/mod.ts";
 import { listGeneratedArtifacts, listSessionAttachments } from "./artifacts.ts";
 import { writeRootDatabase } from "./database.ts";
+import { test } from "#testing";
 
 function record(overrides: Partial<AttachmentRecord>): AttachmentRecord {
   return {
@@ -24,7 +25,7 @@ function record(overrides: Partial<AttachmentRecord>): AttachmentRecord {
   };
 }
 
-Deno.test("list generated artifacts filters status and session in creation order", () => {
+test("list generated artifacts filters status and session in creation order", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-artifacts";

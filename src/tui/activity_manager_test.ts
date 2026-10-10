@@ -2,7 +2,7 @@
 // fed by the AppController (tools, thinking, nesting, interruption) plus its
 // module-level singleton helpers.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   ActivityManager,
   formatElapsed,
@@ -11,8 +11,9 @@ import {
   isParentTool,
   resetActivityManager,
 } from "./activity_manager.ts";
+import { test } from "#testing";
 
-Deno.test("ActivityManager tracks tool executions with timing", () => {
+test("ActivityManager tracks tool executions with timing", () => {
   const am = new ActivityManager();
   const before = Date.now();
   am.startToolExecution("t1", "bash", { command: "ls" });
@@ -27,7 +28,7 @@ Deno.test("ActivityManager tracks tool executions with timing", () => {
   assertEquals(typeof items[0].elapsedMs, "number");
 });
 
-Deno.test("ActivityManager marks errored and interrupted tools", () => {
+test("ActivityManager marks errored and interrupted tools", () => {
   const am = new ActivityManager();
   am.startToolExecution("t1", "bash");
   am.completeToolExecution("t1", undefined, "boom");
@@ -43,7 +44,7 @@ Deno.test("ActivityManager marks errored and interrupted tools", () => {
   assertEquals(am.hasRunningActivities(), true);
 });
 
-Deno.test("ActivityManager honors canonical tool state without an Error", () => {
+test("ActivityManager honors canonical tool state without an Error", () => {
   const am = new ActivityManager();
   am.startToolExecution("failed", "read");
   am.completeToolExecution("failed", "failed", undefined, "failed");
@@ -54,7 +55,7 @@ Deno.test("ActivityManager honors canonical tool state without an Error", () => 
   assertEquals(items.find((i) => i.id === "stopped")?.status, "interrupted");
 });
 
-Deno.test("ActivityManager tracks thinking blocks and clears per turn", () => {
+test("ActivityManager tracks thinking blocks and clears per turn", () => {
   const am = new ActivityManager();
   am.startThinking("turn");
   am.appendThinking("turn", "why?");
@@ -79,7 +80,7 @@ Deno.test("ActivityManager tracks thinking blocks and clears per turn", () => {
   assertEquals(am.hasRunningActivities(), false);
 });
 
-Deno.test("ActivityManager nesting tracks parent depth", () => {
+test("ActivityManager nesting tracks parent depth", () => {
   const am = new ActivityManager();
   am.startToolExecution("parent", "task");
   am.startToolExecution("child", "bash", undefined, undefined, "parent");
@@ -88,14 +89,14 @@ Deno.test("ActivityManager nesting tracks parent depth", () => {
   assertEquals(items.find((i) => i.id === "child")?.parentId, "parent");
 });
 
-Deno.test("singleton accessor returns a stable instance; reset replaces it", () => {
+test("singleton accessor returns a stable instance; reset replaces it", () => {
   const first = getActivityManager();
   assertEquals(getActivityManager(), first);
   resetActivityManager();
   assert(getActivityManager() !== first);
 });
 
-Deno.test("format helpers render compact labels", () => {
+test("format helpers render compact labels", () => {
   assertEquals(formatElapsed(500), "<1s");
   assertEquals(formatElapsed(5000), "5s");
   assertEquals(formatElapsed(125000), "2m5s");

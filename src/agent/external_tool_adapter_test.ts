@@ -1,17 +1,17 @@
 // Focused tests for the public ExternalTool -> internal Tool adapter.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import type {
-  ExternalTool,
-  ExternalToolPromptInfo,
-} from "../../sdk/agent/external_tool.ts";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import {
+  type ExternalTool,
+  type ExternalToolPromptInfo} from "../../sdk/agent/external_tool.ts";
 import { createExternalToolAdapter } from "./external_tool_adapter.ts";
+import { test } from "#testing";
 
 function encode(value: unknown): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(value));
 }
 
-Deno.test("external adapter maps name/description and snippet fallback", () => {
+test("external adapter maps name/description and snippet fallback", () => {
   const tool: ExternalTool = {
     name: () => "host_tool",
     description: () => "does host things",
@@ -25,7 +25,7 @@ Deno.test("external adapter maps name/description and snippet fallback", () => {
   assertEquals(adapted.promptGuidelines(), []);
 });
 
-Deno.test("external adapter honors prompt info interface", () => {
+test("external adapter honors prompt info interface", () => {
   const tool: ExternalTool & ExternalToolPromptInfo = {
     name: () => "host_tool",
     description: () => "does host things",
@@ -39,7 +39,7 @@ Deno.test("external adapter honors prompt info interface", () => {
   assertEquals(adapted.promptGuidelines(), ["one", "two"]);
 });
 
-Deno.test("external adapter defaults empty parameters", () => {
+test("external adapter defaults empty parameters", () => {
   const tool: ExternalTool = {
     name: () => "t",
     description: () => "d",
@@ -50,7 +50,7 @@ Deno.test("external adapter defaults empty parameters", () => {
   assertEquals(adapted.parameters(), { type: "object", properties: {} });
 });
 
-Deno.test("external adapter maps results and errors", async () => {
+test("external adapter maps results and errors", async () => {
   const ok: ExternalTool = {
     name: () => "t",
     description: () => "d",
@@ -77,7 +77,7 @@ Deno.test("external adapter maps results and errors", async () => {
   );
 });
 
-Deno.test("external adapter maps image contents", async () => {
+test("external adapter maps image contents", async () => {
   const tool: ExternalTool = {
     name: () => "t",
     description: () => "d",

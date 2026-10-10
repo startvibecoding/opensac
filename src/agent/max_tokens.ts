@@ -1,4 +1,4 @@
-import type { Model } from "../provider/types.ts";
+import { type Model } from "../provider/types.ts";
 
 const defaultAutoMaxTokens = 8192;
 

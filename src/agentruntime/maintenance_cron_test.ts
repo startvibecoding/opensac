@@ -1,4 +1,4 @@
-import { assert, assertRejects } from "@opensac/assert";
+import { assert, assertRejects } from "../compat/assert.ts";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import {
   defaultMaintenancePolicy,
@@ -15,6 +15,7 @@ import {
 } from "./storage_reconcile.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
+import { test } from "#testing";
 
 function makeSessionRoot(): string {
   const root = Deno.makeTempDirSync({ prefix: "opensac-maint-" });
@@ -41,7 +42,7 @@ function writeArtifactDirectory(
   return path;
 }
 
-Deno.test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
+test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
   const policy = defaultMaintenancePolicy();
   const outside = await runMaintenanceCronJob(
     makeSessionRoot(),
@@ -71,7 +72,7 @@ Deno.test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
   );
 });
 
-Deno.test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
+test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
   const root = makeSessionRoot();
   const policy = defaultAttachmentPolicy();
   const aged = writeArtifactDirectory(
@@ -94,7 +95,7 @@ Deno.test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
   assert(Deno.statSync(aged), "a disabled policy still reclaimed storage");
 });
 
-Deno.test("maintenancePolicyFromSettings", () => {
+test("maintenancePolicyFromSettings", () => {
   const fromNil = maintenancePolicyFromSettings(undefined);
   assert(
     fromNil.reclaimAttachmentStorage === true &&
@@ -128,7 +129,7 @@ Deno.test("maintenancePolicyFromSettings", () => {
   );
 });
 
-Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
+test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
   const root = makeSessionRoot();
   const policy = defaultAttachmentPolicy();
   const aged = writeArtifactDirectory(
@@ -169,7 +170,7 @@ Deno.test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
   closeDatabases();
 });
 
-Deno.test("IsMaintenanceCronJobIDMatchesPrefixOnly", () => {
+test("IsMaintenanceCronJobIDMatchesPrefixOnly", () => {
   assert(isMaintenanceCronJobID(maintenanceStorageReconcileJobID()));
   assert(isMaintenanceCronJobID(MAINTENANCE_CRON_JOB_PREFIX + "anything"));
   assert(!isMaintenanceCronJobID("cron-user"));

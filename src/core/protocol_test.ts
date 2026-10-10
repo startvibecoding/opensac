@@ -3,7 +3,7 @@ import {
   assertEquals,
   assertMatch,
   assertThrows,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import {
   CORE_METHODS,
   coreError,
@@ -11,8 +11,9 @@ import {
   coreResult,
   parseCoreRpcMessage,
 } from "./protocol.ts";
+import { test } from "#testing";
 
-Deno.test("parses Core JSON-RPC requests", () => {
+test("parses Core JSON-RPC requests", () => {
   const message = parseCoreRpcMessage({
     jsonrpc: "2.0",
     id: 1,
@@ -25,7 +26,7 @@ Deno.test("parses Core JSON-RPC requests", () => {
   assertEquals(message?.params, { probe: true });
 });
 
-Deno.test("parses Core JSON-RPC notifications without ids", () => {
+test("parses Core JSON-RPC notifications without ids", () => {
   const message = parseCoreRpcMessage({
     jsonrpc: "2.0",
     method: "run.text_delta",
@@ -38,7 +39,7 @@ Deno.test("parses Core JSON-RPC notifications without ids", () => {
   assertEquals(message.params, { sequence: 1, text: "hello" });
 });
 
-Deno.test("parses successful and failed Core JSON-RPC responses", () => {
+test("parses successful and failed Core JSON-RPC responses", () => {
   const result = parseCoreRpcMessage({
     jsonrpc: "2.0",
     id: "request-1",
@@ -59,7 +60,7 @@ Deno.test("parses successful and failed Core JSON-RPC responses", () => {
   assertEquals(failure?.error?.data, { retry: false });
 });
 
-Deno.test("requires the JSON-RPC version and rejects malformed envelopes", () => {
+test("requires the JSON-RPC version and rejects malformed envelopes", () => {
   const invalidMessages: unknown[] = [
     { jsonrpc: "1.0", id: 1, method: "core.health" },
     { id: 1, result: {} },
@@ -104,7 +105,7 @@ Deno.test("requires the JSON-RPC version and rejects malformed envelopes", () =>
   }
 });
 
-Deno.test("preserves string and numeric request identity", () => {
+test("preserves string and numeric request identity", () => {
   const numeric = parseCoreRpcMessage({
     jsonrpc: "2.0",
     id: 1,
@@ -122,7 +123,7 @@ Deno.test("preserves string and numeric request identity", () => {
   assertEquals(typeof string?.id, "string");
 });
 
-Deno.test("encodes Core JSON-RPC response and notification envelopes", () => {
+test("encodes Core JSON-RPC response and notification envelopes", () => {
   assertEquals(coreResult("1", { healthy: true }), {
     jsonrpc: "2.0",
     id: "1",
@@ -159,7 +160,7 @@ Deno.test("encodes Core JSON-RPC response and notification envelopes", () => {
   });
 });
 
-Deno.test("keeps encoder output valid for optional and structured values", () => {
+test("keeps encoder output valid for optional and structured values", () => {
   assertThrows(() => coreResult(1, undefined));
   assertEquals(coreNotification("ready", undefined), {
     jsonrpc: "2.0",
@@ -175,7 +176,7 @@ Deno.test("keeps encoder output valid for optional and structured values", () =>
   });
 });
 
-Deno.test("uses the initial Core method constants", () => {
+test("uses the initial Core method constants", () => {
   assertEquals(CORE_METHODS, {
     health: "core.health",
     info: "core.info",

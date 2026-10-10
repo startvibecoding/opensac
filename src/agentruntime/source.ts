@@ -14,7 +14,7 @@ import {
   normalizeIterationBudgetPolicy,
 } from "../agent/iteration_budget.ts";
 import { type Binding, findBindingBySessionId } from "../session/bindings.ts";
-import type { Header } from "../session/entry.ts";
+import { type Header } from "../session/entry.ts";
 
 /** Identifies the runtime that owns a session's execution policy. */
 export type RuntimeSource = string;

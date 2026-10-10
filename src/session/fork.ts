@@ -15,8 +15,8 @@ import {
   SessionDAO,
 } from "../dao/mod.ts";
 import type { DB } from "../db/mod.ts";
-import type { Tx } from "../dao/mod.ts";
-import type { ContentBlock, Message } from "../provider/types.ts";
+import { type Tx } from "../dao/mod.ts";
+import { type ContentBlock, type Message } from "../provider/types.ts";
 import {
   type BranchSummaryEntry,
   entryAdditionalDirectories,

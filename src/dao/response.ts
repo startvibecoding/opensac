@@ -131,7 +131,11 @@ const stateColumns = `session_id AS sessionId, state_mode AS stateMode,
   updated_at AS updatedAt`;
 
 export class ResponseDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   linkedRun(
     executor: DB,

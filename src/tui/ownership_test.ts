@@ -5,8 +5,8 @@
 // `createAgentManager`, `createSession`, `DecisionService`). The canonical event
 // vocabulary arrives through `src/agentruntime/events.ts` instead.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
-import { fromFileUrl, join } from "@opensac/path";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { fromFileUrl, join } from "../compat/path.ts";
 import {
   importSpecifiers,
   isTuiFrontendPath,
@@ -15,6 +15,7 @@ import {
   tuiBoundaryViolations,
   type Violation,
 } from "../architecture/guard.ts";
+import { test } from "#testing";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
@@ -30,7 +31,7 @@ function task6Violations(root: string): Violation[] {
   return tuiBoundaryViolations(root);
 }
 
-Deno.test("TUI production graph has no runtime-owner bypass", () => {
+test("TUI production graph has no runtime-owner bypass", () => {
   const violations = task6Violations(projectRoot);
   assertEquals(
     violations,
@@ -39,7 +40,7 @@ Deno.test("TUI production graph has no runtime-owner bypass", () => {
   );
 });
 
-Deno.test("TUI boundary rejects banned imports and constructions", () => {
+test("TUI boundary rejects banned imports and constructions", () => {
   const root = Deno.makeTempDirSync();
   try {
     const tuiDir = join(root, "src/tui");
@@ -103,7 +104,7 @@ Deno.test("TUI boundary rejects banned imports and constructions", () => {
   }
 });
 
-Deno.test("TUISession and root_tui keep the ownership rules", () => {
+test("TUISession and root_tui keep the ownership rules", () => {
   const forbiddenSpecifiers = [
     "session_runtime",
     "session_lifecycle",

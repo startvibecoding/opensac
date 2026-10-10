@@ -1,9 +1,10 @@
-import { assertEquals, assertRejects } from "@opensac/assert";
+import { assertEquals, assertRejects } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreAuth } from "./auth.ts";
 import { CORE_METHODS } from "./protocol.ts";
 import { CoreServer, type CoreServerHandle } from "./server.ts";
 import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
+import { test } from "#testing";
 
 const TEST_VERSION = "0.1.0-test";
 const TEST_PROTOCOL_VERSION = 7;
@@ -39,7 +40,7 @@ async function stopServer(handle: CoreServerHandle): Promise<void> {
   }
 }
 
-Deno.test("CoreServer exposes unauthenticated health on an ephemeral port", async () => {
+test("CoreServer exposes unauthenticated health on an ephemeral port", async () => {
   const handle = await startServer();
   try {
     const response = await fetch(new URL("/health", handle.url));
@@ -56,7 +57,7 @@ Deno.test("CoreServer exposes unauthenticated health on an ephemeral port", asyn
   }
 });
 
-Deno.test("CoreServer keeps health public when authentication is enabled", async () => {
+test("CoreServer keeps health public when authentication is enabled", async () => {
   const handle = await startServer({
     auth: true,
     passwords: ["health-secret", "other-secret"],
@@ -75,7 +76,7 @@ Deno.test("CoreServer keeps health public when authentication is enabled", async
   }
 });
 
-Deno.test("CoreServer serves core.health and core.info without private configuration", async () => {
+test("CoreServer serves core.health and core.info without private configuration", async () => {
   const handle = await startServer({
     auth: true,
     passwords: ["rpc-secret"],
@@ -149,7 +150,7 @@ Deno.test("CoreServer serves core.health and core.info without private configura
   }
 });
 
-Deno.test("CoreServer allows unauthenticated RPC when auth is disabled", async () => {
+test("CoreServer allows unauthenticated RPC when auth is disabled", async () => {
   const handle = await startServer({ passwords: ["ignored-secret"] });
   try {
     const response = await fetch(new URL("/rpc", handle.url), {
@@ -167,7 +168,7 @@ Deno.test("CoreServer allows unauthenticated RPC when auth is disabled", async (
   }
 });
 
-Deno.test("CoreServer accepts any configured Bearer password", async () => {
+test("CoreServer accepts any configured Bearer password", async () => {
   const handle = await startServer({
     auth: true,
     passwords: ["one-secret", "two-secret"],
@@ -191,7 +192,7 @@ Deno.test("CoreServer accepts any configured Bearer password", async () => {
   }
 });
 
-Deno.test("CoreServer rejects missing or wrong passwords only from the auth header", async () => {
+test("CoreServer rejects missing or wrong passwords only from the auth header", async () => {
   const handle = await startServer({
     auth: true,
     passwords: ["header-secret"],
@@ -257,7 +258,7 @@ Deno.test("CoreServer rejects missing or wrong passwords only from the auth head
   }
 });
 
-Deno.test("CoreServer returns JSON-RPC errors for malformed and unknown RPC input", async () => {
+test("CoreServer returns JSON-RPC errors for malformed and unknown RPC input", async () => {
   const handle = await startServer();
   try {
     const invalidJson = await fetch(new URL("/rpc", handle.url), {
@@ -299,7 +300,7 @@ Deno.test("CoreServer returns JSON-RPC errors for malformed and unknown RPC inpu
   }
 });
 
-Deno.test("CoreServer returns a JSON-RPC error for unknown routes", async () => {
+test("CoreServer returns a JSON-RPC error for unknown routes", async () => {
   const handle = await startServer();
   try {
     const response = await fetch(new URL("/does-not-exist", handle.url));
@@ -314,7 +315,7 @@ Deno.test("CoreServer returns a JSON-RPC error for unknown routes", async () => 
   }
 });
 
-Deno.test("CoreServer refuses authentication with no configured passwords", async () => {
+test("CoreServer refuses authentication with no configured passwords", async () => {
   const server = new CoreServer({
     config: config({ auth: true, passwords: [] }),
     version: TEST_VERSION,
@@ -323,7 +324,7 @@ Deno.test("CoreServer refuses authentication with no configured passwords", asyn
   await assertRejects(() => server.start(), Error, "password");
 });
 
-Deno.test("CoreAuth ignores URL and JSON-RPC params and uses only Bearer auth", () => {
+test("CoreAuth ignores URL and JSON-RPC params and uses only Bearer auth", () => {
   const protectedConfig = config({ auth: true, passwords: ["header-only"] });
   assertEquals(
     CoreAuth.authenticate(
@@ -392,7 +393,7 @@ async function waitForShutdownHook(
   throw new Error("timed out waiting for the shutdown hook");
 }
 
-Deno.test("CoreServer acknowledges core.shutdown and invokes the shutdown hook", async () => {
+test("CoreServer acknowledges core.shutdown and invokes the shutdown hook", async () => {
   let shutdownCalls = 0;
   const server = new CoreServer({
     config: config(),
@@ -425,7 +426,7 @@ Deno.test("CoreServer acknowledges core.shutdown and invokes the shutdown hook",
   }
 });
 
-Deno.test("CoreServer rejects core.shutdown when no shutdown hook is wired", async () => {
+test("CoreServer rejects core.shutdown when no shutdown hook is wired", async () => {
   const handle = await startServer();
   try {
     const response = await fetch(new URL("/rpc", handle.url), {
@@ -446,7 +447,7 @@ Deno.test("CoreServer rejects core.shutdown when no shutdown hook is wired", asy
   }
 });
 
-Deno.test("CoreServer ignores a core.shutdown notification", async () => {
+test("CoreServer ignores a core.shutdown notification", async () => {
   let shutdownCalls = 0;
   const server = new CoreServer({
     config: config(),

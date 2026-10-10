@@ -6,8 +6,8 @@
 // the exact error shape Deno produces (the socket reason lives only on `cause`,
 // wrapped by the shared provider `wrapError`), then succeeds.
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { Provider } from "../provider/provider.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
   type Model,
@@ -29,6 +29,7 @@ import {
   TASK_SUCCESS,
   type TaskStatus,
 } from "./events.ts";
+import { test } from "#testing";
 
 function scriptedModel(): Model {
   return {
@@ -113,7 +114,7 @@ async function collect(
   return { status, retries, statusMessages, sawError };
 }
 
-Deno.test("a send request: fetch failed reports the reason and retries the turn", async () => {
+test("a send request: fetch failed reports the reason and retries the turn", async () => {
   const provider = new ScriptedProvider([
     [{ type: streamStart }, { type: streamError, error: fetchFailedError() }],
     [

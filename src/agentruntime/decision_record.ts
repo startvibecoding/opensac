@@ -6,11 +6,10 @@
 // `json.RawMessage` payload maps to decoded `unknown`; `time.Time` maps to
 // `Date`.
 
-import type {
-  DecisionKind,
-  DecisionRequest,
-  DecisionResolution,
-} from "./decision.ts";
+import {
+  type DecisionKind,
+  type DecisionRequest,
+  type DecisionResolution} from "./decision.ts";
 
 export interface DecisionRecord {
   id: string;

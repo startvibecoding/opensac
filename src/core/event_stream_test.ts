@@ -1,9 +1,10 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { coreResult } from "./protocol.ts";
 import { type CoreEventRequest, CoreEventStream } from "./event_stream.ts";
-import type { CoreRuntimeEvent } from "./runtime.ts";
+import { type CoreRuntimeEvent } from "./runtime.ts";
+import { test } from "#testing";
 
-Deno.test("CoreEventStream replays events after a cursor and emits live events", async () => {
+test("CoreEventStream replays events after a cursor and emits live events", async () => {
   const stream = new CoreEventStream();
   const first: CoreRuntimeEvent = {
     sessionId: "session-1",
@@ -45,7 +46,7 @@ Deno.test("CoreEventStream replays events after a cursor and emits live events",
   await stream.close();
 });
 
-Deno.test("CoreEventStream correlates a reverse request with its response", async () => {
+test("CoreEventStream correlates a reverse request with its response", async () => {
   const stream = new CoreEventStream();
   const requests: CoreEventRequest[] = [];
   stream.onRequest((request) => requests.push(request));
@@ -69,7 +70,7 @@ Deno.test("CoreEventStream correlates a reverse request with its response", asyn
   await stream.close();
 });
 
-Deno.test("CoreEventStream keeps an RPC-channel attribution until its release", async () => {
+test("CoreEventStream keeps an RPC-channel attribution until its release", async () => {
   const stream = new CoreEventStream();
   try {
     // A plain /rpc call must never leave a ghost row: the conditional mark
@@ -112,7 +113,7 @@ Deno.test("CoreEventStream keeps an RPC-channel attribution until its release", 
   }
 });
 
-Deno.test("CoreEventStream keeps a socket-owned row after its attributions release", async () => {
+test("CoreEventStream keeps a socket-owned row after its attributions release", async () => {
   const stream = new CoreEventStream();
   try {
     // The /events upgrade registers the identity unconditionally.

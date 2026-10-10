@@ -2,11 +2,12 @@
 // errors), the RunHandle contract over DecisionService, terminal decision
 // status mapping, and resolve persistence commits.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { decisionTerminalStatus, TuiRun } from "./tui_run.ts";
 import { DecisionService } from "../agentruntime/decision.ts";
+import { test } from "#testing";
 
-Deno.test("decisionTerminalStatus maps only cancellation to cancelled", () => {
+test("decisionTerminalStatus maps only cancellation to cancelled", () => {
   assertEquals(decisionTerminalStatus("cancelled"), "cancelled");
   assertEquals(decisionTerminalStatus("cancelling"), "cancelled");
   assertEquals(decisionTerminalStatus("completed"), "timed_out");
@@ -15,7 +16,7 @@ Deno.test("decisionTerminalStatus maps only cancellation to cancelled", () => {
   assertEquals(decisionTerminalStatus("timed_out"), "timed_out");
 });
 
-Deno.test("TuiRun registers decisions through the DecisionService", () => {
+test("TuiRun registers decisions through the DecisionService", () => {
   const decisions = new DecisionService();
   const run = new TuiRun({
     decisions,
@@ -37,7 +38,7 @@ Deno.test("TuiRun registers decisions through the DecisionService", () => {
   assertEquals(run.registerDecision("ap-2", "approval"), undefined);
 });
 
-Deno.test("TuiRun validates kind and required ids through the service", () => {
+test("TuiRun validates kind and required ids through the service", () => {
   const run = new TuiRun({
     decisions: new DecisionService(),
     runId: "run-1",
@@ -57,7 +58,7 @@ Deno.test("TuiRun validates kind and required ids through the service", () => {
   assertEquals(run.registerDecision("q-1", "question"), undefined);
 });
 
-Deno.test("clearDecisions terminalizes pending decisions per state", () => {
+test("clearDecisions terminalizes pending decisions per state", () => {
   const run = new TuiRun({
     decisions: new DecisionService(),
     runId: "run-1",
@@ -74,7 +75,7 @@ Deno.test("clearDecisions terminalizes pending decisions per state", () => {
   assertEquals(err.includes("already resolved"), true);
 });
 
-Deno.test("TuiRun satisfies the RunHandle contract without a runtime", () => {
+test("TuiRun satisfies the RunHandle contract without a runtime", () => {
   const run = new TuiRun({ runId: "run-1" });
   // No decisions service: registration is a no-op success
   assertEquals(run.registerDecision("ap-1", "approval"), undefined);

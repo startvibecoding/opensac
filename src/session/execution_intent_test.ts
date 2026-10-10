@@ -4,7 +4,7 @@
 // durable intent round trip and the atomic intent/Run/event/turn admission
 // contract against the ported implementation.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   createExecutionIntentAndSessionRun,
@@ -15,6 +15,7 @@ import {
   saveExecutionIntent,
   type SessionRun,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function baseRun(overrides: Partial<SessionRun>): SessionRun {
   const now = new Date();
@@ -63,7 +64,7 @@ function baseIntent(overrides: Partial<ExecutionIntent>): ExecutionIntent {
   };
 }
 
-Deno.test("execution intent round trips through durable storage", () => {
+test("execution intent round trips through durable storage", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     saveExecutionIntent(
@@ -95,7 +96,7 @@ Deno.test("execution intent round trips through durable storage", () => {
   }
 });
 
-Deno.test("execution intent admission rejects mismatched identity", () => {
+test("execution intent admission rejects mismatched identity", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     assertThrows(
@@ -130,7 +131,7 @@ Deno.test("execution intent admission rejects mismatched identity", () => {
   }
 });
 
-Deno.test("execution intent atomically admits run, event, and turn", () => {
+test("execution intent atomically admits run, event, and turn", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     const now = new Date();

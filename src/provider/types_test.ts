@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   cacheInfo,
   classifyTurn,
@@ -9,6 +9,7 @@ import {
   turnMeaningful,
   type Usage,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function usage(partial: Partial<Usage>): Usage {
   return {
@@ -22,7 +23,7 @@ function usage(partial: Partial<Usage>): Usage {
   };
 }
 
-Deno.test("Usage CacheInfo", () => {
+test("Usage CacheInfo", () => {
   const tests: Array<{
     name: string;
     input?: number;
@@ -111,7 +112,7 @@ Deno.test("Usage CacheInfo", () => {
   }
 });
 
-Deno.test("Usage PromptTokens", () => {
+test("Usage PromptTokens", () => {
   const tests: Array<{ name: string; usage: Usage | null; want: number }> = [
     { name: "nil usage", usage: null, want: 0 },
     {
@@ -136,7 +137,7 @@ Deno.test("Usage PromptTokens", () => {
   }
 });
 
-Deno.test("Usage TotalInputTokens", () => {
+test("Usage TotalInputTokens", () => {
   const tests: Array<{ name: string; usage: Usage | null; want: number }> = [
     { name: "nil usage", usage: null, want: 0 },
     {
@@ -161,7 +162,7 @@ Deno.test("Usage TotalInputTokens", () => {
   }
 });
 
-Deno.test("ClassifyTurn", () => {
+test("ClassifyTurn", () => {
   const stub = usage({ input: 1, output: 1, totalTokens: 2 });
   const real = usage({ input: 338962, output: 17, totalTokens: 338979 });
   const toolCall = [{ id: "c1", name: "ls" }];
@@ -305,7 +306,7 @@ Deno.test("ClassifyTurn", () => {
   }
 });
 
-Deno.test("IsStubUsage", () => {
+test("IsStubUsage", () => {
   assert(isStubUsage(null));
   assert(isStubUsage(usage({ input: 1, output: 1, totalTokens: 2 })));
   assert(isStubUsage(usage({ input: 1, output: 50, totalTokens: 51 })));

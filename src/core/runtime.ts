@@ -1,5 +1,5 @@
-import type { Settings } from "../config/settings.ts";
-import type { CoreRpcId, CoreRpcParams, CoreRpcResponse } from "./protocol.ts";
+import { type Settings } from "../config/settings.ts";
+import { type CoreRpcId, type CoreRpcParams, type CoreRpcResponse } from "./protocol.ts";
 
 /** A front-end-neutral runtime source identifier. */
 export type CoreRuntimeSource = string;

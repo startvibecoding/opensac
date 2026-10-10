@@ -4,7 +4,7 @@
 // the cancel/replay paths, correlate decision answers to the originating Core
 // request, and close the service session exactly once.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import {
   EVENT_RUN_FINISHED,

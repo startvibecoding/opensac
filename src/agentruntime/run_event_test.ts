@@ -1,10 +1,11 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   type RunEvent,
   type RunEventSink,
   SessionRunEventSink,
 } from "./run_event.ts";
 import { listSessionRunEvents } from "../session/session_events.ts";
+import { test } from "#testing";
 
 class RecordingRunEventSink implements RunEventSink {
   events: RunEvent[] = [];
@@ -15,7 +16,7 @@ class RecordingRunEventSink implements RunEventSink {
   }
 }
 
-Deno.test("SessionRunEventSink RecordJSON", () => {
+test("SessionRunEventSink RecordJSON", () => {
   const sink = new SessionRunEventSink(
     Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" }),
   );
@@ -31,7 +32,7 @@ Deno.test("SessionRunEventSink RecordJSON", () => {
   );
 });
 
-Deno.test("RunEvent carries protocol-neutral data", () => {
+test("RunEvent carries protocol-neutral data", () => {
   const data = { decision: "approval-1" };
   const sink = new RecordingRunEventSink();
   sink.record({
@@ -48,7 +49,7 @@ Deno.test("RunEvent carries protocol-neutral data", () => {
   assertEquals(sink.events[0].data, data);
 });
 
-Deno.test("SessionRunEventSink preserves insertion order", () => {
+test("SessionRunEventSink preserves insertion order", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   const sink = new SessionRunEventSink(sessionDir);
   for (

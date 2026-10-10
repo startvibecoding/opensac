@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { RPCError } from "./rpc.ts";
 import {
   type Callbacks,
@@ -46,17 +46,17 @@ function collector(): {
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-Deno.test("uniqueToolName", () => {
+test("uniqueToolName", () => {
   const existing = new Set(["mcp_a_b", "mcp_a_b_2"]);
   assertEquals(uniqueToolName("mcp_a_b", existing), "mcp_a_b_3");
 });
 
-Deno.test("sanitizeToolName", () => {
+test("sanitizeToolName", () => {
   assertEquals(sanitizeToolName("a/b c"), "a_b_c");
   assertEquals(sanitizeToolName("///"), "tool");
 });
 
-Deno.test("mcpContentToText", () => {
+test("mcpContentToText", () => {
   const out = mcpContentToText([
     { type: "text", text: "hello" },
     { type: "json", json: { k: "v" } },
@@ -65,7 +65,7 @@ Deno.test("mcpContentToText", () => {
   assertEquals(out, 'hello\n{"k":"v"}\n[image content: image/png]');
 });
 
-Deno.test("readLoop responds to ping", async () => {
+test("readLoop responds to ping", async () => {
   const out = collector();
   const client = new Client("test", "stdio", {});
   client.stdinWriter = out.stream.getWriter();
@@ -77,7 +77,7 @@ Deno.test("readLoop responds to ping", async () => {
   assert(out.text().includes('"result":{}'), `got ${out.text()}`);
 });
 
-Deno.test("readLoop response not blocked by sampling", async () => {
+test("readLoop response not blocked by sampling", async () => {
   const out = collector();
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
@@ -111,7 +111,7 @@ Deno.test("readLoop response not blocked by sampling", async () => {
   release();
 });
 
-Deno.test("parseSSECallResponse requires matching id", async () => {
+test("parseSSECallResponse requires matching id", async () => {
   const stream = streamFrom(
     'data: {"jsonrpc":"2.0","result":{"wrong":true}}\n\n' +
       'data: {"jsonrpc":"2.0","id":7,"result":{"ok":true}}\n\n',
@@ -120,13 +120,13 @@ Deno.test("parseSSECallResponse requires matching id", async () => {
   assertEquals(result, { ok: true });
 });
 
-Deno.test("isMCPMethodNotFound", () => {
+test("isMCPMethodNotFound", () => {
   assert(isMCPMethodNotFound(new RPCError(-32601, "method not found")));
   assert(!isMCPMethodNotFound(new RPCError(-32000, "server failed")));
   assert(!isMCPMethodNotFound(new Error("method not found")));
 });
 
-Deno.test("MCP SSE rejects invalid message URL", async () => {
+test("MCP SSE rejects invalid message URL", async () => {
   const registry = createRegistry(Deno.makeTempDirSync(), undefined);
   let threw = false;
   try {
@@ -151,7 +151,7 @@ Deno.test("MCP SSE rejects invalid message URL", async () => {
   assert(threw, "expected an invalid message URL error");
 });
 
-Deno.test("handleInboundNotification no panic", () => {
+test("handleInboundNotification no panic", () => {
   const c = new Client("srv", "stdio", {});
   c.handleInboundNotification({ method: "notifications/progress" });
   c.handleInboundNotification({ method: "logging/message" });
@@ -159,7 +159,7 @@ Deno.test("handleInboundNotification no panic", () => {
   c.handleInboundNotification({ method: "notifications/unknown" });
 });
 
-Deno.test("extractSamplingPrompt", () => {
+test("extractSamplingPrompt", () => {
   const raw = {
     messages: [
       { role: "user", content: "hello" },
@@ -169,7 +169,7 @@ Deno.test("extractSamplingPrompt", () => {
   assertEquals(extractSamplingPrompt(raw), "hello\nworld");
 });
 
-Deno.test("classifyMCPBlock", () => {
+test("classifyMCPBlock", () => {
   const cases: Array<{
     name: string;
     block: Record<string, unknown>;
@@ -236,7 +236,8 @@ Deno.test("classifyMCPBlock", () => {
 // display required). The Go tests embed a fixture PNG that the npm image codec
 // used by this port cannot decode, so the equivalent image is produced here.
 import { Image } from "imagescript";
-import { encodeBase64 } from "@opensac/encoding/base64";
+import { encodeBase64 } from "../compat/encoding.ts";
+import { test } from "#testing";
 
 async function makeTestPNG(): Promise<Uint8Array> {
   const img = new Image(1, 1);
@@ -250,7 +251,7 @@ async function makeTestPNG(): Promise<Uint8Array> {
 const mcpTestPNG = await makeTestPNG();
 const mcpTestPNGBase64 = encodeBase64(mcpTestPNG);
 
-Deno.test("MCP resource read result decodes blob", () => {
+test("MCP resource read result decodes blob", () => {
   const raw =
     `{"contents":[{"uri":"shot://1","mimeType":"image/png","blob":"${mcpTestPNGBase64}"}]}`;
   const out = JSON.parse(raw);
@@ -259,7 +260,7 @@ Deno.test("MCP resource read result decodes blob", () => {
   assertEquals(out.contents[0].uri, "shot://1");
 });
 
-Deno.test("projectMCPContent projects image", async () => {
+test("projectMCPContent projects image", async () => {
   const client = new Client("srv", "stdio", {});
   const { text, contents } = await client.projectMCPContent([
     { type: "text", text: '{"image_width":1464}' },
@@ -277,7 +278,7 @@ Deno.test("projectMCPContent projects image", async () => {
   assert(image.image?.data, "projected image must carry a payload");
 });
 
-Deno.test("projectMCPContent keeps text-only shape", async () => {
+test("projectMCPContent keeps text-only shape", async () => {
   const client = new Client("srv", "stdio", {});
   const { text, contents } = await client.projectMCPContent([
     { type: "text", text: "hello" },
@@ -287,7 +288,7 @@ Deno.test("projectMCPContent keeps text-only shape", async () => {
   assertEquals(contents, undefined);
 });
 
-Deno.test("projectMCPContent keeps audio placeholder", async () => {
+test("projectMCPContent keeps audio placeholder", async () => {
   const client = new Client("srv", "stdio", {});
   const { text, contents } = await client.projectMCPContent([
     { type: "audio", mimeType: "audio/wav" },
@@ -296,7 +297,7 @@ Deno.test("projectMCPContent keeps audio placeholder", async () => {
   assertEquals(contents, undefined);
 });
 
-Deno.test("projectMCPContent degrades invalid payloads", async () => {
+test("projectMCPContent degrades invalid payloads", async () => {
   const client = new Client("srv", "stdio", {});
   const notAnImage = btoa("not an image");
   const { text, contents } = await client.projectMCPContent([
@@ -313,7 +314,7 @@ Deno.test("projectMCPContent degrades invalid payloads", async () => {
   }
 });
 
-Deno.test("projectMCPContent caps image count", async () => {
+test("projectMCPContent caps image count", async () => {
   const client = new Client("srv", "stdio", {});
   const blocks = [];
   for (let i = 0; i < 6; i++) {
@@ -330,7 +331,7 @@ Deno.test("projectMCPContent caps image count", async () => {
   assert(text.includes("at most 4 images per tool result"), text);
 });
 
-Deno.test("projectMCPContent projects resource blob", async () => {
+test("projectMCPContent projects resource blob", async () => {
   const client = new Client("srv", "stdio", {});
   const { text, contents } = await client.projectMCPContent([
     { mimeType: "text/plain", text: "plain resource body" },
@@ -342,7 +343,7 @@ Deno.test("projectMCPContent projects resource blob", async () => {
   assertEquals(contents![1].type, "image");
 });
 
-Deno.test("client image policy uses late binding", async () => {
+test("client image policy uses late binding", async () => {
   const client = new Client("srv", "stdio", {});
   let seen = "";
   client.imagePolicy = (mode) => {
@@ -355,7 +356,7 @@ Deno.test("client image policy uses late binding", async () => {
   assertEquals(seen, "auto");
 });
 
-Deno.test("client image policy falls back to defaults", () => {
+test("client image policy falls back to defaults", () => {
   const client = new Client("srv", "stdio", {});
   assertEquals(client.imagePolicyFor("auto").mode, "auto");
 });

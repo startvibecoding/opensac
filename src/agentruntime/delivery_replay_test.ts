@@ -1,6 +1,6 @@
 // delivery-event coverage from delivery_events.go.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   createDeliveryPendingEvent,
   deliveryPendingData,
@@ -10,7 +10,8 @@ import {
   replayDeliveries,
   replayDeliveriesFromRunEvents,
 } from "./delivery_replay.ts";
-import type { SessionRunEvent } from "../session/session_events.ts";
+import { type SessionRunEvent } from "../session/session_events.ts";
+import { test } from "#testing";
 
 function event(overrides: Partial<SessionRunEvent>): SessionRunEvent {
   return {
@@ -27,7 +28,7 @@ function event(overrides: Partial<SessionRunEvent>): SessionRunEvent {
   };
 }
 
-Deno.test("ReplayDeliveries pending and reconciled", () => {
+test("ReplayDeliveries pending and reconciled", () => {
   const events = [
     event({
       sessionId: "session-1",
@@ -55,7 +56,7 @@ Deno.test("ReplayDeliveries pending and reconciled", () => {
   assertEquals(pending.get("run-1")?.assistantEntry, "entry-1");
 });
 
-Deno.test("delivery pending data and events round trip", () => {
+test("delivery pending data and events round trip", () => {
   const data = deliveryPendingData("run-1", "resp-1", "pending", "entry-1", {
     extraKey: "extra-value",
   });

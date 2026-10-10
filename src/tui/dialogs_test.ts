@@ -1,7 +1,7 @@
 // Focused tests for the interactive dialog framework and the concrete panels:
 // cursor/search/input handling, and that each dialog mutates real state.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import { Dialog } from "./dialog.ts";
 import {
   AuthDialog,
@@ -16,11 +16,11 @@ import { defaultSettings } from "../config/settings.ts";
 import { resolvedModels } from "../provider/factory/factory.ts";
 import { Translator } from "./i18n.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
-import type { TUISessionListEntry } from "./service.ts";
-import type {
-  TUIProviderCatalogEntry,
-  TUISettingsWriteScope,
-} from "./service.ts";
+import { type TUISessionListEntry } from "./service.ts";
+import {
+  type TUIProviderCatalogEntry,
+  type TUISettingsWriteScope} from "./service.ts";
+import { test } from "#testing";
 
 interface Recorder {
   applied: Array<[string, string]>;
@@ -128,7 +128,7 @@ function feedEvents(dialog: Dialog, events: KeyEvent[]): void {
   for (const ev of events) dialog.handleKey(ev);
 }
 
-Deno.test("dialog cursor wraps and search filters", () => {
+test("dialog cursor wraps and search filters", () => {
   const dialog = new Dialog(() => ({
     page: () => ({
       title: "T",
@@ -162,7 +162,7 @@ Deno.test("dialog cursor wraps and search filters", () => {
   assertStringIncludes(cleared, "beta");
 });
 
-Deno.test("search selection picks the filtered row, not the unfiltered index", () => {
+test("search selection picks the filtered row, not the unfiltered index", () => {
   const chosen: string[] = [];
   const dialog = new Dialog(() => ({
     page: () => ({
@@ -186,7 +186,7 @@ Deno.test("search selection picks the filtered row, not the unfiltered index", (
   assertEquals(chosen, ["zeta"]);
 });
 
-Deno.test("model dialog applies the selected model", () => {
+test("model dialog applies the selected model", () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new ModelDialog(h, d));
   feed(dialog, "\r");
@@ -195,7 +195,7 @@ Deno.test("model dialog applies the selected model", () => {
   assertStringIncludes(dialog.outcome.message ?? "", "Model switched");
 });
 
-Deno.test("model dialog filters by typed query", () => {
+test("model dialog filters by typed query", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new ModelDialog(h, d));
   feed(dialog, "v4-pro");
@@ -217,7 +217,7 @@ function defaultModelData(): {
   };
 }
 
-Deno.test("default-model dialog steps provider then model and persists", async () => {
+test("default-model dialog steps provider then model and persists", async () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) =>
     new DefaultModelDialog(h, d, "global", defaultModelData())
@@ -235,7 +235,7 @@ Deno.test("default-model dialog steps provider then model and persists", async (
   assertStringIncludes(dialog.outcome.message ?? "", "Default model set");
 });
 
-Deno.test("default-model dialog escape steps back from the model view", () => {
+test("default-model dialog escape steps back from the model view", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) =>
     new DefaultModelDialog(h, d, "global", defaultModelData())
@@ -246,7 +246,7 @@ Deno.test("default-model dialog escape steps back from the model view", () => {
   assertStringIncludes(dialog.view(100), "Set Default Model");
 });
 
-Deno.test("env dialog adds a variable through key then value prompts", () => {
+test("env dialog adds a variable through key then value prompts", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new EnvDialog(h, d, {}));
   // Navigate to "+ Add Variable" (after the two trailing rows).
@@ -261,7 +261,7 @@ Deno.test("env dialog adds a variable through key then value prompts", () => {
   assertStringIncludes(dialog.view(90), "MY_TEST_VAR = value-1");
 });
 
-Deno.test("env dialog rejects an invalid variable name", () => {
+test("env dialog rejects an invalid variable name", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new EnvDialog(h, d, {}));
   feed(dialog, "\x1b[B\x1b[B");
@@ -273,7 +273,7 @@ Deno.test("env dialog rejects an invalid variable name", () => {
 
 /** The host surface is service-backed; nothing here writes the user config. */
 
-Deno.test("auth dialog walks provider -> credentials and saves", async () => {
+test("auth dialog walks provider -> credentials and saves", async () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new AuthDialog(h, d, defaultSettings()));
   assertStringIncludes(dialog.view(90), "Connect Provider");
@@ -305,7 +305,7 @@ Deno.test("auth dialog walks provider -> credentials and saves", async () => {
   assertEquals(rec.saved[0].scope, "global");
 });
 
-Deno.test("auth dialog escape steps back through views", () => {
+test("auth dialog escape steps back through views", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new AuthDialog(h, d, defaultSettings()));
   feed(dialog, "\r"); // providers
@@ -319,7 +319,7 @@ Deno.test("auth dialog escape steps back through views", () => {
   assertEquals(dialog.closed, true);
 });
 
-Deno.test("sessions dialog lists, switches, and deletes", async () => {
+test("sessions dialog lists, switches, and deletes", async () => {
   const detail = (id: string, count: number): TUISessionListEntry => ({
     sessionId: id,
     workDir: Deno.cwd(),
@@ -341,7 +341,7 @@ Deno.test("sessions dialog lists, switches, and deletes", async () => {
   assertEquals(dialog.closed, true);
 });
 
-Deno.test("settings dialog walks the category tree and cycles fields", async () => {
+test("settings dialog walks the category tree and cycles fields", async () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   assertStringIncludes(dialog.view(90), "Settings");
@@ -361,7 +361,7 @@ Deno.test("settings dialog walks the category tree and cycles fields", async () 
   assertEquals(rec.saved.length >= 1, true);
 });
 
-Deno.test("settings dialog done returns to the root then closes", () => {
+test("settings dialog done returns to the root then closes", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\x1b[B"); // Defaults
@@ -374,7 +374,7 @@ Deno.test("settings dialog done returns to the root then closes", () => {
   assertEquals(dialog.closed, true);
 });
 
-Deno.test("settings dialog third-level input edits a field", async () => {
+test("settings dialog third-level input edits a field", async () => {
   const { host: h, rec } = host();
   const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\x1b[B\x1b[B"); // Behavior
@@ -386,7 +386,7 @@ Deno.test("settings dialog third-level input edits a field", async () => {
   assertEquals(rec.reloads >= 1, true);
 });
 
-Deno.test("settings providers hands off to the auth dialog", () => {
+test("settings providers hands off to the auth dialog", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\r"); // Providers (first row)
@@ -394,7 +394,7 @@ Deno.test("settings providers hands off to the auth dialog", () => {
   assertEquals(dialog.outcome.handoff, "auth");
 });
 
-Deno.test("settings defaults model picker hands off to the default-model dialog", () => {
+test("settings defaults model picker hands off to the default-model dialog", () => {
   const { host: h } = host();
   const dialog = new Dialog((d) => new SettingsDialog(h, d, defaultSettings()));
   feed(dialog, "\x1b[B"); // Defaults
@@ -404,7 +404,7 @@ Deno.test("settings defaults model picker hands off to the default-model dialog"
   assertEquals(dialog.outcome.handoff, "defaultModel");
 });
 
-Deno.test("dialog with no items renders a no-matches line", () => {
+test("dialog with no items renders a no-matches line", () => {
   const dialog = new Dialog(() => ({
     page: () => ({ title: "Empty", items: [], hint: "h" }),
     select: () => {},
@@ -415,7 +415,7 @@ Deno.test("dialog with no items renders a no-matches line", () => {
   assertStringIncludes(dialog.view(80), "no matches");
 });
 
-Deno.test("feedEvents is available for future key-level tests", () => {
+test("feedEvents is available for future key-level tests", () => {
   feedEvents(
     new Dialog(() => ({
       page: () => ({ title: "T", items: [], hint: "h" }),

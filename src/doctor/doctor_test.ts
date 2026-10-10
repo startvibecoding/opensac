@@ -1,5 +1,5 @@
-import { assertEquals, assertStrictEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assertEquals, assertStrictEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   defaultSettings,
   type ModelConfig,
@@ -16,6 +16,7 @@ import {
   STATUS_OK,
   validateProvider,
 } from "./doctor.ts";
+import { test } from "#testing";
 
 function withEnv(name: string, value: string, fn: () => void): void {
   const previous = Deno.env.get(name);
@@ -35,7 +36,7 @@ function checkByID(result: Response, id: string): Check {
   throw new Error(`missing check ${id} in ${JSON.stringify(result.checks)}`);
 }
 
-Deno.test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
+test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
@@ -63,7 +64,7 @@ Deno.test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
   });
 });
 
-Deno.test("RunUsesProjectSettingsForRequestedCWD", () => {
+test("RunUsesProjectSettingsForRequestedCWD", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
@@ -92,7 +93,7 @@ Deno.test("RunUsesProjectSettingsForRequestedCWD", () => {
   });
 });
 
-Deno.test("ValidateProviderReportsMissingModelWhenNoModelCanBeSelected", () => {
+test("ValidateProviderReportsMissingModelWhenNoModelCanBeSelected", () => {
   const settings: Settings = defaultSettings();
   settings.defaultProvider = "doctor-empty-models";
   settings.defaultModel = "";
@@ -117,7 +118,7 @@ Deno.test("ValidateProviderReportsMissingModelWhenNoModelCanBeSelected", () => {
   assertEquals(checks[1].status, STATUS_ERROR);
 });
 
-Deno.test("RunNeverSerializesAPIKey", () => {
+test("RunNeverSerializesAPIKey", () => {
   const configDir = Deno.makeTempDirSync();
   const workDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {

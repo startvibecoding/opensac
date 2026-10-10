@@ -1,7 +1,7 @@
 import type { DB } from "../db/mod.ts";
 import { execChanges, inList, queryAll, queryOptional } from "./database.ts";
-import type { EntryRecord } from "./conversation_turn.ts";
-import type { SessionRunEventRecord } from "./run.ts";
+import { type EntryRecord } from "./conversation_turn.ts";
+import { type SessionRunEventRecord } from "./run.ts";
 
 export interface SessionRecord {
   id: string;
@@ -79,7 +79,11 @@ const capabilityEventColumns = `seq, session_id AS sessionId, id,
   old_value AS oldValue, new_value AS newValue, timestamp, data`;
 
 export class SessionDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   detailAggregates(sessionIds: string[]): SessionDetailAggregates {
     const result: SessionDetailAggregates = {

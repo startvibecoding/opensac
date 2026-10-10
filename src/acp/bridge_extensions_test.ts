@@ -1,9 +1,10 @@
-import { assertEquals } from "@opensac/assert";
-import type { ACPRPCRequest } from "./wire.ts";
+import { assertEquals } from "../compat/assert.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 import {
   type ACPBridgeContext,
   mapACPExtensionToCore,
 } from "./bridge_extensions.ts";
+import { test } from "#testing";
 
 const context: ACPBridgeContext = { source: "acp", workDir: "/tmp" };
 
@@ -14,7 +15,7 @@ function request(
   return { jsonrpc: "2.0", idRaw: '"ext-1"', method, params };
 }
 
-Deno.test("mapACPExtensionToCore maps attachment and project extensions", () => {
+test("mapACPExtensionToCore maps attachment and project extensions", () => {
   assertEquals(
     mapACPExtensionToCore(
       request("fs/read_text_file", {
@@ -44,7 +45,7 @@ Deno.test("mapACPExtensionToCore maps attachment and project extensions", () => 
   );
 });
 
-Deno.test("mapACPExtensionToCore carries workspace cwd to memory handlers", () => {
+test("mapACPExtensionToCore carries workspace cwd to memory handlers", () => {
   assertEquals(
     mapACPExtensionToCore(
       request("opensac/manage/memory/get", {}),
@@ -59,7 +60,7 @@ Deno.test("mapACPExtensionToCore carries workspace cwd to memory handlers", () =
   );
 });
 
-Deno.test("mapACPExtensionToCore carries workspace cwd to cron creation", () => {
+test("mapACPExtensionToCore carries workspace cwd to cron creation", () => {
   assertEquals(
     mapACPExtensionToCore(
       request("opensac/manage/cron/create", {
@@ -83,7 +84,7 @@ Deno.test("mapACPExtensionToCore carries workspace cwd to cron creation", () => 
   );
 });
 
-Deno.test("mapACPExtensionToCore carries workspace cwd to SkillHub catalog handlers", () => {
+test("mapACPExtensionToCore carries workspace cwd to SkillHub catalog handlers", () => {
   assertEquals(
     mapACPExtensionToCore(
       request("opensac/manage/skillhub/search", {}),
@@ -105,7 +106,7 @@ Deno.test("mapACPExtensionToCore carries workspace cwd to SkillHub catalog handl
   );
 });
 
-Deno.test("mapACPExtensionToCore maps manage and decision responses", () => {
+test("mapACPExtensionToCore maps manage and decision responses", () => {
   assertEquals(
     mapACPExtensionToCore(request("opensac/manage/env/get", {}), context),
     {

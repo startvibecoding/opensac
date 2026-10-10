@@ -3,7 +3,7 @@
 // canonical runs directly (foreign-key enforcement is off and a session with no
 // lease row skips lease validation), matching the session run-store tests.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { createSessionRun, type SessionRun } from "../session/run_store.ts";
 import { saveSessionRunEvent } from "../session/session_events.ts";
@@ -12,6 +12,7 @@ import {
   IdempotencyKeyConflictError,
   idempotencyKeyFingerprint,
 } from "./idempotency.ts";
+import { test } from "#testing";
 
 function baseRun(overrides: Partial<SessionRun>): SessionRun {
   return {
@@ -43,7 +44,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
   };
 }
 
-Deno.test("IdempotencyKeyFingerprint", () => {
+test("IdempotencyKeyFingerprint", () => {
   assertEquals(idempotencyKeyFingerprint(""), "");
   assertEquals(idempotencyKeyFingerprint("  "), "");
   const fp = idempotencyKeyFingerprint("submission-1");
@@ -52,7 +53,7 @@ Deno.test("IdempotencyKeyFingerprint", () => {
   assert(fp !== idempotencyKeyFingerprint("submission-2"));
 });
 
-Deno.test("FindIdempotentRun uses canonical started event", () => {
+test("FindIdempotentRun uses canonical started event", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     const sessionId = "session-idempotent";
@@ -118,7 +119,7 @@ Deno.test("FindIdempotentRun uses canonical started event", () => {
   }
 });
 
-Deno.test("FindIdempotentRun resolves a durable submission reservation", () => {
+test("FindIdempotentRun resolves a durable submission reservation", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   try {
     const sessionId = "session-submission";

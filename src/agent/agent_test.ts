@@ -3,15 +3,15 @@
 // the image-admission cases from agent_test.go (ToolResultImageCapabilityGate,
 // ValidateImageRequestBudget*, SupportsImages).
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { ContentBlock, Model } from "../provider/types.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type ContentBlock, type Model } from "../provider/types.ts";
 import {
   createAssistantMessage,
   createUserMessage,
 } from "../provider/types.ts";
 import { createMockProvider } from "../provider/mock.ts";
 import { createRegistry } from "../tools/mod.ts";
-import type { Tool } from "../tools/mod.ts";
+import { type Tool } from "../tools/mod.ts";
 import {
   Agent,
   agentIDFromContext,
@@ -28,8 +28,9 @@ import {
   parentRunContextFromContext,
 } from "./agent.ts";
 import { createRunContext } from "./run_context.ts";
-import type { Event } from "./events.ts";
+import { type Event } from "./events.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
+import { test } from "#testing";
 
 function model(
   input: string[],
@@ -52,13 +53,13 @@ function imageBlock(data = "base64data", detail?: string): ContentBlock {
   return { type: "image", image: { mimeType: "image/png", data, detail } };
 }
 
-Deno.test("createAgent generates a non-empty ID when omitted", () => {
+test("createAgent generates a non-empty ID when omitted", () => {
   const a = createAgent({}, undefined);
   assert(a.id().length > 0);
   assert(a.id().startsWith("agent-"));
 });
 
-Deno.test("agent abort is one-shot and observable", () => {
+test("agent abort is one-shot and observable", () => {
   const a = createAgent({}, undefined);
   assertEquals(a.aborted(), false);
   a.abort();
@@ -67,7 +68,7 @@ Deno.test("agent abort is one-shot and observable", () => {
   assertEquals(a.aborted(), true);
 });
 
-Deno.test("setConversationTurn binds the durable run identity", () => {
+test("setConversationTurn binds the durable run identity", () => {
   const a = createAgent({}, undefined);
   a.setConversationTurn("turn-1", "intent-1", "run-1");
   assertEquals(a.config.conversationTurnId, "turn-1");
@@ -78,7 +79,7 @@ Deno.test("setConversationTurn binds the durable run identity", () => {
   assertEquals(a.config.userEntryId, runUserEntryID("run-1"));
 });
 
-Deno.test("loadHistoryMessages retains messages and context", () => {
+test("loadHistoryMessages retains messages and context", () => {
   const a = createAgent(
     { id: "test", model: model(["text"]), mode: "agent" },
     undefined,
@@ -91,7 +92,7 @@ Deno.test("loadHistoryMessages retains messages and context", () => {
   assertEquals(a.getContext()!.messages.length, 2);
 });
 
-Deno.test("loadHistoryState keeps entry IDs aligned", () => {
+test("loadHistoryState keeps entry IDs aligned", () => {
   const a = createAgent({}, undefined);
   a.loadHistoryState([createUserMessage("a"), createUserMessage("b")], [
     "e1",
@@ -106,12 +107,12 @@ Deno.test("loadHistoryState keeps entry IDs aligned", () => {
   assertEquals(a.getHistoryState()[1], ["e1", "e2", ""]);
 });
 
-Deno.test("getContextUsage returns undefined without a model", () => {
+test("getContextUsage returns undefined without a model", () => {
   const a = createAgent({ id: "test", mode: "agent" }, undefined);
   assertEquals(a.getContextUsage(), undefined);
 });
 
-Deno.test("getContextUsage returns undefined for a zero context window", () => {
+test("getContextUsage returns undefined for a zero context window", () => {
   const a = createAgent(
     { id: "test", model: model(["text"], 0), mode: "agent" },
     undefined,
@@ -119,7 +120,7 @@ Deno.test("getContextUsage returns undefined for a zero context window", () => {
   assertEquals(a.getContextUsage(), undefined);
 });
 
-Deno.test("getContextUsage estimates a positive footprint", () => {
+test("getContextUsage estimates a positive footprint", () => {
   const a = createAgent(
     { id: "test", model: model(["text"], 100000), mode: "agent" },
     undefined,
@@ -132,7 +133,7 @@ Deno.test("getContextUsage estimates a positive footprint", () => {
   assert(usage!.percent !== undefined && usage!.percent > 0);
 });
 
-Deno.test("escalatedMaxTokens never exceeds the model output limit", () => {
+test("escalatedMaxTokens never exceeds the model output limit", () => {
   const a = createAgentWithLoopConfig(
     { model: model(["text"], 128000, 16384) },
     undefined,
@@ -140,7 +141,7 @@ Deno.test("escalatedMaxTokens never exceeds the model output limit", () => {
   assertEquals(a.escalatedMaxTokens(8192), 16384);
 });
 
-Deno.test("escalatedMaxTokens returns zero once at the ceiling", () => {
+test("escalatedMaxTokens returns zero once at the ceiling", () => {
   const a = createAgentWithLoopConfig(
     { model: model(["text"], 0, 0) },
     undefined,
@@ -153,14 +154,14 @@ Deno.test("escalatedMaxTokens returns zero once at the ceiling", () => {
   );
 });
 
-Deno.test("tool-execution settings normalize in createAgent", () => {
+test("tool-execution settings normalize in createAgent", () => {
   const settings = { toolExecution: { mode: "sequential", maxConcurrency: 4 } };
   const a = createAgent({ settings }, undefined);
   assertEquals(a.config.toolExecutionMode, "sequential");
   assertEquals(a.maxToolConcurrency(), 4);
 });
 
-Deno.test("tool-execution settings normalize in createAgentWithLoopConfig", () => {
+test("tool-execution settings normalize in createAgentWithLoopConfig", () => {
   const settings = { toolExecution: { mode: "sequential", maxConcurrency: 4 } };
   const configured = createAgentWithLoopConfig({ settings }, undefined);
   assertEquals(configured.config.toolExecutionMode, "sequential");
@@ -171,7 +172,7 @@ Deno.test("tool-execution settings normalize in createAgentWithLoopConfig", () =
   assertEquals(dflt.maxToolConcurrency(), 10);
 });
 
-Deno.test("forced mode overwrites the configured mode", () => {
+test("forced mode overwrites the configured mode", () => {
   const a = createAgentWithLoopConfig(
     { mode: "agent", forcedMode: "yolo" },
     undefined,
@@ -179,7 +180,7 @@ Deno.test("forced mode overwrites the configured mode", () => {
   assertEquals(a.config.mode, "yolo");
 });
 
-Deno.test("buildFrozenPrompt registers mode tools for the run", () => {
+test("buildFrozenPrompt registers mode tools for the run", () => {
   const registry = createRegistry("/tmp", undefined);
   const fake: Tool = {
     name: () => "read",
@@ -197,13 +198,13 @@ Deno.test("buildFrozenPrompt registers mode tools for the run", () => {
   assertEquals(a.frozenToolDefinitions().length, 1);
 });
 
-Deno.test("no registry means no registered tools", () => {
+test("no registry means no registered tools", () => {
   const a = createAgentWithLoopConfig({ mode: "agent" }, undefined);
   assertEquals(a.isToolRegisteredForRun("read"), false);
   assertEquals(a.frozenSystemPrompt(), "");
 });
 
-Deno.test("supportsImages reflects model input capabilities", () => {
+test("supportsImages reflects model input capabilities", () => {
   const a = createAgentWithLoopConfig({ model: model(["text"]) }, undefined);
   assertEquals(a.supportsImages(), false);
 
@@ -214,7 +215,7 @@ Deno.test("supportsImages reflects model input capabilities", () => {
   assertEquals(a.supportsImages(), false);
 });
 
-Deno.test("gateToolResultImages rejects images for text-only models", () => {
+test("gateToolResultImages rejects images for text-only models", () => {
   const a = createAgentWithLoopConfig({ model: model(["text"]) }, undefined);
   const gated = a.gateToolResultImages("image output", [imageBlock()], false);
   assert(gated.error !== undefined);
@@ -223,7 +224,7 @@ Deno.test("gateToolResultImages rejects images for text-only models", () => {
   assert(gated.content.includes("does not support image input"));
 });
 
-Deno.test("gateToolResultImages passes images through for vision models", () => {
+test("gateToolResultImages passes images through for vision models", () => {
   const a = createAgentWithLoopConfig(
     { model: model(["text", "image"]) },
     undefined,
@@ -236,7 +237,7 @@ Deno.test("gateToolResultImages passes images through for vision models", () => 
   assertEquals(gated.content, "image output");
 });
 
-Deno.test("validateImageRequestBudget rejects over-limit image payloads", () => {
+test("validateImageRequestBudget rejects over-limit image payloads", () => {
   const m = model(["text", "image"]);
   const groq = createMockProvider("groq", [m], []);
   const a = createAgentWithLoopConfig(
@@ -255,7 +256,7 @@ Deno.test("validateImageRequestBudget rejects over-limit image payloads", () => 
   assert(err!.message.includes("provider limit"));
 });
 
-Deno.test("validateImageRequestBudget rejects too many images", () => {
+test("validateImageRequestBudget rejects too many images", () => {
   const m = model(["text", "image"]);
   const groq = createMockProvider("groq", [m], []);
   const a = createAgentWithLoopConfig(
@@ -270,7 +271,7 @@ Deno.test("validateImageRequestBudget rejects too many images", () => {
   assert(err!.message.includes("provider limit is 5"));
 });
 
-Deno.test("validateImageRequestBudget accepts a within-budget request", () => {
+test("validateImageRequestBudget accepts a within-budget request", () => {
   const m = model(["text", "image"]);
   const groq = createMockProvider("groq", [m], []);
   const a = createAgentWithLoopConfig(
@@ -289,7 +290,7 @@ Deno.test("validateImageRequestBudget accepts a within-budget request", () => {
   );
 });
 
-Deno.test("callbackSnapshot and agentEndEvent reflect history", () => {
+test("callbackSnapshot and agentEndEvent reflect history", () => {
   const a = createAgent({}, undefined);
   a.loadHistoryMessages([createUserMessage("hello")]);
   const [msgs, ctx] = a.callbackSnapshot();
@@ -298,7 +299,7 @@ Deno.test("callbackSnapshot and agentEndEvent reflect history", () => {
   assertEquals(a.agentEndEvent().messages!.length, 1);
 });
 
-Deno.test("run-context helpers round-trip typed values", () => {
+test("run-context helpers round-trip typed values", () => {
   const ctx = createRunContext();
   const withId = contextWithAgentID(ctx, "a1");
   assertEquals(agentIDFromContext(withId), "a1");
@@ -314,7 +315,7 @@ Deno.test("run-context helpers round-trip typed values", () => {
   assertEquals(parentModeFromContext(withMode), "yolo");
 });
 
-Deno.test("direct constructor does not build a frozen prompt", () => {
+test("direct constructor does not build a frozen prompt", () => {
   const a = new Agent("id-1", "", {}, undefined);
   assertEquals(a.frozenSystemPrompt(), "");
   assertEquals(a.id(), "id-1");

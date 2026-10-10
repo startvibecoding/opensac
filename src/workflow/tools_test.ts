@@ -8,7 +8,7 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import {
   createCancelTool,
   createLintTool,
@@ -18,8 +18,9 @@ import {
 } from "./tools.ts";
 import { createActiveRegistry } from "./active.ts";
 import { statusCanceled, statusDone, statusError } from "./types.ts";
+import { test } from "#testing";
 
-Deno.test("lint tool validates JavaScript source without running agents", async () => {
+test("lint tool validates JavaScript source without running agents", async () => {
   const result = await createLintTool().execute({}, {
     source:
       `workflow("lint me", {phases:[phase("scan", agent("handler-audit", {key:"r0", mode:"plan", tools:["read","grep"], prompt:"Audit handler."})), phase("verify", agent("cross-check", {mode:"plan", prompt:resultKey("scan.handler-audit","r0")}))]});`,
@@ -29,7 +30,7 @@ Deno.test("lint tool validates JavaScript source without running agents", async 
   assertEquals(parsed.status, statusDone);
 });
 
-Deno.test("lint tool reports workflow errors", async () => {
+test("lint tool reports workflow errors", async () => {
   const result = await createLintTool().execute({}, {
     source:
       `workflow("bad", {phases:[phase("verify", agent("check", {prompt:result("scan.missing")}))]});`,
@@ -42,7 +43,7 @@ Deno.test("lint tool reports workflow errors", async () => {
   );
 });
 
-Deno.test("run tool prompt guidelines require complete JavaScript source", () => {
+test("run tool prompt guidelines require complete JavaScript source", () => {
   const tool = createRunTool(undefined, undefined);
   const guidelines = tool.promptGuidelines().join("\n");
   const params = JSON.stringify(tool.parameters());
@@ -54,7 +55,7 @@ Deno.test("run tool prompt guidelines require complete JavaScript source", () =>
   }
 });
 
-Deno.test("run tool execution timeout", () => {
+test("run tool execution timeout", () => {
   const tool = createRunTool(undefined, undefined);
 
   assert(!tool.executionTimeout({}).provided);
@@ -67,7 +68,7 @@ Deno.test("run tool execution timeout", () => {
   assert(!tool.executionTimeout({ timeoutSeconds: 1.5 }).provided);
 });
 
-Deno.test("cancel tool cancels active run", async () => {
+test("cancel tool cancels active run", async () => {
   const active = createActiveRegistry();
   let canceled = false;
   active.register("run-1", () => {
@@ -79,14 +80,14 @@ Deno.test("cancel tool cancels active run", async () => {
   assertEquals(parsed.status, statusCanceled);
 });
 
-Deno.test("cancel tool rejects inactive run", async () => {
+test("cancel tool rejects inactive run", async () => {
   await assertRejects(
     () =>
       createCancelTool(createActiveRegistry()).execute({}, { id: "missing" }),
   );
 });
 
-Deno.test("lint workflow source times out runaway source", async () => {
+test("lint workflow source times out runaway source", async () => {
   const started = Date.now();
   const res = await lintWorkflowSourceWithin("while (true) {}", 50);
   assert(!res.valid, `lint result = ${JSON.stringify(res)}, want invalid`);

@@ -1,5 +1,5 @@
-import type { CompactionSettings as ConfigCompactionSettings } from "../config/settings.ts";
-import type { CompactionSettings } from "../context/compaction.ts";
+import { type CompactionSettings as ConfigCompactionSettings } from "../config/settings.ts";
+import { type CompactionSettings } from "../context/compaction.ts";
 
 /**
  * Converts the user-facing settings.json compaction block into the agent-loop

@@ -1,12 +1,13 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   queryStats,
   recordQueryTiming,
   resetQueryStats,
   slowQueryThresholdMs,
 } from "./query_stats.ts";
+import { test } from "#testing";
 
-Deno.test("recordQueryTiming accumulates totals and tracks the slowest SQL", () => {
+test("recordQueryTiming accumulates totals and tracks the slowest SQL", () => {
   resetQueryStats();
   recordQueryTiming("SELECT 1", 5);
   recordQueryTiming("SELECT very_slow", 80);
@@ -19,7 +20,7 @@ Deno.test("recordQueryTiming accumulates totals and tracks the slowest SQL", () 
   assertEquals(q.slowTotalMs, 80);
 });
 
-Deno.test("recordQueryTiming counts only threshold crossings as slow", () => {
+test("recordQueryTiming counts only threshold crossings as slow", () => {
   resetQueryStats();
   recordQueryTiming("fast", slowQueryThresholdMs - 1);
   recordQueryTiming("boundary", slowQueryThresholdMs);
@@ -29,14 +30,14 @@ Deno.test("recordQueryTiming counts only threshold crossings as slow", () => {
   assert(q.maxSql === "boundary");
 });
 
-Deno.test("recordQueryTiming truncates retained SQL", () => {
+test("recordQueryTiming truncates retained SQL", () => {
   resetQueryStats();
   recordQueryTiming("x".repeat(500), 100);
   const q = queryStats();
   assert(q.maxSql.length === 200);
 });
 
-Deno.test("resetQueryStats restores the baseline", () => {
+test("resetQueryStats restores the baseline", () => {
   resetQueryStats();
   recordQueryTiming("SELECT 1", 10);
   resetQueryStats();

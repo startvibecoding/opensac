@@ -2,8 +2,8 @@
 // worker and in-process paths must produce identical results, transport
 // failures fall back in-process, and query failures surface unchanged.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { openStandalone } from "../db/mod.ts";
 import {
   StatsDAO,
@@ -18,6 +18,7 @@ import {
   type StatsQueryWorkerPort,
 } from "./query_offload.ts";
 import { DB, type Query } from "./stats.ts";
+import { test } from "#testing";
 
 function insert(db: DB, record: Partial<StatsRecord>): void {
   const raw = db.database.db;
@@ -66,7 +67,7 @@ async function assertExecutorsAgree(
   );
 }
 
-Deno.test("worker executor returns the same results as the inline executor", async () => {
+test("worker executor returns the same results as the inline executor", async () => {
   const db = createSeededDB();
   const worker = createStatsQueryExecutor(db);
   const inline = createInlineStatsQueryExecutor(db);
@@ -79,7 +80,7 @@ Deno.test("worker executor returns the same results as the inline executor", asy
   }
 });
 
-Deno.test("worker executor falls back in-process when the worker cannot spawn", async () => {
+test("worker executor falls back in-process when the worker cannot spawn", async () => {
   const db = createSeededDB();
   let spawns = 0;
   const worker = createStatsQueryExecutor(db, {
@@ -99,7 +100,7 @@ Deno.test("worker executor falls back in-process when the worker cannot spawn", 
   }
 });
 
-Deno.test("worker executor falls back in-process on request timeout", async () => {
+test("worker executor falls back in-process on request timeout", async () => {
   const db = createSeededDB();
   // A port that never replies: the wall-clock budget must kick in.
   const silent = new FakeWorker(() => {});
@@ -118,7 +119,7 @@ Deno.test("worker executor falls back in-process on request timeout", async () =
   }
 });
 
-Deno.test("worker executor surfaces query failures without falling back", async () => {
+test("worker executor surfaces query failures without falling back", async () => {
   const db = createSeededDB();
   // A port that reports a data-level failure for every request.
   const broken = new FakeWorker((msg) => {
@@ -149,7 +150,7 @@ Deno.test("worker executor surfaces query failures without falling back", async 
   }
 });
 
-Deno.test("inline executor surfaces query failures as rejections", async () => {
+test("inline executor surfaces query failures as rejections", async () => {
   const db = createSeededDB();
   const raw = db.database.db;
   if (raw === null) throw new Error("nil connection");
@@ -172,7 +173,7 @@ Deno.test("inline executor surfaces query failures as rejections", async () => {
   }
 });
 
-Deno.test("close is idempotent and stops routing to the worker", async () => {
+test("close is idempotent and stops routing to the worker", async () => {
   const db = createSeededDB();
   const fake = new FakeWorker((msg) => {
     const data = msg as { id: number };

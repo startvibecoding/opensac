@@ -4,8 +4,8 @@
 // canonical session row is written directly through the DAO, which is the same
 // durable state the Manager persists.
 
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { SessionDAO } from "../dao/mod.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -19,6 +19,7 @@ import {
 } from "./database_reset.ts";
 import { openBunDatabase, rootDatabasePath } from "./database.ts";
 import { closeDatabases, openRootDB } from "./root_db.ts";
+import { test } from "#testing";
 
 function seedSession(dir: string, id: string): void {
   const db = openRootDB(dir);
@@ -49,7 +50,7 @@ function backupSessionIds(backupPath: string): string[] {
   return new SessionDAO(db.db).list({}).map((record) => record.id);
 }
 
-Deno.test("reset database creates a fresh database when absent", () => {
+test("reset database creates a fresh database when absent", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const report = resetDatabase(dir);
@@ -62,7 +63,7 @@ Deno.test("reset database creates a fresh database when absent", () => {
   }
 });
 
-Deno.test("reset database moves database and preserves previous sessions", () => {
+test("reset database moves database and preserves previous sessions", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     seedSession(dir, "previous-session");
@@ -99,7 +100,7 @@ Deno.test("reset database moves database and preserves previous sessions", () =>
   }
 });
 
-Deno.test("reset database archives orphaned sidecars", () => {
+test("reset database archives orphaned sidecars", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
@@ -126,7 +127,7 @@ Deno.test("reset database archives orphaned sidecars", () => {
   }
 });
 
-Deno.test("move database files rolls back with the main file first", () => {
+test("move database files rolls back with the main file first", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
@@ -160,7 +161,7 @@ Deno.test("move database files rolls back with the main file first", () => {
   }
 });
 
-Deno.test("reset backup path avoids occupied names", () => {
+test("reset backup path avoids occupied names", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
@@ -181,7 +182,7 @@ Deno.test("reset backup path avoids occupied names", () => {
   }
 });
 
-Deno.test("reset database reports what it left behind", () => {
+test("reset database reports what it left behind", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     Deno.mkdirSync(path.join(dir, "artifacts", "attachment-1"), {

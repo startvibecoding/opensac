@@ -4,7 +4,7 @@
 // module only formats the shared rows for the transcript, so it never opens a
 // database or builds SQL.
 
-import type { TUISessionListEntry } from "./service.ts";
+import { type TUISessionListEntry } from "./service.ts";
 
 /** Formats one session row for the transcript. */
 export function formatSessionEntry(

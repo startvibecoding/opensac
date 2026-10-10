@@ -2,7 +2,7 @@
 // Deno ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
 // property test over the same seeds plus generated inputs.
 
-import { assert } from "@opensac/assert";
+import { assert } from "../compat/assert.ts";
 import {
   auditVerdictFail,
   auditVerdictPass,
@@ -15,6 +15,7 @@ import {
   workerStatusCompleteCandidate,
   workerStatusContinue,
 } from "./report.ts";
+import { test } from "#testing";
 
 function* candidates(): Generator<string> {
   for (
@@ -39,7 +40,7 @@ function* candidates(): Generator<string> {
   }
 }
 
-Deno.test("ParseReports fuzz invariants", () => {
+test("ParseReports fuzz invariants", () => {
   for (const input of candidates()) {
     try {
       const report = parseWorkerReport(input);

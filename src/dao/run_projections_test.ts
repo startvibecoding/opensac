@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   ProjectDAO,
   RunDAO,
@@ -6,6 +6,7 @@ import {
   type SessionRunRecord,
 } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 function run(overrides: Partial<SessionRunRecord>): SessionRunRecord {
   return {
@@ -31,7 +32,7 @@ function run(overrides: Partial<SessionRunRecord>): SessionRunRecord {
   };
 }
 
-Deno.test("run DAO latest run by sessions picks newest per session", () => {
+test("run DAO latest run by sessions picks newest per session", () => {
   const database = openTestDb();
   try {
     const runDAO = new RunDAO(database);
@@ -87,7 +88,7 @@ Deno.test("run DAO latest run by sessions picks newest per session", () => {
   }
 });
 
-Deno.test("project DAO metadata batch counts and clear", () => {
+test("project DAO metadata batch counts and clear", () => {
   const database = openTestDb();
   try {
     const projectDAO = new ProjectDAO(database);

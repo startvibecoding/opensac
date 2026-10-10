@@ -1,11 +1,12 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { projectDirName, projectPath, projectPathFor } from "./paths.ts";
+import { test } from "#testing";
 
-Deno.test("project directory name stays stable", () => {
+test("project directory name stays stable", () => {
   assertEquals(projectDirName, ".opensac");
 });
 
-Deno.test("projectPathFor joins under the given cwd", () => {
+test("projectPathFor joins under the given cwd", () => {
   assertEquals(
     projectPathFor("/work/repo", "rules.md"),
     "/work/repo/.opensac/rules.md",
@@ -16,7 +17,7 @@ Deno.test("projectPathFor joins under the given cwd", () => {
   );
 });
 
-Deno.test("projectPathFor treats an empty cwd as the current directory", () => {
+test("projectPathFor treats an empty cwd as the current directory", () => {
   assertEquals(projectPathFor("", "rule.md"), ".opensac/rule.md");
   assertEquals(projectPath("rule.md"), ".opensac/rule.md");
 });

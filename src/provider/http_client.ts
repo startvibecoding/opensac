@@ -66,7 +66,7 @@ function build(opts: HTTPClientOptions, timeoutMs: number): HttpClient {
       }
       const merged: RequestInit = { ...init };
       if (signal !== undefined) merged.signal = signal;
-      // deno-lint-ignore no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (merged as any).client = client;
       return fetch(url, merged);
     },

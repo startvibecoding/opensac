@@ -1,27 +1,28 @@
 // Focused tests for the TUI input state: backspace/delete, history, suggestions,
 // paste folding on submit, and the shortcut action map.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { InputState } from "./input_state.ts";
 import { Translator } from "./i18n.ts";
+import { test } from "#testing";
 
 function state(): InputState {
   return new InputState({ width: 80, translator: new Translator("en") });
 }
 
-Deno.test("ctrl+t requests the plan modal", () => {
+test("ctrl+t requests the plan modal", () => {
   const s = state();
   assertEquals(s.handleKey("ctrl+t").kind, "plan-details");
 });
 
-Deno.test("backspace removes the character before the cursor", () => {
+test("backspace removes the character before the cursor", () => {
   const s = state();
   s.insertText("abc");
   s.handleKey("backspace");
   assertEquals(s.value, "ab");
 });
 
-Deno.test("delete removes the character under the cursor", () => {
+test("delete removes the character under the cursor", () => {
   const s = state();
   s.insertText("abc");
   s.handleKey("left");
@@ -29,7 +30,7 @@ Deno.test("delete removes the character under the cursor", () => {
   assertEquals(s.value, "ab");
 });
 
-Deno.test("enter submits and resets, expanding folded pastes", () => {
+test("enter submits and resets, expanding folded pastes", () => {
   const s = state();
   s.insertText("hello");
   assertEquals(s.handleKey("enter").kind, "submit");
@@ -38,7 +39,7 @@ Deno.test("enter submits and resets, expanding folded pastes", () => {
   assertEquals(s.value, "");
 });
 
-Deno.test("large paste folds to a marker and expands on submit", () => {
+test("large paste folds to a marker and expands on submit", () => {
   const s = state();
   const payload = Array.from({ length: 9 }, (_, i) => `row${i}`).join("\n");
   s.insertPaste(payload);
@@ -47,7 +48,7 @@ Deno.test("large paste folds to a marker and expands on submit", () => {
   assertEquals(value, payload);
 });
 
-Deno.test("history navigation recalls and restores the draft", () => {
+test("history navigation recalls and restores the draft", () => {
   const s = state();
   s.insertText("first");
   s.takeSubmission();
@@ -64,7 +65,7 @@ Deno.test("history navigation recalls and restores the draft", () => {
   assertEquals(s.value, "draft");
 });
 
-Deno.test("slash command suggestions filter and accept", () => {
+test("slash command suggestions filter and accept", () => {
   const s = state();
   s.insertText("/mo");
   assertEquals(s.suggestionsVisible, true);
@@ -73,7 +74,7 @@ Deno.test("slash command suggestions filter and accept", () => {
   assertEquals(s.value, "/mode ");
 });
 
-Deno.test("shortcut keys map to shell actions", () => {
+test("shortcut keys map to shell actions", () => {
   const s = state();
   s.insertText("x");
   assertEquals(s.handleKey("ctrl+o").kind, "tool-details");
@@ -87,7 +88,7 @@ Deno.test("shortcut keys map to shell actions", () => {
   assertEquals(s.handleKey("pagedown").kind, "page-down");
 });
 
-Deno.test("tab cycles mode only outside slash commands", () => {
+test("tab cycles mode only outside slash commands", () => {
   const s = state();
   assertEquals(s.handleKey("tab").kind, "cycle-mode");
   s.insertText("/mode");

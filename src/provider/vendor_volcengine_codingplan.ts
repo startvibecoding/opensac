@@ -1,4 +1,4 @@
-import type { AdapterConfig, VendorAdapter } from "./vendor.ts";
+import { type AdapterConfig, type VendorAdapter } from "./vendor.ts";
 import { registerVendorAdapter } from "./vendor.ts";
 
 /**

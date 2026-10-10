@@ -11,8 +11,8 @@
 // Go's `(value, error)` returns throw typed errors.
 
 import { createHash } from "node:crypto";
-import { isAbsolute } from "@opensac/path";
-import { decodeBase64Url, encodeBase64Url } from "@opensac/encoding/base64url";
+import { isAbsolute } from "../compat/path.ts";
+import { decodeBase64Url, encodeBase64Url } from "../compat/encoding.ts";
 import {
   type Event,
   EVENT_COMPACTION_END,
@@ -25,7 +25,7 @@ import {
 import { goDurationString } from "../agent/agent_support.ts";
 import { RPCError } from "../mcp/rpc.ts";
 import { isNonTerminalSessionRunStatus } from "../session/run_status.ts";
-import type { FileDiff, TaskPlan } from "../tools/mod.ts";
+import { type FileDiff, type TaskPlan } from "../tools/mod.ts";
 import {
   type PlanEntry,
   type RequestQuestionOption,

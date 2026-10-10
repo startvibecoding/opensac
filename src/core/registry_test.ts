@@ -1,7 +1,8 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
+import { test } from "#testing";
 
 async function withStateDir(
   test: (paths: CorePaths, registry: CoreRegistry) => Promise<void>,
@@ -31,7 +32,7 @@ function registration(
   };
 }
 
-Deno.test("CorePaths.fromStateDir does not create state", async () => {
+test("CorePaths.fromStateDir does not create state", async () => {
   const parent = await Deno.makeTempDir({ prefix: "opensac-core-paths-" });
   try {
     const stateDir = path.join(parent, "state");
@@ -48,7 +49,7 @@ Deno.test("CorePaths.fromStateDir does not create state", async () => {
   }
 });
 
-Deno.test("CoreRegistry writes one complete atomic JSON registration", async () => {
+test("CoreRegistry writes one complete atomic JSON registration", async () => {
   await withStateDir(async (paths, registry) => {
     const value = registration("core-a", { port: 4310 });
     await registry.write(value);
@@ -66,7 +67,7 @@ Deno.test("CoreRegistry writes one complete atomic JSON registration", async () 
   });
 });
 
-Deno.test("CoreRegistry creates a missing state directory only on write", async () => {
+test("CoreRegistry creates a missing state directory only on write", async () => {
   const parent = await Deno.makeTempDir({ prefix: "opensac-core-write-" });
   try {
     const paths = CorePaths.fromStateDir(path.join(parent, "nested", "state"));
@@ -82,7 +83,7 @@ Deno.test("CoreRegistry creates a missing state directory only on write", async 
   }
 });
 
-Deno.test("CoreRegistry rejects malformed and secret-bearing registrations", async () => {
+test("CoreRegistry rejects malformed and secret-bearing registrations", async () => {
   await withStateDir(async (paths, registry) => {
     await assertRejects(() =>
       registry.write({ id: 1 } as unknown as CoreRegistration)
@@ -98,7 +99,7 @@ Deno.test("CoreRegistry rejects malformed and secret-bearing registrations", asy
   });
 });
 
-Deno.test("CoreRegistry remove and isCurrent are identity-scoped", async () => {
+test("CoreRegistry remove and isCurrent are identity-scoped", async () => {
   await withStateDir(async (_paths, registry) => {
     const old = registration("old-core");
     const newer = registration("new-core", { port: 4311 });
@@ -117,7 +118,7 @@ Deno.test("CoreRegistry remove and isCurrent are identity-scoped", async () => {
   });
 });
 
-Deno.test("CoreRegistry remove rechecks identity across a replacement", async () => {
+test("CoreRegistry remove rechecks identity across a replacement", async () => {
   await withStateDir(async (paths) => {
     const old = registration("old-core");
     const newer = registration("new-core", { port: 4311 });
@@ -158,7 +159,7 @@ Deno.test("CoreRegistry remove rechecks identity across a replacement", async ()
   });
 });
 
-Deno.test("stale reclaim takeover cannot displace a replacement claim", async () => {
+test("stale reclaim takeover cannot displace a replacement claim", async () => {
   await withStateDir(async (paths) => {
     const mutationLock = path.join(
       paths.stateDir,
@@ -287,7 +288,7 @@ Deno.test("stale reclaim takeover cannot displace a replacement claim", async ()
   });
 });
 
-Deno.test("concurrent stale mutation-guard recovery has one active owner", async () => {
+test("concurrent stale mutation-guard recovery has one active owner", async () => {
   await withStateDir(async (paths) => {
     const mutationLock = path.join(
       paths.stateDir,
@@ -406,7 +407,7 @@ Deno.test("concurrent stale mutation-guard recovery has one active owner", async
   });
 });
 
-Deno.test("CoreRegistry readers never observe partial replacement JSON", async () => {
+test("CoreRegistry readers never observe partial replacement JSON", async () => {
   await withStateDir(async (_paths, registry) => {
     const initial = registration("initial-core");
     await registry.write(initial);
@@ -434,7 +435,7 @@ Deno.test("CoreRegistry readers never observe partial replacement JSON", async (
   });
 });
 
-Deno.test("CoreRegistry read returns undefined only for a missing file", async () => {
+test("CoreRegistry read returns undefined only for a missing file", async () => {
   await withStateDir(async (paths, registry) => {
     assertEquals(await registry.read(), undefined);
     await Deno.writeTextFile(

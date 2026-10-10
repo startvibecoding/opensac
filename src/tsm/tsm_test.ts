@@ -3,7 +3,7 @@
 // testing); see the note at the end of this file for the one intentional
 // deviation.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   computeIDs,
   createStream,
@@ -20,6 +20,7 @@ import {
   visualWidth,
   wrapANSI,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function root(src: string): Node {
   return parse(src, defaultOption());
@@ -27,40 +28,40 @@ function root(src: string): Node {
 
 // ── Parser: blocks ──────────────────────────────────────────────────────────
 
-Deno.test("heading levels and trailing hashes", () => {
+test("heading levels and trailing hashes", () => {
   const doc = root("## Heading ##");
   const h = doc.findChild(NodeType.Heading)!;
   assertEquals(h.level, 2);
   assertEquals(h.children[0].text, "Heading");
 });
 
-Deno.test("heading requires a space", () => {
+test("heading requires a space", () => {
   const doc = root("#nos");
   assertEquals(doc.findChild(NodeType.Heading), undefined);
   assertEquals(doc.findChild(NodeType.Paragraph)!.textContent(), "#nos\n");
 });
 
-Deno.test("paragraph and hard break", () => {
+test("paragraph and hard break", () => {
   const doc = root("line1  \nline2");
   const p = doc.findChild(NodeType.Paragraph)!;
   assertEquals(p.children.some((c) => c.type === NodeType.HardBreak), true);
   assertEquals(p.textContent(), "line1\nline2\n");
 });
 
-Deno.test("fenced code block", () => {
+test("fenced code block", () => {
   const doc = root("```go\nx := 1\n```");
   const code = doc.findChild(NodeType.FencedCodeBlock)!;
   assertEquals(code.language, "go");
   assertEquals(code.code, "x := 1");
 });
 
-Deno.test("indented code block", () => {
+test("indented code block", () => {
   const doc = root("    code line");
   const code = doc.findChild(NodeType.IndentedCodeBlock)!;
   assertEquals(code.code, "code line");
 });
 
-Deno.test("blockquote nested", () => {
+test("blockquote nested", () => {
   const doc = root("> outer\n>\n> > inner");
   const bq = doc.findChild(NodeType.Blockquote)!;
   assertEquals(bq.quoteLevel, 0);
@@ -70,7 +71,7 @@ Deno.test("blockquote nested", () => {
   );
 });
 
-Deno.test("unordered list with task items", () => {
+test("unordered list with task items", () => {
   const doc = root("- a\n- [x] b\n- [ ] c");
   const list = doc.findChild(NodeType.UnorderedList)!;
   assertEquals(list.children.length, 3);
@@ -79,20 +80,20 @@ Deno.test("unordered list with task items", () => {
   assertEquals(list.children[2].checked, false);
 });
 
-Deno.test("ordered list start number", () => {
+test("ordered list start number", () => {
   const doc = root("3. third\n4. fourth");
   const list = doc.findChild(NodeType.OrderedList)!;
   assertEquals(list.startNum, 3);
   assertEquals(list.children.length, 2);
 });
 
-Deno.test("list item startsWithBold", () => {
+test("list item startsWithBold", () => {
   const doc = root("- **bold** rest");
   const item = doc.findChild(NodeType.UnorderedList)!.children[0];
   assertEquals(item.startsWithBold, true);
 });
 
-Deno.test("table basic", () => {
+test("table basic", () => {
   const doc = root("| a | b |\n|---|---|\n| 1 | 2 |");
   const table = doc.findChild(NodeType.Table)!;
   assertEquals(table.children.length, 2);
@@ -100,7 +101,7 @@ Deno.test("table basic", () => {
   assertEquals(table.children[0].children.length, 2);
 });
 
-Deno.test("thematic break variants", () => {
+test("thematic break variants", () => {
   for (const src of ["---", "***", "___", "- - -"]) {
     assertEquals(
       root(src).findChild(NodeType.ThematicBreak) !== undefined,
@@ -112,7 +113,7 @@ Deno.test("thematic break variants", () => {
 
 // ── Parser: inline ──────────────────────────────────────────────────────────
 
-Deno.test("inline emphasis strong code", () => {
+test("inline emphasis strong code", () => {
   const doc = root("a *i* b **s** c `k`");
   const p = doc.findChild(NodeType.Paragraph)!;
   const kinds = p.children.map((c) => c.type);
@@ -121,7 +122,7 @@ Deno.test("inline emphasis strong code", () => {
   assert(kinds.includes(NodeType.CodeSpan));
 });
 
-Deno.test("inline link, image, strikethrough, autolink", () => {
+test("inline link, image, strikethrough, autolink", () => {
   const doc = root(
     "see [t](http://x.com) ![alt](http://y.png) ~~gone~~ <http://z.com> <a@b.com>",
   );
@@ -136,14 +137,14 @@ Deno.test("inline link, image, strikethrough, autolink", () => {
   );
 });
 
-Deno.test("link title parsed", () => {
+test("link title parsed", () => {
   const doc = root('[t](http://x.com "the title")');
   const link = doc.findChild(NodeType.Paragraph)!.findChild(NodeType.Link)!;
   assertEquals(link.url, "http://x.com");
   assertEquals(link.title, "the title");
 });
 
-Deno.test("speculative emphasis rewrite on stream", () => {
+test("speculative emphasis rewrite on stream", () => {
   // A trailing single delimiter is closed into an (empty) Emphasis node, so
   // the placeholder underscore disappears from the text content.
   assertEquals(parse("a_", streamOption()).textContent(), "a\n");
@@ -156,20 +157,20 @@ Deno.test("speculative emphasis rewrite on stream", () => {
   );
 });
 
-Deno.test("speculative disabled by default", () => {
+test("speculative disabled by default", () => {
   const doc = parse("Hello **wor", defaultOption());
   const p = doc.findChild(NodeType.Paragraph)!;
   assertEquals(p.children.some((c) => c.type === NodeType.Strong), false);
 });
 
-Deno.test("speculative table rewrite", () => {
+test("speculative table rewrite", () => {
   const doc = parse("| a | b", streamOption());
   const p = doc.findChild(NodeType.Paragraph);
   // The partial table paragraph is emptied so nothing renders.
   assert(!p || p.children.length === 0);
 });
 
-Deno.test("latex preprocessing", () => {
+test("latex preprocessing", () => {
   const doc = root("$$\\dfrac{1}{2}$$");
   const code = doc.findChild(NodeType.FencedCodeBlock)!;
   assertEquals(code.language, "blockmath");
@@ -182,7 +183,7 @@ Deno.test("latex preprocessing", () => {
   );
 });
 
-Deno.test("computeIDs and textContent", () => {
+test("computeIDs and textContent", () => {
   const doc = root("# Title\n\nPara.");
   computeIDs(doc);
   assertEquals(doc.id, "0");
@@ -191,14 +192,14 @@ Deno.test("computeIDs and textContent", () => {
   assertEquals(doc.children[0].textContent(), "Title\n");
 });
 
-Deno.test("empty and blank input", () => {
+test("empty and blank input", () => {
   assertEquals(root("").children.length, 0);
   assertEquals(root("\n\n").children.length, 0);
 });
 
 // ── Renderer ────────────────────────────────────────────────────────────────
 
-Deno.test("render heading golden", () => {
+test("render heading golden", () => {
   const out = gsmRender("# Hello **world**", 30);
   assertEquals(
     out.replaceAll("\x1b", "\\e"),
@@ -207,7 +208,7 @@ Deno.test("render heading golden", () => {
   assertEquals(stripANSI(out), "# Hello world\n\n");
 });
 
-Deno.test("render unordered list with task golden", () => {
+test("render unordered list with task golden", () => {
   const out = gsmRender("- a\n- [x] b", 30);
   assertEquals(stripANSI(out), "• a\n☑ b\n\n");
   assertEquals(
@@ -216,7 +217,7 @@ Deno.test("render unordered list with task golden", () => {
   );
 });
 
-Deno.test("render ordered list has no trailing blank line (Go quirk)", () => {
+test("render ordered list has no trailing blank line (Go quirk)", () => {
   const out = gsmRender("3. third\n4. fourth", 20);
   assertEquals(
     out.replaceAll("\x1b", "\\e"),
@@ -224,11 +225,11 @@ Deno.test("render ordered list has no trailing blank line (Go quirk)", () => {
   );
 });
 
-Deno.test("render blockquote golden", () => {
+test("render blockquote golden", () => {
   assertEquals(stripANSI(gsmRender("> q", 30)), "│ q\n\n");
 });
 
-Deno.test("render table golden", () => {
+test("render table golden", () => {
   const out = stripANSI(gsmRender("| a | b |\n|---|---|\n| 1 | 2 |", 30));
   assertEquals(
     out,
@@ -236,11 +237,11 @@ Deno.test("render table golden", () => {
   );
 });
 
-Deno.test("render thematic break golden", () => {
+test("render thematic break golden", () => {
   assertEquals(stripANSI(gsmRender("---", 30)), "─".repeat(28) + "\n\n");
 });
 
-Deno.test("render code block with CJK width", () => {
+test("render code block with CJK width", () => {
   const out = stripANSI(gsmRender("```\n日本\n```", 30));
   assert(out.includes("日本"));
   const lines = out.split("\n");
@@ -248,7 +249,7 @@ Deno.test("render code block with CJK width", () => {
   assertEquals(visualWidth(lines[1]), 30);
 });
 
-Deno.test("render paragraph wrapping", () => {
+test("render paragraph wrapping", () => {
   const out = stripANSI(
     gsmRender("The quick brown fox jumps over the lazy", 12),
   );
@@ -257,26 +258,26 @@ Deno.test("render paragraph wrapping", () => {
   }
 });
 
-Deno.test("render image placeholder", () => {
+test("render image placeholder", () => {
   const out = stripANSI(gsmRender("![alt](http://y.png)", 40));
   assert(out.includes("🖼 alt"));
   assert(out.includes("(http://y.png)"));
 });
 
-Deno.test("renderer themes are defined", () => {
+test("renderer themes are defined", () => {
   assert(defaultTheme().heading.length > 0);
   assert(lightTheme().heading.length > 0);
   assertEquals(new Renderer(undefined, 0).width, 80);
 });
 
-Deno.test("stripANSI", () => {
+test("stripANSI", () => {
   assertEquals(stripANSI("\x1b[1mhello\x1b[0m"), "hello");
   assertEquals(stripANSI("\x1b[38;5;200mx"), "x");
   assertEquals(stripANSI("plain"), "plain");
   assertEquals(stripANSI(""), "");
 });
 
-Deno.test("visualWidth", () => {
+test("visualWidth", () => {
   assertEquals(visualWidth("abc"), 3);
   assertEquals(visualWidth("\x1b[1mab\x1b[0m"), 2);
   assertEquals(visualWidth("日本"), 4);
@@ -284,14 +285,14 @@ Deno.test("visualWidth", () => {
   assertEquals(visualWidth(""), 0);
 });
 
-Deno.test("wrapANSI word boundary", () => {
+test("wrapANSI word boundary", () => {
   assertEquals(wrapANSI("one two three", 7, "", 0), "one two\nthree");
   assertEquals(wrapANSI("one two three", 7, "", 1), "one two\n\nthree");
   assertEquals(wrapANSI("hello", 80, "", 0), "hello");
   assertEquals(wrapANSI("", 80, "", 0), "");
 });
 
-Deno.test("wrapANSI splits overlong words instead of overflowing", () => {
+test("wrapANSI splits overlong words instead of overflowing", () => {
   // A space-free CJK run and a single long styled span are both wider than
   // the wrap width; every produced line must fit inside it.
   for (
@@ -306,7 +307,7 @@ Deno.test("wrapANSI splits overlong words instead of overflowing", () => {
   }
 });
 
-Deno.test("wrapANSI re-opens the style state at each continuation line", () => {
+test("wrapANSI re-opens the style state at each continuation line", () => {
   // The trailing reset belongs to the end of the code span, so the line that
   // starts with "width" must still re-open the span's colour; a snapshot
   // taken after the word's escapes were consumed used to render it plain.
@@ -333,14 +334,14 @@ Deno.test("wrapANSI re-opens the style state at each continuation line", () => {
 
 // ── gsm streaming facade ────────────────────────────────────────────────────
 
-Deno.test("createStream default width and empty output", () => {
+test("createStream default width and empty output", () => {
   const s = createStream(0);
   assertEquals(s.output(), "");
   s.update("# hi");
   assert(s.output().includes("# hi"));
 });
 
-Deno.test("stream preserves Unicode order for SSE text", () => {
+test("stream preserves Unicode order for SSE text", () => {
   const sseText =
     "已改回 `https://se.lab.bza.edu.cn`,编译通过。\n\n现在 baseURL 默认是 `https://se.lab.bza.edu.cn`,仍保留了 `OSCANNER_BASE_URL` 环境变量覆盖能力。";
   const expectedInOrder = [
@@ -382,6 +383,6 @@ Deno.test("stream preserves Unicode order for SSE text", () => {
 // reinterpreted as a Latin-1 rune (e.g. `\本` renders "æ"). This port operates
 // on code points, so `\本` renders "本". We keep the correct behaviour and do
 // not reproduce that UTF-8 bug.
-Deno.test("escaping a multibyte character is code-point correct", () => {
+test("escaping a multibyte character is code-point correct", () => {
   assertEquals(stripANSI(gsmRender("\\本", 20)), "本\n\n");
 });

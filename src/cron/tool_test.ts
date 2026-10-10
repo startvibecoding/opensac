@@ -1,8 +1,9 @@
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import type { CronJob } from "./cron.ts";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import { type CronJob } from "./cron.ts";
 import { createSessionScopedStore } from "./session_store.ts";
 import { createSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
 import { createCronTool } from "./tool.ts";
+import { test } from "#testing";
 
 function createStore(): SQLiteCronStore {
   return createSQLiteCronStore(
@@ -14,7 +15,7 @@ function create(store: SQLiteCronStore, job: CronJob): CronJob {
   return store.create(job);
 }
 
-Deno.test("CronToolCreateOneShot", () => {
+test("CronToolCreateOneShot", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -32,7 +33,7 @@ Deno.test("CronToolCreateOneShot", () => {
   assertEquals(jobs[0].schedule, "");
 });
 
-Deno.test("CronToolCreatePeriodic", () => {
+test("CronToolCreatePeriodic", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -54,7 +55,7 @@ Deno.test("CronToolCreatePeriodic", () => {
   );
 });
 
-Deno.test("CronToolCreateDefaultOneShot", () => {
+test("CronToolCreateDefaultOneShot", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -69,7 +70,7 @@ Deno.test("CronToolCreateDefaultOneShot", () => {
   assert(jobs[0].oneShot, "expected default to be one-shot when no schedule");
 });
 
-Deno.test("CronToolList", () => {
+test("CronToolList", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -83,7 +84,7 @@ Deno.test("CronToolList", () => {
   assert(result.text !== "No cron jobs configured.", "expected non-empty list");
 });
 
-Deno.test("CronToolEnableDisable", () => {
+test("CronToolEnableDisable", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -96,7 +97,7 @@ Deno.test("CronToolEnableDisable", () => {
   assert(store.get(job.id!).enabled, "expected enabled");
 });
 
-Deno.test("CronToolRunReenablesDisabledJob", () => {
+test("CronToolRunReenablesDisabledJob", () => {
   const store = createStore();
   const tool = createCronTool(store);
   const job = create(store, {
@@ -118,7 +119,7 @@ Deno.test("CronToolRunReenablesDisabledJob", () => {
   assertEquals(got.lastStatus, "");
 });
 
-Deno.test("CronToolRemove", () => {
+test("CronToolRemove", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -128,7 +129,7 @@ Deno.test("CronToolRemove", () => {
   assertEquals(store.list().length, 0);
 });
 
-Deno.test("CronToolSessionScopedCreateAndDeleteByName", () => {
+test("CronToolSessionScopedCreateAndDeleteByName", () => {
   const base = createStore();
   const current = createSessionScopedStore(
     base,
@@ -159,7 +160,7 @@ Deno.test("CronToolSessionScopedCreateAndDeleteByName", () => {
   assertEquals(other.list().length, 1);
 });
 
-Deno.test("CronToolMissingParams", () => {
+test("CronToolMissingParams", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
@@ -183,7 +184,7 @@ Deno.test("CronToolMissingParams", () => {
   );
 });
 
-Deno.test("CronToolUnknownAction", () => {
+test("CronToolUnknownAction", () => {
   const store = createStore();
   const tool = createCronTool(store);
   assertThrows(() => tool.execute({}, { action: "invalid" }));

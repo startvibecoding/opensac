@@ -1,4 +1,4 @@
-import { assert } from "@opensac/assert";
+import { assert } from "../compat/assert.ts";
 import {
   auditTaskPrompt,
   criticTaskPrompt,
@@ -8,8 +8,9 @@ import {
 import { createUpdateTool } from "./tools.ts";
 import { statusActive, statusCompleteCandidate } from "./state.ts";
 import { makeObjective } from "./test_helpers.ts";
+import { test } from "#testing";
 
-Deno.test("SteeringPrompt requires full objective audit", () => {
+test("SteeringPrompt requires full objective audit", () => {
   const obj = makeObjective({
     sessionId: "sess",
     esmId: "esm",
@@ -39,7 +40,7 @@ Deno.test("SteeringPrompt requires full objective audit", () => {
   );
 });
 
-Deno.test("UpdateTool requires reason", () => {
+test("UpdateTool requires reason", () => {
   const tool = createUpdateTool(null, () => "");
   const params = JSON.stringify(tool.parameters());
   assert(
@@ -62,7 +63,7 @@ Deno.test("UpdateTool requires reason", () => {
   }
 });
 
-Deno.test("Worker and audit prompts use isolated roles", () => {
+test("Worker and audit prompts use isolated roles", () => {
   const obj = makeObjective({
     objective: "ship real feature",
     status: statusCompleteCandidate,

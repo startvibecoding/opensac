@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   formatRetryMessage,
   isRetryable,
@@ -6,6 +6,7 @@ import {
   retryErrorDetail,
   truncateErr,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function coded(message: string, code: string): Error {
   return Object.assign(new Error(message), { code });
@@ -18,7 +19,7 @@ function abortError(): Error {
   ) as unknown as Error;
 }
 
-Deno.test("IsRetryable_NetworkErrors", () => {
+test("IsRetryable_NetworkErrors", () => {
   const tests: Array<[string, unknown, number, boolean]> = [
     ["nil error", null, 0, false],
     ["429", null, 429, true],
@@ -113,28 +114,28 @@ Deno.test("IsRetryable_NetworkErrors", () => {
   }
 });
 
-Deno.test("RetryDelay_ExponentialBackoff", () => {
+test("RetryDelay_ExponentialBackoff", () => {
   assertEquals(retryDelay(0, 2000), 2000);
   assertEquals(retryDelay(1, 2000), 4000);
   assertEquals(retryDelay(2, 2000), 8000);
 });
 
-Deno.test("RetryDelay_CappedAt30s", () => {
+test("RetryDelay_CappedAt30s", () => {
   assert(retryDelay(10, 5000) <= 30000);
 });
 
-Deno.test("RetryDelay_DefaultBase", () => {
+test("RetryDelay_DefaultBase", () => {
   assertEquals(retryDelay(0, 0), 2000);
 });
 
-Deno.test("FormatRetryMessage_Timeout", () => {
+test("FormatRetryMessage_Timeout", () => {
   assert(
     formatRetryMessage(0, 3, 2000, new Error("context deadline exceeded")) !==
       "",
   );
 });
 
-Deno.test("FormatRetryMessage_ServerOverloaded", () => {
+test("FormatRetryMessage_ServerOverloaded", () => {
   const msg = formatRetryMessage(
     0,
     3,
@@ -144,23 +145,23 @@ Deno.test("FormatRetryMessage_ServerOverloaded", () => {
   assert(msg.includes("server overloaded"), msg);
 });
 
-Deno.test("FormatRetryMessage_RateLimited", () => {
+test("FormatRetryMessage_RateLimited", () => {
   assert(
     formatRetryMessage(1, 3, 4000, new Error("HTTP 429: rate limit")) !== "",
   );
 });
 
-Deno.test("FormatRetryMessage_ConnectionRefused", () => {
+test("FormatRetryMessage_ConnectionRefused", () => {
   assert(
     formatRetryMessage(2, 3, 8000, new Error("connection refused")) !== "",
   );
 });
 
-Deno.test("FormatRetryMessage_Generic", () => {
+test("FormatRetryMessage_Generic", () => {
   assert(formatRetryMessage(0, 3, 2000, new Error("some random error")) !== "");
 });
 
-Deno.test("FormatRetryMessage_StreamReadError", () => {
+test("FormatRetryMessage_StreamReadError", () => {
   const msg = formatRetryMessage(
     0,
     3,
@@ -170,7 +171,7 @@ Deno.test("FormatRetryMessage_StreamReadError", () => {
   assert(msg.includes("upstream stream read error"), msg);
 });
 
-Deno.test("FormatRetryMessage_OriginTimeout", () => {
+test("FormatRetryMessage_OriginTimeout", () => {
   const msg = formatRetryMessage(
     0,
     3,
@@ -180,7 +181,7 @@ Deno.test("FormatRetryMessage_OriginTimeout", () => {
   assert(msg.includes("origin timeout (HTTP 524)"), msg);
 });
 
-Deno.test("FormatRetryMessage_JSONErrorMessage", () => {
+test("FormatRetryMessage_JSONErrorMessage", () => {
   const openAIError = new Error(
     `HTTP 400: {"object":"error","message":"\\"auto\\" tool choice requires --enable-auto-tool-choice and --tool-call-parser to be set","type":"BadRequestError","param":null,"code":400}`,
   );
@@ -192,7 +193,7 @@ Deno.test("FormatRetryMessage_JSONErrorMessage", () => {
   assert(msg.includes("Retrying (1/3)"), msg);
 });
 
-Deno.test("FormatRetryMessage_JSONErrorNested", () => {
+test("FormatRetryMessage_JSONErrorNested", () => {
   const nestedError = new Error(
     `HTTP 400: {"error":{"message":"Invalid API key provided"},"code":400}`,
   );
@@ -200,13 +201,13 @@ Deno.test("FormatRetryMessage_JSONErrorNested", () => {
   assert(msg.includes("Invalid API key provided"), msg);
 });
 
-Deno.test("FormatRetryMessage_JSONErrorInvalid", () => {
+test("FormatRetryMessage_JSONErrorInvalid", () => {
   const invalidJSON = new Error("HTTP 400: not valid json {");
   const msg = formatRetryMessage(0, 3, 1000, invalidJSON);
   assert(msg.includes("error:"), msg);
 });
 
-Deno.test("RetryErrorDetailDoesNotFabricateHttpStatusFromUnrelatedNumber", () => {
+test("RetryErrorDetailDoesNotFabricateHttpStatusFromUnrelatedNumber", () => {
   // A bare `includes("500")` used to relabel any error whose text happened to
   // contain those digits as an HTTP status, hiding the original fault behind a
   // wrong category and pointing the user at the wrong fix. A number embedded in
@@ -229,7 +230,7 @@ Deno.test("RetryErrorDetailDoesNotFabricateHttpStatusFromUnrelatedNumber", () =>
   );
 });
 
-Deno.test("RetryErrorDetailNeverThrowsOnHostileInput", () => {
+test("RetryErrorDetailNeverThrowsOnHostileInput", () => {
   // Classification runs inside the provider retry loop, so it must degrade to a
   // best-effort line rather than throw and abort a live run that would otherwise
   // keep retrying. Here `message` is a throwing getter, so the cause-chain walk
@@ -245,7 +246,7 @@ Deno.test("RetryErrorDetailNeverThrowsOnHostileInput", () => {
   assert(typeof got === "string", "must return a string, not throw");
 });
 
-Deno.test("RetryErrorDetail", () => {
+test("RetryErrorDetail", () => {
   assertEquals(retryErrorDetail(null), "");
 
   const openAIError = new Error(
@@ -266,7 +267,7 @@ Deno.test("RetryErrorDetail", () => {
   assert(got.includes("boom at layer 1 at layer 2"), got);
 });
 
-Deno.test("TruncateErrRuneSafe", () => {
+test("TruncateErrRuneSafe", () => {
   const s = "错".repeat(100);
   const got = truncateErr(s, 50);
   assert(new TextEncoder().encode(got).length <= 50, `${got.length}`);
@@ -275,7 +276,7 @@ Deno.test("TruncateErrRuneSafe", () => {
   for (const r of body) assert(r === "错", `broken rune ${r}`);
 });
 
-Deno.test("IsRetryable_AuthenticationFailures", () => {
+test("IsRetryable_AuthenticationFailures", () => {
   const tests: Array<[string, unknown, number, boolean]> = [
     [
       "invalid api key message",

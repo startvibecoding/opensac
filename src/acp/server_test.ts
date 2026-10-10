@@ -10,15 +10,15 @@ import {
   assertEquals,
   assertNotStrictEquals,
   assertStrictEquals,
-} from "@opensac/assert";
-import * as path from "@opensac/path";
+} from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   acpDecisionDeadlineMarks,
   AcpServer,
   type AcpServerSink,
   workspaceAdditionalDirectoryLimit,
 } from "./server.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 import {
   DECISION_APPROVAL,
   DECISION_QUESTION,
@@ -35,6 +35,7 @@ import {
   TASK_SUCCESS,
 } from "../agent/events.ts";
 import { run as doctorRun } from "../doctor/doctor.ts";
+import { test } from "#testing";
 
 /** A synchronous in-memory sink, the port of the Go `syncedBuffer` fixture. */
 class SyncBuffer implements AcpServerSink {
@@ -141,7 +142,7 @@ function withEnv(name: string, value: string, fn: () => void): void {
 
 // ─── §4.1 run status ────────────────────────────────────────────────────────
 
-Deno.test("notifyRunStatus projects a run_status session event", () => {
+test("notifyRunStatus projects a run_status session event", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.notifyRunStatus("session-1", "run-1", "running");
@@ -157,7 +158,7 @@ Deno.test("notifyRunStatus projects a run_status session event", () => {
 
 // ─── §4.2 session metadata and projects ─────────────────────────────────────
 
-Deno.test("setSessionMeta validates params before storage", () => {
+test("setSessionMeta validates params before storage", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleSetSessionMeta(rpc(1, "opensac/session/setMeta", {}));
@@ -172,7 +173,7 @@ Deno.test("setSessionMeta validates params before storage", () => {
   for (const message of messages) assertRPCErrorCode(message, "invalid_params");
 });
 
-Deno.test("project handlers return structured errors without settings", () => {
+test("project handlers return structured errors without settings", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleProjectsList(rpc(1, "opensac/projects/list"));
@@ -189,7 +190,7 @@ Deno.test("project handlers return structured errors without settings", () => {
   assertRPCErrorCode(messages[4], "invalid_params");
 });
 
-Deno.test("project create/list/rename/delete round trip", () => {
+test("project create/list/rename/delete round trip", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   const sessionDir = Deno.makeTempDirSync();
@@ -230,7 +231,7 @@ Deno.test("project create/list/rename/delete round trip", () => {
 
 // ─── §4.3 workspace extension ───────────────────────────────────────────────
 
-Deno.test("workspace extend validates, merges, dedupes, and caps", () => {
+test("workspace extend validates, merges, dedupes, and caps", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.cwd = Deno.makeTempDirSync();
@@ -295,7 +296,7 @@ Deno.test("workspace extend validates, merges, dedupes, and caps", () => {
   assertEquals(server.workspaceAdditionalDirectories.length, 2);
 });
 
-Deno.test("workspace extend normalizes symlinks", () => {
+test("workspace extend normalizes symlinks", () => {
   const target = Deno.makeTempDirSync();
   const link = path.join(Deno.makeTempDirSync(), "link");
   try {
@@ -316,7 +317,7 @@ Deno.test("workspace extend normalizes symlinks", () => {
 
 // ─── §4.4 decision deadline reminders ───────────────────────────────────────
 
-Deno.test("scheduleDecisionDeadline emits both marks and stops cleanly", async () => {
+test("scheduleDecisionDeadline emits both marks and stops cleanly", async () => {
   const originalCap = acpDecisionDeadlineMarks.firstNoticeCapMs;
   const originalFinal = acpDecisionDeadlineMarks.finalNoticeMs;
   acpDecisionDeadlineMarks.firstNoticeCapMs = 3_600_000;
@@ -355,7 +356,7 @@ Deno.test("scheduleDecisionDeadline emits both marks and stops cleanly", async (
   }
 });
 
-Deno.test("scheduleDecisionDeadline stops before the first mark", async () => {
+test("scheduleDecisionDeadline stops before the first mark", async () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   const stop = server.scheduleDecisionDeadline(
@@ -375,7 +376,7 @@ Deno.test("scheduleDecisionDeadline stops before the first mark", async () => {
   stop(); // double stop is safe
 });
 
-Deno.test("scheduleDecisionDeadline skips the final notice for short timeouts", async () => {
+test("scheduleDecisionDeadline skips the final notice for short timeouts", async () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   // timeout/2 = 10ms fires; timeout-60s is negative and must not schedule.
@@ -401,7 +402,7 @@ Deno.test("scheduleDecisionDeadline skips the final notice for short timeouts", 
 
 // ─── §4.6 sub-agent lifecycle events ────────────────────────────────────────
 
-Deno.test("observeSubagentEvent projects started and a single terminal", () => {
+test("observeSubagentEvent projects started and a single terminal", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
 
@@ -517,7 +518,7 @@ Deno.test("observeSubagentEvent projects started and a single terminal", () => {
 
 // ─── §4.8 attachment listing ────────────────────────────────────────────────
 
-Deno.test("attachment list validates params before storage", () => {
+test("attachment list validates params before storage", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAttachmentList(rpc(1, "opensac/attachment/list"));
@@ -532,7 +533,7 @@ Deno.test("attachment list validates params before storage", () => {
 
 // ─── §4.9 capability discovery ──────────────────────────────────────────────
 
-Deno.test("initialize declares the Phase 1 feature keys", () => {
+test("initialize declares the Phase 1 feature keys", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleInitialize(rpc(1, "initialize", { protocolVersion: 1 }));
@@ -564,7 +565,7 @@ Deno.test("initialize declares the Phase 1 feature keys", () => {
   }
 });
 
-Deno.test("initialize advertises standard session lifecycle capabilities", () => {
+test("initialize advertises standard session lifecycle capabilities", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleInitialize(rpc(1, "initialize"));
@@ -598,7 +599,7 @@ Deno.test("initialize advertises standard session lifecycle capabilities", () =>
   );
 });
 
-Deno.test("initialize parses typed client capabilities", () => {
+test("initialize parses typed client capabilities", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleInitialize(
@@ -630,7 +631,7 @@ Deno.test("initialize parses typed client capabilities", () => {
   assert(typeof sessionCaps.additionalDirectories === "object");
 });
 
-Deno.test("initialize rejects a duplicate call", () => {
+test("initialize rejects a duplicate call", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleInitialize(rpc(1, "initialize", { protocolVersion: 1 }));
@@ -643,7 +644,7 @@ Deno.test("initialize rejects a duplicate call", () => {
 
 // ─── doctor ─────────────────────────────────────────────────────────────────
 
-Deno.test("handleDoctor does not require a session", () => {
+test("handleDoctor does not require a session", () => {
   const configDir = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
@@ -658,7 +659,7 @@ Deno.test("handleDoctor does not require a session", () => {
   });
 });
 
-Deno.test("handleDoctor uses the server cwd when the request omits it", () => {
+test("handleDoctor uses the server cwd when the request omits it", () => {
   const configDir = Deno.makeTempDirSync();
   const cwd = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
@@ -675,7 +676,7 @@ Deno.test("handleDoctor uses the server cwd when the request omits it", () => {
   });
 });
 
-Deno.test("initialize and doctor use the configured run version", () => {
+test("initialize and doctor use the configured run version", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.version = "0.3.1";
@@ -691,7 +692,7 @@ Deno.test("initialize and doctor use the configured run version", () => {
   assertEquals(doctorResult.version, "0.3.1");
 });
 
-Deno.test("doctor matches the shared doctor response", () => {
+test("doctor matches the shared doctor response", () => {
   const configDir = Deno.makeTempDirSync();
   const cwd = Deno.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
@@ -718,7 +719,7 @@ Deno.test("doctor matches the shared doctor response", () => {
   });
 });
 
-Deno.test("handleDoctor rejects a relative cwd", () => {
+test("handleDoctor rejects a relative cwd", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleDoctor(rpc(1, "opensac/doctor", { cwd: "relative" }));

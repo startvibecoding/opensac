@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createKnowledgeBase, getKnowledgeBase } from "../session/mod.ts";
 import {
   createKnowledgeBaseService,
@@ -9,8 +9,9 @@ import {
   knowledgeBaseIDFromCronJobID,
   runKnowledgeBaseCronJob,
 } from "./knowledge_cron.ts";
+import { test } from "#testing";
 
-Deno.test("run knowledge base cron job routes namespaced jobs only", async () => {
+test("run knowledge base cron job routes namespaced jobs only", async () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const service = createKnowledgeBaseService(
     sessionDir,
@@ -50,7 +51,7 @@ Deno.test("run knowledge base cron job routes namespaced jobs only", async () =>
   assert(nilThrew);
 });
 
-Deno.test("run knowledge base cron job indexes through canonical background path", async () => {
+test("run knowledge base cron job indexes through canonical background path", async () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   Deno.writeTextFileSync(
@@ -90,7 +91,7 @@ Deno.test("run knowledge base cron job indexes through canonical background path
   assertEquals(progress.progress.running, false);
 });
 
-Deno.test("run knowledge base cron job honors context cancellation", async () => {
+test("run knowledge base cron job honors context cancellation", async () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const base = createKnowledgeBase(sessionDir, {

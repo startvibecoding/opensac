@@ -1,11 +1,12 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { COMMAND, prompt } from "./systeminit.ts";
+import { test } from "#testing";
 
-Deno.test("CommandIsTheSlashSysteminit", () => {
+test("CommandIsTheSlashSysteminit", () => {
   assertEquals(COMMAND, "/systeminit");
 });
 
-Deno.test("PromptNonInteractiveOmitsQuestionGuidance", () => {
+test("PromptNonInteractiveOmitsQuestionGuidance", () => {
   const p = prompt(false, "");
   assert(p.includes("high-quality AGENTS.md"));
   assert(!p.includes("question` tool"));
@@ -13,13 +14,13 @@ Deno.test("PromptNonInteractiveOmitsQuestionGuidance", () => {
   assertEquals(p, prompt(false, ""));
 });
 
-Deno.test("PromptInteractiveAddsQuestionGuidance", () => {
+test("PromptInteractiveAddsQuestionGuidance", () => {
   const p = prompt(true, "");
   assert(p.includes("question` tool"));
   assert(p.endsWith("When done, briefly summarize what you wrote and where."));
 });
 
-Deno.test("PromptAppendsTrimmedExtraBeforeFinalNote", () => {
+test("PromptAppendsTrimmedExtraBeforeFinalNote", () => {
   const p = prompt(false, "  write AGENTS.md in English  ");
   assert(
     p.includes(
@@ -32,7 +33,7 @@ Deno.test("PromptAppendsTrimmedExtraBeforeFinalNote", () => {
   );
 });
 
-Deno.test("PromptIgnoresBlankExtra", () => {
+test("PromptIgnoresBlankExtra", () => {
   assertEquals(prompt(false, "   \n\t"), prompt(false, ""));
   assertEquals(prompt(true, " "), prompt(true, ""));
 });

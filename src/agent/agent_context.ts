@@ -18,7 +18,7 @@ import {
   type ToolDefinition,
   type Usage,
 } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import { retryDelay } from "../provider/retry.ts";
 import {
   estimateGuardTokens,
@@ -26,7 +26,7 @@ import {
   GenericTokenEstimator,
   type TokenEstimator,
 } from "../context/tokenizer.ts";
-import type { ToolImage } from "./events.ts";
+import { type ToolImage } from "./events.ts";
 
 /** Default auto-compaction threshold (fraction of the context window). */
 export const defaultAutoCompactionThreshold = 0.80;

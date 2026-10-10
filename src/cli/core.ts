@@ -51,7 +51,7 @@ import {
 } from "../core/server.ts";
 import { SOURCE_UNKNOWN } from "../agentruntime/source.ts";
 import { current as currentVersion } from "../version/version.ts";
-import type { CoreRuntimeHost } from "../core/runtime.ts";
+import { type CoreRuntimeHost } from "../core/runtime.ts";
 
 /** Options that can override process/environment-derived Core inputs. */
 export interface CoreCommandOptions {

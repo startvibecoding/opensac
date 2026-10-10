@@ -2,7 +2,7 @@
 // provider: provider listing, default-model persistence, TUI language, cron
 // gating, and the clipboard reader's fallback behavior.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
 import { Translator } from "./i18n.ts";
 import { createFakeTUIService } from "./service.ts";
@@ -10,6 +10,7 @@ import {
   TuiSessionCommands,
   type TuiSessionLike,
 } from "./tui_session_commands.ts";
+import { test } from "#testing";
 
 interface Stub {
   commands: TuiSessionCommands;
@@ -39,33 +40,33 @@ function stub(multiAgent = false): Stub {
   return { commands: new TuiSessionCommands(session), settings, messages };
 }
 
-Deno.test("showProviders lists configured providers and usage", async () => {
+test("showProviders lists configured providers and usage", async () => {
   const { commands } = stub();
   const text = await commands.showProviders();
   assertStringIncludes(text, "Providers");
   assertStringIncludes(text, "test-provider");
 });
 
-Deno.test("tuiLang reports the configured language", async () => {
+test("tuiLang reports the configured language", async () => {
   const { commands } = stub();
   const result = await commands.tuiLang(["/tuilang"]);
   assertStringIncludes(result.message ?? "", "auto");
 });
 
-Deno.test("tuiLang rejects an invalid value", async () => {
+test("tuiLang rejects an invalid value", async () => {
   const { commands } = stub();
   const result = await commands.tuiLang(["/tuilang", "global", "klingon"]);
   assertEquals(result.error, true);
 });
 
-Deno.test("cron is gated on multi-agent mode", () => {
+test("cron is gated on multi-agent mode", () => {
   const { commands } = stub(false);
   const result = commands.cron(["/cron", "list"]);
   assertEquals(result.error, true);
   assertStringIncludes(result.message ?? "", "multi-agent");
 });
 
-Deno.test("cron rejects an unknown subcommand", () => {
+test("cron rejects an unknown subcommand", () => {
   // The cron store opens the shared session database: keep it inside a temp
   // config dir so tests never touch the developer's real sessions.db.
   const iso = isolateConfigDir();
@@ -96,7 +97,7 @@ function isolateConfigDir(): { restore: () => void } {
   };
 }
 
-Deno.test("setDefaultModel validates scope and persists globally", async () => {
+test("setDefaultModel validates scope and persists globally", async () => {
   const iso = isolateConfigDir();
   try {
     const { commands, settings } = stub();
@@ -111,13 +112,13 @@ Deno.test("setDefaultModel validates scope and persists globally", async () => {
   }
 });
 
-Deno.test("previewPastedImage reports when nothing was pasted", () => {
+test("previewPastedImage reports when nothing was pasted", () => {
   const { commands } = stub();
   const result = commands.previewPastedImage();
   assertStringIncludes(result.message ?? "", "No image");
 });
 
-Deno.test("handleBTW asks the Core-owned transient query", async () => {
+test("handleBTW asks the Core-owned transient query", async () => {
   const settings = defaultSettings();
   const service = createFakeTUIService();
   await service.createSession({ workDir: Deno.cwd(), sessionId: "s1" });
@@ -146,7 +147,7 @@ Deno.test("handleBTW asks the Core-owned transient query", async () => {
   assertEquals((await commands.handleBTW("")).message !== undefined, true);
 });
 
-Deno.test("systemInit refuses to run while the agent is busy", async () => {
+test("systemInit refuses to run while the agent is busy", async () => {
   const settings = defaultSettings();
   const session = {
     translator: new Translator("en"),

@@ -3,15 +3,14 @@
 // implementation used by tests. The SQLite-backed `Manager` in `manager.ts`
 // provides the production implementation of this interface.
 
-import type { Message } from "../provider/types.ts";
-import type {
-  AdditionalDirectoriesEntry,
-  CompactionEntry,
-  Header,
-  ModeChangeEntry,
-  ModelChangeEntry,
-  ThinkingLevelChangeEntry,
-} from "./entry.ts";
+import { type Message } from "../provider/types.ts";
+import {
+  type AdditionalDirectoriesEntry,
+  type CompactionEntry,
+  type Header,
+  type ModeChangeEntry,
+  type ModelChangeEntry,
+  type ThinkingLevelChangeEntry} from "./entry.ts";
 import {
   entryAdditionalDirectories,
   entryCompaction,
@@ -24,7 +23,7 @@ import {
   generateID,
 } from "./entry.ts";
 import { buildReplayState, latestCompactionLocked } from "./replay.ts";
-import type { ReplayState } from "./replay.ts";
+import { type ReplayState } from "./replay.ts";
 
 /** The session entry-format version persisted in every Header. */
 export const currentVersion = 3;

@@ -4,7 +4,7 @@
 // reindexed in place so Chinese phrase queries match afterwards, without
 // touching graph rows or the active snapshot.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import {
   KNOWLEDGE_GRAPH_SCHEMA_VERSION,
@@ -15,10 +15,11 @@ import {
   queryKnowledgeBaseDatabase,
 } from "./knowledge_database.ts";
 import { knowledgeStoreSchema } from "./migrations.ts";
+import { test } from "#testing";
 
 const knowledgeStoreSchemaVersion = 2;
 
-Deno.test("knowledge store migrates legacy fts to bigram index", () => {
+test("knowledge store migrates legacy fts to bigram index", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {

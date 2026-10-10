@@ -1,4 +1,4 @@
-import type { Registry, Tool, ToolContext, ToolResult } from "./tool.ts";
+import { Registry, type Tool, type ToolContext, type ToolResult } from "./tool.ts";
 import { createTextToolResult } from "./tool.ts";
 
 /** Lists directory contents. */

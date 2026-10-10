@@ -2,15 +2,16 @@
 // from Delete (Ink collapses both onto DEL), arrows/ctrl/alt decode, and
 // bracketed paste folds to one event.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { coalesceSplitPaste, splitInputChunk } from "./keys.ts";
+import { test } from "#testing";
 
-Deno.test("plain text chunk becomes one text event", () => {
+test("plain text chunk becomes one text event", () => {
   const events = splitInputChunk("hello");
   assertEquals(events, [{ type: "text", text: "hello", paste: false }]);
 });
 
-Deno.test("DEL byte is backspace, not delete", () => {
+test("DEL byte is backspace, not delete", () => {
   assertEquals(splitInputChunk("\x7f"), [{
     type: "key",
     name: "backspace",
@@ -29,7 +30,7 @@ Deno.test("DEL byte is backspace, not delete", () => {
   }]);
 });
 
-Deno.test("arrows and modifiers decode", () => {
+test("arrows and modifiers decode", () => {
   assertEquals(splitInputChunk("\x1b[A"), [{
     type: "key",
     name: "up",
@@ -62,7 +63,7 @@ Deno.test("arrows and modifiers decode", () => {
   }]);
 });
 
-Deno.test("ctrl letters and enter/newline decode", () => {
+test("ctrl letters and enter/newline decode", () => {
   assertEquals(splitInputChunk("\x01"), [{
     type: "key",
     name: "ctrl+a",
@@ -95,7 +96,7 @@ Deno.test("ctrl letters and enter/newline decode", () => {
   }]);
 });
 
-Deno.test("alt+enter and alt+letter decode", () => {
+test("alt+enter and alt+letter decode", () => {
   assertEquals(splitInputChunk("\x1b\r"), [{
     type: "key",
     name: "enter",
@@ -108,7 +109,7 @@ Deno.test("alt+enter and alt+letter decode", () => {
   }]);
 });
 
-Deno.test("Batched input splits into individual keys", () => {
+test("Batched input splits into individual keys", () => {
   const events = splitInputChunk("hi\r");
   assertEquals(events, [
     { type: "text", text: "hi", paste: false },
@@ -116,19 +117,19 @@ Deno.test("Batched input splits into individual keys", () => {
   ]);
 });
 
-Deno.test("bracketed paste becomes one paste text event", () => {
+test("bracketed paste becomes one paste text event", () => {
   const events = splitInputChunk("\x1b[200~line1\nline2\x1b[201~");
   assertEquals(events, [{ type: "text", text: "line1\nline2", paste: true }]);
 });
 
-Deno.test("long text runs are marked as paste", () => {
+test("long text runs are marked as paste", () => {
   const events = splitInputChunk("x".repeat(600));
   assertEquals(events.length, 1);
   assertEquals(events[0].type, "text");
   assertEquals((events[0] as { paste: boolean }).paste, true);
 });
 
-Deno.test("coalesceSplitPaste joins split pastes but not plain typing", () => {
+test("coalesceSplitPaste joins split pastes but not plain typing", () => {
   assertEquals(coalesceSplitPaste(splitInputChunk("a\nb\nc")), "a\nb\nc");
   assertEquals(coalesceSplitPaste(splitInputChunk("hi")), null);
   assertEquals(coalesceSplitPaste(splitInputChunk("hi\r")), null);

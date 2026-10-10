@@ -11,7 +11,7 @@
 // `bufio.Reader.ReadSlice` maps to `ACPLineReader.readLine()`.
 
 import type { RPCError } from "../mcp/rpc.ts";
-import type { SessionUpdate } from "./protocol.ts";
+import { type SessionUpdate } from "./protocol.ts";
 
 /** Advertised ACP protocol revision (matches the Go constant). */
 export const acpProtocolVersion = 1;

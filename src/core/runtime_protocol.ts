@@ -1,5 +1,5 @@
-import type { CoreRpcParams } from "./protocol.ts";
-import type { CorePreparedInput } from "./runtime.ts";
+import { type CoreRpcParams } from "./protocol.ts";
+import { type CorePreparedInput } from "./runtime.ts";
 
 /** Domain methods exposed by the Core Runtime Host. */
 export const CORE_RUNTIME_METHODS = {
@@ -189,8 +189,11 @@ export class CoreSessionNotResidentError extends Error {
   override name = "CoreSessionNotResidentError";
   readonly code = CORE_ERROR_SESSION_NOT_RESIDENT;
 
-  constructor(readonly sessionId: string) {
+    readonly sessionId: string;
+
+  constructor(sessionId: string) {
     super(`session not found: ${sessionId}`);
+    this.sessionId = sessionId;
   }
 }
 

@@ -4,9 +4,9 @@
 // covered by session_runtime_test.ts; the manifest assertion here exercises
 // the materializer's own deterministic `buildManifest` instead.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import { decodeBase64 } from "@opensac/encoding/base64";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import { decodeBase64 } from "../compat/encoding.ts";
+import * as path from "../compat/path.ts";
 import { InputResourceDAO } from "../dao/mod.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases, openRootDB } from "../session/root_db.ts";
@@ -18,6 +18,7 @@ import {
   type InputIngress,
   InputMaterializer,
 } from "./input_materializer.ts";
+import { test } from "#testing";
 
 const encoder = new TextEncoder();
 
@@ -57,7 +58,7 @@ function onePixelPNG(): Uint8Array {
   );
 }
 
-Deno.test("InputMaterializerWritesProjectResourceAndManifest", async () => {
+test("InputMaterializerWritesProjectResourceAndManifest", async () => {
   const { root, workDir, sessionId } = inputTestSession();
   try {
     const materializer = new InputMaterializer(
@@ -100,7 +101,7 @@ Deno.test("InputMaterializerWritesProjectResourceAndManifest", async () => {
   }
 });
 
-Deno.test(
+test(
   "InputMaterializerCanonicalizesImageWithoutDirectProviderContent",
   async () => {
     const { root, workDir, sessionId } = inputTestSession();
@@ -130,7 +131,7 @@ Deno.test(
   },
 );
 
-Deno.test("InputMaterializerDetectsExtensionlessWebP", async () => {
+test("InputMaterializerDetectsExtensionlessWebP", async () => {
   const { root, workDir, sessionId } = inputTestSession();
   try {
     const materializer = new InputMaterializer(
@@ -158,7 +159,7 @@ Deno.test("InputMaterializerDetectsExtensionlessWebP", async () => {
   }
 });
 
-Deno.test("InputMaterializerDeduplicatesConcurrentEventItem", async () => {
+test("InputMaterializerDeduplicatesConcurrentEventItem", async () => {
   const { root, workDir, sessionId } = inputTestSession();
   try {
     const materializer = new InputMaterializer(
@@ -188,7 +189,7 @@ Deno.test("InputMaterializerDeduplicatesConcurrentEventItem", async () => {
   }
 });
 
-Deno.test("InputMaterializerUsesStableHMACForReferenceFallback", async () => {
+test("InputMaterializerUsesStableHMACForReferenceFallback", async () => {
   const { root, workDir, sessionId } = inputTestSession();
   try {
     const materializer = new InputMaterializer(
@@ -219,7 +220,7 @@ Deno.test("InputMaterializerUsesStableHMACForReferenceFallback", async () => {
   }
 });
 
-Deno.test("InputResourceLifecycleEventsAndDraftCleanup", async () => {
+test("InputResourceLifecycleEventsAndDraftCleanup", async () => {
   const { root, workDir, sessionId } = inputTestSession();
   try {
     const materializer = new InputMaterializer(root, workDir, {
@@ -290,7 +291,7 @@ Deno.test("InputResourceLifecycleEventsAndDraftCleanup", async () => {
   }
 });
 
-Deno.test("InputMaterializerRejectsOversizedAndInvalidImage", async () => {
+test("InputMaterializerRejectsOversizedAndInvalidImage", async () => {
   const { root, workDir, sessionId } = inputTestSession();
   try {
     const materializer = new InputMaterializer(root, workDir, {

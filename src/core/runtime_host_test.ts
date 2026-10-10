@@ -4,9 +4,9 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
-import { encodeBase64 } from "@opensac/encoding/base64";
-import { join } from "@opensac/path";
+} from "../compat/assert.ts";
+import { encodeBase64 } from "../compat/encoding.ts";
+import { join } from "../compat/path.ts";
 import {
   defaultSettings,
   getSessionDir,
@@ -59,12 +59,11 @@ import {
   createProductionCoreExtensionHandler,
   createProductionCoreRuntimeDependencies,
 } from "./runtime_host.ts";
-import type {
-  CoreExtensionHandler,
-  CoreRuntimeEvent,
-  CoreRuntimeHostOptions,
-  CoreSessionRuntime,
-} from "./runtime.ts";
+import {
+  type CoreExtensionHandler,
+  type CoreRuntimeEvent,
+  type CoreRuntimeHostOptions,
+  type CoreSessionRuntime} from "./runtime.ts";
 import {
   testWithIsolatedConfig as test,
   withIsolatedConfig,

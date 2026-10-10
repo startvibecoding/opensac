@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { builtinFS, type Bundle, loadBundleFS } from "./mod.ts";
 import {
   expertSchemaVersion,
@@ -7,6 +7,7 @@ import {
   typeAgent,
   typeTeam,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function loadSeed(name: string): Bundle {
   const b = loadBundleFS(builtinFS, name);
@@ -14,7 +15,7 @@ function loadSeed(name: string): Bundle {
   return b;
 }
 
-Deno.test("builtin seeds load valid", () => {
+test("builtin seeds load valid", () => {
   const entries = builtinFS.readDir(".") ?? [];
   const found = new Set(entries.map((e) => e.name));
   for (const seed of ["software-company", "frontend-developer"]) {
@@ -24,7 +25,7 @@ Deno.test("builtin seeds load valid", () => {
   }
 });
 
-Deno.test("software company seed", () => {
+test("software company seed", () => {
   const b = loadSeed("software-company");
 
   assertEquals(b.manifest.schemaVersion, expertSchemaVersion);
@@ -138,7 +139,7 @@ Deno.test("software company seed", () => {
   }
 });
 
-Deno.test("frontend developer seed", () => {
+test("frontend developer seed", () => {
   const b = loadSeed("frontend-developer");
 
   assertEquals(b.manifest.expertType, typeAgent);

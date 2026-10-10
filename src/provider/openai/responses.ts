@@ -5,17 +5,16 @@
 // decoded values for replay items.
 
 import { wrapError } from "../errors.ts";
-import type {
-  ChatParams,
-  ContentBlock,
-  Message,
-  Model,
-  ResponseOptions,
-  StructuredOutputOptions,
-  ToolChoice,
-  ToolDefinition,
-  Usage,
-} from "../types.ts";
+import {
+  type ChatParams,
+  type ContentBlock,
+  type Message,
+  type Model,
+  type ResponseOptions,
+  type StructuredOutputOptions,
+  type ToolChoice,
+  type ToolDefinition,
+  type Usage} from "../types.ts";
 import {
   asJsonRecord,
   optNumber,
@@ -56,7 +55,7 @@ import {
 } from "../retry.ts";
 import { nextToolCallFallbackId } from "../toolcall_id.ts";
 import { providerUserAgent } from "../../ua/ua.ts";
-import type { ResponsesHostedPolicy } from "./hosted_registry.ts";
+import { type ResponsesHostedPolicy } from "./hosted_registry.ts";
 import {
   cloneStringMap,
   cloneStringSlice,

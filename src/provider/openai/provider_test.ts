@@ -2,7 +2,7 @@
 // Go's httptest-based mock client is replaced by an injected fetch client
 // (see test_helpers.ts) that returns prepared Response objects.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../../compat/assert.ts";
 import {
   cacheInfo,
   type ChatParams,
@@ -44,6 +44,7 @@ import {
   mustUsage,
 } from "./test_helpers.ts";
 import { createOpenAIProvider } from "./provider.ts";
+import { test } from "#testing";
 
 function model(id: string, extra: Partial<Model> = {}): Model {
   return {
@@ -76,7 +77,7 @@ function createAssistantToolCall(contents: Message["contents"]): Message {
 
 // ─── retries ─────────────────────────────────────────────────────────────────
 
-Deno.test("OpenAIRetriesEarlyStreamReadError", async () => {
+test("OpenAIRetriesEarlyStreamReadError", async () => {
   const streamErr = new Error(
     "read tcp 192.168.1.143:44252-180.76.199.86:443: read: connection reset by peer",
   );
@@ -117,7 +118,7 @@ Deno.test("OpenAIRetriesEarlyStreamReadError", async () => {
   assert(sawDone);
 });
 
-Deno.test("OpenAIRetriesGeneric4xxResponse", async () => {
+test("OpenAIRetriesGeneric4xxResponse", async () => {
   let attempts = 0;
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("mock"),
@@ -159,7 +160,7 @@ Deno.test("OpenAIRetriesGeneric4xxResponse", async () => {
   assert(sawRetry && sawText && sawDone);
 });
 
-Deno.test("OpenAIPreservesFinal4xxDiagnosticAfterRetries", async () => {
+test("OpenAIPreservesFinal4xxDiagnosticAfterRetries", async () => {
   let attempts = 0;
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("mock"),
@@ -190,7 +191,7 @@ Deno.test("OpenAIPreservesFinal4xxDiagnosticAfterRetries", async () => {
   throw new Error("expected final provider error");
 });
 
-Deno.test("OpenAIDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
+test("OpenAIDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   const streamErr = new Error(
     "stream error: stream ID 19; INTERNAL_ERROR; received from peer",
   );
@@ -234,7 +235,7 @@ Deno.test("OpenAIDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
 
 // ─── convertMessages ─────────────────────────────────────────────────────────
 
-Deno.test("ConvertMessagesToolResultUsesTextContents", () => {
+test("ConvertMessagesToolResultUsesTextContents", () => {
   const p = new Provider(
     "openai",
     "",
@@ -265,7 +266,7 @@ Deno.test("ConvertMessagesToolResultUsesTextContents", () => {
   assertEquals(messages[0].content, "bash output from content block");
 });
 
-Deno.test("ConvertMessagesToolResultIncludesKimiToolName", () => {
+test("ConvertMessagesToolResultIncludesKimiToolName", () => {
   const p = new Provider(
     "openai",
     "",
@@ -302,7 +303,7 @@ Deno.test("ConvertMessagesToolResultIncludesKimiToolName", () => {
   assertEquals(messages[1].name, "read");
 });
 
-Deno.test("ConvertMessagesImageDetailForOfficialProviders", async (t) => {
+test("ConvertMessagesImageDetailForOfficialProviders", async (t) => {
   const tests = [
     {
       name: "openai detail",
@@ -388,7 +389,7 @@ function countImages(
   return imageCount;
 }
 
-Deno.test("ConvertMessagesLimitsHistoricalImagesForMoark", () => {
+test("ConvertMessagesLimitsHistoricalImagesForMoark", () => {
   const input = imageMessages(6);
   const p = createOpenAIProvider("key", "https://api.moark.com/v1", []);
   const got = p.convertMessages(params({ messages: input }), false);
@@ -397,14 +398,14 @@ Deno.test("ConvertMessagesLimitsHistoricalImagesForMoark", () => {
   assertEquals(got[0].content, "[image omitted: provider image limit]");
 });
 
-Deno.test("ConvertMessagesDoesNotLimitImagesForOtherGateways", () => {
+test("ConvertMessagesDoesNotLimitImagesForOtherGateways", () => {
   const input = imageMessages(6);
   const p = createOpenAIProvider("key", "https://api.example.test/v1", []);
   const got = p.convertMessages(params({ messages: input }), false);
   assertEquals(countImages(got), 6);
 });
 
-Deno.test("ConvertMessagesUsesConfiguredImageLimit", () => {
+test("ConvertMessagesUsesConfiguredImageLimit", () => {
   const input = imageMessages(4);
   const p = createOpenAIProvider("key", "https://api.example.test/v1", []);
   p.setMaxImagesPerRequest(2);
@@ -421,7 +422,7 @@ Deno.test("ConvertMessagesUsesConfiguredImageLimit", () => {
 
 // ─── headers / requests ──────────────────────────────────────────────────────
 
-Deno.test("OpenAICustomHeaders", async () => {
+test("OpenAICustomHeaders", async () => {
   const { provider: p } = createMockOpenAIProvider(
     [model("gpt-test")],
     "data: [DONE]\n",
@@ -443,7 +444,7 @@ Deno.test("OpenAICustomHeaders", async () => {
   );
 });
 
-Deno.test("OpenAIChatParallelToolCallsRequest", async (t) => {
+test("OpenAIChatParallelToolCallsRequest", async (t) => {
   const tests = [
     {
       name: "defaults enabled when function tools are present",
@@ -499,7 +500,7 @@ Deno.test("OpenAIChatParallelToolCallsRequest", async (t) => {
   }
 });
 
-Deno.test("OpenAIChatParsesMultipleToolCalls", async () => {
+test("OpenAIChatParsesMultipleToolCalls", async () => {
   const toolChunk = (
     index: number,
     id: string,
@@ -547,7 +548,7 @@ Deno.test("OpenAIChatParsesMultipleToolCalls", async () => {
 
 // ─── thinking helpers ────────────────────────────────────────────────────────
 
-Deno.test("OpenAIKimiThinkingEffort", () => {
+test("OpenAIKimiThinkingEffort", () => {
   const cases: Array<[ThinkingLevel, string]> = [
     [thinkingMinimal, "low"],
     [thinkingLow, "low"],
@@ -560,7 +561,7 @@ Deno.test("OpenAIKimiThinkingEffort", () => {
   }
 });
 
-Deno.test("DeepSeekReasoningEffort", () => {
+test("DeepSeekReasoningEffort", () => {
   assertEquals(deepseekReasoningEffort(thinkingMinimal), "high");
   assertEquals(deepseekReasoningEffort(thinkingLow), "high");
   assertEquals(deepseekReasoningEffort(thinkingMedium), "high");
@@ -568,7 +569,7 @@ Deno.test("DeepSeekReasoningEffort", () => {
   assertEquals(deepseekReasoningEffort(thinkingXHigh), "max");
 });
 
-Deno.test("DoubaoSeedReasoningEffort", () => {
+test("DoubaoSeedReasoningEffort", () => {
   assertEquals(doubaoSeedReasoningEffort(thinkingMinimal), "minimal");
   assertEquals(doubaoSeedReasoningEffort(thinkingLow), "low");
   assertEquals(doubaoSeedReasoningEffort(thinkingMedium), "medium");
@@ -577,7 +578,7 @@ Deno.test("DoubaoSeedReasoningEffort", () => {
   assertEquals(doubaoSeedReasoningEffort(thinkingOff), "");
 });
 
-Deno.test("IsDoubaoSeedModel", () => {
+test("IsDoubaoSeedModel", () => {
   assertEquals(isDoubaoSeedModel("doubao-seed-2.1-turbo"), true);
   assertEquals(isDoubaoSeedModel("doubao-seed-2-1-turbo-260628"), true);
   assertEquals(isDoubaoSeedModel("doubao-seed-evolving"), true);
@@ -585,7 +586,7 @@ Deno.test("IsDoubaoSeedModel", () => {
   assertEquals(isDoubaoSeedModel("deepseek-v4-pro"), false);
 });
 
-Deno.test("QwenThinkingBudget", () => {
+test("QwenThinkingBudget", () => {
   assertEquals(qwenThinkingBudget(thinkingMinimal), 500);
   assertEquals(qwenThinkingBudget(thinkingLow), 500);
   assertEquals(qwenThinkingBudget(thinkingMedium), 4096);
@@ -593,7 +594,7 @@ Deno.test("QwenThinkingBudget", () => {
   assertEquals(qwenThinkingBudget(thinkingXHigh), 10240);
 });
 
-Deno.test("IsQwenModel", () => {
+test("IsQwenModel", () => {
   for (
     const id of [
       "qwen3.6-flash",
@@ -620,7 +621,7 @@ Deno.test("IsQwenModel", () => {
   }
 });
 
-Deno.test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
+test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("deepseek-test", { reasoning: true }),
   ], "data: [DONE]\n");
@@ -643,7 +644,7 @@ Deno.test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
   assertEquals(req.reasoning_effort, "max");
 });
 
-Deno.test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
+test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("deepseek-v4-flash", { reasoning: true }),
   ], "data: [DONE]\n");
@@ -666,7 +667,7 @@ Deno.test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
   assertEquals(req.reasoning_effort, "high");
 });
 
-Deno.test("OpenAIThinkingFormatFromModelCompat", async () => {
+test("OpenAIThinkingFormatFromModelCompat", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("compat-test", {
       reasoning: true,
@@ -691,7 +692,7 @@ Deno.test("OpenAIThinkingFormatFromModelCompat", async () => {
   assertEquals(req.reasoning_effort, "high");
 });
 
-Deno.test("OpenAIThinkingFormatQwen", async (t) => {
+test("OpenAIThinkingFormatQwen", async (t) => {
   const cases = [
     {
       name: "qwen3.7-plus low",
@@ -747,7 +748,7 @@ Deno.test("OpenAIThinkingFormatQwen", async (t) => {
 
 // ─── max tokens / compat fields ──────────────────────────────────────────────
 
-Deno.test("OpenAIOmitsMaxTokensByDefault", async () => {
+test("OpenAIOmitsMaxTokensByDefault", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("gpt-test", { maxTokens: 64000 }),
   ], "data: [DONE]\n");
@@ -768,7 +769,7 @@ Deno.test("OpenAIOmitsMaxTokensByDefault", async () => {
   assert(!("max_completion_tokens" in raw));
 });
 
-Deno.test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
+test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("gpt-5-mini", { maxTokens: 64000 }),
   ], "data: [DONE]\n");
@@ -790,7 +791,7 @@ Deno.test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
   assertEquals(raw["max_completion_tokens"], 2048);
 });
 
-Deno.test("OpenAIModelCompatRequestFields", async () => {
+test("OpenAIModelCompatRequestFields", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("compat-fields", {
       reasoning: true,
@@ -820,7 +821,7 @@ Deno.test("OpenAIModelCompatRequestFields", async () => {
   assert(!("reasoning_effort" in raw));
 });
 
-Deno.test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
+test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
   let attempts = 0;
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("custom-reasoning-model"),
@@ -850,7 +851,7 @@ Deno.test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
   assertEquals(attempts, 2);
 });
 
-Deno.test("OpenAIRequiresReasoningContentOnAssistant", async () => {
+test("OpenAIRequiresReasoningContentOnAssistant", async () => {
   const { provider: p } = createMockOpenAIProvider([
     model("compat-reasoning", {
       compat: { requiresReasoningContentOnAssistant: true },
@@ -884,7 +885,7 @@ Deno.test("OpenAIRequiresReasoningContentOnAssistant", async () => {
 
 // ─── normalizeToolResultSequence ─────────────────────────────────────────────
 
-Deno.test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
+test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
   const messages: Message[] = [
     createAssistantToolCall([{
       type: "toolCall",
@@ -902,7 +903,7 @@ Deno.test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
   assertEquals(got[2].role, "user");
 });
 
-Deno.test("NormalizeToolResultSequenceDoesNotDuplicateResults", () => {
+test("NormalizeToolResultSequenceDoesNotDuplicateResults", () => {
   const messages: Message[] = [
     createAssistantToolCall([{
       type: "toolCall",
@@ -913,7 +914,7 @@ Deno.test("NormalizeToolResultSequenceDoesNotDuplicateResults", () => {
   assertEquals(normalizeToolResultSequence(messages).length, messages.length);
 });
 
-Deno.test("NormalizeToolResultSequenceOrdersAndFiltersResults", () => {
+test("NormalizeToolResultSequenceOrdersAndFiltersResults", () => {
   const messages: Message[] = [
     createAssistantToolCall([
       { type: "toolCall", toolCall: { id: "a", name: "read" } },
@@ -930,7 +931,7 @@ Deno.test("NormalizeToolResultSequenceOrdersAndFiltersResults", () => {
   assertEquals(got[2].toolCallId, "b");
 });
 
-Deno.test("NormalizeToolResultSequenceDropsOrphanedResults", () => {
+test("NormalizeToolResultSequenceDropsOrphanedResults", () => {
   const messages: Message[] = [
     createAssistantToolCall([{
       type: "toolCall",
@@ -945,7 +946,7 @@ Deno.test("NormalizeToolResultSequenceDropsOrphanedResults", () => {
   assertEquals(got[2].role, "user");
 });
 
-Deno.test("OpenAIRequiresReasoningContentForKimiModels", () => {
+test("OpenAIRequiresReasoningContentForKimiModels", () => {
   const p = createOpenAIProvider("key", "https://api.test/v1", []);
   assert(p.requiresReasoningContentOnAssistant(model("kimi-k3")));
   assert(p.requiresReasoningContentOnAssistant(model("k3")));
@@ -953,7 +954,7 @@ Deno.test("OpenAIRequiresReasoningContentForKimiModels", () => {
 
 // ─── cache / tool call parsing ───────────────────────────────────────────────
 
-Deno.test("OpenAICache_CacheHit", async () => {
+test("OpenAICache_CacheHit", async () => {
   const sse = 'data: {"choices":[{"delta":{"content":"Hello"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":5,"total_tokens":1005,"prompt_tokens_details":{"cached_tokens":750}}}\n' +
     "data: [DONE]\n";
@@ -967,7 +968,7 @@ Deno.test("OpenAICache_CacheHit", async () => {
   assertEquals(cacheInfo(u), "Cache: 75%");
 });
 
-Deno.test("OpenAICache_NoCache", async () => {
+test("OpenAICache_NoCache", async () => {
   const sse = 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":200,"completion_tokens":8,"total_tokens":208}}\n' +
     "data: [DONE]\n";
@@ -980,7 +981,7 @@ Deno.test("OpenAICache_NoCache", async () => {
   assertEquals(cacheInfo(u), "Cache: 0%");
 });
 
-Deno.test("OpenAICache_100Pct", async () => {
+test("OpenAICache_100Pct", async () => {
   const sse = 'data: {"choices":[{"delta":{"content":"Full"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":500,"completion_tokens":4,"total_tokens":504,"prompt_tokens_details":{"cached_tokens":500}}}\n' +
     "data: [DONE]\n";
@@ -992,7 +993,7 @@ Deno.test("OpenAICache_100Pct", async () => {
   assertEquals(cacheInfo(u), "Cache: 100%");
 });
 
-Deno.test("OpenAICache_ProxyFirstChunkHasUsage", async () => {
+test("OpenAICache_ProxyFirstChunkHasUsage", async () => {
   const sse =
     'data: {"choices":[{"delta":{"content":"Hey"}}],"usage":{"prompt_tokens":800,"completion_tokens":3,"total_tokens":803,"prompt_tokens_details":{"cached_tokens":600}}}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n' +
@@ -1006,7 +1007,7 @@ Deno.test("OpenAICache_ProxyFirstChunkHasUsage", async () => {
   assertEquals(cacheInfo(u), "Cache: 75%");
 });
 
-Deno.test("OpenAICache_ProxyFirstWinsOnConflict", async () => {
+test("OpenAICache_ProxyFirstWinsOnConflict", async () => {
   const sse =
     'data: {"choices":[{"delta":{"content":"A"}}],"usage":{"prompt_tokens":1000,"completion_tokens":6,"total_tokens":1006,"prompt_tokens_details":{"cached_tokens":750}}}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":999,"completion_tokens":99,"total_tokens":1098,"prompt_tokens_details":{"cached_tokens":800}}}\n' +
@@ -1021,7 +1022,7 @@ Deno.test("OpenAICache_ProxyFirstWinsOnConflict", async () => {
   assertEquals(cacheInfo(u), "Cache: 75%");
 });
 
-Deno.test("OpenAICache_ProxySplitUsage", async () => {
+test("OpenAICache_ProxySplitUsage", async () => {
   const sse =
     'data: {"choices":[{"delta":{"content":"B"}}],"usage":{"prompt_tokens":400,"completion_tokens":7,"total_tokens":407}}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0,"prompt_tokens_details":{"cached_tokens":300}}}\n' +
@@ -1036,7 +1037,7 @@ Deno.test("OpenAICache_ProxySplitUsage", async () => {
   assertEquals(cacheInfo(u), "Cache: 75%");
 });
 
-Deno.test("OpenAIToolCall_MissingIDGetsFallback", async () => {
+test("OpenAIToolCall_MissingIDGetsFallback", async () => {
   const sse =
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"type":"function","function":{"name":"bash","arguments":"{\\"command\\":"}}]},"finish_reason":null}]}\n' +
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"type":"function","function":{"arguments":"\\"echo hi\\"}"}}]},"finish_reason":null}]}\n' +
@@ -1055,7 +1056,7 @@ Deno.test("OpenAIToolCall_MissingIDGetsFallback", async () => {
   assertEquals(JSON.stringify(got!.arguments), '{"command":"echo hi"}');
 });
 
-Deno.test("OpenAIToolCall_AcceptsObjectArguments", async () => {
+test("OpenAIToolCall_AcceptsObjectArguments", async () => {
   const sse =
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_write","type":"function","function":{"name":"write","arguments":{"path":"internal/raft/node.go","content":"package raft\\n"}}}]},"finish_reason":"tool_calls"}]}\n' +
     "data: [DONE]\n";

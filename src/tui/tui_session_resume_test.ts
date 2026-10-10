@@ -11,13 +11,14 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import {
   createFakeTUIService,
   type FakeTUIService,
   sessionNotResidentError,
 } from "./service.ts";
 import { isDirectoryTarget, TUISession } from "./tui_session.ts";
+import { test } from "#testing";
 
 /** Redirects the config dir so no test touches real user state. */
 function isolateConfigDir(): { restore: () => void } {
@@ -63,7 +64,7 @@ function rows(session: TUISession): string[] {
   return session.controller.store.messages.filter((row) => row !== "");
 }
 
-Deno.test("continueLast resumes the newest persisted session and reprints it", async () => {
+test("continueLast resumes the newest persisted session and reprints it", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -109,7 +110,7 @@ Deno.test("continueLast resumes the newest persisted session and reprints it", a
   }
 });
 
-Deno.test("continueLast starts a fresh session when nothing is persisted yet", async () => {
+test("continueLast starts a fresh session when nothing is persisted yet", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -123,7 +124,7 @@ Deno.test("continueLast starts a fresh session when nothing is persisted yet", a
   }
 });
 
-Deno.test("resumeSession wins over continueLast and reprints in order", async () => {
+test("resumeSession wins over continueLast and reprints in order", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -176,7 +177,7 @@ Deno.test("resumeSession wins over continueLast and reprints in order", async ()
   }
 });
 
-Deno.test("an unresolvable resume target reports once and still starts a usable session", async () => {
+test("an unresolvable resume target reports once and still starts a usable session", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -197,7 +198,7 @@ Deno.test("an unresolvable resume target reports once and still starts a usable 
   }
 });
 
-Deno.test("a transcript read failure keeps the resumed session usable", async () => {
+test("a transcript read failure keeps the resumed session usable", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -232,7 +233,7 @@ Deno.test("a transcript read failure keeps the resumed session usable", async ()
   }
 });
 
-Deno.test("isDirectoryTarget separates a path from a session id", () => {
+test("isDirectoryTarget separates a path from a session id", () => {
   // A bare token is an id: that is what `opensac -r abc123` means.
   assertEquals(isDirectoryTarget("abc123"), false);
   assertEquals(isDirectoryTarget(""), false);
@@ -244,7 +245,7 @@ Deno.test("isDirectoryTarget separates a path from a session id", () => {
   assertEquals(isDirectoryTarget("C:\\Users\\me\\app"), true);
 });
 
-Deno.test("a resume target in another directory is not adopted", async () => {
+test("a resume target in another directory is not adopted", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -269,7 +270,7 @@ Deno.test("a resume target in another directory is not adopted", async () => {
   }
 });
 
-Deno.test("a Core failure during resume propagates instead of reporting a bad id", async () => {
+test("a Core failure during resume propagates instead of reporting a bad id", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -283,7 +284,7 @@ Deno.test("a Core failure during resume propagates instead of reporting a bad id
   }
 });
 
-Deno.test("-c with no session in the directory ignores other directories", async () => {
+test("-c with no session in the directory ignores other directories", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -305,7 +306,7 @@ Deno.test("-c with no session in the directory ignores other directories", async
   }
 });
 
-Deno.test("a resume scopes its open to the directory the target came from", async () => {
+test("a resume scopes its open to the directory the target came from", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -344,7 +345,7 @@ Deno.test("a resume scopes its open to the directory the target came from", asyn
   }
 });
 
-Deno.test("a resumed session inherits its persisted mode", async () => {
+test("a resumed session inherits its persisted mode", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -365,7 +366,7 @@ Deno.test("a resumed session inherits its persisted mode", async () => {
   }
 });
 
-Deno.test("repeated resume reprints the history once, not twice", async () => {
+test("repeated resume reprints the history once, not twice", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -393,7 +394,7 @@ Deno.test("repeated resume reprints the history once, not twice", async () => {
   }
 });
 
-Deno.test("a not-resident Core answer is retried, not reported as a bad id", async () => {
+test("a not-resident Core answer is retried, not reported as a bad id", async () => {
   const guard = isolateConfigDir();
   try {
     const service = createFakeTUIService();
@@ -437,7 +438,7 @@ Deno.test("a not-resident Core answer is retried, not reported as a bad id", asy
   }
 });
 
-Deno.test("continueLast skips an abandoned empty session", async () => {
+test("continueLast skips an abandoned empty session", async () => {
   // Every startup persists its session row, so the newest row is often a
   // never-used empty one. `-c` must continue the newest conversation, not the
   // newest file, or it reprints nothing and looks like it never resumed.
@@ -481,7 +482,7 @@ Deno.test("continueLast skips an abandoned empty session", async () => {
   }
 });
 
-Deno.test("a resumed assistant turn reprints as an assistant row", async () => {
+test("a resumed assistant turn reprints as an assistant row", async () => {
   // The reprint keeps the raw Markdown source on an assistant-kind row so the
   // history renders through the same Markdown projection as a live turn.
   const guard = isolateConfigDir();
@@ -517,7 +518,7 @@ Deno.test("a resumed assistant turn reprints as an assistant row", async () => {
   }
 });
 
-Deno.test("a /sessions switch reprints the durable conversation", async () => {
+test("a /sessions switch reprints the durable conversation", async () => {
   // The switch command used to adopt the session and reset the transcript
   // without reprinting it, so the conversation the Runtime replayed into the
   // Agent stayed invisible.

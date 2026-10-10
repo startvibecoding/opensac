@@ -1,13 +1,14 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import {
   createFakeTUIService,
   runNotFoundError,
   sessionNotFoundError,
   TUIServiceError,
 } from "./service.ts";
+import { test } from "#testing";
 
-Deno.test("fake TUIService admits a prompt and streams its run to a terminal event", async () => {
+test("fake TUIService admits a prompt and streams its run to a terminal event", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({
     workDir: "/workspace/project",
@@ -28,7 +29,7 @@ Deno.test("fake TUIService admits a prompt and streams its run to a terminal eve
   assertEquals(events.at(-1)?.eventType, "run_finished");
 });
 
-Deno.test("fake TUIService generates deterministic session and run IDs", async () => {
+test("fake TUIService generates deterministic session and run IDs", async () => {
   const service = createFakeTUIService();
   const first = await service.createSession({ workDir: "/w" });
   const second = await service.createSession({ workDir: "/w" });
@@ -44,7 +45,7 @@ Deno.test("fake TUIService generates deterministic session and run IDs", async (
   assertEquals(accepted.runId, "run-1");
 });
 
-Deno.test("fake TUIService rejects unknown sessions with stable errors", async () => {
+test("fake TUIService rejects unknown sessions with stable errors", async () => {
   const service = createFakeTUIService();
   const missing = "session-missing";
 
@@ -85,7 +86,7 @@ Deno.test("fake TUIService rejects unknown sessions with stable errors", async (
   await assertSessionError(() => service.capabilities({ sessionId: missing }));
 });
 
-Deno.test("fake TUIService rejects unknown runs with a stable error", async () => {
+test("fake TUIService rejects unknown runs with a stable error", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({ workDir: "/w" });
   const error = await assertRejects(
@@ -102,7 +103,7 @@ Deno.test("fake TUIService rejects unknown runs with a stable error", async () =
   );
 });
 
-Deno.test("fake TUIService emits only events after the requested cursor", async () => {
+test("fake TUIService emits only events after the requested cursor", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({ workDir: "/w" });
   const accepted = await service.prompt({
@@ -134,7 +135,7 @@ Deno.test("fake TUIService emits only events after the requested cursor", async 
   assertEquals(await collect(2), []);
 });
 
-Deno.test("fake TUIService streams live emitted events until a terminal event", async () => {
+test("fake TUIService streams live emitted events until a terminal event", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({ workDir: "/w" });
   service.emit(session.sessionId, "run-live", "run_started", { text: "x" });
@@ -164,7 +165,7 @@ Deno.test("fake TUIService streams live emitted events until a terminal event", 
   assertEquals(await iterator.next(), { done: true, value: undefined });
 });
 
-Deno.test("fake TUIService cancelRun terminalizes a running run once", async () => {
+test("fake TUIService cancelRun terminalizes a running run once", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({ workDir: "/w" });
   service.emit(session.sessionId, "run-c", "run_started", { text: "x" });
@@ -197,7 +198,7 @@ Deno.test("fake TUIService cancelRun terminalizes a running run once", async () 
   );
 });
 
-Deno.test("fake TUIService projects config, skills, attachments, and capabilities", async () => {
+test("fake TUIService projects config, skills, attachments, and capabilities", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({
     workDir: "/w",
@@ -245,7 +246,7 @@ Deno.test("fake TUIService projects config, skills, attachments, and capabilitie
   });
 });
 
-Deno.test("fake TUIService projects skills, prepared inputs, and settings", async () => {
+test("fake TUIService projects skills, prepared inputs, and settings", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({ workDir: "/w" });
 
@@ -295,7 +296,7 @@ Deno.test("fake TUIService projects skills, prepared inputs, and settings", asyn
   ]);
 });
 
-Deno.test("fake TUIService round-trips settings documents and the provider catalog", async () => {
+test("fake TUIService round-trips settings documents and the provider catalog", async () => {
   const service = createFakeTUIService();
   const doc = await service.getSettings();
   assertEquals(doc.defaultProvider, "test-provider");
@@ -331,7 +332,7 @@ Deno.test("fake TUIService round-trips settings documents and the provider catal
   );
 });
 
-Deno.test("fake TUIService replaces env documents and tracks session context", async () => {
+test("fake TUIService replaces env documents and tracks session context", async () => {
   const service = createFakeTUIService();
   assertEquals(await service.listEnv(), {});
   assertEquals(await service.updateEnv({ vars: { A: "1" } }), { A: "1" });
@@ -366,7 +367,7 @@ Deno.test("fake TUIService replaces env documents and tracks session context", a
   assertEquals(error.message, sessionNotFoundError("session-missing").message);
 });
 
-Deno.test("fake TUIService tracks expert binding and forks child sessions", async () => {
+test("fake TUIService tracks expert binding and forks child sessions", async () => {
   const service = createFakeTUIService();
   const session = await service.createSession({ workDir: "/w" });
 

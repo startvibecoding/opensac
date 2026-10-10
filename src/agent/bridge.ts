@@ -74,7 +74,7 @@ import {
   type ToolDefinition as PublicToolDefinition,
   type Usage as PublicUsage,
 } from "../../sdk/agent/mod.ts";
-import type { ContextUsage } from "../context/mod.ts";
+import { type ContextUsage } from "../context/mod.ts";
 import {
   BaseProvider,
   type ChatParams as InternalChatParams,
@@ -99,7 +99,7 @@ import {
   type ToolDefinition as InternalToolDefinition,
   type Usage as InternalUsage,
 } from "../provider/mod.ts";
-import type { FileDiff, TaskPlan } from "../tools/mod.ts";
+import { type FileDiff, type TaskPlan } from "../tools/mod.ts";
 import type { Agent } from "./agent.ts";
 import {
   type Event,
@@ -706,7 +706,11 @@ function modelCompatToPublic(c: InternalModelCompat): PublicModelCompat {
  * implementation through the shared runtime.
  */
 export class PublicProviderAdapter implements PublicProvider {
-  constructor(private readonly inner: InternalProvider) {}
+    private readonly inner: InternalProvider;
+
+  constructor(inner: InternalProvider) {
+    this.inner = inner;
+  }
 
   name(): string {
     return this.inner.name();

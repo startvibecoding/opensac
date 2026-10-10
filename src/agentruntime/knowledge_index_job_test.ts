@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createKnowledgeBase } from "../session/mod.ts";
 import {
   createKnowledgeBaseService,
@@ -6,8 +6,9 @@ import {
 } from "./knowledgebase.ts";
 import { KNOWLEDGE_INDEX_PHASE_COMMITTING } from "./knowledge_index_job.ts";
 import { SOURCE_ACP } from "./source.ts";
+import { test } from "#testing";
 
-Deno.test("knowledge base start index runs in background with progress", async () => {
+test("knowledge base start index runs in background with progress", async () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const files: Record<string, string> = {
@@ -58,7 +59,7 @@ Deno.test("knowledge base start index runs in background with progress", async (
   assertEquals(reused.id, snapshot.id);
 });
 
-Deno.test("knowledge base start index rejects disabled base synchronously", () => {
+test("knowledge base start index rejects disabled base synchronously", () => {
   const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
   const base = createKnowledgeBase(sessionDir, {

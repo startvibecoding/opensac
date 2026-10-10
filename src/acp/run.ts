@@ -1,4 +1,4 @@
-import { join } from "@opensac/path";
+import { join } from "../compat/path.ts";
 import { CoreClient } from "../core/client.ts";
 import { resolveCoreConfig } from "../core/config.ts";
 import {
@@ -17,8 +17,8 @@ import {
   readRequest,
   validRPCID,
 } from "./wire.ts";
-import type { AcpServerSink } from "./server.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type AcpServerSink } from "./server.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 
 /** Process-level ACP options, retained at the Core bridge boundary. */
 export interface RunOptions {

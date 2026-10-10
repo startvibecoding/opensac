@@ -1,19 +1,20 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { truncateString, truncateWithSuffix } from "./truncate.ts";
+import { test } from "#testing";
 
-Deno.test("TruncateStringKeepsValidUTF8", () => {
+test("TruncateStringKeepsValidUTF8", () => {
   const got = truncateString("你好世界", 5);
   // Deno strings are always valid UTF-16; assert it decodes to the first rune.
   assertEquals(got, "你");
 });
 
-Deno.test("TruncateWithSuffix", () => {
+test("TruncateWithSuffix", () => {
   const got = truncateWithSuffix("hello world", 5, "...");
   assertEquals(got, "hello...");
   assert(!truncateWithSuffix("🙂🙂", 5, "...").includes("\uFFFD"));
 });
 
-Deno.test("TruncateString fuzz invariants", () => {
+test("TruncateString fuzz invariants", () => {
   const seeds: Array<[string, number]> = [
     ["", 0],
     ["hello", 3],

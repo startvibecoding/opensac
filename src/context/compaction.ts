@@ -6,7 +6,7 @@
 //   worker pool (same `maxParallelToolCompactions` limit).
 // - `json.RawMessage` tool arguments are serialized back to text for prompts.
 
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import { retryDelay } from "../provider/retry.ts";
 import {
   type ChatParams,

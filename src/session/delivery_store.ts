@@ -8,7 +8,7 @@
 // write), and `time.Time` maps to `Date` (millisecond leases use epoch millis).
 
 import { DeliveryDAO } from "../dao/mod.ts";
-import type { Database, DeliveryFailureRecord } from "../dao/mod.ts";
+import { Database, type DeliveryFailureRecord } from "../dao/mod.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 import { writeRootDatabase } from "./database.ts";
 import { normalizedRunJSON } from "./run_json.ts";

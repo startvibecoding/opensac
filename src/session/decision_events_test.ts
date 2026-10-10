@@ -1,7 +1,8 @@
-import { assert, assertFalse } from "@opensac/assert";
+import { assert, assertFalse } from "../compat/assert.ts";
 import { decisionEventType, isDecisionEventType } from "./decision_events.ts";
+import { test } from "#testing";
 
-Deno.test("is decision event type", () => {
+test("is decision event type", () => {
   for (
     const eventType of [
       "decision_pending",
@@ -36,7 +37,7 @@ Deno.test("is decision event type", () => {
   }
 });
 
-Deno.test("decision event type derives canonical name", () => {
+test("decision event type derives canonical name", () => {
   assert(decisionEventType("pending") === "decision_pending");
   assert(decisionEventType("timed_out") === "decision_timed_out");
 });

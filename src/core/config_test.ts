@@ -1,6 +1,7 @@
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { defaultCoreConfig, resolveCoreConfig } from "./config.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
+import { test } from "#testing";
 
 function settingsWithCore(core: unknown): Settings {
   return {
@@ -9,7 +10,7 @@ function settingsWithCore(core: unknown): Settings {
   } as unknown as Settings;
 }
 
-Deno.test("core configuration defaults", () => {
+test("core configuration defaults", () => {
   assertEquals(defaultCoreConfig(), {
     host: "127.0.0.1",
     port: 27183,
@@ -24,7 +25,7 @@ Deno.test("core configuration defaults", () => {
   });
 });
 
-Deno.test("core configuration resolves explicit values and partial defaults", () => {
+test("core configuration resolves explicit values and partial defaults", () => {
   assertEquals(
     resolveCoreConfig(settingsWithCore({
       host: "0.0.0.0",
@@ -50,7 +51,7 @@ Deno.test("core configuration resolves explicit values and partial defaults", ()
   );
 });
 
-Deno.test("core configuration rejects invalid values", () => {
+test("core configuration rejects invalid values", () => {
   for (
     const core of [
       { host: 123 },
@@ -73,7 +74,7 @@ Deno.test("core configuration rejects invalid values", () => {
   }
 });
 
-Deno.test("core configuration copies password arrays", () => {
+test("core configuration copies password arrays", () => {
   const passwords = ["secret"];
   const resolved = resolveCoreConfig(settingsWithCore({
     auth: true,

@@ -2,12 +2,13 @@
 // Raw INSERTs in the Go tests map to StatsDAO.insert over the shared
 // connection; the test never constructs SQL itself.
 
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { StatsDAO, type StatsRecord } from "../dao/mod.ts";
 import { closeDatabases, openBunDatabase } from "../session/mod.ts";
 import { dashboardHTML, opensacSmallICO } from "./assets.ts";
 import { DB, type Query } from "./stats.ts";
+import { test } from "#testing";
 
 function insert(db: DB, record: Partial<StatsRecord>): void {
   const raw = db.database.db;
@@ -36,12 +37,12 @@ function createTestDB(): DB {
   return DB.open(dbPath);
 }
 
-Deno.test("DashboardUsesOpenSACSmallFavicon", () => {
+test("DashboardUsesOpenSACSmallFavicon", () => {
   assert(dashboardHTML().includes('href="/opensac-small.ico"'));
   assert(opensacSmallICO().length > 0);
 });
 
-Deno.test("DashboardShareActivityUsesSevenDayFlameHeatmap", () => {
+test("DashboardShareActivityUsesSevenDayFlameHeatmap", () => {
   const html = dashboardHTML();
   for (
     const expected of [
@@ -62,7 +63,7 @@ Deno.test("DashboardShareActivityUsesSevenDayFlameHeatmap", () => {
   }
 });
 
-Deno.test("Summary", () => {
+test("Summary", () => {
   const db = createTestDB();
   insert(db, {
     timestamp: new Date().toISOString(),
@@ -83,7 +84,7 @@ Deno.test("Summary", () => {
   closeDatabases();
 });
 
-Deno.test("TimeSeries", () => {
+test("TimeSeries", () => {
   const db = createTestDB();
   for (let i = 0; i < 3; i++) {
     insert(db, {
@@ -100,7 +101,7 @@ Deno.test("TimeSeries", () => {
   closeDatabases();
 });
 
-Deno.test("TimeSeriesOneHour", () => {
+test("TimeSeriesOneHour", () => {
   const db = createTestDB();
   const rows: Array<{ ts: string; totalTokens: number }> = [
     { ts: isoUTC(2026, 6, 28, 12, 40), totalTokens: 100 },
@@ -128,7 +129,7 @@ Deno.test("TimeSeriesOneHour", () => {
   closeDatabases();
 });
 
-Deno.test("ByProvider", () => {
+test("ByProvider", () => {
   const db = createTestDB();
   const now = new Date().toISOString();
   insert(db, {
@@ -170,7 +171,7 @@ Deno.test("ByProvider", () => {
   closeDatabases();
 });
 
-Deno.test("ByModel", () => {
+test("ByModel", () => {
   const db = createTestDB();
   const now = new Date().toISOString();
   insert(db, {
@@ -211,7 +212,7 @@ Deno.test("ByModel", () => {
   closeDatabases();
 });
 
-Deno.test("Recent", () => {
+test("Recent", () => {
   const db = createTestDB();
   const now = new Date().toISOString();
   for (let i = 0; i < 5; i++) {
@@ -231,7 +232,7 @@ Deno.test("Recent", () => {
   closeDatabases();
 });
 
-Deno.test("RecentFiltered", () => {
+test("RecentFiltered", () => {
   const db = createTestDB();
   insert(db, {
     timestamp: "2026-07-02T10:00:00Z",
@@ -267,7 +268,7 @@ Deno.test("RecentFiltered", () => {
   closeDatabases();
 });
 
-Deno.test("CurrentSchemaInitializationIsIdempotent", () => {
+test("CurrentSchemaInitializationIsIdempotent", () => {
   const tmpDir = Deno.makeTempDirSync();
   const dbPath = path.join(tmpDir, "sessions.db");
   const f = Deno.openSync(dbPath, { create: true, write: true });
@@ -285,7 +286,7 @@ Deno.test("CurrentSchemaInitializationIsIdempotent", () => {
   closeDatabases();
 });
 
-Deno.test("OpenUsesSharedSessionConnection", () => {
+test("OpenUsesSharedSessionConnection", () => {
   const dbPath = path.join(Deno.makeTempDirSync(), "sessions.db");
   const shared = openBunDatabase(dbPath);
 

@@ -10,9 +10,9 @@ import {
   assertEquals,
   assertFalse,
   assertThrows,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
-import type { Model } from "../provider/types.ts";
+import { type Model } from "../provider/types.ts";
 import { createMockProvider, type MockProvider } from "../provider/mock.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { AgentAdapter } from "./bridge.ts";

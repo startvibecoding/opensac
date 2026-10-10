@@ -5,14 +5,13 @@
 // when the original bytes were not valid JSON.
 
 import { type Family, type Hint, inferFamily } from "../imageproc/mod.ts";
-import type {
-  ContentBlock,
-  ImageContent,
-  Message,
-  Model,
-} from "../provider/types.ts";
+import {
+  type ContentBlock,
+  type ImageContent,
+  type Message,
+  type Model} from "../provider/types.ts";
 import { deepSeekTokenCount } from "./deepseek_tokenizer.ts";
-import type { CompactionSettings } from "./compaction.ts";
+import { type CompactionSettings } from "./compaction.ts";
 
 /** Estimates the context footprint of provider messages. */
 export interface TokenEstimator {

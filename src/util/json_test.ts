@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   asJsonRecord,
   optBoolean,
@@ -8,8 +8,9 @@ import {
   optStringMap,
   parseJsonRecord,
 } from "./json.ts";
+import { test } from "#testing";
 
-Deno.test("asJsonRecord accepts objects and rejects the rest", () => {
+test("asJsonRecord accepts objects and rejects the rest", () => {
   assertEquals(asJsonRecord({ a: 1 }), { a: 1 });
   assertEquals(asJsonRecord(null), undefined);
   assertEquals(asJsonRecord("x"), undefined);
@@ -17,14 +18,14 @@ Deno.test("asJsonRecord accepts objects and rejects the rest", () => {
   assertEquals(asJsonRecord([1]), undefined);
 });
 
-Deno.test("parseJsonRecord parses objects and rejects other shapes", () => {
+test("parseJsonRecord parses objects and rejects other shapes", () => {
   assertEquals(parseJsonRecord('{"a":"b"}'), { a: "b" });
   assertEquals(parseJsonRecord("null"), undefined);
   assertEquals(parseJsonRecord("[1]"), undefined);
   assertEquals(parseJsonRecord("not json"), undefined);
 });
 
-Deno.test("opt field readers ignore absent or mistyped fields", () => {
+test("opt field readers ignore absent or mistyped fields", () => {
   const rec = parseJsonRecord(
     '{"s":"x","n":3,"b":true,"a":["p"],"m":{"k":"v"},"bad":5}',
   );
@@ -42,7 +43,7 @@ Deno.test("opt field readers ignore absent or mistyped fields", () => {
   assertEquals(optString(undefined, "s"), undefined);
 });
 
-Deno.test("optStringArray rejects mixed-type arrays", () => {
+test("optStringArray rejects mixed-type arrays", () => {
   const rec = parseJsonRecord('{"a":["p",5]}');
   assert(rec !== undefined);
   assertEquals(optStringArray(rec, "a"), undefined);

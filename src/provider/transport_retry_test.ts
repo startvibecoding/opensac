@@ -6,10 +6,11 @@
 // saw only "send request: fetch failed", which no rule matched, so a plain
 // connection blip terminalized a live run instead of reporting and retrying.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { isAbortLike } from "../util/errors.ts";
 import { errorChainText, wrapError } from "./errors.ts";
 import { isRetryable, retryErrorDetail } from "./retry.ts";
+import { test } from "#testing";
 
 /** Builds one error in the exact shape Deno's `fetch` produces. */
 function denoFetchFailure(causeMessage: string): Error {
@@ -18,7 +19,7 @@ function denoFetchFailure(causeMessage: string): Error {
   return failure;
 }
 
-Deno.test("wrapError keeps the cause chain and names the real reason", () => {
+test("wrapError keeps the cause chain and names the real reason", () => {
   const raw = denoFetchFailure(
     "error sending request for url (http://127.0.0.1:45999/v1): client error (Connect): tcp connect error: Connection refused (os error 111)",
   );
@@ -37,7 +38,7 @@ Deno.test("wrapError keeps the cause chain and names the real reason", () => {
   );
 });
 
-Deno.test("a fetch failure the provider wrapped is retryable and reported", () => {
+test("a fetch failure the provider wrapped is retryable and reported", () => {
   const wrapped = wrapError(
     "send request",
     denoFetchFailure(
@@ -49,7 +50,7 @@ Deno.test("a fetch failure the provider wrapped is retryable and reported", () =
   assertEquals(retryErrorDetail(wrapped), "connection refused");
 });
 
-Deno.test("the legacy flattened message still classifies as retryable", () => {
+test("the legacy flattened message still classifies as retryable", () => {
   // An error that already lost its chain (a persisted run record, an older
   // provider path) must not fall back to "unclassifiable, fail the run".
   const flattened = new Error("send request: fetch failed");
@@ -57,7 +58,7 @@ Deno.test("the legacy flattened message still classifies as retryable", () => {
   assertEquals(retryErrorDetail(flattened), "network request failed");
 });
 
-Deno.test("a DNS failure through the wrapper is retryable", () => {
+test("a DNS failure through the wrapper is retryable", () => {
   const wrapped = wrapError(
     "send request",
     denoFetchFailure(
@@ -68,7 +69,7 @@ Deno.test("a DNS failure through the wrapper is retryable", () => {
   assertEquals(retryErrorDetail(wrapped), "dns lookup failed");
 });
 
-Deno.test("a fetch failure that may never succeed is still retried but named", () => {
+test("a fetch failure that may never succeed is still retried but named", () => {
   // Under the retry-by-default policy these configuration faults are retried
   // within the caller's bounded budget instead of terminalizing a live run; the
   // distinction that still matters is that the printed reason names the real
@@ -89,7 +90,7 @@ Deno.test("a fetch failure that may never succeed is still retried but named", (
   assertEquals(retryErrorDetail(tls), "TLS certificate verification failed");
 });
 
-Deno.test("a wrapped authentication failure stays permanent", () => {
+test("a wrapped authentication failure stays permanent", () => {
   // Classification walks the chain, so a wrapped 401 cannot be smuggled into
   // the retry path by the provider prefix.
   const wrapped = wrapError(
@@ -99,12 +100,12 @@ Deno.test("a wrapped authentication failure stays permanent", () => {
   assertEquals(isRetryable(wrapped, 0), false);
 });
 
-Deno.test("an explicit cancellation is still never retried", () => {
+test("an explicit cancellation is still never retried", () => {
   const aborted = new DOMException("The operation was aborted.", "AbortError");
   assertEquals(isRetryable(wrapError("send request", aborted), 0), false);
 });
 
-Deno.test("a cancellation wrapped as a fetch failure is never retried", () => {
+test("a cancellation wrapped as a fetch failure is never retried", () => {
   // An explicit abort must win over the generic transport rule, or a cancelled
   // run would be replayed against the user's intent.
   const aborted = new TypeError("fetch failed", {
@@ -118,7 +119,7 @@ Deno.test("a cancellation wrapped as a fetch failure is never retried", () => {
   assertEquals(isRetryable(wrapError("send request", canceled), 0), false);
 });
 
-Deno.test("every Deno abort shape is never retried, bare or wrapped", () => {
+test("every Deno abort shape is never retried, bare or wrapped", () => {
   // The shapes Deno actually produces for a cancelled fetch. Each one names the
   // cancellation without using the "The operation was aborted." wording, so a
   // check that reads only the top message or one exact phrase lets a user abort
@@ -152,7 +153,7 @@ Deno.test("every Deno abort shape is never retried, bare or wrapped", () => {
   }
 });
 
-Deno.test("a permanent transport failure is retried but still named clearly", () => {
+test("a permanent transport failure is retried but still named clearly", () => {
   // The reason shown to the user must name the configuration problem rather than
   // hide it behind "request timed out" or the generic "network request failed",
   // even though the run now retries it within its bounded budget. A TLS/blocked-
@@ -205,7 +206,7 @@ Deno.test("a permanent transport failure is retried but still named clearly", ()
   }
 });
 
-Deno.test("a genuine timeout stays retryable after the permanence check", () => {
+test("a genuine timeout stays retryable after the permanence check", () => {
   // The reorder must not swallow the failures long-task continuity does retry.
   assertEquals(isRetryable(new Error("read timed out"), 0), true);
   assertEquals(isRetryable(new Error("context deadline exceeded"), 0), true);
@@ -225,7 +226,7 @@ Deno.test("a genuine timeout stays retryable after the permanence check", () => 
   );
 });
 
-Deno.test("wrapError names the reason through a doubly-wrapped chain", () => {
+test("wrapError names the reason through a doubly-wrapped chain", () => {
   // Providers wrap at more than one stage (`stream read error: send request:
   // fetch failed: ...`), so reading only the first link would surface the
   // intermediate "fetch failed" instead of the socket reason further down.

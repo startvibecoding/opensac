@@ -4,10 +4,11 @@
 // The Core-side delegate tool registration is covered by
 // `src/core/runtime_host_test.ts`.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService, type FakeTUIService } from "./service.ts";
 import { dispatchCommand } from "./commands.ts";
+import { test } from "#testing";
 
 function makeSession(): { session: TUISession; service: FakeTUIService } {
   const service = createFakeTUIService();
@@ -26,7 +27,7 @@ function makeSession(): { session: TUISession; service: FakeTUIService } {
   return { session, service };
 }
 
-Deno.test("delegate on/off toggle flows through the service", async () => {
+test("delegate on/off toggle flows through the service", async () => {
   const { session, service } = makeSession();
   await session.start();
   try {
@@ -54,7 +55,7 @@ Deno.test("delegate on/off toggle flows through the service", async () => {
   }
 });
 
-Deno.test("agent listing and destroy project the service registry", async () => {
+test("agent listing and destroy project the service registry", async () => {
   const { session, service } = makeSession();
   await session.start();
   try {
@@ -72,7 +73,7 @@ Deno.test("agent listing and destroy project the service registry", async () => 
   }
 });
 
-Deno.test("compact runs through the service and reports the terminal status", async () => {
+test("compact runs through the service and reports the terminal status", async () => {
   const { session } = makeSession();
   await session.start();
   try {

@@ -1,13 +1,14 @@
-// deno-lint-ignore-file no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Subprocess integration test (migrated shape of the Go
 // TestACPStdioProcessHelper family): spawns `deno run src/main.ts acp` in a
 // temp OPENSAC_DIR and verifies the initialize handshake over real stdio, the
 // startup error line for an unconfigured provider, and clean EOF shutdown.
 
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { CorePaths } from "../core/paths.ts";
 import { CoreRegistry } from "../core/registry.ts";
+import { test } from "#testing";
 
 const mainTs = path.join(
   path.dirname(path.fromFileUrl(import.meta.url)),
@@ -83,7 +84,7 @@ function writeSettings(
   );
 }
 
-Deno.test("acp subprocess completes initialize handshake", async () => {
+test("acp subprocess completes initialize handshake", async () => {
   const configDir = Deno.makeTempDirSync();
   const homeDir = Deno.makeTempDirSync();
   // Build a minimal settings blob around a provider whose presence is only
@@ -129,7 +130,7 @@ Deno.test("acp subprocess completes initialize handshake", async () => {
   }
 });
 
-Deno.test("acp subprocess rejects methods before initialize", async () => {
+test("acp subprocess rejects methods before initialize", async () => {
   const configDir = Deno.makeTempDirSync();
   const homeDir = Deno.makeTempDirSync();
   writeSettings(configDir, {
@@ -165,7 +166,7 @@ Deno.test("acp subprocess rejects methods before initialize", async () => {
   );
 });
 
-Deno.test("acp subprocess exits cleanly at EOF after initialize", async () => {
+test("acp subprocess exits cleanly at EOF after initialize", async () => {
   const configDir = Deno.makeTempDirSync();
   const homeDir = Deno.makeTempDirSync();
   writeSettings(configDir, {
@@ -201,7 +202,7 @@ Deno.test("acp subprocess exits cleanly at EOF after initialize", async () => {
   assertEquals(messages.find((message) => message.id === 2)?.error, undefined);
 });
 
-Deno.test("acp subprocess routes project extensions through Core", async () => {
+test("acp subprocess routes project extensions through Core", async () => {
   const configDir = Deno.makeTempDirSync();
   const homeDir = Deno.makeTempDirSync();
   writeSettings(configDir, {
@@ -244,7 +245,7 @@ Deno.test("acp subprocess routes project extensions through Core", async () => {
   assertEquals(listed?.result?.projects?.[0]?.name, "CoreProject");
 });
 
-Deno.test("acp subprocess --help is served by the CLI parser", async () => {
+test("acp subprocess --help is served by the CLI parser", async () => {
   const result = await runAcp([], {}, undefined);
   // Empty stdin with no provider is the startup path; --help is checked via a
   // direct command instead to avoid the ACP preflight.

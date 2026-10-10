@@ -1,16 +1,17 @@
 // Tests for the pure ACP extension projections
 // (internal/acp/extensions.go).
 
-import { assertEquals } from "@opensac/assert";
-import type { Project } from "../session/projects.ts";
+import { assertEquals } from "../compat/assert.ts";
+import { type Project } from "../session/projects.ts";
 import {
   acpProjectResult,
   formatRFC3339,
   isZeroTime,
   sessionListLastRun,
 } from "./extensions.ts";
+import { test } from "#testing";
 
-Deno.test("acpProjectResult formats dates and honors the optional count", () => {
+test("acpProjectResult formats dates and honors the optional count", () => {
   const project: Project = {
     id: "p1",
     name: "Docs",
@@ -36,13 +37,13 @@ Deno.test("acpProjectResult formats dates and honors the optional count", () => 
   assertEquals(isZeroTime(new Date()), false);
 });
 
-Deno.test("sessionListLastRun degrades to an empty projection", () => {
+test("sessionListLastRun degrades to an empty projection", () => {
   const sessionDir = Deno.makeTempDirSync();
   assertEquals(sessionListLastRun(sessionDir, []), {});
   assertEquals(sessionListLastRun(sessionDir, ["missing-1"]), {});
 });
 
-Deno.test("formatRFC3339 drops fractional seconds", () => {
+test("formatRFC3339 drops fractional seconds", () => {
   assertEquals(
     formatRFC3339(new Date("2026-09-20T05:00:00.999Z")),
     "2026-09-20T05:00:00Z",

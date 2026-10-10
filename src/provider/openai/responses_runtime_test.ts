@@ -6,17 +6,18 @@
 // Manager; foreign-key enforcement is off and a session with no lease row skips
 // lease validation, so these tests use a literal session ID.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../../compat/assert.ts";
 import { closeAll } from "../../db/mod.ts";
 import { getResponseTurn } from "../../session/mod.ts";
 import { type ResponseRun } from "../../session/mod.ts";
-import type { ChatParams, Model } from "../types.ts";
+import { type ChatParams, type Model } from "../types.ts";
 import { createUserMessage } from "../types.ts";
 import { createOpenAIProvider } from "./provider.ts";
 // Side-effect import: registers the OpenAI provider factories.
 import "./register.ts";
 import { archiveBackgroundResponse } from "./responses_runtime.ts";
 import { mockClient, type MockRequest } from "./test_helpers.ts";
+import { test } from "#testing";
 
 function model(id: string): Model {
   return {
@@ -53,7 +54,7 @@ function tempDir(): string {
   return Deno.makeTempDirSync({ prefix: "opensac-responses-runtime-" });
 }
 
-Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {
+test("ResponsesRunManagerStartGetAndCancel", async () => {
   let postCount = 0;
   let cancelReceived = false;
   const sessionDir = tempDir();
@@ -112,7 +113,7 @@ Deno.test("ResponsesRunManagerStartGetAndCancel", async () => {
   }
 });
 
-Deno.test("ResponsesRunManagerStartUsesConfiguredRetryAndIdempotency", async () => {
+test("ResponsesRunManagerStartUsesConfiguredRetryAndIdempotency", async () => {
   for (
     const tc of [
       {
@@ -184,7 +185,7 @@ Deno.test("ResponsesRunManagerStartUsesConfiguredRetryAndIdempotency", async () 
   }
 });
 
-Deno.test("ArchiveBackgroundResponsePreservesUsageAndAttachments", () => {
+test("ArchiveBackgroundResponsePreservesUsageAndAttachments", () => {
   const sessionDir = tempDir();
   try {
     const response = {

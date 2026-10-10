@@ -1,8 +1,9 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { SteeringSource } from "./steering.ts";
 import { cleanup, makeStore } from "./test_helpers.ts";
+import { test } from "#testing";
 
-Deno.test("SteeringSource injects each active objective version once", () => {
+test("SteeringSource injects each active objective version once", () => {
   const { store, sessionID } = makeStore("opensac-esm-steering-");
   try {
     const source = new SteeringSource(store, sessionID);
@@ -25,7 +26,7 @@ Deno.test("SteeringSource injects each active objective version once", () => {
   }
 });
 
-Deno.test("SteeringSource skips paused objective until resumed", () => {
+test("SteeringSource skips paused objective until resumed", () => {
   const { store, sessionID } = makeStore("opensac-esm-steering-");
   try {
     store.create(sessionID, "finish the objective");

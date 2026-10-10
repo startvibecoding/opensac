@@ -1,7 +1,7 @@
 // Focused shell tests: raw stdin → editor/backspace/submit and a split paste.
 // Ink input requires a TTY, so the shell is mounted over a fake stdin/stdout.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import React from "react";
 import { EventEmitter } from "node:events";
 import { render } from "ink";
@@ -11,6 +11,7 @@ import { EVENT_TEXT_DELTA, EVENT_TURN_START } from "../agent/events.ts";
 import { InputState } from "./input_state.ts";
 import { Translator } from "./i18n.ts";
 import type { TUISession } from "./tui_session.ts";
+import { test } from "#testing";
 
 class FakeStdin extends EventEmitter {
   isTTY = true;
@@ -147,7 +148,7 @@ function mount(busy = false): Harness {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-Deno.test({
+test({
   name: "shell types, backspaces, and submits",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -168,7 +169,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "shell routes shortcut keys",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -187,7 +188,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "shell folds a bracket-pasted payload",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -205,7 +206,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "ESM panel is exclusive and closes while output continues",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -275,7 +276,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "busy footer animates the rotating dots spinner",
   sanitizeOps: false,
   sanitizeResources: false,

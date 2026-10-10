@@ -5,9 +5,9 @@ import {
   assertEquals,
   assertRejects,
   assertThrows,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
-import type { Tool } from "../tools/tool.ts";
+import { type Tool } from "../tools/tool.ts";
 import { createRegistry } from "../tools/tool.ts";
 import { createNoneSandbox } from "../sandbox/none.ts";
 import { createTestFactoryAndManager } from "./agent_testutil.ts";

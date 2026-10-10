@@ -7,14 +7,14 @@
 // as the Core's OPENSAC_DIR, so its registration, lock, sessions, and database
 // stay isolated from the shared Core's state.
 
-import { join } from "@opensac/path";
+import { join } from "../compat/path.ts";
 import {
   CoreClient,
   type CoreClientOptions,
   type CoreLauncher,
   waitForRegistrationExit,
 } from "./client.ts";
-import type { ResolvedCoreConfig } from "./config.ts";
+import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 

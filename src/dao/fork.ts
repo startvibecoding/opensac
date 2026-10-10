@@ -64,7 +64,11 @@ const entryColumns = `session_id AS sessionId, seq, id, type,
   parent_id AS parentId, timestamp, data`;
 
 export class ForkDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   findRequest(
     executor: DB,

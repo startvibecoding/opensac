@@ -5,7 +5,7 @@
 //
 // Run `deno task build:node` first. Run: `deno task pack:node`.
 
-import { dirname, fromFileUrl, join, resolve } from "@opensac/path";
+import { dirname, fromFileUrl, join, resolve } from "../src/compat/path.ts";
 
 const repoDir = resolve(dirname(fromFileUrl(import.meta.url)), "..");
 const nodeDir = join(repoDir, "dist", "node");

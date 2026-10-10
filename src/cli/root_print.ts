@@ -15,11 +15,10 @@ import { createCoreClientTUIService } from "../tui/core_service.ts";
 import { tuiResumeOptions } from "./root_tui.ts";
 import { isDirectoryTarget } from "../tui/tui_session.ts";
 import { isSessionNotFound } from "../tui/service.ts";
-import type {
-  TUIDecisionRequest,
-  TUIService,
-  TUISessionView,
-} from "../tui/service.ts";
+import {
+  type TUIDecisionRequest,
+  type TUIService,
+  type TUISessionView} from "../tui/service.ts";
 import { coreEventToAgentEvent } from "../tui/run_event_projection.ts";
 import {
   EVENT_ERROR,

@@ -13,7 +13,7 @@ import {
   type SessionRunRecord,
 } from "../dao/mod.ts";
 import type { Database } from "../dao/mod.ts";
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import { writeRootDatabase } from "./database.ts";
 import { entryTurnEnd, generateID, type TurnEndEntry } from "./entry.ts";
 import {
@@ -40,7 +40,7 @@ import {
   isTerminalSessionRunStatus,
   nonTerminalSessionRunStatuses,
 } from "./run_status.ts";
-import type { SessionRunEvent } from "./session_events.ts";
+import { type SessionRunEvent } from "./session_events.ts";
 import {
   appendRunAssistantMessageTx,
   appendRunUserMessageTx,

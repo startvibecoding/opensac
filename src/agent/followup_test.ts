@@ -2,20 +2,21 @@
 // require the agent loop). The Go tests also cover the loop wake path; that
 // lands with the core loop port.
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { Message } from "../provider/types.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type Message } from "../provider/types.ts";
 import {
   createMemberCompletion,
   createMemberMailbox,
   MEMBER_STATUS_DONE,
 } from "./mailbox.ts";
 import { composeFollowUps } from "./followup.ts";
+import { test } from "#testing";
 
-Deno.test("composeFollowUps returns undefined without a mailbox", () => {
+test("composeFollowUps returns undefined without a mailbox", () => {
   assertEquals(composeFollowUps(null), undefined);
 });
 
-Deno.test("composeFollowUps returns pending completions", async () => {
+test("composeFollowUps returns pending completions", async () => {
   const mbox = createMemberMailbox();
   const hook = composeFollowUps(mbox)!;
   assertEquals(await hook(undefined), null);
@@ -34,7 +35,7 @@ Deno.test("composeFollowUps returns pending completions", async () => {
   assert(messages![0].content!.includes("[MEMBER_COMPLETION]"));
 });
 
-Deno.test("composeFollowUps waits for running children then returns completion", async () => {
+test("composeFollowUps waits for running children then returns completion", async () => {
   const mbox = createMemberMailbox();
   mbox.setRunningPredicate(() => true);
   const hook = composeFollowUps(mbox)!;
@@ -49,7 +50,7 @@ Deno.test("composeFollowUps waits for running children then returns completion",
   assert(messages![0].content!.includes("[MEMBER_COMPLETION]"));
 });
 
-Deno.test("composeFollowUps keeps adapter steering responsive", async () => {
+test("composeFollowUps keeps adapter steering responsive", async () => {
   const mbox = createMemberMailbox();
   mbox.setRunningPredicate(() => true);
 
@@ -68,7 +69,7 @@ Deno.test("composeFollowUps keeps adapter steering responsive", async () => {
   assertEquals(messages![0].content, "steer");
 });
 
-Deno.test("composeFollowUps ignores cancellation while waiting", async () => {
+test("composeFollowUps ignores cancellation while waiting", async () => {
   const mbox = createMemberMailbox();
   mbox.setRunningPredicate(() => true);
   const hook = composeFollowUps(mbox)!;

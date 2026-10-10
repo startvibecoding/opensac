@@ -4,8 +4,8 @@
 // listing/detail projection, open/reload, sub-agent table isolation, deletion,
 // content overrides, and additional-directory bindings.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   type ContentBlock,
@@ -46,6 +46,7 @@ import {
   withMessagesOnly,
   withSearch,
 } from "./manager.ts";
+import { test } from "#testing";
 
 function textBlock(text: string): ContentBlock {
   return { type: "text", text };
@@ -76,7 +77,7 @@ function countRows(
   return row === null || row === undefined ? 0 : Number(row.n);
 }
 
-Deno.test("session manager: new", () => {
+test("session manager: new", () => {
   const dir = Deno.makeTempDirSync();
   try {
     const sessionDir = path.join(dir, "sessions");
@@ -91,7 +92,7 @@ Deno.test("session manager: new", () => {
   }
 });
 
-Deno.test("session manager: init", () => {
+test("session manager: init", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -104,7 +105,7 @@ Deno.test("session manager: init", () => {
   });
 });
 
-Deno.test("session manager: init with duplicate ID does not merge entries", () => {
+test("session manager: init with duplicate ID does not merge entries", () => {
   withTempDir((_dir, sessionDir) => {
     const first = createManager(Deno.makeTempDirSync(), sessionDir);
     first.initWithID("duplicate-session");
@@ -121,7 +122,7 @@ Deno.test("session manager: init with duplicate ID does not merge entries", () =
   });
 });
 
-Deno.test("session manager: append message", () => {
+test("session manager: append message", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -136,7 +137,7 @@ Deno.test("session manager: append message", () => {
   });
 });
 
-Deno.test("session manager: append message auto-initializes", () => {
+test("session manager: append message auto-initializes", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     const id = m.appendMessage(createUserMessage("Hello"));
@@ -147,7 +148,7 @@ Deno.test("session manager: append message auto-initializes", () => {
   });
 });
 
-Deno.test("session manager: append model / thinking / compaction / session info", () => {
+test("session manager: append model / thinking / compaction / session info", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -162,7 +163,7 @@ Deno.test("session manager: append model / thinking / compaction / session info"
   });
 });
 
-Deno.test("session manager: compaction metadata chain", () => {
+test("session manager: compaction metadata chain", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -189,7 +190,7 @@ Deno.test("session manager: compaction metadata chain", () => {
   });
 });
 
-Deno.test("session manager: header / leaf / file", () => {
+test("session manager: header / leaf / file", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -201,7 +202,7 @@ Deno.test("session manager: header / leaf / file", () => {
   });
 });
 
-Deno.test("session manager: get messages applies compaction", () => {
+test("session manager: get messages applies compaction", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -225,7 +226,7 @@ Deno.test("session manager: get messages applies compaction", () => {
   });
 });
 
-Deno.test("session manager: summary-only compaction", () => {
+test("session manager: summary-only compaction", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -241,7 +242,7 @@ Deno.test("session manager: summary-only compaction", () => {
   });
 });
 
-Deno.test("session manager: compaction clears stale usage", () => {
+test("session manager: compaction clears stale usage", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -267,7 +268,7 @@ Deno.test("session manager: compaction clears stale usage", () => {
   });
 });
 
-Deno.test("session manager: multiple compactions", () => {
+test("session manager: multiple compactions", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -288,7 +289,7 @@ Deno.test("session manager: multiple compactions", () => {
   });
 });
 
-Deno.test("session manager: open round trip", () => {
+test("session manager: open round trip", () => {
   withTempDir((_dir, sessionDir) => {
     const m1 = createManager("/tmp/test", sessionDir);
     m1.init();
@@ -299,11 +300,11 @@ Deno.test("session manager: open round trip", () => {
   });
 });
 
-Deno.test("session manager: open non-existent file fails", () => {
+test("session manager: open non-existent file fails", () => {
   assertThrows(() => openSession("/nonexistent/path.db"));
 });
 
-Deno.test("session manager: list for dir", () => {
+test("session manager: list for dir", () => {
   withTempDir((_dir, sessionDir) => {
     createManager("/tmp/test1", sessionDir).init();
     createManager("/tmp/test1", sessionDir).init();
@@ -314,7 +315,7 @@ Deno.test("session manager: list for dir", () => {
   });
 });
 
-Deno.test("session manager: sub-agent sessions excluded from main lists", () => {
+test("session manager: sub-agent sessions excluded from main lists", () => {
   withTempDir((_dir, sessionDir) => {
     const main = createManager("/tmp/test", sessionDir);
     main.initWithID("main-session");
@@ -344,7 +345,7 @@ Deno.test("session manager: sub-agent sessions excluded from main lists", () => 
   });
 });
 
-Deno.test("session manager: continue recent", () => {
+test("session manager: continue recent", () => {
   withTempDir((_dir, sessionDir) => {
     const m1 = createManager("/tmp/test", sessionDir);
     m1.init();
@@ -353,7 +354,7 @@ Deno.test("session manager: continue recent", () => {
   });
 });
 
-Deno.test("session manager: continue recent creates a new session", () => {
+test("session manager: continue recent creates a new session", () => {
   withTempDir((_dir, sessionDir) => {
     const m = continueRecent("/tmp/nonexistent", sessionDir);
     assert(m.getFile() !== "");
@@ -363,7 +364,7 @@ Deno.test("session manager: continue recent creates a new session", () => {
   });
 });
 
-Deno.test("session manager: open by path or id", () => {
+test("session manager: open by path or id", () => {
   withTempDir((_dir, sessionDir) => {
     const m1 = createManager("/tmp/test", sessionDir);
     m1.initWithID("session-test-id");
@@ -383,7 +384,7 @@ Deno.test("session manager: open by path or id", () => {
   });
 });
 
-Deno.test("session manager: open by path or id rejects ambiguous prefix", () => {
+test("session manager: open by path or id rejects ambiguous prefix", () => {
   withTempDir((_dir, sessionDir) => {
     for (const id of ["abcdef01", "abcdef02"]) {
       createManager("/tmp/test", sessionDir).initWithID(id);
@@ -395,7 +396,7 @@ Deno.test("session manager: open by path or id rejects ambiguous prefix", () => 
   });
 });
 
-Deno.test("session manager: open by ID recreates missing handle", () => {
+test("session manager: open by ID recreates missing handle", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.initWithID("custom-session-123");
@@ -405,7 +406,7 @@ Deno.test("session manager: open by ID recreates missing handle", () => {
   });
 });
 
-Deno.test("session manager: open by ID exact ignores cwd", () => {
+test("session manager: open by ID exact ignores cwd", () => {
   withTempDir((_dir, sessionDir) => {
     createManager("/tmp/test-a", sessionDir).initWithID("exact-session");
     const reopened = openByIDExact(sessionDir, "exact-session");
@@ -414,7 +415,7 @@ Deno.test("session manager: open by ID exact ignores cwd", () => {
   });
 });
 
-Deno.test("session manager: load rejects session not registered in DB", () => {
+test("session manager: load rejects session not registered in DB", () => {
   const dir = Deno.makeTempDirSync();
   try {
     const handlePath = path.join(dir, "session.db");
@@ -427,7 +428,7 @@ Deno.test("session manager: load rejects session not registered in DB", () => {
   }
 });
 
-Deno.test("session manager: append maintains parent chain", () => {
+test("session manager: append maintains parent chain", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -440,7 +441,7 @@ Deno.test("session manager: append maintains parent chain", () => {
   });
 });
 
-Deno.test("session manager: append messages persists batch in order", () => {
+test("session manager: append messages persists batch in order", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -470,7 +471,7 @@ Deno.test("session manager: append messages persists batch in order", () => {
   });
 });
 
-Deno.test("session manager: empty batch is a no-op", () => {
+test("session manager: empty batch is a no-op", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/batch-empty", sessionDir);
     m.initWithID("batch-empty-session");
@@ -479,7 +480,7 @@ Deno.test("session manager: empty batch is a no-op", () => {
   });
 });
 
-Deno.test("session manager: stale batch is rejected without persistence", () => {
+test("session manager: stale batch is rejected without persistence", () => {
   withTempDir((_dir, sessionDir) => {
     const first = createManager("/tmp/batch-stale", sessionDir);
     first.initWithID("batch-stale-session");
@@ -505,7 +506,7 @@ Deno.test("session manager: stale batch is rejected without persistence", () => 
   });
 });
 
-Deno.test("session manager: large batches are chunked with an unbroken chain", () => {
+test("session manager: large batches are chunked with an unbroken chain", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/batch-cap", sessionDir);
     m.initWithID("batch-cap-session");
@@ -524,7 +525,7 @@ Deno.test("session manager: large batches are chunked with an unbroken chain", (
   });
 });
 
-Deno.test("session manager: sub-agent batch uses separate tables", () => {
+test("session manager: sub-agent batch uses separate tables", () => {
   withTempDir((_dir, sessionDir) => {
     const child = createSubAgentManager("/tmp/batch-sub", sessionDir);
     child.initWithID("batch-sub-session");
@@ -545,7 +546,7 @@ Deno.test("session manager: sub-agent batch uses separate tables", () => {
   });
 });
 
-Deno.test("session manager: concurrent managers reject stale writer and reload recovers", () => {
+test("session manager: concurrent managers reject stale writer and reload recovers", () => {
   withTempDir((_dir, sessionDir) => {
     const first = createManager("/tmp/reload", sessionDir);
     first.initWithID("reload-session");
@@ -560,7 +561,7 @@ Deno.test("session manager: concurrent managers reject stale writer and reload r
   });
 });
 
-Deno.test("session manager: session info listing", () => {
+test("session manager: session info listing", () => {
   withTempDir((_dir, sessionDir) => {
     createManager("/tmp/test", sessionDir).init();
     createManager("/tmp/test", sessionDir).init();
@@ -573,7 +574,7 @@ Deno.test("session manager: session info listing", () => {
   });
 });
 
-Deno.test("session manager: delete session", () => {
+test("session manager: delete session", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -583,13 +584,13 @@ Deno.test("session manager: delete session", () => {
   });
 });
 
-Deno.test("session manager: delete non-existent session is idempotent", () => {
+test("session manager: delete non-existent session is idempotent", () => {
   withTempDir((_dir, sessionDir) => {
     deleteSession(path.join(sessionDir, "missing.db"), sessionDir);
   });
 });
 
-Deno.test("session manager: delete refuses an execution owner", () => {
+test("session manager: delete refuses an execution owner", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager(Deno.makeTempDirSync(), sessionDir);
     m.init();
@@ -608,7 +609,7 @@ Deno.test("session manager: delete refuses an execution owner", () => {
   });
 });
 
-Deno.test("session manager: delete rejects path outside session dir", () => {
+test("session manager: delete rejects path outside session dir", () => {
   withTempDir((dir, sessionDir) => {
     const outside = path.join(dir, "outside.db");
     Deno.writeTextFileSync(outside, "session-id");
@@ -616,7 +617,7 @@ Deno.test("session manager: delete rejects path outside session dir", () => {
   });
 });
 
-Deno.test("session manager: delete rejects shared DB", () => {
+test("session manager: delete rejects shared DB", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -626,7 +627,7 @@ Deno.test("session manager: delete rejects shared DB", () => {
   });
 });
 
-Deno.test("session manager: list for dir detailed", () => {
+test("session manager: list for dir detailed", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -642,7 +643,7 @@ Deno.test("session manager: list for dir detailed", () => {
   });
 });
 
-Deno.test("session manager: detailed list orders by last activity, not creation", () => {
+test("session manager: detailed list orders by last activity, not creation", () => {
   // `-c` continues "the most recent session" through this ordering. A freshly
   // created but abandoned startup must not outrank the conversation that was
   // actually used last, so modTime is the newest entry, floored by creation.
@@ -681,7 +682,7 @@ Deno.test("session manager: detailed list orders by last activity, not creation"
   });
 });
 
-Deno.test("session manager: list all detailed across work dirs with search and count", () => {
+test("session manager: list all detailed across work dirs with search and count", () => {
   withTempDir((_dir, sessionDir) => {
     const a = createManager("/tmp/alpha", sessionDir);
     a.init();
@@ -702,13 +703,13 @@ Deno.test("session manager: list all detailed across work dirs with search and c
   });
 });
 
-Deno.test("session manager: encode path is collision free", () => {
+test("session manager: encode path is collision free", () => {
   assertEquals(encodePath("/tmp/test"), encodePath("/tmp/test"));
   assert(encodePath("/tmp/test") !== encodePath("/tmp/test2"));
   assert(encodePath("/tmp/test-1") !== encodePath("/tmp/test:1"));
 });
 
-Deno.test("session manager: session file ID parsing", () => {
+test("session manager: session file ID parsing", () => {
   assertEquals(
     sessionFileID("/path/to/20240101-120000_abcd1234.db"),
     "abcd1234",
@@ -717,11 +718,11 @@ Deno.test("session manager: session file ID parsing", () => {
   assertEquals(sessionFileID("simple_id.db"), "id");
 });
 
-Deno.test("session manager: open by path or id rejects empty value", () => {
+test("session manager: open by path or id rejects empty value", () => {
   assertThrows(() => openByPathOrID("/tmp", "/tmp/sessions", ""));
 });
 
-Deno.test("session manager: full round trip", () => {
+test("session manager: full round trip", () => {
   withTempDir((_dir, sessionDir) => {
     const m1 = createManager("/tmp/test", sessionDir);
     m1.init();
@@ -741,7 +742,7 @@ Deno.test("session manager: full round trip", () => {
   });
 });
 
-Deno.test("session manager: entries survive reopen durably", () => {
+test("session manager: entries survive reopen durably", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
@@ -755,7 +756,7 @@ Deno.test("session manager: entries survive reopen durably", () => {
   });
 });
 
-Deno.test("session manager: additional directories replay preserves leaf", () => {
+test("session manager: additional directories replay preserves leaf", () => {
   const dir = Deno.makeTempDirSync();
   try {
     const m = createManager(Deno.makeTempDirSync(), dir);
@@ -791,7 +792,7 @@ function imageToolResultMessage(): Message {
   return msg;
 }
 
-Deno.test("session manager: content override replaces message on replay", () => {
+test("session manager: content override replaces message on replay", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager(Deno.makeTempDirSync(), sessionDir);
     m.init();
@@ -835,7 +836,7 @@ Deno.test("session manager: content override replaces message on replay", () => 
   });
 });
 
-Deno.test("session manager: content override rejects unknown target", () => {
+test("session manager: content override rejects unknown target", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager(Deno.makeTempDirSync(), sessionDir);
     m.init();
@@ -845,7 +846,7 @@ Deno.test("session manager: content override rejects unknown target", () => {
   });
 });
 
-Deno.test("session manager: expert binding persists across reload", () => {
+test("session manager: expert binding persists across reload", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/expert", sessionDir);
     m.initWithID("expert-session");
@@ -859,7 +860,7 @@ Deno.test("session manager: expert binding persists across reload", () => {
   });
 });
 
-Deno.test("session manager: set work dir persists to the sessions row", () => {
+test("session manager: set work dir persists to the sessions row", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/old", sessionDir);
     m.initWithID("workdir-session");
@@ -871,7 +872,7 @@ Deno.test("session manager: set work dir persists to the sessions row", () => {
   });
 });
 
-Deno.test("session manager: channel binding rotate and create", () => {
+test("session manager: channel binding rotate and create", () => {
   withTempDir((_dir, sessionDir) => {
     const bound = createBound("/tmp/chan", sessionDir, "wechat", "user-1");
     assertEquals(bound.getHeader()!.channelType, "wechat");

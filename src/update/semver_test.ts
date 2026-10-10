@@ -1,10 +1,11 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { canonical, compare, isValid } from "./semver.ts";
+import { test } from "#testing";
 
 // TestSemverIsValid pins the x/mod/semver parse rules the update package relies
 // on: a leading "v" is mandatory, minor/patch are optional, numeric identifiers
 // must not carry a leading zero, and build metadata (unlike prerelease) may.
-Deno.test("semver isValid accepts canonical and short forms", () => {
+test("semver isValid accepts canonical and short forms", () => {
   const valid = [
     "v0.0.0",
     "v1",
@@ -20,7 +21,7 @@ Deno.test("semver isValid accepts canonical and short forms", () => {
   for (const v of valid) assert(isValid(v), `expected ${v} to be valid`);
 });
 
-Deno.test("semver isValid rejects malformed versions", () => {
+test("semver isValid rejects malformed versions", () => {
   const invalid = [
     "",
     "1.2.3",
@@ -46,7 +47,7 @@ Deno.test("semver isValid rejects malformed versions", () => {
   for (const v of invalid) assert(!isValid(v), `expected ${v} to be invalid`);
 });
 
-Deno.test("semver canonical fills minor and patch and drops build metadata", () => {
+test("semver canonical fills minor and patch and drops build metadata", () => {
   assertEquals(canonical("v1"), "v1.0.0");
   assertEquals(canonical("v1.2"), "v1.2.0");
   assertEquals(canonical("v1.2.3"), "v1.2.3");
@@ -59,7 +60,7 @@ Deno.test("semver canonical fills minor and patch and drops build metadata", () 
   assertEquals(canonical(""), "");
 });
 
-Deno.test("semver compare orders releases, prereleases, and invalid versions", () => {
+test("semver compare orders releases, prereleases, and invalid versions", () => {
   const cases: Array<[string, string, number]> = [
     ["v1.2.3", "v1.2.3", 0],
     ["v2.0.0", "v1.9.9", 1],

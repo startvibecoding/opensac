@@ -1,8 +1,8 @@
-import type { SkillHubSettings } from "../config/settings.ts";
+import { type SkillHubSettings } from "../config/settings.ts";
 import { createClawHubClient } from "./clawhub.ts";
 import { defaultHttpClient, type HttpClient } from "./http.ts";
 import { createSkillHubClient } from "./skillhubcn.ts";
-import type { Market, MarketClient } from "./types.ts";
+import { type Market, type MarketClient } from "./types.ts";
 
 /**
  * Constructs the enabled built-in market clients from settings.

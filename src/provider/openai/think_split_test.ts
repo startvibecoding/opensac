@@ -1,10 +1,11 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../../compat/assert.ts";
 import { ThinkSplitter } from "./think_split.ts";
+import { test } from "#testing";
 
 const open = "\u003cthink\u003e";
 const close = "\u003c/think\u003e";
 
-Deno.test("ThinkSplitterSingleChunk", () => {
+test("ThinkSplitterSingleChunk", () => {
   const s = new ThinkSplitter();
   const { text, think } = s.push(
     `${open}reasoning here${close}visible answer`,
@@ -16,14 +17,14 @@ Deno.test("ThinkSplitterSingleChunk", () => {
   assertEquals(f.think, "");
 });
 
-Deno.test("ThinkSplitterPlainText", () => {
+test("ThinkSplitterPlainText", () => {
   const s = new ThinkSplitter();
   const { text, think } = s.push("just plain text");
   assertEquals(think, "");
   assertEquals(text, "just plain text");
 });
 
-Deno.test("ThinkSplitterTagSplitAcrossChunks", () => {
+test("ThinkSplitterTagSplitAcrossChunks", () => {
   const s = new ThinkSplitter();
   let text = "";
   let think = "";
@@ -47,14 +48,14 @@ Deno.test("ThinkSplitterTagSplitAcrossChunks", () => {
   assertEquals(text, "answer");
 });
 
-Deno.test("ThinkSplitterTextBeforeThink", () => {
+test("ThinkSplitterTextBeforeThink", () => {
   const s = new ThinkSplitter();
   const { text, think } = s.push(`hello ${open}secret${close} world`);
   assertEquals(think, "secret");
   assertEquals(text, "hello  world");
 });
 
-Deno.test("ThinkSplitterUnclosedThink", () => {
+test("ThinkSplitterUnclosedThink", () => {
   const s = new ThinkSplitter();
   const { text, think } = s.push(`${open}still thinking`);
   assertEquals(text, "");
@@ -64,7 +65,7 @@ Deno.test("ThinkSplitterUnclosedThink", () => {
   assertEquals(f.think, "");
 });
 
-Deno.test("ThinkSplitterPartialFalseAlarm", () => {
+test("ThinkSplitterPartialFalseAlarm", () => {
   // A "<" that turns out not to be a tag must be emitted as text.
   const s = new ThinkSplitter();
   let text = "";
@@ -73,7 +74,7 @@ Deno.test("ThinkSplitterPartialFalseAlarm", () => {
   assertEquals(text, "a \u003cb c");
 });
 
-Deno.test("ThinkSplitterFlushPartialTag", () => {
+test("ThinkSplitterFlushPartialTag", () => {
   // A dangling partial tag at end of stream is emitted literally.
   const s = new ThinkSplitter();
   const { text } = s.push("done \u003cthi");

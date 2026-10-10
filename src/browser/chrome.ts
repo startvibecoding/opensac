@@ -8,7 +8,7 @@
 // dropped (callers can observe errors); process-group handling is omitted
 // because `Deno.Command` children are detached enough for our use.
 
-import type { BrowserType, LaunchOptions } from "./protocol.ts";
+import { type BrowserType, type LaunchOptions } from "./protocol.ts";
 
 /** DEFAULT_CDP_PORT is the default Chrome DevTools Protocol port. */
 export const DEFAULT_CDP_PORT = 9222;

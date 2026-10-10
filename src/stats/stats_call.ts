@@ -3,7 +3,7 @@
 // `stats.DB` method mapping in one place means the two execution placements
 // cannot drift: both run the same queries over the same DAO.
 
-import type { DB, Query } from "./stats.ts";
+import { DB, type Query } from "./stats.ts";
 
 /** One dashboard query request, transported across the worker boundary. */
 export type StatsCall =

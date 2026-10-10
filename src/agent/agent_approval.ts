@@ -11,8 +11,8 @@ import {
   matchBashCommand,
   matchEditPath,
 } from "../config/allow.ts";
-import type { AllowConfig } from "../config/allow.ts";
-import type { Settings } from "../config/settings.ts";
+import { type AllowConfig } from "../config/allow.ts";
+import { type Settings } from "../config/settings.ts";
 
 /** The subset of Agent config the approval decision depends on. */
 export interface ApprovalConfig {

@@ -1,5 +1,6 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { type ServerHandler, type ServerTool, serveStdio } from "./server.ts";
+import { test } from "#testing";
 
 const fixture: ServerHandler = {
   listTools(_signal: AbortSignal): ServerTool[] {
@@ -40,7 +41,7 @@ function collectingStream(): {
   return { stream, text };
 }
 
-Deno.test("serveStdio dispatches standard tool methods", async () => {
+test("serveStdio dispatches standard tool methods", async () => {
   const input = streamFrom(
     `{"jsonrpc":"2.0","id":1,"method":"initialize"}\n` +
       `{"jsonrpc":"2.0","id":2,"method":"tools/list"}\n` +

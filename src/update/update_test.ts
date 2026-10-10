@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals } from "@opensac/assert";
+import { assertEquals, assertNotEquals } from "../compat/assert.ts";
 import {
   cachePath,
   checkInBackground,
@@ -10,8 +10,9 @@ import {
   setFetchLatestVersion,
   setNow,
 } from "./update.ts";
+import { test } from "#testing";
 
-Deno.test("CompareVersions", () => {
+test("CompareVersions", () => {
   const cases: Array<[string, string, number]> = [
     ["1.1.50", "1.1.50", 0],
     ["v1.1.50", "1.1.50", 0],
@@ -28,7 +29,7 @@ Deno.test("CompareVersions", () => {
   }
 });
 
-Deno.test("IsCheckable", () => {
+test("IsCheckable", () => {
   const cases: Record<string, boolean> = {
     "dev": false,
     "": false,
@@ -41,11 +42,11 @@ Deno.test("IsCheckable", () => {
   }
 });
 
-Deno.test("Normalize", () => {
+test("Normalize", () => {
   assertEquals(normalize(" v1.2.3 "), "1.2.3");
 });
 
-Deno.test("CheckInBackgroundRespectsDisableFlag", () => {
+test("CheckInBackgroundRespectsDisableFlag", () => {
   const dir = Deno.makeTempDirSync();
   const oldDir = Deno.env.get("OPENSAC_DIR");
   const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
@@ -65,7 +66,7 @@ Deno.test("CheckInBackgroundRespectsDisableFlag", () => {
   }
 });
 
-Deno.test("CheckInBackgroundRecordsFailureCooldown", async () => {
+test("CheckInBackgroundRecordsFailureCooldown", async () => {
   const dir = Deno.makeTempDirSync();
   const oldDir = Deno.env.get("OPENSAC_DIR");
   const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
@@ -91,7 +92,7 @@ Deno.test("CheckInBackgroundRecordsFailureCooldown", async () => {
   }
 });
 
-Deno.test("RefreshCacheNotifiesForNewerSemver", async () => {
+test("RefreshCacheNotifiesForNewerSemver", async () => {
   const dir = Deno.makeTempDirSync();
   const oldDir = Deno.env.get("OPENSAC_DIR");
   const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
@@ -119,7 +120,7 @@ Deno.test("RefreshCacheNotifiesForNewerSemver", async () => {
   }
 });
 
-Deno.test("RefreshCacheSkipsNotifyForCurrentOrOlderVersion", async () => {
+test("RefreshCacheSkipsNotifyForCurrentOrOlderVersion", async () => {
   const dir = Deno.makeTempDirSync();
   const oldDir = Deno.env.get("OPENSAC_DIR");
   Deno.env.set("OPENSAC_DIR", dir);

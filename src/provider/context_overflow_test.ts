@@ -1,7 +1,8 @@
-import { assert } from "@opensac/assert";
+import { assert } from "../compat/assert.ts";
 import { isContextOverflowError } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("IsContextOverflowError", () => {
+test("IsContextOverflowError", () => {
   const tests: Array<[string, unknown, boolean]> = [
     ["nil", null, false],
     [

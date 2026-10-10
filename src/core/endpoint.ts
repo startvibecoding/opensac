@@ -1,5 +1,5 @@
-import type { ResolvedCoreConfig } from "./config.ts";
-import type { CoreRegistration } from "./registry.ts";
+import { type ResolvedCoreConfig } from "./config.ts";
+import { type CoreRegistration } from "./registry.ts";
 
 /** Returns a normalized host without URL brackets. */
 export function normalizeCoreHost(value: string): string {

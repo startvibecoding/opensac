@@ -1,13 +1,14 @@
 // Test for the ported internal/session/input_resources.go public surface.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   listInputResourceEvents,
   saveInputResourceEvent,
 } from "./input_resources.ts";
+import { test } from "#testing";
 
-Deno.test("input resource events round-trip in durable order", () => {
+test("input resource events round-trip in durable order", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     saveInputResourceEvent(sessionDir, {
@@ -47,7 +48,7 @@ Deno.test("input resource events round-trip in durable order", () => {
   }
 });
 
-Deno.test("input resource event identity is validated", () => {
+test("input resource event identity is validated", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     assertThrows(() =>

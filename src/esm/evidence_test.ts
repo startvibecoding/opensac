@@ -1,4 +1,4 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   type Event,
   eventToolCall,
@@ -9,8 +9,9 @@ import {
   roleAssistant,
 } from "../../sdk/agent/mod.ts";
 import { EvidenceTracker, finalAssistantResponse } from "./evidence.ts";
+import { test } from "#testing";
 
-Deno.test("FinalAssistantResponse prefers content and falls back to blocks", () => {
+test("FinalAssistantResponse prefers content and falls back to blocks", () => {
   let messages: Message[] = [
     { role: roleAssistant, content: "first answer" },
     {
@@ -36,7 +37,7 @@ Deno.test("FinalAssistantResponse prefers content and falls back to blocks", () 
   );
 });
 
-Deno.test("EvidenceTracker counts unique tool calls and errors", () => {
+test("EvidenceTracker counts unique tool calls and errors", () => {
   const tracker = new EvidenceTracker();
   const events: Event[] = [
     {

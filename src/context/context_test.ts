@@ -1,6 +1,6 @@
-import { assert, assertEquals, assertFalse } from "@opensac/assert";
+import { assert, assertEquals, assertFalse } from "../compat/assert.ts";
 import { createMockProvider, MockProvider } from "../provider/mock.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
   type ContentBlock,
@@ -43,6 +43,7 @@ import {
   summarizeToolResultOnce,
   type TokenEstimator,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function zeroCost() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
@@ -140,7 +141,7 @@ class CompactRecordingProvider implements Provider {
   }
 }
 
-Deno.test("EstimateTokens", () => {
+test("EstimateTokens", () => {
   const tests: Array<[string, Message, number]> = [
     ["simple text message", msg({ role: "user", content: "Hello, world!" }), 4],
     ["empty message", msg({ role: "user", content: "" }), 0],
@@ -181,7 +182,7 @@ Deno.test("EstimateTokens", () => {
   }
 });
 
-Deno.test("CalculateContextTokens", () => {
+test("CalculateContextTokens", () => {
   assertEquals(calculateContextTokens(null), 0, "nil usage");
   const u = usage({
     input: 100,
@@ -194,7 +195,7 @@ Deno.test("CalculateContextTokens", () => {
   assertEquals(calculateContextTokens(u), 130, "with cache aware totalTokens");
 });
 
-Deno.test("ContextUsageFromMessagesNormalizesCacheBreakdown", () => {
+test("ContextUsageFromMessagesNormalizesCacheBreakdown", () => {
   const messages: Message[] = [
     createUserMessage("current request"),
     msg({
@@ -220,11 +221,11 @@ Deno.test("ContextUsageFromMessagesNormalizesCacheBreakdown", () => {
   assertEquals(result.tokens, result.totalTokens);
 });
 
-Deno.test("EstimateTextTokensUsesDeepSeekAddedTokens", () => {
+test("EstimateTextTokensUsesDeepSeekAddedTokens", () => {
   assertEquals(estimateTextTokens("<｜User｜>"), 1);
 });
 
-Deno.test("EstimateContextTokens", () => {
+test("EstimateContextTokens", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "Hello" }),
     msg({
@@ -239,7 +240,7 @@ Deno.test("EstimateContextTokens", () => {
   assertEquals(tokens, 104);
 });
 
-Deno.test("EstimateContextTokensWithEstimator", () => {
+test("EstimateContextTokensWithEstimator", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "already counted" }),
     msg({
@@ -258,7 +259,7 @@ Deno.test("EstimateContextTokensWithEstimator", () => {
   assertEquals(tokens, 142);
 });
 
-Deno.test("ShouldCompact", () => {
+test("ShouldCompact", () => {
   const tests: Array<[string, number, number, number, boolean]> = [
     ["over threshold", 190000, 200000, 16384, true],
     ["under threshold", 100000, 200000, 16384, false],
@@ -269,14 +270,14 @@ Deno.test("ShouldCompact", () => {
   }
 });
 
-Deno.test("ShouldCompactPercent", () => {
+test("ShouldCompactPercent", () => {
   assert(shouldCompactPercent(160, 200, 0.8));
   assertFalse(shouldCompactPercent(159, 200, 0.8));
   assert(shouldCompactPercent(80, 100, 80));
   assertFalse(shouldCompactPercent(80, 0, 0.8));
 });
 
-Deno.test("FindCutPoint", () => {
+test("FindCutPoint", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "Message 1" }),
     msg({ role: "assistant", content: "Response 1" }),
@@ -291,7 +292,7 @@ Deno.test("FindCutPoint", () => {
   );
 });
 
-Deno.test("FindCutPointWithEstimator", () => {
+test("FindCutPointWithEstimator", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "old" }),
     msg({ role: "assistant", content: "old response" }),
@@ -316,7 +317,7 @@ Deno.test("FindCutPointWithEstimator", () => {
   assertEquals(cutPoint.turnStartIndex, 2);
 });
 
-Deno.test("ResolveCompressionTemplate", () => {
+test("ResolveCompressionTemplate", () => {
   const tests: Array<[string, string, string, string]> = [
     ["default empty", "", "default", "structured context checkpoint"],
     ["code", "code", "code", "structured coding checkpoint"],
@@ -335,7 +336,7 @@ Deno.test("ResolveCompressionTemplate", () => {
   }
 });
 
-Deno.test("CompactUsesConfiguredTemplate", async () => {
+test("CompactUsesConfiguredTemplate", async () => {
   const p = new CompactRecordingProvider([model({
     id: "m",
     name: "m",
@@ -365,7 +366,7 @@ Deno.test("CompactUsesConfiguredTemplate", async () => {
   assert((last.content ?? "").includes("structured coding checkpoint"));
 });
 
-Deno.test("CompactCapsSummaryMaxTokens", async () => {
+test("CompactCapsSummaryMaxTokens", async () => {
   const p = new CompactRecordingProvider([model({
     id: "m",
     name: "m",
@@ -389,7 +390,7 @@ Deno.test("CompactCapsSummaryMaxTokens", async () => {
   assertEquals(p.lastChat.maxTokens, defaultMaxCompactionSummaryTokens);
 });
 
-Deno.test("CompactWithOptionsForceAllowsSummaryOnly", async () => {
+test("CompactWithOptionsForceAllowsSummaryOnly", async () => {
   const p = new CompactRecordingProvider([model({
     id: "m",
     name: "m",
@@ -413,7 +414,7 @@ Deno.test("CompactWithOptionsForceAllowsSummaryOnly", async () => {
   assertEquals(result.firstKeptIndex, messages.length);
 });
 
-Deno.test("GenerateSummaryUsesConfiguredUpdateTemplate", async () => {
+test("GenerateSummaryUsesConfiguredUpdateTemplate", async () => {
   const p = new CompactRecordingProvider([model({
     id: "m",
     name: "m",
@@ -435,7 +436,7 @@ Deno.test("GenerateSummaryUsesConfiguredUpdateTemplate", async () => {
   assert((last.content ?? "").includes("## Goal\nprevious"));
 });
 
-Deno.test("EstimateTokensImage", () => {
+test("EstimateTokensImage", () => {
   const message = msg({
     role: "user",
     contents: [{
@@ -446,7 +447,7 @@ Deno.test("EstimateTokensImage", () => {
   assertEquals(estimateTokens(message), 1200);
 });
 
-Deno.test("EstimateTokensLargeImageUsesPayloadSize", () => {
+test("EstimateTokensLargeImageUsesPayloadSize", () => {
   const message = msg({
     role: "user",
     contents: [{
@@ -457,7 +458,7 @@ Deno.test("EstimateTokensLargeImageUsesPayloadSize", () => {
   assertEquals(estimateTokens(message), 5000);
 });
 
-Deno.test("EstimateTokensImageUsesDimensions", () => {
+test("EstimateTokensImageUsesDimensions", () => {
   const message = msg({
     role: "user",
     contents: [{
@@ -473,7 +474,7 @@ Deno.test("EstimateTokensImageUsesDimensions", () => {
   assertEquals(estimateTokens(message), 3200);
 });
 
-Deno.test("ResolveTokenEstimatorUsesModelAwareImageRules", () => {
+test("ResolveTokenEstimatorUsesModelAwareImageRules", () => {
   const tests: Array<[string, Model, ImageContent, number]> = [
     [
       "claude patch estimate",
@@ -536,7 +537,7 @@ Deno.test("ResolveTokenEstimatorUsesModelAwareImageRules", () => {
   }
 });
 
-Deno.test("ModelAwareTokenEstimatorSumsMultipleImages", () => {
+test("ModelAwareTokenEstimatorSumsMultipleImages", () => {
   const estimator = resolveTokenEstimator(
     { enabled: true, reserveTokens: 0, keepRecentTokens: 0, tokenizer: "auto" },
     model({ id: "gemini-2.5-pro", provider: "google-gemini" }),
@@ -568,7 +569,7 @@ Deno.test("ModelAwareTokenEstimatorSumsMultipleImages", () => {
   assertEquals(estimator.estimateTokens(message), 775);
 });
 
-Deno.test("EstimateTokensThinking", () => {
+test("EstimateTokensThinking", () => {
   const message = msg({
     role: "assistant",
     contents: [{ type: "thinking", thinking: "Let me think about this..." }],
@@ -576,7 +577,7 @@ Deno.test("EstimateTokensThinking", () => {
   assertEquals(estimateTokens(message), 6);
 });
 
-Deno.test("CompactDoesNotResendPreviousSummaryAsConversationMessage", async () => {
+test("CompactDoesNotResendPreviousSummaryAsConversationMessage", async () => {
   const summary = "## Goal\ncarry forward state";
   const messages: Message[] = [
     createSystemInjectedUserMessage(summary),
@@ -606,7 +607,7 @@ Deno.test("CompactDoesNotResendPreviousSummaryAsConversationMessage", async () =
   assert((last.content ?? "").includes("<existing-summary>"));
 });
 
-Deno.test("EstimateTokensContentBlocksTakePrecedence", () => {
+test("EstimateTokensContentBlocksTakePrecedence", () => {
   const message = msg({
     role: "assistant",
     content: "This should be ignored because Contents is set",
@@ -615,7 +616,7 @@ Deno.test("EstimateTokensContentBlocksTakePrecedence", () => {
   assertEquals(estimateTokens(message), 1);
 });
 
-Deno.test("EstimateTokensToolCallNilBlock", () => {
+test("EstimateTokensToolCallNilBlock", () => {
   const message = msg({
     role: "assistant",
     contents: [{ type: "toolCall" }],
@@ -623,7 +624,7 @@ Deno.test("EstimateTokensToolCallNilBlock", () => {
   assertEquals(estimateTokens(message), 0);
 });
 
-Deno.test("CalculateContextTokensFallback", () => {
+test("CalculateContextTokensFallback", () => {
   const u = usage({
     input: 100,
     output: 50,
@@ -634,7 +635,7 @@ Deno.test("CalculateContextTokensFallback", () => {
   assertEquals(calculateContextTokens(u), 130);
 });
 
-Deno.test("EstimateContextTokensNoUsage", () => {
+test("EstimateContextTokensNoUsage", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "Hello" }),
     msg({ role: "assistant", content: "Hi there" }),
@@ -645,13 +646,13 @@ Deno.test("EstimateContextTokensNoUsage", () => {
   assertEquals(tokens, expected);
 });
 
-Deno.test("EstimateContextTokensEmptyMessages", () => {
+test("EstimateContextTokensEmptyMessages", () => {
   const { tokens, lastUsageIndex } = estimateContextTokens([]);
   assertEquals(tokens, 0);
   assertEquals(lastUsageIndex, -1);
 });
 
-Deno.test("EstimateContextTokensUsageWithZeroTotal", () => {
+test("EstimateContextTokensUsageWithZeroTotal", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "Hello" }),
     msg({
@@ -664,7 +665,7 @@ Deno.test("EstimateContextTokensUsageWithZeroTotal", () => {
   assertEquals(lastUsageIndex, -1);
 });
 
-Deno.test("FindValidCutPoints", () => {
+test("FindValidCutPoints", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "msg1" }),
     msg({ role: "assistant", content: "resp1" }),
@@ -675,7 +676,7 @@ Deno.test("FindValidCutPoints", () => {
   assertEquals(findValidCutPoints(messages, 0, messages.length), [0, 1, 3, 4]);
 });
 
-Deno.test("FindValidCutPointsSubrange", () => {
+test("FindValidCutPointsSubrange", () => {
   const messages: Message[] = [
     msg({ role: "user" }),
     msg({ role: "assistant" }),
@@ -685,11 +686,11 @@ Deno.test("FindValidCutPointsSubrange", () => {
   assertEquals(findValidCutPoints(messages, 1, 3), [1, 2]);
 });
 
-Deno.test("FindValidCutPointsEmpty", () => {
+test("FindValidCutPointsEmpty", () => {
   assertEquals(findValidCutPoints([], 0, 0), []);
 });
 
-Deno.test("FindTurnStartIndex", () => {
+test("FindTurnStartIndex", () => {
   const messages: Message[] = [
     msg({ role: "user" }),
     msg({ role: "assistant" }),
@@ -705,7 +706,7 @@ Deno.test("FindTurnStartIndex", () => {
   assertEquals(findTurnStartIndex(noUserMsgs, 1, 0), -1);
 });
 
-Deno.test("FindCutPointNoCutPoints", () => {
+test("FindCutPointNoCutPoints", () => {
   const messages: Message[] = [
     msg({ role: "toolResult", content: "result1" }),
     msg({ role: "toolResult", content: "result2" }),
@@ -715,7 +716,7 @@ Deno.test("FindCutPointNoCutPoints", () => {
   assertEquals(result.turnStartIndex, -1);
 });
 
-Deno.test("FindCutPointSplitTurn", () => {
+test("FindCutPointSplitTurn", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "first question" }),
     msg({ role: "assistant", content: "first answer" }),
@@ -728,7 +729,7 @@ Deno.test("FindCutPointSplitTurn", () => {
   assert(result.firstKeptIndex >= 0 && result.firstKeptIndex < messages.length);
 });
 
-Deno.test("FindCutPointKeepAll", () => {
+test("FindCutPointKeepAll", () => {
   const messages: Message[] = [
     msg({ role: "user", content: "Hello" }),
     msg({ role: "assistant", content: "Hi" }),
@@ -737,7 +738,7 @@ Deno.test("FindCutPointKeepAll", () => {
   assertEquals(result.firstKeptIndex, 0);
 });
 
-Deno.test("SerializeConversation", () => {
+test("SerializeConversation", () => {
   const result = serializeConversation([
     msg({ role: "user", content: "Hello" }),
     msg({ role: "assistant", content: "Hi there" }),
@@ -747,7 +748,7 @@ Deno.test("SerializeConversation", () => {
   assert(result.includes("Assistant: Hi there"));
 });
 
-Deno.test("SerializeConversationToolResult", () => {
+test("SerializeConversationToolResult", () => {
   const result = serializeConversation([
     msg({ role: "toolResult", toolName: "bash", content: "output here" }),
   ]);
@@ -755,7 +756,7 @@ Deno.test("SerializeConversationToolResult", () => {
   assert(result.includes("output here"));
 });
 
-Deno.test("SerializeConversationThinking", () => {
+test("SerializeConversationThinking", () => {
   const result = serializeConversation([
     msg({
       role: "assistant",
@@ -769,7 +770,7 @@ Deno.test("SerializeConversationThinking", () => {
   assert(result.includes("Here is my answer"));
 });
 
-Deno.test("SerializeConversationToolCall", () => {
+test("SerializeConversationToolCall", () => {
   const result = serializeConversation([
     msg({
       role: "assistant",
@@ -786,7 +787,7 @@ Deno.test("SerializeConversationToolCall", () => {
   assert(result.includes("[tool_call: read("));
 });
 
-Deno.test("SerializeConversationSystemInjectedSkipped", () => {
+test("SerializeConversationSystemInjectedSkipped", () => {
   const result = serializeConversation([
     msg({ role: "user", content: "Hello", systemInjected: true }),
     msg({ role: "user", content: "World" }),
@@ -795,14 +796,14 @@ Deno.test("SerializeConversationSystemInjectedSkipped", () => {
   assert(result.includes("World"));
 });
 
-Deno.test("SerializeConversationUserContentBlocks", () => {
+test("SerializeConversationUserContentBlocks", () => {
   const result = serializeConversation([
     msg({ role: "user", contents: [textBlock("block content")] }),
   ]);
   assert(result.includes("User: block content"));
 });
 
-Deno.test("SerializeConversationUserNonTextContentBlocks", () => {
+test("SerializeConversationUserNonTextContentBlocks", () => {
   const result = serializeConversation([
     msg({
       role: "user",
@@ -815,7 +816,7 @@ Deno.test("SerializeConversationUserNonTextContentBlocks", () => {
   assert(result.includes("[image: image/png]"));
 });
 
-Deno.test("SerializeConversationToolResultContentBlocks", () => {
+test("SerializeConversationToolResultContentBlocks", () => {
   const result = serializeConversation([
     msg({
       role: "toolResult",
@@ -826,26 +827,26 @@ Deno.test("SerializeConversationToolResultContentBlocks", () => {
   assert(result.includes("tool block output"));
 });
 
-Deno.test("SerializeConversationLongToolResult", () => {
+test("SerializeConversationLongToolResult", () => {
   const result = serializeConversation([
     msg({ role: "toolResult", toolName: "bash", content: "x".repeat(600) }),
   ]);
   assert(result.includes("..."));
 });
 
-Deno.test("DefaultCompactionSettings", () => {
+test("DefaultCompactionSettings", () => {
   const s = defaultCompactionSettings();
   assert(s.enabled);
   assertEquals(s.reserveTokens, 16384);
   assertEquals(s.keepRecentTokens, 20000);
 });
 
-Deno.test("ShouldCompactExact", () => {
+test("ShouldCompactExact", () => {
   assertFalse(shouldCompact(183616, 200000, 16384));
   assert(shouldCompact(183617, 200000, 16384));
 });
 
-Deno.test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
+test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
   const mdl = model({ id: "test-model" });
   const p = createMockProvider("test", [mdl], [{
     type: streamTextDelta,
@@ -886,7 +887,7 @@ Deno.test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
   }
 });
 
-Deno.test("CompressLargeToolResultsSkipsSmallResults", async () => {
+test("CompressLargeToolResultsSkipsSmallResults", async () => {
   const mdl = model({ id: "test-model" });
   const p: MockProvider = createMockProvider("test", [mdl], [{
     type: streamTextDelta,
@@ -907,7 +908,7 @@ Deno.test("CompressLargeToolResultsSkipsSmallResults", async () => {
   assertEquals(got[0].content, "small");
 });
 
-Deno.test("SummarizeToolResultUsesValidStandaloneUserMessage", async () => {
+test("SummarizeToolResultUsesValidStandaloneUserMessage", async () => {
   const p = new CompactRecordingProvider([model({ id: "test-model" })]);
   const message = createToolResultMessage(
     "call-1",

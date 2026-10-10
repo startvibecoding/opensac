@@ -6,8 +6,8 @@
 // (TestBuildRequestMessagesRetainsImagesForUnsupportedModel), plus focused
 // tests for the newly ported request-assembly helpers.
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { ContentBlock, Message, Model } from "../provider/types.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type ContentBlock, type Message, type Model } from "../provider/types.ts";
 import {
   createAssistantMessage,
   createSystemInjectedUserMessage,
@@ -17,6 +17,7 @@ import {
 import { createRegistry } from "../tools/mod.ts";
 import { createAgent } from "./agent.ts";
 import { isContextGuardToolResult } from "./agent_context.ts";
+import { test } from "#testing";
 
 function model(
   input: string[],
@@ -39,7 +40,7 @@ function imageBlock(data = "base64data"): ContentBlock {
   return { type: "image", image: { mimeType: "image/png", data } };
 }
 
-Deno.test("setForceCompact drives shouldCompact and is consumed once", () => {
+test("setForceCompact drives shouldCompact and is consumed once", () => {
   const registry = createRegistry("/tmp", undefined);
   const a = createAgent(
     {
@@ -68,7 +69,7 @@ Deno.test("setForceCompact drives shouldCompact and is consumed once", () => {
   assertEquals(a.shouldCompact(), false);
 });
 
-Deno.test("setForceCompact without messages does not force", () => {
+test("setForceCompact without messages does not force", () => {
   const a = createAgent(
     { model: model(["text"], 100000), mode: "agent" },
     undefined,
@@ -77,7 +78,7 @@ Deno.test("setForceCompact without messages does not force", () => {
   assertEquals(a.shouldCompact(), false);
 });
 
-Deno.test("setForceCompact without a model does not force", () => {
+test("setForceCompact without a model does not force", () => {
   const a = createAgent({ mode: "agent" }, undefined);
   a.loadHistoryMessages([
     createUserMessage("Hello"),
@@ -87,7 +88,7 @@ Deno.test("setForceCompact without a model does not force", () => {
   assertEquals(a.shouldCompact(), false);
 });
 
-Deno.test("shouldCompact is false over threshold with no compactable messages", () => {
+test("shouldCompact is false over threshold with no compactable messages", () => {
   const registry = createRegistry("/tmp", undefined);
   const a = createAgent(
     {
@@ -108,7 +109,7 @@ Deno.test("shouldCompact is false over threshold with no compactable messages", 
   assertEquals(a.shouldCompact(), false);
 });
 
-Deno.test("buildRequestMessages retains images for unsupported models", () => {
+test("buildRequestMessages retains images for unsupported models", () => {
   const a = createAgent({ model: model(["text"]), mode: "agent" }, undefined);
   a.loadHistoryMessages([
     {
@@ -125,7 +126,7 @@ Deno.test("buildRequestMessages retains images for unsupported models", () => {
   assertEquals(messages[1].contents![0].type, "image");
 });
 
-Deno.test("buildSessionContextMessage carries date, model, cwd and mode", () => {
+test("buildSessionContextMessage carries date, model, cwd and mode", () => {
   const registry = createRegistry("/work/dir", undefined);
   const a = createAgent(
     { model: model(["text"], 1000), mode: "yolo" },
@@ -139,7 +140,7 @@ Deno.test("buildSessionContextMessage carries date, model, cwd and mode", () => 
   assert(/Current date: \d{4}-\d{2}-\d{2}/.test(msg.content ?? ""));
 });
 
-Deno.test("requestTokenBudget derives the input budget from the window", () => {
+test("requestTokenBudget derives the input budget from the window", () => {
   const a = createAgent(
     { model: model(["text"], 100000), maxTokens: 8192 },
     undefined,
@@ -154,7 +155,7 @@ Deno.test("requestTokenBudget derives the input budget from the window", () => {
   assertEquals(noModel.requestTokenBudget(), [0, 0, 0, false]);
 });
 
-Deno.test("maxTokensForRequest clamps to the context window", () => {
+test("maxTokensForRequest clamps to the context window", () => {
   const a = createAgent(
     { model: model(["text"], 1000), maxTokens: 800 },
     undefined,
@@ -167,7 +168,7 @@ Deno.test("maxTokensForRequest clamps to the context window", () => {
   assert(clamped > 0);
 });
 
-Deno.test("replaceLargestToolResultForContext replaces the largest result", () => {
+test("replaceLargestToolResultForContext replaces the largest result", () => {
   const registry = createRegistry("/tmp", undefined);
   const a = createAgent(
     {
@@ -203,7 +204,7 @@ Deno.test("replaceLargestToolResultForContext replaces the largest result", () =
   assertEquals(guarded[0].toolName, "big_tool");
 });
 
-Deno.test("previousCompactionSummary falls back to the Goal message", () => {
+test("previousCompactionSummary falls back to the Goal message", () => {
   const a = createAgent({ model: model(["text"]), mode: "agent" }, undefined);
   const goal = createSystemInjectedUserMessage("## Goal\nShip it");
   const summary = a.previousCompactionSummary([goal]);

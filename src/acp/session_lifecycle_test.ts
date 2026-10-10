@@ -5,8 +5,8 @@
 // internal/acp/acp.go). Fixtures create real persisted sessions in a temp
 // session directory and call the handlers directly.
 
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   acpFailureRPCError,
   AcpServer,
@@ -15,7 +15,7 @@ import {
   SessionProviderMismatchError,
 } from "./server.ts";
 import { type ACPRPCRequest, encodeSessionCursor } from "./mod.ts";
-import type { Settings } from "../config/settings.ts";
+import { type Settings } from "../config/settings.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
 import {
   DECISION_QUESTION,
@@ -24,6 +24,7 @@ import {
 import type { ExecutionRuntime } from "../agentruntime/execution.ts";
 import { PHASE_PERSISTENCE } from "../agentruntime/error_info.ts";
 import { listAllDetailed, openByIDExact } from "../session/manager.ts";
+import { test } from "#testing";
 
 class SyncBuffer implements AcpServerSink {
   #buf = "";
@@ -103,7 +104,7 @@ function errorOf(message: Record<string, unknown>): Record<string, unknown> {
   return err;
 }
 
-Deno.test("session/list scopes to the workspace and projects additive _meta", () => {
+test("session/list scopes to the workspace and projects additive _meta", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
@@ -127,7 +128,7 @@ Deno.test("session/list scopes to the workspace and projects additive _meta", ()
   assertEquals(result.nextCursor, undefined);
 });
 
-Deno.test("session/list rejects a cwd outside the negotiated workspace", () => {
+test("session/list rejects a cwd outside the negotiated workspace", () => {
   const { server, sink, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
@@ -141,7 +142,7 @@ Deno.test("session/list rejects a cwd outside the negotiated workspace", () => {
   assert((err.message as string).includes("outside the negotiated workspace"));
 });
 
-Deno.test("session/list rejects an invalid cursor and pages by offset", () => {
+test("session/list rejects an invalid cursor and pages by offset", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   makeSession(sessionDir, workA, "sess-a");
@@ -164,7 +165,7 @@ Deno.test("session/list rejects an invalid cursor and pages by offset", () => {
   assertEquals(result.sessions.length, 0);
 });
 
-Deno.test("opensac/session/listAll validates scope and filters by query", () => {
+test("opensac/session/listAll validates scope and filters by query", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
@@ -202,7 +203,7 @@ Deno.test("opensac/session/listAll validates scope and filters by query", () => 
   assertEquals(result.sessions[0].sessionId, "sess-a");
 });
 
-Deno.test("opensac/session/setTitle persists and notifies", () => {
+test("opensac/session/setTitle persists and notifies", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-title");
@@ -227,7 +228,7 @@ Deno.test("opensac/session/setTitle persists and notifies", () => {
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });
 
-Deno.test("opensac/session/setWorkDir guards and moves the session", async () => {
+test("opensac/session/setWorkDir guards and moves the session", async () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
@@ -281,7 +282,7 @@ Deno.test("opensac/session/setWorkDir guards and moves the session", async () =>
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });
 
-Deno.test("session/close shuts down an open runtime and is workspace-guarded", async () => {
+test("session/close shuts down an open runtime and is workspace-guarded", async () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-close");
@@ -305,7 +306,7 @@ Deno.test("session/close shuts down an open runtime and is workspace-guarded", a
   assertEquals(errorOf(responseOf(sink.toString())).code, -32000);
 });
 
-Deno.test("opensac/session/delete removes an idle session and rejects an active one", () => {
+test("opensac/session/delete removes an idle session and rejects an active one", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-del");
@@ -341,7 +342,7 @@ Deno.test("opensac/session/delete removes an idle session and rejects an active 
   assertEquals(errorOf(responseOf(sink.toString())).code, -32000);
 });
 
-Deno.test("opensac/session/history pages the canonical transcript", () => {
+test("opensac/session/history pages the canonical transcript", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-hist");
@@ -375,7 +376,7 @@ Deno.test("opensac/session/history pages the canonical transcript", () => {
   assertEquals(errorOf(responseOf(sink.toString())).code, -32602);
 });
 
-Deno.test("decision ledger persists, replays, and terminalizes on close", () => {
+test("decision ledger persists, replays, and terminalizes on close", () => {
   const { server, sink, sessionDir, root } = createFixture();
   const workA = path.join(root, "a");
   const id = makeSession(sessionDir, workA, "sess-dec");
@@ -417,7 +418,7 @@ Deno.test("decision ledger persists, replays, and terminalizes on close", () => 
   assertEquals(terminal[terminal.length - 1].status, "cancelled");
 });
 
-Deno.test("acpFailureRPCError projects mismatch and generic envelopes", () => {
+test("acpFailureRPCError projects mismatch and generic envelopes", () => {
   const mismatch = new SessionProviderMismatchError("p1", "m1", "p2");
   const mismatchError = acpFailureRPCError(mismatch, null, PHASE_PERSISTENCE);
   assertEquals(mismatchError.code, -32002);

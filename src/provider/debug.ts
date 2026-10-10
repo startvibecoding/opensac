@@ -1,4 +1,4 @@
-import type { ToolCallBlock, Usage } from "./types.ts";
+import { type ToolCallBlock, type Usage } from "./types.ts";
 
 /**
  * Suppresses debug stderr output while retaining debug.log. The interactive TUI

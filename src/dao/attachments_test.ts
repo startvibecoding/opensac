@@ -1,6 +1,7 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { AttachmentDAO, type AttachmentRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 function record(overrides: Partial<AttachmentRecord>): AttachmentRecord {
   return {
@@ -24,7 +25,7 @@ function record(overrides: Partial<AttachmentRecord>): AttachmentRecord {
 
 // TestAttachmentDAOListStorageReferencesReturnsEveryRow proves the reference
 // set covers every session and lifecycle status.
-Deno.test("attachment DAO list storage references returns every row", () => {
+test("attachment DAO list storage references returns every row", () => {
   const db = openTestDb();
   try {
     const now = Date.now();
@@ -61,7 +62,7 @@ Deno.test("attachment DAO list storage references returns every row", () => {
   }
 });
 
-Deno.test("attachment DAO list by session optional status", () => {
+test("attachment DAO list by session optional status", () => {
   const db = openTestDb();
   try {
     const attachmentDAO = new AttachmentDAO(db);

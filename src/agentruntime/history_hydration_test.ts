@@ -2,7 +2,7 @@
 // with the replayed conversation history before the next user message, or the
 // follow-up turn loses all prior context.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { Builder, SessionRuntime } from "./session_runtime.ts";
 import { SOURCE_TUI } from "./source.ts";
 import { createSession } from "./session_lifecycle.ts";
@@ -12,8 +12,9 @@ import {
   sandboxLevelFromSettings,
 } from "../config/settings.ts";
 import { createUserMessage } from "../provider/types.ts";
+import { test } from "#testing";
 
-Deno.test("buildAgent hydrates the agent with prior session messages", async () => {
+test("buildAgent hydrates the agent with prior session messages", async () => {
   const workDir = await Deno.makeTempDir();
   const settings = defaultSettings();
   const manager = createSession({ workDir });
@@ -69,7 +70,7 @@ Deno.test("buildAgent hydrates the agent with prior session messages", async () 
   await Deno.remove(workDir, { recursive: true });
 });
 
-Deno.test("buildAgent without hydrateHistory leaves history empty", async () => {
+test("buildAgent without hydrateHistory leaves history empty", async () => {
   const workDir = await Deno.makeTempDir();
   const settings = defaultSettings();
   const manager = createSession({ workDir });

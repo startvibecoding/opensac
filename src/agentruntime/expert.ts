@@ -9,7 +9,7 @@
 // runtime-bound publish path) stays smaller; Go's `sync.RWMutex` is dropped
 // because Deno is single-threaded.
 
-import type { MemberDef, MemberMailbox } from "../agent/mod.ts";
+import { type MemberDef, MemberMailbox } from "../agent/mod.ts";
 import { Center } from "../expert/center.ts";
 import {
   type AgentDef,
@@ -18,7 +18,7 @@ import {
   typeAgent,
   typeTeam,
 } from "../expert/expert.ts";
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import {
   CONFIG_OPTION_EXPERT,

@@ -1,8 +1,8 @@
 // (the Go package ships no env test, so these
 // cover the ported behaviour directly).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   applyEnvPatch,
   clearEnv,
@@ -15,6 +15,7 @@ import {
   unsetEnv,
   validateEnvName,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function withConfigDir(fn: (tmp: string) => void): void {
   const tmp = Deno.makeTempDirSync({ prefix: "env-" });
@@ -28,14 +29,14 @@ function withConfigDir(fn: (tmp: string) => void): void {
   }
 }
 
-Deno.test("validateEnvName", () => {
+test("validateEnvName", () => {
   validateEnvName("GOOD_NAME");
   assertThrows(() => validateEnvName(""));
   assertThrows(() => validateEnvName("A=B"));
   assertThrows(() => validateEnvName("A\nB"));
 });
 
-Deno.test("env set/unset/list round trip", () => {
+test("env set/unset/list round trip", () => {
   withConfigDir(() => {
     const c: EnvConfig = { vars: {} };
     setEnv(c, "FOO", "bar");
@@ -54,7 +55,7 @@ Deno.test("env set/unset/list round trip", () => {
   });
 });
 
-Deno.test("env applyPatch validates and applies atomically", () => {
+test("env applyPatch validates and applies atomically", () => {
   withConfigDir(() => {
     const c: EnvConfig = { vars: {} };
     applyEnvPatch(c, { A: "1", B: "2" }, ["OLD"]);
@@ -65,7 +66,7 @@ Deno.test("env applyPatch validates and applies atomically", () => {
   });
 });
 
-Deno.test("env save orders keys", () => {
+test("env save orders keys", () => {
   withConfigDir(() => {
     const c: EnvConfig = { vars: {} };
     saveEnv(c);

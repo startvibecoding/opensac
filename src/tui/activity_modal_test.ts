@@ -2,7 +2,7 @@
 // its renderers, and the tool-modal state/geometry (scrolling, target
 // switching, chrome math, framed rendering).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   AgentActivityStore,
   formatActivityAge,
@@ -25,10 +25,11 @@ import {
 } from "../agent/events.ts";
 import { Translator } from "./i18n.ts";
 import { ToolModalState, type ToolModalTarget } from "./tool_modal.ts";
+import { test } from "#testing";
 
 // ─── activity store ─────────────────────────────────────────────────────────
 
-Deno.test("activity store ignores lead and approval/question events", () => {
+test("activity store ignores lead and approval/question events", () => {
   assertEquals(
     AgentActivityStore.isBackgroundAgentEvent({ type: EVENT_TEXT_DELTA }),
     false,
@@ -56,7 +57,7 @@ Deno.test("activity store ignores lead and approval/question events", () => {
   );
 });
 
-Deno.test("activity store folds deltas, tools, and terminal states", () => {
+test("activity store folds deltas, tools, and terminal states", () => {
   const store = new AgentActivityStore();
   const now = new Date();
   store.record(
@@ -102,7 +103,7 @@ Deno.test("activity store folds deltas, tools, and terminal states", () => {
   assertEquals(store.order, ["a1"]);
 });
 
-Deno.test("activity store honors canonical tool failure without an Error", () => {
+test("activity store honors canonical tool failure without an Error", () => {
   const store = new AgentActivityStore();
   store.record({
     type: EVENT_TOOL_RESULT,
@@ -114,7 +115,7 @@ Deno.test("activity store honors canonical tool failure without an Error", () =>
   assertEquals(store.get("a1")!.state, "error");
 });
 
-Deno.test("activity store keeps terminal state on late events", () => {
+test("activity store keeps terminal state on late events", () => {
   const store = new AgentActivityStore();
   store.record({ type: EVENT_DONE, agentId: "a1" });
   assertEquals(store.get("a1")!.state, "done");
@@ -123,7 +124,7 @@ Deno.test("activity store keeps terminal state on late events", () => {
   assertEquals(store.get("a1")!.state, "done");
 });
 
-Deno.test("activity store records workflow kind and cancellation", () => {
+test("activity store records workflow kind and cancellation", () => {
   const store = new AgentActivityStore();
   store.record({
     type: EVENT_RUN_FINISHED,
@@ -135,7 +136,7 @@ Deno.test("activity store records workflow kind and cancellation", () => {
   assertEquals(act.state, "canceled");
 });
 
-Deno.test("activity store caps the event timeline", () => {
+test("activity store caps the event timeline", () => {
   const store = new AgentActivityStore();
   for (let i = 0; i < 250; i++) {
     store.record({ type: EVENT_STATUS, agentId: "a1", statusMessage: `s${i}` });
@@ -147,7 +148,7 @@ Deno.test("activity store caps the event timeline", () => {
 
 // ─── activity rendering ─────────────────────────────────────────────────────
 
-Deno.test("renderAgentActivity shows header, sections, and timeline", () => {
+test("renderAgentActivity shows header, sections, and timeline", () => {
   const store = new AgentActivityStore();
   const now = new Date("2026-09-20T12:00:30");
   store.record(
@@ -172,13 +173,13 @@ Deno.test("renderAgentActivity shows header, sections, and timeline", () => {
   assertEquals(panel.includes("Activity timeline:"), true);
 });
 
-Deno.test("renderAgentActivity handles unknown agent", () => {
+test("renderAgentActivity handles unknown agent", () => {
   const tr = new Translator("en");
   const panel = renderAgentActivity(undefined, "ghost", tr);
   assertEquals(panel, "ghost\n\nno activity captured yet");
 });
 
-Deno.test("formatActivityTool picks known keys and truncates values", () => {
+test("formatActivityTool picks known keys and truncates values", () => {
   assertEquals(formatActivityTool("bash"), "bash");
   assertEquals(
     formatActivityTool("bash", { cmd: "ls -la" }),
@@ -198,7 +199,7 @@ Deno.test("formatActivityTool picks known keys and truncates values", () => {
   );
 });
 
-Deno.test("truncatePlain collapses whitespace and ellipsizes by runes", () => {
+test("truncatePlain collapses whitespace and ellipsizes by runes", () => {
   assertEquals(truncatePlain("  a   b  ", 10), "a b");
   assertEquals(truncatePlain("abcdef", 6), "abcdef");
   assertEquals(truncatePlain("abcdef", 5), "ab...");
@@ -206,7 +207,7 @@ Deno.test("truncatePlain collapses whitespace and ellipsizes by runes", () => {
   assertEquals(truncatePlain("abcdef", 2), "ab");
 });
 
-Deno.test("formatActivityAge renders seconds and minutes", () => {
+test("formatActivityAge renders seconds and minutes", () => {
   const now = new Date("2026-09-20T12:01:00");
   assertEquals(
     formatActivityAge(new Date("2026-09-20T12:00:45"), now),
@@ -222,7 +223,7 @@ Deno.test("formatActivityAge renders seconds and minutes", () => {
   );
 });
 
-Deno.test("activity store resolves i18n lines through its translator", () => {
+test("activity store resolves i18n lines through its translator", () => {
   const store = new AgentActivityStore(new Translator("zh"));
   const now = new Date();
   store.record({
@@ -253,7 +254,7 @@ Deno.test("activity store resolves i18n lines through its translator", () => {
   assertEquals(panel.includes("已取消"), true);
 });
 
-Deno.test("formatActivityAge resolves localized labels with a translator", () => {
+test("formatActivityAge resolves localized labels with a translator", () => {
   const now = new Date("2026-09-20T12:01:00");
   const zh = new Translator("zh");
   assertEquals(
@@ -266,7 +267,7 @@ Deno.test("formatActivityAge resolves localized labels with a translator", () =>
   );
 });
 
-Deno.test("renderActivitySummary shows last 4 agents with state", () => {
+test("renderActivitySummary shows last 4 agents with state", () => {
   const store = new AgentActivityStore();
   for (let i = 0; i < 6; i++) {
     store.record({
@@ -285,7 +286,7 @@ Deno.test("renderActivitySummary shows last 4 agents with state", () => {
 
 // ─── tool modal state ───────────────────────────────────────────────────────
 
-Deno.test("tool modal geometry helpers match the Go math", () => {
+test("tool modal geometry helpers match the Go math", () => {
   assertEquals(ToolModalState.widthFor(80), 76);
   assertEquals(ToolModalState.widthFor(10), 20);
   assertEquals(ToolModalState.contentWidthFor(76), 72);
@@ -297,7 +298,7 @@ Deno.test("tool modal geometry helpers match the Go math", () => {
   assertEquals(ToolModalState.maxOffsetFor(3, 5), 0);
 });
 
-Deno.test("tool modal scrolls, clamps, and tracks the bottom pin", () => {
+test("tool modal scrolls, clamps, and tracks the bottom pin", () => {
   const modal = new ToolModalState(80, 24);
   const lines = Array.from({ length: 10 }, (_, i) => `line ${i}`);
   const pageSize = modal.pageSizeFor(false, 24); // 24 - 3 - 2 = 19 → clamped to line count on render
@@ -315,7 +316,7 @@ Deno.test("tool modal scrolls, clamps, and tracks the bottom pin", () => {
   assertEquals(modal.pinnedBottom, false);
 });
 
-Deno.test("tool modal switches targets with wrap and resets scroll", () => {
+test("tool modal switches targets with wrap and resets scroll", () => {
   const modal = new ToolModalState(80, 24);
   const targets: ToolModalTarget[] = [
     { id: "lead", kind: "main", label: "Main" },
@@ -334,7 +335,7 @@ Deno.test("tool modal switches targets with wrap and resets scroll", () => {
   assertEquals(modal.active, 0);
 });
 
-Deno.test("tool modal renders framed content with title and position", () => {
+test("tool modal renders framed content with title and position", () => {
   const modal = new ToolModalState(60, 20);
   modal.setTargets([{ id: "lead", kind: "main" }]);
   const lines = Array.from({ length: 8 }, (_, i) => `line ${i}`);
@@ -342,7 +343,7 @@ Deno.test("tool modal renders framed content with title and position", () => {
     availableHeight: 20,
   });
   const raw = view.replace(
-    // deno-lint-ignore no-control-regex
+    // eslint-disable-next-line no-control-regex
     /\u001B\[[0-9;]*m/g,
     "",
   );
@@ -359,7 +360,7 @@ Deno.test("tool modal renders framed content with title and position", () => {
   const wideView = wide.render(lines, new Translator("en"), {
     availableHeight: 40,
   }).replace(
-    // deno-lint-ignore no-control-regex
+    // eslint-disable-next-line no-control-regex
     /\u001B\[[0-9;]*m/g,
     "",
   );
@@ -369,7 +370,7 @@ Deno.test("tool modal renders framed content with title and position", () => {
   assertEquals(widths.size, 1);
 });
 
-Deno.test("tool modal renders tabs when multiple targets", () => {
+test("tool modal renders tabs when multiple targets", () => {
   const modal = new ToolModalState(80, 24);
   modal.setTargets([
     { id: "lead", kind: "main", label: "Main" },
@@ -378,7 +379,7 @@ Deno.test("tool modal renders tabs when multiple targets", () => {
   const view = modal.render(["content"], new Translator("en"), {
     availableHeight: 24,
   });
-  // deno-lint-ignore no-control-regex
+  // eslint-disable-next-line no-control-regex
   const raw = view.replace(/\u001B\[[0-9;]*m/g, "");
   assertEquals(raw.includes("Main"), true);
   assertEquals(raw.includes("worker-1"), true);

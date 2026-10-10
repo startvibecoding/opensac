@@ -1,6 +1,6 @@
 // (bwrap cases).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   bwrapCapabilitiesComplete,
   createBwrapSandbox,
@@ -8,6 +8,7 @@ import {
   Level,
   probeBwrapCapabilities,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function indexArgs(args: string[], ...seq: string[]): number {
   for (let i = 0; i + seq.length <= args.length; i++) {
@@ -23,7 +24,7 @@ function indexArgs(args: string[], ...seq: string[]): number {
   return -1;
 }
 
-Deno.test("createBwrapSandbox name and level", () => {
+test("createBwrapSandbox name and level", () => {
   const sb = createBwrapSandbox("/tmp", Level.Standard);
   assertEquals(sb.name(), "bwrap");
   assertEquals(sb.level(), Level.Standard);
@@ -33,7 +34,7 @@ Deno.test("createBwrapSandbox name and level", () => {
   assertEquals(strict.level(), Level.Strict);
 });
 
-Deno.test("bwrapCapabilities require every runtime flag", () => {
+test("bwrapCapabilities require every runtime flag", () => {
   const caps = {
     unshareUser: true,
     unsharePid: true,
@@ -53,12 +54,12 @@ Deno.test("bwrapCapabilities require every runtime flag", () => {
   assert(!bwrapCapabilitiesComplete({ ...caps, hostname: false }));
 });
 
-Deno.test("probeBwrapCapabilities missing path", () => {
+test("probeBwrapCapabilities missing path", () => {
   const caps = probeBwrapCapabilities("/definitely/missing/bwrap");
   assert(caps === undefined);
 });
 
-Deno.test("probeBwrapCapabilities real binary", () => {
+test("probeBwrapCapabilities real binary", () => {
   const path = findBwrap();
   if (path === "") return; // bwrap unavailable
   const caps = probeBwrapCapabilities(path);
@@ -69,7 +70,7 @@ Deno.test("probeBwrapCapabilities real binary", () => {
   );
 });
 
-Deno.test("bwrap args use complete isolation profile", () => {
+test("bwrap args use complete isolation profile", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Standard, {
     tmpSize: "4096",
@@ -104,7 +105,7 @@ Deno.test("bwrap args use complete isolation profile", () => {
   assert(indexArgs(args, "--chdir", project) >= 0);
 });
 
-Deno.test("bwrap args do not rebind dev devices", () => {
+test("bwrap args do not rebind dev devices", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Standard, {
     allowedRead: ["/dev/null", "/dev/urandom", "/etc/ssl"],
@@ -123,7 +124,7 @@ Deno.test("bwrap args do not rebind dev devices", () => {
   assert(indexArgs(args, "--ro-bind", "/etc/ssl", "/etc/ssl") >= 0);
 });
 
-Deno.test("bwrap normalizes human readable tmpSize", () => {
+test("bwrap normalizes human readable tmpSize", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Standard, {
     tmpSize: "100m",
@@ -138,7 +139,7 @@ Deno.test("bwrap normalizes human readable tmpSize", () => {
   assertEquals(indexArgs(args, "--size", "100m"), -1);
 });
 
-Deno.test("bwrap args preserve host network", () => {
+test("bwrap args preserve host network", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const forOpts = (networkAccess: boolean) =>
     createBwrapSandbox(project, Level.Standard).buildBwrapArgs(
@@ -152,7 +153,7 @@ Deno.test("bwrap args preserve host network", () => {
   }
 });
 
-Deno.test("bwrap wrapCommand returns a command spec", () => {
+test("bwrap wrapCommand returns a command spec", () => {
   const sb = createBwrapSandbox("/tmp", Level.Standard);
   const spec = sb.wrapCommand(undefined, "/bin/bash", "echo hello", {
     workDir: "/tmp",
@@ -163,7 +164,7 @@ Deno.test("bwrap wrapCommand returns a command spec", () => {
   assert(spec.args.includes("--setenv"));
 });
 
-Deno.test("bwrap strict level binds project read-only", () => {
+test("bwrap strict level binds project read-only", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Strict);
   const args = sb.buildBwrapArgs(

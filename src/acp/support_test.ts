@@ -1,8 +1,8 @@
 // Translated tests from internal/acp/acp_mcp_test.go and focused coverage for
 // the ACP server-support helpers (startup errors, cursors, titles, paging).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import type { Message } from "../provider/types.ts";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import { type Message } from "../provider/types.ts";
 import type { Manager } from "../session/manager.ts";
 import {
   acpConfigValue,
@@ -25,8 +25,9 @@ import {
   transcriptPageSize,
   truncateTitle,
 } from "./support.ts";
+import { test } from "#testing";
 
-Deno.test("classifyACPStartupError does not expose its cause", () => {
+test("classifyACPStartupError does not expose its cause", () => {
   const secret = "do-not-expose-this-value";
   const startup = classifyACPStartupError(
     new Error(`invalid provider config api key=${secret}`),
@@ -38,7 +39,7 @@ Deno.test("classifyACPStartupError does not expose its cause", () => {
   assertEquals(isStartupError(new Error("x")), false);
 });
 
-Deno.test("startupErrorFromDoctor projects the first failing check", () => {
+test("startupErrorFromDoctor projects the first failing check", () => {
   const error = startupErrorFromDoctor({
     ok: false,
     version: "1",
@@ -67,7 +68,7 @@ Deno.test("startupErrorFromDoctor projects the first failing check", () => {
   assertEquals(doctorStartupMessage("Unknown Provider"), "unknown provider");
 });
 
-Deno.test("transcript cursors round-trip and reject invalid values", () => {
+test("transcript cursors round-trip and reject invalid values", () => {
   const cursor = encodeTranscriptCursor(7);
   assertEquals(decodeTranscriptCursor(cursor), 7);
   assertThrows(() => decodeTranscriptCursor("!!not-base64!!"));
@@ -77,7 +78,7 @@ Deno.test("transcript cursors round-trip and reject invalid values", () => {
   assertEquals(transcriptPageSize(1000), 100);
 });
 
-Deno.test("tool titles and stop reasons project faithfully", () => {
+test("tool titles and stop reasons project faithfully", () => {
   assertEquals(toolTitle("bash", { command: "ls -la" }), "bash: ls -la");
   assertEquals(toolTitle("read", { path: "/a/b" }), "read: path=/a/b");
   assertEquals(
@@ -106,7 +107,7 @@ Deno.test("tool titles and stop reasons project faithfully", () => {
   assertEquals(toolRawInput(undefined), { args: null });
 });
 
-Deno.test("replayMessageID is stable and messageUpdates matches roles", () => {
+test("replayMessageID is stable and messageUpdates matches roles", () => {
   const first = replayMessageID("s1", "message", "hello");
   assertEquals(first, replayMessageID("s1", "message", "hello"));
   assert(first.startsWith("acp_replay_message_"));
@@ -156,7 +157,7 @@ Deno.test("replayMessageID is stable and messageUpdates matches roles", () => {
   assertEquals(resultUpdates[0].title, "bash: ls");
 });
 
-Deno.test("transcriptPage windows canonical messages", () => {
+test("transcriptPage windows canonical messages", () => {
   const messages: Message[] = [];
   const entryIDs: string[] = [];
   for (let i = 0; i < 5; i++) {
@@ -186,7 +187,7 @@ Deno.test("transcriptPage windows canonical messages", () => {
   );
 });
 
-Deno.test("acpConfigValue decodes strings and booleans", () => {
+test("acpConfigValue decodes strings and booleans", () => {
   assertEquals(acpConfigValue("model-a", false), "model-a");
   assertEquals(acpConfigValue(true, false), "true");
   assertEquals(acpConfigValue(false, false), "false");
@@ -195,7 +196,7 @@ Deno.test("acpConfigValue decodes strings and booleans", () => {
   assertThrows(() => acpConfigValue(5, false));
 });
 
-Deno.test("elicitation and question projections", () => {
+test("elicitation and question projections", () => {
   const request = elicitationRequestForQuestion({
     sessionId: "s1",
     question: "Pick",

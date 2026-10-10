@@ -3,9 +3,9 @@
 // count title, one indented branch per call, and a single scrollback commit
 // once the whole batch reaches a terminal state.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { render } from "ink";
-import type { Event } from "../agent/events.ts";
+import { type Event } from "../agent/events.ts";
 import {
   EVENT_TOOL_EXECUTION_START,
   EVENT_TOOL_RESULT,
@@ -17,6 +17,7 @@ import { Translator } from "./i18n.ts";
 import { stripANSI } from "./renderutil.ts";
 import { TranscriptStore } from "./transcript_store.ts";
 import { formatToolGroup } from "./tool_row_format.ts";
+import { test } from "#testing";
 
 // ── group assignment (TranscriptStore) ──────────────────────────────────────
 
@@ -24,7 +25,7 @@ function store(): TranscriptStore {
   return new TranscriptStore({ translator: new Translator("en") });
 }
 
-Deno.test("calls that overlap share one parallel group", () => {
+test("calls that overlap share one parallel group", () => {
   const s = store();
   s.appendToolExecutionStart("t1", "bash", { command: "sleep 100" });
   s.appendToolExecutionStart("t2", "read", { path: "/tmp/file.go" });
@@ -40,7 +41,7 @@ Deno.test("calls that overlap share one parallel group", () => {
   assertEquals(s.toolGroupIDAt(999), 0);
 });
 
-Deno.test("a call after its predecessor finished opens a new group", () => {
+test("a call after its predecessor finished opens a new group", () => {
   const s = store();
   s.appendToolExecutionStart("t1", "bash");
   s.appendToolResult({ toolCallID: "t1", toolResult: "done" });
@@ -53,7 +54,7 @@ Deno.test("a call after its predecessor finished opens a new group", () => {
   assertEquals(s.isMultiToolGroup(2), false);
 });
 
-Deno.test("a result that opens its own row stays ungrouped", () => {
+test("a result that opens its own row stays ungrouped", () => {
   const s = store();
   s.appendToolResult({
     toolCallID: "stray",
@@ -65,7 +66,7 @@ Deno.test("a result that opens its own row stays ungrouped", () => {
   assertEquals(s.isMultiToolGroup(0), false);
 });
 
-Deno.test("resetting the transcript restarts group numbering", () => {
+test("resetting the transcript restarts group numbering", () => {
   const s = store();
   s.appendToolExecutionStart("t1", "bash");
   s.appendToolExecutionStart("t2", "bash");
@@ -78,7 +79,7 @@ Deno.test("resetting the transcript restarts group numbering", () => {
 
 // ── tree block shape ────────────────────────────────────────────────────────
 
-Deno.test("formatToolGroup draws a title with one branch per call", () => {
+test("formatToolGroup draws a title with one branch per call", () => {
   assertEquals(
     formatToolGroup("🔧 Running: 3 tools", [
       "[bash] sleep 100 (running)",
@@ -94,7 +95,7 @@ Deno.test("formatToolGroup draws a title with one branch per call", () => {
   );
 });
 
-Deno.test("formatToolGroup aligns continuation lines under the branch", () => {
+test("formatToolGroup aligns continuation lines under the branch", () => {
   assertEquals(
     formatToolGroup("✅ Done: 2 tools", ["[bash] a\nline2\nline3", "[read] b"]),
     [
@@ -107,7 +108,7 @@ Deno.test("formatToolGroup aligns continuation lines under the branch", () => {
   );
 });
 
-Deno.test("formatToolGroup drops empty member rows", () => {
+test("formatToolGroup drops empty member rows", () => {
   assertEquals(
     formatToolGroup("✅ Done: 2 tools", ["", "[read] b"]),
     ["✅ Done: 2 tools", "└─ [read] b"].join("\n"),
@@ -227,7 +228,7 @@ function controller(): AppController {
   });
 }
 
-Deno.test("parallel running calls render as one tree group", async () => {
+test("parallel running calls render as one tree group", async () => {
   const c = controller();
   startTool(c, "t1", "bash", { command: "sleep 100" });
   startTool(c, "t2", "read", { path: "/tmp/file.go" });
@@ -249,7 +250,7 @@ Deno.test("parallel running calls render as one tree group", async () => {
   }
 });
 
-Deno.test("a single running call keeps its standalone row", async () => {
+test("a single running call keeps its standalone row", async () => {
   const c = controller();
   startTool(c, "t1", "bash", { command: "sleep 100" });
 
@@ -266,7 +267,7 @@ Deno.test("a single running call keeps its standalone row", async () => {
   }
 });
 
-Deno.test("a partially finished batch stays one running group", async () => {
+test("a partially finished batch stays one running group", async () => {
   const c = controller();
   startTool(c, "t1", "bash", { command: "sleep 100" });
   startTool(c, "t2", "bash", { command: "sleep 200" });
@@ -284,7 +285,7 @@ Deno.test("a partially finished batch stays one running group", async () => {
   }
 });
 
-Deno.test("a finished batch commits to scrollback as one tree block", async () => {
+test("a finished batch commits to scrollback as one tree block", async () => {
   const c = controller();
   startTool(c, "t1", "bash", { command: "sleep 100" });
   startTool(c, "t2", "read", { path: "/tmp/file.go" });
@@ -313,7 +314,7 @@ Deno.test("a finished batch commits to scrollback as one tree block", async () =
   }
 });
 
-Deno.test("an interrupted batch still commits as one tree block", async () => {
+test("an interrupted batch still commits as one tree block", async () => {
   const c = controller();
   startTool(c, "t1", "bash", { command: "sleep 100" });
   startTool(c, "t2", "bash", { command: "sleep 200" });
@@ -336,7 +337,7 @@ Deno.test("an interrupted batch still commits as one tree block", async () => {
   }
 });
 
-Deno.test("the batch title follows the session language", async () => {
+test("the batch title follows the session language", async () => {
   const c = new AppController(new Translator("zh"), {
     onMessage: () => {},
     scheduleRender: () => {},

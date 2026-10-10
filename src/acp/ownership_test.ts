@@ -1,6 +1,7 @@
-import { assert, assertEquals } from "@opensac/assert";
-import { fromFileUrl, join } from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { fromFileUrl, join } from "../compat/path.ts";
 import { productionViolations, type Violation } from "../architecture/guard.ts";
+import { test } from "#testing";
 
 function formatViolations(violations: Violation[]): string {
   return violations.map((violation) =>
@@ -10,14 +11,14 @@ function formatViolations(violations: Violation[]): string {
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
-Deno.test("production ACP entry cannot import runtime implementation modules", () => {
+test("production ACP entry cannot import runtime implementation modules", () => {
   const violations = productionViolations(projectRoot).filter(
     (violation) => violation.file === "src/acp/run.ts",
   );
   assertEquals(violations, [], formatViolations(violations));
 });
 
-Deno.test("ACP public surface does not export the legacy management router", () => {
+test("ACP public surface does not export the legacy management router", () => {
   const source = Deno.readTextFileSync(join(projectRoot, "src/acp/mod.ts"));
   assertEquals(source.includes('export * from "./manage.ts";'), false);
   assertEquals(source.includes('export * from "./manage_skillhub.ts";'), false);
@@ -27,7 +28,7 @@ Deno.test("ACP public surface does not export the legacy management router", () 
   );
 });
 
-Deno.test("ACP bridge files cannot import runtime implementation modules", () => {
+test("ACP bridge files cannot import runtime implementation modules", () => {
   const root = Deno.makeTempDirSync();
   try {
     const acpDir = join(root, "src/acp");
@@ -60,7 +61,7 @@ Deno.test("ACP bridge files cannot import runtime implementation modules", () =>
   }
 });
 
-Deno.test("ACP bridge files cannot directly construct runtime owners", () => {
+test("ACP bridge files cannot directly construct runtime owners", () => {
   const root = Deno.makeTempDirSync();
   try {
     const acpDir = join(root, "src/acp");

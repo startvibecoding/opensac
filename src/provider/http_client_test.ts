@@ -3,10 +3,11 @@
 // ForceAttemptHTTP2). Deno has no pluggable transport, so the port exposes the
 // normalized proxy URL and HTTP/1.1 flag on the client and asserts on those.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createHttpClient } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("NewHTTPClientDefaultProxy", () => {
+test("NewHTTPClientDefaultProxy", () => {
   const client = createHttpClient(1000);
   try {
     assertEquals(client.proxyUrl, undefined);
@@ -15,7 +16,7 @@ Deno.test("NewHTTPClientDefaultProxy", () => {
   }
 });
 
-Deno.test("NewHTTPClientExplicitProxy", () => {
+test("NewHTTPClientExplicitProxy", () => {
   const client = createHttpClient(1000, {
     proxyUrl: " http://127.0.0.1:7890 ",
   });
@@ -26,7 +27,7 @@ Deno.test("NewHTTPClientExplicitProxy", () => {
   }
 });
 
-Deno.test("NewHTTPClientRejectsInvalidProxy", () => {
+test("NewHTTPClientRejectsInvalidProxy", () => {
   for (const proxyURL of ["http://[::1", "127.0.0.1:7890", "http://"]) {
     assert(
       (() => {
@@ -42,7 +43,7 @@ Deno.test("NewHTTPClientRejectsInvalidProxy", () => {
   }
 });
 
-Deno.test("NewHTTPClientForceHTTP11", () => {
+test("NewHTTPClientForceHTTP11", () => {
   const client = createHttpClient(1000, { forceHTTP11: true });
   try {
     assertEquals(client.forceHTTP11, true);

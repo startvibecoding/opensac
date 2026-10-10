@@ -15,17 +15,16 @@
 // the live session.
 //
 
-import type {
-  ModelCompat,
-  ModelConfig,
-  ProviderConfig,
-  ResponsesConfig,
-  ResponsesToolControlConfig,
-  Settings,
-} from "../config/settings.ts";
+import {
+  type ModelCompat,
+  type ModelConfig,
+  type ProviderConfig,
+  type ResponsesConfig,
+  type ResponsesToolControlConfig,
+  type Settings} from "../config/settings.ts";
 import { defaultProviderConfigsAll } from "../config/settings.ts";
 import { presetModelConfig } from "../config/model_preset.ts";
-import type { DialogItem, DialogPage } from "./dialog.ts";
+import { type DialogItem, type DialogPage } from "./dialog.ts";
 
 type TriBool = boolean | null;
 

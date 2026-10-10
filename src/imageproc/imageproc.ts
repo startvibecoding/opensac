@@ -8,7 +8,7 @@
 
 import { Image } from "imagescript";
 import { decode as decodeWebp } from "@jsquash/webp";
-import type { Family, Hint } from "./policy.ts";
+import { type Family, type Hint } from "./policy.ts";
 import { inferFamily } from "./policy.ts";
 
 /** Image processing mode. */

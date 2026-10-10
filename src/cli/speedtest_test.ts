@@ -2,7 +2,7 @@
 // parsing, target collection, token estimation, averaging/sorting, the table
 // projection, and the command path with an injected fake provider (no network).
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   averageSpeedtestResults,
   collectSpeedtestTargets,
@@ -19,9 +19,10 @@ import {
   type SpeedtestResult,
   type SpeedtestTarget,
 } from "./speedtest.ts";
-import type { Settings } from "../config/mod.ts";
-import type { Model, Provider, StreamEvent } from "../provider/mod.ts";
+import { type Settings } from "../config/mod.ts";
+import { type Model, type Provider, type StreamEvent } from "../provider/mod.ts";
 import { streamDone, streamTextDelta, streamUsage } from "../provider/mod.ts";
+import { test } from "#testing";
 
 function settingsWithProviders(): Settings {
   const base = {
@@ -55,7 +56,7 @@ function settingsWithProviders(): Settings {
   return base;
 }
 
-Deno.test("parseSpeedtestThinkingLevel accepts valid and rejects invalid", () => {
+test("parseSpeedtestThinkingLevel accepts valid and rejects invalid", () => {
   assertEquals(parseSpeedtestThinkingLevel("off"), "off");
   assertEquals(parseSpeedtestThinkingLevel(" xhigh "), "xhigh");
   assertRejects(() => {
@@ -64,7 +65,7 @@ Deno.test("parseSpeedtestThinkingLevel accepts valid and rejects invalid", () =>
   }).then(() => {}, () => {});
 });
 
-Deno.test("collectSpeedtestTargets filters unconfigured providers", () => {
+test("collectSpeedtestTargets filters unconfigured providers", () => {
   const flags = defaultSpeedtestFlags();
   const targets = collectSpeedtestTargets(settingsWithProviders(), flags);
   // p1 configured; empty has no key; placeholder only has ${...}
@@ -74,7 +75,7 @@ Deno.test("collectSpeedtestTargets filters unconfigured providers", () => {
   );
 });
 
-Deno.test("collectSpeedtestTargets honors --provider/--model filters", () => {
+test("collectSpeedtestTargets honors --provider/--model filters", () => {
   const flags = defaultSpeedtestFlags();
   flags.provider = "p1";
   flags.model = "m2";
@@ -83,14 +84,14 @@ Deno.test("collectSpeedtestTargets honors --provider/--model filters", () => {
   assertEquals(targets[0].modelId, "m2");
 });
 
-Deno.test("estimateSpeedtestTokens prefers words or runes/4", () => {
+test("estimateSpeedtestTokens prefers words or runes/4", () => {
   assertEquals(estimateSpeedtestTokens(""), 0);
   // words (6) lose to runes/4 (ceil(26/4)=7); Go returns byRunes
   assertEquals(estimateSpeedtestTokens("one two three four five six"), 7);
   assertEquals(estimateSpeedtestTokens("a".repeat(40)), 10);
 });
 
-Deno.test("averageSpeedtestResults averages successful runs only", () => {
+test("averageSpeedtestResults averages successful runs only", () => {
   const target: SpeedtestTarget = {
     provider: "p",
     modelId: "m",
@@ -117,7 +118,7 @@ Deno.test("averageSpeedtestResults averages successful runs only", () => {
   assertEquals(avg.outputTokens, 50);
 });
 
-Deno.test("sortSpeedtestResults orders by success, rate, provider", () => {
+test("sortSpeedtestResults orders by success, rate, provider", () => {
   const target = (p: string, m: string): SpeedtestTarget => ({
     provider: p,
     modelId: m,
@@ -153,7 +154,7 @@ Deno.test("sortSpeedtestResults orders by success, rate, provider", () => {
   assertEquals(countSpeedtestSuccesses(results), 3);
 });
 
-Deno.test("formatSpeedtestRate and duration render Go-style", () => {
+test("formatSpeedtestRate and duration render Go-style", () => {
   assertEquals(formatSpeedtestRate(0), "--");
   assertEquals(formatSpeedtestRate(123.44), "123.4");
   assertEquals(formatSpeedtestDuration(0), "--");
@@ -161,7 +162,7 @@ Deno.test("formatSpeedtestRate and duration render Go-style", () => {
   assertEquals(formatSpeedtestDuration(1500), "1.50s");
 });
 
-Deno.test("printSpeedtestResults renders aligned columns", () => {
+test("printSpeedtestResults renders aligned columns", () => {
   const lines: string[] = [];
   const target: SpeedtestTarget = {
     provider: "prov",
@@ -192,7 +193,7 @@ Deno.test("printSpeedtestResults renders aligned columns", () => {
   assert(header.indexOf("Model") === row.indexOf("model-x"));
 });
 
-Deno.test("runSpeedtestRequest computes rate from usage", async () => {
+test("runSpeedtestRequest computes rate from usage", async () => {
   const events: StreamEvent[] = [
     { type: streamTextDelta, textDelta: "hello " },
     { type: streamTextDelta, textDelta: "world" },
@@ -232,7 +233,7 @@ Deno.test("runSpeedtestRequest computes rate from usage", async () => {
   assert(result.firstTokenLatencyMs >= 0);
 });
 
-Deno.test("runSpeedtestRequest surfaces stream errors", async () => {
+test("runSpeedtestRequest surfaces stream errors", async () => {
   const provider: Provider = {
     chat(): AsyncIterable<StreamEvent> {
       return (async function* () {
@@ -253,7 +254,7 @@ Deno.test("runSpeedtestRequest surfaces stream errors", async () => {
   assert(result.outputTokens > 0);
 });
 
-Deno.test("executeSpeedtestCommand validates flags and empty targets", async () => {
+test("executeSpeedtestCommand validates flags and empty targets", async () => {
   await assertRejects(
     () => executeSpeedtestCommand({ maxTokens: 0 }),
     Error,

@@ -4,8 +4,8 @@
 // the file-diff and atomic-write helpers, the file-lock manager, the globset/
 // ignore helpers, and the job manager.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
   BashTool,
@@ -40,6 +40,7 @@ import {
   createBashTool,
   MAX_BASH_RESULT_CHARS,
 } from "./bash.ts";
+import { test } from "#testing";
 
 function tempDir(): string {
   return Deno.makeTempDirSync();
@@ -66,12 +67,12 @@ async function expectRejects(fn: () => unknown): Promise<void> {
   assert(threw, "expected the call to fail");
 }
 
-Deno.test("operation id context helpers", () => {
+test("operation id context helpers", () => {
   const withId = { ...ctx, operationId: "op-1" };
   assertEquals(withId.operationId, "op-1");
 });
 
-Deno.test("NewRegistry and register/get/remove", () => {
+test("NewRegistry and register/get/remove", () => {
   const r = createRegistry("/tmp", undefined);
   const plan = new PlanTool(r);
   r.register(plan);
@@ -82,7 +83,7 @@ Deno.test("NewRegistry and register/get/remove", () => {
   assertEquals(r.get("plan"), undefined);
 });
 
-Deno.test("RegisterDefaults registers the standard tool set", () => {
+test("RegisterDefaults registers the standard tool set", () => {
   const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
   const expected = [
@@ -103,13 +104,13 @@ Deno.test("RegisterDefaults registers the standard tool set", () => {
   }
 });
 
-Deno.test("RegisterDefaultsWithPlanTool(false) omits plan", () => {
+test("RegisterDefaultsWithPlanTool(false) omits plan", () => {
   const r = createRegistry("/tmp", undefined);
   r.registerDefaultsWithPlanTool(false);
   assertEquals(r.get("plan"), undefined);
 });
 
-Deno.test("ModeTools filters by mode", () => {
+test("ModeTools filters by mode", () => {
   const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
 
@@ -126,7 +127,7 @@ Deno.test("ModeTools filters by mode", () => {
   assertEquals(osNames, ["bash"]);
 });
 
-Deno.test("PlanTool formats and returns a structured plan", async () => {
+test("PlanTool formats and returns a structured plan", async () => {
   const r = createRegistry("/tmp", undefined);
   const tool = new PlanTool(r);
   const result = await tool.execute(ctx, {
@@ -144,7 +145,7 @@ Deno.test("PlanTool formats and returns a structured plan", async () => {
   assertStringIncludes(result.text, "[running] Implement change");
 });
 
-Deno.test("PlanTool rejects empty steps and bad status", async () => {
+test("PlanTool rejects empty steps and bad status", async () => {
   const r = createRegistry("/tmp", undefined);
   const tool = new PlanTool(r);
   await expectRejects(() => tool.execute(ctx, { steps: [] }));
@@ -153,7 +154,7 @@ Deno.test("PlanTool rejects empty steps and bad status", async () => {
   );
 });
 
-Deno.test("ReadTool reads numbered lines with offset and limit", async () => {
+test("ReadTool reads numbered lines with offset and limit", async () => {
   const dir = tempDir();
   const file = path.join(dir, "a.txt");
   writeText(file, "one\ntwo\nthree\nfour\n");
@@ -177,20 +178,20 @@ Deno.test("ReadTool reads numbered lines with offset and limit", async () => {
   assertEquals(pastEnd.text, "(end of file)");
 });
 
-Deno.test("ReadTool rejects path escape", async () => {
+test("ReadTool rejects path escape", async () => {
   const dir = tempDir();
   const r = createRegistry(dir, undefined);
   const tool = new ReadTool(r);
   await expectRejects(() => tool.execute(ctx, { path: "../../etc/passwd" }));
 });
 
-Deno.test("ReadTool rejects a missing required path", async () => {
+test("ReadTool rejects a missing required path", async () => {
   const r = createRegistry("/tmp", undefined);
   const tool = new ReadTool(r);
   await expectRejects(() => tool.execute(ctx, {}));
 });
 
-Deno.test("WriteTool writes and reports a diff", async () => {
+test("WriteTool writes and reports a diff", async () => {
   const dir = tempDir();
   const r = createRegistry(dir, undefined);
   const tool = new WriteTool(r);
@@ -203,7 +204,7 @@ Deno.test("WriteTool writes and reports a diff", async () => {
   assertStringIncludes(result.text, "File written:");
 });
 
-Deno.test("EditTool applies multiple disjoint edits", async () => {
+test("EditTool applies multiple disjoint edits", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "alpha beta gamma");
@@ -220,7 +221,7 @@ Deno.test("EditTool applies multiple disjoint edits", async () => {
   assert(result.diff);
 });
 
-Deno.test("EditTool rejects non-unique and missing oldText", async () => {
+test("EditTool rejects non-unique and missing oldText", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "x x");
@@ -240,7 +241,7 @@ Deno.test("EditTool rejects non-unique and missing oldText", async () => {
   );
 });
 
-Deno.test("EditTool rejects overlapping edits", async () => {
+test("EditTool rejects overlapping edits", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "abcdef");
@@ -257,7 +258,7 @@ Deno.test("EditTool rejects overlapping edits", async () => {
   );
 });
 
-Deno.test("InsertTool positions", async () => {
+test("InsertTool positions", async () => {
   const cases: Array<{ position: Record<string, unknown>; want: string }> = [
     { position: { type: "head" }, want: "X\na\nb\n" },
     { position: { type: "tail" }, want: "a\nb\nX" },
@@ -278,7 +279,7 @@ Deno.test("InsertTool positions", async () => {
   }
 });
 
-Deno.test("InsertTool dedupe and dry run", async () => {
+test("InsertTool dedupe and dry run", async () => {
   const dir = tempDir();
   const file = path.join(dir, "file.txt");
   writeText(file, "a\nb\n");
@@ -306,7 +307,7 @@ Deno.test("InsertTool dedupe and dry run", async () => {
   assertEquals(readText(file), "a\nb\n");
 });
 
-Deno.test("InsertTool rejects match position and out-of-range line", async () => {
+test("InsertTool rejects match position and out-of-range line", async () => {
   const dir = tempDir();
   const file = path.join(dir, "file.txt");
   writeText(file, "a\n");
@@ -328,7 +329,7 @@ Deno.test("InsertTool rejects match position and out-of-range line", async () =>
   );
 });
 
-Deno.test("FindTool finds files and respects maxDepth", async () => {
+test("FindTool finds files and respects maxDepth", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "test.txt"), "Hello");
   writeText(path.join(dir, "test.go"), "package main");
@@ -354,7 +355,7 @@ Deno.test("FindTool finds files and respects maxDepth", async () => {
   );
 });
 
-Deno.test("GrepTool searches, filters by include and respects gitignore", async () => {
+test("GrepTool searches, filters by include and respects gitignore", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "one.go"), "package main\nfunc Hello() {}\n");
   writeText(path.join(dir, "two.txt"), "Hello text\n");
@@ -381,7 +382,7 @@ Deno.test("GrepTool searches, filters by include and respects gitignore", async 
   assert(!gitignored.text.includes("ignored.go"));
 });
 
-Deno.test("GrepTool limits total results and falls back to literal", async () => {
+test("GrepTool limits total results and falls back to literal", async () => {
   const dir = tempDir();
   for (let i = 0; i < 5; i++) {
     writeText(path.join(dir, `file${i}.txt`), "match one\nmatch two\n");
@@ -409,7 +410,7 @@ Deno.test("GrepTool limits total results and falls back to literal", async () =>
   assertStringIncludes(literal.text, "(no matches found)");
 });
 
-Deno.test("GrepTool skips oversized files instead of buffering them", async () => {
+test("GrepTool skips oversized files instead of buffering them", async () => {
   const dir = tempDir();
   writeText(
     path.join(dir, "huge.txt"),
@@ -424,7 +425,7 @@ Deno.test("GrepTool skips oversized files instead of buffering them", async () =
   assertStringIncludes(result.text, "skipped 1 files");
 });
 
-Deno.test("LsTool lists directory entries", async () => {
+test("LsTool lists directory entries", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "a.txt"), "hi");
   Deno.mkdirSync(path.join(dir, "sub"));
@@ -434,7 +435,7 @@ Deno.test("LsTool lists directory entries", async () => {
   assertStringIncludes(result.text, "sub/");
 });
 
-Deno.test("BashTool runs a sync command", async () => {
+test("BashTool runs a sync command", async () => {
   const tool = new BashTool(
     createRegistry("/tmp", undefined),
     createJobManager(),
@@ -447,7 +448,7 @@ Deno.test("BashTool runs a sync command", async () => {
   assertStringIncludes(result.text, "[exit_code]\n0");
 });
 
-Deno.test("BashTool captures stderr and non-zero exit code", async () => {
+test("BashTool captures stderr and non-zero exit code", async () => {
   const tool = new BashTool(
     createRegistry("/tmp", undefined),
     createJobManager(),
@@ -460,7 +461,7 @@ Deno.test("BashTool captures stderr and non-zero exit code", async () => {
   assertStringIncludes(failing.text, "[exit_code]\n3");
 });
 
-Deno.test("buildBashResult keeps every section when the output is oversized", () => {
+test("buildBashResult keeps every section when the output is oversized", () => {
   const result = buildBashResult(
     "bash",
     "loud-failure",
@@ -477,7 +478,7 @@ Deno.test("buildBashResult keeps every section when the output is oversized", ()
   assertStringIncludes(result, "... (truncated)");
 });
 
-Deno.test("buildBashResult leaves a small result untouched", () => {
+test("buildBashResult leaves a small result untouched", () => {
   assertEquals(
     buildBashResult("bash", "echo hi", "/w", "hi", "", 0),
     "[runtime]\nbash\n[command]\necho hi\n[cwd]\n/w\n[stdout]\nhi\n" +
@@ -485,7 +486,7 @@ Deno.test("buildBashResult leaves a small result untouched", () => {
   );
 });
 
-Deno.test("BashTool uses non-interactive auth env", async () => {
+test("BashTool uses non-interactive auth env", async () => {
   const tool = new BashTool(
     createRegistry("/tmp", undefined),
     createJobManager(),
@@ -497,7 +498,7 @@ Deno.test("BashTool uses non-interactive auth env", async () => {
   assertStringIncludes(result.text, "[stdout]\n0:true:true:never");
 });
 
-Deno.test("BashTool async creates a job that jobs/kill can manage", async () => {
+test("BashTool async creates a job that jobs/kill can manage", async () => {
   const jm = createJobManager();
   const r = createRegistry("/tmp", undefined);
   const bash = createBashTool(r, jm);
@@ -522,7 +523,7 @@ Deno.test("BashTool async creates a job that jobs/kill can manage", async () => 
   await expectRejects(() => jobs.execute(ctx, { jobId: 99 }));
 });
 
-Deno.test("BashTool honors a parent abort signal", async () => {
+test("BashTool honors a parent abort signal", async () => {
   const tool = new BashTool(
     createRegistry("/tmp", undefined),
     createJobManager(),
@@ -537,7 +538,7 @@ Deno.test("BashTool honors a parent abort signal", async () => {
   assertStringIncludes(result.text, "[exit_code]\n");
 });
 
-Deno.test("QuestionTool asks via the attached asker", async () => {
+test("QuestionTool asks via the attached asker", async () => {
   const r = createRegistry("/tmp", undefined);
   const tool = new QuestionTool(r);
   const withAsker: ToolContext = {
@@ -557,7 +558,7 @@ Deno.test("QuestionTool asks via the attached asker", async () => {
   await expectRejects(() => tool.execute({}, {}));
 });
 
-Deno.test("SkillRefTool loads a reference from a fake manager", async () => {
+test("SkillRefTool loads a reference from a fake manager", async () => {
   const fake = {
     loadReference: (skill: string, ref: string) =>
       skill === "demo" && ref === "references/x.md" ? "content!" : undefined,
@@ -574,12 +575,12 @@ Deno.test("SkillRefTool loads a reference from a fake manager", async () => {
   );
 });
 
-Deno.test("ImageGenerationTool rejects when disabled", async () => {
+test("ImageGenerationTool rejects when disabled", async () => {
   const tool = new ImageGenerationTool(undefined);
   await expectRejects(() => tool.execute(ctx, { prompt: "a cat" }));
 });
 
-Deno.test("buildFileDiff reports added and deleted lines", () => {
+test("buildFileDiff reports added and deleted lines", () => {
   const diff = buildFileDiff("f.txt", "a\nb\nc\n", "a\nB\nc\nd\n");
   assertEquals(diff.path, "f.txt");
   assert(diff.added >= 1);
@@ -587,7 +588,7 @@ Deno.test("buildFileDiff reports added and deleted lines", () => {
   assertStringIncludes(diff.unified, "--- f.txt");
 });
 
-Deno.test("writeFileAtomic writes and leaves no temp file", () => {
+test("writeFileAtomic writes and leaves no temp file", () => {
   const dir = tempDir();
   const file = path.join(dir, "out.txt");
   writeFileAtomic(file, new TextEncoder().encode("hello world"));
@@ -597,7 +598,7 @@ Deno.test("writeFileAtomic writes and leaves no temp file", () => {
   }
 });
 
-Deno.test("file lock manager waits and cancels", async () => {
+test("file lock manager waits and cancels", async () => {
   const mgr = new FileLockManager();
   const file = path.join(tempDir(), "locked.txt");
   const release = await mgr.acquire(undefined, file, "first");
@@ -631,7 +632,7 @@ async function withDeadline<T>(p: Promise<T>, ms = 2000): Promise<T> {
   }
 }
 
-Deno.test("file lock manager hands the lock to the next waiter", async () => {
+test("file lock manager hands the lock to the next waiter", async () => {
   const mgr = new FileLockManager();
   const file = path.join(tempDir(), "locked.txt");
   const order: string[] = [];
@@ -662,7 +663,7 @@ Deno.test("file lock manager hands the lock to the next waiter", async () => {
   releaseFourth();
 });
 
-Deno.test("file lock manager survives an aborted waiter in the queue", async () => {
+test("file lock manager survives an aborted waiter in the queue", async () => {
   const mgr = new FileLockManager();
   const file = path.join(tempDir(), "locked.txt");
   const first = await mgr.acquire(undefined, file, "first");
@@ -679,7 +680,7 @@ Deno.test("file lock manager survives an aborted waiter in the queue", async () 
   releaseNext();
 });
 
-Deno.test("EditTool serializes concurrent edits to the same file", async () => {
+test("EditTool serializes concurrent edits to the same file", async () => {
   const dir = tempDir();
   const file = path.join(dir, "e.txt");
   writeText(file, "alpha beta gamma");
@@ -701,13 +702,13 @@ Deno.test("EditTool serializes concurrent edits to the same file", async () => {
   assertEquals(readText(file), "ALPHA beta GAMMA");
 });
 
-Deno.test("default registries share a file lock manager", () => {
+test("default registries share a file lock manager", () => {
   const r1 = createRegistry(tempDir(), undefined);
   const r2 = createRegistry(tempDir(), undefined);
   assertEquals(r1.fileLocks() === r2.fileLocks(), true);
 });
 
-Deno.test("RegistryResolvePath resolves and rejects escapes", async () => {
+test("RegistryResolvePath resolves and rejects escapes", async () => {
   const r = createRegistry("/home/user/project", undefined);
   assertEquals(
     r.resolvePath("src/main.go"),
@@ -720,7 +721,7 @@ Deno.test("RegistryResolvePath resolves and rejects escapes", async () => {
   );
 });
 
-Deno.test("RegistryConfig registers filtered tools", () => {
+test("RegistryConfig registers filtered tools", () => {
   const all = createRegistryWithConfig({ workDir: "/tmp" });
   assert(all.all().length > 0);
 
@@ -734,13 +735,13 @@ Deno.test("RegistryConfig registers filtered tools", () => {
   assert(filtered.get("bash") === undefined);
 });
 
-Deno.test("Registry job managers are per-instance", () => {
+test("Registry job managers are per-instance", () => {
   const r1 = createRegistry("/tmp", undefined);
   const r2 = createRegistry("/tmp", undefined);
   assert(r1.jobManager() !== r2.jobManager());
 });
 
-Deno.test("tool snippets and guidelines are gathered", () => {
+test("tool snippets and guidelines are gathered", () => {
   const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
   const snippets = r.toolSnippets(["read", "write", "bash"]);
@@ -749,7 +750,7 @@ Deno.test("tool snippets and guidelines are gathered", () => {
   assert(guidelines.length >= 1);
 });
 
-Deno.test("ToolDefinition exposes name/description/parameters", () => {
+test("ToolDefinition exposes name/description/parameters", () => {
   const r = createRegistry("/tmp", undefined);
   const tool: Tool = new ReadTool(r);
   const def = { name: tool.name(), description: tool.description() };
@@ -758,7 +759,7 @@ Deno.test("ToolDefinition exposes name/description/parameters", () => {
   assert(tool.parameters() !== undefined);
 });
 
-Deno.test("mode tools for plan does not include write/bash", () => {
+test("mode tools for plan does not include write/bash", () => {
   const r = createRegistry("/tmp", undefined);
   r.registerDefaults();
   const planNames = new Set(r.modeTools("plan").map((t) => t.name));
@@ -768,7 +769,7 @@ Deno.test("mode tools for plan does not include write/bash", () => {
   assert(!planNames.has("bash"));
 });
 
-Deno.test("GlobSet matches anchored, unanchored, and negated patterns", () => {
+test("GlobSet matches anchored, unanchored, and negated patterns", () => {
   const gs = GlobSet.newGlobSet(["*.go", "!main.go", "bin/"]);
   // An unanchored pattern matches any path component.
   assertEquals(gs.match("src/app.go").isIgnored, true);
@@ -777,7 +778,7 @@ Deno.test("GlobSet matches anchored, unanchored, and negated patterns", () => {
   assertEquals(gs.matchGlobFilter("app.txt"), true);
 });
 
-Deno.test("IgnoreStack honors hidden and gitignore rules", () => {
+test("IgnoreStack honors hidden and gitignore rules", () => {
   const dir = tempDir();
   writeText(path.join(dir, ".gitignore"), "ignored.go\n");
   const stack = new IgnoreStack(false, false, 0);
@@ -789,14 +790,14 @@ Deno.test("IgnoreStack honors hidden and gitignore rules", () => {
   assert(!stack.isIgnored(path.join(dir, "kept.go"), false));
 });
 
-Deno.test("formatGoDuration matches Go duration strings", () => {
+test("formatGoDuration matches Go duration strings", () => {
   assertEquals(formatGoDuration(0), "0s");
   assertEquals(formatGoDuration(5000), "5s");
   assertEquals(formatGoDuration(90000), "1m30s");
   assertEquals(formatGoDuration(3600000), "1h0m0s");
 });
 
-Deno.test("GrepTool falls back to literal when a match request times out", async () => {
+test("GrepTool falls back to literal when a match request times out", async () => {
   const dir = tempDir();
   // `(a|a)+$` passes the shape screen but backtracks exponentially against
   // the 40-char line below; the bounded worker turns the hang into a timeout.
@@ -814,7 +815,7 @@ Deno.test("GrepTool falls back to literal when a match request times out", async
   assert(!result.text.includes("evil.txt:"));
 });
 
-Deno.test("GrepTool literal fallback keeps finding literal matches after timeout", async () => {
+test("GrepTool literal fallback keeps finding literal matches after timeout", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "a.txt"), "(a|a)+$ is here\n");
   writeText(path.join(dir, "b.txt"), "a".repeat(40) + "!\n");
@@ -829,7 +830,7 @@ Deno.test("GrepTool literal fallback keeps finding literal matches after timeout
   assertStringIncludes(result.text, "(a|a)+$ is here");
 });
 
-Deno.test("GrepTool matches across chunk boundaries in order", async () => {
+test("GrepTool matches across chunk boundaries in order", async () => {
   const dir = tempDir();
   const lines: string[] = [];
   for (let i = 0; i < 1300; i++) {

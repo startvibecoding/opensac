@@ -3,7 +3,7 @@
 // `AbortError` / `TimeoutError` named errors because Deno has no `context`
 // package.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   classifyError,
   displayErrorMessage,
@@ -17,6 +17,7 @@ import {
   RETRY_USER,
   SIDE_EFFECT_UNKNOWN,
 } from "./error_info.ts";
+import { test } from "#testing";
 
 function namedError(name: string, message: string): Error {
   const err = new Error(message);
@@ -24,7 +25,7 @@ function namedError(name: string, message: string): Error {
   return err;
 }
 
-Deno.test("ClassifyErrorRetrySafety", () => {
+test("ClassifyErrorRetrySafety", () => {
   const base = classifyError(new Error("HTTP 503 upstream unavailable"), {});
   assert(base.code === "provider_unavailable");
   assert(base.retryMode === RETRY_AUTOMATIC);
@@ -39,7 +40,7 @@ Deno.test("ClassifyErrorRetrySafety", () => {
   assert(unsafe.retryable === true);
 });
 
-Deno.test("ClassifyErrorCancellationAndTimeout", () => {
+test("ClassifyErrorCancellationAndTimeout", () => {
   const cancelled = classifyError(namedError("AbortError", "cancelled"), {});
   assert(cancelled.code === "run_cancelled");
   assert(cancelled.retryMode === RETRY_USER);
@@ -61,7 +62,7 @@ Deno.test("ClassifyErrorCancellationAndTimeout", () => {
   assert(plain.detail === plain.message);
 });
 
-Deno.test("SharedFailureContractAcrossAdapters", () => {
+test("SharedFailureContractAcrossAdapters", () => {
   // The adapters intentionally have different wire formats, but the runtime
   // classification is the contract they must all project.
   const entries = ["tui", "acp", "cli"];
@@ -90,7 +91,7 @@ Deno.test("SharedFailureContractAcrossAdapters", () => {
   }
 });
 
-Deno.test("DisplayErrorMessageIncludesProviderDetail", () => {
+test("DisplayErrorMessageIncludesProviderDetail", () => {
   const info: ErrorInfo = {
     message: "The model service is temporarily unavailable.",
     detail: "API error 503: upstream overloaded",

@@ -12,9 +12,9 @@ import {
   decisionEventType,
   isDecisionEventType,
 } from "../session/decision_events.ts";
-import type { SessionRunEvent } from "../session/session_events.ts";
+import { type SessionRunEvent } from "../session/session_events.ts";
 import { listSessionRunEvents } from "../session/session_events.ts";
-import type { DecisionRequest, DecisionResolution } from "./decision.ts";
+import { type DecisionRequest, type DecisionResolution } from "./decision.ts";
 import {
   createDecisionRequestRecord,
   createDecisionResolutionRecord,

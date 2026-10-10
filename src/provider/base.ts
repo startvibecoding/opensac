@@ -1,4 +1,4 @@
-import type { Model } from "./types.ts";
+import { type Model } from "./types.ts";
 
 /** BaseProvider provides common functionality for provider implementations. */
 export class BaseProvider {

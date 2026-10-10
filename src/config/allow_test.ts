@@ -1,5 +1,5 @@
-import { assert } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   addBashCommand,
   addBashPrefix,
@@ -21,6 +21,7 @@ import {
   setGlobalAutoEdit,
   setProjectAutoEdit,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function withTempAllowPaths(fn: () => void): void {
   const tmp = Deno.makeTempDirSync({ prefix: "allow-" });
@@ -37,7 +38,7 @@ function withTempAllowPaths(fn: () => void): void {
   }
 }
 
-Deno.test("matchGlob", () => {
+test("matchGlob", () => {
   const cases: Array<[string, string, boolean]> = [
     ["*.go", "main.go", true],
     ["*.go", "dir/main.go", false],
@@ -63,7 +64,7 @@ Deno.test("matchGlob", () => {
   }
 });
 
-Deno.test("allow edit path ops", () => {
+test("allow edit path ops", () => {
   const c: AllowConfig = {};
   assert(addEditPath(c, "internal/**"));
   assert(!addEditPath(c, "internal/**"));
@@ -73,7 +74,7 @@ Deno.test("allow edit path ops", () => {
   assert(!matchEditPath(c, "internal/agent/agent.go"));
 });
 
-Deno.test("allow bash command ops", () => {
+test("allow bash command ops", () => {
   const c: AllowConfig = {};
   assert(addBashCommand(c, "go test ./internal/tui"));
   assert(!addBashCommand(c, "go test ./internal/tui"));
@@ -85,7 +86,7 @@ Deno.test("allow bash command ops", () => {
   assert(!matchBashCommand(c, "go env"));
 });
 
-Deno.test("allow autoEdit flag", () => {
+test("allow autoEdit flag", () => {
   const c: AllowConfig = { autoEdit: true };
   assert(getAutoEdit(c));
   setAutoEdit(c, false);
@@ -94,13 +95,13 @@ Deno.test("allow autoEdit flag", () => {
   assert(getAutoEdit(c));
 });
 
-Deno.test("loadAllow defaults autoEdit on", () => {
+test("loadAllow defaults autoEdit on", () => {
   withTempAllowPaths(() => {
     assert(getAutoEdit(loadAllow()));
   });
 });
 
-Deno.test("allow global explicit false overrides default", () => {
+test("allow global explicit false overrides default", () => {
   withTempAllowPaths(() => {
     Deno.mkdirSync(path.dirname(globalAllowPath()), { recursive: true });
     Deno.writeTextFileSync(globalAllowPath(), `{"autoEdit":false}`);
@@ -108,7 +109,7 @@ Deno.test("allow global explicit false overrides default", () => {
   });
 });
 
-Deno.test("allow project editPaths do not persist inherited global autoEdit", () => {
+test("allow project editPaths do not persist inherited global autoEdit", () => {
   withTempAllowPaths(() => {
     Deno.mkdirSync(path.dirname(globalAllowPath()), { recursive: true });
     Deno.writeTextFileSync(globalAllowPath(), `{"autoEdit":true}`);
@@ -128,7 +129,7 @@ Deno.test("allow project editPaths do not persist inherited global autoEdit", ()
   });
 });
 
-Deno.test("allow project bash rules persist and reload", () => {
+test("allow project bash rules persist and reload", () => {
   withTempAllowPaths(() => {
     const c: AllowConfig = {};
     assert(addBashCommand(c, "make test"));
@@ -144,7 +145,7 @@ Deno.test("allow project bash rules persist and reload", () => {
   });
 });
 
-Deno.test("allow project explicit false overrides global autoEdit", () => {
+test("allow project explicit false overrides global autoEdit", () => {
   withTempAllowPaths(() => {
     Deno.mkdirSync(path.dirname(globalAllowPath()), { recursive: true });
     Deno.mkdirSync(path.dirname(projectAllowPath()), { recursive: true });
@@ -159,7 +160,7 @@ Deno.test("allow project explicit false overrides global autoEdit", () => {
   });
 });
 
-Deno.test("allow saveProject persists explicit false", () => {
+test("allow saveProject persists explicit false", () => {
   withTempAllowPaths(() => {
     const c: AllowConfig = {};
     setProjectAutoEdit(c, false);
@@ -169,7 +170,7 @@ Deno.test("allow saveProject persists explicit false", () => {
   });
 });
 
-Deno.test("allow global autoEdit does not override project effective state", () => {
+test("allow global autoEdit does not override project effective state", () => {
   withTempAllowPaths(() => {
     Deno.mkdirSync(path.dirname(globalAllowPath()), { recursive: true });
     Deno.mkdirSync(path.dirname(projectAllowPath()), { recursive: true });

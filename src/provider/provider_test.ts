@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertExists } from "@opensac/assert";
+import { assert, assertEquals, assertExists } from "../compat/assert.ts";
 import {
   BaseProvider,
   calculateCost,
@@ -22,6 +22,7 @@ import {
   type ToolCallBlock,
   type Usage,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function assertClose(got: number, want: number, msg: string): void {
   assert(
@@ -30,7 +31,7 @@ function assertClose(got: number, want: number, msg: string): void {
   );
 }
 
-Deno.test("NewBaseProvider", () => {
+test("NewBaseProvider", () => {
   const models: Model[] = [
     { id: "model1", name: "Model 1" },
     { id: "model2", name: "Model 2" },
@@ -40,7 +41,7 @@ Deno.test("NewBaseProvider", () => {
   assertEquals(p.models().length, 2);
 });
 
-Deno.test("GetModel", () => {
+test("GetModel", () => {
   const models: Model[] = [
     { id: "model1", name: "Model 1" },
     { id: "model2", name: "Model 2" },
@@ -52,7 +53,7 @@ Deno.test("GetModel", () => {
   assertEquals(p.getModel("model3"), undefined);
 });
 
-Deno.test("MockProvider", async () => {
+test("MockProvider", async () => {
   const models: Model[] = [{
     id: "model1",
     name: "Model 1",
@@ -75,7 +76,7 @@ Deno.test("MockProvider", async () => {
   assertEquals(p.getCallCount(), 1);
 });
 
-Deno.test("MockProviderWithContext", async () => {
+test("MockProviderWithContext", async () => {
   const models: Model[] = [{
     id: "model1",
     name: "Model 1",
@@ -98,7 +99,7 @@ Deno.test("MockProviderWithContext", async () => {
   assert(events.some((e) => e.type === streamError));
 });
 
-Deno.test("ModelPricing", () => {
+test("ModelPricing", () => {
   const u: Usage = {
     input: 1000,
     output: 500,
@@ -116,7 +117,7 @@ Deno.test("ModelPricing", () => {
   assertClose(u.cost.total, 0.003 + 0.0075 + 0.00003 + 0.0001875, "total");
 });
 
-Deno.test("ModelPricingDoesNotDoubleChargeIncludedCacheRead", () => {
+test("ModelPricingDoesNotDoubleChargeIncludedCacheRead", () => {
   const u: Usage = {
     input: 1000,
     output: 100,
@@ -134,7 +135,7 @@ Deno.test("ModelPricingDoesNotDoubleChargeIncludedCacheRead", () => {
   assertClose(u.cost.total, 0.001875, "total cost");
 });
 
-Deno.test("ModelPricingDoesNotDoubleChargeGoogleCacheReadWithReasoning", () => {
+test("ModelPricingDoesNotDoubleChargeGoogleCacheReadWithReasoning", () => {
   const u: Usage = {
     input: 1000,
     output: 100,
@@ -151,7 +152,7 @@ Deno.test("ModelPricingDoesNotDoubleChargeGoogleCacheReadWithReasoning", () => {
   assertClose(u.cost.input, 0.0005, "input cost");
 });
 
-Deno.test("ModelPricingNilModel", () => {
+test("ModelPricingNilModel", () => {
   const u: Usage = {
     input: 1000,
     output: 500,
@@ -164,14 +165,14 @@ Deno.test("ModelPricingNilModel", () => {
   assertEquals(u.cost.total, 0);
 });
 
-Deno.test("NewUserMessage", () => {
+test("NewUserMessage", () => {
   const msg = createUserMessage("Hello");
   assertEquals(msg.role, "user");
   assertEquals(msg.content, "Hello");
   assert(msg.timestamp.getTime() !== 0);
 });
 
-Deno.test("NewAssistantMessage", () => {
+test("NewAssistantMessage", () => {
   const contents: ContentBlock[] = [
     { type: "text", text: "Hello" },
     { type: "thinking", thinking: "Let me think..." },
@@ -182,7 +183,7 @@ Deno.test("NewAssistantMessage", () => {
   assert(msg.timestamp.getTime() !== 0);
 });
 
-Deno.test("NewToolResultMessage", () => {
+test("NewToolResultMessage", () => {
   const msg = createToolResultMessage(
     "call_1",
     "ls",
@@ -196,7 +197,7 @@ Deno.test("NewToolResultMessage", () => {
   assertEquals(msg.isError, false);
 });
 
-Deno.test("NewToolResultMessageError", () => {
+test("NewToolResultMessageError", () => {
   const msg = createToolResultMessage(
     "call_1",
     "bash",
@@ -206,7 +207,7 @@ Deno.test("NewToolResultMessageError", () => {
   assert(msg.isError);
 });
 
-Deno.test("StreamEventTypes", () => {
+test("StreamEventTypes", () => {
   const events: StreamEvent[] = [
     { type: streamStart },
     { type: streamTextDelta, textDelta: "Hello" },
@@ -219,7 +220,7 @@ Deno.test("StreamEventTypes", () => {
   assert(events.length === 7);
 });
 
-Deno.test("ThinkingLevels", () => {
+test("ThinkingLevels", () => {
   const levels: ThinkingLevel[] = [
     "off",
     "minimal",
@@ -233,7 +234,7 @@ Deno.test("ThinkingLevels", () => {
   assertEquals(thinkingHigh, "high");
 });
 
-Deno.test("Model", () => {
+test("Model", () => {
   const model: Model = {
     id: "gpt-4o",
     name: "GPT-4o",
@@ -253,13 +254,13 @@ Deno.test("Model", () => {
   assertEquals(model.maxTokens, 16384);
 });
 
-Deno.test("ContentBlock", () => {
+test("ContentBlock", () => {
   const block: ContentBlock = { type: "text", text: "Hello" };
   assertEquals(block.type, "text");
   assertEquals(block.text, "Hello");
 });
 
-Deno.test("ToolCallBlock", () => {
+test("ToolCallBlock", () => {
   const block: ToolCallBlock = {
     id: "call_1",
     name: "ls",
@@ -270,7 +271,7 @@ Deno.test("ToolCallBlock", () => {
   assertEquals(JSON.stringify(block.arguments), `{"path":"."}`);
 });
 
-Deno.test("ChatParams", () => {
+test("ChatParams", () => {
   const params: ChatParams = {
     messages: [createUserMessage("Hello")],
     tools: [{ name: "ls", description: "List files" }],

@@ -9,8 +9,8 @@ import {
   assertEquals,
   assertRejects,
   assertThrows,
-} from "@opensac/assert";
-import type { Model } from "../provider/types.ts";
+} from "../compat/assert.ts";
+import { type Model } from "../provider/types.ts";
 import { thinkingHigh, thinkingMedium } from "../provider/types.ts";
 import { createMockProvider } from "../provider/mock.ts";
 import { createManager } from "../session/manager.ts";
@@ -25,7 +25,7 @@ import {
 import { ATTACHMENT_FILE } from "./attachment.ts";
 import { AttachmentService } from "./input.ts";
 import { defaultAttachmentPolicy } from "./attachment.ts";
-import type { SessionAttachment } from "./attachment.ts";
+import { type SessionAttachment } from "./attachment.ts";
 import { ExpertSwitchRequiresForkError } from "./expert.ts";
 import {
   CONFIG_OPTION_EXPERT,
@@ -44,6 +44,7 @@ import {
   SOURCE_ACP,
   SOURCE_TUI,
 } from "./source.ts";
+import { test } from "#testing";
 
 function makeModel(overrides: Partial<Model> = {}): Model {
   return {
@@ -118,7 +119,7 @@ function writeExpertFixtures(workDir: string): void {
   writeBundle("solo", "agent", "solo-lead");
 }
 
-Deno.test("beginArtifactCollectionDisabledByDefault", () => {
+test("beginArtifactCollectionDisabledByDefault", () => {
   const registry = createRegistry(Deno.makeTempDirSync(), undefined);
   const runtime = new SessionRuntime({ registry });
   const collector = runtime.beginArtifactCollection("run-disabled");
@@ -126,7 +127,7 @@ Deno.test("beginArtifactCollectionDisabledByDefault", () => {
   assert(registry.get("publish_artifact") === undefined);
 });
 
-Deno.test("setArtifactEnabledRejectsClosedRuntime", () => {
+test("setArtifactEnabledRejectsClosedRuntime", () => {
   const runtime = new SessionRuntime();
   runtime.setArtifactEnabled(true);
   assert(runtime.artifactCapabilitySnapshot());
@@ -141,7 +142,7 @@ Deno.test("setArtifactEnabledRejectsClosedRuntime", () => {
   assert(runtime.artifactCapabilitySnapshot());
 });
 
-Deno.test("artifactCollectorObserverReceivesPersistedRecord", async () => {
+test("artifactCollectorObserverReceivesPersistedRecord", async () => {
   const { root, workDir, manager } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());
@@ -178,7 +179,7 @@ Deno.test("artifactCollectorObserverReceivesPersistedRecord", async () => {
   }
 });
 
-Deno.test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () => {
+test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () => {
   const { root, workDir, manager } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());
@@ -212,7 +213,7 @@ Deno.test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () =>
   }
 });
 
-Deno.test("attachSessionResourcesUsesManagerIdentity", async () => {
+test("attachSessionResourcesUsesManagerIdentity", async () => {
   const workDir = Deno.makeTempDirSync();
   const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
@@ -232,13 +233,13 @@ Deno.test("attachSessionResourcesUsesManagerIdentity", async () => {
   }
 });
 
-Deno.test("attachSessionResourcesRejectsIncompleteOwnership", async () => {
+test("attachSessionResourcesRejectsIncompleteOwnership", async () => {
   await assertRejects(() =>
     attachSessionResources({ workDir: Deno.makeTempDirSync() })
   );
 });
 
-Deno.test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
+test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
   const workDir = Deno.makeTempDirSync();
   const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
@@ -254,7 +255,7 @@ Deno.test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
   }
 });
 
-Deno.test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
+test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
   const workDir = Deno.makeTempDirSync();
   const sessionDir = Deno.makeTempDirSync();
   const first = createManager(workDir, sessionDir);
@@ -273,7 +274,7 @@ Deno.test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
   }
 });
 
-Deno.test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
+test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
   const manager = createManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
   manager.init();
   try {
@@ -285,7 +286,7 @@ Deno.test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
   }
 });
 
-Deno.test("buildRegistryAppliesAdapterPolicy", () => {
+test("buildRegistryAppliesAdapterPolicy", () => {
   const workDir = Deno.makeTempDirSync();
   const registry = buildRegistry(workDir, undefined, undefined, {
     registerDefaults: true,
@@ -315,7 +316,7 @@ Deno.test("buildRegistryAppliesAdapterPolicy", () => {
   assert(threw, "empty work directory must fail");
 });
 
-Deno.test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () => {
+test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () => {
   const workDir = Deno.makeTempDirSync();
   writeExpertFixtures(workDir);
   const manager = createManager(workDir, Deno.makeTempDirSync());
@@ -363,7 +364,7 @@ Deno.test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () =>
   }
 });
 
-Deno.test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
+test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
   const workDir = Deno.makeTempDirSync();
   const manager = createManager(workDir, Deno.makeTempDirSync());
   manager.init();
@@ -441,7 +442,7 @@ function bytesIngress(
   };
 }
 
-Deno.test("sessionRuntimeAcceptInputBuildsCanonicalUserMessage", async () => {
+test("sessionRuntimeAcceptInputBuildsCanonicalUserMessage", async () => {
   const { root, workDir, manager } = inputTestSession();
   try {
     const runtime = new SessionRuntime({
@@ -469,7 +470,7 @@ Deno.test("sessionRuntimeAcceptInputBuildsCanonicalUserMessage", async () => {
   }
 });
 
-Deno.test("sessionRuntimeAttachPreparedInputRejectsUnavailable", async () => {
+test("sessionRuntimeAttachPreparedInputRejectsUnavailable", async () => {
   const { root, workDir, manager } = inputTestSession();
   try {
     const runtime = new SessionRuntime({
@@ -492,7 +493,7 @@ Deno.test("sessionRuntimeAttachPreparedInputRejectsUnavailable", async () => {
   }
 });
 
-Deno.test("sessionRuntimeShutdownReleasesResourcesAfterTerminalPersistenceFailure", async () => {
+test("sessionRuntimeShutdownReleasesResourcesAfterTerminalPersistenceFailure", async () => {
   const runtime = new SessionRuntime();
   const execution = new ExecutionRuntime();
   execution.begin(undefined, "run-shutdown");

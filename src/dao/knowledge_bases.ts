@@ -129,7 +129,11 @@ const evidenceColumns = `id, snapshot_id AS snapshotId, node_id AS nodeId,
 
 /** The only owner of SQL for the knowledge-base configuration/hraph store. */
 export class KnowledgeBaseDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   listBases(): KnowledgeBaseRecord[] {
     return queryAll<KnowledgeBaseRecord>(

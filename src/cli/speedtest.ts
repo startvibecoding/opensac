@@ -25,7 +25,7 @@ import {
   loadSettings,
   type Settings,
 } from "../config/mod.ts";
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 
 export const DEFAULT_SPEEDTEST_PROMPT =
   "Reply with exactly 120 English words about terminal software performance. Do not use markdown, lists, or code.";

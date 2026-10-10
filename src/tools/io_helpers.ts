@@ -4,7 +4,7 @@
 // maps to Deno's Unix `mode`; the atomic writes use a temp file in the target
 // directory plus a rename, preserving the existing permissions.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 
 /** Writes data to `p` atomically using a temp file and rename. */
 export function writeFileAtomic(p: string, data: Uint8Array): void {

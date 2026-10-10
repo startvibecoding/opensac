@@ -13,7 +13,7 @@
 // `Date`, `time.Duration` maps to milliseconds, and Go's `(value, error)` pairs
 // throw instead.
 
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import {
   type Event as AgentEvent,
   EVENT_COMPACTION_END,
@@ -52,7 +52,7 @@ import {
   runAssistantEntryID,
   runTerminalEventID,
 } from "../session/run_user_message.ts";
-import type { DeliveryPlan, OrderedDeliveryOperationPlan } from "./delivery.ts";
+import { type DeliveryPlan, type OrderedDeliveryOperationPlan } from "./delivery.ts";
 import {
   applyErrorDefaults,
   classifyError,

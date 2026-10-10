@@ -1,9 +1,10 @@
 // Rotating-dot spinner frames: the pure tick → frame mapping.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { SPINNER_FRAMES, spinnerFrame } from "./spinner.ts";
+import { test } from "#testing";
 
-Deno.test("spinnerFrame cycles through every frame and wraps", () => {
+test("spinnerFrame cycles through every frame and wraps", () => {
   for (let i = 0; i < SPINNER_FRAMES.length; i++) {
     assertEquals(spinnerFrame(i), SPINNER_FRAMES[i]);
   }

@@ -1,9 +1,10 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   createIdleTimeoutStream,
   isStreamTimeoutError,
   StreamTimeoutError,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,7 +31,7 @@ function chunkStream(
   });
 }
 
-Deno.test("IdleTimeoutAllowsContinuousData", async () => {
+test("IdleTimeoutAllowsContinuousData", async () => {
   const stream = createIdleTimeoutStream(chunkStream(["a", "b", "c"]), 50);
   assert(stream !== null);
   const reader = stream!.getReader();
@@ -56,7 +57,7 @@ Deno.test("IdleTimeoutAllowsContinuousData", async () => {
   assertEquals(got, "abc");
 });
 
-Deno.test("IdleTimeoutFiresOnStall", async () => {
+test("IdleTimeoutFiresOnStall", async () => {
   const stream = createIdleTimeoutStream(chunkStream(["a"]), 50);
   assert(stream !== null);
   const reader = stream!.getReader();
@@ -79,7 +80,7 @@ Deno.test("IdleTimeoutFiresOnStall", async () => {
   assert(Date.now() - start <= 2000, "idle timeout took too long");
 });
 
-Deno.test("IsStreamTimeoutError", () => {
+test("IsStreamTimeoutError", () => {
   const cases: Array<[unknown, boolean]> = [
     [new StreamTimeoutError(), true],
     [new Error("stream read error: context deadline exceeded"), true],

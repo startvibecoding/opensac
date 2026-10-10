@@ -37,7 +37,7 @@ import {
   removeTool as removeBrowserTool,
   SKILL_NAME as BrowserSkillName,
 } from "../browser/mod.ts";
-import type { AllowConfig } from "../config/allow.ts";
+import { type AllowConfig } from "../config/allow.ts";
 import {
   configDir,
   getGlobalSkillsDir,
@@ -53,10 +53,10 @@ import {
   loadRuleFile,
 } from "../contextfiles/contextfiles.ts";
 import { Center } from "../expert/center.ts";
-import type { Bundle, Summary } from "../expert/expert.ts";
+import { type Bundle, type Summary } from "../expert/expert.ts";
 import { type Client, closeClients, connectServers } from "../mcp/mcp.ts";
 import { loadConfiguredServers } from "../mcp/config.ts";
-import type { Model, ThinkingLevel } from "../provider/types.ts";
+import { type Model, type ThinkingLevel } from "../provider/types.ts";
 import {
   type Attachment,
   createUserMessage,
@@ -67,21 +67,21 @@ import {
   type AttachmentResolver,
   validateAttachmentReferenceForResolver,
 } from "../provider/attachments.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   parseQualifiedModel,
   qualifiedModel,
   resolveModel as resolveProviderModel,
 } from "../provider/factory/factory.ts";
-import type { RunContext } from "../agent/run_context.ts";
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type RunContext } from "../agent/run_context.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import {
   createManager,
   Level,
   type Manager as SandboxManager,
   type Options as SandboxOptions,
 } from "../sandbox/sandbox.ts";
-import type { SandboxSettings } from "../config/settings.ts";
+import { type SandboxSettings } from "../config/settings.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
 import {
   loadSessionCapabilities,
@@ -168,7 +168,7 @@ import {
 import { beforeToolCallForPolicy } from "./tool_policy.ts";
 import { beforeToolExecuteForRuntime } from "./tool_fence.ts";
 import { isMCPServerEnabled, type MCPPolicy } from "./registry.ts";
-import type { SessionCapabilities } from "../session/session_events.ts";
+import { type SessionCapabilities } from "../session/session_events.ts";
 
 /** The front-end-neutral state required to construct and run a session. */
 export interface SessionRuntimeInit {

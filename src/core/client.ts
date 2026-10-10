@@ -1,4 +1,4 @@
-import { basename, fileURLToPath, fromFileUrl } from "@opensac/path";
+import { basename, fileURLToPath, fromFileUrl } from "../compat/path.ts";
 import { CORE_AUTH_HEADER, CORE_CLIENT_ID_HEADER } from "./auth.ts";
 import {
   assertResolvedCoreConfig,

@@ -4,7 +4,7 @@
 // SQLite file beside sessions.db; it is never attached to the canonical
 // session database.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { close, type DB, openWithOptions } from "../db/mod.ts";
 import { type Database, type Tx, wrapDatabase } from "../dao/mod.ts";
 import { rootDBPath } from "./root_db.ts";

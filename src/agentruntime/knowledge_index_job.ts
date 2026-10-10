@@ -9,7 +9,7 @@
 // Deviations: `context.Context` maps to an optional `AbortSignal`; Go's
 // `<-chan struct{}` completion signal maps to a Promise exposed by `done()`.
 
-import type { KnowledgeSnapshot } from "../session/mod.ts";
+import { type KnowledgeSnapshot } from "../session/mod.ts";
 
 /** Thrown when the knowledge-base service is unavailable. */
 export class KnowledgeBaseServiceMissingError extends Error {

@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 
 /**
  * Returns an absolute path after resolving all existing components. Missing

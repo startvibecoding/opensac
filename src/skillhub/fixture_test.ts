@@ -1,9 +1,10 @@
-import { assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import { createClawHubClient } from "./clawhub.ts";
 import { clientsForSettings } from "./factory.ts";
 import { jsonResponse, startServer } from "./test_helpers.ts";
+import { test } from "#testing";
 
-Deno.test("ConfiguredClientsUseURLAndBearerToken", async () => {
+test("ConfiguredClientsUseURLAndBearerToken", async () => {
   const server = await startServer((request) => {
     assertEquals(request.headers.get("authorization"), "Bearer secret");
     assertEquals(new URL(request.url).pathname, "/api/v1/search");
@@ -27,7 +28,7 @@ Deno.test("ConfiguredClientsUseURLAndBearerToken", async () => {
   }
 });
 
-Deno.test("ClawHubFileContentFixture", async () => {
+test("ClawHubFileContentFixture", async () => {
   const server = await startServer((request) => {
     assertStringIncludes(new URL(request.url).pathname, "/files/SKILL.md");
     return jsonResponse(`{"content":"# Fixture Skill"}`);

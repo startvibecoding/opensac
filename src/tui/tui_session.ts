@@ -13,16 +13,15 @@ import {
   EVENT_RUN_FINISHED,
   EVENT_TOOL_APPROVAL_REQUEST,
 } from "../agentruntime/events.ts";
-import type {
-  TUICoreConnectionState,
-  TUIDecisionAnswer,
-  TUIDecisionRequest,
-  TUIPreparedInput,
-  TUIService,
-  TUISessionView,
-  TUISettingsView,
-  TUITranscriptMessage,
-} from "./service.ts";
+import {
+  type TUICoreConnectionState,
+  type TUIDecisionAnswer,
+  type TUIDecisionRequest,
+  type TUIPreparedInput,
+  type TUIService,
+  type TUISessionView,
+  type TUISettingsView,
+  type TUITranscriptMessage} from "./service.ts";
 import { SOURCE_TUI } from "../agentruntime/source.ts";
 import {
   isDecisionNotFound,
@@ -30,7 +29,7 @@ import {
   isSessionNotResident,
 } from "./service.ts";
 import { coreEventToAgentEvent } from "./run_event_projection.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import { AppController } from "./app_controller.ts";
 import { TuiRun } from "./tui_run.ts";
 import { localTimeZone, Translator } from "./i18n.ts";
@@ -43,7 +42,7 @@ import {
 } from "./modal_content.ts";
 import { renderTaskPlanLines } from "./plan_view.ts";
 import { type AgentActivity, renderAgentActivity } from "./activity.ts";
-import type { TaskPlan } from "../tools/tool.ts";
+import { type TaskPlan } from "../tools/tool.ts";
 import { expandedToolRow } from "./tool_row_format.ts";
 import {
   esmObjectiveFromView,
@@ -85,8 +84,8 @@ import {
 } from "./dialogs.ts";
 import { clampWidth, Dialog, frame } from "./dialog.ts";
 import { ACCENT, BOLD, DIM, RED, RESET } from "./theme.ts";
-import type { AppProps } from "./app.tsx";
-import type { Objective } from "../esm/state.ts";
+import { type AppProps } from "./app.tsx";
+import { type Objective } from "../esm/state.ts";
 import { type KeyEvent, splitInputChunk } from "./keys.ts";
 import { displayWidth } from "./formatters.ts";
 

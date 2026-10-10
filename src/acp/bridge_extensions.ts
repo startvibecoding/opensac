@@ -1,8 +1,8 @@
-import type { CoreRpcId, CoreRpcRequest } from "../core/protocol.ts";
-import type { ACPBridgeContext } from "./bridge_protocol.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type CoreRpcId, type CoreRpcRequest } from "../core/protocol.ts";
+import { type ACPBridgeContext } from "./bridge_protocol.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 
-export type { ACPBridgeContext } from "./bridge_protocol.ts";
+export { type ACPBridgeContext } from "./bridge_protocol.ts";
 
 /** Maps ACP extension methods to front-end-neutral Core methods. */
 export function mapACPExtensionToCore(

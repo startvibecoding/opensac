@@ -4,35 +4,37 @@
 // emphasis/table) → Render.
 
 /** Identifies the kind of AST node. Values mirror the Go iota block. */
-export enum NodeType {
+export const NodeType = {
+
   // Block nodes
-  Document = 0,
-  Heading = 1,
-  Paragraph = 2,
-  FencedCodeBlock = 3,
-  IndentedCodeBlock = 4,
-  Blockquote = 5,
-  ThematicBreak = 6,
-  OrderedList = 7,
-  UnorderedList = 8,
-  ListItem = 9,
-  Table = 10,
-  TableRow = 11,
-  TableCell = 12,
+  Document: 0,
+  Heading: 1,
+  Paragraph: 2,
+  FencedCodeBlock: 3,
+  IndentedCodeBlock: 4,
+  Blockquote: 5,
+  ThematicBreak: 6,
+  OrderedList: 7,
+  UnorderedList: 8,
+  ListItem: 9,
+  Table: 10,
+  TableRow: 11,
+  TableCell: 12,
 
   // Inline nodes (>= 100)
-  Text = 100,
-  Emphasis = 101,
-  Strong = 102,
-  CodeSpan = 103,
-  Link = 104,
-  Image = 105,
-  Strikethrough = 106,
-  SoftBreak = 107,
-  HardBreak = 108,
-  Autolink = 109,
-  LineBreak = 110,
-}
+  Text: 100,
+  Emphasis: 101,
+  Strong: 102,
+  CodeSpan: 103,
+  Link: 104,
+  Image: 105,
+  Strikethrough: 106,
+  SoftBreak: 107,
+  HardBreak: 108,
+  Autolink: 109,
+  LineBreak: 110,
+} as const;
+export type NodeType = (typeof NodeType)[keyof typeof NodeType];
 
 /** A single node in the Markdown AST. */
 export class Node {

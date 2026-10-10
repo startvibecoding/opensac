@@ -15,7 +15,7 @@ import {
   type Policy,
   prepareBytes,
 } from "../imageproc/mod.ts";
-import type { ContentBlock, ImageContent } from "../provider/types.ts";
+import { type ContentBlock, type ImageContent } from "../provider/types.ts";
 import {
   createTextToolResult,
   operationIDFromContext,

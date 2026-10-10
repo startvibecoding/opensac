@@ -3,7 +3,7 @@
 // parser reproduces handleCommand's dispatch prologue (strings.Fields,
 // /skill: prefix, slash commands, plain text).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   commandSpecs,
   findCommandSpec,
@@ -11,8 +11,9 @@ import {
   parseInputLine,
   splitFields,
 } from "./command_specs.ts";
+import { test } from "#testing";
 
-Deno.test("commandSpecs keeps the Go spec table exactly", () => {
+test("commandSpecs keeps the Go spec table exactly", () => {
   // Names in Go declaration order (command_specs.go)
   const expectedNames = [
     "/auth",
@@ -67,7 +68,7 @@ Deno.test("commandSpecs keeps the Go spec table exactly", () => {
   );
 });
 
-Deno.test("splitFields collapses whitespace like strings.Fields", () => {
+test("splitFields collapses whitespace like strings.Fields", () => {
   assertEquals(splitFields(""), []);
   assertEquals(splitFields("   "), []);
   assertEquals(splitFields("  /model   deepseek-v4  "), [
@@ -77,7 +78,7 @@ Deno.test("splitFields collapses whitespace like strings.Fields", () => {
   assertEquals(splitFields("a\tb\nc"), ["a", "b", "c"]);
 });
 
-Deno.test("parseInputLine dispatches commands, skills, and text", () => {
+test("parseInputLine dispatches commands, skills, and text", () => {
   assertEquals(parseInputLine(""), { kind: "text", command: "", args: [] });
 
   const cmd = parseInputLine("/mode yolo");
@@ -99,7 +100,7 @@ Deno.test("parseInputLine dispatches commands, skills, and text", () => {
   assertEquals(text.command, "");
 });
 
-Deno.test("isKnownCommand recognizes specs and rejects unknowns", () => {
+test("isKnownCommand recognizes specs and rejects unknowns", () => {
   assert(isKnownCommand("/help"));
   assert(isKnownCommand("/quit"));
   assertEquals(isKnownCommand("/bogus"), false);

@@ -1,6 +1,7 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { RuntimeSubmissionDAO, type RuntimeSubmissionRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 function record(
   overrides: Partial<RuntimeSubmissionRecord> = {},
@@ -21,7 +22,7 @@ function record(
 // TestRuntimeSubmissionDAORoundTrip guards the idempotency key lookup: the
 // same (session, scope, key) must resolve the stored intent/run, and any other
 // triple must miss so the caller can submit again.
-Deno.test("runtime submission DAO finds rows by session scope and key", () => {
+test("runtime submission DAO finds rows by session scope and key", () => {
   const db = openTestDb();
   try {
     const dao = new RuntimeSubmissionDAO(db);

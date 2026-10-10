@@ -2,7 +2,7 @@
 // The goja-specific `TestGojaUndefinedAndNullExportAsNil` is dropped (no goja
 // equivalent): the Deno worker already normalizes undefined/null to null.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   evalJsWorkflow,
   evalJsWorkflowWithin,
@@ -12,6 +12,7 @@ import {
 import { jsWorkerSource } from "./js_worker_source.ts";
 import { resolveJsValue, Runner, WorkflowRuntime } from "./runner.ts";
 import { isCanceled, type RunState, statusRunning } from "./types.ts";
+import { test } from "#testing";
 
 function fixedClock(): () => Date {
   let t = new Date(Date.UTC(2026, 5, 18, 10, 0, 0, 0));
@@ -38,7 +39,7 @@ function testRuntime(): WorkflowRuntime {
   );
 }
 
-Deno.test("resolveJsValue nested values and numbers", async () => {
+test("resolveJsValue nested values and numbers", async () => {
   const rt = testRuntime();
   const value = {
     object: {
@@ -62,7 +63,7 @@ Deno.test("resolveJsValue nested values and numbers", async () => {
   assertEquals(got.object.items, [3, 2.5, null]);
 });
 
-Deno.test("resolveJsValue errors propagate", async () => {
+test("resolveJsValue errors propagate", async () => {
   const rt = testRuntime();
   await assertRejects(
     () =>
@@ -84,7 +85,7 @@ Deno.test("resolveJsValue errors propagate", async () => {
   assert(canceled, "expected cancellation error");
 });
 
-Deno.test("evalJsWorkflow cancellation interrupts runtime", async () => {
+test("evalJsWorkflow cancellation interrupts runtime", async () => {
   const ac = new AbortController();
   const done = evalJsWorkflow(
     `workflow("hang", {phases:[phase("loop", function(){ while (true) {} })]});`,
@@ -100,7 +101,7 @@ Deno.test("evalJsWorkflow cancellation interrupts runtime", async () => {
   assert(canceled, "expected context cancellation to stop evaluation");
 });
 
-Deno.test("evalJsWorkflowWithin times out runaway source", async () => {
+test("evalJsWorkflowWithin times out runaway source", async () => {
   const started = Date.now();
   const err = await assertRejects(
     () => evalJsWorkflowWithin("while (true) {}", 50),
@@ -115,7 +116,7 @@ Deno.test("evalJsWorkflowWithin times out runaway source", async () => {
   );
 });
 
-Deno.test("evalJsWorkflowWithin keeps completion behavior", async () => {
+test("evalJsWorkflowWithin keeps completion behavior", async () => {
   const wf = await evalJsWorkflowWithin(
     `workflow("ok", {phases:[phase("scan", agent("worker", {prompt:"look"})), phase("verify", agent("checker", {prompt: result("scan.worker")}))]});`,
     1000,
@@ -124,13 +125,13 @@ Deno.test("evalJsWorkflowWithin keeps completion behavior", async () => {
   assertEquals(wf.children.length, 2);
 });
 
-Deno.test("isJsExpr recognizes deferred expressions", () => {
+test("isJsExpr recognizes deferred expressions", () => {
   assert(isJsExpr({ expr: "result", args: [] }));
   assert(!isJsExpr({ kind: "result" }));
   assert(!isJsExpr("x"));
 });
 
-Deno.test("results and logs are deterministically ordered", async () => {
+test("results and logs are deterministically ordered", async () => {
   const rt = testRuntime();
   const t0 = new Date(Date.UTC(2026, 7, 7, 12, 0, 0, 0));
   rt.state.results!["p.b"] = {
@@ -170,7 +171,7 @@ Deno.test("results and logs are deterministically ordered", async () => {
   assertEquals(rt.state.logs![0].message, "hello world");
 });
 
-Deno.test("inlined workflow worker source stays in sync with js_worker.js", async () => {
+test("inlined workflow worker source stays in sync with js_worker.js", async () => {
   const onDisk = await Deno.readTextFile(
     new URL("./js_worker.js", import.meta.url),
   );

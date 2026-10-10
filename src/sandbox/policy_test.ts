@@ -1,10 +1,11 @@
 // (bwrap-specific cases omitted).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { normalizeOptions, parseTmpSize } from "./policy.ts";
+import { test } from "#testing";
 
-Deno.test("normalizeTmpSize", () => {
+test("normalizeTmpSize", () => {
   const cases: Record<string, string> = {
     "100m": "104857600",
     "1g": "1073741824",
@@ -32,14 +33,14 @@ Deno.test("normalizeTmpSize", () => {
   }
 });
 
-Deno.test("normalizeOptions ignores legacy linux /home deny", () => {
+test("normalizeOptions ignores legacy linux /home deny", () => {
   if (Deno.build.os !== "linux") return;
   const project = "/home/free/src/vibecoding";
   const opts = normalizeOptions(project, { deniedPaths: ["/home"] });
   assertEquals(opts.deniedPaths, []);
 });
 
-Deno.test("normalizeOptions rejects overlapping allow and deny", () => {
+test("normalizeOptions rejects overlapping allow and deny", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const err = assertThrows(() =>
     normalizeOptions(project, {
@@ -50,7 +51,7 @@ Deno.test("normalizeOptions rejects overlapping allow and deny", () => {
   assert((err as Error).message.includes("overlaps"));
 });
 
-Deno.test("normalizeOptions keeps .git visible", () => {
+test("normalizeOptions keeps .git visible", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const opts = normalizeOptions(project, {
     deniedPaths: [path.join(project, ".git")],
@@ -58,7 +59,7 @@ Deno.test("normalizeOptions keeps .git visible", () => {
   assertEquals(opts.deniedPaths, []);
 });
 
-Deno.test("normalizeOptions canonicalizes relative paths", () => {
+test("normalizeOptions canonicalizes relative paths", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const cache = path.join(project, "cache");
   Deno.mkdirSync(cache, { recursive: true });
@@ -66,7 +67,7 @@ Deno.test("normalizeOptions canonicalizes relative paths", () => {
   assertEquals(opts.allowedRead, [Deno.realPathSync(cache)]);
 });
 
-Deno.test("normalizeOptions rejects deny containing project", () => {
+test("normalizeOptions rejects deny containing project", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const err = assertThrows(() =>
     normalizeOptions(project, { deniedPaths: [path.dirname(project)] })

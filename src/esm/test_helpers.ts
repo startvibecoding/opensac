@@ -3,14 +3,13 @@
 import { closeAll } from "../db/mod.ts";
 import { type Objective, phaseWorker, statusActive } from "./state.ts";
 import { Store } from "./store.ts";
-import type { RoleResult } from "./supervisor.ts";
-import type {
-  Role,
-  RoleRequest,
-  RuntimeAdapter,
-  RuntimeEvent,
-  RuntimeEventSink,
-} from "./runtime_core.ts";
+import { type RoleResult } from "./supervisor.ts";
+import {
+  type Role,
+  type RoleRequest,
+  type RuntimeAdapter,
+  type RuntimeEvent,
+  type RuntimeEventSink} from "./runtime_core.ts";
 
 /** Builds an Objective with sensible defaults for tests. */
 export function makeObjective(overrides: Partial<Objective> = {}): Objective {

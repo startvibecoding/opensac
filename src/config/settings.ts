@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import {
   configDir as platformConfigDirImpl,
   defaultEnvVars,
@@ -11,7 +11,7 @@ import {
   skillsDir as platformSkillsDir,
 } from "../platform/platform.ts";
 import { type CoreSettings, defaultCoreConfig } from "../core/config.ts";
-import type { Options as SandboxOptions } from "../sandbox/sandbox.ts";
+import { type Options as SandboxOptions } from "../sandbox/sandbox.ts";
 import { Level } from "../sandbox/sandbox.ts";
 import { defaultProviderConfigs } from "./provider_defaults.ts";
 import { projectDirName, projectPath, projectPathFor } from "./paths.ts";

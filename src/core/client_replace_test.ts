@@ -4,7 +4,7 @@
 // fixtures, and the behavior they cover (stopping a Core the client cannot
 // talk to) is a distinct policy from ordinary startup.
 
-import { assertEquals, assertRejects } from "@opensac/assert";
+import { assertEquals, assertRejects } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
@@ -15,6 +15,7 @@ import {
   type CoreLauncher,
   CoreStartupError,
 } from "./client.ts";
+import { test } from "#testing";
 
 const TEST_VERSION = "0.1.0-replace-test";
 const TEST_PROTOCOL_VERSION = 19;
@@ -82,7 +83,7 @@ async function startServer(
   }).start();
 }
 
-Deno.test("ensureStarted refuses an incompatible Core by default", async () => {
+test("ensureStarted refuses an incompatible Core by default", async () => {
   await withStateDir(async (stateDir, paths) => {
     let shutdownCalls = 0;
     const handle = await startServer(FOREIGN_VERSION, () => {
@@ -109,7 +110,7 @@ Deno.test("ensureStarted refuses an incompatible Core by default", async () => {
   });
 });
 
-Deno.test("ensureStarted replaces an incompatible Core when asked", async () => {
+test("ensureStarted replaces an incompatible Core when asked", async () => {
   await withStateDir(async (stateDir, paths) => {
     const registry = new CoreRegistry(paths);
     let shutdownCalls = 0;
@@ -166,7 +167,7 @@ Deno.test("ensureStarted replaces an incompatible Core when asked", async () => 
   });
 });
 
-Deno.test("ensureStarted leaves a compatible Core alone when asked", async () => {
+test("ensureStarted leaves a compatible Core alone when asked", async () => {
   await withStateDir(async (stateDir, paths) => {
     let shutdownCalls = 0;
     const handle = await startServer(TEST_VERSION, () => {
@@ -205,7 +206,7 @@ Deno.test("ensureStarted leaves a compatible Core alone when asked", async () =>
   });
 });
 
-Deno.test("ensureStarted reports a replaced Core that never exits", async () => {
+test("ensureStarted reports a replaced Core that never exits", async () => {
   await withStateDir(async (stateDir, paths) => {
     // The registered Core answers `core.shutdown` but never actually leaves, so
     // racing it for the Core lock would be worse than failing with the mismatch

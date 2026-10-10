@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "../config/mod.ts";
+import { type ProviderConfig } from "../config/mod.ts";
 
 /** AdapterConfig is the provider configuration after vendor defaults are applied. */
 export interface AdapterConfig {
@@ -21,13 +21,19 @@ export interface VendorAdapter {
 
 /** A data-driven vendor adapter keyed by base-URL substrings. */
 export class SimpleVendorAdapter implements VendorAdapter {
-  constructor(
-    private readonly adapterName: string,
-    private readonly domains: string[],
-    private readonly thinkingFormatValue: string = "",
-    private readonly cacheControlValue: boolean | undefined = undefined,
-    private readonly defaultApi: string = "",
-  ) {}
+    private readonly adapterName: string;
+  private readonly domains: string[];
+  private readonly thinkingFormatValue: string = "";
+  private readonly cacheControlValue: boolean | undefined = undefined;
+  private readonly defaultApi: string = "";
+
+  constructor(adapterName: string, domains: string[], thinkingFormatValue: string = "", cacheControlValue: boolean | undefined = undefined, defaultApi: string = "") {
+    this.adapterName = adapterName;
+    this.domains = domains;
+    this.thinkingFormatValue = thinkingFormatValue;
+    this.cacheControlValue = cacheControlValue;
+    this.defaultApi = defaultApi;
+  }
 
   name(): string {
     return this.adapterName;

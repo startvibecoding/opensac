@@ -4,7 +4,7 @@
 // `src/`. Implementation wiring (the internal builder and provider bridge)
 // lives in `src/bootstrap/`.
 
-import type { HostedItem } from "./provider.ts";
+import { type HostedItem } from "./provider.ts";
 
 /** AgentID uniquely identifies an agent instance. */
 export type AgentID = string;

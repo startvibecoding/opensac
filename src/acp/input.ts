@@ -11,8 +11,8 @@
 // maps to the optional `AbortSignal` threaded by `InputIngress.open`.
 
 import { createHash } from "node:crypto";
-import { isAbsolute, join, relative, resolve, SEPARATOR } from "@opensac/path";
-import { decodeBase64 } from "@opensac/encoding/base64";
+import { isAbsolute, join, relative, resolve, SEPARATOR } from "../compat/path.ts";
+import { decodeBase64 } from "../compat/encoding.ts";
 import {
   ATTACHMENT_AUDIO,
   ATTACHMENT_FILE,
@@ -26,7 +26,7 @@ import {
   type RunInput,
 } from "../agentruntime/input_materializer.ts";
 import type { SessionRuntime } from "../agentruntime/session_runtime.ts";
-import type { ContentBlock } from "./protocol.ts";
+import { type ContentBlock } from "./protocol.ts";
 
 /** Raised when a prompt content type cannot be normalized by the Runtime. */
 export class ACPPromptContentError extends Error {

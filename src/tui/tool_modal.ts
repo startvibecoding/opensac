@@ -6,7 +6,7 @@
 
 import { displayWidth } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
-import type { ModalContentView } from "./modal_content.ts";
+import { type ModalContentView } from "./modal_content.ts";
 // Style constants matching the Go toolModalStyle (rounded border + padding).
 import { ACCENT, BOLD, DIM, RESET } from "./theme.ts";
 

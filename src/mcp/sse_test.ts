@@ -2,11 +2,12 @@
 // The legacy HTTP+SSE transport maps `httptest` + `http.Flusher` to a
 // `Deno.serve` response backed by a manually-driven `ReadableStream`.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
-import type { RPCRequest } from "./rpc.ts";
+import { type RPCRequest } from "./rpc.ts";
 import { closeClients, connectServers } from "./mcp.ts";
+import { test } from "#testing";
 
 type Handler = (req: RPCRequest, raw: Request) => unknown | Promise<unknown>;
 
@@ -47,7 +48,7 @@ function ok(id: unknown, result: unknown): Record<string, unknown> {
   return { jsonrpc: "2.0", id, result };
 }
 
-Deno.test("MCP server SSE call flow", async () => {
+test("MCP server SSE call flow", async () => {
   let streamController:
     | ReadableStreamDefaultController<Uint8Array>
     | undefined;
@@ -152,7 +153,7 @@ Deno.test("MCP server SSE call flow", async () => {
   }
 });
 
-Deno.test("MCP server SSE notification callback", async () => {
+test("MCP server SSE notification callback", async () => {
   let streamController:
     | ReadableStreamDefaultController<Uint8Array>
     | undefined;

@@ -16,7 +16,11 @@ export interface SessionMetadataRecord {
 }
 
 export class ProjectDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   list(): ProjectRecord[] {
     return queryAll<ProjectRecord>(

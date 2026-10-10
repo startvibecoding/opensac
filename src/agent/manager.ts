@@ -9,16 +9,16 @@
 // `expertID`) are installed once by the runtime assembly layer before any run
 // starts, mirroring the Go exported fields the sub-agent tools read directly.
 
-import type { AgentID } from "../../sdk/agent/types.ts";
-import type { AllowConfig } from "../config/allow.ts";
-import type { Model } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
-import type { Settings } from "../config/settings.ts";
-import type { AgentLoopConfig } from "./agent.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
+import { type AllowConfig } from "../config/allow.ts";
+import { type Model } from "../provider/types.ts";
+import { type Provider } from "../provider/provider.ts";
+import { type Settings } from "../config/settings.ts";
+import { type AgentLoopConfig } from "./agent.ts";
 import { AgentAdapter } from "./bridge.ts";
-import type { AgentFactory, AgentOptions } from "./factory.ts";
+import { AgentFactory, type AgentOptions } from "./factory.ts";
 import type { MemberDefRegistry } from "./memberdef.ts";
-import type { MemberCompletion, MemberMailbox } from "./mailbox.ts";
+import { type MemberCompletion, MemberMailbox } from "./mailbox.ts";
 import {
   appendUniqueAgentID,
   defaultSubAgentPolicy,

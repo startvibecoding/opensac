@@ -1,16 +1,16 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   cloneCategories,
   cloneSearchPage,
   cloneSkillDetail,
   createMemoryCache,
 } from "./cache.ts";
-import type {
-  Category,
-  SearchPage,
-  SkillDetail,
-  SkillSummary,
-} from "./types.ts";
+import {
+  type Category,
+  type SearchPage,
+  type SkillDetail,
+  type SkillSummary} from "./types.ts";
+import { test } from "#testing";
 
 function summary(overrides: Partial<SkillSummary> = {}): SkillSummary {
   return {
@@ -35,7 +35,7 @@ function page(): SearchPage {
   };
 }
 
-Deno.test("memory cache round-trips pages, details, and categories", () => {
+test("memory cache round-trips pages, details, and categories", () => {
   const cache = createMemoryCache(60_000);
   cache.setPage("q", page());
   cache.setDetail("d", summary({ id: "detail-1" }) as SkillDetail);
@@ -49,7 +49,7 @@ Deno.test("memory cache round-trips pages, details, and categories", () => {
   assertEquals(cache.getCategories("missing"), undefined);
 });
 
-Deno.test("memory cache expires entries at the configured ttl", () => {
+test("memory cache expires entries at the configured ttl", () => {
   const expired = createMemoryCache(0);
   expired.setPage("q", page());
   assertEquals(expired.getPage("q"), undefined, "ttl 0 means already expired");
@@ -61,7 +61,7 @@ Deno.test("memory cache expires entries at the configured ttl", () => {
   assertEquals(live.getPage("q"), undefined);
 });
 
-Deno.test("memory cache stores clones so callers cannot mutate the cache", () => {
+test("memory cache stores clones so callers cannot mutate the cache", () => {
   const cache = createMemoryCache(60_000);
   const source = page();
   cache.setPage("q", source);
@@ -84,7 +84,7 @@ Deno.test("memory cache stores clones so callers cannot mutate the cache", () =>
   assertEquals(again?.items[0].displayName, "Skill One");
 });
 
-Deno.test("cloneSearchPage deep-clones nested tags and installed state", () => {
+test("cloneSearchPage deep-clones nested tags and installed state", () => {
   const original: SearchPage = {
     items: [summary({
       tags: ["a", "b"],
@@ -99,7 +99,7 @@ Deno.test("cloneSearchPage deep-clones nested tags and installed state", () => {
   assertEquals(original.items[0].installed?.dir, "/tmp/x");
 });
 
-Deno.test("cloneCategories deep-clones nested children", () => {
+test("cloneCategories deep-clones nested children", () => {
   const original: Category[] = [{
     key: "root",
     name: "Root",
@@ -114,7 +114,7 @@ Deno.test("cloneCategories deep-clones nested children", () => {
   assert(cloned[0].children !== original[0].children);
 });
 
-Deno.test("cloneSkillDetail clones files and download sources", () => {
+test("cloneSkillDetail clones files and download sources", () => {
   const detail: SkillDetail = {
     ...summary(),
     files: [{ path: "SKILL.md", size: 10 }],

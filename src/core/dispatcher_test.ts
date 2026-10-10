@@ -1,9 +1,10 @@
 // deno-lint-ignore-file require-await -- async fake host models the Promise-based Runtime seam
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { CoreRuntimeDispatcher } from "./dispatcher.ts";
 import { CoreEventStream } from "./event_stream.ts";
-import type { CoreRpcParams } from "./protocol.ts";
-import type { CoreRuntimeHost } from "./runtime.ts";
+import { type CoreRpcParams } from "./protocol.ts";
+import { type CoreRuntimeHost } from "./runtime.ts";
+import { test } from "#testing";
 
 function testHost(
   extension?: CoreRuntimeHost["extension"],
@@ -188,7 +189,7 @@ function testHost(
   };
 }
 
-Deno.test("CoreRuntimeDispatcher dispatches session.create and preserves request id", async () => {
+test("CoreRuntimeDispatcher dispatches session.create and preserves request id", async () => {
   const dispatcher = new CoreRuntimeDispatcher({
     host: testHost(),
     events: new CoreEventStream(),
@@ -207,7 +208,7 @@ Deno.test("CoreRuntimeDispatcher dispatches session.create and preserves request
   );
 });
 
-Deno.test("CoreRuntimeDispatcher dispatches session.listPersisted listings", async () => {
+test("CoreRuntimeDispatcher dispatches session.listPersisted listings", async () => {
   const seen: Array<{ workDir?: string }> = [];
   const host = {
     ...testHost(),
@@ -246,7 +247,7 @@ Deno.test("CoreRuntimeDispatcher dispatches session.listPersisted listings", asy
   assertEquals(seen[1], {});
 });
 
-Deno.test("CoreRuntimeDispatcher routes session.transcript to the durable projection", async () => {
+test("CoreRuntimeDispatcher routes session.transcript to the durable projection", async () => {
   const seen: Array<{ sessionId: string }> = [];
   const host = {
     ...testHost(),
@@ -268,7 +269,7 @@ Deno.test("CoreRuntimeDispatcher routes session.transcript to the durable projec
   assertEquals(seen, [{ sessionId: "session-9" }]);
   assertEquals(response?.result, [{ role: "user", text: "earlier turn" }]);
 });
-Deno.test("run.events.subscribe attributes the subscription to the calling client", async () => {
+test("run.events.subscribe attributes the subscription to the calling client", async () => {
   // The `/events` upgrade registers the client identity, but the subscribe itself
   // arrives as an RPC message. Without the caller's identity threaded through,
   // `core.clients.list` reported every RPC-channel subscription as ownerless, so
@@ -312,7 +313,7 @@ Deno.test("run.events.subscribe attributes the subscription to the calling clien
   await events.close();
 });
 
-Deno.test("run.events.subscribe releases its attribution row when the client unsubscribes", async () => {
+test("run.events.subscribe releases its attribution row when the client unsubscribes", async () => {
   // The attribution marks the conditional rpc-only row. Releasing it (the
   // socket's matching subscription ended, or the client explicitly went away)
   // must drop the row again: a stateless HTTP caller must never linger in
@@ -342,7 +343,7 @@ Deno.test("run.events.subscribe releases its attribution row when the client uns
   await events.close();
 });
 
-Deno.test("CoreRuntimeDispatcher sends extension methods to the Core extension handler", async () => {
+test("CoreRuntimeDispatcher sends extension methods to the Core extension handler", async () => {
   const calls: string[] = [];
   const dispatcher = new CoreRuntimeDispatcher({
     host: testHost(async (method) => {
@@ -361,7 +362,7 @@ Deno.test("CoreRuntimeDispatcher sends extension methods to the Core extension h
   assertEquals(response?.result, { ok: true });
   assertEquals(calls, ["project.list"]);
 });
-Deno.test("CoreRuntimeDispatcher returns stable errors and no response for notifications", async () => {
+test("CoreRuntimeDispatcher returns stable errors and no response for notifications", async () => {
   const dispatcher = new CoreRuntimeDispatcher({
     host: testHost(),
     events: new CoreEventStream(),
@@ -389,7 +390,7 @@ Deno.test("CoreRuntimeDispatcher returns stable errors and no response for notif
   assertEquals(notification, undefined);
 });
 
-Deno.test("CoreRuntimeDispatcher forwards neutral policy and content fields to the host", async () => {
+test("CoreRuntimeDispatcher forwards neutral policy and content fields to the host", async () => {
   const captured: Array<{ method: string; input: unknown }> = [];
   const base = testHost();
   const host: CoreRuntimeHost = {
@@ -465,7 +466,7 @@ Deno.test("CoreRuntimeDispatcher forwards neutral policy and content fields to t
   ]);
 });
 
-Deno.test("CoreRuntimeDispatcher rejects malformed neutral fields instead of dropping them", async () => {
+test("CoreRuntimeDispatcher rejects malformed neutral fields instead of dropping them", async () => {
   const dispatcher = new CoreRuntimeDispatcher({
     host: testHost(),
     events: new CoreEventStream(),
@@ -503,7 +504,7 @@ Deno.test("CoreRuntimeDispatcher rejects malformed neutral fields instead of dro
   }
 });
 
-Deno.test("CoreRuntimeDispatcher routes the settings, catalog, env, and context surfaces", async () => {
+test("CoreRuntimeDispatcher routes the settings, catalog, env, and context surfaces", async () => {
   const seen: Array<[string, unknown]> = [];
   const host = {
     ...testHost(),
@@ -637,7 +638,7 @@ Deno.test("CoreRuntimeDispatcher routes the settings, catalog, env, and context 
   ]);
 });
 
-Deno.test("CoreRuntimeDispatcher routes expert and fork requests", async () => {
+test("CoreRuntimeDispatcher routes expert and fork requests", async () => {
   const seen: Array<[string, unknown]> = [];
   const host = {
     ...testHost(),
@@ -727,7 +728,7 @@ Deno.test("CoreRuntimeDispatcher routes expert and fork requests", async () => {
   ]);
 });
 
-Deno.test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and transient surface", async () => {
+test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and transient surface", async () => {
   const captured: Array<{ method: string; input: unknown }> = [];
   const base = testHost();
   const host: CoreRuntimeHost = {
@@ -877,7 +878,7 @@ Deno.test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and
   ]);
 });
 
-Deno.test("session.open tolerates a blank workDir and keeps a real one", async () => {
+test("session.open tolerates a blank workDir and keeps a real one", async () => {
   const seen: Array<{ sessionId: string; workDir?: string }> = [];
   const dispatcher = new CoreRuntimeDispatcher({
     host: {

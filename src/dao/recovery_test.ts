@@ -1,6 +1,7 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { ForkDAO, RecoveryDAO, type RecoveryRecord } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 const SESSION = "session-recovery";
 
@@ -27,7 +28,7 @@ function record(
 // TestRecoveryDAOUpsertBumpsAttemptAndClearsRetryState pins the retry bookkeeping:
 // a re-upsert of the same run counts as another attempt and clears the previous
 // error/retry deadline instead of overwriting them.
-Deno.test("recovery DAO upsert counts attempts and clears retry state", () => {
+test("recovery DAO upsert counts attempts and clears retry state", () => {
   const db = openTestDb();
   try {
     const dao = new RecoveryDAO(db);
@@ -67,7 +68,7 @@ Deno.test("recovery DAO upsert counts attempts and clears retry state", () => {
   }
 });
 
-Deno.test("recovery DAO update matches run and session together", () => {
+test("recovery DAO update matches run and session together", () => {
   const db = openTestDb();
   try {
     const dao = new RecoveryDAO(db);
@@ -115,7 +116,7 @@ Deno.test("recovery DAO update matches run and session together", () => {
   }
 });
 
-Deno.test("recovery DAO lists open turns with the run that opened them", () => {
+test("recovery DAO lists open turns with the run that opened them", () => {
   const db = openTestDb();
   try {
     const dao = new RecoveryDAO(db);

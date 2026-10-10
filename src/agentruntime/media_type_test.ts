@@ -1,7 +1,8 @@
 // Focused tests for the ported net/http DetectContentType sniffing subset.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { detectAttachmentMediaType, detectContentType } from "./media_type.ts";
+import { test } from "#testing";
 
 function decodeBase64(value: string): Uint8Array {
   const binary = atob(value);
@@ -14,7 +15,7 @@ const onePixelPng = decodeBase64(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl8P6sAAAAASUVORK5CYII=",
 );
 
-Deno.test("DetectContentTypeSniffsCommonMedia", () => {
+test("DetectContentTypeSniffsCommonMedia", () => {
   assertEquals(detectContentType(onePixelPng), "image/png");
   assertEquals(
     detectContentType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])),
@@ -44,7 +45,7 @@ Deno.test("DetectContentTypeSniffsCommonMedia", () => {
   );
 });
 
-Deno.test("DetectAttachmentMediaTypeReadsFileBytes", async () => {
+test("DetectAttachmentMediaTypeReadsFileBytes", async () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-media-" });
   const file = `${dir}/pixel.png`;
   await Deno.writeFile(file, onePixelPng);

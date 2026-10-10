@@ -1,5 +1,5 @@
 import { endpoint, type HttpClient, statusText } from "./http.ts";
-import type { SkillSummary } from "./types.ts";
+import { type SkillSummary } from "./types.ts";
 
 /** Clamps a requested limit to the 1..100 range, defaulting to 20. */
 export function boundedLimit(limit: number | undefined): number {

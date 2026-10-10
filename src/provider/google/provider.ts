@@ -16,7 +16,7 @@ import {
   createIdleTimeoutStream,
   streamIdleTimeoutMs,
 } from "../idle_timeout.ts";
-import type { Provider as ProviderInterface } from "../provider.ts";
+import { type Provider as ProviderInterface } from "../provider.ts";
 import {
   asJsonRecord,
   optBoolean,

@@ -5,7 +5,7 @@
 // ownership.
 
 import { createMemberMailbox } from "../agent/mod.ts";
-import type { Settings } from "../config/settings.ts";
+import { type Settings } from "../config/settings.ts";
 import { Center } from "../expert/center.ts";
 import type { Client } from "../mcp/mcp.ts";
 import type { Manager as SandboxManager } from "../sandbox/sandbox.ts";
@@ -17,7 +17,7 @@ import { AttachmentService } from "./input.ts";
 import { defaultInputPolicy, InputMaterializer } from "./input_materializer.ts";
 import { normalizeAdditionalDirectories } from "./session_directories.ts";
 import { SessionRuntime } from "./session_runtime.ts";
-import type { ProviderCatalog } from "./session_options.ts";
+import { type ProviderCatalog } from "./session_options.ts";
 import { resolveManagerSource } from "./session_source.ts";
 import {
   policyForSource,

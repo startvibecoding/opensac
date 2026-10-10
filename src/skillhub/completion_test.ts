@@ -1,11 +1,12 @@
-import { assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { LocalIndex } from "./local.ts";
 import { Service } from "./service.ts";
 import { CountingClient, emptyDetail } from "./test_helpers.ts";
-import type { SkillSummary } from "./types.ts";
+import { type SkillSummary } from "./types.ts";
+import { test } from "#testing";
 
-Deno.test("LocalIndexIncludesAndMergesLocalSkill", async () => {
+test("LocalIndexIncludesAndMergesLocalSkill", async () => {
   const root = await Deno.makeTempDir();
   await Deno.mkdir(path.join(root, "handmade"), { recursive: true });
   await Deno.writeTextFile(
@@ -28,7 +29,7 @@ Deno.test("LocalIndexIncludesAndMergesLocalSkill", async () => {
   assertEquals(items[0].installed?.local, true);
 });
 
-Deno.test("ServiceCachesSearch", async () => {
+test("ServiceCachesSearch", async () => {
   const client = new CountingClient();
   const service = new Service(await Deno.makeTempDir(), [], [], client);
   await service.search(undefined, "skillhub.cn", { limit: 1 });

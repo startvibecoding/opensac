@@ -1,4 +1,4 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import type { ReactElement } from "react";
 import { render } from "ink";
 import { App } from "./app.tsx";
@@ -8,6 +8,7 @@ import { Translator } from "./i18n.ts";
 import { stripANSI } from "./renderutil.ts";
 import { displayWidth } from "./formatters.ts";
 import { visualWidth as markdownVisualWidth } from "../tsm/mod.ts";
+import { test } from "#testing";
 
 class FakeStdout {
   columns = 20;
@@ -51,7 +52,7 @@ class FakeStdout {
   }
 }
 
-Deno.test("assistant markdown rows stay within the TUI width", async () => {
+test("assistant markdown rows stay within the TUI width", async () => {
   const controller = new AppController(new Translator("en"), {
     onMessage: () => {},
     scheduleRender: () => {},

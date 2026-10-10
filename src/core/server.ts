@@ -17,11 +17,11 @@ import {
   type CoreShutdownResult,
   parseCoreRpcMessage,
 } from "./protocol.ts";
-import type { ResolvedCoreConfig } from "./config.ts";
+import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreEventStream } from "./event_stream.ts";
 import { CoreRuntimeDispatcher } from "./dispatcher.ts";
 import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
-import type { CoreRuntimeHost } from "./runtime.ts";
+import { type CoreRuntimeHost } from "./runtime.ts";
 
 /** The protocol version implemented by this Core server. */
 export const CORE_PROTOCOL_VERSION = 1 as const;

@@ -4,7 +4,7 @@
 // and verified-remote snapshot states. Raw SQL lease fixtures are allowed in
 // tests (the DAO/DB rule governs production code). `time.Time` maps to `Date`.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission,
@@ -34,6 +34,7 @@ import {
   SESSION_EXECUTION_ORPHANED,
   SESSION_EXECUTION_RESERVED,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function makeRun(overrides: Partial<DurableRun>): DurableRun {
   return {
@@ -119,7 +120,7 @@ function initSession(sessionDir: string, id: string): void {
   manager.initWithID(id);
 }
 
-Deno.test("inspectSessionExecutionTracksLocalLifecycle", () => {
+test("inspectSessionExecutionTracksLocalLifecycle", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-local");
@@ -178,7 +179,7 @@ Deno.test("inspectSessionExecutionTracksLocalLifecycle", () => {
   }
 });
 
-Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () => {
+test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () => {
   const cases: {
     name: string;
     leasePurpose: string;
@@ -281,7 +282,7 @@ Deno.test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () =>
   }
 });
 
-Deno.test("inspectSessionExecutionProjectsMutationAsReserved", () => {
+test("inspectSessionExecutionProjectsMutationAsReserved", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-reserved");
@@ -301,7 +302,7 @@ Deno.test("inspectSessionExecutionProjectsMutationAsReserved", () => {
   }
 });
 
-Deno.test(
+test(
   "inspectSessionExecutionRequiresCanonicalRemoteRecordForDetachedState",
   () => {
     const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
@@ -353,7 +354,7 @@ Deno.test(
   },
 );
 
-Deno.test("reattachDurableRunPromotesRecoveryLeaseAndRegistersLocal", () => {
+test("reattachDurableRunPromotesRecoveryLeaseAndRegistersLocal", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-reattach");

@@ -1,10 +1,11 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { presetModelConfig } from "./model_preset.ts";
 import { defaultProviderConfigsAll } from "./settings.ts";
+import { test } from "#testing";
 
 // TestPresetModelConfigExactMatchInCurrentProvider pins step 1 of the
 // resolution order: the current provider's own catalog wins.
-Deno.test("preset model config prefers the current provider catalog", () => {
+test("preset model config prefers the current provider catalog", () => {
   const preset = presetModelConfig("anthropic", "claude-3-5-haiku-20241022");
   assertEquals(preset.id, "claude-3-5-haiku-20241022");
   assertEquals(preset.name, "Claude Haiku 3.5");
@@ -12,7 +13,7 @@ Deno.test("preset model config prefers the current provider catalog", () => {
   assert(preset.input?.includes("image"));
 });
 
-Deno.test("preset model config returns a copy the caller may mutate", () => {
+test("preset model config returns a copy the caller may mutate", () => {
   const catalog = defaultProviderConfigsAll();
   const builtin = catalog["anthropic"].models.find((m) =>
     m.id === "claude-3-5-haiku-20241022"
@@ -27,7 +28,7 @@ Deno.test("preset model config returns a copy the caller may mutate", () => {
   assertEquals(builtin.contextWindow, 200000);
 });
 
-Deno.test("preset model config falls back to any other built-in provider", () => {
+test("preset model config falls back to any other built-in provider", () => {
   const catalog = defaultProviderConfigsAll();
   const providerIDs = Object.keys(catalog).filter((pid) => pid !== "anthropic");
   assert(providerIDs.length > 0);
@@ -44,13 +45,13 @@ Deno.test("preset model config falls back to any other built-in provider", () =>
   assertEquals(preset.contextWindow, expected.contextWindow);
 });
 
-Deno.test("preset model config matches case-insensitively before giving up", () => {
+test("preset model config matches case-insensitively before giving up", () => {
   const preset = presetModelConfig("anthropic", "CLAUDE-3-5-HAIKU-20241022");
   assertEquals(preset.id, "CLAUDE-3-5-HAIKU-20241022");
   assertEquals(preset.contextWindow, 200000);
 });
 
-Deno.test("preset model config unknown ids get generic defaults", () => {
+test("preset model config unknown ids get generic defaults", () => {
   const preset = presetModelConfig("anthropic", "totally-unknown-model-xyz");
   assertEquals(preset, {
     id: "totally-unknown-model-xyz",

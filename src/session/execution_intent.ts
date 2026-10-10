@@ -20,7 +20,7 @@ import {
 import { reserveRuntimeSubmissionTx } from "./runtime_submission.ts";
 import { appendRunUserMessageTx } from "./run_user_message.ts";
 import { type SessionRun, sessionRunRecord } from "./run_store.ts";
-import type { SessionRunEvent } from "./session_events.ts";
+import { type SessionRunEvent } from "./session_events.ts";
 
 /**
  * The durable, adapter-neutral record of an accepted user request.

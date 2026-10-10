@@ -1,19 +1,18 @@
 // Shared test helpers for src/skillhub (mirrors the Go _test.go fixtures).
 
-import type { HttpClient } from "./http.ts";
-import type {
-  Category,
-  DownloadResult,
-  DownloadSource,
-  MarketClient,
-  MarketInfo,
-  SearchPage,
-  SearchQuery,
-  SkillDetail,
-  SkillFile,
-  SkillId,
-  SkillSummary,
-} from "./types.ts";
+import { type HttpClient } from "./http.ts";
+import {
+  type Category,
+  type DownloadResult,
+  type DownloadSource,
+  type MarketClient,
+  type MarketInfo,
+  type SearchPage,
+  type SearchQuery,
+  type SkillDetail,
+  type SkillFile,
+  type SkillId,
+  type SkillSummary} from "./types.ts";
 import { createZip, type ZipWriteEntry } from "./zip.ts";
 
 /** Builds a JSON Response for the fake HTTP client. */

@@ -1,4 +1,4 @@
-import type { HttpClient } from "./http_client.ts";
+import { type HttpClient } from "./http_client.ts";
 import { applyHeaders, createHttpClient } from "./http_client.ts";
 
 /** Bounds a single model-discovery request. */

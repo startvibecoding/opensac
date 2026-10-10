@@ -11,7 +11,7 @@ import {
   getActiveDurableRun,
   listLatestDurableRunsBySessions,
 } from "../agentruntime/run_queries.ts";
-import type { Project } from "../session/projects.ts";
+import { type Project } from "../session/projects.ts";
 import { acpRunStatus } from "./projection.ts";
 
 /** The additive ACP project projection. */

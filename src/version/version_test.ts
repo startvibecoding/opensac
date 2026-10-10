@@ -1,7 +1,8 @@
-import { assertEquals, assertNotEquals } from "@opensac/assert";
+import { assertEquals, assertNotEquals } from "../compat/assert.ts";
 import { current, setVersion } from "./version.ts";
+import { test } from "#testing";
 
-Deno.test("CurrentUsesBuildVersion", () => {
+test("CurrentUsesBuildVersion", () => {
   const prev = Deno.env.get("OPENSAC_BUILD_VERSION");
   setVersion("0.3.1");
   try {
@@ -13,7 +14,7 @@ Deno.test("CurrentUsesBuildVersion", () => {
   }
 });
 
-Deno.test("CurrentIsNeverEmpty", () => {
+test("CurrentIsNeverEmpty", () => {
   setVersion("");
   Deno.env.delete("OPENSAC_BUILD_VERSION");
   Deno.env.delete("OPENSAC_VCS_REVISION");

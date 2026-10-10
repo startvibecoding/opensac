@@ -1,10 +1,11 @@
 // deno-lint-ignore-file require-await -- async fake methods model Promise-returning seams
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 import { ACPBridge } from "./bridge.ts";
-import type { BridgeCoreClient } from "./bridge_client.ts";
+import { type BridgeCoreClient } from "./bridge_client.ts";
+import { test } from "#testing";
 
 class FakeBridgeClient implements BridgeCoreClient {
   readonly calls: { method: string; params?: unknown }[] = [];
@@ -61,7 +62,7 @@ function request(
   return { jsonrpc: "2.0", idRaw, method, params };
 }
 
-Deno.test("ACPBridge maps session/prompt to Core and forwards Core events", async () => {
+test("ACPBridge maps session/prompt to Core and forwards Core events", async () => {
   const client = new FakeBridgeClient();
   const output: string[] = [];
   const bridge = new ACPBridge({
@@ -102,7 +103,7 @@ Deno.test("ACPBridge maps session/prompt to Core and forwards Core events", asyn
   assertEquals(client.closed, 1);
 });
 
-Deno.test("ACPBridge maps session updates to Core replay and cancel to run.cancel", async () => {
+test("ACPBridge maps session updates to Core replay and cancel to run.cancel", async () => {
   const client = new FakeBridgeClient();
   const output: string[] = [];
   const bridge = new ACPBridge({
@@ -130,7 +131,7 @@ Deno.test("ACPBridge maps session updates to Core replay and cancel to run.cance
   ]);
   await bridge.close();
 });
-Deno.test("ACPBridge gates pre-initialize methods and correlates reverse responses", async () => {
+test("ACPBridge gates pre-initialize methods and correlates reverse responses", async () => {
   const client = new FakeBridgeClient();
   const output: string[] = [];
   const bridge = new ACPBridge({

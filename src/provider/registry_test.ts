@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import type { ProviderConfig } from "../config/mod.ts";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import { type ProviderConfig } from "../config/mod.ts";
 import {
   createMockProvider,
   createProvider,
@@ -12,12 +12,13 @@ import {
   setGlobalProviderRegistry,
   vendorFromBaseURL,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function cfg(partial: Partial<ProviderConfig>): ProviderConfig {
   return { models: [], ...partial };
 }
 
-Deno.test("ProviderRegistryRegisterAndCreate", () => {
+test("ProviderRegistryRegisterAndCreate", () => {
   const r = new ProviderRegistry();
   r.register(
     "test",
@@ -30,19 +31,19 @@ Deno.test("ProviderRegistryRegisterAndCreate", () => {
   assertEquals(p.name(), "test");
 });
 
-Deno.test("ProviderRegistryCreateNotFound", () => {
+test("ProviderRegistryCreateNotFound", () => {
   const r = new ProviderRegistry();
   assertThrows(() => r.create("nonexistent", cfg({})));
 });
 
-Deno.test("ProviderRegistryList", () => {
+test("ProviderRegistryList", () => {
   const r = new ProviderRegistry();
   r.register("a", (_cfg) => null as unknown as Provider);
   r.register("b", (_cfg) => null as unknown as Provider);
   assertEquals(r.list().length, 2);
 });
 
-Deno.test("VendorFromBaseURL", () => {
+test("VendorFromBaseURL", () => {
   const tests: Array<[string, string]> = [
     ["https://api.ant-ling.com", "ant-ling"],
     ["https://api.anthropic.com/v1/messages", "anthropic"],
@@ -105,7 +106,7 @@ function withRegistry(r: ProviderRegistry, fn: () => void): void {
   }
 }
 
-Deno.test("ResolveProviderExplicitVendor", () => {
+test("ResolveProviderExplicitVendor", () => {
   const r = new ProviderRegistry();
   r.register("myvendor", (_cfg) => createMockProvider("myvendor", [], []));
   withRegistry(r, () => {
@@ -114,7 +115,7 @@ Deno.test("ResolveProviderExplicitVendor", () => {
   });
 });
 
-Deno.test("ResolveProviderAutoDetect", () => {
+test("ResolveProviderAutoDetect", () => {
   const r = new ProviderRegistry();
   r.register("deepseek", () => createMockProvider("deepseek", [], []));
   r.register("openai-chat", () => createMockProvider("openai-chat", [], []));
@@ -130,7 +131,7 @@ Deno.test("ResolveProviderAutoDetect", () => {
   });
 });
 
-Deno.test("ResolveProviderFallback", () => {
+test("ResolveProviderFallback", () => {
   const r = new ProviderRegistry();
   for (
     const name of [
@@ -171,7 +172,7 @@ Deno.test("ResolveProviderFallback", () => {
   });
 });
 
-Deno.test("ResolveProviderUnknownAPI", () => {
+test("ResolveProviderUnknownAPI", () => {
   withRegistry(new ProviderRegistry(), () => {
     const err = assertThrows(() =>
       resolveProvider(cfg({ api: "unknown-api" }))
@@ -180,7 +181,7 @@ Deno.test("ResolveProviderUnknownAPI", () => {
   });
 });
 
-Deno.test("ResolveProviderUnregisteredVendorUsesAPI", () => {
+test("ResolveProviderUnregisteredVendorUsesAPI", () => {
   const r = new ProviderRegistry();
   for (
     const name of [
@@ -208,7 +209,7 @@ Deno.test("ResolveProviderUnregisteredVendorUsesAPI", () => {
   });
 });
 
-Deno.test("ResolveProviderVendorPriorityOverAPIFallback", () => {
+test("ResolveProviderVendorPriorityOverAPIFallback", () => {
   const r = new ProviderRegistry();
   r.register("openai", () => createMockProvider("openai", [], []));
   r.register(
@@ -223,7 +224,7 @@ Deno.test("ResolveProviderVendorPriorityOverAPIFallback", () => {
   });
 });
 
-Deno.test("ResolveProviderGoogleFallback", () => {
+test("ResolveProviderGoogleFallback", () => {
   const r = new ProviderRegistry();
   r.register(
     "google-gemini",
@@ -255,7 +256,7 @@ Deno.test("ResolveProviderGoogleFallback", () => {
   });
 });
 
-Deno.test("GlobalRegistry", () => {
+test("GlobalRegistry", () => {
   const orig = globalProviderRegistry();
   setGlobalProviderRegistry(new ProviderRegistry());
   try {

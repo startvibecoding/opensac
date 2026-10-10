@@ -2,8 +2,9 @@
 // Deno ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
 // property test over the same seeds plus generated inputs.
 
-import { assert } from "@opensac/assert";
+import { assert } from "../compat/assert.ts";
 import { sanitizeToolName } from "./mcp.ts";
+import { test } from "#testing";
 
 function* candidates(): Generator<string> {
   for (
@@ -22,7 +23,7 @@ function* candidates(): Generator<string> {
   }
 }
 
-Deno.test("sanitizeToolName fuzz invariants", () => {
+test("sanitizeToolName fuzz invariants", () => {
   for (const name of candidates()) {
     const got = sanitizeToolName(name);
     assert(got !== "", `SanitizeToolName(${JSON.stringify(name)}) was empty`);

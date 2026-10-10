@@ -1,8 +1,8 @@
 // Focused tests for the stateless subagent/manager helpers ported from
 // internal/agent (backlog #19).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import type { MemberDef } from "./memberdef.ts";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import { type MemberDef } from "./memberdef.ts";
 import {
   appendUniqueAgentID,
   buildSubAgentTask,
@@ -16,37 +16,38 @@ import {
   subAgentToolNames,
   validateSubAgentPolicy,
 } from "./subagent_support.ts";
+import { test } from "#testing";
 
 // --- SubAgentPolicy tests (ported from subagent_test.go) ---
 
-Deno.test("SubAgentPolicyDefault", () => {
+test("SubAgentPolicyDefault", () => {
   const p = defaultSubAgentPolicy();
   assertEquals(p.maxChildren, 5);
   assertEquals(p.allowedModes, ["plan", "agent", "yolo", "os"]);
   assertEquals(p.timeoutPerAgentMs, 30 * 60 * 1000);
 });
 
-Deno.test("SubAgentPolicyValidateTopLevel", () => {
+test("SubAgentPolicyValidateTopLevel", () => {
   const p = defaultSubAgentPolicy();
   validateSubAgentPolicy(p, "", "yolo", 0);
 });
 
-Deno.test("SubAgentPolicyValidateAllowed", () => {
+test("SubAgentPolicyValidateAllowed", () => {
   const p = defaultSubAgentPolicy();
   validateSubAgentPolicy(p, "parent", "agent", 0);
 });
 
-Deno.test("SubAgentPolicyValidateMaxChildren", () => {
+test("SubAgentPolicyValidateMaxChildren", () => {
   const p = defaultSubAgentPolicy();
   assertThrows(() => validateSubAgentPolicy(p, "parent", "agent", 5));
 });
 
-Deno.test("SubAgentPolicyValidateDisallowedMode", () => {
+test("SubAgentPolicyValidateDisallowedMode", () => {
   const p = defaultSubAgentPolicy();
   assertThrows(() => validateSubAgentPolicy(p, "parent", "admin", 0));
 });
 
-Deno.test("SubAgentPolicyValidateCustom", () => {
+test("SubAgentPolicyValidateCustom", () => {
   const p: SubAgentPolicy = {
     maxChildren: 3,
     allowedModes: ["agent", "plan"],
@@ -61,7 +62,7 @@ Deno.test("SubAgentPolicyValidateCustom", () => {
 
 // --- SubAgentToolNames (adapted from subagent_tools_test.go) ---
 
-Deno.test("SubAgentToolNamesAreCanonical", () => {
+test("SubAgentToolNamesAreCanonical", () => {
   const names = subAgentToolNames();
   assert(names.length > 0);
   const seen = new Set<string>();
@@ -72,7 +73,7 @@ Deno.test("SubAgentToolNamesAreCanonical", () => {
   }
 });
 
-Deno.test("SubAgentToolNamesReturnsAFreshArray", () => {
+test("SubAgentToolNamesReturnsAFreshArray", () => {
   const names = subAgentToolNames();
   names[0] = "mutated";
   assertEquals(subAgentToolNames()[0] === "mutated", false);
@@ -80,7 +81,7 @@ Deno.test("SubAgentToolNamesReturnsAFreshArray", () => {
 
 // --- mode capability / member resolution ---
 
-Deno.test("ModeWithinCapabilityMonotonicReductions", () => {
+test("ModeWithinCapabilityMonotonicReductions", () => {
   assert(modeWithinCapability("plan", "yolo"));
   assert(modeWithinCapability("agent", "yolo"));
   assert(modeWithinCapability("yolo", "yolo"));
@@ -92,7 +93,7 @@ Deno.test("ModeWithinCapabilityMonotonicReductions", () => {
   assertEquals(modeWithinCapability("plan", "unknown"), false);
 });
 
-Deno.test("ResolveMemberModeDefaultsAndCeilings", () => {
+test("ResolveMemberModeDefaultsAndCeilings", () => {
   // Empty parent mode defaults to yolo; a member may narrow to plan.
   const member: MemberDef = {
     id: "m",
@@ -120,7 +121,7 @@ Deno.test("ResolveMemberModeDefaultsAndCeilings", () => {
   );
 });
 
-Deno.test("RestrictMemberToolsFiltersAndDedupes", () => {
+test("RestrictMemberToolsFiltersAndDedupes", () => {
   // Empty declaration retains the request.
   assertEquals(restrictMemberTools(["a", "b"], []), ["a", "b"]);
   // Empty request retains the declaration.
@@ -132,7 +133,7 @@ Deno.test("RestrictMemberToolsFiltersAndDedupes", () => {
   );
 });
 
-Deno.test("BuildSubAgentTaskWrapsInstruction", () => {
+test("BuildSubAgentTaskWrapsInstruction", () => {
   const out = buildSubAgentTask("  do the thing  ");
   assert(out.startsWith("Delegated task:\ndo the thing\n"));
   assert(out.includes("Result: <the direct answer"));
@@ -140,7 +141,7 @@ Deno.test("BuildSubAgentTaskWrapsInstruction", () => {
 
 // --- manager bookkeeping helpers ---
 
-Deno.test("IsTerminalManagedState", () => {
+test("IsTerminalManagedState", () => {
   for (const state of ["done", "incomplete", "error", "canceled"]) {
     assert(isTerminalManagedState(state), state);
   }
@@ -149,7 +150,7 @@ Deno.test("IsTerminalManagedState", () => {
   }
 });
 
-Deno.test("AppendUniqueAgentIDAvoidsDuplicates", () => {
+test("AppendUniqueAgentIDAvoidsDuplicates", () => {
   const ids: string[] = [];
   const first = appendUniqueAgentID(ids, "a");
   assertEquals(first, ["a"]);
@@ -159,7 +160,7 @@ Deno.test("AppendUniqueAgentIDAvoidsDuplicates", () => {
   assertEquals(appendUniqueAgentID(second, "a"), second);
 });
 
-Deno.test("RemoveAgentIDFilters", () => {
+test("RemoveAgentIDFilters", () => {
   assertEquals(removeAgentID([], "a"), []);
   assertEquals(removeAgentID(["a", "b", "a"], "a"), ["b"]);
   assertEquals(removeAgentID(["a"], "z"), ["a"]);

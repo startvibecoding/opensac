@@ -23,7 +23,7 @@ import {
 import { AppController } from "./app_controller.ts";
 import { renderHeader } from "./header.ts";
 import { displayWidth } from "./formatters.ts";
-import type { ToolResultEntry, TranscriptStore } from "./transcript_store.ts";
+import { type ToolResultEntry, TranscriptStore } from "./transcript_store.ts";
 import type { Translator } from "./i18n.ts";
 import { formatToolGroup, formatToolRow } from "./tool_row_format.ts";
 import { CompactThinkingRow } from "./thinking_display.tsx";

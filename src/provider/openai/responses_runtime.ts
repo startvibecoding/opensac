@@ -10,8 +10,8 @@
 import { providerUserAgent } from "../../ua/ua.ts";
 import { applyHeaders } from "../http_client.ts";
 import { isRetryable, retryDelay } from "../retry.ts";
-import type { ChatParams, Message } from "../types.ts";
-import type { ResponsesHostedPolicy } from "./hosted_registry.ts";
+import { type ChatParams, type Message } from "../types.ts";
+import { type ResponsesHostedPolicy } from "./hosted_registry.ts";
 import type { Provider } from "./provider.ts";
 import {
   buildResponsesRequest,

@@ -6,8 +6,8 @@
 // Deno process. `TestKnowledgeMCPHandlerReturnsBoundedCitedSnapshotEvidence`
 // is translated directly.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { mcpProtocolVersion } from "../mcp/rpc.ts";
 import { serveStdio } from "../mcp/server.ts";
 import { createKnowledgeBase } from "../session/mod.ts";
@@ -16,6 +16,7 @@ import {
   createKnowledgeBaseService,
   defaultKnowledgeBaseIndexPolicy,
 } from "./knowledgebase.ts";
+import { test } from "#testing";
 
 function tempDir(): string {
   return Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
@@ -84,7 +85,7 @@ function collectingStream(): {
   return { stream, text };
 }
 
-Deno.test("knowledge MCP connects as standard tool", async () => {
+test("knowledge MCP connects as standard tool", async () => {
   const { sessionDir, baseID } = await prepareIndexedBase();
   const handler = KnowledgeMCPHandler.create(sessionDir, [baseID]);
   const input = streamFrom(
@@ -113,7 +114,7 @@ Deno.test("knowledge MCP connects as standard tool", async () => {
   }
 });
 
-Deno.test(
+test(
   "knowledge MCP handler returns bounded cited snapshot evidence",
   async () => {
     const { sessionDir, baseID } = await prepareIndexedBase();

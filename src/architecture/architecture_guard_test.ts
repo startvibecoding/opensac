@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@opensac/assert";
-import { fromFileUrl, join } from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { fromFileUrl, join } from "../compat/path.ts";
 import {
   coreBoundaryAllowlist,
   foreignKeyEnforcementPattern,
@@ -8,6 +8,7 @@ import {
   stringLiterals,
   type Violation,
 } from "./guard.ts";
+import { test } from "#testing";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
@@ -18,7 +19,7 @@ function formatViolations(violations: Violation[]): string {
 // Prevents adapters from silently reintroducing complete Agent construction or
 // canonical Run persistence. The Core allowlist is file-specific and remains
 // subject to the same Agent/runtime checks as every other production module.
-Deno.test("production architecture guard", () => {
+test("production architecture guard", () => {
   const violations = productionViolations(projectRoot);
   assertEquals(
     violations,
@@ -27,7 +28,7 @@ Deno.test("production architecture guard", () => {
   );
 });
 
-Deno.test("Core boundary allowlist is narrow and preserves Agent construction guards", () => {
+test("Core boundary allowlist is narrow and preserves Agent construction guards", () => {
   const root = Deno.makeTempDirSync();
   try {
     const coreDir = join(root, "src/core");
@@ -94,7 +95,7 @@ Deno.test("Core boundary allowlist is narrow and preserves Agent construction gu
   }
 });
 
-Deno.test("Core boundary rejects a concatenated dynamic import independently", () => {
+test("Core boundary rejects a concatenated dynamic import independently", () => {
   const root = Deno.makeTempDirSync();
   try {
     const coreDir = join(root, "src/core");
@@ -121,7 +122,7 @@ Deno.test("Core boundary rejects a concatenated dynamic import independently", (
   }
 });
 
-Deno.test("Core Runtime Host is the narrow runtime import exception", () => {
+test("Core Runtime Host is the narrow runtime import exception", () => {
   const root = Deno.makeTempDirSync();
   try {
     const coreDir = join(root, "src/core");
@@ -129,7 +130,7 @@ Deno.test("Core Runtime Host is the narrow runtime import exception", () => {
     Deno.writeTextFileSync(
       join(coreDir, "runtime_host.ts"),
       [
-        'import type { RuntimeSource } from "../agentruntime/source.ts";',
+        'import { type RuntimeSource } from "../agentruntime/source.ts";',
         "export type Source = RuntimeSource;",
       ].join("\n"),
     );
@@ -142,7 +143,7 @@ Deno.test("Core Runtime Host is the narrow runtime import exception", () => {
     Deno.removeSync(root, { recursive: true });
   }
 });
-Deno.test("string literals ignore comments and template bodies", () => {
+test("string literals ignore comments and template bodies", () => {
   const source = [
     '// "comment_literal"',
     'const raw = `{"decision":"resume"}`;',
@@ -151,7 +152,7 @@ Deno.test("string literals ignore comments and template bodies", () => {
   assertEquals(stringLiterals(source), ["decision_"]);
 });
 
-Deno.test("import specifiers read static and dynamic imports", () => {
+test("import specifiers read static and dynamic imports", () => {
   const source = [
     'import { createSessionRun } from "../session/run_store.ts";',
     'import type { SQLInputValue } from "node:sqlite";',
@@ -170,7 +171,7 @@ Deno.test("import specifiers read static and dynamic imports", () => {
   ]);
 });
 
-Deno.test("foreign key enforcement pattern only matches enabling values", () => {
+test("foreign key enforcement pattern only matches enabling values", () => {
   assert(foreignKeyEnforcementPattern.test("file:db?_pragma=foreign_keys(ON)"));
   assert(foreignKeyEnforcementPattern.test("PRAGMA foreign_keys = 1"));
   assert(foreignKeyEnforcementPattern.test("pragma foreign_keys = true"));
@@ -284,7 +285,7 @@ const bypassCases: Case[] = [
   },
 ];
 
-Deno.test("production architecture guard detects canonical run bypasses", async (t) => {
+test("production architecture guard detects canonical run bypasses", async (t) => {
   for (const tc of bypassCases) {
     await t.step(tc.name, () => {
       const root = Deno.makeTempDirSync();

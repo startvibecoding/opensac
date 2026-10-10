@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../../compat/assert.ts";
 import {
   createResponsesNormalizer,
   decodeResponsesOutputItem,
@@ -7,7 +7,8 @@ import {
   type ResponsesSSEFrame,
   safeResponsesAttachmentURL,
 } from "./responses_codec.ts";
-import type { ResponsesSSEEvent } from "./responses.ts";
+import { type ResponsesSSEEvent } from "./responses.ts";
+import { test } from "#testing";
 
 function readResponsesFixture(name: string): string {
   return Deno.readTextFileSync(
@@ -15,7 +16,7 @@ function readResponsesFixture(name: string): string {
   );
 }
 
-Deno.test("DecodeResponsesSSESupportsFieldsMultilineDataAndDone", async () => {
+test("DecodeResponsesSSESupportsFieldsMultilineDataAndDone", async () => {
   const input = "event: response.output_text.delta\r\n" +
     "id: evt_1\r\n" +
     'data: {"type":"response.output_text.delta",\r\n' +
@@ -42,7 +43,7 @@ Deno.test("DecodeResponsesSSESupportsFieldsMultilineDataAndDone", async () => {
   assertEquals(frames[1].data, "[DONE]");
 });
 
-Deno.test("DecodeResponsesSSEAcceptsLineDelimitedGatewayEvents", async () => {
+test("DecodeResponsesSSEAcceptsLineDelimitedGatewayEvents", async () => {
   const input = 'data: {"type":"response.created"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n' +
     "data: [DONE]\n";
@@ -55,7 +56,7 @@ Deno.test("DecodeResponsesSSEAcceptsLineDelimitedGatewayEvents", async () => {
   assertEquals(types.length, 3);
 });
 
-Deno.test("ResponsesProtocolFixtures", async (t) => {
+test("ResponsesProtocolFixtures", async (t) => {
   await t.step("custom tool SSE", async () => {
     const n = createResponsesNormalizer();
     const err = await decodeResponsesSSE(
@@ -140,7 +141,7 @@ Deno.test("ResponsesProtocolFixtures", async (t) => {
   });
 });
 
-Deno.test("ResponsesNormalizerInterleavesFunctionArgumentsByItemIdentity", () => {
+test("ResponsesNormalizerInterleavesFunctionArgumentsByItemIdentity", () => {
   const n = createResponsesNormalizer();
   const events: ResponsesSSEEvent[] = [
     {
@@ -222,7 +223,7 @@ Deno.test("ResponsesNormalizerInterleavesFunctionArgumentsByItemIdentity", () =>
   assertEquals(responsesArgumentsText(calls[1].arguments), `{"path":"b"}`);
 });
 
-Deno.test("ResponsesNormalizerMergesIDlessCompletedOutput", () => {
+test("ResponsesNormalizerMergesIDlessCompletedOutput", () => {
   const n = createResponsesNormalizer();
   const added: ResponsesSSEEvent = {
     type: "response.output_item.added",
@@ -251,7 +252,7 @@ Deno.test("ResponsesNormalizerMergesIDlessCompletedOutput", () => {
   assertEquals(n.response.items.length, 2);
 });
 
-Deno.test("ResponsesNormalizerCollectsCustomToolInput", () => {
+test("ResponsesNormalizerCollectsCustomToolInput", () => {
   const n = createResponsesNormalizer();
   const events: ResponsesSSEEvent[] = [
     {
@@ -291,7 +292,7 @@ Deno.test("ResponsesNormalizerCollectsCustomToolInput", () => {
   );
 });
 
-Deno.test("ResponsesNormalizerPreservesUnknownItemWithSanitizedCanonicalJSON", () => {
+test("ResponsesNormalizerPreservesUnknownItemWithSanitizedCanonicalJSON", () => {
   const n = createResponsesNormalizer();
   const event: ResponsesSSEEvent = {
     type: "response.output_item.done",
@@ -308,7 +309,7 @@ Deno.test("ResponsesNormalizerPreservesUnknownItemWithSanitizedCanonicalJSON", (
   assert(canonical.includes("[REDACTED]"));
 });
 
-Deno.test("ResponsesNormalizerRecordsUnknownEventType", () => {
+test("ResponsesNormalizerRecordsUnknownEventType", () => {
   const n = createResponsesNormalizer();
   assertEquals(
     n.apply(
@@ -330,7 +331,7 @@ Deno.test("ResponsesNormalizerRecordsUnknownEventType", () => {
   assertEquals(events[0], "response.future_event");
 });
 
-Deno.test("ResponsesNormalizerRejectsComputerUseItem", () => {
+test("ResponsesNormalizerRejectsComputerUseItem", () => {
   const n = createResponsesNormalizer();
   const event: ResponsesSSEEvent = {
     type: "response.output_item.done",
@@ -349,7 +350,7 @@ Deno.test("ResponsesNormalizerRejectsComputerUseItem", () => {
   assert(!(n.response.items[0].canonical ?? "").includes("redact-me"));
 });
 
-Deno.test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
+test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
   const n = createResponsesNormalizer();
   const events: Array<{ event: ResponsesSSEEvent; raw: string }> = [
     {
@@ -443,7 +444,7 @@ Deno.test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
   assertEquals(attachments[4].metadata?.["score"], 0.92);
 });
 
-Deno.test("SafeResponsesAttachmentURLRejectsPrivateTargets", () => {
+test("SafeResponsesAttachmentURLRejectsPrivateTargets", () => {
   for (
     const raw of [
       "https://localhost/file",
@@ -462,7 +463,7 @@ Deno.test("SafeResponsesAttachmentURLRejectsPrivateTargets", () => {
   );
 });
 
-Deno.test("DecodeResponsesSSEReportsMalformedEventSequence", async () => {
+test("DecodeResponsesSSEReportsMalformedEventSequence", async () => {
   const errWant = new Error("stop");
   const err = await decodeResponsesSSE("data: {not-json}\n", () => errWant);
   assertEquals(err, errWant);

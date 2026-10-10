@@ -11,7 +11,7 @@ import {
   resolveImageGenerationToken,
   type Settings,
 } from "../config/settings.ts";
-import type { ContentBlock } from "../provider/types.ts";
+import { type ContentBlock } from "../provider/types.ts";
 import {
   operationIDFromContext,
   type Tool,

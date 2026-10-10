@@ -1,7 +1,7 @@
 //
 // Package platform provides cross-platform compatibility utilities.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { resourceUrl } from "./resources.ts";
 
 const APP_DIR_NAME = "opensac";

@@ -1,10 +1,11 @@
 // Tests for the transcript/scrollback streaming skeleton.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import type { ReactElement } from "react";
 import { render } from "ink";
 import { MarkdownBlock, renderMarkdown, Transcript } from "./mod.ts";
-import type { TranscriptBlock } from "./mod.ts";
+import { type TranscriptBlock } from "./mod.ts";
+import { test } from "#testing";
 
 class FakeStdout {
   columns = 80;
@@ -56,7 +57,7 @@ function view(blocks: TranscriptBlock[]): ReactElement {
   return Transcript({ blocks, width: 40 });
 }
 
-Deno.test("markdown helpers delegate to tsm", () => {
+test("markdown helpers delegate to tsm", () => {
   assertEquals(renderMarkdown("# Hi", 40).includes("# Hi"), true);
   const block = new MarkdownBlock(40);
   block.update("Hel");
@@ -68,7 +69,7 @@ Deno.test("markdown helpers delegate to tsm", () => {
   assert(!block.output().includes("**"));
 });
 
-Deno.test({
+test({
   name: "completed blocks commit to Static exactly once",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -96,7 +97,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "active streaming block stays in the managed view and updates",
   sanitizeOps: false,
   sanitizeResources: false,

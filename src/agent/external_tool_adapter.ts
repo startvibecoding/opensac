@@ -2,13 +2,12 @@
 // Adapts a public agent.ExternalTool to the internal tools.Tool interface so
 // host-provided tools can run inside the agent loop.
 
-import type {
-  ExternalTool,
-  ExternalToolPromptInfo,
-} from "../../sdk/agent/external_tool.ts";
-import type { ContentBlock } from "../../sdk/agent/types.ts";
-import type { ContentBlock as ProviderContentBlock } from "../provider/types.ts";
-import type { Tool, ToolContext, ToolResult } from "../tools/mod.ts";
+import {
+  type ExternalTool,
+  type ExternalToolPromptInfo} from "../../sdk/agent/external_tool.ts";
+import { type ContentBlock } from "../../sdk/agent/types.ts";
+import { type ContentBlock as ProviderContentBlock } from "../provider/types.ts";
+import { type Tool, type ToolContext, type ToolResult } from "../tools/mod.ts";
 
 /** Adapts a public ExternalTool to the internal tools.Tool interface. */
 export class ExternalToolAdapter implements Tool {

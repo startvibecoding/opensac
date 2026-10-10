@@ -8,10 +8,9 @@
 // maps to the narrow `ToolFenceRuntime` view so the hook has no import cycle
 // with the SessionRuntime slice.
 
-import type {
-  BeforeToolExecuteContext,
-  ToolCallBlockResult,
-} from "../agent/mod.ts";
+import {
+  type BeforeToolExecuteContext,
+  type ToolCallBlockResult} from "../agent/mod.ts";
 import type { Manager } from "../session/manager.ts";
 import { validateRuntimeLease } from "../session/mod.ts";
 

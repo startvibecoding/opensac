@@ -1,4 +1,4 @@
-import type { Attachment } from "./types.ts";
+import { type Attachment } from "./types.ts";
 
 /**
  * AttachmentContent is an optional provider-specific download result. It is

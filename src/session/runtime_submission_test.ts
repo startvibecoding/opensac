@@ -1,6 +1,6 @@
 // Test for the ported internal/session/runtime_submission.go admission surface.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { writeRootDatabase } from "./database.ts";
 import {
@@ -9,6 +9,7 @@ import {
   RuntimeSubmissionError,
   type RuntimeSubmissionRunInput,
 } from "./runtime_submission.ts";
+import { test } from "#testing";
 
 function runInput(
   overrides: Partial<RuntimeSubmissionRunInput>,
@@ -25,7 +26,7 @@ function runInput(
   };
 }
 
-Deno.test("runtime submission reserve and lookup", () => {
+test("runtime submission reserve and lookup", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     writeRootDatabase(

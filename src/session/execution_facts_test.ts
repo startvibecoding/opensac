@@ -3,7 +3,7 @@
 // tests here use direct DAO session/Run persistence plus the portable lease
 // surface, mirroring runtime_lock_test.ts.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { RunDAO, SessionDAO } from "../dao/mod.ts";
 import {
@@ -15,6 +15,7 @@ import {
   readSessionExecutionFacts,
 } from "./mod.ts";
 import { openRootDB } from "./root_db.ts";
+import { test } from "#testing";
 
 function makeSession(sessionDir: string, id: string): void {
   const db = openRootDB(sessionDir);
@@ -65,7 +66,7 @@ function makeRun(
   });
 }
 
-Deno.test("ReadSessionExecutionFactsUsesCanonicalRunAndLease", () => {
+test("ReadSessionExecutionFactsUsesCanonicalRunAndLease", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-facts-" });
   try {
     const sessionId = "execution-facts";
@@ -102,7 +103,7 @@ Deno.test("ReadSessionExecutionFactsUsesCanonicalRunAndLease", () => {
   }
 });
 
-Deno.test("ReadSessionExecutionFactsPreservesReleasedLeaseTombstone", () => {
+test("ReadSessionExecutionFactsPreservesReleasedLeaseTombstone", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-facts-" });
   try {
     const sessionId = "execution-facts-released";
@@ -120,7 +121,7 @@ Deno.test("ReadSessionExecutionFactsPreservesReleasedLeaseTombstone", () => {
   }
 });
 
-Deno.test("ReadSessionExecutionFactsReportsMissingSession", () => {
+test("ReadSessionExecutionFactsReportsMissingSession", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-facts-" });
   try {
     makeSession(sessionDir, "execution-facts-existing");
@@ -136,7 +137,7 @@ Deno.test("ReadSessionExecutionFactsReportsMissingSession", () => {
   }
 });
 
-Deno.test("CanonicalNonTerminalSessionRunStatuses", () => {
+test("CanonicalNonTerminalSessionRunStatuses", () => {
   const want = new Set([
     "created",
     "queued",

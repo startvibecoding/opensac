@@ -1,6 +1,6 @@
-import { decodeBase64, encodeBase64 } from "@opensac/encoding/base64";
-import { fileURLToPath } from "@opensac/path";
-import * as path from "@opensac/path";
+import { decodeBase64, encodeBase64 } from "../compat/encoding.ts";
+import { fileURLToPath } from "../compat/path.ts";
+import * as path from "../compat/path.ts";
 import { AttachmentService } from "../agentruntime/input.ts";
 import {
   ATTACHMENT_AUDIO,
@@ -9,36 +9,35 @@ import {
   ATTACHMENT_VIDEO,
   defaultAttachmentPolicy,
 } from "../agentruntime/attachment.ts";
-import type {
-  CoreAgentView,
-  CoreCapabilityView,
-  CoreEsmCommandInput,
-  CoreEsmObjectiveView,
-  CoreEsmView,
-  CoreExpertBundleView,
-  CoreExpertStateView,
-  CoreExpertSummaryView,
-  CoreExtensionHandler,
-  CorePreparedInput,
-  CorePrepareInput,
-  CorePromptExecution,
-  CorePromptInput,
-  CoreProviderCatalogView,
-  CoreReverseRequest,
-  CoreRuntimeDependencies,
-  CoreRuntimeEvent,
-  CoreRuntimeHost,
-  CoreRuntimeHostOptions,
-  CoreRunView,
-  CoreSessionContextView,
-  CoreSessionCreateInput,
-  CoreSessionRuntime,
-  CoreSessionView,
-  CoreSkillView,
-  CoreTranscriptMessage,
-  CoreTransientPromptInput,
-  CoreTransientPromptResult,
-} from "./runtime.ts";
+import {
+  type CoreAgentView,
+  type CoreCapabilityView,
+  type CoreEsmCommandInput,
+  type CoreEsmObjectiveView,
+  type CoreEsmView,
+  type CoreExpertBundleView,
+  type CoreExpertStateView,
+  type CoreExpertSummaryView,
+  type CoreExtensionHandler,
+  type CorePreparedInput,
+  type CorePrepareInput,
+  type CorePromptExecution,
+  type CorePromptInput,
+  type CoreProviderCatalogView,
+  type CoreReverseRequest,
+  type CoreRuntimeDependencies,
+  type CoreRuntimeEvent,
+  type CoreRuntimeHost,
+  type CoreRuntimeHostOptions,
+  type CoreRunView,
+  type CoreSessionContextView,
+  type CoreSessionCreateInput,
+  type CoreSessionRuntime,
+  type CoreSessionView,
+  type CoreSkillView,
+  type CoreTranscriptMessage,
+  type CoreTransientPromptInput,
+  type CoreTransientPromptResult} from "./runtime.ts";
 import { CoreSessionNotResidentError } from "./runtime_protocol.ts";
 import {
   Builder,
@@ -185,7 +184,7 @@ import {
   SCOPE_GLOBAL,
   SCOPE_PROJECT,
 } from "../expert/mod.ts";
-import type { RunState } from "../agentruntime/run_state.ts";
+import { type RunState } from "../agentruntime/run_state.ts";
 import {
   EVENT_ERROR,
   EVENT_QUESTION_REQUEST,

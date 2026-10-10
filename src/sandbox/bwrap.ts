@@ -1,13 +1,12 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { lookPathSync } from "../platform/platform.ts";
 import { normalizeTmpSize, pathsOverlap } from "./policy.ts";
 import { protectedGitPaths, uniquePaths } from "./git_paths.ts";
-import type {
-  CommandSpec,
-  ExecOpts,
-  GitAccessSandbox,
-  Options,
-} from "./sandbox.ts";
+import {
+  type CommandSpec,
+  type ExecOpts,
+  type GitAccessSandbox,
+  type Options} from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
 
 /** Default tmpfs size used when no policy value is supplied. */

@@ -22,7 +22,11 @@ export interface ChannelToolGenerationRecord {
 
 /** Owns session/channel binding and channel-tool persistence. */
 export class BindingDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   listChannelTools(sessionId: string): ChannelToolRecord[] {
     return queryAll<Record<string, unknown>>(

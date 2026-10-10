@@ -8,8 +8,8 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
-import { fromFileUrl, join } from "@opensac/path";
+} from "../compat/assert.ts";
+import { fromFileUrl, join } from "../compat/path.ts";
 import { defaultSettings } from "../config/settings.ts";
 import {
   createFakeTUIService,
@@ -32,6 +32,7 @@ import {
   TASK_FAILED,
   TASK_SUCCESS,
 } from "../agentruntime/events.ts";
+import { test } from "#testing";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
@@ -132,7 +133,7 @@ function printOptions(overrides: Partial<PrintOptions> = {}): PrintOptions {
   };
 }
 
-Deno.test("print mode projects text output from canonical Core events", async () => {
+test("print mode projects text output from canonical Core events", async () => {
   const out: string[] = [];
   const err: string[] = [];
   const scripted = scriptedService({
@@ -193,7 +194,7 @@ Deno.test("print mode projects text output from canonical Core events", async ()
   assertEquals(scripted.prompts[0].mode, "yolo");
 });
 
-Deno.test("print mode projects NDJSON output from canonical Core events", async () => {
+test("print mode projects NDJSON output from canonical Core events", async () => {
   const out: string[] = [];
   const scripted = scriptedService({
     events: [
@@ -238,7 +239,7 @@ Deno.test("print mode projects NDJSON output from canonical Core events", async 
   assertEquals(call?.id, "t1");
 });
 
-Deno.test("print mode fails with exit 1 when a tool needs approval", async () => {
+test("print mode fails with exit 1 when a tool needs approval", async () => {
   const err: string[] = [];
   const scripted = scriptedService({
     events: [
@@ -272,7 +273,7 @@ Deno.test("print mode fails with exit 1 when a tool needs approval", async () =>
   ]);
 });
 
-Deno.test("print mode answers questions unattended and keeps exit semantics", async () => {
+test("print mode answers questions unattended and keeps exit semantics", async () => {
   const scripted = scriptedService({
     events: [
       { eventType: "text_delta", payload: { text: "done" } },
@@ -301,7 +302,7 @@ Deno.test("print mode answers questions unattended and keeps exit semantics", as
   ]);
 });
 
-Deno.test("print mode surfaces failed runs instead of silent success", async () => {
+test("print mode surfaces failed runs instead of silent success", async () => {
   // A non-completed durable run must report why it failed and exit non-zero:
   // scripts can tell a failed turn from a completed one.
   const err: string[] = [];
@@ -326,7 +327,7 @@ Deno.test("print mode surfaces failed runs instead of silent success", async () 
   assertStringIncludes(err.join("\n"), "model exploded");
 });
 
-Deno.test("print mode emits terminal NDJSON records with the run status", async () => {
+test("print mode emits terminal NDJSON records with the run status", async () => {
   const out: string[] = [];
   const completed = scriptedService({
     events: [
@@ -376,7 +377,7 @@ Deno.test("print mode emits terminal NDJSON records with the run status", async 
   });
 });
 
-Deno.test("print mode mints a fresh session per run when no resume flag is given", async () => {
+test("print mode mints a fresh session per run when no resume flag is given", async () => {
   // With no `-c`/`-r`/`--session`, print keeps the Go setupSession default: one
   // fresh Core-owned session per run. The resume flags are covered by the
   // dedicated tests below, so this one pins only the no-flag path.
@@ -407,7 +408,7 @@ Deno.test("print mode mints a fresh session per run when no resume flag is given
   );
 });
 
-Deno.test("root_print has no Builder/ExecutionRuntime construction left", () => {
+test("root_print has no Builder/ExecutionRuntime construction left", () => {
   const violations = tuiBoundaryViolations(projectRoot).filter((violation) =>
     violation.file === "src/cli/root_print.ts"
   );
@@ -431,7 +432,7 @@ Deno.test("root_print has no Builder/ExecutionRuntime construction left", () => 
   }
 });
 
-Deno.test("print mode keeps retry progress and provider errors visible", async () => {
+test("print mode keeps retry progress and provider errors visible", async () => {
   const events: ScriptEvent[] = [
     {
       eventType: "agent_event",
@@ -486,7 +487,7 @@ Deno.test("print mode keeps retry progress and provider errors visible", async (
   assert(types.includes("retry"), JSON.stringify(types));
 });
 
-Deno.test("print -c continues this directory's newest session", async () => {
+test("print -c continues this directory's newest session", async () => {
   const fake = createFakeTUIService();
   // An earlier conversation in the same directory, as a previous run left it.
   const earlier = await fake.createSession({ workDir: Deno.cwd() });
@@ -533,7 +534,7 @@ function settledScript(): Scripted {
   });
 }
 
-Deno.test("print without -c/-r still creates a fresh session", async () => {
+test("print without -c/-r still creates a fresh session", async () => {
   const scripted = settledScript();
   const result = await runPrintAction(
     printOptions(),
@@ -543,7 +544,7 @@ Deno.test("print without -c/-r still creates a fresh session", async () => {
   assertEquals(scripted.creates.length, 1, "no resume flags, one new session");
 });
 
-Deno.test("print with an unresolvable -r target degrades to a fresh session", async () => {
+test("print with an unresolvable -r target degrades to a fresh session", async () => {
   const scripted = settledScript();
   const result = await runPrintAction(
     printOptions({ resume: "no-such-session" }),
@@ -558,7 +559,7 @@ Deno.test("print with an unresolvable -r target degrades to a fresh session", as
   );
 });
 
-Deno.test("print -r against an unreachable Core fails instead of silently resuming elsewhere", async () => {
+test("print -r against an unreachable Core fails instead of silently resuming elsewhere", async () => {
   const fake = createFakeTUIService();
   const service: TUIService = {
     ...fake,

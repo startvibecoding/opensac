@@ -10,8 +10,8 @@
 // Core-owned transient side query, and cron goes through the shared SQLite
 // store.
 
-import * as path from "@opensac/path";
-import { encodeBase64 } from "@opensac/encoding/base64";
+import * as path from "../compat/path.ts";
+import { encodeBase64 } from "../compat/encoding.ts";
 import {
   getSessionDir,
   isProjectDir,
@@ -19,13 +19,13 @@ import {
   loadSettings,
 } from "../config/settings.ts";
 import { createSQLiteCronStore } from "../cron/sqlite_store.ts";
-import type { CronStore } from "../cron/cron.ts";
+import { type CronStore } from "../cron/cron.ts";
 import { ATTACHMENT_IMAGE } from "../agentruntime/attachment.ts";
 import { prompt as systemInitPrompt } from "../systeminit/systeminit.ts";
 import { openFile } from "../platform/platform.ts";
 import { localTimeZone, utcOffset } from "./i18n.ts";
-import type { CommandResult } from "./commands.ts";
-import type { TUIPreparedInput } from "./service.ts";
+import { type CommandResult } from "./commands.ts";
+import { type TUIPreparedInput } from "./service.ts";
 import type { TUISession } from "./tui_session.ts";
 
 /**

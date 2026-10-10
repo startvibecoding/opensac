@@ -1,9 +1,9 @@
 // Translated tests from internal/acp/acp_artifact_test.go and
 // internal/acp/acp_mcp_test.go for the ACP prompt/input conversion layer.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
-import { encodeBase64 } from "@opensac/encoding/base64";
-import { join } from "@opensac/path";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
+import { encodeBase64 } from "../compat/encoding.ts";
+import { join } from "../compat/path.ts";
 import {
   acpAttachmentKind,
   ACPPromptContentError,
@@ -14,8 +14,9 @@ import {
   promptToText,
   resolveACPResourcePath,
 } from "./input.ts";
+import { test } from "#testing";
 
-Deno.test("promptToIngresses normalizes every declared capability", () => {
+test("promptToIngresses normalizes every declared capability", () => {
   const workspace = Deno.makeTempDirSync();
   const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
   const pngPath = join(workspace, "pixel.png");
@@ -56,7 +57,7 @@ Deno.test("promptToIngresses normalizes every declared capability", () => {
   );
 });
 
-Deno.test("promptToIngresses reads a local resource link over Runtime", async () => {
+test("promptToIngresses reads a local resource link over Runtime", async () => {
   const workspace = Deno.makeTempDirSync();
   const path = join(workspace, "notes.md");
   Deno.writeFileSync(path, new TextEncoder().encode("hello"));
@@ -84,7 +85,7 @@ Deno.test("promptToIngresses reads a local resource link over Runtime", async ()
   assertEquals(stream.bytes, new TextEncoder().encode("hello"));
 });
 
-Deno.test("promptToIngresses rejects a remote resource URI", () => {
+test("promptToIngresses rejects a remote resource URI", () => {
   const workspace = Deno.makeTempDirSync();
   assertThrows(
     () =>
@@ -104,7 +105,7 @@ Deno.test("promptToIngresses rejects a remote resource URI", () => {
   );
 });
 
-Deno.test("promptToText rejects non-text and promptToRunInput rejects resources", () => {
+test("promptToText rejects non-text and promptToRunInput rejects resources", () => {
   assertThrows(() => promptToText([{ type: "image" }]), ACPPromptContentError);
   assertThrows(
     () =>
@@ -122,7 +123,7 @@ Deno.test("promptToText rejects non-text and promptToRunInput rejects resources"
   );
 });
 
-Deno.test("resolveACPResourcePath confines resources to the workspace", () => {
+test("resolveACPResourcePath confines resources to the workspace", () => {
   const workspace = Deno.makeTempDirSync();
   const outside = Deno.makeTempDirSync();
   const outsideFile = join(outside, "secret.txt");
@@ -147,7 +148,7 @@ Deno.test("resolveACPResourcePath confines resources to the workspace", () => {
   );
 });
 
-Deno.test("encodedACPIngress requires base64 data and defaults image media type", async () => {
+test("encodedACPIngress requires base64 data and defaults image media type", async () => {
   assertThrows(
     () => encodedACPIngress({ type: "image", data: "" }, "acp:test", 0),
     ACPPromptContentError,
@@ -166,7 +167,7 @@ Deno.test("encodedACPIngress requires base64 data and defaults image media type"
   assertEquals(stream.bytes, bytes);
 });
 
-Deno.test("acpAttachmentKind maps content and media types", () => {
+test("acpAttachmentKind maps content and media types", () => {
   assertEquals(acpAttachmentKind("image", ""), "image");
   assertEquals(acpAttachmentKind("audio", ""), "audio");
   assertEquals(acpAttachmentKind("", "image/webp; charset=x"), "image");
@@ -175,7 +176,7 @@ Deno.test("acpAttachmentKind maps content and media types", () => {
   assertEquals(acpAttachmentKind("", "application/pdf"), "file");
 });
 
-Deno.test("acpPromptRequestSnapshot requires a materializer for resources", () => {
+test("acpPromptRequestSnapshot requires a materializer for resources", () => {
   assertThrows(
     () => {
       acpPromptRequestSnapshot(null, "hi", {

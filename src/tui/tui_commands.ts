@@ -32,19 +32,18 @@ import {
   type Settings,
 } from "../config/settings.ts";
 import { ensureRuleFile, ruleFilePath } from "../contextfiles/contextfiles.ts";
-import type {
-  TUIAgentView,
-  TUIEsmObjectiveView,
-  TUIExpertBundleView,
-  TUISessionListEntry,
-  TUISessionView,
-} from "./service.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
+import {
+  type TUIAgentView,
+  type TUIEsmObjectiveView,
+  type TUIExpertBundleView,
+  type TUISessionListEntry,
+  type TUISessionView} from "./service.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import { CONFIG_OPTION_BROWSER } from "../agentruntime/session_options.ts";
 import { Service as SkillHubService } from "../skillhub/service.ts";
 import { projectSkillDirs } from "../skills/skills.ts";
 import { createLocalIndex } from "../skillhub/local.ts";
-import type { Market } from "../skillhub/types.ts";
+import { type Market } from "../skillhub/types.ts";
 import { clientsForSettings } from "../skillhub/factory.ts";
 import { defaultStore as workflowStore } from "../workflow/tools.ts";
 import { defaultActiveRegistry } from "../workflow/active.ts";
@@ -52,7 +51,7 @@ import { DB as StatsDB } from "../stats/stats.ts";
 import { Server as StatsServer } from "../stats/server.ts";
 import { formatDuration } from "./formatters.ts";
 import { renderSessionList } from "./session_commands.ts";
-import type { CommandResult } from "./commands.ts";
+import { type CommandResult } from "./commands.ts";
 import type { TUISession } from "./tui_session.ts";
 
 /** Default dashboard listen address (Go defaultStatsAddr). */

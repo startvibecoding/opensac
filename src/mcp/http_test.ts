@@ -1,11 +1,12 @@
 //
 // `net/http/httptest` maps to `Deno.serve` on an ephemeral localhost port.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
-import type { RPCRequest } from "./rpc.ts";
+import { type RPCRequest } from "./rpc.ts";
 import { type Callbacks, Client, closeClients, connectServers } from "./mcp.ts";
+import { test } from "#testing";
 
 interface TestServer {
   url: string;
@@ -44,7 +45,7 @@ function ok(id: unknown, result: unknown): Record<string, unknown> {
   return { jsonrpc: "2.0", id, result };
 }
 
-Deno.test("connect MCPServers HTTP registers and executes", async () => {
+test("connect MCPServers HTTP registers and executes", async () => {
   let sampled = false;
   let notified = false;
 
@@ -163,7 +164,7 @@ Deno.test("connect MCPServers HTTP registers and executes", async () => {
   }
 });
 
-Deno.test("MCP HTTP session id header round trip", async () => {
+test("MCP HTTP session id header round trip", async () => {
   const sid = "sid-123";
   const srv = startServer((req, raw) => {
     const headers: Record<string, string> = {};
@@ -188,7 +189,7 @@ Deno.test("MCP HTTP session id header round trip", async () => {
   }
 });
 
-Deno.test("MCP HTTP rejects mismatched response id", async () => {
+test("MCP HTTP rejects mismatched response id", async () => {
   const srv = startServer(() => {
     // Echo a *string* id, which never matches the numeric request id.
     return { jsonrpc: "2.0", id: "1", result: {} };
@@ -217,7 +218,7 @@ Deno.test("MCP HTTP rejects mismatched response id", async () => {
   }
 });
 
-Deno.test("MCP HTTP propagates runtime operation id", async () => {
+test("MCP HTTP propagates runtime operation id", async () => {
   const operationID = "tool:stable-mcp-operation";
   let seen = "";
   const srv = startServer((req, raw) => {
@@ -240,7 +241,7 @@ Deno.test("MCP HTTP propagates runtime operation id", async () => {
   }
 });
 
-Deno.test("MCP HTTP close cancels in-flight request", async () => {
+test("MCP HTTP close cancels in-flight request", async () => {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   const started = Promise.withResolvers<void>();
@@ -266,7 +267,7 @@ Deno.test("MCP HTTP close cancels in-flight request", async () => {
   await srv.close();
 });
 
-Deno.test("connect MCP servers returns resource discovery error", async () => {
+test("connect MCP servers returns resource discovery error", async () => {
   const srv = startServer((req) => {
     switch (req.method) {
       case "initialize":

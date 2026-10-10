@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "jsx": "react",
+    "types": ["node"],
+    "paths": {
+      "@opensac/path": ["./src/compat/path.ts"],
+      "@opensac/path/posix": ["./src/compat/path_posix.ts"],
+      "@opensac/assert": ["./src/compat/assert.ts"],
+      "@opensac/encoding/base64": ["./src/compat/encoding.ts"],
+      "@opensac/encoding/base64url": ["./src/compat/encoding.ts"],
+      "#testing": ["./src/testing/mod.ts"],
+      "#testing/*": ["./src/testing/*.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "sdk/**/*.ts", "examples/**/*.ts", "scripts/**/*.ts", "bootstrap.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "bin",
+    "desktop",
+    "src/platform/busybox_assets",
+    "src/context/tokenizerdata",
+    "src/expert/builtin",
+    "src/skills/builtin",
+    "src/stats/dashboard.html"
+  ]
+}

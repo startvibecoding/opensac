@@ -1,12 +1,13 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   hostedToolImageGeneration,
   hostedToolType,
   hostedToolWebSearchAnthropicMessages,
   hostedWebSearchToolType,
 } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("HostedToolTypeImageGeneration", () => {
+test("HostedToolTypeImageGeneration", () => {
   assertEquals(
     hostedToolType("openai-responses", hostedToolImageGeneration),
     hostedToolImageGeneration,
@@ -17,7 +18,7 @@ Deno.test("HostedToolTypeImageGeneration", () => {
   );
 });
 
-Deno.test("HostedWebSearchToolType", () => {
+test("HostedWebSearchToolType", () => {
   const tests: Array<[string, string, string, string]> = [
     ["responses web search", "responses", "web_search", "web_search"],
     [

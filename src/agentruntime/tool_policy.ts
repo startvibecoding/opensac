@@ -8,10 +8,9 @@
 // standalone `evaluateToolCall(policy, toolName, args)` free function so this
 // module stays free of a source.ts import cycle.
 
-import type {
-  BeforeToolCallContext,
-  ToolCallBlockResult,
-} from "../agent/agent.ts";
+import {
+  type BeforeToolCallContext,
+  type ToolCallBlockResult} from "../agent/agent.ts";
 import type { ExecutionPolicy } from "./source.ts";
 
 /** CommandRisk is the unattended-execution risk assigned to a bash command. */

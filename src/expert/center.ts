@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { projectPathFor } from "../config/mod.ts";
 import { configDir } from "../platform/platform.ts";
 import { builtinFS } from "./builtin.ts";
@@ -8,7 +8,7 @@ import {
   sourceGlobal,
   sourceProject,
 } from "./expert.ts";
-import type { LocalizedText, Summary } from "./expert.ts";
+import { type LocalizedText, type Summary } from "./expert.ts";
 import {
   loadBundle,
   loadBundleFS,

@@ -24,7 +24,11 @@ const columns = `session_id AS sessionId, owner_instance_id AS ownerId,
   expires_at AS expiresAt, updated_at AS updatedAt`;
 
 export class RuntimeLeaseDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   now(executor: DB): number {
     return Number(

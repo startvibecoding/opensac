@@ -4,7 +4,7 @@
 // the built-in catalog. Unknown IDs receive safe generic defaults. This helper
 // is for creating new model entries; it does not alter existing configuration.
 
-import type { ModelConfig } from "./settings.ts";
+import { type ModelConfig } from "./settings.ts";
 import { defaultProviderConfigsAll } from "./settings.ts";
 
 /** Conservative context-window fallback for unknown model IDs. */

@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { optStringMap, parseJsonRecord } from "../util/json.ts";
 import { configDir } from "./settings.ts";
 

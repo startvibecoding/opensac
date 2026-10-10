@@ -1,8 +1,8 @@
-import type { Message } from "../provider/types.ts";
-import type { ExecutionIntent } from "../session/execution_intent.ts";
+import { type Message } from "../provider/types.ts";
+import { type ExecutionIntent } from "../session/execution_intent.ts";
 import { generateID, runUserEntryID } from "../session/mod.ts";
-import type { DurableRun } from "./run_store.ts";
-import type { RunEvent } from "./run_event.ts";
+import { type DurableRun } from "./run_store.ts";
+import { type RunEvent } from "./run_event.ts";
 import { ExecutionRuntime } from "./execution.ts";
 import { RunStore } from "./run_store.ts";
 import { SessionRunEventSink } from "./run_event.ts";

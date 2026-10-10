@@ -1,10 +1,10 @@
 // deno-lint-ignore-file require-await -- async fake client models the Core seam
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
 import { privateCoreConfig } from "../core/private_core.ts";
 import { type CoreCommandHandle, startCoreCommand } from "../cli/core.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
-import type { BridgeCoreClient } from "./bridge_client.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
+import { type BridgeCoreClient } from "./bridge_client.ts";
 import { ACPLineReader } from "./wire.ts";
 import {
   defaultACPCoreDependencies,
@@ -12,6 +12,7 @@ import {
   type RunTransport,
   standaloneACPCoreDependencies,
 } from "./run.ts";
+import { test } from "#testing";
 
 class FakeCoreClient implements BridgeCoreClient {
   closed = 0;
@@ -70,7 +71,7 @@ function transport(input: string): RunTransport {
   } as RunTransport & { output: string[] };
 }
 
-Deno.test("runACPCore bridges initialize over Core and closes on EOF", async () => {
+test("runACPCore bridges initialize over Core and closes on EOF", async () => {
   const client = new FakeCoreClient();
   const io = transport('{"jsonrpc":"2.0","id":1,"method":"initialize"}\n');
   await runACPCore({}, io, { createClient: () => client });
@@ -89,7 +90,7 @@ Deno.test("runACPCore bridges initialize over Core and closes on EOF", async () 
 const TEST_VERSION = "0.1.0-acp-run-test";
 const TEST_PROTOCOL_VERSION = 3;
 
-Deno.test("runACPCore disposes owned resources before closing the bridge", async () => {
+test("runACPCore disposes owned resources before closing the bridge", async () => {
   const client = new FakeCoreClient();
   const order: string[] = [];
   const io = transport('{"jsonrpc":"2.0","id":1,"method":"initialize"}\n');
@@ -105,14 +106,14 @@ Deno.test("runACPCore disposes owned resources before closing the bridge", async
   assertEquals(client.closed, 1);
 });
 
-Deno.test("default ACP dependencies select a private Core only for --standalone", () => {
+test("default ACP dependencies select a private Core only for --standalone", () => {
   assertEquals(defaultACPCoreDependencies({}).dispose, undefined);
   assert(
     defaultACPCoreDependencies({ standalone: true }).dispose !== undefined,
   );
 });
 
-Deno.test("standalone ACP dependencies own and clean up a private Core", async () => {
+test("standalone ACP dependencies own and clean up a private Core", async () => {
   const parentDir = await Deno.makeTempDir({
     prefix: "opensac-acp-standalone-",
   });

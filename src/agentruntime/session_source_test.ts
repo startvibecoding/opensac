@@ -3,7 +3,7 @@
 // `resolveManagerPolicy`). Go exercises these only through the agent-manager
 // integration cases; these cover the precedence and conflict rules directly.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import {
@@ -11,8 +11,9 @@ import {
   resolveManagerSource,
 } from "./session_source.ts";
 import { SOURCE_TUI, SOURCE_WE_CHAT, SourceConflictError } from "./source.ts";
+import { test } from "#testing";
 
-Deno.test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
+test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = createManager(Deno.makeTempDirSync(), sessionDir);
@@ -25,13 +26,13 @@ Deno.test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
   }
 });
 
-Deno.test("resolveManagerSourceFallsBackToRequestWithoutManager", () => {
+test("resolveManagerSourceFallsBackToRequestWithoutManager", () => {
   const resolved = resolveManagerSource(undefined, { requested: SOURCE_TUI });
   assertEquals(resolved.source, SOURCE_TUI);
   assertEquals(resolved.conflicted, false);
 });
 
-Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
+test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = createManager(Deno.makeTempDirSync(), sessionDir);
@@ -45,7 +46,7 @@ Deno.test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
   }
 });
 
-Deno.test("resolveManagerPolicyAppliesForcedChannelMode", () => {
+test("resolveManagerPolicyAppliesForcedChannelMode", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
   try {
     const manager = createManager(Deno.makeTempDirSync(), sessionDir);
@@ -64,7 +65,7 @@ Deno.test("resolveManagerPolicyAppliesForcedChannelMode", () => {
   }
 });
 
-Deno.test("resolveManagerPolicyUsesDefaultWhenUnbound", () => {
+test("resolveManagerPolicyUsesDefaultWhenUnbound", () => {
   const result = resolveManagerPolicy(undefined, {}, "", "", "agent");
   assertEquals(result.mode, "agent");
 });

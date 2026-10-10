@@ -1,7 +1,7 @@
 // settings_sparse_test.go, settings_maintenance_test.go, manage_additions_test.go.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   defaultProviderConfig,
   defaultSettings,
@@ -42,6 +42,7 @@ import {
   toolExecutionEffectiveMaxConcurrency,
   toolExecutionEffectiveMode,
 } from "./mod.ts";
+import { test } from "#testing";
 
 const SAVED_ENV = [
   "OPENSAC_DIR",
@@ -77,7 +78,7 @@ function withConfigDir(fn: (tmp: string) => void): void {
   }
 }
 
-Deno.test("defaultSettings", () => {
+test("defaultSettings", () => {
   const s = defaultSettings();
   assertEquals(s.defaultProvider, "deepseek-openai");
   assertEquals(s.defaultModel, "deepseek-v4-flash");
@@ -165,7 +166,7 @@ Deno.test("defaultSettings", () => {
   });
 });
 
-Deno.test("core settings merge field-by-field", () => {
+test("core settings merge field-by-field", () => {
   const global = parseSettings(defaultSettings(), {
     core: {
       host: "0.0.0.0",
@@ -190,7 +191,7 @@ Deno.test("core settings merge field-by-field", () => {
   });
 });
 
-Deno.test("core settings serialize explicit values", () => {
+test("core settings serialize explicit values", () => {
   const data = marshalSettings({
     core: {
       host: "0.0.0.0",
@@ -213,21 +214,21 @@ Deno.test("core settings serialize explicit values", () => {
   });
 });
 
-Deno.test("default settings confirmBeforeWrite and plan tool", () => {
+test("default settings confirmBeforeWrite and plan tool", () => {
   const s = defaultSettings();
   assertEquals(s.approval!.confirmBeforeWrite, true);
   assert(isPlanToolEnabled(s));
   assert(isUpdateCheckEnabled(s));
 });
 
-Deno.test("default skillHub settings", () => {
+test("default skillHub settings", () => {
   const s = defaultSettings();
   assertEquals(s.skillHub!.defaultMarket, "skillhub.cn");
   assertEquals(s.skillHub!.defaultInstallScope, "project");
   assertEquals(s.skillHub!.officialHandles, ["user_0064faa7"]);
 });
 
-Deno.test("getProviderConfig and getModelConfig", () => {
+test("getProviderConfig and getModelConfig", () => {
   const s = defaultSettings();
   assertEquals(getProviderConfig(s, "deepseek-openai")!.api, "openai-chat");
   assertEquals(getProviderConfig(s, "nonexistent"), undefined);
@@ -237,7 +238,7 @@ Deno.test("getProviderConfig and getModelConfig", () => {
   assertEquals(getModelConfig(s, "nonexistent", "model"), undefined);
 });
 
-Deno.test("moark/gitee model maxTokens table", () => {
+test("moark/gitee model maxTokens table", () => {
   const s = defaultSettings();
   const want: Record<string, number> = {
     "auto": 0,
@@ -281,7 +282,7 @@ Deno.test("moark/gitee model maxTokens table", () => {
   }
 });
 
-Deno.test("gitee/moark qwen3.8-27b defaults", () => {
+test("gitee/moark qwen3.8-27b defaults", () => {
   const s = defaultSettings();
   for (const providerName of ["gitee", "moark"]) {
     const model = getModelConfig(s, providerName, "qwen3.8-27b");
@@ -293,7 +294,7 @@ Deno.test("gitee/moark qwen3.8-27b defaults", () => {
   }
 });
 
-Deno.test("gitee/moark qwen3.8-omni-flash defaults", () => {
+test("gitee/moark qwen3.8-omni-flash defaults", () => {
   const s = defaultSettings();
   for (const providerName of ["gitee", "moark"]) {
     const model = getModelConfig(s, providerName, "qwen3.8-omni-flash");
@@ -304,7 +305,7 @@ Deno.test("gitee/moark qwen3.8-omni-flash defaults", () => {
   }
 });
 
-Deno.test("xiaomi mimo-v2.6, bai channel, and model ordering", () => {
+test("xiaomi mimo-v2.6, bai channel, and model ordering", () => {
   const s = defaultSettings();
   assertEquals(
     s.providers!["xiaomi"].models.map((m) => m.id),
@@ -340,7 +341,7 @@ Deno.test("xiaomi mimo-v2.6, bai channel, and model ordering", () => {
   );
 });
 
-Deno.test("volcengine plan models use shared maxTokens", () => {
+test("volcengine plan models use shared maxTokens", () => {
   const s = defaultSettings();
   for (
     const providerName of ["volcengine-agentplan", "volcengine-codingplan"]
@@ -357,7 +358,7 @@ Deno.test("volcengine plan models use shared maxTokens", () => {
   }
 });
 
-Deno.test("authored setting round trip", () => {
+test("authored setting round trip", () => {
   const data = marshalSettings({ authored: true });
   assert(data !== "{}");
   JSON.parse(data);
@@ -369,7 +370,7 @@ Deno.test("authored setting round trip", () => {
   assert(!disabled.includes('"skills"'));
 });
 
-Deno.test("resolveKey and resolveKeyValue", () => {
+test("resolveKey and resolveKeyValue", () => {
   const s = defaultSettings();
   Deno.env.set("OPENSAC_TEST_KEY", "secret-value");
   try {
@@ -394,19 +395,19 @@ Deno.test("resolveKey and resolveKeyValue", () => {
   }
 });
 
-Deno.test("resolveProviderHeaders falls back to built-in preset", () => {
+test("resolveProviderHeaders falls back to built-in preset", () => {
   const s = defaultSettings();
   const headers = resolveProviderHeaders(s, "kimi-coding");
   assertEquals(headers!["User-Agent"], "opencode/1.17.18");
 });
 
-Deno.test("normalizeSamplingPtr", () => {
+test("normalizeSamplingPtr", () => {
   assertEquals(normalizeSamplingPtr(undefined), undefined);
   assertEquals(normalizeSamplingPtr(0), undefined);
   assertEquals(normalizeSamplingPtr(0.5), 0.5);
 });
 
-Deno.test("getShell/getSessionDir/getGlobalSkillsDir", () => {
+test("getShell/getSessionDir/getGlobalSkillsDir", () => {
   const s = defaultSettings();
   assertEquals(getShell({ ...s, shellPath: "/bin/custom" }), "/bin/custom");
   assertEquals(
@@ -419,7 +420,7 @@ Deno.test("getShell/getSessionDir/getGlobalSkillsDir", () => {
   );
 });
 
-Deno.test("toolExecution defaults and effective values", () => {
+test("toolExecution defaults and effective values", () => {
   const s = defaultSettings();
   assertEquals(s.toolExecution, { mode: "parallel", maxConcurrency: 10 });
   assertEquals(toolExecutionEffectiveMode({}), "parallel");
@@ -431,7 +432,7 @@ Deno.test("toolExecution defaults and effective values", () => {
   assertEquals(toolExecutionEffectiveMaxConcurrency({ maxConcurrency: 4 }), 4);
 });
 
-Deno.test("skillsDisabled is null-safe and copies", () => {
+test("skillsDisabled is null-safe and copies", () => {
   assertEquals(skillsDisabled(undefined), undefined);
   assertEquals(skillsDisabled({}), undefined);
   const s = { skills: { disabled: ["gen-skill"] } };
@@ -440,7 +441,7 @@ Deno.test("skillsDisabled is null-safe and copies", () => {
   assertEquals(s.skills.disabled[0], "gen-skill");
 });
 
-Deno.test("mergeModelConfigs keeps builtin-only models", () => {
+test("mergeModelConfigs keeps builtin-only models", () => {
   const builtin: ModelConfig[] = [
     { id: "a", name: "A", contextWindow: 100 },
     { id: "b", name: "B" },
@@ -451,7 +452,7 @@ Deno.test("mergeModelConfigs keeps builtin-only models", () => {
   assertEquals(merged[0].name, "B-runtime");
 });
 
-Deno.test("resolveModelConfig tracks explicit zero maxTokens", () => {
+test("resolveModelConfig tracks explicit zero maxTokens", () => {
   const s = defaultSettings();
   // Explicit zero in project overrides the built-in maxTokens.
   const runtime = parseSettings(s, {
@@ -477,7 +478,7 @@ Deno.test("resolveModelConfig tracks explicit zero maxTokens", () => {
 
 // ── file-level behavior ──────────────────────────────────────────────────────
 
-Deno.test("loadGlobalSettingsSparse does not expand defaults", () => {
+test("loadGlobalSettingsSparse does not expand defaults", () => {
   withConfigDir((tmp) => {
     const p = path.join(tmp, "config", "settings.json");
     Deno.mkdirSync(path.dirname(p), { recursive: true });
@@ -502,7 +503,7 @@ Deno.test("loadGlobalSettingsSparse does not expand defaults", () => {
   });
 });
 
-Deno.test("saveGlobalSettingsPatch preserves sparse file", () => {
+test("saveGlobalSettingsPatch preserves sparse file", () => {
   withConfigDir((tmp) => {
     const p = path.join(tmp, "config", "settings.json");
     Deno.mkdirSync(path.dirname(p), { recursive: true });
@@ -546,7 +547,7 @@ Deno.test("saveGlobalSettingsPatch preserves sparse file", () => {
   });
 });
 
-Deno.test("loadSettingsWithMeta creates sparse default file", () => {
+test("loadSettingsWithMeta creates sparse default file", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "project");
     Deno.mkdirSync(project, { recursive: true });
@@ -589,7 +590,7 @@ Deno.test("loadSettingsWithMeta creates sparse default file", () => {
   });
 });
 
-Deno.test("maintenance defaults and sparse patch", () => {
+test("maintenance defaults and sparse patch", () => {
   const zero = marshalSettings({});
   assert(!zero.includes("maintenance"));
 
@@ -618,7 +619,7 @@ Deno.test("maintenance defaults and sparse patch", () => {
   });
 });
 
-Deno.test("loadSettings project supports false and zero overrides", () => {
+test("loadSettings project supports false and zero overrides", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "project");
     Deno.mkdirSync(project, { recursive: true });
@@ -648,7 +649,7 @@ Deno.test("loadSettings project supports false and zero overrides", () => {
   });
 });
 
-Deno.test("skills sparse round trip", () => {
+test("skills sparse round trip", () => {
   withConfigDir(() => {
     assert(!marshalSettings({}).includes("skills"));
     assertEquals(skillsDisabled(undefined), undefined);
@@ -666,7 +667,7 @@ Deno.test("skills sparse round trip", () => {
   });
 });
 
-Deno.test("loadSettingsFor applies env overrides and project settings", () => {
+test("loadSettingsFor applies env overrides and project settings", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "proj");
     Deno.mkdirSync(path.join(project, ".opensac"), { recursive: true });
@@ -686,7 +687,7 @@ Deno.test("loadSettingsFor applies env overrides and project settings", () => {
   });
 });
 
-Deno.test("isProjectDir", () => {
+test("isProjectDir", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "proj-" });
   assertEquals(isProjectDir(""), false);
   assertEquals(isProjectDir(path.join(tmp, "missing")), false);
@@ -695,7 +696,7 @@ Deno.test("isProjectDir", () => {
   assertEquals(isProjectDir(tmp), true);
 });
 
-Deno.test("effective image generation fills provider defaults", () => {
+test("effective image generation fills provider defaults", () => {
   const s = defaultSettings();
   const cfg = effectiveImageGeneration(s);
   assertEquals(cfg.provider, "openai");
@@ -704,7 +705,7 @@ Deno.test("effective image generation fills provider defaults", () => {
   assert(!isWebSearchEnabled(s));
 });
 
-Deno.test("defaultProviderConfig returns a copy", () => {
+test("defaultProviderConfig returns a copy", () => {
   const a = defaultProviderConfig("openai")!;
   a.baseUrl = "mutated";
   const b = defaultProviderConfig("openai")!;
@@ -712,7 +713,7 @@ Deno.test("defaultProviderConfig returns a copy", () => {
   assertEquals(defaultProviderConfig("nope"), undefined);
 });
 
-Deno.test("parseSettings merges nested objects field-by-field", () => {
+test("parseSettings merges nested objects field-by-field", () => {
   const base = defaultSettings();
   const merged = parseSettings(base, `{"webSearch":{"model":"m"}}`);
   assertEquals(merged.webSearch!.model, "m");
@@ -720,7 +721,7 @@ Deno.test("parseSettings merges nested objects field-by-field", () => {
   assertEquals(merged.webSearch!.providerType, "openai-responses");
 });
 
-Deno.test("saveGlobalSettingsPatch rejects invalid existing json", () => {
+test("saveGlobalSettingsPatch rejects invalid existing json", () => {
   withConfigDir((tmp) => {
     const p = path.join(tmp, "config", "settings.json");
     Deno.mkdirSync(path.dirname(p), { recursive: true });

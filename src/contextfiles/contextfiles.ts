@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { projectDirName, projectPathFor } from "../config/mod.ts";
 
 /** Well-known context file names used by various AI coding tools. */

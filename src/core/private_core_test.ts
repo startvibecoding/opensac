@@ -1,11 +1,12 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import { basename, join } from "@opensac/path";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import { basename, join } from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 import { coreResult, type CoreRpcRequest } from "./protocol.ts";
 import { CORE_PROTOCOL_VERSION } from "./server.ts";
 import { privateCoreConfig, startPrivateCore } from "./private_core.ts";
 import { type CoreCommandHandle, startCoreCommand } from "../cli/core.ts";
+import { test } from "#testing";
 
 const TEST_VERSION = "0.1.0-private-core-test";
 const TEST_PROTOCOL_VERSION = 3;
@@ -114,7 +115,7 @@ function inProcessCoreLauncher(): {
   };
 }
 
-Deno.test("startPrivateCore owns an isolated Core that close() shuts down and cleans up", async () => {
+test("startPrivateCore owns an isolated Core that close() shuts down and cleans up", async () => {
   await withParentDir(async (parentDir) => {
     const { launcher, owned } = inProcessCoreLauncher();
     const handle = await startPrivateCore({
@@ -155,7 +156,7 @@ Deno.test("startPrivateCore owns an isolated Core that close() shuts down and cl
   });
 });
 
-Deno.test("startPrivateCore cleans up its state directory when the Core never becomes ready", async () => {
+test("startPrivateCore cleans up its state directory when the Core never becomes ready", async () => {
   await withParentDir(async (parentDir) => {
     const error = await assertRejects(
       () =>
@@ -178,7 +179,7 @@ Deno.test("startPrivateCore cleans up its state directory when the Core never be
   });
 });
 
-Deno.test("startPrivateCore keeps the private state directory when the Core exit cannot be observed", async () => {
+test("startPrivateCore keeps the private state directory when the Core exit cannot be observed", async () => {
   await withParentDir(async (parentDir) => {
     // A stub Core that acknowledges core.shutdown but never exits and never
     // removes its registration: the exit can never be observed.

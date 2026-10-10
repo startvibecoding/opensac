@@ -3,8 +3,8 @@ import {
   assertEquals,
   assertRejects,
   assertThrows,
-} from "@opensac/assert";
-import * as path from "@opensac/path";
+} from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { CoreAuth } from "./auth.ts";
 import { type CoreCommandDependencies, startCoreCommand } from "../cli/core.ts";
 import { resolveCoreConfig } from "./config.ts";
@@ -23,6 +23,7 @@ import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 import { CORE_METHODS, coreError, coreResult } from "./protocol.ts";
 import { CoreServer, type CoreServerHandle } from "./server.ts";
+import { test } from "#testing";
 
 const VERSION = "0.1.0-final-review-test";
 const PROTOCOL_VERSION = 91;
@@ -267,7 +268,7 @@ async function runLifecycleProcess(
   return JSON.parse(await Deno.readTextFile(resultFile)) as { url: string };
 }
 
-Deno.test("final review: two processes reuse a healthy Core before and after lock acquisition", async () => {
+test("final review: two processes reuse a healthy Core before and after lock acquisition", async () => {
   await withStateDir(async (stateDir, paths) => {
     const lifecycle = await makeCoreLifecycleScript();
     const holdResult = path.join(lifecycle.directory, "hold.json");
@@ -330,7 +331,7 @@ Deno.test("final review: two processes reuse a healthy Core before and after loc
   });
 });
 
-Deno.test("final review: fixed-port processes reuse a healthy Core", async () => {
+test("final review: fixed-port processes reuse a healthy Core", async () => {
   await withStateDir(async (stateDir, paths) => {
     let resolveAddress!: (address: Deno.Addr) => void;
     const addressReady = new Promise<Deno.Addr>((resolve) => {
@@ -398,7 +399,7 @@ Deno.test("final review: fixed-port processes reuse a healthy Core", async () =>
   });
 });
 
-Deno.test("final review: wildcard listeners expose connectable loopback URLs", async () => {
+test("final review: wildcard listeners expose connectable loopback URLs", async () => {
   for (const hostname of ["0.0.0.0", "::"]) {
     const server = new CoreServer({
       config: config({ host: hostname }),
@@ -421,7 +422,7 @@ Deno.test("final review: wildcard listeners expose connectable loopback URLs", a
   }
 });
 
-Deno.test("final review: source launcher grants the child explicit permissions", () => {
+test("final review: source launcher grants the child explicit permissions", () => {
   const args = defaultLauncherArgs(Deno.execPath());
   for (
     const permission of [
@@ -441,7 +442,7 @@ Deno.test("final review: source launcher grants the child explicit permissions",
   assertEquals(args.includes("core"), true);
 });
 
-Deno.test("final review: source launcher child can spawn a subprocess", async () => {
+test("final review: source launcher child can spawn a subprocess", async () => {
   // Regression: the child permissions omitted `--allow-run`, so a globally
   // installed `opensac` reported `Requires run access to "/bin/bash"` for
   // every tool even though the parent shim had full access.
@@ -480,7 +481,7 @@ Deno.test("final review: source launcher child can spawn a subprocess", async ()
   );
 });
 
-Deno.test("final review: real source launcher starts and stops a Core child", async () => {
+test("final review: real source launcher starts and stops a Core child", async () => {
   await withStateDir(async (stateDir, paths) => {
     const result = await runSourceEntry(stateDir, 0);
     assertEquals(result.ok, true, result.message);
@@ -492,7 +493,7 @@ Deno.test("final review: real source launcher starts and stops a Core child", as
   });
 });
 
-Deno.test("final review: default launcher reports a typed fixed-port child failure", async () => {
+test("final review: default launcher reports a typed fixed-port child failure", async () => {
   let resolveAddress!: (address: Deno.Addr) => void;
   const addressReady = new Promise<Deno.Addr>((resolve) => {
     resolveAddress = resolve;
@@ -523,7 +524,7 @@ Deno.test("final review: default launcher reports a typed fixed-port child failu
   }
 });
 
-Deno.test("final review: CoreClient maps wildcard registrations to reachable hosts", async () => {
+test("final review: CoreClient maps wildcard registrations to reachable hosts", async () => {
   await withStateDir(async (stateDir, paths) => {
     for (const hostname of ["0.0.0.0", "::"]) {
       const handle = await new CoreServer({
@@ -556,7 +557,7 @@ Deno.test("final review: CoreClient maps wildcard registrations to reachable hos
   });
 });
 
-Deno.test("final review: client rejects a fixed endpoint port mismatch before probing", async () => {
+test("final review: client rejects a fixed endpoint port mismatch before probing", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startProbe(() => new Response("wrong endpoint"));
     try {
@@ -583,7 +584,7 @@ Deno.test("final review: client rejects a fixed endpoint port mismatch before pr
   });
 });
 
-Deno.test("final review: CoreClient rejects a specific registration for wildcard config", async () => {
+test("final review: CoreClient rejects a specific registration for wildcard config", async () => {
   await withStateDir(async (stateDir, paths) => {
     let requests = 0;
     const handle = await startProbe(() => {
@@ -615,7 +616,7 @@ Deno.test("final review: CoreClient rejects a specific registration for wildcard
   });
 });
 
-Deno.test("final review: endpoint compatibility separates wildcard bind policy", () => {
+test("final review: endpoint compatibility separates wildcard bind policy", () => {
   const fixed = (host: string) => config({ host, port: 4096 });
   for (
     const [registrationHost, configuredHost] of [
@@ -672,7 +673,7 @@ Deno.test("final review: endpoint compatibility separates wildcard bind policy",
   );
 });
 
-Deno.test("final review: production registration records a connect host", async () => {
+test("final review: production registration records a connect host", async () => {
   for (
     const [host, connectHost] of [
       ["0.0.0.0", "127.0.0.1"],
@@ -698,7 +699,7 @@ Deno.test("final review: production registration records a connect host", async 
   }
 });
 
-Deno.test("final review: command refuses wildcard reuse of a specific Core", async () => {
+test("final review: command refuses wildcard reuse of a specific Core", async () => {
   for (
     const [specificHost, wildcardHost] of [
       ["127.0.0.1", "0.0.0.0"],
@@ -736,7 +737,7 @@ Deno.test("final review: command refuses wildcard reuse of a specific Core", asy
   }
 });
 
-Deno.test("final review: a dead old-version registration is stale before endpoint probing", async () => {
+test("final review: a dead old-version registration is stale before endpoint probing", async () => {
   await withStateDir(async (stateDir, paths) => {
     let requests = 0;
     const handle = await startProbe(() => {
@@ -764,7 +765,7 @@ Deno.test("final review: a dead old-version registration is stale before endpoin
   });
 });
 
-Deno.test("final review: a dead old-version registration is stale even with liveness shortcut disabled", async () => {
+test("final review: a dead old-version registration is stale even with liveness shortcut disabled", async () => {
   await withStateDir(async (stateDir, paths) => {
     await new CoreRegistry(paths).write(
       registration(1, {
@@ -784,7 +785,7 @@ Deno.test("final review: a dead old-version registration is stale even with live
   });
 });
 
-Deno.test("final review: late launcher registration is identity-cleaned after startup cancellation", async () => {
+test("final review: late launcher registration is identity-cleaned after startup cancellation", async () => {
   await withStateDir(async (stateDir, paths) => {
     let resolveLate!: () => void;
     let lateWritten!: () => void;
@@ -829,7 +830,7 @@ Deno.test("final review: late launcher registration is identity-cleaned after st
   });
 });
 
-Deno.test("final review: close does not wait forever for an uncooperative launcher", async () => {
+test("final review: close does not wait forever for an uncooperative launcher", async () => {
   await withStateDir(async (stateDir) => {
     const client = new CoreClient({
       stateDir,
@@ -846,7 +847,7 @@ Deno.test("final review: close does not wait forever for an uncooperative launch
   });
 });
 
-Deno.test("final review: external abort reaches the launcher signal", async () => {
+test("final review: external abort reaches the launcher signal", async () => {
   await withStateDir(async (stateDir) => {
     const controller = new AbortController();
     let launcherSignal: AbortSignal | undefined;
@@ -883,7 +884,7 @@ Deno.test("final review: external abort reaches the launcher signal", async () =
   });
 });
 
-Deno.test("final review: CoreClient classifies valid and malformed 403 bodies", async () => {
+test("final review: CoreClient classifies valid and malformed 403 bodies", async () => {
   await withStateDir(async (stateDir, paths) => {
     let mode: "forbid" | "ready" | "malformed" = "forbid";
     const handle = await startProbe(async (request) => {
@@ -960,7 +961,7 @@ Deno.test("final review: CoreClient classifies valid and malformed 403 bodies", 
   });
 });
 
-Deno.test("final review: stored abort cancels a response while JSON is decoding", async () => {
+test("final review: stored abort cancels a response while JSON is decoding", async () => {
   await withStateDir(async (stateDir, paths) => {
     const controller = new AbortController();
     const handle = await startProbe(async (request) => {
@@ -1021,7 +1022,7 @@ Deno.test("final review: stored abort cancels a response while JSON is decoding"
   });
 });
 
-Deno.test("final review: malformed JSON after headers clears the request timer", async () => {
+test("final review: malformed JSON after headers clears the request timer", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startProbe(async (request) => {
       await request.json();
@@ -1053,7 +1054,7 @@ Deno.test("final review: malformed JSON after headers clears the request timer",
   });
 });
 
-Deno.test("final review: stalled response bodies are bounded and cleaned up", async () => {
+test("final review: stalled response bodies are bounded and cleaned up", async () => {
   await withStateDir(async (stateDir, paths) => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -1080,7 +1081,7 @@ Deno.test("final review: stalled response bodies are bounded and cleaned up", as
   });
 });
 
-Deno.test("final review: whitespace-edge passwords are rejected rather than trimmed", () => {
+test("final review: whitespace-edge passwords are rejected rather than trimmed", () => {
   const protectedConfig = config({
     auth: true,
     passwords: [" secret "],
@@ -1116,7 +1117,7 @@ Deno.test("final review: whitespace-edge passwords are rejected rather than trim
   );
 });
 
-Deno.test("final review: an owned Core stops when registration ownership is replaced", async () => {
+test("final review: an owned Core stops when registration ownership is replaced", async () => {
   await withStateDir(async (stateDir, paths) => {
     const dependencies = {
       ownershipMonitorIntervalMs: 10,
@@ -1159,7 +1160,7 @@ Deno.test("final review: an owned Core stops when registration ownership is repl
   });
 });
 
-Deno.test("final review: registration loss stops even when lock read is unreadable", async () => {
+test("final review: registration loss stops even when lock read is unreadable", async () => {
   await withStateDir(async (stateDir, paths) => {
     const realRegistry = new CoreRegistry(paths);
     let lockReleases = 0;
@@ -1212,7 +1213,7 @@ Deno.test("final review: registration loss stops even when lock read is unreadab
   });
 });
 
-Deno.test("final review: an owned Core stops when lock ownership is replaced", async () => {
+test("final review: an owned Core stops when lock ownership is replaced", async () => {
   await withStateDir(async (stateDir, paths) => {
     const dependencies = {
       ownershipMonitorIntervalMs: 10,
@@ -1258,7 +1259,7 @@ Deno.test("final review: an owned Core stops when lock ownership is replaced", a
   });
 });
 
-Deno.test("final review: registry recovers an incomplete transition marker", async () => {
+test("final review: registry recovers an incomplete transition marker", async () => {
   await withStateDir(async (stateDir, paths) => {
     const scriptDir = await Deno.makeTempDir({
       prefix: "opensac-core-incomplete-transition-",
@@ -1307,7 +1308,7 @@ Deno.test("final review: registry recovers an incomplete transition marker", asy
   });
 });
 
-Deno.test("final review: live incomplete transition ownership remains fail-closed", async () => {
+test("final review: live incomplete transition ownership remains fail-closed", async () => {
   await withStateDir(async (stateDir, paths) => {
     const transitionDir = path.join(
       stateDir,
@@ -1341,7 +1342,7 @@ Deno.test("final review: live incomplete transition ownership remains fail-close
   });
 });
 
-Deno.test("final review: registry recovers a transition marker left by a crashed subprocess", async () => {
+test("final review: registry recovers a transition marker left by a crashed subprocess", async () => {
   await withStateDir(async (stateDir, paths) => {
     const scriptDir = await Deno.makeTempDir({
       prefix: "opensac-core-transition-crash-",

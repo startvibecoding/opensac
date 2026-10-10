@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   Center,
   sourceBuiltin,
@@ -7,6 +7,7 @@ import {
   sourceProject,
   typeTeam,
 } from "./mod.ts";
+import { test } from "#testing";
 
 /** Builds a minimal valid agent-bundle manifest for shadow assertions. */
 function shadowManifest(name: string, displayZh: string): string {
@@ -64,7 +65,7 @@ function withEnv(key: string, value: string, fn: () => void): void {
   }
 }
 
-Deno.test("center list shadow and sort", () => {
+test("center list shadow and sort", () => {
   withTempDir((globalRoot) => {
     withEnv("OPENSAC_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
@@ -154,7 +155,7 @@ Deno.test("center list shadow and sort", () => {
   });
 });
 
-Deno.test("center list missing layers tolerated", () => {
+test("center list missing layers tolerated", () => {
   withTempDir((globalRoot) => {
     withEnv("OPENSAC_DIR", globalRoot, () => {
       const list = new Center().list();
@@ -180,7 +181,7 @@ Deno.test("center list missing layers tolerated", () => {
   });
 });
 
-Deno.test("center list invalid manifest flagged", () => {
+test("center list invalid manifest flagged", () => {
   withTempDir((globalRoot) => {
     withEnv("OPENSAC_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {
@@ -221,7 +222,7 @@ Deno.test("center list invalid manifest flagged", () => {
   });
 });
 
-Deno.test("center get", () => {
+test("center get", () => {
   withTempDir((globalRoot) => {
     withEnv("OPENSAC_DIR", globalRoot, () => {
       withTempDir((projectRoot) => {

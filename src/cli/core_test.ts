@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   type CoreCommandDependencies,
   type CoreCommandOptions,
@@ -27,8 +27,8 @@ import {
 import { CorePaths } from "../core/paths.ts";
 import { type CoreRegistration, CoreRegistry } from "../core/registry.ts";
 import { CORE_METHODS, type CoreShutdownResult } from "../core/protocol.ts";
-import type { CoreRuntimeHost } from "../core/runtime.ts";
-import type { CoreLockInspection } from "../core/lock.ts";
+import { type CoreRuntimeHost } from "../core/runtime.ts";
+import { type CoreLockInspection } from "../core/lock.ts";
 import {
   CoreServer,
   type CoreServerHandle,
@@ -36,6 +36,7 @@ import {
 } from "../core/server.ts";
 import { CORE_PROTOCOL_VERSION } from "../core/server.ts";
 import { current as currentVersion } from "../version/version.ts";
+import { test } from "#testing";
 
 const TEST_VERSION = "0.1.0-core-command-test";
 const TEST_PROTOCOL_VERSION = 7;
@@ -153,10 +154,10 @@ function fakeServerHandle(
   };
 }
 
-Deno.test("root command registers core while serve and a2a remain absent", async () => {
+test("root command registers core while serve and a2a remain absent", async () => {
   const { createRootCommand } = await import("./command.ts");
   const root = createRootCommand(TEST_VERSION);
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const names = (root as any).getCommands().map((command: any) =>
     command.getName()
   );
@@ -165,7 +166,7 @@ Deno.test("root command registers core while serve and a2a remain absent", async
   assertEquals(names.includes("a2a"), false);
 });
 
-Deno.test("runCoreCommand starts, registers, and awaits complete cleanup", async () => {
+test("runCoreCommand starts, registers, and awaits complete cleanup", async () => {
   await withStateDir(async (stateDir, paths) => {
     let signalHandler: (() => void) | undefined;
     let stopped = false;
@@ -216,7 +217,7 @@ Deno.test("runCoreCommand starts, registers, and awaits complete cleanup", async
   });
 });
 
-Deno.test("runCoreCommand treats a post-registration abort as normal shutdown", async () => {
+test("runCoreCommand treats a post-registration abort as normal shutdown", async () => {
   await withStateDir(async (stateDir, paths) => {
     const realRegistry = new CoreRegistry(paths);
     let signalHandler: (() => void) | undefined;
@@ -258,7 +259,7 @@ Deno.test("runCoreCommand treats a post-registration abort as normal shutdown", 
   });
 });
 
-Deno.test("lazy production Core host exposes the production extension handler", async () => {
+test("lazy production Core host exposes the production extension handler", async () => {
   await withStateDir(async (stateDir) => {
     let runtime: CoreRuntimeHost | undefined;
     const handle = await startCoreCommand(options({ stateDir }), {
@@ -276,7 +277,7 @@ Deno.test("lazy production Core host exposes the production extension handler", 
   });
 });
 
-Deno.test("startCoreCommand stop is idempotent and done waits for cleanup", async () => {
+test("startCoreCommand stop is idempotent and done waits for cleanup", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startCoreCommand(options({ stateDir }));
     try {
@@ -307,7 +308,7 @@ Deno.test("startCoreCommand stop is idempotent and done waits for cleanup", asyn
   });
 });
 
-Deno.test("Core command performs one server, registration, and lock cleanup", async () => {
+test("Core command performs one server, registration, and lock cleanup", async () => {
   await withStateDir(async (stateDir) => {
     let acquired = 0;
     let released = 0;
@@ -358,7 +359,7 @@ Deno.test("Core command performs one server, registration, and lock cleanup", as
   });
 });
 
-Deno.test("Core command loads settings and writes the configured port", async () => {
+test("Core command loads settings and writes the configured port", async () => {
   await withStateDir(async (stateDir, paths) => {
     let loadCalls = 0;
     const handle = await startCoreCommand(
@@ -388,7 +389,7 @@ Deno.test("Core command loads settings and writes the configured port", async ()
   });
 });
 
-Deno.test("Core command rejects auth without a password before acquiring resources", async () => {
+test("Core command rejects auth without a password before acquiring resources", async () => {
   await withStateDir(async (stateDir, paths) => {
     await assertRejects(
       () =>
@@ -407,7 +408,7 @@ Deno.test("Core command rejects auth without a password before acquiring resourc
   });
 });
 
-Deno.test("Core command reports a fixed-port conflict and releases its lock", async () => {
+test("Core command reports a fixed-port conflict and releases its lock", async () => {
   const stateDir = await Deno.makeTempDir({
     prefix: "opensac-core-port-conflict-",
   });
@@ -449,7 +450,7 @@ Deno.test("Core command reports a fixed-port conflict and releases its lock", as
   }
 });
 
-Deno.test("Core command dependency failure is surfaced to the caller", async () => {
+test("Core command dependency failure is surfaced to the caller", async () => {
   await withStateDir(async (stateDir) => {
     const error = new Error("injected Core lock failure");
     await assertRejects(
@@ -466,7 +467,7 @@ Deno.test("Core command dependency failure is surfaced to the caller", async () 
   });
 });
 
-Deno.test("stop retains ownership when server shutdown is uncertain", async () => {
+test("stop retains ownership when server shutdown is uncertain", async () => {
   await withStateDir(async (stateDir) => {
     const shutdownError = new Error("listener shutdown failed");
     let removes = 0;
@@ -498,7 +499,7 @@ Deno.test("stop retains ownership when server shutdown is uncertain", async () =
   });
 });
 
-Deno.test("stop aggregates lock release failures after clean server cleanup", async () => {
+test("stop aggregates lock release failures after clean server cleanup", async () => {
   await withStateDir(async (stateDir) => {
     const releaseError = new Error("lock release failed");
     let removes = 0;
@@ -530,7 +531,7 @@ Deno.test("stop aggregates lock release failures after clean server cleanup", as
   });
 });
 
-Deno.test("startup cleanup retains the lock when server shutdown fails", async () => {
+test("startup cleanup retains the lock when server shutdown fails", async () => {
   await withStateDir(async (stateDir) => {
     const writeError = new Error("registration write failed");
     const shutdownError = new Error("server shutdown failed");
@@ -561,7 +562,7 @@ Deno.test("startup cleanup retains the lock when server shutdown fails", async (
   });
 });
 
-Deno.test("partial CoreServer start cleanup failure retains the lock", async () => {
+test("partial CoreServer start cleanup failure retains the lock", async () => {
   await withStateDir(async (stateDir, paths) => {
     const cleanupError = new Error("partial listener cleanup failed");
     let partialListener: Deno.HttpServer | undefined;
@@ -605,7 +606,7 @@ Deno.test("partial CoreServer start cleanup failure retains the lock", async () 
   });
 });
 
-Deno.test("registration write failure releases ownership after server stops", async () => {
+test("registration write failure releases ownership after server stops", async () => {
   await withStateDir(async (stateDir) => {
     const writeError = new Error("registration write failed");
     let removes = 0;
@@ -637,7 +638,7 @@ Deno.test("registration write failure releases ownership after server stops", as
   });
 });
 
-Deno.test("runCoreCommand aborts a blocked startup and removes listeners", async () => {
+test("runCoreCommand aborts a blocked startup and removes listeners", async () => {
   await withStateDir(async (stateDir) => {
     let signalHandler: (() => void) | undefined;
     let receivedSignal: AbortSignal | undefined;
@@ -683,7 +684,7 @@ Deno.test("runCoreCommand aborts a blocked startup and removes listeners", async
   });
 });
 
-Deno.test("startCoreCommand reuses a compatible healthy registration", async () => {
+test("startCoreCommand reuses a compatible healthy registration", async () => {
   await withStateDir(async (stateDir, paths) => {
     const existing = await new CoreServer({
       config: config(),
@@ -737,7 +738,7 @@ Deno.test("startCoreCommand reuses a compatible healthy registration", async () 
   });
 });
 
-Deno.test("a replaced registration is not accepted as the current Core", async () => {
+test("a replaced registration is not accepted as the current Core", async () => {
   await withStateDir(async (stateDir, paths) => {
     const original = registration(4310);
     const replacement = registration(4310, { id: "replacement-core" });
@@ -789,7 +790,7 @@ Deno.test("a replaced registration is not accepted as the current Core", async (
   });
 });
 
-Deno.test("a version-mismatched registered Core is not reused or overwritten", async () => {
+test("a version-mismatched registered Core is not reused or overwritten", async () => {
   await withStateDir(async (stateDir, paths) => {
     let probe: Deno.HttpServer | undefined;
     try {
@@ -874,7 +875,7 @@ Deno.test("a version-mismatched registered Core is not reused or overwritten", a
   });
 });
 
-Deno.test("fixed-port classification ignores a healthy Core on another port", async () => {
+test("fixed-port classification ignores a healthy Core on another port", async () => {
   await withStateDir(async (stateDir, paths) => {
     const configuredPort = 4311;
     const healthyPort = 4312;
@@ -942,7 +943,7 @@ Deno.test("fixed-port classification ignores a healthy Core on another port", as
   });
 });
 
-Deno.test("fixed-port classification rejects redirects as unrelated", async () => {
+test("fixed-port classification rejects redirects as unrelated", async () => {
   await withStateDir(async (stateDir, paths) => {
     let probe: Deno.HttpServer | undefined;
     try {
@@ -990,7 +991,7 @@ Deno.test("fixed-port classification rejects redirects as unrelated", async () =
 // Keep the imported production version visible in this focused suite: the
 // command must use the same version source as the process entry point unless
 // a test explicitly supplies a deterministic override.
-Deno.test("Core command defaults use the process version source", () => {
+test("Core command defaults use the process version source", () => {
   assert(currentVersion().trim().length > 0);
   assertEquals(CORE_PROTOCOL_VERSION, 1);
 });
@@ -1085,7 +1086,7 @@ async function deadPid(): Promise<number> {
   return child.pid;
 }
 
-Deno.test("stopCoreCommand reports absent when no Core is registered", async () => {
+test("stopCoreCommand reports absent when no Core is registered", async () => {
   const outcome = await stopCoreCommand(
     stopOptions(),
     stopDeps({ discovery: { status: "missing" } }),
@@ -1093,7 +1094,7 @@ Deno.test("stopCoreCommand reports absent when no Core is registered", async () 
   assertEquals(outcome, { status: "absent", exited: true, signalled: false });
 });
 
-Deno.test("stopCoreCommand reports absent for a stale registration whose process is gone", async () => {
+test("stopCoreCommand reports absent for a stale registration whose process is gone", async () => {
   const reg = registration(4096, { pid: await deadPid() });
   const outcome = await stopCoreCommand(
     stopOptions(),
@@ -1108,7 +1109,7 @@ Deno.test("stopCoreCommand reports absent for a stale registration whose process
   assertEquals(outcome, { status: "absent", exited: true, signalled: false });
 });
 
-Deno.test("stopCoreCommand refuses to signal a stale Core it cannot verify", async () => {
+test("stopCoreCommand refuses to signal a stale Core it cannot verify", async () => {
   const kills: Array<[number, string]> = [];
   const reg = registration(4096, { pid: Deno.pid });
   await assertRejects(
@@ -1130,7 +1131,7 @@ Deno.test("stopCoreCommand refuses to signal a stale Core it cannot verify", asy
   assertEquals(kills, []);
 });
 
-Deno.test("stopCoreCommand refuses to signal a Core with foreign authentication", async () => {
+test("stopCoreCommand refuses to signal a Core with foreign authentication", async () => {
   const kills: Array<[number, string]> = [];
   const reg = registration(4096, { pid: Deno.pid });
   await assertRejects(
@@ -1152,7 +1153,7 @@ Deno.test("stopCoreCommand refuses to signal a Core with foreign authentication"
   assertEquals(kills, []);
 });
 
-Deno.test("stopCoreCommand stops a ready Core through core.shutdown", async () => {
+test("stopCoreCommand stops a ready Core through core.shutdown", async () => {
   const kills: Array<[number, string]> = [];
   let shutdownCalls = 0;
   const reg = registration(4096, { pid: Deno.pid });
@@ -1172,7 +1173,7 @@ Deno.test("stopCoreCommand stops a ready Core through core.shutdown", async () =
   assertEquals(kills, []);
 });
 
-Deno.test("stopCoreCommand reports a requested stop that is still exiting", async () => {
+test("stopCoreCommand reports a requested stop that is still exiting", async () => {
   const reg = registration(4096, { pid: Deno.pid });
   const outcome = await stopCoreCommand(
     stopOptions({ stopTimeoutMs: 0 }),
@@ -1187,7 +1188,7 @@ Deno.test("stopCoreCommand reports a requested stop that is still exiting", asyn
   assertEquals(outcome, { status: "stopped", exited: false, signalled: false });
 });
 
-Deno.test("stopCoreCommand signals an older Core that predates core.shutdown", async () => {
+test("stopCoreCommand signals an older Core that predates core.shutdown", async () => {
   const kills: Array<[number, string]> = [];
   const reg = registration(4096, { pid: Deno.pid });
   const outcome = await stopCoreCommand(
@@ -1206,7 +1207,7 @@ Deno.test("stopCoreCommand signals an older Core that predates core.shutdown", a
   assertEquals(kills, [[reg.pid, "SIGTERM"]]);
 });
 
-Deno.test("stopCoreCommand fails closed when registration identity cannot be proven", async () => {
+test("stopCoreCommand fails closed when registration identity cannot be proven", async () => {
   const kills: Array<[number, string]> = [];
   const reg = registration(4096, { pid: Deno.pid });
   await assertRejects(
@@ -1228,7 +1229,7 @@ Deno.test("stopCoreCommand fails closed when registration identity cannot be pro
   assertEquals(kills, []);
 });
 
-Deno.test("stopCoreCommand stops a real Core through the graceful path", async () => {
+test("stopCoreCommand stops a real Core through the graceful path", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startCoreCommand(options({ stateDir }));
     try {
@@ -1322,7 +1323,7 @@ function lifecycleDeps(
   };
 }
 
-Deno.test("statusCoreCommand reports a running Core with its uptime", async () => {
+test("statusCoreCommand reports a running Core with its uptime", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const outcome = await statusCoreCommand(
@@ -1347,7 +1348,7 @@ Deno.test("statusCoreCommand reports a running Core with its uptime", async () =
   assertEquals(probe.closeCalls, 1);
 });
 
-Deno.test("statusCoreCommand reports a missing Core without starting one", async () => {
+test("statusCoreCommand reports a missing Core without starting one", async () => {
   const probe = lifecycleProbe();
   const outcome = await statusCoreCommand(
     lifecycleOptions(),
@@ -1363,7 +1364,7 @@ Deno.test("statusCoreCommand reports a missing Core without starting one", async
   assertEquals(probe.closeCalls, 1);
 });
 
-Deno.test("statusCoreCommand projects a stale registration as not running", async () => {
+test("statusCoreCommand projects a stale registration as not running", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096, { pid: await deadPid() });
   const outcome = await statusCoreCommand(
@@ -1388,7 +1389,7 @@ Deno.test("statusCoreCommand projects a stale registration as not running", asyn
   });
 });
 
-Deno.test("launchCoreCommand reuses a healthy Core instead of launching a second one", async () => {
+test("launchCoreCommand reuses a healthy Core instead of launching a second one", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const outcome = await launchCoreCommand(
@@ -1406,7 +1407,7 @@ Deno.test("launchCoreCommand reuses a healthy Core instead of launching a second
   assertEquals(probe.closeCalls, 1);
 });
 
-Deno.test("launchCoreCommand starts a missing Core exactly once", async () => {
+test("launchCoreCommand starts a missing Core exactly once", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const outcome = await launchCoreCommand(
@@ -1421,7 +1422,7 @@ Deno.test("launchCoreCommand starts a missing Core exactly once", async () => {
   assertEquals(probe.ensureStartedCalls, 1);
 });
 
-Deno.test("launchCoreCommand refuses to replace an incompatible registered Core", async () => {
+test("launchCoreCommand refuses to replace an incompatible registered Core", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   await assertRejects(
@@ -1444,7 +1445,7 @@ const orphanLock: CoreLockInspection = {
   reclaimableAutomatically: false,
 };
 
-Deno.test("launchCoreCommand repairs a consented orphan lock before launching", async () => {
+test("launchCoreCommand repairs a consented orphan lock before launching", async () => {
   const probe = lifecycleProbe();
   const started = readyDiscovery(registration(4096));
   let confirmCalls = 0;
@@ -1473,7 +1474,7 @@ Deno.test("launchCoreCommand repairs a consented orphan lock before launching", 
   assertEquals(outcome.status, "started");
 });
 
-Deno.test("launchCoreCommand declines the orphan repair without deleting or launching", async () => {
+test("launchCoreCommand declines the orphan repair without deleting or launching", async () => {
   const probe = lifecycleProbe();
   const started = readyDiscovery(registration(4096));
   let reclaimCalls = 0;
@@ -1501,7 +1502,7 @@ Deno.test("launchCoreCommand declines the orphan repair without deleting or laun
   assertEquals(probe.ensureStartedCalls, 0);
 });
 
-Deno.test("launchCoreCommand does not prompt or delete a lock when not interactive", async () => {
+test("launchCoreCommand does not prompt or delete a lock when not interactive", async () => {
   const probe = lifecycleProbe();
   const started = readyDiscovery(registration(4096));
   let reclaimCalls = 0;
@@ -1527,7 +1528,7 @@ Deno.test("launchCoreCommand does not prompt or delete a lock when not interacti
   assertEquals(outcome.status, "started");
 });
 
-Deno.test("launchCoreCommand leaves a held lock untouched", async () => {
+test("launchCoreCommand leaves a held lock untouched", async () => {
   const probe = lifecycleProbe();
   const started = readyDiscovery(registration(4096));
   let confirmCalls = 0;
@@ -1559,7 +1560,7 @@ Deno.test("launchCoreCommand leaves a held lock untouched", async () => {
   assertEquals(probe.ensureStartedCalls, 1);
 });
 
-Deno.test("restartCoreCommand stops the running Core before starting a replacement", async () => {
+test("restartCoreCommand stops the running Core before starting a replacement", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const stopped: string[] = [];
@@ -1587,7 +1588,7 @@ Deno.test("restartCoreCommand stops the running Core before starting a replaceme
   assertEquals(probe.ensureStartedCalls, 1);
 });
 
-Deno.test("restartCoreCommand starts a Core when none was running", async () => {
+test("restartCoreCommand starts a Core when none was running", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const outcome = await restartCoreCommand(lifecycleOptions(), {
@@ -1606,7 +1607,7 @@ Deno.test("restartCoreCommand starts a Core when none was running", async () => 
   assertEquals(outcome.started.status, "started");
 });
 
-Deno.test("restartCoreCommand refuses to start while the old Core is still exiting", async () => {
+test("restartCoreCommand refuses to start while the old Core is still exiting", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   await assertRejects(
@@ -1629,7 +1630,7 @@ Deno.test("restartCoreCommand refuses to start while the old Core is still exiti
   assertEquals(probe.ensureStartedCalls, 0);
 });
 
-Deno.test("pairCoreCommand reports the paired endpoint without a password", async () => {
+test("pairCoreCommand reports the paired endpoint without a password", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const outcome = await pairCoreCommand(
@@ -1648,7 +1649,7 @@ Deno.test("pairCoreCommand reports the paired endpoint without a password", asyn
   assertEquals(probe.closeCalls, 1);
 });
 
-Deno.test("pairCoreCommand verifies a candidate password against the Core", async () => {
+test("pairCoreCommand verifies a candidate password against the Core", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   const outcome = await pairCoreCommand(
@@ -1664,7 +1665,7 @@ Deno.test("pairCoreCommand verifies a candidate password against the Core", asyn
   assertEquals(probe.selectedPasswords, ["secret"]);
 });
 
-Deno.test("pairCoreCommand rejects a candidate password the Core refuses", async () => {
+test("pairCoreCommand rejects a candidate password the Core refuses", async () => {
   const probe = lifecycleProbe();
   const reg = registration(4096);
   await assertRejects(
@@ -1691,7 +1692,7 @@ Deno.test("pairCoreCommand rejects a candidate password the Core refuses", async
   assertEquals(probe.selectedPasswords, ["wrong"]);
 });
 
-Deno.test("pairCoreCommand refuses a password when core auth is disabled", async () => {
+test("pairCoreCommand refuses a password when core auth is disabled", async () => {
   const probe = lifecycleProbe();
   await assertRejects(
     () =>
@@ -1705,7 +1706,7 @@ Deno.test("pairCoreCommand refuses a password when core auth is disabled", async
   assertEquals(probe.closeCalls, 0);
 });
 
-Deno.test("pairCoreCommand explains how to start a Core that is not running", async () => {
+test("pairCoreCommand explains how to start a Core that is not running", async () => {
   const probe = lifecycleProbe();
   await assertRejects(
     () =>
@@ -1719,7 +1720,7 @@ Deno.test("pairCoreCommand explains how to start a Core that is not running", as
   assertEquals(probe.closeCalls, 1);
 });
 
-Deno.test("status, start, and pair project a real running Core", async () => {
+test("status, start, and pair project a real running Core", async () => {
   await withStateDir(async (stateDir) => {
     const handle = await startCoreCommand(options({ stateDir }));
     try {

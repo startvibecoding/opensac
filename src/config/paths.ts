@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 
 /** Project-level configuration directory name. */
 export const projectDirName = ".opensac";

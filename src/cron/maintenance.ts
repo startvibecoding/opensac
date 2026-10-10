@@ -5,7 +5,7 @@
 // lands with the Scheduler and the durable Runtime lifecycle (backlog #26).
 
 import { isMaintenanceCronJobID } from "../agentruntime/maintenance_cron.ts";
-import type { CronJob } from "./cron.ts";
+import { type CronJob } from "./cron.ts";
 
 /**
  * Removes Runtime-owned maintenance jobs from a job list headed for a

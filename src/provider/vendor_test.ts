@@ -1,12 +1,13 @@
-import { assertEquals } from "@opensac/assert";
-import type { ProviderConfig } from "../config/mod.ts";
+import { assertEquals } from "../compat/assert.ts";
+import { type ProviderConfig } from "../config/mod.ts";
 import { resolveAdapterConfig, vendorFromBaseURL } from "./mod.ts";
+import { test } from "#testing";
 
 function cfg(partial: Partial<ProviderConfig>): ProviderConfig {
   return { models: [], ...partial };
 }
 
-Deno.test("ResolveAdapterConfigExplicitVendor", () => {
+test("ResolveAdapterConfigExplicitVendor", () => {
   const resolved = resolveAdapterConfig(cfg({
     vendor: "deepseek",
     baseUrl: "https://example.com/v1",
@@ -16,13 +17,13 @@ Deno.test("ResolveAdapterConfigExplicitVendor", () => {
   assertEquals(resolved.thinkingFormat, "deepseek");
 });
 
-Deno.test("ResolveAdapterConfigExplicitVendorDefaultAPI", () => {
+test("ResolveAdapterConfigExplicitVendorDefaultAPI", () => {
   const resolved = resolveAdapterConfig(cfg({ vendor: "Anthropic" }));
   assertEquals(resolved.vendor, "anthropic");
   assertEquals(resolved.api, "anthropic-messages");
 });
 
-Deno.test("ResolveAdapterConfigResponsesVendorsDefaultAPI", () => {
+test("ResolveAdapterConfigResponsesVendorsDefaultAPI", () => {
   const tests: Array<[string, string]> = [
     ["https://api.openai.com/v1", "openai"],
     ["https://www.codeok.cc/v1", "codeok"],
@@ -35,7 +36,7 @@ Deno.test("ResolveAdapterConfigResponsesVendorsDefaultAPI", () => {
   }
 });
 
-Deno.test("ResolveAdapterConfigBaseURLDetect", () => {
+test("ResolveAdapterConfigBaseURLDetect", () => {
   const resolved = resolveAdapterConfig(cfg({
     baseUrl: "https://api.deepseek.com/anthropic",
     api: "anthropic-messages",
@@ -44,7 +45,7 @@ Deno.test("ResolveAdapterConfigBaseURLDetect", () => {
   assertEquals(resolved.thinkingFormat, "deepseek");
 });
 
-Deno.test("ResolveAdapterConfigPreservesExplicitThinkingFormat", () => {
+test("ResolveAdapterConfigPreservesExplicitThinkingFormat", () => {
   const resolved = resolveAdapterConfig(cfg({
     vendor: "deepseek",
     baseUrl: "https://api.deepseek.com",
@@ -54,7 +55,7 @@ Deno.test("ResolveAdapterConfigPreservesExplicitThinkingFormat", () => {
   assertEquals(resolved.thinkingFormat, "openai");
 });
 
-Deno.test("ResolveAdapterConfigGenericFallback", () => {
+test("ResolveAdapterConfigGenericFallback", () => {
   const resolved = resolveAdapterConfig(
     cfg({ baseUrl: "https://unknown.example.com/v1" }),
   );
@@ -62,7 +63,7 @@ Deno.test("ResolveAdapterConfigGenericFallback", () => {
   assertEquals(resolved.api, "openai-chat");
 });
 
-Deno.test("ResolveAdapterConfigGoogleGemini", () => {
+test("ResolveAdapterConfigGoogleGemini", () => {
   const resolved = resolveAdapterConfig(cfg({
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
   }));
@@ -70,7 +71,7 @@ Deno.test("ResolveAdapterConfigGoogleGemini", () => {
   assertEquals(resolved.api, "google-gemini");
 });
 
-Deno.test("ResolveAdapterConfigGoogleVertex", () => {
+test("ResolveAdapterConfigGoogleVertex", () => {
   const resolved = resolveAdapterConfig(cfg({
     baseUrl:
       "https://aiplatform.googleapis.com/v1/projects/test/locations/global/publishers/google/models",
@@ -79,7 +80,7 @@ Deno.test("ResolveAdapterConfigGoogleVertex", () => {
   assertEquals(resolved.api, "google-vertex");
 });
 
-Deno.test("ResolveAdapterConfigExplicitVendorKimi", () => {
+test("ResolveAdapterConfigExplicitVendorKimi", () => {
   const resolved = resolveAdapterConfig(cfg({
     vendor: "kimi",
     baseUrl: "https://api.kimi.com/coding",
@@ -89,7 +90,7 @@ Deno.test("ResolveAdapterConfigExplicitVendorKimi", () => {
   assertEquals(resolved.thinkingFormat, "");
 });
 
-Deno.test("ResolveAdapterConfigExplicitVendorZai", () => {
+test("ResolveAdapterConfigExplicitVendorZai", () => {
   const resolved = resolveAdapterConfig(cfg({
     vendor: "zai",
     baseUrl: "https://api.z.ai/api/coding/paas/v4",
@@ -99,7 +100,7 @@ Deno.test("ResolveAdapterConfigExplicitVendorZai", () => {
   assertEquals(resolved.thinkingFormat, "zai");
 });
 
-Deno.test("ResolveAdapterConfigBaseURLDetectKimi", () => {
+test("ResolveAdapterConfigBaseURLDetectKimi", () => {
   for (
     const url of ["https://api.moonshot.cn/v1", "https://api.kimi.com/coding"]
   ) {
@@ -108,7 +109,7 @@ Deno.test("ResolveAdapterConfigBaseURLDetectKimi", () => {
   }
 });
 
-Deno.test("ResolveAdapterConfigBaseURLDetectZai", () => {
+test("ResolveAdapterConfigBaseURLDetectZai", () => {
   for (
     const url of [
       "https://api.z.ai/api/coding/paas/v4",
@@ -121,14 +122,14 @@ Deno.test("ResolveAdapterConfigBaseURLDetectZai", () => {
   }
 });
 
-Deno.test("VendorFromBaseURLDetectsXiaomiTokenPlan", () => {
+test("VendorFromBaseURLDetectsXiaomiTokenPlan", () => {
   assertEquals(
     vendorFromBaseURL("https://token-plan-cn.xiaomimimo.com/v1"),
     "xiaomi-token-plan-cn",
   );
 });
 
-Deno.test("VendorFromBaseURLDetectsGoogleAdapters", () => {
+test("VendorFromBaseURLDetectsGoogleAdapters", () => {
   const tests: Array<[string, string]> = [
     [
       "https://generativelanguage.googleapis.com/v1beta/models",
@@ -144,7 +145,7 @@ Deno.test("VendorFromBaseURLDetectsGoogleAdapters", () => {
   }
 });
 
-Deno.test("ResolveAdapterConfigBaseURLDetectAgnes", () => {
+test("ResolveAdapterConfigBaseURLDetectAgnes", () => {
   for (
     const [url, vendor] of [
       ["https://apihub.agnes-ai.com/v1", "agnes"],
@@ -159,7 +160,7 @@ Deno.test("ResolveAdapterConfigBaseURLDetectAgnes", () => {
   }
 });
 
-Deno.test("ResolveAdapterConfigExplicitVendorAgnes", () => {
+test("ResolveAdapterConfigExplicitVendorAgnes", () => {
   const resolved = resolveAdapterConfig(cfg({
     vendor: "Agnes",
     baseUrl: "https://apihub.agnes-ai.com/v1",
@@ -168,7 +169,7 @@ Deno.test("ResolveAdapterConfigExplicitVendorAgnes", () => {
   assertEquals(resolved.api, "openai-chat");
 });
 
-Deno.test("ResolveAdapterConfigExplicitVendorAMDRadeon", () => {
+test("ResolveAdapterConfigExplicitVendorAMDRadeon", () => {
   const resolved = resolveAdapterConfig(cfg({
     vendor: "amd-radeon",
     baseUrl: "https://developer.amd.com.cn/radeon/api/v1",
@@ -178,7 +179,7 @@ Deno.test("ResolveAdapterConfigExplicitVendorAMDRadeon", () => {
   assertEquals(resolved.api, "openai-chat");
 });
 
-Deno.test("ResolveAdapterConfigBaseURLDetectAMDRadeon", () => {
+test("ResolveAdapterConfigBaseURLDetectAMDRadeon", () => {
   const resolved = resolveAdapterConfig(cfg({
     baseUrl: "https://developer.amd.com.cn/radeon/api/v1",
   }));

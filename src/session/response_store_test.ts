@@ -4,7 +4,7 @@
 // enforcement is off and a session with no lease row skips lease validation, so
 // these tests use a literal session ID and exercise the store directly.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   abandonInterruptedToolExecutionRecords,
@@ -25,6 +25,7 @@ import {
   type ToolExecutionRecord,
   updateToolExecutionRecord,
 } from "./mod.ts";
+import { test } from "#testing";
 
 const sessionID = "session-response-store";
 
@@ -45,7 +46,7 @@ function tryRun(fn: () => void): Error | null {
   }
 }
 
-Deno.test("response runtime store persists summaries items runs and deduplication", () => {
+test("response runtime store persists summaries items runs and deduplication", () => {
   const sessionDir = tempDir();
   try {
     const now = new Date();
@@ -234,7 +235,7 @@ Deno.test("response runtime store persists summaries items runs and deduplicatio
   }
 });
 
-Deno.test("list response replay turns deduplicates historical function items", () => {
+test("list response replay turns deduplicates historical function items", () => {
   const sessionDir = tempDir();
   try {
     saveResponseTurn(sessionDir, {
@@ -303,7 +304,7 @@ Deno.test("list response replay turns deduplicates historical function items", (
   }
 });
 
-Deno.test("archive JSON preserves numeric usage counters", () => {
+test("archive JSON preserves numeric usage counters", () => {
   const raw = archiveJSON({
     usage: { totalTokens: 18, cached_tokens: 4, access_token: "secret" },
   });
@@ -319,7 +320,7 @@ Deno.test("archive JSON preserves numeric usage counters", () => {
   assertEquals(value.usage.access_token, "[REDACTED]");
 });
 
-Deno.test("response session state compare and swap", () => {
+test("response session state compare and swap", () => {
   const sessionDir = tempDir();
   try {
     const state = {

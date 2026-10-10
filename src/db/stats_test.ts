@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   beginWaitStats,
   busyRetryStats,
@@ -9,6 +9,7 @@ import {
   SQLITE_EXPVAR_KEY,
   sqliteStatsSnapshot,
 } from "./mod.ts";
+import { test } from "#testing";
 
 const SNAPSHOT_KEYS = [
   "beginCount",
@@ -25,7 +26,7 @@ const SNAPSHOT_KEYS = [
 
 // TestSqliteStatsSnapshotPinsExpvarShape keeps the debug endpoint contract
 // stable: the expvar key and the published field names must not drift.
-Deno.test("sqlite stats snapshot publishes the expvar field set", () => {
+test("sqlite stats snapshot publishes the expvar field set", () => {
   assertEquals(SQLITE_EXPVAR_KEY, "opensac_sqlite");
 
   const snapshot = sqliteStatsSnapshot();
@@ -39,7 +40,7 @@ Deno.test("sqlite stats snapshot publishes the expvar field set", () => {
   }
 });
 
-Deno.test("sqlite stats snapshot reflects begin wait recording", () => {
+test("sqlite stats snapshot reflects begin wait recording", () => {
   const before = sqliteStatsSnapshot();
   recordBeginWait(7);
   const after = sqliteStatsSnapshot();
@@ -59,7 +60,7 @@ Deno.test("sqlite stats snapshot reflects begin wait recording", () => {
 
 // The begin path is the only writer of the begin counters in production, so a
 // committed transaction must move them; without contention no retry may.
-Deno.test("runInTx records exactly one begin attempt", () => {
+test("runInTx records exactly one begin attempt", () => {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-db-stats-test-" });
   const path = `${dir}/sessions.db`;
   try {

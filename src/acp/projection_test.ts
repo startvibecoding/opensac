@@ -5,7 +5,7 @@
 // Deviations: `json.RawMessage` maps to decoded `unknown`; `nil` slices map to
 // empty arrays (both serialize identically under Go's `omitempty`).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   type Event,
   EVENT_COMPACTION_END,
@@ -47,6 +47,7 @@ import {
   toolCallLocations,
 } from "./mod.ts";
 import { ToolCallContent } from "./protocol.ts";
+import { test } from "#testing";
 
 const unknownEventType: EventType = 999;
 
@@ -54,7 +55,7 @@ function retryEvent(partial: Partial<Event>): Event {
   return { type: unknownEventType, ...partial };
 }
 
-Deno.test("acpRunStatusProjectionMapsCanonicalStatuses", () => {
+test("acpRunStatusProjectionMapsCanonicalStatuses", () => {
   const cases: Record<string, string> = {
     running: "running",
     created: "running",
@@ -77,7 +78,7 @@ Deno.test("acpRunStatusProjectionMapsCanonicalStatuses", () => {
   }
 });
 
-Deno.test("acpToolImageContentsProjectsWithinLimits", () => {
+test("acpToolImageContentsProjectsWithinLimits", () => {
   const small = btoa("pixel");
   const contents = acpToolImageContents([
     { mimeType: "image/png", data: small },
@@ -95,7 +96,7 @@ Deno.test("acpToolImageContentsProjectsWithinLimits", () => {
   assertEquals(acpToolImageContents([]).length, 0);
 });
 
-Deno.test("acpToolImageContentsDegradesOversizedAndExcessImages", () => {
+test("acpToolImageContentsDegradesOversizedAndExcessImages", () => {
   const oversized = btoa("x".repeat(acpToolImageMaxBytes + 1));
   const small = btoa("pixel");
   const images = [{ mimeType: "image/png", data: oversized }];
@@ -122,7 +123,7 @@ Deno.test("acpToolImageContentsDegradesOversizedAndExcessImages", () => {
   assertEquals(notesSeen, 3);
 });
 
-Deno.test("extractSamplingInputParsesMessagesAndSystemPrompt", () => {
+test("extractSamplingInputParsesMessagesAndSystemPrompt", () => {
   const { prompt, systemPrompt, maxTokens } = extractSamplingInput({
     maxTokens: 512,
     messages: [
@@ -136,13 +137,13 @@ Deno.test("extractSamplingInputParsesMessagesAndSystemPrompt", () => {
   assertEquals(extractSamplingPrompt({ maxTokens: 1, messages: [] }), "");
 });
 
-Deno.test("parseJSONRawToMapDecodesObjectsOnly", () => {
+test("parseJSONRawToMapDecodesObjectsOnly", () => {
   assertEquals(parseJSONRawToMap({}), {});
   assertEquals(parseJSONRawToMap("bad"), undefined);
   assertEquals(parseJSONRawToMap(undefined), undefined);
 });
 
-Deno.test("acpEventNameMapsCompactionAndTurnEvents", () => {
+test("acpEventNameMapsCompactionAndTurnEvents", () => {
   assertEquals(acpEventName(EVENT_COMPACTION_START), "compaction_started");
   assertEquals(acpEventName(EVENT_COMPACTION_END), "compaction_finished");
   assertEquals(acpEventName(EVENT_TURN_START), "turn_started");
@@ -150,7 +151,7 @@ Deno.test("acpEventNameMapsCompactionAndTurnEvents", () => {
   assertEquals(acpEventName(unknownEventType), "unknown");
 });
 
-Deno.test("acpToolKindMapsToolVocabulary", () => {
+test("acpToolKindMapsToolVocabulary", () => {
   assertEquals(acpToolKind("read"), "read");
   assertEquals(acpToolKind("ls"), "read");
   assertEquals(acpToolKind("write"), "edit");
@@ -162,7 +163,7 @@ Deno.test("acpToolKindMapsToolVocabulary", () => {
   assertEquals(acpToolKind("other-tool"), "other");
 });
 
-Deno.test("acpHostedStatusNormalizesTerminalValues", () => {
+test("acpHostedStatusNormalizesTerminalValues", () => {
   assertEquals(acpHostedStatus("completed"), "completed");
   assertEquals(acpHostedStatus("failed"), "failed");
   assertEquals(acpHostedStatus("canceled"), "canceled");
@@ -170,7 +171,7 @@ Deno.test("acpHostedStatusNormalizesTerminalValues", () => {
   assertEquals(acpHostedStatus(""), "in_progress");
 });
 
-Deno.test("textToolContentWrapsNonEmptyText", () => {
+test("textToolContentWrapsNonEmptyText", () => {
   assertEquals(textToolContent("").length, 0);
   const contents = textToolContent("hello");
   assertEquals(contents.length, 1);
@@ -179,7 +180,7 @@ Deno.test("textToolContentWrapsNonEmptyText", () => {
   assertEquals(contents[0].content!.text, "hello");
 });
 
-Deno.test("acpPlanEntriesMapsStepStatuses", () => {
+test("acpPlanEntriesMapsStepStatuses", () => {
   const entries = acpPlanEntries({
     title: "Plan",
     note: "",
@@ -203,7 +204,7 @@ Deno.test("acpPlanEntriesMapsStepStatuses", () => {
   );
 });
 
-Deno.test("formatACPPlanRendersStepsAndNote", () => {
+test("formatACPPlanRendersStepsAndNote", () => {
   assertEquals(formatACPPlan(undefined), "Plan updated.");
   assertEquals(
     formatACPPlan({ title: "", note: "", steps: [] }),
@@ -226,7 +227,7 @@ Deno.test("formatACPPlanRendersStepsAndNote", () => {
   );
 });
 
-Deno.test("acpStreamMessageIDsAreStable", () => {
+test("acpStreamMessageIDsAreStable", () => {
   assertEquals(acpStreamMessageID("s", "p", "message", 2), "acp_s_p_message_2");
   const first = acpStreamFallbackMessageID("session", false);
   const second = acpStreamFallbackMessageID("session", false);
@@ -238,7 +239,7 @@ Deno.test("acpStreamMessageIDsAreStable", () => {
   );
 });
 
-Deno.test("acpRetryEventUsesStructuredFields", () => {
+test("acpRetryEventUsesStructuredFields", () => {
   assertEquals(acpRetryMessage(retryEvent({})), "Retrying...");
   const ev = retryEvent({
     retryAttempt: 2,
@@ -257,7 +258,7 @@ Deno.test("acpRetryEventUsesStructuredFields", () => {
   });
 });
 
-Deno.test("toolCallLocationsOnlyProjectsAbsolutePaths", () => {
+test("toolCallLocationsOnlyProjectsAbsolutePaths", () => {
   assertEquals(toolCallLocations(undefined), []);
   assertEquals(
     toolCallLocations({
@@ -290,21 +291,21 @@ Deno.test("toolCallLocationsOnlyProjectsAbsolutePaths", () => {
   );
 });
 
-Deno.test("sessionCursorRoundTripsAndRejectsInvalid", () => {
+test("sessionCursorRoundTripsAndRejectsInvalid", () => {
   assertEquals(decodeSessionCursor(encodeSessionCursor(0)), 0);
   assertEquals(decodeSessionCursor(encodeSessionCursor(1234)), 1234);
   assertThrows(() => decodeSessionCursor("not-a-cursor"), Error);
   assertThrows(() => decodeSessionCursor(""), Error);
 });
 
-Deno.test("sameStringSliceComparesOrderSensitively", () => {
+test("sameStringSliceComparesOrderSensitively", () => {
   assert(sameStringSlice([], []));
   assert(sameStringSlice(["a", "b"], ["a", "b"]));
   assert(!sameStringSlice(["a", "b"], ["b", "a"]));
   assert(!sameStringSlice(["a"], ["a", "b"]));
 });
 
-Deno.test("acpStructuredRPCErrorCarriesStableCode", () => {
+test("acpStructuredRPCErrorCarriesStableCode", () => {
   const err = acpStructuredRPCError(-32602, "invalid_params", "bad", {
     field: "set",
     index: 1,
@@ -314,7 +315,7 @@ Deno.test("acpStructuredRPCErrorCarriesStableCode", () => {
   assertEquals(err.data, { code: "invalid_params", field: "set", index: 1 });
 });
 
-Deno.test("requestQuestionPayloadForTrimsOptions", () => {
+test("requestQuestionPayloadForTrimsOptions", () => {
   const payload = requestQuestionPayloadFor({
     question: "Choose",
     options: ["a", "  ", "b"],
@@ -329,7 +330,7 @@ Deno.test("requestQuestionPayloadForTrimsOptions", () => {
   });
 });
 
-Deno.test("questionProjectionForKeepsLegacyAndV1Methods", () => {
+test("questionProjectionForKeepsLegacyAndV1Methods", () => {
   const request = { question: "Q", options: ["a"], explanation: "" };
   const legacy = questionProjectionFor(false, request);
   assertEquals(legacy.method, "_opensac/request_question");
@@ -339,7 +340,7 @@ Deno.test("questionProjectionForKeepsLegacyAndV1Methods", () => {
   assertEquals((v1.params as Record<string, unknown>).prompt, "Q");
 });
 
-Deno.test("artifactSessionUpdateCarriesCanonicalIdentity", () => {
+test("artifactSessionUpdateCarriesCanonicalIdentity", () => {
   assertEquals(
     artifactSessionUpdate("art-1", "a.png", "image", "image/png", 4, "run-1"),
     {
@@ -355,7 +356,7 @@ Deno.test("artifactSessionUpdateCarriesCanonicalIdentity", () => {
   );
 });
 
-Deno.test("acpByteSizeFormatsBinaryPrefixes", () => {
+test("acpByteSizeFormatsBinaryPrefixes", () => {
   assertEquals(acpByteSize(0), "0B");
   assertEquals(acpByteSize(1023), "1023B");
   assertEquals(acpByteSize(1024), "1.0KB");
@@ -363,7 +364,7 @@ Deno.test("acpByteSizeFormatsBinaryPrefixes", () => {
   assertEquals(acpByteSize(2 << 20), "2.0MB");
 });
 
-Deno.test("acpOptionalProjectIDHandlesAbsentNullAndString", () => {
+test("acpOptionalProjectIDHandlesAbsentNullAndString", () => {
   assertEquals(acpOptionalProjectID(undefined), { present: false, value: "" });
   assertEquals(acpOptionalProjectID(null), { present: true, value: "" });
   assertEquals(acpOptionalProjectID("  proj  "), {
@@ -373,7 +374,7 @@ Deno.test("acpOptionalProjectIDHandlesAbsentNullAndString", () => {
   assertThrows(() => acpOptionalProjectID(5), Error);
 });
 
-Deno.test("toolCallContentJSONKeepsStrictUnion", () => {
+test("toolCallContentJSONKeepsStrictUnion", () => {
   const diff = new ToolCallContent({
     type: "diff",
     path: "/tmp/a.ts",

@@ -2,10 +2,11 @@
 // logic). The Agent-construction helpers are replaced with the minimal
 // ApprovalConfig view the decision now takes.
 
-import { assert } from "@opensac/assert";
-import type { AllowConfig } from "../config/allow.ts";
-import type { ApprovalSettings, Settings } from "../config/settings.ts";
+import { assert } from "../compat/assert.ts";
+import { type AllowConfig } from "../config/allow.ts";
+import { type ApprovalSettings, type Settings } from "../config/settings.ts";
 import { needsApproval } from "./agent_approval.ts";
+import { test } from "#testing";
 
 function approval(a: ApprovalSettings): Settings {
   return { approval: a };
@@ -26,7 +27,7 @@ function cfgAllow(
   return { mode, settings, allow };
 }
 
-Deno.test("needsApproval: autoEdit skips approval", () => {
+test("needsApproval: autoEdit skips approval", () => {
   const settings = approval({ confirmBeforeWrite: true });
   const allow: AllowConfig = { autoEdit: true };
   assert(
@@ -41,7 +42,7 @@ Deno.test("needsApproval: autoEdit skips approval", () => {
   );
 });
 
-Deno.test("needsApproval: edit-path whitelist", () => {
+test("needsApproval: edit-path whitelist", () => {
   const settings = approval({ confirmBeforeWrite: true });
   const allow: AllowConfig = { editPaths: ["internal/**"] };
   assert(
@@ -54,13 +55,13 @@ Deno.test("needsApproval: edit-path whitelist", () => {
   }));
 });
 
-Deno.test("needsApproval: edit-path plan mode unaffected", () => {
+test("needsApproval: edit-path plan mode unaffected", () => {
   const allow: AllowConfig = { autoEdit: true, editPaths: ["**"] };
   const c = cfgAllow("plan", approval({}), allow);
   assert(!needsApproval(c, "bash", { command: "ls" }));
 });
 
-Deno.test("needsApproval: non-bash never needs approval", () => {
+test("needsApproval: non-bash never needs approval", () => {
   assert(
     !needsApproval(cfg("agent", approval({})), "read", {
       path: "README.md",
@@ -68,23 +69,23 @@ Deno.test("needsApproval: non-bash never needs approval", () => {
   );
 });
 
-Deno.test("needsApproval: agent-mode write confirm", () => {
+test("needsApproval: agent-mode write confirm", () => {
   const c = cfg("agent", approval({ confirmBeforeWrite: true }));
   assert(needsApproval(c, "write", { path: "README.md" }));
   assert(needsApproval(c, "edit", { path: "README.md" }));
 });
 
-Deno.test("needsApproval: yolo-mode write does not confirm", () => {
+test("needsApproval: yolo-mode write does not confirm", () => {
   const c = cfg("yolo", approval({ confirmBeforeWrite: true }));
   assert(!needsApproval(c, "write", { path: "README.md" }));
 });
 
-Deno.test("needsApproval: agent-mode whitelist skips approval", () => {
+test("needsApproval: agent-mode whitelist skips approval", () => {
   const c = cfg("agent", approval({ bashWhitelist: ["go ", "make "] }));
   assert(!needsApproval(c, "bash", { command: "go test ./..." }));
 });
 
-Deno.test("needsApproval: agent-mode project bash rules skip approval", () => {
+test("needsApproval: agent-mode project bash rules skip approval", () => {
   const allow: AllowConfig = {
     bashCommands: ["make test"],
     bashPrefixes: ["go test "],
@@ -95,13 +96,13 @@ Deno.test("needsApproval: agent-mode project bash rules skip approval", () => {
   assert(needsApproval(c, "bash", { command: "go env" }));
 });
 
-Deno.test("needsApproval: bash rules accept cmd alias", () => {
+test("needsApproval: bash rules accept cmd alias", () => {
   const allow: AllowConfig = { bashCommands: ["make test"] };
   const c = cfgAllow("agent", approval({}), allow);
   assert(!needsApproval(c, "bash", { cmd: "make test" }));
 });
 
-Deno.test("needsApproval: agent-mode blacklist forces approval", () => {
+test("needsApproval: agent-mode blacklist forces approval", () => {
   const c = cfg(
     "agent",
     approval({
@@ -112,30 +113,30 @@ Deno.test("needsApproval: agent-mode blacklist forces approval", () => {
   assert(needsApproval(c, "bash", { command: "rm -rf /tmp/demo" }));
 });
 
-Deno.test("needsApproval: blacklist overrides project bash allow", () => {
+test("needsApproval: blacklist overrides project bash allow", () => {
   const allow: AllowConfig = { bashCommands: ["rm -rf build"] };
   const c = cfgAllow("agent", approval({ bashBlacklist: ["rm -rf"] }), allow);
   assert(needsApproval(c, "bash", { command: "rm -rf build" }));
 });
 
-Deno.test("needsApproval: agent-mode non-whitelisted needs approval", () => {
+test("needsApproval: agent-mode non-whitelisted needs approval", () => {
   const c = cfg("agent", approval({ bashWhitelist: ["go "] }));
   assert(needsApproval(c, "bash", { command: "python script.py" }));
 });
 
-Deno.test("needsApproval: yolo-mode allows unless blacklisted", () => {
+test("needsApproval: yolo-mode allows unless blacklisted", () => {
   const c = cfg("yolo", approval({ bashBlacklist: ["rm -rf"] }));
   assert(!needsApproval(c, "bash", { command: "go test ./..." }));
   assert(needsApproval(c, "bash", { command: "rm -rf /" }));
 });
 
-Deno.test("needsApproval: os-mode allows unless blacklisted", () => {
+test("needsApproval: os-mode allows unless blacklisted", () => {
   const c = cfg("os", approval({ bashBlacklist: ["rm -rf"] }));
   assert(!needsApproval(c, "bash", { command: "go test ./..." }));
   assert(needsApproval(c, "bash", { command: "rm -rf /" }));
 });
 
-Deno.test("needsApproval: blacklist overrides whitelist", () => {
+test("needsApproval: blacklist overrides whitelist", () => {
   const c = cfg(
     "agent",
     approval({

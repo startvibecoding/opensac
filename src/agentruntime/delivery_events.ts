@@ -3,7 +3,7 @@
 // channel recovery never hand-assembles them. `json.RawMessage` maps to
 // decoded `unknown`; `time.Time` maps to `Date`.
 
-import type { RunEvent } from "./run_event.ts";
+import { type RunEvent } from "./run_event.ts";
 
 /**
  * Returns the compatibility payload used by existing channel recovery while

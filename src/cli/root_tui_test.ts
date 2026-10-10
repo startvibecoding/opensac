@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@opensac/assert";
+import { assertEquals, assertRejects } from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
 import {
   advanceEditorCaret,
@@ -6,8 +6,9 @@ import {
   runInteractiveAction,
   tuiResumeOptions,
 } from "./root_tui.ts";
+import { test } from "#testing";
 
-Deno.test("interactive refresh skips idle redraws", () => {
+test("interactive refresh skips idle redraws", () => {
   let rerenders = 0;
   const rerender = () => rerenders++;
 
@@ -18,7 +19,7 @@ Deno.test("interactive refresh skips idle redraws", () => {
   assertEquals(rerenders, 1);
 });
 
-Deno.test("caret blinks while a run streams without an extra repaint", () => {
+test("caret blinks while a run streams without an extra repaint", () => {
   // During a busy run the 100ms refresh timer already repaints, so the caret
   // toggles for the blink but the caret step never forces its own full repaint
   // (that periodic repaint is what flashed the whole managed block).
@@ -40,7 +41,7 @@ Deno.test("caret blinks while a run streams without an extra repaint", () => {
   assertEquals(repaints, 0);
 });
 
-Deno.test("idle caret stays solid with no periodic repaint", () => {
+test("idle caret stays solid with no periodic repaint", () => {
   // The regression: an idle caret must never force a repaint, or the managed
   // region flashes every blink tick on terminals without synchronized output.
   let toggles = 0;
@@ -59,7 +60,7 @@ Deno.test("idle caret stays solid with no periodic repaint", () => {
   assertEquals(blinking, false);
 });
 
-Deno.test("busy→idle edge restores a solid caret with one repaint", () => {
+test("busy→idle edge restores a solid caret with one repaint", () => {
   // The last busy blink can leave the caret hidden; the transition repaints
   // once so the idle editor shows a solid caret, then stops repainting.
   let toggles = 0;
@@ -81,7 +82,7 @@ Deno.test("busy→idle edge restores a solid caret with one repaint", () => {
   assertEquals(repaints, 1, "steady idle stays silent");
 });
 
-Deno.test("runInteractiveAction requires a terminal instead of crashing Ink", async () => {
+test("runInteractiveAction requires a terminal instead of crashing Ink", async () => {
   await assertRejects(
     () =>
       runInteractiveAction(
@@ -100,7 +101,7 @@ Deno.test("runInteractiveAction requires a terminal instead of crashing Ink", as
   );
 });
 
-Deno.test("tuiResumeOptions maps the session flags the TUI resumes from", () => {
+test("tuiResumeOptions maps the session flags the TUI resumes from", () => {
   // The original defect: `-c` was parsed and never reached the TUI, so every
   // launch opened a new empty session.
   assertEquals(

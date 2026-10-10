@@ -4,7 +4,7 @@
 // context, and the two `context.Context`s combine into a derived AbortSignal
 // that fires when either the run or its parent cancels.
 
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import {
   type Event as PublicEvent,
   eventDone,
@@ -17,7 +17,7 @@ import {
 } from "../../sdk/agent/mod.ts";
 import { type Event, EVENT_TOOL_APPROVAL_REQUEST } from "../agent/events.ts";
 import type { AgentManager } from "../agent/manager.ts";
-import type { RunContext } from "../agent/run_context.ts";
+import { type RunContext } from "../agent/run_context.ts";
 import {
   forwardChildAgentEvent,
   lastAssistantResponse,

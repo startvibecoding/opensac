@@ -10,11 +10,10 @@
 // Deviation: Go's `json.Decoder.DisallowUnknownFields` plus a trailing-value
 // EOF check maps to an explicit strict-key validation over `JSON.parse`.
 
-import type {
-  KnowledgeChunk,
-  KnowledgeGraphSnapshot,
-  KnowledgeNode,
-} from "../session/mod.ts";
+import {
+  type KnowledgeChunk,
+  type KnowledgeGraphSnapshot,
+  type KnowledgeNode} from "../session/mod.ts";
 import { generateID } from "../session/entry.ts";
 import { truncateKnowledgeText } from "./knowledge_context.ts";
 

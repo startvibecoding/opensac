@@ -1,5 +1,5 @@
 import { coreError, coreResult, type CoreRpcId } from "../core/protocol.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import {
   type ACPBridgeContext,
   type ACPRPCResponse,
@@ -9,8 +9,8 @@ import {
   mapCoreResponseToACP,
   mapCoreReverseRequestToACP,
 } from "./bridge_protocol.ts";
-import type { BridgeCoreClient } from "./bridge_client.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type BridgeCoreClient } from "./bridge_client.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 import { acpProtocolVersion } from "./wire.ts";
 
 export interface ACPBridgeOptions {

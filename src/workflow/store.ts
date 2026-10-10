@@ -3,7 +3,7 @@
 // `os.Rename` map to `Deno.makeTempFile` + `Deno.rename`; `ctx.Err()` maps to
 // `signal.aborted`. JSON dates revive back into `Date` objects on load.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import {
   type AgentResult,
   type PhaseState,

@@ -4,12 +4,13 @@
 // coordinator's startup scan, wake-driven convergence, idempotent start, and
 // coordinated stop over the shared recovery path.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
 import { getSessionRun, getSessionRunRecovery } from "../session/mod.ts";
 import { acquireExecutionAdmission } from "../session/runtime_lock.ts";
 import { type DurableRun, RecoveryCoordinator, RunStore } from "./mod.ts";
+import { test } from "#testing";
 
 function durableRun(overrides: Partial<DurableRun>): DurableRun {
   return {
@@ -62,7 +63,7 @@ async function waitFor(
   return predicate();
 }
 
-Deno.test("RecoveryCoordinatorStartupScanConvergesThenWakeReconverges", async () => {
+test("RecoveryCoordinatorStartupScanConvergesThenWakeReconverges", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-coordinator-" });
   const store = new RunStore(sessionDir);
   const coordinator = new RecoveryCoordinator(sessionDir, {

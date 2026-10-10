@@ -4,7 +4,7 @@
 // continuation worker's canonical run events after /esm create and resume, and
 // Ctrl+O / Ctrl+E layouts must adapt to the terminal size.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService, type FakeTUIService } from "./service.ts";
@@ -80,7 +80,7 @@ test(
     session.openToolModal();
     const view = session.toolModalView();
     const lines = view.split("\n");
-    // deno-lint-ignore no-control-regex
+    // eslint-disable-next-line no-control-regex
     const border = lines[0].replace(/\u001B\[[0-9;]*m/g, "");
     assert(border.startsWith("╭"));
     assertEquals(displayWidth(border), 70);
@@ -104,7 +104,7 @@ test(
     session.openESMPanel();
     const view = session.esmPanelView();
     const lines = view.split("\n");
-    // deno-lint-ignore no-control-regex
+    // eslint-disable-next-line no-control-regex
     const border = lines[0].replace(/\u001B\[[0-9;]*m/g, "");
     assert(border.startsWith("╭"));
     // esmPanelWidth subtracts 4 columns for the shell gutter.

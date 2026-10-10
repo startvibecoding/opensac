@@ -6,8 +6,8 @@
 // lines through its own Translator at record time; rendering takes snapshots,
 // mirroring the Go split between App state and render helpers.
 
-import type { Event } from "../agentruntime/events.ts";
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type Event } from "../agentruntime/events.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import {
   EVENT_DONE,
   EVENT_ERROR,

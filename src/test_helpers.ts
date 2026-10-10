@@ -23,5 +23,6 @@ export function testWithIsolatedConfig(
   name: string,
   fn: (context: Deno.TestContext) => void | Promise<void>,
 ): void {
-  Deno.test(name, (context) => withIsolatedConfig(() => fn(context)));
+  test(name, (context) => withIsolatedConfig(() => fn(context)));
+import { test } from "#testing";
 }

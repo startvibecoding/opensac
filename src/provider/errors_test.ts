@@ -6,14 +6,15 @@
 // point is that the real socket reason survives every wrap and reaches the
 // classifier readable rather than as the opaque "fetch failed".
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   errorChainText,
   isProviderTransportFailure,
   wrapError,
 } from "./errors.ts";
+import { test } from "#testing";
 
-Deno.test("errorChainText joins every link, oldest last", () => {
+test("errorChainText joins every link, oldest last", () => {
   const root = new Error("Connection refused (os error 111)");
   const mid = new Error("tcp connect error", { cause: root });
   const top = new TypeError("fetch failed", { cause: mid });
@@ -25,7 +26,7 @@ Deno.test("errorChainText joins every link, oldest last", () => {
   assertEquals(text.split("\n").length, 3);
 });
 
-Deno.test("errorChainText skips empty messages and object noise", () => {
+test("errorChainText skips empty messages and object noise", () => {
   // An empty-message wrapper must contribute nothing rather than a blank line.
   const blank = new Error("");
   blank.cause = new Error("real reason");
@@ -38,7 +39,7 @@ Deno.test("errorChainText skips empty messages and object noise", () => {
   );
 });
 
-Deno.test("errorChainText terminates on a cyclic cause chain", () => {
+test("errorChainText terminates on a cyclic cause chain", () => {
   const a = new Error("a");
   const b = new Error("b", { cause: a });
   (a as { cause?: unknown }).cause = b;
@@ -48,7 +49,7 @@ Deno.test("errorChainText terminates on a cyclic cause chain", () => {
   assertEquals(text.split("\n").length, 2);
 });
 
-Deno.test("wrapError keeps the original error as the cause", () => {
+test("wrapError keeps the original error as the cause", () => {
   const raw = new TypeError("fetch failed");
   const wrapped = wrapError("send request", raw);
   assert(wrapped instanceof Error);
@@ -56,7 +57,7 @@ Deno.test("wrapError keeps the original error as the cause", () => {
   assertEquals(wrapped.message, "send request: fetch failed");
 });
 
-Deno.test("wrapError names the deepest socket reason in the message", () => {
+test("wrapError names the deepest socket reason in the message", () => {
   const raw = new TypeError("fetch failed", {
     cause: new Error(
       "error sending request for url (https://api.test/v1): client error (Connect): tcp connect error: Connection refused (os error 111)",
@@ -73,7 +74,7 @@ Deno.test("wrapError names the deepest socket reason in the message", () => {
   assert(wrapped.message.includes("fetch failed"), wrapped.message);
 });
 
-Deno.test("wrapError does not repeat a reason the message already carries", () => {
+test("wrapError does not repeat a reason the message already carries", () => {
   const inner = new Error("upstream stream read error");
   const outer = new Error("stream read error: upstream stream read error", {
     cause: inner,
@@ -87,7 +88,7 @@ Deno.test("wrapError does not repeat a reason the message already carries", () =
   );
 });
 
-Deno.test("wrapError stringifies a non-Error thrown value", () => {
+test("wrapError stringifies a non-Error thrown value", () => {
   assertEquals(
     wrapError("stage", "plain string").message,
     "stage: plain string",
@@ -95,7 +96,7 @@ Deno.test("wrapError stringifies a non-Error thrown value", () => {
   assertEquals(wrapError("stage", 42).message, "stage: 42");
 });
 
-Deno.test("wrapError is idempotent over an already-wrapped chain", () => {
+test("wrapError is idempotent over an already-wrapped chain", () => {
   const raw = new TypeError("fetch failed", {
     cause: new Error(
       "dns error: failed to lookup address: Name or service not known",
@@ -115,7 +116,7 @@ Deno.test("wrapError is idempotent over an already-wrapped chain", () => {
   assertEquals(once.cause, raw);
 });
 
-Deno.test("isProviderTransportFailure recognizes every provider stage prefix", () => {
+test("isProviderTransportFailure recognizes every provider stage prefix", () => {
   // A dead socket reached through each provider's distinct `wrapError` prefix.
   const refused = new TypeError("fetch failed", {
     cause: new Error("Connection refused (os error 111)"),
@@ -144,13 +145,13 @@ Deno.test("isProviderTransportFailure recognizes every provider stage prefix", (
   );
 });
 
-Deno.test("isProviderTransportFailure names gateway and HTTP status faults", () => {
+test("isProviderTransportFailure names gateway and HTTP status faults", () => {
   assert(isProviderTransportFailure(new Error("HTTP 502: bad gateway")));
   assert(isProviderTransportFailure(new Error("upstream request timeout")));
   assert(isProviderTransportFailure(new Error("broken pipe")));
 });
 
-Deno.test("isProviderTransportFailure is false for a non-transport fault", () => {
+test("isProviderTransportFailure is false for a non-transport fault", () => {
   // A genuine internal role failure has no network signature and must NOT be
   // routed onto the transport-recovery path.
   assertEquals(

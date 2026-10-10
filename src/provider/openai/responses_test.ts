@@ -1,7 +1,7 @@
 // (non-session
 // cases) and the Responses API cases in provider_test.go.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../../compat/assert.ts";
 import { createProvider } from "../registry.ts";
 import {
   type ChatParams,
@@ -36,6 +36,7 @@ import {
   createMockOpenAIProvider,
   decodeBody,
 } from "./test_helpers.ts";
+import { test } from "#testing";
 
 function model(id: string, extra: Partial<Model> = {}): Model {
   return {
@@ -68,7 +69,7 @@ function readResponsesFixture(name: string): string {
   );
 }
 
-Deno.test("ResponsesChatFallsBackToSynchronousWhenBackgroundCoordinatorIsUnavailable", async () => {
+test("ResponsesChatFallsBackToSynchronousWhenBackgroundCoordinatorIsUnavailable", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
@@ -88,7 +89,7 @@ Deno.test("ResponsesChatFallsBackToSynchronousWhenBackgroundCoordinatorIsUnavail
   assertEquals(body["stream"], true);
 });
 
-Deno.test("ResponsesRequestDiagnosticsDescribeLocalFieldOmissions", () => {
+test("ResponsesRequestDiagnosticsDescribeLocalFieldOmissions", () => {
   const opts = { suppressConversation: true };
   const diagnostics = responsesRequestDiagnostics(
     params({ temperature: 0.4, topP: 0.4, responseOptions: opts }),
@@ -101,7 +102,7 @@ Deno.test("ResponsesRequestDiagnosticsDescribeLocalFieldOmissions", () => {
   assertEquals(diagnostics[1]["reason"], "remote_state_replay_fallback");
 });
 
-Deno.test("ResponsesStreamEmitsHostedItemLifecycleEvents", async () => {
+test("ResponsesStreamEmitsHostedItemLifecycleEvents", async () => {
   const { provider: p } = createMockOpenAIProvider(
     [model("responses-hosted")],
     readResponsesFixture("hosted_lifecycle.sse"),
@@ -123,7 +124,7 @@ Deno.test("ResponsesStreamEmitsHostedItemLifecycleEvents", async () => {
   assertEquals(lifecycle[1].outputIndex, 2);
 });
 
-Deno.test("OpenAIResponsesAPIRequest", async () => {
+test("OpenAIResponsesAPIRequest", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
@@ -153,7 +154,7 @@ Deno.test("OpenAIResponsesAPIRequest", async () => {
   assert((raw["prompt_cache_key"] as string) !== "");
 });
 
-Deno.test("OpenAIResponsesAPIConfigOverrides", async () => {
+test("OpenAIResponsesAPIConfigOverrides", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
@@ -182,7 +183,7 @@ Deno.test("OpenAIResponsesAPIConfigOverrides", async () => {
   assertEquals(raw["max_output_tokens"], 1234);
 });
 
-Deno.test("OpenAIResponsesAPIConfigAndResponseOptions", async () => {
+test("OpenAIResponsesAPIConfigAndResponseOptions", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
@@ -232,7 +233,7 @@ Deno.test("OpenAIResponsesAPIConfigAndResponseOptions", async () => {
   assertEquals(format["strict"], true);
 });
 
-Deno.test("OpenAIResponsesAPIConfigFieldsAreEncoded", async () => {
+test("OpenAIResponsesAPIConfigFieldsAreEncoded", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
@@ -272,7 +273,7 @@ Deno.test("OpenAIResponsesAPIConfigFieldsAreEncoded", async () => {
   assertEquals(format["strict"], false);
 });
 
-Deno.test("OpenAIResponsesAPIPreviousResponseIDIsEncoded", async () => {
+test("OpenAIResponsesAPIPreviousResponseIDIsEncoded", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
@@ -292,7 +293,7 @@ Deno.test("OpenAIResponsesAPIPreviousResponseIDIsEncoded", async () => {
   assert(!("conversation" in raw));
 });
 
-Deno.test("OpenAIResponsesAPIConversationCanBeSuppressedForReplay", () => {
+test("OpenAIResponsesAPIConversationCanBeSuppressedForReplay", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -316,7 +317,7 @@ Deno.test("OpenAIResponsesAPIConversationCanBeSuppressedForReplay", () => {
   assertEquals(req.conversation ?? "", "");
 });
 
-Deno.test("OpenAIResponsesAPINativeReplayItemsArePreserved", async () => {
+test("OpenAIResponsesAPINativeReplayItemsArePreserved", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test")],
     "data: [DONE]\n",
@@ -350,7 +351,7 @@ Deno.test("OpenAIResponsesAPINativeReplayItemsArePreserved", async () => {
   assert(body.includes(`"call_id":"call_1"`));
 });
 
-Deno.test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
+test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -411,7 +412,7 @@ Deno.test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
   assertEquals(input[2].output, "hello");
 });
 
-Deno.test("OpenAIResponsesAPICustomToolContentListOutput", () => {
+test("OpenAIResponsesAPICustomToolContentListOutput", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -448,7 +449,7 @@ Deno.test("OpenAIResponsesAPICustomToolContentListOutput", () => {
   assertEquals(content[2].filename, "report.csv");
 });
 
-Deno.test("OpenAIResponsesAPIRejectsInvalidCustomToolFormat", () => {
+test("OpenAIResponsesAPIRejectsInvalidCustomToolFormat", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -474,7 +475,7 @@ Deno.test("OpenAIResponsesAPIRejectsInvalidCustomToolFormat", () => {
   assert(error!.message.includes("grammar syntax"));
 });
 
-Deno.test("OpenAIResponsesAPIRejectsInvalidNativeReplayItem", () => {
+test("OpenAIResponsesAPIRejectsInvalidNativeReplayItem", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -498,7 +499,7 @@ Deno.test("OpenAIResponsesAPIRejectsInvalidNativeReplayItem", () => {
   assert(error!.message.includes("replay item"));
 });
 
-Deno.test("OpenAIResponsesAPIRejectsInvalidConfig", () => {
+test("OpenAIResponsesAPIRejectsInvalidConfig", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -513,7 +514,7 @@ Deno.test("OpenAIResponsesAPIRejectsInvalidConfig", () => {
   assert(error!.message.includes("conversation"));
 });
 
-Deno.test("OpenAIResponsesAPIValidatesStrictStructuredOutputSchema", () => {
+test("OpenAIResponsesAPIValidatesStrictStructuredOutputSchema", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -560,7 +561,7 @@ Deno.test("OpenAIResponsesAPIValidatesStrictStructuredOutputSchema", () => {
   });
 });
 
-Deno.test("OpenAIResponsesStateFallbackError", () => {
+test("OpenAIResponsesStateFallbackError", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
@@ -578,7 +579,7 @@ Deno.test("OpenAIResponsesStateFallbackError", () => {
   }
 });
 
-Deno.test("OpenAIResponsesAPIStreamToolCall", async () => {
+test("OpenAIResponsesAPIStreamToolCall", async () => {
   const lines = [
     `{"type":"response.output_text.delta","delta":"Working"}`,
     `{"type":"response.function_call_arguments.delta","item_id":"call_1","delta":"{\\"command\\":"}`,
@@ -621,7 +622,7 @@ Deno.test("OpenAIResponsesAPIStreamToolCall", async () => {
   assert(gotDone);
 });
 
-Deno.test("OpenAIResponsesAPISupportsDoneOnlyTextEvent", async () => {
+test("OpenAIResponsesAPISupportsDoneOnlyTextEvent", async () => {
   const sse =
     'data: {"type":"response.output_text.done","text":"done-only"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n' +
@@ -640,7 +641,7 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyTextEvent", async () => {
   assertEquals(text, "done-only");
 });
 
-Deno.test("OpenAIResponsesAPISupportsDoneOnlyRefusalEvent", async () => {
+test("OpenAIResponsesAPISupportsDoneOnlyRefusalEvent", async () => {
   const sse =
     'data: {"type":"response.refusal.done","refusal":"cannot comply"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n';
@@ -658,7 +659,7 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyRefusalEvent", async () => {
   assertEquals(text, "cannot comply");
 });
 
-Deno.test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
+test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
   const sse =
     'data: {"type":"response.reasoning_summary_text.done","text":"think-only"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n';
@@ -682,7 +683,7 @@ Deno.test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
   assertEquals(reasoning, "think-only");
 });
 
-Deno.test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
+test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", {
       reasoning: true,
@@ -708,7 +709,7 @@ Deno.test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
   assert(!("summary" in reasoning));
 });
 
-Deno.test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
+test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
   const { provider: p } = createMockOpenAIProvider(
     [model("responses-test", {
       compat: { supportsLongCacheRetention: false },
@@ -729,7 +730,7 @@ Deno.test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
   assert((events[0].error?.message ?? "").includes("prompt_cache_retention"));
 });
 
-Deno.test("OpenAIResponsesAPIPromptCacheCanBeDisabled", async () => {
+test("OpenAIResponsesAPIPromptCacheCanBeDisabled", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
@@ -748,7 +749,7 @@ Deno.test("OpenAIResponsesAPIPromptCacheCanBeDisabled", async () => {
   assert(!("prompt_cache_key" in raw));
 });
 
-Deno.test("OpenAIResponsesAPINoReasoningWhenOff", async () => {
+test("OpenAIResponsesAPINoReasoningWhenOff", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
     [model("responses-test", { reasoning: true })],
     "data: [DONE]\n",
@@ -766,7 +767,7 @@ Deno.test("OpenAIResponsesAPINoReasoningWhenOff", async () => {
   assert(!("reasoning" in raw));
 });
 
-Deno.test("OpenAIResponsesFactoryEnablesResponsesMode", () => {
+test("OpenAIResponsesFactoryEnablesResponsesMode", () => {
   const p = createProvider("openai-responses", {
     api: "openai-responses",
     apiKey: "k",

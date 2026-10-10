@@ -9,7 +9,7 @@
 // field rather than Go interface type switches; `json.RawMessage` tool-call
 // arguments clone structurally instead of as raw bytes.
 
-import type { ContentBlock, Message } from "../provider/types.ts";
+import { type ContentBlock, type Message } from "../provider/types.ts";
 import { createSystemInjectedUserMessage } from "../provider/types.ts";
 import {
   type CompactionEntry,

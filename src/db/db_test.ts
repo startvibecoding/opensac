@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   close,
   closeAll,
@@ -9,13 +9,14 @@ import {
   schemaIncompatible,
   takeMigrationRecoveries,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function tempDbPath(name: string): string {
   const dir = Deno.makeTempDirSync({ prefix: "opensac-db-test-" });
   return `${dir}/${name}`;
 }
 
-Deno.test("open caches connections by canonical path", () => {
+test("open caches connections by canonical path", () => {
   const p = tempDbPath("a.db");
   const a = open(p);
   const b = open(p);
@@ -23,7 +24,7 @@ Deno.test("open caches connections by canonical path", () => {
   closeAll();
 });
 
-Deno.test("open enables WAL and runs the migrator once", () => {
+test("open enables WAL and runs the migrator once", () => {
   const p = tempDbPath("b.db");
   let runs = 0;
   const db = open(p, (conn) => {
@@ -38,7 +39,7 @@ Deno.test("open enables WAL and runs the migrator once", () => {
   closeAll();
 });
 
-Deno.test("write runs a transaction and commits", () => {
+test("write runs a transaction and commits", () => {
   const p = tempDbPath("c.db");
   const db = open(p, (conn) => conn.exec("CREATE TABLE t(a INTEGER)"));
   const result = runInTx(db, (conn) => {
@@ -54,7 +55,7 @@ Deno.test("write runs a transaction and commits", () => {
   closeAll();
 });
 
-Deno.test("write rolls back on error", () => {
+test("write rolls back on error", () => {
   const p = tempDbPath("d.db");
   const db = open(p, (conn) => conn.exec("CREATE TABLE t(a INTEGER)"));
   assertThrows(() =>
@@ -67,7 +68,7 @@ Deno.test("write rolls back on error", () => {
   closeAll();
 });
 
-Deno.test("schema-incompatible migration is backed up and rebuilt", () => {
+test("schema-incompatible migration is backed up and rebuilt", () => {
   const p = tempDbPath("e.db");
   // The migrator creates the schema, but refuses a legacy database the way a
   // real migration would: on the rebuilt (empty) database it succeeds.
@@ -97,7 +98,7 @@ Deno.test("schema-incompatible migration is backed up and rebuilt", () => {
   closeAll();
 });
 
-Deno.test("non-incompatible migration error is reported unchanged", () => {
+test("non-incompatible migration error is reported unchanged", () => {
   const p = tempDbPath("f.db");
   assertThrows(
     () =>
@@ -111,7 +112,7 @@ Deno.test("non-incompatible migration error is reported unchanged", () => {
   closeAll();
 });
 
-Deno.test("read-only standalone opens an existing database", () => {
+test("read-only standalone opens an existing database", () => {
   const p = tempDbPath("g.db");
   const db = open(p, (conn) => conn.exec("CREATE TABLE t(a INTEGER)"));
   db.run("INSERT INTO t VALUES (1)");

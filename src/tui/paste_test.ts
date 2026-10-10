@@ -1,15 +1,16 @@
 // Focused tests for paste folding/expansion (Go handlePaste / expandPasteMarkers).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { PasteStore } from "./paste.ts";
+import { test } from "#testing";
 
-Deno.test("small pastes insert directly without a marker", () => {
+test("small pastes insert directly without a marker", () => {
   const store = new PasteStore();
   assertEquals(store.fold("hello world"), "hello world");
   assertEquals(store.size, 0);
 });
 
-Deno.test("multi-line pastes fold to a line marker", () => {
+test("multi-line pastes fold to a line marker", () => {
   const store = new PasteStore();
   const payload = Array.from({ length: 8 }, (_, i) => `line ${i}`).join("\n");
   const marker = store.fold(payload);
@@ -17,14 +18,14 @@ Deno.test("multi-line pastes fold to a line marker", () => {
   assertEquals(store.size, 1);
 });
 
-Deno.test("single-line long pastes fold to a char marker", () => {
+test("single-line long pastes fold to a char marker", () => {
   const store = new PasteStore();
   const payload = "x".repeat(600);
   const marker = store.fold(payload);
   assertEquals(marker, "[paste #1 600 chars]");
 });
 
-Deno.test("expand restores folded content and drops the used entry", () => {
+test("expand restores folded content and drops the used entry", () => {
   const store = new PasteStore();
   const payload = Array.from({ length: 8 }, (_, i) => `l${i}`).join("\n");
   const marker = store.fold(payload);
@@ -35,7 +36,7 @@ Deno.test("expand restores folded content and drops the used entry", () => {
   assertEquals(store.size, 0);
 });
 
-Deno.test("expand leaves unreferenced pastes intact", () => {
+test("expand leaves unreferenced pastes intact", () => {
   const store = new PasteStore();
   store.fold("x".repeat(600));
   assertEquals(store.expand("no marker here"), "no marker here");

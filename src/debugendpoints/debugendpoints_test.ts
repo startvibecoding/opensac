@@ -1,4 +1,4 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   ADDR_ENV,
   createDebugHandler,
@@ -7,8 +7,9 @@ import {
   resetDebugServer,
   start,
 } from "./debugendpoints.ts";
+import { test } from "#testing";
 
-Deno.test("ServesExpvarsWithSQLiteStats", async () => {
+test("ServesExpvarsWithSQLiteStats", async () => {
   const req = new Request("http://127.0.0.1/debug/vars");
   const resp = createDebugHandler()(req);
   assertEquals(resp.status, 200);
@@ -16,7 +17,7 @@ Deno.test("ServesExpvarsWithSQLiteStats", async () => {
   assertEquals(typeof vars["opensac_sqlite"], "object");
 });
 
-Deno.test("ListenAddrDefaultsToLocalhost", () => {
+test("ListenAddrDefaultsToLocalhost", () => {
   const prev = Deno.env.get(ADDR_ENV);
   Deno.env.set(ADDR_ENV, "");
   try {
@@ -27,7 +28,7 @@ Deno.test("ListenAddrDefaultsToLocalhost", () => {
   }
 });
 
-Deno.test("ListenAddrUsesEnvOverride", () => {
+test("ListenAddrUsesEnvOverride", () => {
   const prev = Deno.env.get(ADDR_ENV);
   Deno.env.set(ADDR_ENV, "127.0.0.1:0");
   try {
@@ -38,13 +39,13 @@ Deno.test("ListenAddrUsesEnvOverride", () => {
   }
 });
 
-Deno.test("ServesPprofIndex", () => {
+test("ServesPprofIndex", () => {
   const req = new Request("http://127.0.0.1/debug/pprof/");
   const resp = createDebugHandler()(req);
   assertEquals(resp.status, 200);
 });
 
-Deno.test("StartServesDebugServer", async () => {
+test("StartServesDebugServer", async () => {
   const prev = Deno.env.get(ADDR_ENV);
   Deno.env.set(ADDR_ENV, "127.0.0.1:0");
   resetDebugServer();

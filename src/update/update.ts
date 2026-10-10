@@ -3,7 +3,7 @@
 // npm registry. It never blocks the user: network checks run in the background
 // and failures only affect the update notification.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { configDir } from "../config/settings.ts";
 import { userAgent } from "../ua/ua.ts";
 import * as semver from "./semver.ts";

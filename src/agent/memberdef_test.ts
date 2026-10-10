@@ -1,7 +1,8 @@
 // (pure cases).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { createMemberDefRegistry, type MemberDef } from "./memberdef.ts";
+import { test } from "#testing";
 
 function def(id: string, displayName = ""): MemberDef {
   return {
@@ -18,7 +19,7 @@ function def(id: string, displayName = ""): MemberDef {
   };
 }
 
-Deno.test("createMemberDefRegistry order and lookup", () => {
+test("createMemberDefRegistry order and lookup", () => {
   const defs = [
     def("lead", "交付总监"),
     null,
@@ -39,7 +40,7 @@ Deno.test("createMemberDefRegistry order and lookup", () => {
   assertEquals(r.ids(), ["lead", "engineer"]);
 });
 
-Deno.test("createMemberDefRegistry empty", () => {
+test("createMemberDefRegistry empty", () => {
   const r = createMemberDefRegistry([]);
   assertEquals(r.ids().length, 0);
   assertEquals(r.get("any"), undefined);

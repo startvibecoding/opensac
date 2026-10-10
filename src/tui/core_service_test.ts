@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import {
   coreResult,
   type CoreRpcNotification,
@@ -11,6 +11,7 @@ import {
   type TUICoreEventConnection,
 } from "./core_service.ts";
 import { TUIServiceError } from "./service.ts";
+import { test } from "#testing";
 
 const SESSION_VIEW = {
   sessionId: "session-1",
@@ -162,7 +163,7 @@ function fakeClient(
   };
 }
 
-Deno.test("core TUIService forwards session creation without adapter defaults", async () => {
+test("core TUIService forwards session creation without adapter defaults", async () => {
   const client = fakeClient({ "session.create": SESSION_VIEW });
   const service = createCoreClientTUIService(client, {
     now: () => new Date("2026-01-03T00:00:00.000Z"),
@@ -206,7 +207,7 @@ Deno.test("core TUIService forwards session creation without adapter defaults", 
   });
 });
 
-Deno.test("core TUIService maps prompt, cancel, and config calls to Core methods", async () => {
+test("core TUIService maps prompt, cancel, and config calls to Core methods", async () => {
   const client = fakeClient({
     "session.prompt": {
       sessionId: "session-1",
@@ -262,7 +263,7 @@ Deno.test("core TUIService maps prompt, cancel, and config calls to Core methods
   });
 });
 
-Deno.test("core TUIService rethrows prompt errors unchanged", async () => {
+test("core TUIService rethrows prompt errors unchanged", async () => {
   const marker = new Error("provider exploded");
   const client = fakeClient({}, {
     failWith: (method) => method === "session.prompt" ? marker : undefined,
@@ -278,7 +279,7 @@ Deno.test("core TUIService rethrows prompt errors unchanged", async () => {
   assertEquals(caught, marker);
 });
 
-Deno.test("core TUIService streams replayed events then live events until terminal", async () => {
+test("core TUIService streams replayed events then live events until terminal", async () => {
   const client = fakeClient();
   client.events.replayed = [event(1, "run_started", false)];
   const service = createCoreClientTUIService(client);
@@ -300,7 +301,7 @@ Deno.test("core TUIService streams replayed events then live events until termin
   assertEquals(client.events.listenerCount, 0);
 });
 
-Deno.test("core TUIService starts event streams from the requested cursor", async () => {
+test("core TUIService starts event streams from the requested cursor", async () => {
   const client = fakeClient();
   client.events.replayed = [
     event(1, "run_started", false),
@@ -320,7 +321,7 @@ Deno.test("core TUIService starts event streams from the requested cursor", asyn
   ]);
 });
 
-Deno.test("core TUIService redials a dropped run stream and finishes from the replacement", async () => {
+test("core TUIService redials a dropped run stream and finishes from the replacement", async () => {
   // Fresh per dial, as a real client hands out one socket per connection.
   const client = fakeClient({}, { freshEvents: true });
   const service = createCoreClientTUIService(client);
@@ -353,7 +354,7 @@ Deno.test("core TUIService redials a dropped run stream and finishes from the re
   assertEquals(await iterator.next(), { done: true, value: undefined });
 });
 
-Deno.test("core TUIService gives up on a run stream that keeps dropping", async () => {
+test("core TUIService gives up on a run stream that keeps dropping", async () => {
   // Every dial dies immediately with no events: an empty replay plus a drop
   // right after it, which is what "the replacement Core died again" looks
   // like from the stream's side.
@@ -393,7 +394,7 @@ async function settle(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
 
-Deno.test("core TUIService reports missing capabilities explicitly", async () => {
+test("core TUIService reports missing capabilities explicitly", async () => {
   const client = fakeClient();
   const service = createCoreClientTUIService(client);
 
@@ -416,7 +417,7 @@ Deno.test("core TUIService reports missing capabilities explicitly", async () =>
   assertEquals(client.calls, []);
 });
 
-Deno.test("core TUIService projects the secret-safe settings view", async () => {
+test("core TUIService projects the secret-safe settings view", async () => {
   const client = fakeClient({
     "manage.settings.get": {
       defaultProvider: "test-provider",
@@ -456,7 +457,7 @@ Deno.test("core TUIService projects the secret-safe settings view", async () => 
   ]);
 });
 
-Deno.test("core TUIService maps skill activation onto the Core skill method", async () => {
+test("core TUIService maps skill activation onto the Core skill method", async () => {
   const client = fakeClient({
     "session.skill.set": { sessionId: "session-1", activeSkills: ["review"] },
     "session.config.get": { ...SESSION_VIEW, capabilities: {} },
@@ -496,7 +497,7 @@ Deno.test("core TUIService maps skill activation onto the Core skill method", as
   }]);
 });
 
-Deno.test("core TUIService lists attachments for the session", async () => {
+test("core TUIService lists attachments for the session", async () => {
   const client = fakeClient({
     "attachment.list": {
       attachments: [{
@@ -529,7 +530,7 @@ Deno.test("core TUIService lists attachments for the session", async () => {
   });
 });
 
-Deno.test("core TUIService materializes prepared inputs through the Core", async () => {
+test("core TUIService materializes prepared inputs through the Core", async () => {
   const client = fakeClient({
     "input.prepare": {
       resourceId: "resource-1",
@@ -560,7 +561,7 @@ Deno.test("core TUIService materializes prepared inputs through the Core", async
   assertEquals(client.calls[0].method, "input.prepare");
 });
 
-Deno.test("core TUIService projects capability discovery metadata", async () => {
+test("core TUIService projects capability discovery metadata", async () => {
   const client = fakeClient({
     "session.capabilities": {
       sandbox: { enabled: true, available: true },
@@ -580,7 +581,7 @@ Deno.test("core TUIService projects capability discovery metadata", async () => 
   });
 });
 
-Deno.test("core TUIService rejects malformed Core views", async () => {
+test("core TUIService rejects malformed Core views", async () => {
   const client = fakeClient({
     "session.create": { sessionId: "session-1" },
     "session.open": null,
@@ -599,7 +600,7 @@ Deno.test("core TUIService rejects malformed Core views", async () => {
   );
 });
 
-Deno.test("core TUIService maps missing timestamps to the provided clock", async () => {
+test("core TUIService maps missing timestamps to the provided clock", async () => {
   const { createdAt: _createdAt, updatedAt: _updatedAt, ...withoutDates } =
     SESSION_VIEW;
   const client = fakeClient({ "session.create": withoutDates });
@@ -616,7 +617,7 @@ Deno.test("core TUIService maps missing timestamps to the provided clock", async
   assertEquals(view.updatedAt.toISOString(), "2026-02-01T00:00:00.000Z");
 });
 
-Deno.test("core TUIService reads and updates settings documents through the Core", async () => {
+test("core TUIService reads and updates settings documents through the Core", async () => {
   const client = fakeClient({
     "settings.get": { defaultProvider: "p", defaultModel: "m", providers: {} },
     "settings.update": {
@@ -661,7 +662,7 @@ Deno.test("core TUIService reads and updates settings documents through the Core
   assertEquals(updated.defaultProvider, "p2");
 });
 
-Deno.test("core TUIService projects the provider catalog and validates pairs", async () => {
+test("core TUIService projects the provider catalog and validates pairs", async () => {
   const client = fakeClient({
     "model.catalog": [{
       id: "test-provider",
@@ -699,7 +700,7 @@ Deno.test("core TUIService projects the provider catalog and validates pairs", a
   });
 });
 
-Deno.test("core TUIService rethrows provider validation errors with the raw cause", async () => {
+test("core TUIService rethrows provider validation errors with the raw cause", async () => {
   const client = fakeClient({}, {
     failWith: (method) =>
       method === "model.validate"
@@ -717,7 +718,7 @@ Deno.test("core TUIService rethrows provider validation errors with the raw caus
   );
 });
 
-Deno.test("core TUIService round-trips env and session context documents", async () => {
+test("core TUIService round-trips env and session context documents", async () => {
   const client = fakeClient({
     "env.list": { A: "1" },
     "env.update": { A: "2" },
@@ -751,7 +752,7 @@ Deno.test("core TUIService round-trips env and session context documents", async
   });
 });
 
-Deno.test("core TUIService maps expert commands and forks onto Core methods", async () => {
+test("core TUIService maps expert commands and forks onto Core methods", async () => {
   const client = fakeClient({
     "expert.list": [{
       name: "demo-expert",
@@ -822,7 +823,7 @@ Deno.test("core TUIService maps expert commands and forks onto Core methods", as
   assertEquals(child.sessionId, "session-2");
 });
 
-Deno.test("core TUIService maps agent, delegate, ESM, transient, and compact calls to Core methods", async () => {
+test("core TUIService maps agent, delegate, ESM, transient, and compact calls to Core methods", async () => {
   const objective = {
     sessionId: "session-1",
     esmId: "esm-1",
@@ -954,7 +955,7 @@ Deno.test("core TUIService maps agent, delegate, ESM, transient, and compact cal
   });
 });
 
-Deno.test("core TUIService re-establishes the decision bridge after the Core drops it", async () => {
+test("core TUIService re-establishes the decision bridge after the Core drops it", async () => {
   const client = fakeClient(
     {
       "session.prompt": {
@@ -981,7 +982,7 @@ Deno.test("core TUIService re-establishes the decision bridge after the Core dro
   assertEquals(client.eventConnections[0].listenerCount, 0);
 });
 
-Deno.test("core TUIService retries the decision bridge after a failed dial", async () => {
+test("core TUIService retries the decision bridge after a failed dial", async () => {
   let failNext = true;
   const client = fakeClient(
     {
@@ -1009,7 +1010,7 @@ Deno.test("core TUIService retries the decision bridge after a failed dial", asy
   assertEquals(client.eventConnections.length, 2);
 });
 
-Deno.test("core TUIService reports a Core restart and the reconnect that follows", async () => {
+test("core TUIService reports a Core restart and the reconnect that follows", async () => {
   const client = fakeClient(
     {
       "session.prompt": {
@@ -1039,7 +1040,7 @@ Deno.test("core TUIService reports a Core restart and the reconnect that follows
   assertEquals(states.length, 3, "an unsubscribed listener hears nothing");
 });
 
-Deno.test("core TUIService projects session.transcript and rejects a broken role", async () => {
+test("core TUIService projects session.transcript and rejects a broken role", async () => {
   const service = createCoreClientTUIService(
     fakeClient({
       "session.transcript": [

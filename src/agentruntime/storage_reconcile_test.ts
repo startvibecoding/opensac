@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   defaultAttachmentPolicy,
   type SessionAttachment,
@@ -14,6 +14,7 @@ import {
 } from "./storage_reconcile.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases, rootDBPath } from "../session/root_db.ts";
+import { test } from "#testing";
 
 const artifactReconcileGraceMs = 24 * 60 * 60 * 1000;
 
@@ -76,7 +77,7 @@ function exists(p: string): boolean {
   }
 }
 
-Deno.test("ReconcileArtifactStorageReclaimsOnlyAgedUnreferenced", async () => {
+test("ReconcileArtifactStorageReclaimsOnlyAgedUnreferenced", async () => {
   const { root, sessionId } = inputTestSession();
   try {
     const service = new AttachmentService(root, defaultAttachmentPolicy());
@@ -126,7 +127,7 @@ Deno.test("ReconcileArtifactStorageReclaimsOnlyAgedUnreferenced", async () => {
   }
 });
 
-Deno.test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () => {
+test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () => {
   const policy = defaultAttachmentPolicy();
   const now = new Date();
 
@@ -165,7 +166,7 @@ Deno.test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () 
   closeDatabases();
 });
 
-Deno.test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
+test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
   const { root, sessionId } = inputTestSession();
   void sessionId;
   try {
@@ -197,7 +198,7 @@ Deno.test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
   }
 });
 
-Deno.test("ReconcileArtifactStorageOpportunisticRunsOncePerInterval", async () => {
+test("ReconcileArtifactStorageOpportunisticRunsOncePerInterval", async () => {
   const { root, sessionId } = inputTestSession();
   void sessionId;
   try {
@@ -226,7 +227,7 @@ Deno.test("ReconcileArtifactStorageOpportunisticRunsOncePerInterval", async () =
   }
 });
 
-Deno.test("ArtifactReclaimFloorIsRetentionPlusGrace", () => {
+test("ArtifactReclaimFloorIsRetentionPlusGrace", () => {
   const now = new Date(Date.UTC(2026, 0, 2, 3, 4, 5));
   const floor = artifactReclaimFloor(defaultAttachmentPolicy(), now);
   const want = now.getTime() -

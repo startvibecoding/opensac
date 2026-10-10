@@ -3,7 +3,7 @@
 // `AcpServer`, bind an in-memory sink, and call `handleAgentEvent` directly,
 // mirroring the Go fixture server.
 
-import { assert, assertEquals, assertStrictEquals } from "@opensac/assert";
+import { assert, assertEquals, assertStrictEquals } from "../compat/assert.ts";
 import {
   AcpServer,
   type AcpServerSink,
@@ -34,8 +34,9 @@ import {
   type Model,
   type Usage,
 } from "../provider/types.ts";
-import type { FileDiff } from "../tools/mod.ts";
+import { type FileDiff } from "../tools/mod.ts";
 import { createSession } from "../agentruntime/session_lifecycle.ts";
+import { test } from "#testing";
 
 /** A synchronous in-memory sink, the port of the Go `syncedBuffer` fixture. */
 class SyncBuffer implements AcpServerSink {
@@ -145,7 +146,7 @@ function makeDiff(
   };
 }
 
-Deno.test("handleAgentEvent projects tool-result images", () => {
+test("handleAgentEvent projects tool-result images", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   const payload = btoa("screenshot-bytes");
@@ -178,7 +179,7 @@ Deno.test("handleAgentEvent projects tool-result images", () => {
   assertEquals(rawOutput.content, "image attached");
 });
 
-Deno.test("tool boundary starts a new assistant message", () => {
+test("tool boundary starts a new assistant message", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   const rt = new ACPSessionRuntime();
@@ -226,7 +227,7 @@ Deno.test("tool boundary starts a new assistant message", () => {
   assert(updates[0].messageId !== updates[3].messageId);
 });
 
-Deno.test("plan update uses the standard plan variant", () => {
+test("plan update uses the standard plan variant", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -245,7 +246,7 @@ Deno.test("plan update uses the standard plan variant", () => {
   assertEquals(entry.status, "in_progress");
 });
 
-Deno.test("opensac status uses an extension notification", () => {
+test("opensac status uses an extension notification", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -256,7 +257,7 @@ Deno.test("opensac status uses an extension notification", () => {
   assertEquals(message.method, "_opensac/session_event");
 });
 
-Deno.test("opensac retry uses a structured extension notification", () => {
+test("opensac retry uses a structured extension notification", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -279,7 +280,7 @@ Deno.test("opensac retry uses a structured extension notification", () => {
   assert(!message.includes("provider diagnostic"));
 });
 
-Deno.test("hosted item uses a non-executable tool update", () => {
+test("hosted item uses a non-executable tool update", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -297,7 +298,7 @@ Deno.test("hosted item uses a non-executable tool update", () => {
   assertEquals(update.status, "completed");
 });
 
-Deno.test("tool diff uses ACP structured content and locations", () => {
+test("tool diff uses ACP structured content and locations", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   const oldText = "before\n";
@@ -321,7 +322,7 @@ Deno.test("tool diff uses ACP structured content and locations", () => {
   assertEquals(locations[0].path, path);
 });
 
-Deno.test("tool diff includes null oldText for a created file", () => {
+test("tool diff includes null oldText for a created file", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -336,7 +337,7 @@ Deno.test("tool diff includes null oldText for a created file", () => {
   assertStrictEquals(diff.oldText, null);
 });
 
-Deno.test("streamed content chunks share a message ID", () => {
+test("streamed content chunks share a message ID", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.handleAgentEvent("session-1", {
@@ -357,7 +358,7 @@ Deno.test("streamed content chunks share a message ID", () => {
   assertEquals(first.messageId, second.messageId);
 });
 
-Deno.test("usage event emits a cumulative usage update", () => {
+test("usage event emits a cumulative usage update", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.m = makeModel({
@@ -428,7 +429,7 @@ Deno.test("usage event emits a cumulative usage update", () => {
   assertEquals(meta.totalInputTokens, 122);
 });
 
-Deno.test("persisted session usage shares the usage-update baseline", () => {
+test("persisted session usage shares the usage-update baseline", () => {
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-usage-" });
   const sessionDir = `${root}/sessions`;
   Deno.mkdirSync(sessionDir, { recursive: true });
@@ -505,7 +506,7 @@ Deno.test("persisted session usage shares the usage-update baseline", () => {
   Deno.removeSync(root, { recursive: true });
 });
 
-Deno.test("terminal run events project the structured status", () => {
+test("terminal run events project the structured status", () => {
   const cases: Array<{
     event: AgentEvent;
     status: string;
@@ -555,7 +556,7 @@ Deno.test("terminal run events project the structured status", () => {
   }
 });
 
-Deno.test("child terminal events never project a parent terminal", () => {
+test("child terminal events never project a parent terminal", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   server.sessions.set("session-1", new ACPSessionRuntime());

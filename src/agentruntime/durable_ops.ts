@@ -4,7 +4,7 @@
 // `RunStore`; this module owns no SQL.
 
 import { listSessionRunEvents } from "../session/mod.ts";
-import type { SessionRun } from "../session/mod.ts";
+import { type SessionRun } from "../session/mod.ts";
 import { type RunEvent, SessionRunEventSink } from "./run_event.ts";
 import { type RunState } from "./run_state.ts";
 import { type DurableRun, RunStore } from "./run_store.ts";

@@ -40,7 +40,11 @@ const eventColumns = `id, session_id AS sessionId, resource_id AS resourceId,
   run_id AS runId, event_type AS eventType, status, timestamp, data`;
 
 export class InputResourceDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   insert(executor: DB, record: InputResourceRecord): void {
     execChanges(

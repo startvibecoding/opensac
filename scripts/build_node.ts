@@ -12,8 +12,9 @@
 // Run: `deno task build:node` (output: dist/node). This does NOT publish.
 
 import * as esbuild from "npm:esbuild@^0.28.2";
-import { dirname, fromFileUrl, join, resolve } from "@opensac/path";
+import { dirname, fromFileUrl, join, resolve } from "../src/compat/path.ts";
 import { resolveBuildVersion, toPackageVersion } from "./version.ts";
+import { isMainModule } from "../src/platform/node_compat.ts";
 
 /**
  * npm package name of the platform-independent package. The bare `opensac` is
@@ -149,10 +150,10 @@ async function main(): Promise<void> {
     jsxFragment: "React.Fragment",
     alias: aliasMap(REPO_DIR),
     external: EXTERNAL,
-    // The bundle is the bin entry, so its main guard must run. The banner also
-    // embeds the release version as the `OPENSAC_BUILD_VERSION` default, the
-    // same value the old binary build baked in.
-    define: { "import.meta.main": "true" },
+    // The banner embeds the release version as the `OPENSAC_BUILD_VERSION`
+    // default, the same value the old binary build baked in. The bundle's main
+    // guard uses `isMainModule(import.meta.url)`, which needs no define.
+    define: {},
     banner: {
       js: `#!/usr/bin/env node\nprocess.env.OPENSAC_BUILD_VERSION ??= ${
         JSON.stringify(version)
@@ -172,4 +173,4 @@ async function main(): Promise<void> {
   console.error(`Wrote ${OUT_DIR}`);
 }
 
-if (import.meta.main) await main();
+if (isMainModule(import.meta.url)) await main();

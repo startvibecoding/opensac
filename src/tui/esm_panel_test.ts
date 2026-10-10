@@ -2,7 +2,7 @@
 // ESM panel rendering pipeline (phase/pipeline/progress math, field
 // wrapping, live activity lines, full panel assembly).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   stripANSI,
   truncateANSI,
@@ -22,15 +22,16 @@ import {
   formatDurationMSForPanel,
   renderESMPipeline,
 } from "./esm_panel.ts";
-import type { Objective } from "../esm/state.ts";
+import { type Objective } from "../esm/state.ts";
 import {
   statusBlocked,
   statusComplete,
   statusCompleteCandidate,
   statusPaused,
 } from "../esm/state.ts";
-import type { AgentActivity } from "./activity.ts";
+import { type AgentActivity } from "./activity.ts";
 import { Translator } from "./i18n.ts";
+import { test } from "#testing";
 
 function makeObjective(partial: Partial<Objective> = {}): Objective {
   return {
@@ -63,7 +64,7 @@ const tr = new Translator("en");
 
 // ─── renderutil ─────────────────────────────────────────────────────────────
 
-Deno.test("visibleWidth counts cells, CJK doubles, ANSI zero", () => {
+test("visibleWidth counts cells, CJK doubles, ANSI zero", () => {
   assertEquals(visibleWidth("abc"), 3);
   assertEquals(visibleWidth("中文"), 4);
   assertEquals(visibleWidth("\u001B[31mred\u001B[0m"), 3);
@@ -71,7 +72,7 @@ Deno.test("visibleWidth counts cells, CJK doubles, ANSI zero", () => {
   assertEquals(visibleWidth(""), 0);
 });
 
-Deno.test("wrapPlainText hard-wraps at cell boundaries", () => {
+test("wrapPlainText hard-wraps at cell boundaries", () => {
   assertEquals(wrapPlainText("short", 10), "short");
   assertEquals(wrapPlainText("abcdefghij", 4), "abcd\nefgh\nij");
   // CJK: two cells per rune → 4-wide line holds 2 runes
@@ -80,7 +81,7 @@ Deno.test("wrapPlainText hard-wraps at cell boundaries", () => {
   assertEquals(wrapPlainText("abc", 0), "abc"); // width<=0 passthrough
 });
 
-Deno.test("wrapPlainText preserves ANSI styling across breaks", () => {
+test("wrapPlainText preserves ANSI styling across breaks", () => {
   const styled = "\u001B[31mabcdefgh\u001B[0m";
   const wrapped = wrapPlainText(styled, 3);
   const lines = wrapped.split("\n");
@@ -88,13 +89,13 @@ Deno.test("wrapPlainText preserves ANSI styling across breaks", () => {
   assertEquals(stripANSI(wrapped).split("\n").join(""), "abcdefgh");
 });
 
-Deno.test("wrapANSI breaks at word and path boundaries", () => {
+test("wrapANSI breaks at word and path boundaries", () => {
   assertEquals(wrapANSI("hello world", 5), "hello\nworld");
   assertEquals(wrapANSI("/a/b/c", 4), "/a/b\nc");
   assertEquals(wrapANSI("short", 10), "short");
 });
 
-Deno.test("truncateANSI truncates without breaking escapes", () => {
+test("truncateANSI truncates without breaking escapes", () => {
   assertEquals(truncateANSI("abcdef", 3), "abc");
   assertEquals(
     truncateANSI("\u001B[31mabcdef\u001B[0m", 3),
@@ -108,14 +109,14 @@ Deno.test("truncateANSI truncates without breaking escapes", () => {
 
 // ─── esm panel ──────────────────────────────────────────────────────────────
 
-Deno.test("esmPanelWidth matches the Go defaults", () => {
+test("esmPanelWidth matches the Go defaults", () => {
   assertEquals(esmPanelWidth(80), 76);
   assertEquals(esmPanelWidth(0), 76);
   assertEquals(esmPanelWidth(-5), 76);
   assertEquals(esmPanelWidth(4), 1);
 });
 
-Deno.test("effectiveESMPhase falls back from status", () => {
+test("effectiveESMPhase falls back from status", () => {
   assertEquals(effectiveESMPhase(makeObjective({ phase: "critic" })), "critic");
   assertEquals(effectiveESMPhase(makeObjective({ phase: "" })), "worker");
   assertEquals(
@@ -130,7 +131,7 @@ Deno.test("effectiveESMPhase falls back from status", () => {
   );
 });
 
-Deno.test("esmPhaseIndex and completed stages ladder", () => {
+test("esmPhaseIndex and completed stages ladder", () => {
   assertEquals(esmPhaseIndex("worker"), 0);
   assertEquals(esmPhaseIndex("critic"), 1);
   assertEquals(esmPhaseIndex("audit"), 2);
@@ -140,7 +141,7 @@ Deno.test("esmPhaseIndex and completed stages ladder", () => {
   assertEquals(esmCompletedStages("complete"), 3);
 });
 
-Deno.test("renderESMPipeline marks current, done, and paused stages", () => {
+test("renderESMPipeline marks current, done, and paused stages", () => {
   assertEquals(
     renderESMPipeline("worker", "active", tr),
     "[>] Worker execution -> [ ] Critic review -> [ ] Final audit",
@@ -164,7 +165,7 @@ Deno.test("renderESMPipeline marks current, done, and paused stages", () => {
   );
 });
 
-Deno.test("esmPhaseActivityLabel prefers status over phase", () => {
+test("esmPhaseActivityLabel prefers status over phase", () => {
   assertEquals(
     esmPhaseActivityLabel("worker", "active", tr),
     "Worker is investigating and implementing the objective",
@@ -187,7 +188,7 @@ Deno.test("esmPhaseActivityLabel prefers status over phase", () => {
   );
 });
 
-Deno.test("esmPanelProgress reports stages and remaining work", () => {
+test("esmPanelProgress reports stages and remaining work", () => {
   const obj = makeObjective({ remainingWork: ["a", "b"] });
   assertEquals(
     esmPanelProgress(obj, "worker", tr),
@@ -200,7 +201,7 @@ Deno.test("esmPanelProgress reports stages and remaining work", () => {
   );
 });
 
-Deno.test("esmPanelLines renders no-objective guidance", () => {
+test("esmPanelLines renders no-objective guidance", () => {
   const lines = esmPanelLines(null, 76, tr);
   assertEquals(
     lines[0],
@@ -209,7 +210,7 @@ Deno.test("esmPanelLines renders no-objective guidance", () => {
   assertEquals(lines[2], "Create one with /esm <objective>.");
 });
 
-Deno.test("esmPanelLines assembles the full objective view", () => {
+test("esmPanelLines assembles the full objective view", () => {
   const obj = makeObjective({
     phase: "critic",
     progressSummary: "worker finished task 1",
@@ -253,7 +254,7 @@ Deno.test("esmPanelLines assembles the full objective view", () => {
   assertEquals(text.includes("Last saved update:"), true);
 });
 
-Deno.test("esmPanelLines reports load errors", () => {
+test("esmPanelLines reports load errors", () => {
   const lines = esmPanelLines(makeObjective(), 76, tr, undefined, {
     loadError: "db unavailable",
   });
@@ -261,7 +262,7 @@ Deno.test("esmPanelLines reports load errors", () => {
   assertEquals(lines[0], "Failed to load ESM progress: db unavailable");
 });
 
-Deno.test("esmPanelLines appends live activity for the active agent", () => {
+test("esmPanelLines appends live activity for the active agent", () => {
   const obj = makeObjective();
   // No active agent: no live details section
   const plain = esmPanelLines(obj, 76, tr);
@@ -296,7 +297,7 @@ Deno.test("esmPanelLines appends live activity for the active agent", () => {
   assertEquals(text.includes("bash"), true);
 });
 
-Deno.test("activeESMPanelActivity falls back through result/text/think", () => {
+test("activeESMPanelActivity falls back through result/text/think", () => {
   const base: AgentActivity = {
     agentId: "a1",
     kind: "subagent",
@@ -336,7 +337,7 @@ Deno.test("activeESMPanelActivity falls back through result/text/think", () => {
   assertEquals(activeESMPanelActivity({ activeAgentId: "" }, 76, tr), []);
 });
 
-Deno.test("esmPanelLines wraps long fields to the panel width", () => {
+test("esmPanelLines wraps long fields to the panel width", () => {
   const obj = makeObjective({ objective: "x".repeat(200) });
   const lines = esmPanelLines(obj, 40, tr);
   for (const line of lines) {
@@ -344,7 +345,7 @@ Deno.test("esmPanelLines wraps long fields to the panel width", () => {
   }
 });
 
-Deno.test("formatDurationMSForPanel switches units", () => {
+test("formatDurationMSForPanel switches units", () => {
   assertEquals(formatDurationMSForPanel(500), "500ms");
   assertEquals(formatDurationMSForPanel(65_000), "1m05s");
 });

@@ -1,4 +1,4 @@
-import type { Message, Usage } from "../provider/types.ts";
+import { type Message, type Usage } from "../provider/types.ts";
 import { genericTokenEstimator, type TokenEstimator } from "./tokenizer.ts";
 
 /**

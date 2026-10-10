@@ -3,8 +3,8 @@
 // emitted before the legacy terminal events and followed by EVENT_AGENT_END; the
 // terminal status distinguishes success/failed/incomplete/canceled.
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { Model, StreamEvent, Usage } from "../provider/types.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type Model, type StreamEvent, type Usage } from "../provider/types.ts";
 import {
   streamDone,
   streamError,
@@ -17,7 +17,7 @@ import {
 import { MockProvider } from "../provider/mock.ts";
 import { createNoneSandbox } from "../sandbox/none.ts";
 import { createRegistry } from "../tools/tool.ts";
-import type { Tool, ToolContext, ToolResult } from "../tools/tool.ts";
+import { type Tool, type ToolContext, type ToolResult } from "../tools/tool.ts";
 import {
   type Agent,
   type AgentLoopConfig,
@@ -42,6 +42,7 @@ import {
 } from "./events.ts";
 import { eventToPublic, eventTypeToPublic } from "./bridge.ts";
 import { eventRunFinished as publicEventRunFinished } from "../../sdk/agent/types.ts";
+import { test } from "#testing";
 
 function terminalModel(): Model {
   return {
@@ -106,7 +107,7 @@ function requireSingleRunFinished(events: Event[]): Event {
   return finished[0];
 }
 
-Deno.test("run finished success on normal completion", async () => {
+test("run finished success on normal completion", async () => {
   const agent = createTerminalContractAgent([
     { type: streamStart },
     { type: streamTextDelta, textDelta: "hello" },
@@ -122,7 +123,7 @@ Deno.test("run finished success on normal completion", async () => {
   assert(taskStatusIsSuccessful(finished.status!));
 });
 
-Deno.test("run finished failed on stream error", async () => {
+test("run finished failed on stream error", async () => {
   const agent = createTerminalContractAgent([
     { type: streamStart },
     {
@@ -137,7 +138,7 @@ Deno.test("run finished failed on stream error", async () => {
   assert(finished.error !== undefined);
 });
 
-Deno.test("run projects provider retry metadata", async () => {
+test("run projects provider retry metadata", async () => {
   const agent = createTerminalContractAgent([
     { type: streamStart },
     {
@@ -185,7 +186,7 @@ Deno.test("run projects provider retry metadata", async () => {
   assertEquals(retry!.retryReason, "provider");
 });
 
-Deno.test("run finished incomplete on max iterations", async () => {
+test("run finished incomplete on max iterations", async () => {
   const agent = createTerminalContractAgent([
     { type: streamStart },
     {
@@ -232,7 +233,7 @@ class BlockingTool implements Tool {
   }
 }
 
-Deno.test("run finished canceled on abort", async () => {
+test("run finished canceled on abort", async () => {
   const provider = new MockProvider("mock", [terminalModel()], [
     { type: streamStart },
     {
@@ -270,7 +271,7 @@ Deno.test("run finished canceled on abort", async () => {
   assertEquals(finished.status, TASK_CANCELED);
 });
 
-Deno.test("run finished bridge preserves terminal contract", () => {
+test("run finished bridge preserves terminal contract", () => {
   assertEquals(eventTypeToPublic(EVENT_RUN_FINISHED), publicEventRunFinished);
   const pub = eventToPublic({
     type: EVENT_RUN_FINISHED,
@@ -284,7 +285,7 @@ Deno.test("run finished bridge preserves terminal contract", () => {
   assert(!taskStatusIsSuccessful(pub.status!));
 });
 
-Deno.test("task status helpers", () => {
+test("task status helpers", () => {
   const terminal: Record<string, boolean> = {
     [TASK_SUCCESS]: true,
     [TASK_INCOMPLETE]: true,

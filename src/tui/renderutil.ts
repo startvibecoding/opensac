@@ -88,7 +88,7 @@ function isANSIBlankLine(s: string): boolean {
 export function stripANSI(s: string): string {
   // Plain text is the common case: skip the regex copy entirely.
   if (s.indexOf("\u001B") === -1) return s;
-  // deno-lint-ignore no-control-regex
+  // eslint-disable-next-line no-control-regex
   return s.replace(/\u001B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\-_])/g, "");
 }
 

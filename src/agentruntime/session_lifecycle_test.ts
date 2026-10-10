@@ -4,7 +4,7 @@
 // exact-ID open, workdir-scoped open, and lease-guarded deletion contracts that
 // the Go callers rely on.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   createSession,
   deleteSession,
@@ -13,12 +13,13 @@ import {
   openSessionForWorkDir,
 } from "./session_lifecycle.ts";
 import { acquireSessionMutation } from "./execution_admission.ts";
+import { test } from "#testing";
 
 function tempDir(): string {
   return Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
 }
 
-Deno.test("createSession requires a work directory", () => {
+test("createSession requires a work directory", () => {
   assertThrows(
     () => createSession({ workDir: "  ", sessionDir: tempDir() }),
     Error,
@@ -26,7 +27,7 @@ Deno.test("createSession requires a work directory", () => {
   );
 });
 
-Deno.test("createSession initializes a local session", () => {
+test("createSession initializes a local session", () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   const mgr = createSession({ workDir, sessionDir });
@@ -36,7 +37,7 @@ Deno.test("createSession initializes a local session", () => {
   assertEquals(header!.cwd, workDir);
 });
 
-Deno.test("createSession initializes a bound channel session", () => {
+test("createSession initializes a bound channel session", () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   const mgr = createSession({
@@ -52,7 +53,7 @@ Deno.test("createSession initializes a bound channel session", () => {
   assertEquals(header.channelId, "user-1");
 });
 
-Deno.test("openSession opens by exact ID and requires an ID", () => {
+test("openSession opens by exact ID and requires an ID", () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   const created = createSession({
@@ -72,7 +73,7 @@ Deno.test("openSession opens by exact ID and requires an ID", () => {
   );
 });
 
-Deno.test("openSessionForWorkDir is workdir-scoped", () => {
+test("openSessionForWorkDir is workdir-scoped", () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   createSession({ workDir, sessionDir, id: "scoped-session" });
@@ -89,7 +90,7 @@ Deno.test("openSessionForWorkDir is workdir-scoped", () => {
   );
 });
 
-Deno.test("deleteSession removes a session under the mutation lease", async () => {
+test("deleteSession removes a session under the mutation lease", async () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   createSession({ workDir, sessionDir, id: "delete-me" });
@@ -97,7 +98,7 @@ Deno.test("deleteSession removes a session under the mutation lease", async () =
   assertThrows(() => openSession(sessionDir, "delete-me"));
 });
 
-Deno.test("deleteSessionWithMutation uses a caller-held guard", async () => {
+test("deleteSessionWithMutation uses a caller-held guard", async () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   createSession({ workDir, sessionDir, id: "guarded-delete" });

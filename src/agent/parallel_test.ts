@@ -1,6 +1,7 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 import { boundedParallel } from "./parallel.ts";
+import { test } from "#testing";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,7 +26,7 @@ function trackPeak<T>(
   };
 }
 
-Deno.test("boundedParallel preserves order and concurrency limit", async () => {
+test("boundedParallel preserves order and concurrency limit", async () => {
   const items = Array.from({ length: 32 }, (_v, i) => i);
   const tracker = trackPeak<number>(async (item) => {
     await sleep((items.length - item) % 4 + 1);
@@ -43,7 +44,7 @@ Deno.test("boundedParallel preserves order and concurrency limit", async () => {
   }
 });
 
-Deno.test("boundedParallel default and serial limits", async () => {
+test("boundedParallel default and serial limits", async () => {
   const items = Array.from(
     { length: defaultToolExecutionMaxConcurrency + 4 },
     (_v, i) => i,

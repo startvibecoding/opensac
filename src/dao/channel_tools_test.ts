@@ -1,8 +1,9 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { BindingDAO, type ChannelToolRecord, SessionDAO } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
-Deno.test("channel tools generation", () => {
+test("channel tools generation", () => {
   const db = openTestDb();
   try {
     const sessionId = "session-bound";

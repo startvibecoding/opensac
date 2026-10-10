@@ -5,8 +5,8 @@
 // success, and a run cancelled during the member wait terminalizes as
 // canceled).
 
-import { assert, assertEquals } from "@opensac/assert";
-import type { Provider } from "../provider/provider.ts";
+import { assert, assertEquals } from "../compat/assert.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
   createSystemInjectedUserMessage,
@@ -30,6 +30,7 @@ import {
   TASK_SUCCESS,
   type TaskStatus,
 } from "./events.ts";
+import { test } from "#testing";
 
 function scriptedModel(): Model {
   return {
@@ -104,7 +105,7 @@ async function collectTerminal(
   return { status, reason, errorEvent };
 }
 
-Deno.test("loop reports truncated output as incomplete", async () => {
+test("loop reports truncated output as incomplete", async () => {
   const provider = new ScriptedProvider([[
     { type: streamStart },
     { type: streamTextDelta, textDelta: "partial answer that was cut off" },
@@ -126,7 +127,7 @@ Deno.test("loop reports truncated output as incomplete", async () => {
   assertEquals(provider.calls, 1);
 });
 
-Deno.test("loop marks a recovered turn a success", async () => {
+test("loop marks a recovered turn a success", async () => {
   const provider = new ScriptedProvider([
     [
       { type: streamStart },
@@ -166,7 +167,7 @@ Deno.test("loop marks a recovered turn a success", async () => {
   assert(reason === "stop");
 });
 
-Deno.test("run cancelled during member wait terminalizes as canceled", async () => {
+test("run cancelled during member wait terminalizes as canceled", async () => {
   const provider = new ScriptedProvider([[
     { type: streamStart },
     { type: streamTextDelta, textDelta: "lead turn" },

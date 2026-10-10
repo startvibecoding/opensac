@@ -3,8 +3,8 @@
 // remains in the session transcript. `json.RawMessage` maps to decoded
 // `unknown`.
 
-import type { SessionRunEvent } from "../session/session_events.ts";
-import type { RunEvent } from "./run_event.ts";
+import { type SessionRunEvent } from "../session/session_events.ts";
+import { type RunEvent } from "./run_event.ts";
 
 /** The protocol-neutral projection of a durable delivery handoff. */
 export interface DeliveryRecord {

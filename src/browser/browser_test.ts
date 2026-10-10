@@ -1,6 +1,6 @@
 // for the ported protocol/client surface.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { Image } from "imagescript";
 import { createManager } from "../skills/mod.ts";
 import { createRegistry } from "../tools/tool.ts";
@@ -15,6 +15,7 @@ import {
   SKILL_NAME,
 } from "./mod.ts";
 import { formatAxTree, runeAlignedPrefix, truncateHtml } from "./ops.ts";
+import { test } from "#testing";
 
 async function testPng(width: number, height: number): Promise<Uint8Array> {
   const img = new Image(width, height);
@@ -30,7 +31,7 @@ async function testPng(width: number, height: number): Promise<Uint8Array> {
   return await img.encode();
 }
 
-Deno.test("built-in browser skill is discoverable", () => {
+test("built-in browser skill is discoverable", () => {
   const manager = createManager("", []);
   manager.load();
   const skill = manager.get(SKILL_NAME);
@@ -53,7 +54,7 @@ Deno.test("built-in browser skill is discoverable", () => {
   }
 });
 
-Deno.test("register and remove browser tool", () => {
+test("register and remove browser tool", () => {
   const tmp = Deno.makeTempDirSync({ prefix: "browser-" });
   const registry = createRegistry(tmp, undefined);
 
@@ -64,7 +65,7 @@ Deno.test("register and remove browser tool", () => {
   assertEquals(isToolRegistered(registry), false);
 });
 
-Deno.test("screenshot tool result processes image", async () => {
+test("screenshot tool result processes image", async () => {
   const tmp = Deno.makeTempDirSync({ prefix: "browser-" });
   const registry = createRegistry(tmp, undefined);
   const tool = createTool(registry);
@@ -88,7 +89,7 @@ Deno.test("screenshot tool result processes image", async () => {
   assert(result.text.includes("original: 200x100"));
 });
 
-Deno.test("client options default launch viewport", () => {
+test("client options default launch viewport", () => {
   const opts = clientOptions({});
   assert(opts.launch);
   assertEquals(opts.launch.viewportWidth, 1920);
@@ -96,7 +97,7 @@ Deno.test("client options default launch viewport", () => {
   assertEquals(opts.launch.headless, true);
 });
 
-Deno.test("client options allow viewport and headless override", () => {
+test("client options allow viewport and headless override", () => {
   const opts = clientOptions({
     viewportWidth: 1366,
     viewportHeight: 768,
@@ -108,7 +109,7 @@ Deno.test("client options allow viewport and headless override", () => {
   assertEquals(opts.launch.headless, false);
 });
 
-Deno.test("html options from params", () => {
+test("html options from params", () => {
   assertEquals(htmlOptionsFromParams({ selector: "body" }), undefined);
   assertEquals(htmlOptionsFromParams({ maxBytes: 0 }), {
     maxBytes: 0,
@@ -128,7 +129,7 @@ Deno.test("html options from params", () => {
   });
 });
 
-Deno.test("cookie from params", () => {
+test("cookie from params", () => {
   const c = cookieFromParams({
     name: "session",
     value: "abc",
@@ -149,7 +150,7 @@ Deno.test("cookie from params", () => {
   assertEquals(c.expires, 1700000000);
 });
 
-Deno.test("truncateHtml caps by bytes and chars", () => {
+test("truncateHtml caps by bytes and chars", () => {
   const short = "hello";
   assertEquals(truncateHtml(short), short);
 
@@ -165,7 +166,7 @@ Deno.test("truncateHtml caps by bytes and chars", () => {
   assert(charCapped.startsWith("abc"));
 });
 
-Deno.test("runeAlignedPrefix never splits multibyte runes", () => {
+test("runeAlignedPrefix never splits multibyte runes", () => {
   const s = "a本b"; // a=1 byte, 本=3 bytes, b=1 byte
   assertEquals(runeAlignedPrefix(s, 0), "");
   assertEquals(runeAlignedPrefix(s, 1), "a");
@@ -174,7 +175,7 @@ Deno.test("runeAlignedPrefix never splits multibyte runes", () => {
   assertEquals(runeAlignedPrefix(s, 100), s);
 });
 
-Deno.test("formatAxTree renders roles, refs, and interactive filter", () => {
+test("formatAxTree renders roles, refs, and interactive filter", () => {
   const nodes = [
     {
       nodeId: "1",

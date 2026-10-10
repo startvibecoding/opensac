@@ -7,7 +7,8 @@
 // This script is a release tool: `make node-publish*` is the only intended
 // entry point, and it publishes to the configured registry.
 
-import { join, resolve } from "@opensac/path";
+import { join, resolve } from "../src/compat/path.ts";
+import { isMainModule } from "../src/platform/node_compat.ts";
 
 export interface NpmPackageJson {
   name: string;
@@ -191,7 +192,7 @@ export async function publishIfNeeded(
   return { label, published: true };
 }
 
-if (import.meta.main) {
+if (isMainModule(import.meta.url)) {
   const parsed = parseArgs(Deno.args, {
     registry: Deno.env.get("NPM_REGISTRY") ??
       Deno.env.get("npm_config_registry") ??

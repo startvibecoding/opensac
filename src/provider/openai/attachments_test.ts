@@ -1,13 +1,14 @@
-import { assert, assertEquals } from "@opensac/assert";
-import type { Attachment } from "../types.ts";
+import { assert, assertEquals } from "../../compat/assert.ts";
+import { type Attachment } from "../types.ts";
 import {
   resolveAttachment,
   resolveAttachmentWithMetadata,
 } from "./attachments.ts";
 import { createOpenAIProvider } from "./provider.ts";
 import { mockClient } from "./test_helpers.ts";
+import { test } from "#testing";
 
-Deno.test("ResolveAttachmentDownloadsAuthorizedProviderFile", async () => {
+test("ResolveAttachmentDownloadsAuthorizedProviderFile", async () => {
   const p = createOpenAIProvider("test-key", "https://api.test/v1", []);
   p.client = mockClient((req) => {
     if (req.url !== "https://api.test/v1/files/file_123/content") {
@@ -35,7 +36,7 @@ Deno.test("ResolveAttachmentDownloadsAuthorizedProviderFile", async () => {
   assert(rejected, "invalid attachment reference was accepted");
 });
 
-Deno.test("ResolveAttachmentWithMetadataUsesCodeInterpreterContainer", async () => {
+test("ResolveAttachmentWithMetadataUsesCodeInterpreterContainer", async () => {
   const p = createOpenAIProvider("test-key", "https://api.test/v1", []);
   p.client = mockClient((req) => {
     if (

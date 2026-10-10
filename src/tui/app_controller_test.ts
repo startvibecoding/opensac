@@ -2,9 +2,9 @@
 // the transcript store, background-activity routing, approval/question
 // queues with decision registration, and run-finished terminalization.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { AppController, type RunHandle } from "./app_controller.ts";
-import type { Event } from "../agent/events.ts";
+import { type Event } from "../agent/events.ts";
 import {
   EVENT_DONE,
   EVENT_ERROR,
@@ -57,7 +57,7 @@ function ev(partial: Partial<Event>): Event {
   return { ...partial } as Event;
 }
 
-Deno.test("plan updates set the current plan and tag their tool row", () => {
+test("plan updates set the current plan and tag their tool row", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   c.handleAgentEvent(
@@ -90,7 +90,7 @@ Deno.test("plan updates set the current plan and tag their tool row", () => {
   assertEquals(c.store.toolResults[0]?.plan?.title, "T");
 });
 
-Deno.test("lead streaming events feed the transcript store", () => {
+test("lead streaming events feed the transcript store", () => {
   const { c } = controller("lead");
   c.attachRun(runHandle().handle);
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
@@ -105,7 +105,7 @@ Deno.test("lead streaming events feed the transcript store", () => {
   assertEquals(c.store.messages.length, 2);
 });
 
-Deno.test("background events route to the activity store, not the transcript", () => {
+test("background events route to the activity store, not the transcript", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(
     ev({ type: EVENT_TEXT_DELTA, agentId: "sub-1", textDelta: "sub text" }),
@@ -120,7 +120,7 @@ Deno.test("background events route to the activity store, not the transcript", (
   assertEquals(c.activities.size, 1);
 });
 
-Deno.test("tool events open and terminalize rows", () => {
+test("tool events open and terminalize rows", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({
     type: EVENT_TOOL_EXECUTION_START,
@@ -138,7 +138,7 @@ Deno.test("tool events open and terminalize rows", () => {
   assertEquals(c.store.toolResults[0].status, "completed");
 });
 
-Deno.test("tool terminal state distinguishes failed and interrupted results", () => {
+test("tool terminal state distinguishes failed and interrupted results", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({
     type: EVENT_TOOL_EXECUTION_START,
@@ -171,7 +171,7 @@ Deno.test("tool terminal state distinguishes failed and interrupted results", ()
   assertEquals(c.store.toolResults[1].executionState, "interrupted");
 });
 
-Deno.test("tool call event uses the embedded ToolCallBlock id/name", () => {
+test("tool call event uses the embedded ToolCallBlock id/name", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({
     type: EVENT_TOOL_CALL,
@@ -181,7 +181,7 @@ Deno.test("tool call event uses the embedded ToolCallBlock id/name", () => {
   assertEquals(c.store.toolResults[0].toolName, "read");
 });
 
-Deno.test("status messages become transcript rows; retry-status skipped", () => {
+test("status messages become transcript rows; retry-status skipped", () => {
   const { c, messages } = controller("lead");
   c.handleAgentEvent(ev({ type: EVENT_STATUS, statusMessage: "thinking..." }));
   assertEquals(messages, ["thinking..."]);
@@ -193,7 +193,7 @@ Deno.test("status messages become transcript rows; retry-status skipped", () => 
   assertEquals(messages.length, 1);
 });
 
-Deno.test("routine lifecycle rows are full-view-only, important ones are not", () => {
+test("routine lifecycle rows are full-view-only, important ones are not", () => {
   const { c, messages } = controller("lead");
   c.handleAgentEvent(ev({
     type: EVENT_STATUS,
@@ -212,7 +212,7 @@ Deno.test("routine lifecycle rows are full-view-only, important ones are not", (
   assertEquals(c.store.messageKinds.get(1), "status");
 });
 
-Deno.test("hosted items only stay visible in the simple view once terminal", () => {
+test("hosted items only stay visible in the simple view once terminal", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({
     type: EVENT_HOSTED_ITEM,
@@ -227,7 +227,7 @@ Deno.test("hosted items only stay visible in the simple view once terminal", () 
   assertEquals(c.store.messages[1], "hosted item [image]: completed");
 });
 
-Deno.test("clearing the transcript forgets kinds and full-view-only rows", () => {
+test("clearing the transcript forgets kinds and full-view-only rows", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({ type: EVENT_STATUS, statusMessage: "compacting" }));
   const generation = c.store.generation;
@@ -238,7 +238,7 @@ Deno.test("clearing the transcript forgets kinds and full-view-only rows", () =>
   assertEquals(c.store.generation, generation + 1);
 });
 
-Deno.test("run finished terminalizes the run and interrupted tools", () => {
+test("run finished terminalizes the run and interrupted tools", () => {
   const { c, messages } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
@@ -269,7 +269,7 @@ Deno.test("run finished terminalizes the run and interrupted tools", () => {
   assertEquals(f2, ["completed"]);
 });
 
-Deno.test("cancellation maps to cancelled and adds a message", () => {
+test("cancellation maps to cancelled and adds a message", () => {
   const { c, messages } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
@@ -278,7 +278,7 @@ Deno.test("cancellation maps to cancelled and adds a message", () => {
   assertEquals(messages.some((m) => m.toLowerCase().includes("cancel")), true);
 });
 
-Deno.test("legacy EVENT_DONE/EVENT_ERROR terminalize when RunFinished is absent", () => {
+test("legacy EVENT_DONE/EVENT_ERROR terminalize when RunFinished is absent", () => {
   const { c } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
@@ -290,7 +290,7 @@ Deno.test("legacy EVENT_DONE/EVENT_ERROR terminalize when RunFinished is absent"
   assertEquals(finished, ["failed"]);
 });
 
-Deno.test("legacy EVENT_DONE terminalizes the run as completed", () => {
+test("legacy EVENT_DONE terminalizes the run as completed", () => {
   const { c } = controller("lead");
   const { handle, finished } = runHandle();
   c.attachRun(handle);
@@ -299,7 +299,7 @@ Deno.test("legacy EVENT_DONE terminalizes the run as completed", () => {
   assertEquals(c.runTerminalHandled, true);
 });
 
-Deno.test("approval requests register a decision and queue", () => {
+test("approval requests register a decision and queue", () => {
   const { c } = controller("lead");
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
@@ -317,7 +317,7 @@ Deno.test("approval requests register a decision and queue", () => {
   assertEquals(c.waitingForApproval, true);
 });
 
-Deno.test("member questions route to the lead mailbox path, not the human", () => {
+test("member questions route to the lead mailbox path, not the human", () => {
   const { c, messages } = controller("lead");
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
@@ -332,7 +332,7 @@ Deno.test("member questions route to the lead mailbox path, not the human", () =
   assertEquals(messages.some((m) => m.includes("Worker")), true);
 });
 
-Deno.test("human questions register and queue", () => {
+test("human questions register and queue", () => {
   const { c } = controller("lead");
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
@@ -351,7 +351,7 @@ Deno.test("human questions register and queue", () => {
   assertEquals(c.waitingForQuestion, false);
 });
 
-Deno.test("duplicate approval registration surfaces an error message", () => {
+test("duplicate approval registration surfaces an error message", () => {
   const { c, messages } = controller("lead");
   const handle: RunHandle = {
     registerDecision() {
@@ -375,6 +375,7 @@ Deno.test("duplicate approval registration surfaces an error message", () => {
 
 import { App } from "./app.tsx";
 import { render } from "ink";
+import { test } from "#testing";
 
 class FakeStdout {
   columns = 100;
@@ -418,7 +419,7 @@ class FakeStdout {
   }
 }
 
-Deno.test({
+test({
   name: "App renders controller transcript, header, and approval panel",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -454,7 +455,7 @@ Deno.test({
     await new Promise((resolve) => setTimeout(resolve, 50));
     instance.unmount();
     const out = stdout.output.replace(
-      // deno-lint-ignore no-control-regex
+      // eslint-disable-next-line no-control-regex
       /\u001B\[[0-9;]*m/g,
       "",
     );
@@ -464,7 +465,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "overlay freezes new scrollback and hides live activity",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -526,7 +527,7 @@ Deno.test({
   },
 });
 
-Deno.test({
+test({
   name: "terminal tool rows remain scrollback-only after overlay close",
   sanitizeOps: false,
   sanitizeResources: false,
@@ -585,7 +586,7 @@ Deno.test({
   },
 });
 
-Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
+test("lead activity timeline tracks thinking and tools per turn", () => {
   const { c } = controller("lead");
   c.attachRun(runHandle().handle);
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
@@ -626,7 +627,7 @@ Deno.test("lead activity timeline tracks thinking and tools per turn", () => {
   );
 });
 
-Deno.test("run finish interrupts tools that never returned", () => {
+test("run finish interrupts tools that never returned", () => {
   const { c } = controller("lead");
   const { handle } = runHandle();
   c.attachRun(handle);
@@ -647,7 +648,7 @@ Deno.test("run finish interrupts tools that never returned", () => {
   );
 });
 
-Deno.test("new turn resets the activity timeline", () => {
+test("new turn resets the activity timeline", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   c.handleAgentEvent(ev({
@@ -659,7 +660,7 @@ Deno.test("new turn resets the activity timeline", () => {
   assertEquals(c.activityManager.buildTimeline().length, 0);
 });
 
-Deno.test({
+test({
   name: "live activity rows render each tool's single-line call",
   sanitizeOps: false,
   sanitizeResources: false,

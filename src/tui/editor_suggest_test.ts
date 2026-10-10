@@ -3,7 +3,7 @@
 // suggestion dropdown (filter/wrap/scroll), and the command-suggest wiring
 // (spec-driven items, argument tables).
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { Buffer } from "./components/editor/buffer.ts";
 import { Editor, wrapLineSegments } from "./components/editor/editor.ts";
 import { Suggest, type SuggestItem } from "./components/suggest/suggest.ts";
@@ -13,15 +13,16 @@ import {
   commandSuggestionItemsForInput,
 } from "./command_suggest.ts";
 import { Translator } from "./i18n.ts";
+import { test } from "#testing";
 
 function strip(s: string): string {
-  // deno-lint-ignore no-control-regex
+  // eslint-disable-next-line no-control-regex
   return s.replace(/\u001B\[[0-9;]*m/g, "");
 }
 
 // ─── buffer ─────────────────────────────────────────────────────────────────
 
-Deno.test("buffer inserts, deletes, and moves across lines", () => {
+test("buffer inserts, deletes, and moves across lines", () => {
   const b = new Buffer();
   assertEquals(b.value, "");
   assertEquals(b.lineCount, 1);
@@ -42,7 +43,7 @@ Deno.test("buffer inserts, deletes, and moves across lines", () => {
   assertEquals(b.cursorPos(), [0, 3]); // preferredCol clamped to 3
 });
 
-Deno.test("buffer deleteBack merges lines and tracks cursor", () => {
+test("buffer deleteBack merges lines and tracks cursor", () => {
   const b = new Buffer();
   b.setValue("ab\ncd");
   b.moveEndAll();
@@ -56,7 +57,7 @@ Deno.test("buffer deleteBack merges lines and tracks cursor", () => {
   assertEquals(b.cursorPos(), [0, 2]);
 });
 
-Deno.test("buffer ctrl-w deletes the previous word", () => {
+test("buffer ctrl-w deletes the previous word", () => {
   const b = new Buffer();
   b.setValue("one two three");
   b.moveEndAll();
@@ -67,7 +68,7 @@ Deno.test("buffer ctrl-w deletes the previous word", () => {
   assertEquals(b.value, "one ");
 });
 
-Deno.test("buffer insertString splits multi-line paste", () => {
+test("buffer insertString splits multi-line paste", () => {
   const b = new Buffer();
   b.setValue("ab|cd");
   b.moveEndAll();
@@ -79,7 +80,7 @@ Deno.test("buffer insertString splits multi-line paste", () => {
   assertEquals(b.cursorPos(), [1, 1]);
 });
 
-Deno.test("buffer word movement crosses the whole buffer", () => {
+test("buffer word movement crosses the whole buffer", () => {
   const b = new Buffer();
   b.setValue("one two\nthree four");
   b.moveEndAll();
@@ -95,7 +96,7 @@ Deno.test("buffer word movement crosses the whole buffer", () => {
   assertEquals(b.cursorPos(), [1, 5]);
 });
 
-Deno.test("buffer counts runes including newlines and CJK", () => {
+test("buffer counts runes including newlines and CJK", () => {
   const b = new Buffer();
   b.setValue("中文\nab");
   assertEquals(b.runeCount, 5); // 2 + newline + 2
@@ -106,7 +107,7 @@ Deno.test("buffer counts runes including newlines and CJK", () => {
 
 // ─── editor ─────────────────────────────────────────────────────────────────
 
-Deno.test("editor handles keys: typing, submit, newline, edits", () => {
+test("editor handles keys: typing, submit, newline, edits", () => {
   const e = new Editor({ width: 40 });
   e.insertText("hello");
   assertEquals(e.value, "hello");
@@ -124,7 +125,7 @@ Deno.test("editor handles keys: typing, submit, newline, edits", () => {
   assertEquals(e.value, "hello");
 });
 
-Deno.test("editor blur blocks input", () => {
+test("editor blur blocks input", () => {
   const e = new Editor({ width: 40 });
   e.blur();
   e.insertText("nope");
@@ -132,7 +133,7 @@ Deno.test("editor blur blocks input", () => {
   assertEquals(e.handleKey("enter"), false);
 });
 
-Deno.test("editor view wraps long lines and windows around the cursor", () => {
+test("editor view wraps long lines and windows around the cursor", () => {
   const e = new Editor({ width: 30, maxLines: 2 });
   e.insertText("word ".repeat(10).trim());
   const view = e.view();
@@ -144,13 +145,13 @@ Deno.test("editor view wraps long lines and windows around the cursor", () => {
   }
 });
 
-Deno.test("editor placeholder renders when empty", () => {
+test("editor placeholder renders when empty", () => {
   const e = new Editor({ width: 40, placeholder: "Type a message..." });
   const view = strip(e.view());
   assertEquals(view.includes("Type a message..."), true);
 });
 
-Deno.test("wrapLineSegments splits by display width", () => {
+test("wrapLineSegments splits by display width", () => {
   const segs = wrapLineSegments("abcdef", 4, 0, 0);
   assertEquals(segs.length, 2);
   assertEquals(segs[0].text, "abcd");
@@ -162,7 +163,7 @@ Deno.test("wrapLineSegments splits by display width", () => {
 
 // ─── suggest ────────────────────────────────────────────────────────────────
 
-Deno.test("suggest filters by prefix on label or value", () => {
+test("suggest filters by prefix on label or value", () => {
   const s = new Suggest(60);
   const items: SuggestItem[] = [
     { label: "/mode", value: "/mode ", description: "switch mode" },
@@ -187,7 +188,7 @@ Deno.test("suggest filters by prefix on label or value", () => {
   assertEquals(s.filtered.length, 3);
 });
 
-Deno.test("suggest selection wraps and applies", () => {
+test("suggest selection wraps and applies", () => {
   const s = new Suggest(60);
   s.setItems([
     { label: "a", value: "a" },
@@ -202,7 +203,7 @@ Deno.test("suggest selection wraps and applies", () => {
   assertEquals(s.selected?.label, "b");
 });
 
-Deno.test("suggest view renders dropdown with border and scroll indicator", () => {
+test("suggest view renders dropdown with border and scroll indicator", () => {
   const s = new Suggest(40, 3);
   const items: SuggestItem[] = [];
   for (let i = 0; i < 5; i++) {
@@ -219,7 +220,7 @@ Deno.test("suggest view renders dropdown with border and scroll indicator", () =
 
 // ─── command suggest wiring ─────────────────────────────────────────────────
 
-Deno.test("commandSuggestionItems carries localized descriptions", () => {
+test("commandSuggestionItems carries localized descriptions", () => {
   const en = commandSuggestionItems();
   assertEquals(en.length, 33);
   assertEquals(en[0].label, "/auth");
@@ -231,7 +232,7 @@ Deno.test("commandSuggestionItems carries localized descriptions", () => {
   assertEquals(zh[0]?.description?.includes("token"), true);
 });
 
-Deno.test("commandSuggestionItemsForInput gates on slash and newline", () => {
+test("commandSuggestionItemsForInput gates on slash and newline", () => {
   assertEquals(commandSuggestionItemsForInput("hello"), undefined);
   assertEquals(commandSuggestionItemsForInput("/mode\nsecond"), undefined);
   const names = commandSuggestionItemsForInput("/mo");
@@ -242,7 +243,7 @@ Deno.test("commandSuggestionItemsForInput gates on slash and newline", () => {
   assertEquals(s.filtered.map((i) => i.label), ["/mode", "/model"]);
 });
 
-Deno.test("commandArgumentSuggestionItems suggests known arguments", () => {
+test("commandArgumentSuggestionItems suggests known arguments", () => {
   const mode = commandArgumentSuggestionItems("/mode ");
   assertEquals(mode.map((i) => i.value), [
     "/mode plan",

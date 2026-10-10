@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreClient, type CoreLauncher } from "./client.ts";
 import { CoreLockBusyError } from "./lock.ts";
@@ -12,6 +12,7 @@ import {
 } from "./server.ts";
 import { type CoreCommandHandle, startCoreCommand } from "../cli/core.ts";
 import { CORE_RUNTIME_METHODS } from "./runtime_protocol.ts";
+import { test } from "#testing";
 
 const TEST_VERSION = "0.1.0-core-integration-test";
 const TEST_PROTOCOL_VERSION = 23;
@@ -105,7 +106,7 @@ async function assertLiveCore(
   assertEquals(await client.call<CoreInfo>(CORE_METHODS.info), EXPECTED_INFO);
 }
 
-Deno.test("Core foundation exposes the locked, registered, authenticated client path", async () => {
+test("Core foundation exposes the locked, registered, authenticated client path", async () => {
   await withStateDir(async (firstStateDir, firstPaths) => {
     const handle = await startCoreCommand(commandOptions(firstStateDir));
     let client: CoreClient | undefined;
@@ -165,7 +166,7 @@ Deno.test("Core foundation exposes the locked, registered, authenticated client 
   });
 });
 
-Deno.test("concurrent Core clients share one locked registration and server", async () => {
+test("concurrent Core clients share one locked registration and server", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handles: CoreCommandHandle[] = [];
     let serverStarts = 0;
@@ -232,7 +233,7 @@ Deno.test("concurrent Core clients share one locked registration and server", as
   });
 });
 
-Deno.test("the client that started the shared Core can exit without disconnecting another client", async () => {
+test("the client that started the shared Core can exit without disconnecting another client", async () => {
   // TUI #1 auto-starts the shared Core; TUI #2 attaches as a plain client.
   // Closing TUI #1 must not stop the Core or drop TUI #2's connections: the
   // shared Core outlives every client, and only `core.shutdown`, a signal to
@@ -320,7 +321,7 @@ Deno.test("the client that started the shared Core can exit without disconnectin
   });
 });
 
-Deno.test("a core.shutdown request stops the Core command and releases ownership", async () => {
+test("a core.shutdown request stops the Core command and releases ownership", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startCoreCommand(commandOptions(stateDir));
     try {

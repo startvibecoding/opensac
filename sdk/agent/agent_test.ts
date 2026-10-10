@@ -2,7 +2,7 @@
 // plus focused coverage for the pure helpers added by agent/types.go,
 // agent/provider.go, and agent/builder.go.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../../src/compat/assert.ts";
 import {
   type Agent,
   boolPtr,
@@ -26,6 +26,7 @@ import {
   type Usage,
   vendorFromBaseURL,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function usage(partial: Partial<Usage>): Usage {
   return {
@@ -39,7 +40,7 @@ function usage(partial: Partial<Usage>): Usage {
   };
 }
 
-Deno.test("MapPointToOriginalWithCrop", () => {
+test("MapPointToOriginalWithCrop", () => {
   const img: ImageContent = {
     width: 100,
     height: 50,
@@ -56,7 +57,7 @@ Deno.test("MapPointToOriginalWithCrop", () => {
   assertEquals([x, y], [140, 80]);
 });
 
-Deno.test("MapNormalizedRectToOriginal", () => {
+test("MapNormalizedRectToOriginal", () => {
   const img: ImageContent = {
     width: 100,
     height: 50,
@@ -75,12 +76,12 @@ Deno.test("MapNormalizedRectToOriginal", () => {
   assertEquals([x, y, w, h], [20, 20, 60, 40]);
 });
 
-Deno.test("MapPointToOriginal rejects missing geometry", () => {
+test("MapPointToOriginal rejects missing geometry", () => {
   const [x, y, ok] = mapPointToOriginal({}, 1, 1);
   assertEquals([x, y, ok], [0, 0, false]);
 });
 
-Deno.test("MapRectToOriginal scales rectangle", () => {
+test("MapRectToOriginal scales rectangle", () => {
   const img: ImageContent = {
     width: 100,
     height: 100,
@@ -92,7 +93,7 @@ Deno.test("MapRectToOriginal scales rectangle", () => {
   assertEquals([x, y, w, h], [20, 40, 60, 80]);
 });
 
-Deno.test("MapNormalizedPointToOriginal scales point", () => {
+test("MapNormalizedPointToOriginal scales point", () => {
   const img: ImageContent = {
     width: 100,
     height: 50,
@@ -104,7 +105,7 @@ Deno.test("MapNormalizedPointToOriginal scales point", () => {
   assertEquals([x, y], [50, 12.5]);
 });
 
-Deno.test("UsageTotalInputTokens", () => {
+test("UsageTotalInputTokens", () => {
   // totalTokens present: total input = total - output.
   assertEquals(
     totalInputTokens(usage({ totalTokens: 100, outputTokens: 40 })),
@@ -118,7 +119,7 @@ Deno.test("UsageTotalInputTokens", () => {
   assertEquals(totalInputTokens(null), 0);
 });
 
-Deno.test("UsageCalculateCost", () => {
+test("UsageCalculateCost", () => {
   const u = usage({
     inputTokens: 1_000_000,
     outputTokens: 2_000_000,
@@ -133,7 +134,7 @@ Deno.test("UsageCalculateCost", () => {
   assertEquals(u.cost.total, 6.25);
 });
 
-Deno.test("TaskStatusClassification", () => {
+test("TaskStatusClassification", () => {
   assert(taskStatusIsTerminal(taskSuccess));
   assert(taskStatusIsTerminal(taskError));
   assert(taskStatusIsSuccessful(taskSuccess));
@@ -141,7 +142,7 @@ Deno.test("TaskStatusClassification", () => {
   assert(!taskStatusIsTerminal("running"));
 });
 
-Deno.test("BuilderDefaults", () => {
+test("BuilderDefaults", () => {
   const cfg = newBuilder().config();
   assertEquals(cfg.mode, "yolo");
   assertEquals(cfg.thinkingLevel, "medium");
@@ -154,7 +155,7 @@ Deno.test("BuilderDefaults", () => {
   assert(cfg.maxTokensUserSet);
 });
 
-Deno.test("BuilderFluentConfig", () => {
+test("BuilderFluentConfig", () => {
   const cfg = new Builder()
     .withMode("plan")
     .withModel("gpt-4")
@@ -167,11 +168,11 @@ Deno.test("BuilderFluentConfig", () => {
   assert(cfg.disableBuiltinTools);
 });
 
-Deno.test("BuilderBuildRequiresProvider", () => {
+test("BuilderBuildRequiresProvider", () => {
   assertThrows(() => newBuilder().build(), Error, "provider is required");
 });
 
-Deno.test("BuilderBuildUsesRegisteredBuilder", () => {
+test("BuilderBuildUsesRegisteredBuilder", () => {
   const fake = { id: () => "x" } as unknown as Agent;
   let captured: string | undefined;
   setBuilderFunc((b) => {
@@ -202,7 +203,7 @@ Deno.test("BuilderBuildUsesRegisteredBuilder", () => {
   }
 });
 
-Deno.test("VendorFromBaseURL", () => {
+test("VendorFromBaseURL", () => {
   assertEquals(vendorFromBaseURL("https://api.deepseek.com/v1"), "deepseek");
   assertEquals(
     vendorFromBaseURL("https://token-plan-ams.xiaomimimo.com"),
@@ -212,11 +213,11 @@ Deno.test("VendorFromBaseURL", () => {
   assertEquals(vendorFromBaseURL("https://example.com"), "");
 });
 
-Deno.test("BoolPtr", () => {
+test("BoolPtr", () => {
   assertEquals(boolPtr(true), true);
   assertEquals(boolPtr(false), false);
 });
 
-Deno.test("NewUserMessage", () => {
+test("NewUserMessage", () => {
   assertEquals(newUserMessage("hi"), { role: roleUser, content: "hi" });
 });

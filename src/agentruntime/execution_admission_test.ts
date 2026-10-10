@@ -5,7 +5,7 @@
 // retained as a detached remote execution. `context.Context` maps to
 // `AbortSignal`, so `context.DeadlineExceeded` maps to a `TimeoutError` reason.
 
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { createManager } from "../session/manager.ts";
 import {
   acquireExecutionAdmission as sessionAcquireExecutionAdmission,
@@ -21,6 +21,7 @@ import {
   type DurableRun,
   RunStore,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function initRecoveryTestSession(sessionDir: string, id: string): void {
   const manager = createManager(Deno.makeTempDirSync(), sessionDir);
@@ -58,7 +59,7 @@ function makeRun(overrides: Partial<DurableRun>): DurableRun {
   };
 }
 
-Deno.test(
+test(
   "acquireExecutionAdmissionRecoversOrphanBeforeReturningGuard",
   async () => {
     const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
@@ -95,7 +96,7 @@ Deno.test(
   },
 );
 
-Deno.test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
+test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
   try {
     initRecoveryTestSession(sessionDir, "admission-owned");
@@ -142,7 +143,7 @@ Deno.test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
   }
 });
 
-Deno.test("acquireExecutionAdmissionRetainsVerifiedRemoteRun", async () => {
+test("acquireExecutionAdmissionRetainsVerifiedRemoteRun", async () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
   try {
     initRecoveryTestSession(sessionDir, "admission-remote");

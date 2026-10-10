@@ -2,7 +2,7 @@
 // Go's `<-chan Event` maps to an `AsyncIterable<Event>`; `context.Context`
 // maps to an optional `AbortSignal`.
 
-import type { Event } from "./events.ts";
+import { type Event } from "./events.ts";
 
 /** Receives agent events from a running request. */
 export interface EventHandler {

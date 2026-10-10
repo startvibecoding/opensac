@@ -1,9 +1,9 @@
 // (AgentFactory runtime-config inheritance, provider-name propagation, and the
 // compile-time AgentAdapter interface assertion).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
-import type { Agent as PublicAgent } from "../../sdk/agent/types.ts";
+import { type Agent as PublicAgent } from "../../sdk/agent/types.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
 import { Level, Manager as SandboxManager } from "../sandbox/sandbox.ts";
 import { createManager } from "../sandbox/sandbox.ts";

@@ -72,7 +72,11 @@ const operationColumns =
   created_at AS createdAt, updated_at AS updatedAt`;
 
 export class DeliveryDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   runExists(executor: DB, sessionId: string, runId: string): boolean {
     return queryAll<{ id: string }>(

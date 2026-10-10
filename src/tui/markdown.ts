@@ -4,7 +4,7 @@
 // streaming-optimized parser option, and a completed block is re-rendered once
 // with the full parser before it is committed to the terminal scrollback.
 
-import type { Theme } from "../tsm/mod.ts";
+import { type Theme } from "../tsm/mod.ts";
 import { gsmRender, renderWithStreamOption } from "../tsm/mod.ts";
 
 /** Renders a completed Markdown block to ANSI text. */
@@ -34,10 +34,13 @@ export class MarkdownBlock {
   #text = "";
   #done = false;
 
-  constructor(
-    readonly width: number,
-    readonly theme?: Theme,
-  ) {}
+    readonly width: number;
+  readonly theme?: Theme;
+
+  constructor(width: number, theme?: Theme) {
+    this.width = width;
+    this.theme = theme;
+  }
 
   get text(): string {
     return this.#text;

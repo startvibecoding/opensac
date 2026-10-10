@@ -3,7 +3,7 @@
 // dispatch. Subprocess/stdio behavior is covered by the ACP process test
 // (run_process_test.ts) which spawns `deno run src/main.ts acp`.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   defaultCLIOptions,
   parseGoDurationMs,
@@ -27,8 +27,9 @@ import {
   type CoreStatusOutcome,
 } from "./core.ts";
 import { executeDoctorCommand } from "./doctor.ts";
+import { test } from "#testing";
 
-Deno.test("parseGoDurationMs covers Go duration units", () => {
+test("parseGoDurationMs covers Go duration units", () => {
   assertEquals(parseGoDurationMs("5m"), 300_000);
   assertEquals(parseGoDurationMs("30s"), 30_000);
   assertEquals(parseGoDurationMs("1h"), 3_600_000);
@@ -39,13 +40,13 @@ Deno.test("parseGoDurationMs covers Go duration units", () => {
   assertEquals(parseGoDurationMs("1.5m"), 90_000);
 });
 
-Deno.test("parseGoDurationMs rejects invalid and non-positive values", () => {
+test("parseGoDurationMs rejects invalid and non-positive values", () => {
   for (const value of ["", "abc", "5", "-1m", "0s", "5x"]) {
     assertEquals(parseGoDurationMs(value), 0, value);
   }
 });
 
-Deno.test("resolveACPTimeout flag wins over environment", () => {
+test("resolveACPTimeout flag wins over environment", () => {
   const env: Record<string, string | undefined> = {
     OPENSAC_ACP_PERMISSION_TIMEOUT: "10m",
     OPENSAC_ACP_QUESTION_TIMEOUT: "2m",
@@ -67,7 +68,7 @@ Deno.test("resolveACPTimeout flag wins over environment", () => {
   assertEquals(resolveACPTimeout("", "MISSING", env), 0);
 });
 
-Deno.test("acpRunOptions maps CLI flags and resolved timeouts", () => {
+test("acpRunOptions maps CLI flags and resolved timeouts", () => {
   const flags = defaultCLIOptions();
   flags.provider = "deepseek";
   flags.model = "v4";
@@ -105,14 +106,14 @@ Deno.test("acpRunOptions maps CLI flags and resolved timeouts", () => {
   }
 });
 
-Deno.test("acp exposes --standalone and core exposes the stop lifecycle command", async () => {
+test("acp exposes --standalone and core exposes the stop lifecycle command", async () => {
   const acpHelp = await createACPCommand("test-version").getHelp();
   assert(acpHelp.includes("--standalone"), "acp help must list --standalone");
   const coreHelp = await createCoreCommand("test-version").getHelp();
   assert(coreHelp.includes("stop"), "core help must list stop");
 });
 
-Deno.test("core dispatches bare start and the stop subcommand to their own runners", async () => {
+test("core dispatches bare start and the stop subcommand to their own runners", async () => {
   const calls: string[] = [];
   const runners = {
     start: (version: string) => {
@@ -137,7 +138,7 @@ Deno.test("core dispatches bare start and the stop subcommand to their own runne
   assertEquals(calls, ["stop:test-version"]);
 });
 
-Deno.test("doctor command projects JSON and human output", () => {
+test("doctor command projects JSON and human output", () => {
   const configDir = Deno.makeTempDirSync();
   const previous = Deno.env.get("OPENSAC_DIR");
   Deno.env.set("OPENSAC_DIR", configDir);
@@ -167,7 +168,7 @@ Deno.test("doctor command projects JSON and human output", () => {
   }
 });
 
-Deno.test("root command registers acp doctor and knowledge-mcp", async () => {
+test("root command registers acp doctor and knowledge-mcp", async () => {
   const root = createRootCommand("test-version");
   const help = await root.getHelp();
   const names: string[] = [
@@ -182,7 +183,7 @@ Deno.test("root command registers acp doctor and knowledge-mcp", async () => {
   }
 });
 
-Deno.test("every supported subcommand is wired (no pending placeholders)", async () => {
+test("every supported subcommand is wired (no pending placeholders)", async () => {
   const root = createRootCommand("test-version");
   const help = await root.getHelp();
   for (
@@ -200,7 +201,7 @@ Deno.test("every supported subcommand is wired (no pending placeholders)", async
   // The removed serve/A2A modes must not come back as subcommands. Read the
   // command tree instead of parsing colored help text (the `acp` description
   // contains the substring "server").
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const listed = (root as any).getCommands().map((cmd: any) => cmd.getName());
   for (const removed of ["serve", "a2a", "cron"]) {
     assertEquals(
@@ -211,11 +212,11 @@ Deno.test("every supported subcommand is wired (no pending placeholders)", async
   }
 });
 
-Deno.test("knowledge-mcp serve requires at least one knowledge base", async () => {
+test("knowledge-mcp serve requires at least one knowledge base", async () => {
   const root = createRootCommand("test-version");
   let threw = false;
   try {
-    // deno-lint-ignore no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (root as any).parse(["knowledge-mcp", "serve"]);
   } catch (error) {
     threw = true;
@@ -228,15 +229,15 @@ Deno.test("knowledge-mcp serve requires at least one knowledge base", async () =
   assert(threw);
 });
 
-Deno.test("root -P print action is wired (no longer a placeholder)", async () => {
+test("root -P print action is wired (no longer a placeholder)", async () => {
   const root = createRootCommand("test-version");
   const help = await root.getHelp();
   assert(help.includes("prompt..."), help);
   assert(help.includes("--print"), help);
 });
 
-Deno.test("core exposes status, start, stop, restart, pair, and list subcommands", () => {
-  // deno-lint-ignore no-explicit-any
+test("core exposes status, start, stop, restart, pair, and list subcommands", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const command = createCoreCommand("test-version") as any;
   const names = command
     .getCommands()
@@ -251,7 +252,7 @@ Deno.test("core exposes status, start, stop, restart, pair, and list subcommands
   ]);
 });
 
-Deno.test("core dispatches status, start, restart, pair, and list to their own runners", async () => {
+test("core dispatches status, start, restart, pair, and list to their own runners", async () => {
   const startOutcome: CoreStartOutcome = {
     status: "started",
     url: "http://127.0.0.1:1",
@@ -338,7 +339,7 @@ Deno.test("core dispatches status, start, restart, pair, and list to their own r
   assertEquals(calls, ["foreground:test-version"]);
 });
 
-Deno.test("core lifecycle formatters project human and JSON output", () => {
+test("core lifecycle formatters project human and JSON output", () => {
   const statusOutcome: CoreStatusOutcome = {
     status: "ready",
     running: true,

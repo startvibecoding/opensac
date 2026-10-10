@@ -1,6 +1,6 @@
 // (pure cases).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   contextWithIterationBudget,
   createIterationBudget,
@@ -11,6 +11,7 @@ import {
   normalizeIterationBudgetPolicy,
 } from "./iteration_budget.ts";
 import { createRunContext } from "./run_context.ts";
+import { test } from "#testing";
 
 const defaultRenewFactor = 0.5;
 const defaultMaxRenewals = 2;
@@ -29,7 +30,7 @@ function policy(
   };
 }
 
-Deno.test("iteration budget policy normalize", () => {
+test("iteration budget policy normalize", () => {
   const p = normalizeIterationBudgetPolicy(policy({}), 90);
   assertEquals([p.soft, p.hard], [90, 180]);
   assertEquals(p.renewFactor, defaultRenewFactor);
@@ -40,7 +41,7 @@ Deno.test("iteration budget policy normalize", () => {
   assert(!iterationBudgetPolicyEnabled(policy({})));
 });
 
-Deno.test("iteration budget request clamp", () => {
+test("iteration budget request clamp", () => {
   const b = createIterationBudget(
     policy({
       soft: 10,
@@ -73,7 +74,7 @@ Deno.test("iteration budget request clamp", () => {
   assertThrows(() => b.request(0, "one more"));
 });
 
-Deno.test("iteration budget can renew", () => {
+test("iteration budget can renew", () => {
   const b = createIterationBudget(
     policy({
       soft: 10,
@@ -110,7 +111,7 @@ Deno.test("iteration budget can renew", () => {
   assert(!capped.canRenew());
 });
 
-Deno.test("iteration budget context round trip", () => {
+test("iteration budget context round trip", () => {
   assertEquals(iterationBudgetFromContext(createRunContext()), undefined);
   const b = createIterationBudget(policy({ soft: 4, hard: 8 }), 4);
   const ctx = contextWithIterationBudget(createRunContext(), b);

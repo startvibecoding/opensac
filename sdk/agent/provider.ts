@@ -3,13 +3,12 @@
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`.
 
-import type {
-  Attachment,
-  Message,
-  ToolCallBlock,
-  ToolDefinition,
-  Usage,
-} from "./types.ts";
+import {
+  type Attachment,
+  type Message,
+  type ToolCallBlock,
+  type ToolDefinition,
+  type Usage} from "./types.ts";
 
 /**
  * Provider is the interface that all LLM provider implementations must

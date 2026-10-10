@@ -1,11 +1,12 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   mapNormalizedRectToOriginal,
   mapPointToOriginal,
   mapRectToOriginal,
 } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("ImageContentMapPointToOriginal", () => {
+test("ImageContentMapPointToOriginal", () => {
   const img = {
     data: "",
     mimeType: "",
@@ -20,7 +21,7 @@ Deno.test("ImageContentMapPointToOriginal", () => {
   assertEquals(y, 20);
 });
 
-Deno.test("ImageContentMapPointToOriginalWithCrop", () => {
+test("ImageContentMapPointToOriginalWithCrop", () => {
   const img = {
     data: "",
     mimeType: "",
@@ -40,7 +41,7 @@ Deno.test("ImageContentMapPointToOriginalWithCrop", () => {
   assertEquals(y, 80);
 });
 
-Deno.test("ImageContentMapRectToOriginal", () => {
+test("ImageContentMapRectToOriginal", () => {
   const img = {
     data: "",
     mimeType: "",
@@ -54,7 +55,7 @@ Deno.test("ImageContentMapRectToOriginal", () => {
   assertEquals([x, y, w, h], [20, 10, 40, 20]);
 });
 
-Deno.test("ImageContentMapNormalizedRectToOriginal", () => {
+test("ImageContentMapNormalizedRectToOriginal", () => {
   const img = {
     data: "",
     mimeType: "",
@@ -75,7 +76,7 @@ Deno.test("ImageContentMapNormalizedRectToOriginal", () => {
   assertEquals([x, y, w, h], [20, 20, 60, 40]);
 });
 
-Deno.test("ImageContentMapPointToOriginalRejectsMissingMetadata", () => {
+test("ImageContentMapPointToOriginalRejectsMissingMetadata", () => {
   const img = { data: "", mimeType: "", width: 100, height: 50 };
   const [, , ok] = mapPointToOriginal(img, 1, 1);
   assert(!ok);

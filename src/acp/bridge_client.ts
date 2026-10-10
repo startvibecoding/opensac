@@ -9,8 +9,8 @@ import {
   type CoreRpcRequest,
   type CoreRpcResponse,
 } from "../core/protocol.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
-import type { CoreServerRequest } from "./bridge_protocol.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
+import { type CoreServerRequest } from "./bridge_protocol.ts";
 
 export interface BridgeCoreClient {
   connect(): Promise<void>;

@@ -1,6 +1,7 @@
-import { assertEquals } from "@opensac/assert";
-import { fromFileUrl } from "@opensac/path";
+import { assertEquals } from "../compat/assert.ts";
+import { fromFileUrl } from "../compat/path.ts";
 import { publicSdkInternalImports } from "./guard.ts";
+import { test } from "#testing";
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 
@@ -8,7 +9,7 @@ const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
 // import this repository's `src/` packages. Implementation wiring belongs in
 // `src/bootstrap/`, which external modules blank-import. The examples
 // demonstrate correct public SDK usage and follow the same rule.
-Deno.test("public SDK must not import src", () => {
+test("public SDK must not import src", () => {
   const violations = [
     ...publicSdkInternalImports(projectRoot, "sdk"),
     ...publicSdkInternalImports(projectRoot, "examples"),

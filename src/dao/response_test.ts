@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   ResponseDAO,
   type ResponseItemRecord,
@@ -8,6 +8,7 @@ import {
   type ToolExecutionRecord,
 } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 const SESSION = "session-response";
 
@@ -121,7 +122,7 @@ function stateRecord(
   };
 }
 
-Deno.test("response DAO run insert, upsert, and linked lookup", () => {
+test("response DAO run insert, upsert, and linked lookup", () => {
   const db = openTestDb();
   try {
     const dao = new ResponseDAO(db);
@@ -176,7 +177,7 @@ Deno.test("response DAO run insert, upsert, and linked lookup", () => {
   }
 });
 
-Deno.test("response DAO turn upsert, items, and replay ordering", () => {
+test("response DAO turn upsert, items, and replay ordering", () => {
   const db = openTestDb();
   try {
     const dao = new ResponseDAO(db);
@@ -256,7 +257,7 @@ Deno.test("response DAO turn upsert, items, and replay ordering", () => {
   }
 });
 
-Deno.test("response DAO tool execution claim, update, reclaim, recover", () => {
+test("response DAO tool execution claim, update, reclaim, recover", () => {
   const db = openTestDb();
   try {
     const dao = new ResponseDAO(db);
@@ -361,7 +362,7 @@ Deno.test("response DAO tool execution claim, update, reclaim, recover", () => {
   }
 });
 
-Deno.test("response DAO session state insert wins and CAS bumps version", () => {
+test("response DAO session state insert wins and CAS bumps version", () => {
   const db = openTestDb();
   try {
     const dao = new ResponseDAO(db);
@@ -393,7 +394,7 @@ Deno.test("response DAO session state insert wins and CAS bumps version", () => 
   }
 });
 
-Deno.test("response DAO requires an open database", () => {
+test("response DAO requires an open database", () => {
   const dao = new ResponseDAO(null);
   let threw = false;
   try {

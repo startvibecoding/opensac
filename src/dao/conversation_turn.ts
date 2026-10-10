@@ -42,7 +42,11 @@ const turnColumns = `id, session_id AS sessionId, intent_id AS intentId, kind,
   ended_at AS endedAt`;
 
 export class ConversationTurnDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   appendEntry(executor: DB, record: EntryRecord): number {
     const seq = execReturning<number>(

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse } from "@opensac/assert";
+import { assert, assertEquals, assertFalse } from "../compat/assert.ts";
 import { DECISION_APPROVAL, DECISION_QUESTION } from "./decision.ts";
 import {
   buildDecisionEvent,
@@ -11,9 +11,10 @@ import {
 } from "./decision_events.ts";
 import { replayDecisions } from "./decision_replay.ts";
 import { SessionRunEventSink } from "./run_event.ts";
-import type { SessionRunEvent } from "../session/session_events.ts";
+import { type SessionRunEvent } from "../session/session_events.ts";
+import { test } from "#testing";
 
-Deno.test("Build and decode decision event round trip", () => {
+test("Build and decode decision event round trip", () => {
   const deadline = new Date(Date.now() + 60_000);
   const event = buildDecisionEvent({
     request: {
@@ -52,7 +53,7 @@ Deno.test("Build and decode decision event round trip", () => {
   assertEquals(record.expiresAt?.getTime(), deadline.getTime());
 });
 
-Deno.test("DecodeDecisionEvent defaults identity and rejects foreign", () => {
+test("DecodeDecisionEvent defaults identity and rejects foreign", () => {
   const data = {
     decision: {
       id: "q-1",
@@ -131,7 +132,7 @@ Deno.test("DecodeDecisionEvent defaults identity and rejects foreign", () => {
   }
 });
 
-Deno.test("NewDecisionRecord shape by status", () => {
+test("NewDecisionRecord shape by status", () => {
   const request = {
     id: "d-1",
     sessionId: "s-1",
@@ -160,7 +161,7 @@ Deno.test("NewDecisionRecord shape by status", () => {
   assertEquals(resolved.expiresAt, undefined);
 });
 
-Deno.test("Load decision records by session and run", () => {
+test("Load decision records by session and run", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
   const sink = new SessionRunEventSink(sessionDir);
   const transitions = [

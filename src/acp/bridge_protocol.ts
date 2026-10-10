@@ -4,8 +4,8 @@ import {
   type CoreRpcRequest,
   type CoreRpcResponse,
 } from "../core/protocol.ts";
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
-import type { ACPRPCRequest } from "./wire.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
+import { type ACPRPCRequest } from "./wire.ts";
 import { mapACPExtensionToCore } from "./bridge_extensions.ts";
 
 /** Context shared by ACP request projections. */

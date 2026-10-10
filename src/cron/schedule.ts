@@ -4,7 +4,7 @@
 // `Date` with `null` for Go's zero time and an explicit result object replacing
 // Go's multiple return values.
 
-import type { CronJob } from "./cron.ts";
+import { type CronJob } from "./cron.ts";
 
 /** The parsed result of a schedule expression. */
 export interface ScheduleResult {

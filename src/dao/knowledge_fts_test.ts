@@ -1,6 +1,6 @@
 // (package dao internal test).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   knowledgeFTSHasTokenRune,
   knowledgeFTSIndexText,
@@ -8,8 +8,9 @@ import {
   knowledgeIsFTSCJK,
 } from "./mod.ts";
 import { closeTestDbs, openBareDb } from "./test_util.ts";
+import { test } from "#testing";
 
-Deno.test("knowledge FTS index text splits CJK runs into bigrams", () => {
+test("knowledge FTS index text splits CJK runs into bigrams", () => {
   const cases: { name: string; input: string; want: string }[] = [
     {
       name: "latin unchanged",
@@ -34,7 +35,7 @@ Deno.test("knowledge FTS index text splits CJK runs into bigrams", () => {
   }
 });
 
-Deno.test("knowledge FTS query builds CJK phrases", () => {
+test("knowledge FTS query builds CJK phrases", () => {
   const cases: { query: string; want: string }[] = [
     { query: "知识库", want: `"知识 识库"` },
     { query: "go语言", want: `"go 语言"` },
@@ -50,7 +51,7 @@ Deno.test("knowledge FTS query builds CJK phrases", () => {
 
 // TestKnowledgeFTSCJKRoundTrip proves the index/query rewrite pair against a
 // real FTS5 table with the same definition as knowledge_chunk_fts.
-Deno.test("knowledge FTS CJK round trip", () => {
+test("knowledge FTS CJK round trip", () => {
   const db = openBareDb();
   try {
     db.exec(

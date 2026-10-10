@@ -11,16 +11,15 @@
 
 import { Browser } from "./ops.ts";
 import { discoverCdpUrl, launch } from "./chrome.ts";
-import type {
-  Cookie,
-  HTMLOptions,
-  LaunchOptions,
-  NavigationOptions,
-  Response as ProtocolResponse,
-  ScreenshotOptions,
-  SnapshotOptions,
-} from "./protocol.ts";
-import type { BrowserType } from "./protocol.ts";
+import {
+  type Cookie,
+  type HTMLOptions,
+  type LaunchOptions,
+  type NavigationOptions,
+  type Response as ProtocolResponse,
+  type ScreenshotOptions,
+  type SnapshotOptions} from "./protocol.ts";
+import { type BrowserType } from "./protocol.ts";
 
 /** Options configures the client behavior. */
 export interface Options {

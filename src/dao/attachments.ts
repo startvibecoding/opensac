@@ -29,7 +29,11 @@ const columns = `id, session_id AS sessionId, run_id AS runId, origin, kind,
   expires_at AS expiresAt, metadata`;
 
 export class AttachmentDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   insert(executor: DB, record: AttachmentRecord | null): void {
     if (record === null) return;

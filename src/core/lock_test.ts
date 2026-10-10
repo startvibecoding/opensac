@@ -1,8 +1,9 @@
-import { assert, assertEquals, assertRejects } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 import { type CoreRegistration, CoreRegistry } from "./registry.ts";
 import { CoreLock, CoreLockBusyError } from "./lock.ts";
+import { test } from "#testing";
 
 async function withStateDir(
   test: (paths: CorePaths, registry: CoreRegistry) => Promise<void>,
@@ -48,7 +49,7 @@ async function seedLock(
   );
 }
 
-Deno.test("CoreLock uses a private lock directory and releases it", async () => {
+test("CoreLock uses a private lock directory and releases it", async () => {
   await withStateDir(async (paths) => {
     const handle = await CoreLock.acquire(paths);
     try {
@@ -69,7 +70,7 @@ Deno.test("CoreLock uses a private lock directory and releases it", async () => 
   });
 });
 
-Deno.test("concurrent CoreLock acquisitions have one owner", async () => {
+test("concurrent CoreLock acquisitions have one owner", async () => {
   await withStateDir(async (paths) => {
     const attempts = await Promise.allSettled([
       CoreLock.acquire(paths),
@@ -93,7 +94,7 @@ Deno.test("concurrent CoreLock acquisitions have one owner", async () => {
   });
 });
 
-Deno.test("two CoreLock acquisitions cannot succeed until release", async () => {
+test("two CoreLock acquisitions cannot succeed until release", async () => {
   await withStateDir(async (paths) => {
     const first = await CoreLock.acquire(paths);
     try {
@@ -110,7 +111,7 @@ Deno.test("two CoreLock acquisitions cannot succeed until release", async () => 
   });
 });
 
-Deno.test("CoreLock release is token protected and idempotent", async () => {
+test("CoreLock release is token protected and idempotent", async () => {
   await withStateDir(async (paths) => {
     const handle = await CoreLock.acquire(paths);
     const metadataPath = path.join(paths.lockFile, "meta.json");
@@ -127,7 +128,7 @@ Deno.test("CoreLock release is token protected and idempotent", async () => {
   });
 });
 
-Deno.test("CoreLock recovers a demonstrably dead owner with no healthy registration", async () => {
+test("CoreLock recovers a demonstrably dead owner with no healthy registration", async () => {
   await withStateDir(async (paths, registry) => {
     await seedLock(paths, {
       token: "stale-token",
@@ -145,7 +146,7 @@ Deno.test("CoreLock recovers a demonstrably dead owner with no healthy registrat
   });
 });
 
-Deno.test("CoreLock recovers when the registered process is also dead", async () => {
+test("CoreLock recovers when the registered process is also dead", async () => {
   await withStateDir(async (paths, registry) => {
     await registry.write(registration("stale-core", { pid: 999_999_98 }));
     await seedLock(paths, {
@@ -160,7 +161,7 @@ Deno.test("CoreLock recovers when the registered process is also dead", async ()
   });
 });
 
-Deno.test("CoreLock refuses stale recovery while a registered process may be healthy", async () => {
+test("CoreLock refuses stale recovery while a registered process may be healthy", async () => {
   await withStateDir(async (paths, registry) => {
     await registry.write(registration("live-core"));
     await seedLock(paths, {
@@ -178,7 +179,7 @@ Deno.test("CoreLock refuses stale recovery while a registered process may be hea
   });
 });
 
-Deno.test("CoreLock does not reclaim an old timestamp for a live owner", async () => {
+test("CoreLock does not reclaim an old timestamp for a live owner", async () => {
   await withStateDir(async (paths) => {
     await seedLock(paths, {
       token: "live-token",
@@ -195,7 +196,7 @@ Deno.test("CoreLock does not reclaim an old timestamp for a live owner", async (
   });
 });
 
-Deno.test("CoreLock treats unreadable owner metadata as busy", async () => {
+test("CoreLock treats unreadable owner metadata as busy", async () => {
   await withStateDir(async (paths) => {
     await Deno.mkdir(paths.lockFile, { mode: 0o700 });
     await Deno.writeTextFile(
@@ -211,7 +212,7 @@ Deno.test("CoreLock treats unreadable owner metadata as busy", async () => {
   });
 });
 
-Deno.test("concurrent stale recovery never removes a re-acquired lock", async () => {
+test("concurrent stale recovery never removes a re-acquired lock", async () => {
   await withStateDir(async (paths) => {
     await seedLock(paths, {
       token: "stale-token",
@@ -284,7 +285,7 @@ Deno.test("concurrent stale recovery never removes a re-acquired lock", async ()
   });
 });
 
-Deno.test("CoreLock fails closed when owner liveness cannot be established", async () => {
+test("CoreLock fails closed when owner liveness cannot be established", async () => {
   await withStateDir(async (paths) => {
     await seedLock(paths, {
       token: "unknown-token",
@@ -312,7 +313,7 @@ async function seedOrphanLock(
   }
 }
 
-Deno.test("CoreLock.inspect classifies free, held, and orphan locks", async () => {
+test("CoreLock.inspect classifies free, held, and orphan locks", async () => {
   await withStateDir(async (paths) => {
     assertEquals((await CoreLock.inspect(paths)).state, "free");
 
@@ -332,7 +333,7 @@ Deno.test("CoreLock.inspect classifies free, held, and orphan locks", async () =
   });
 });
 
-Deno.test("CoreLock.acquire auto-heals a stale missing-metadata orphan", async () => {
+test("CoreLock.acquire auto-heals a stale missing-metadata orphan", async () => {
   await withStateDir(async (paths) => {
     await seedOrphanLock(paths, 60_000);
     const handle = await CoreLock.acquire(paths);
@@ -345,7 +346,7 @@ Deno.test("CoreLock.acquire auto-heals a stale missing-metadata orphan", async (
   });
 });
 
-Deno.test("CoreLock.acquire refuses a missing-metadata orphan inside the grace window", async () => {
+test("CoreLock.acquire refuses a missing-metadata orphan inside the grace window", async () => {
   await withStateDir(async (paths) => {
     await seedOrphanLock(paths, 0);
     await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
@@ -353,7 +354,7 @@ Deno.test("CoreLock.acquire refuses a missing-metadata orphan inside the grace w
   });
 });
 
-Deno.test("CoreLock.acquire will not auto-heal malformed metadata or a live registration", async () => {
+test("CoreLock.acquire will not auto-heal malformed metadata or a live registration", async () => {
   await withStateDir(async (paths, registry) => {
     // Malformed metadata is never auto-healed, even past the grace window: it
     // is an unreadable-ownership signal that requires explicit human consent.
@@ -381,7 +382,7 @@ async function handleMalformedLock(paths: CorePaths): Promise<void> {
   assertEquals(await exists(paths.lockFile), false);
 }
 
-Deno.test("CoreLock.reclaimOrphan removes a consented orphan even inside the grace window", async () => {
+test("CoreLock.reclaimOrphan removes a consented orphan even inside the grace window", async () => {
   await withStateDir(async (paths) => {
     await seedOrphanLock(paths, 0);
     assertEquals(await CoreLock.reclaimOrphan(paths), true);
@@ -392,7 +393,7 @@ Deno.test("CoreLock.reclaimOrphan removes a consented orphan even inside the gra
   });
 });
 
-Deno.test("CoreLock.reclaimOrphan refuses consent removal while a live Core is registered", async () => {
+test("CoreLock.reclaimOrphan refuses consent removal while a live Core is registered", async () => {
   await withStateDir(async (paths, registry) => {
     await registry.write(registration("live-core"));
     await seedOrphanLock(paths, 0);

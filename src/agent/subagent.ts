@@ -7,7 +7,7 @@
 // restrictMemberTools, buildSubAgentTask, SubAgentPolicy) already live in
 // subagent_support.ts and are reused here.
 
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 import {
   type Event as PublicEvent,
   eventDone,
@@ -22,7 +22,7 @@ import {
   taskIncomplete,
   type TaskStatus,
 } from "../../sdk/agent/mod.ts";
-import type { Registry, Tool, ToolContext, ToolResult } from "../tools/tool.ts";
+import { Registry, type Tool, type ToolContext, type ToolResult } from "../tools/tool.ts";
 import { createTextToolResult } from "../tools/tool.ts";
 import type { AgentAdapter } from "./bridge.ts";
 import {
@@ -61,8 +61,8 @@ import {
   type MemberCompletion,
   type MemberMailbox,
 } from "./mailbox.ts";
-import type { MemberDef } from "./memberdef.ts";
-import type { RunContext } from "./run_context.ts";
+import { type MemberDef } from "./memberdef.ts";
+import { type RunContext } from "./run_context.ts";
 import { SubAgentWaitTool } from "./subagent_wait.ts";
 import {
   buildSubAgentTask,
@@ -73,7 +73,7 @@ import {
 } from "./subagent_support.ts";
 
 export { subAgentToolNames } from "./subagent_support.ts";
-export { MEMBER_ITEM_QUESTION, MEMBER_STATUS_QUESTION, MemberCompletion };
+export { MEMBER_ITEM_QUESTION, MEMBER_STATUS_QUESTION, type MemberCompletion };
 export { SubAgentWaitTool };
 
 type EventSink = (ev: Event) => boolean;

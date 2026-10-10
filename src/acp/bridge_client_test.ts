@@ -1,8 +1,9 @@
 // deno-lint-ignore-file require-await -- async fake methods model Promise-returning seams
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
-import type { CoreClient, CoreEventConnection } from "../core/client.ts";
+import { CoreClient, type CoreEventConnection } from "../core/client.ts";
 import { ACPBridgeClient } from "./bridge_client.ts";
+import { test } from "#testing";
 
 class FakeCoreClient {
   readonly calls: { method: string; params?: unknown }[] = [];
@@ -73,7 +74,7 @@ class FakeEventConnection implements CoreEventConnection {
   }
 }
 
-Deno.test("ACPBridgeClient connects, subscribes, replays, and closes only the client", async () => {
+test("ACPBridgeClient connects, subscribes, replays, and closes only the client", async () => {
   const core = new FakeCoreClient();
   const bridge = new ACPBridgeClient({ core: core as unknown as CoreClient });
   await bridge.connect();
@@ -99,7 +100,7 @@ Deno.test("ACPBridgeClient connects, subscribes, replays, and closes only the cl
   assertEquals(core.closed, 1);
 });
 
-Deno.test("ACPBridgeClient correlates and responds to Core reverse requests", async () => {
+test("ACPBridgeClient correlates and responds to Core reverse requests", async () => {
   const core = new FakeCoreClient();
   const bridge = new ACPBridgeClient({ core: core as unknown as CoreClient });
   await bridge.connect();

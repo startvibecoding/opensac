@@ -10,7 +10,7 @@ import type { ReactElement } from "react";
 import { Text } from "ink";
 import { formatDuration, truncateDisplay } from "./formatters.ts";
 import { normalizeCommand } from "./tool_row_format.ts";
-import type { DiffStats } from "./turn_card.tsx";
+import { type DiffStats } from "./turn_card.tsx";
 
 const ICONS = {
   running: ">",

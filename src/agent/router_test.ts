@@ -1,15 +1,16 @@
 // (no dedicated Go test).
 // Unknown handlers are routed; global handlers receive every event.
 
-import { assertEquals } from "@opensac/assert";
-import type { Event } from "../../sdk/agent/types.ts";
+import { assertEquals } from "../compat/assert.ts";
+import { type Event } from "../../sdk/agent/types.ts";
 import { createEventRouter, RouterEventHandlerFunc } from "./router.ts";
+import { test } from "#testing";
 
 function event(agentId: string): Event {
   return { agentId, type: 0 };
 }
 
-Deno.test("event router routes to agent-specific then global handlers", () => {
+test("event router routes to agent-specific then global handlers", () => {
   const router = createEventRouter();
   const seen: string[] = [];
 

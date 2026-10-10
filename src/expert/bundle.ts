@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import {
   type AgentDef,
   type Bundle,
@@ -57,7 +57,11 @@ export interface BundleSource {
 }
 
 class OsSource implements BundleSource {
-  constructor(private readonly root: string) {}
+    private readonly root: string;
+
+  constructor(root: string) {
+    this.root = root;
+  }
 
   readFile(name: string): string | null {
     try {
@@ -97,10 +101,13 @@ class OsSource implements BundleSource {
 }
 
 class FsSource implements BundleSource {
-  constructor(
-    private readonly fsys: ExpertFS,
-    private readonly root: string,
-  ) {}
+    private readonly fsys: ExpertFS;
+  private readonly root: string;
+
+  constructor(fsys: ExpertFS, root: string) {
+    this.fsys = fsys;
+    this.root = root;
+  }
 
   private join(name: string): string {
     return this.root === "" ? name : this.root + "/" + name;

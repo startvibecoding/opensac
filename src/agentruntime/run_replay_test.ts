@@ -1,7 +1,8 @@
-import { assertEquals } from "@opensac/assert";
-import type { SessionRunEvent } from "../session/session_events.ts";
+import { assertEquals } from "../compat/assert.ts";
+import { type SessionRunEvent } from "../session/session_events.ts";
 import { replayRunEvents, replayRunEventsJSON } from "./run_replay.ts";
 import { RUN_STATE_COMPLETED, RUN_STATE_RUNNING } from "./run_state.ts";
+import { test } from "#testing";
 
 function event(overrides: Partial<SessionRunEvent>): SessionRunEvent {
   return {
@@ -18,7 +19,7 @@ function event(overrides: Partial<SessionRunEvent>): SessionRunEvent {
   };
 }
 
-Deno.test("ReplayRunEvents reconstructs terminal state", () => {
+test("ReplayRunEvents reconstructs terminal state", () => {
   const now = Date.now();
   const events = [
     event({
@@ -58,7 +59,7 @@ Deno.test("ReplayRunEvents reconstructs terminal state", () => {
   assertEquals(replay.terminal, true);
 });
 
-Deno.test("ReplayRunEvents keeps pending run non-terminal", () => {
+test("ReplayRunEvents keeps pending run non-terminal", () => {
   const replay = replayRunEvents([
     event({
       sessionId: "session-1",
@@ -71,7 +72,7 @@ Deno.test("ReplayRunEvents keeps pending run non-terminal", () => {
   assertEquals(replay.terminal, false);
 });
 
-Deno.test("ReplayRunEventsJSON sorts by timestamp", () => {
+test("ReplayRunEventsJSON sorts by timestamp", () => {
   const now = Date.now();
   const events = [
     event({

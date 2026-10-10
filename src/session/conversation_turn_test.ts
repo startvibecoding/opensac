@@ -4,7 +4,7 @@
 // Manager is replaced with direct function calls against a temp session
 // database.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   ConversationTurnNotOpenError,
@@ -12,12 +12,13 @@ import {
   listConversationTurns,
   startConversationTurn,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function tempDir(): string {
   return Deno.makeTempDirSync({ prefix: "opensac-session-" });
 }
 
-Deno.test("startConversationTurn opens a durable boundary row", () => {
+test("startConversationTurn opens a durable boundary row", () => {
   const sessionDir = tempDir();
   try {
     startConversationTurn(sessionDir, {
@@ -46,7 +47,7 @@ Deno.test("startConversationTurn opens a durable boundary row", () => {
   }
 });
 
-Deno.test("opening the same open turn with the same run is idempotent", () => {
+test("opening the same open turn with the same run is idempotent", () => {
   const sessionDir = tempDir();
   try {
     const turn = {
@@ -70,7 +71,7 @@ Deno.test("opening the same open turn with the same run is idempotent", () => {
   }
 });
 
-Deno.test("a second concurrent turn is rejected", () => {
+test("a second concurrent turn is rejected", () => {
   const sessionDir = tempDir();
   try {
     startConversationTurn(sessionDir, {
@@ -109,7 +110,7 @@ Deno.test("a second concurrent turn is rejected", () => {
   }
 });
 
-Deno.test("endConversationTurn closes the boundary and is idempotent", () => {
+test("endConversationTurn closes the boundary and is idempotent", () => {
   const sessionDir = tempDir();
   try {
     startConversationTurn(sessionDir, {
@@ -155,7 +156,7 @@ Deno.test("endConversationTurn closes the boundary and is idempotent", () => {
   }
 });
 
-Deno.test("ending an unknown turn reports not-open", () => {
+test("ending an unknown turn reports not-open", () => {
   const sessionDir = tempDir();
   try {
     assertThrows(
@@ -175,7 +176,7 @@ Deno.test("ending an unknown turn reports not-open", () => {
   }
 });
 
-Deno.test("a closed turn can be reopened for a new attempt", () => {
+test("a closed turn can be reopened for a new attempt", () => {
   const sessionDir = tempDir();
   try {
     const base = {

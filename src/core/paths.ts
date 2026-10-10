@@ -1,4 +1,4 @@
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 
 /**
  * Filesystem locations owned by the Core discovery/lock subsystem.

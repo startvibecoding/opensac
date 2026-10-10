@@ -1,4 +1,4 @@
-import type { ResolvedCoreConfig } from "./config.ts";
+import { type ResolvedCoreConfig } from "./config.ts";
 
 /** The HTTP header carrying the Core password. */
 export const CORE_AUTH_HEADER = "Authorization" as const;

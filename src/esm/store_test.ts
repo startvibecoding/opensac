@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   EsmInvalidTransitionError,
@@ -16,6 +16,7 @@ import {
 } from "./state.ts";
 import { Store as ESMStore } from "./store.ts";
 import { workerTaskPrompt } from "./prompt.ts";
+import { test } from "#testing";
 
 function createTestStore(): { store: Store; sessionID: string } {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-esm-store-" });
@@ -35,7 +36,7 @@ function assertSentinel(fn: () => unknown, expected: new () => Error): void {
   );
 }
 
-Deno.test("Store create and usage accounting", () => {
+test("Store create and usage accounting", () => {
   const { store, sessionID } = createTestStore();
   try {
     let obj = store.create(sessionID, "ship esm");
@@ -65,7 +66,7 @@ Deno.test("Store create and usage accounting", () => {
   }
 });
 
-Deno.test("Store blocked audit and complete", () => {
+test("Store blocked audit and complete", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -108,7 +109,7 @@ Deno.test("Store blocked audit and complete", () => {
   }
 });
 
-Deno.test("Store blocked audit requires consecutive runs", () => {
+test("Store blocked audit requires consecutive runs", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -158,7 +159,7 @@ Deno.test("Store blocked audit requires consecutive runs", () => {
   }
 });
 
-Deno.test("Store complete requires evidence", () => {
+test("Store complete requires evidence", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -174,7 +175,7 @@ Deno.test("Store complete requires evidence", () => {
   }
 });
 
-Deno.test("Store reject completion candidate returns active", () => {
+test("Store reject completion candidate returns active", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -196,7 +197,7 @@ Deno.test("Store reject completion candidate returns active", () => {
   }
 });
 
-Deno.test("Store persists worker progress", () => {
+test("Store persists worker progress", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -222,7 +223,7 @@ Deno.test("Store persists worker progress", () => {
   }
 });
 
-Deno.test("Store repeated recovery resets worker progress", () => {
+test("Store repeated recovery resets worker progress", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -248,7 +249,7 @@ Deno.test("Store repeated recovery resets worker progress", () => {
   }
 });
 
-Deno.test("Store repeated completion rejections remain active", () => {
+test("Store repeated completion rejections remain active", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -294,7 +295,7 @@ Deno.test("Store repeated completion rejections remain active", () => {
   }
 });
 
-Deno.test("Store non-rejected run resets completion rejection streak", () => {
+test("Store non-rejected run resets completion rejection streak", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -315,7 +316,7 @@ Deno.test("Store non-rejected run resets completion rejection streak", () => {
   }
 });
 
-Deno.test("Store worker precheck rejection keeps objective active", () => {
+test("Store worker precheck rejection keeps objective active", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -336,7 +337,7 @@ Deno.test("Store worker precheck rejection keeps objective active", () => {
   }
 });
 
-Deno.test("Store record completion review while active", () => {
+test("Store record completion review while active", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");
@@ -354,7 +355,7 @@ Deno.test("Store record completion review while active", () => {
   }
 });
 
-Deno.test("Store invalid transition sentinel", () => {
+test("Store invalid transition sentinel", () => {
   const { store, sessionID } = createTestStore();
   try {
     store.create(sessionID, "finish migration");

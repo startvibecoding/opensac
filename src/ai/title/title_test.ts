@@ -1,4 +1,4 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../../compat/assert.ts";
 import { Generator, maxTitleRunes, normalizeTitle } from "./title.ts";
 import {
   type ChatParams,
@@ -9,6 +9,7 @@ import {
   type StreamEvent,
   streamTextDelta,
 } from "../../provider/mod.ts";
+import { test } from "#testing";
 
 class RecordingProvider implements Provider {
   params?: ChatParams;
@@ -47,7 +48,7 @@ class RecordingProvider implements Provider {
   }
 }
 
-Deno.test("GeneratorUsesCommonProviderInterfaceAndNormalizes", async () => {
+test("GeneratorUsesCommonProviderInterfaceAndNormalizes", async () => {
   const p = new RecordingProvider([
     { type: streamTextDelta, textDelta: '  "修复登录问题\n' },
     { type: streamTextDelta, textDelta: '并补充测试"  ' },
@@ -62,7 +63,7 @@ Deno.test("GeneratorUsesCommonProviderInterfaceAndNormalizes", async () => {
   assertEquals(p.params?.messages.length, 2);
 });
 
-Deno.test("GeneratorFallsBackWhenProviderFails", async () => {
+test("GeneratorFallsBackWhenProviderFails", async () => {
   const p = new RecordingProvider([
     { type: streamError, error: new Error("provider down") },
   ]);
@@ -74,12 +75,12 @@ Deno.test("GeneratorFallsBackWhenProviderFails", async () => {
   assertEquals(name, "hi");
 });
 
-Deno.test("NormalizeLimitsUnicodeTitle", () => {
+test("NormalizeLimitsUnicodeTitle", () => {
   const got = normalizeTitle("###" + "界" + "界".repeat(50));
   assertEquals([...got].length, maxTitleRunes);
 });
 
-Deno.test("NormalizeReproducesGoOverEscapedCutset", () => {
+test("NormalizeReproducesGoOverEscapedCutset", () => {
   // Go's cutset includes a literal backslash and the letter `t`.
   assertEquals(normalizeTitle(" test "), "es");
   assertEquals(normalizeTitle("#title#"), "itle");

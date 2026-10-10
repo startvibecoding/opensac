@@ -11,14 +11,14 @@
 // `Date`; Go's `(value, error)` returns throw typed errors.
 
 import { createHash } from "node:crypto";
-import { decodeBase64Url, encodeBase64Url } from "@opensac/encoding/base64url";
+import { decodeBase64Url, encodeBase64Url } from "../compat/encoding.ts";
 import {
   type Response as DoctorResponse,
   STATUS_ERROR,
 } from "../doctor/mod.ts";
-import type { Message } from "../provider/types.ts";
+import { type Message } from "../provider/types.ts";
 import type { Manager } from "../session/manager.ts";
-import type { SessionUpdate } from "./protocol.ts";
+import { type SessionUpdate } from "./protocol.ts";
 import { acpToolKind, textToolContent } from "./projection.ts";
 import { utf8Length, utf8Prefix } from "./metadata.ts";
 

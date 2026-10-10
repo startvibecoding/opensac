@@ -6,8 +6,8 @@
 // Deviation: `map[string]provider.Provider` maps to `Record<string, Provider>`;
 // Go's `sort` maps to `Array.prototype.sort`.
 
-import type { Model, ThinkingLevel } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Model, type ThinkingLevel } from "../provider/types.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   thinkingHigh,
   thinkingLow,

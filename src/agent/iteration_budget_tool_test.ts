@@ -2,8 +2,8 @@
 // ExtendBudgetTool + tool-context cases; the loop-driven cases move with the
 // core loop).
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
-import type { ToolContext } from "../tools/tool.ts";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
+import { type ToolContext } from "../tools/tool.ts";
 import {
   createIterationBudget,
   ITERATION_BUDGET_TOOL_NAME,
@@ -12,6 +12,7 @@ import {
   toolContextWithIterationBudget,
 } from "./iteration_budget.ts";
 import { createExtendBudgetTool } from "./iteration_budget_tool.ts";
+import { test } from "#testing";
 
 function policy(
   partial: Partial<IterationBudgetPolicy>,
@@ -27,7 +28,7 @@ function policy(
   };
 }
 
-Deno.test("extend_budget tool metadata and rejection without a budget", () => {
+test("extend_budget tool metadata and rejection without a budget", () => {
   const tool = createExtendBudgetTool();
   assertEquals(tool.name(), ITERATION_BUDGET_TOOL_NAME);
   const ctx: ToolContext = {};
@@ -38,7 +39,7 @@ Deno.test("extend_budget tool metadata and rejection without a budget", () => {
   );
 });
 
-Deno.test("extend_budget tool grants and rejects missing reason", () => {
+test("extend_budget tool grants and rejects missing reason", () => {
   const tool = createExtendBudgetTool();
   const b = createIterationBudget(
     policy({

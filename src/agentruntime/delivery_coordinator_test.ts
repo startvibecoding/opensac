@@ -4,7 +4,7 @@
 // the `SessionRuntime` slice), matching `delivery_store_test.ts`. Go's
 // `(DeliveryResult, error)` executor returns map to `DeliveryExecutorOutcome`.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
   createDeliveryPlan,
@@ -21,6 +21,7 @@ import {
   deliveryFailureRetryable,
   emptyDeliveryResult,
 } from "./delivery_coordinator.ts";
+import { test } from "#testing";
 
 function baseRun(overrides: Partial<SessionRun>): SessionRun {
   return {
@@ -118,7 +119,7 @@ function plan(
   return { intent, operations };
 }
 
-Deno.test("DeliveryCoordinatorReconcilesDueOperationAndBoundsRetries", async () => {
+test("DeliveryCoordinatorReconcilesDueOperationAndBoundsRetries", async () => {
   const { sessionDir, sessionId } = fixture();
   try {
     const now = new Date();
@@ -154,7 +155,7 @@ Deno.test("DeliveryCoordinatorReconcilesDueOperationAndBoundsRetries", async () 
   }
 });
 
-Deno.test("DeliveryCoordinatorPreservesUncertainResult", async () => {
+test("DeliveryCoordinatorPreservesUncertainResult", async () => {
   const { sessionDir, sessionId } = fixture();
   try {
     const now = new Date();
@@ -191,7 +192,7 @@ Deno.test("DeliveryCoordinatorPreservesUncertainResult", async () => {
   }
 });
 
-Deno.test("DeliveryCoordinatorAppliesRetryLimitToProviderRetryResult", async () => {
+test("DeliveryCoordinatorAppliesRetryLimitToProviderRetryResult", async () => {
   const { sessionDir, sessionId } = fixture();
   try {
     const now = new Date();
@@ -232,7 +233,7 @@ Deno.test("DeliveryCoordinatorAppliesRetryLimitToProviderRetryResult", async () 
   }
 });
 
-Deno.test("DeliveryCoordinatorPreservesCheckpointOnExecutorError", async () => {
+test("DeliveryCoordinatorPreservesCheckpointOnExecutorError", async () => {
   const { sessionDir, sessionId } = fixture();
   try {
     const now = new Date();
@@ -275,7 +276,7 @@ Deno.test("DeliveryCoordinatorPreservesCheckpointOnExecutorError", async () => {
   }
 });
 
-Deno.test("DeliveryCoordinatorRetriesTransientFailuresWithinTheWindow", async () => {
+test("DeliveryCoordinatorRetriesTransientFailuresWithinTheWindow", async () => {
   const { sessionDir, sessionId } = fixture();
   try {
     const now = new Date();
@@ -326,7 +327,7 @@ Deno.test("DeliveryCoordinatorRetriesTransientFailuresWithinTheWindow", async ()
   }
 });
 
-Deno.test("DeliveryCoordinatorReopenedOperationGetsAFreshWindow", async () => {
+test("DeliveryCoordinatorReopenedOperationGetsAFreshWindow", async () => {
   const { sessionDir, sessionId } = fixture();
   try {
     const now = new Date();

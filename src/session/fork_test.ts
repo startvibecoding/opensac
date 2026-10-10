@@ -4,7 +4,7 @@
 // turn helpers and persist sessions/run rows through the DAO. The final
 // atomic-admission fixture is preserved with literal IDs and direct row counts.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
 import {
@@ -30,6 +30,7 @@ import {
   updateSessionRunStatus,
 } from "./mod.ts";
 import { finishSessionRunAndConversationTurn } from "./run_store.ts";
+import { test } from "#testing";
 
 function makeSession(sessionDir: string, id: string): void {
   const db = openRootDB(sessionDir);
@@ -115,7 +116,7 @@ function startTurn(
   });
 }
 
-Deno.test("fork session and message boundary", () => {
+test("fork session and message boundary", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "source");
@@ -165,7 +166,7 @@ Deno.test("fork session and message boundary", () => {
   }
 });
 
-Deno.test("fork rejects an open turn and independent sessions stay concurrent", () => {
+test("fork rejects an open turn and independent sessions stay concurrent", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "a");
@@ -194,7 +195,7 @@ Deno.test("fork rejects an open turn and independent sessions stay concurrent", 
   }
 });
 
-Deno.test("fork rejects an orphaned pending decision", () => {
+test("fork rejects an orphaned pending decision", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "pending-decision");
@@ -226,7 +227,7 @@ Deno.test("fork rejects an orphaned pending decision", () => {
   }
 });
 
-Deno.test("fork allows an orphaned cancelled decision", () => {
+test("fork allows an orphaned cancelled decision", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "cancelled-decision");
@@ -277,7 +278,7 @@ Deno.test("fork allows an orphaned cancelled decision", () => {
   }
 });
 
-Deno.test("fork uses a legacy completed run boundary", () => {
+test("fork uses a legacy completed run boundary", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "legacy-fork");
@@ -348,7 +349,7 @@ Deno.test("fork uses a legacy completed run boundary", () => {
   }
 });
 
-Deno.test("execution admission atomically starts a conversation turn", () => {
+test("execution admission atomically starts a conversation turn", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fork-" });
   try {
     makeSession(sessionDir, "atomic-turn");

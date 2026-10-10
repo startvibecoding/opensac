@@ -1,7 +1,8 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "./compat/assert.ts";
 import { withIsolatedConfig } from "./test_helpers.ts";
+import { test } from "#testing";
 
-Deno.test("isolated config restores the caller's config directory", async () => {
+test("isolated config restores the caller's config directory", async () => {
   const previous = Deno.env.get("OPENSAC_DIR");
   let observed: string | undefined;
 

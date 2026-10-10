@@ -9,13 +9,14 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import {
   createFakeTUIService,
   type FakeTUIService,
   TUIServiceError,
 } from "./service.ts";
 import { TUISession } from "./tui_session.ts";
+import { test } from "#testing";
 
 /**
  * Redirects the config dir to a temp dir so session/lease writes during these
@@ -54,7 +55,7 @@ function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 10));
 }
 
-Deno.test("answerApproval answers the Core decision request", async () => {
+test("answerApproval answers the Core decision request", async () => {
   const iso = isolateConfigDir();
   try {
     const fake = createFakeTUIService();
@@ -91,7 +92,7 @@ Deno.test("answerApproval answers the Core decision request", async () => {
   }
 });
 
-Deno.test("answerQuestion answers the Core decision request", async () => {
+test("answerQuestion answers the Core decision request", async () => {
   const iso = isolateConfigDir();
   try {
     const fake = createFakeTUIService();
@@ -122,7 +123,7 @@ Deno.test("answerQuestion answers the Core decision request", async () => {
   }
 });
 
-Deno.test("answering an unknown decision still clears the panel quietly", async () => {
+test("answering an unknown decision still clears the panel quietly", async () => {
   const iso = isolateConfigDir();
   try {
     const s = session();
@@ -145,7 +146,7 @@ Deno.test("answering an unknown decision still clears the panel quietly", async 
   }
 });
 
-Deno.test("an early submit failure unwinds busy and surfaces the error", async () => {
+test("an early submit failure unwinds busy and surfaces the error", async () => {
   const iso = isolateConfigDir();
   try {
     const s = session();

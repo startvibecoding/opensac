@@ -6,10 +6,10 @@
 // Deviations from Go: `context.Context` is dropped (the DAO layer is
 // synchronous), and `tx.Rollback` maps to `Database.runInTx`.
 
-import type { Tx } from "../dao/mod.ts";
+import { type Tx } from "../dao/mod.ts";
 import { ConversationTurnDAO } from "../dao/mod.ts";
 import { entrySession, entryTurnEnd, entryTurnStart } from "./entry.ts";
-import type { TurnEndEntry, TurnStartEntry } from "./entry.ts";
+import { type TurnEndEntry, type TurnStartEntry } from "./entry.ts";
 import { generateID } from "./entry.ts";
 import { openRootDB, parseSessionTimestamp } from "./root_db.ts";
 import { getEntryMetadata } from "./replay.ts";

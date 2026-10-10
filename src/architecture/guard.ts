@@ -12,7 +12,7 @@
 // running `deno info`; the whole-repo tests call the same functions against the
 // real tree.
 
-import { dirname, join, relative } from "@opensac/path";
+import { dirname, join, relative } from "../compat/path.ts";
 
 export interface Violation {
   file: string;

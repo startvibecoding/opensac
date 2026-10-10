@@ -5,7 +5,7 @@
 // mirrors that directory; regenerate it whenever the builtin skills change.
 
 import { builtinFiles } from "./builtin_content.ts";
-import type { SkillFS, SkillFSEntry } from "./skills.ts";
+import { type SkillFS, type SkillFSEntry } from "./skills.ts";
 
 /** Builds an in-memory SkillFS over the embedded built-in skills. */
 export function createBuiltinFS(): SkillFS {

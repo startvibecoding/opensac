@@ -3,7 +3,7 @@
 // public `Builder` constructs a real Agent, and the built agent must run one
 // full turn against a scripted public Provider through the bridge.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   eventAgentEnd,
   eventTextDelta,
@@ -18,6 +18,7 @@ import {
 // Importing the facade registers the provider factories, the provider
 // resolution hook, and the internal agent builder (Go's bootstrap init()).
 import "../../bootstrap.ts";
+import { test } from "#testing";
 
 const testModel: ModelInfo = {
   id: "test-model",
@@ -29,7 +30,7 @@ const testModel: ModelInfo = {
   maxTokens: 0,
 };
 
-Deno.test("bootstrap facade registers the internal agent builder", () => {
+test("bootstrap facade registers the internal agent builder", () => {
   const agent = newBuilder()
     .withProvider({
       chat: async function* (): AsyncIterable<StreamEvent> {
@@ -48,7 +49,7 @@ Deno.test("bootstrap facade registers the internal agent builder", () => {
   assertEquals(agent.parentId(), "");
 });
 
-Deno.test("built agent runs one turn through the provider bridge", async () => {
+test("built agent runs one turn through the provider bridge", async () => {
   const agent = newBuilder()
     .withProvider({
       chat: async function* (): AsyncIterable<StreamEvent> {

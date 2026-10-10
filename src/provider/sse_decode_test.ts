@@ -3,7 +3,7 @@
 // unchecked cast), keep failure at the boundary for bad JSON and shape
 // garbage, and stay open to unknown event types and fields.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { decodeAnthropicStreamEvent } from "./anthropic/provider.ts";
 import { decodeGoogleStreamChunk } from "./google/provider.ts";
 import { decodeOpenAIStreamChunk } from "./openai/provider.ts";
@@ -11,8 +11,9 @@ import {
   decodeResponsesCompletedObject,
   decodeResponsesEvent,
 } from "./openai/responses.ts";
+import { test } from "#testing";
 
-Deno.test("decodeAnthropicStreamEvent matches a well-formed payload exactly", () => {
+test("decodeAnthropicStreamEvent matches a well-formed payload exactly", () => {
   const samples = [
     `{"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":1,"cache_read_input_tokens":2}}}`,
     `{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call_1","name":"read","input":{"path":"a.ts"}}}`,
@@ -28,7 +29,7 @@ Deno.test("decodeAnthropicStreamEvent matches a well-formed payload exactly", ()
   }
 });
 
-Deno.test("decodeAnthropicStreamEvent keeps failure at the boundary", () => {
+test("decodeAnthropicStreamEvent keeps failure at the boundary", () => {
   // Bad JSON and non-object payloads are rejected outright.
   assertEquals(decodeAnthropicStreamEvent("{"), undefined);
   assertEquals(decodeAnthropicStreamEvent("42"), undefined);
@@ -50,7 +51,7 @@ Deno.test("decodeAnthropicStreamEvent keeps failure at the boundary", () => {
   assertEquals(delta.delta, undefined);
 });
 
-Deno.test("decodeAnthropicStreamEvent passes unknown event types through", () => {
+test("decodeAnthropicStreamEvent passes unknown event types through", () => {
   const event = decodeAnthropicStreamEvent(
     `{"type":"message_boundary_delta","frobnicate":1}`,
   );
@@ -58,7 +59,7 @@ Deno.test("decodeAnthropicStreamEvent passes unknown event types through", () =>
   assertEquals(event.type, "message_boundary_delta");
 });
 
-Deno.test("decodeGoogleStreamChunk matches a well-formed payload exactly", () => {
+test("decodeGoogleStreamChunk matches a well-formed payload exactly", () => {
   const samples = [
     `{"candidates":[{"content":{"role":"model","parts":[{"text":"hi"}]},"finishReason":"STOP"}]}`,
     `{"candidates":[{"content":{"parts":[{"functionCall":{"id":"c1","name":"read","args":{"path":"a.ts"}},"thoughtSignature":"sig"}]}}],"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":4,"totalTokenCount":7}}`,
@@ -71,7 +72,7 @@ Deno.test("decodeGoogleStreamChunk matches a well-formed payload exactly", () =>
   }
 });
 
-Deno.test("decodeGoogleStreamChunk survives shape garbage", () => {
+test("decodeGoogleStreamChunk survives shape garbage", () => {
   assertEquals(decodeGoogleStreamChunk("["), undefined);
   // A candidate without content no longer crashes the parts loop.
   const chunk = decodeGoogleStreamChunk(
@@ -89,7 +90,7 @@ Deno.test("decodeGoogleStreamChunk survives shape garbage", () => {
   assertEquals(dirty.candidates?.[0].content.parts, [{ text: "ok" }]);
 });
 
-Deno.test("decodeOpenAIStreamChunk matches a well-formed payload exactly", () => {
+test("decodeOpenAIStreamChunk matches a well-formed payload exactly", () => {
   const samples = [
     `{"id":"1","object":"chat.completion.chunk","created":2,"model":"m","choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":null}]}`,
     `{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"read","arguments":"{\\"p\\":1}"}}]}}],"usage":null}`,
@@ -102,7 +103,7 @@ Deno.test("decodeOpenAIStreamChunk matches a well-formed payload exactly", () =>
   }
 });
 
-Deno.test("decodeOpenAIStreamChunk keeps nulls and rejects garbage", () => {
+test("decodeOpenAIStreamChunk keeps nulls and rejects garbage", () => {
   assertEquals(decodeOpenAIStreamChunk("{"), undefined);
   const chunk = decodeOpenAIStreamChunk(
     `{"usage":null,"choices":[{"finish_reason":null,"delta":{"reasoning_content":null}}]}`,
@@ -120,7 +121,7 @@ Deno.test("decodeOpenAIStreamChunk keeps nulls and rejects garbage", () => {
   assertEquals(garbage.choices?.[0].delta, undefined);
 });
 
-Deno.test("decodeResponsesEvent matches a well-formed payload exactly", () => {
+test("decodeResponsesEvent matches a well-formed payload exactly", () => {
   const samples = [
     `{"type":"response.output_text.delta","delta":"hi","item_id":"i1","output_index":0}`,
     `{"type":"response.output_item.done","output_index":1,"item":{"id":"i2","type":"function_call","status":"completed","call_id":"c1","name":"read","arguments":"{}"}}`,
@@ -134,7 +135,7 @@ Deno.test("decodeResponsesEvent matches a well-formed payload exactly", () => {
   }
 });
 
-Deno.test("decodeResponsesEvent tolerates unknown events and shape garbage", () => {
+test("decodeResponsesEvent tolerates unknown events and shape garbage", () => {
   // Non-object payloads are rejected at the boundary (the legacy cast threw
   // a TypeError on the `type` fill-in instead).
   assertEquals(decodeResponsesEvent(42), undefined);
@@ -160,7 +161,7 @@ Deno.test("decodeResponsesEvent tolerates unknown events and shape garbage", () 
   assertEquals(nulled.error, null);
 });
 
-Deno.test("decodeResponsesCompletedObject decodes output and usage shapes", () => {
+test("decodeResponsesCompletedObject decodes output and usage shapes", () => {
   const decoded = decodeResponsesCompletedObject({
     id: "r1",
     status: "completed",

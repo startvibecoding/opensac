@@ -24,7 +24,7 @@
 
 import { createHash } from "node:crypto";
 import { isAbortError, isTimeoutError } from "../util/errors.ts";
-import { isAbsolute, normalize } from "@opensac/path";
+import { isAbsolute, normalize } from "../compat/path.ts";
 import {
   calculateCost,
   createUserMessage,
@@ -36,7 +36,7 @@ import {
   totalInputTokens,
   type Usage,
 } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import { create, resolveModel } from "../provider/factory/mod.ts";
 import {
   getSessionDir,
@@ -44,8 +44,8 @@ import {
   normalizeSamplingPtr,
   type Settings,
 } from "../config/settings.ts";
-import type { MCPServer } from "../config/mcp.ts";
-import type { AllowConfig } from "../config/allow.ts";
+import { type MCPServer } from "../config/mcp.ts";
+import { type AllowConfig } from "../config/allow.ts";
 import {
   COMMAND as systeminitCommand,
   prompt as systeminitPrompt,
@@ -93,10 +93,10 @@ import {
   forkWithExpert as forkSessionPrefixWithExpert,
 } from "../agentruntime/fork.ts";
 import { type DurableRun, RunStore } from "../agentruntime/run_store.ts";
-import type { RunEvent } from "../agentruntime/run_event.ts";
+import { type RunEvent } from "../agentruntime/run_event.ts";
 import type { ArtifactCollector } from "../agentruntime/artifact.ts";
 import { withKnowledgeContext } from "../agentruntime/knowledgebase.ts";
-import type { KnowledgeBaseReference } from "../agentruntime/knowledge_context.ts";
+import { type KnowledgeBaseReference } from "../agentruntime/knowledge_context.ts";
 import {
   type InputIngress,
   type InputSubmission,
@@ -111,7 +111,7 @@ import {
 } from "../agentruntime/run_state.ts";
 import { generateID } from "../session/entry.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
-import type { ExecutionIntent } from "../session/execution_intent.ts";
+import { type ExecutionIntent } from "../session/execution_intent.ts";
 import {
   KnowledgeBaseNotFoundError,
   KnowledgeBaseUnindexedError,
@@ -127,7 +127,7 @@ import { defaultAttachmentPolicy } from "../agentruntime/attachment.ts";
 import { normalizeAdditionalDirectories } from "../agentruntime/session_directories.ts";
 import { getActiveDurableRun } from "../agentruntime/run_queries.ts";
 import type { SessionRuntime } from "../agentruntime/session_runtime.ts";
-import type { SessionConfigOption } from "../agentruntime/session_options.ts";
+import { type SessionConfigOption } from "../agentruntime/session_options.ts";
 import {
   DECISION_APPROVAL,
   DECISION_QUESTION,
@@ -135,7 +135,7 @@ import {
   type DecisionRequest,
   DecisionService,
 } from "../agentruntime/decision.ts";
-import type { DecisionRecord } from "../agentruntime/decision_record.ts";
+import { type DecisionRecord } from "../agentruntime/decision_record.ts";
 import {
   type Event as AgentEvent,
   EVENT_COMPACTION_END,
@@ -163,7 +163,7 @@ import {
   TASK_INCOMPLETE,
   TASK_SUCCESS,
 } from "../agent/events.ts";
-import type { ContextUsage } from "../context/mod.ts";
+import { type ContextUsage } from "../context/mod.ts";
 import type { AgentManager } from "../agent/manager.ts";
 import type { Manager as SessionManager } from "../session/manager.ts";
 import {

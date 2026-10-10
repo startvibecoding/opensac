@@ -3,15 +3,16 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
+} from "../compat/assert.ts";
 import { createClawHubClient } from "./clawhub.ts";
 import { installSkill } from "./install.ts";
 import { jsonResponse, makeArchive, startServer } from "./test_helpers.ts";
+import { test } from "#testing";
 
 const ambiguousCustomMailPayload =
   `{"code":"AMBIGUOUS_SKILL_SLUG","message":"Found multiple skills with the slug \\"custom-mail-fresh100\\"; specify which one you want to install:","slug":"custom-mail-fresh100","matches":[{"ownerHandle":"xuxuclassmate","slug":"custom-mail-fresh100","ref":"@xuxuclassmate/custom-mail-fresh100","url":"https://clawhub.ai/xuxuclassmate/skills/custom-mail-fresh100"},{"ownerHandle":"xuxuclassmate","slug":"custom-mail","ref":"@xuxuclassmate/custom-mail","url":"https://clawhub.ai/xuxuclassmate/skills/custom-mail"}]}`;
 
-Deno.test("ClawHubDetailResolvesAmbiguousSlug", async () => {
+test("ClawHubDetailResolvesAmbiguousSlug", async () => {
   const calls: string[] = [];
   const server = await startServer((request) => {
     const u = new URL(request.url);
@@ -41,7 +42,7 @@ Deno.test("ClawHubDetailResolvesAmbiguousSlug", async () => {
   }
 });
 
-Deno.test("ClawHubDetailCachesResolvedOwner", async () => {
+test("ClawHubDetailCachesResolvedOwner", async () => {
   const server = await startServer((request) => {
     const u = new URL(request.url);
     if (!u.searchParams.get("owner")) {
@@ -77,7 +78,7 @@ Deno.test("ClawHubDetailCachesResolvedOwner", async () => {
   }
 });
 
-Deno.test("ClawHubAmbiguousSlugWithoutExactMatchReturnsHelpfulError", async () => {
+test("ClawHubAmbiguousSlugWithoutExactMatchReturnsHelpfulError", async () => {
   const payload =
     `{"code":"AMBIGUOUS_SKILL_SLUG","message":"Found multiple skills with the slug \\"custom-mail-fresh100\\"; specify which one you want to install:","slug":"custom-mail-fresh100","matches":[{"ownerHandle":"alice","slug":"other-mail","ref":"@alice/other-mail","url":"https://clawhub.ai/alice/skills/other-mail"},{"ownerHandle":"bob","slug":"something-else","ref":"@bob/something-else","url":"https://clawhub.ai/bob/skills/something-else"}]}`;
   const server = await startServer(() =>
@@ -99,7 +100,7 @@ Deno.test("ClawHubAmbiguousSlugWithoutExactMatchReturnsHelpfulError", async () =
   }
 });
 
-Deno.test("ClawHubInstallResolvesAmbiguousSlugEndToEnd", async () => {
+test("ClawHubInstallResolvesAmbiguousSlugEndToEnd", async () => {
   const archive = await makeArchive({ "SKILL.md": "# Mail\n" });
   const calls: string[] = [];
   const server = await startServer((request) => {
@@ -150,7 +151,7 @@ Deno.test("ClawHubInstallResolvesAmbiguousSlugEndToEnd", async () => {
   }
 });
 
-Deno.test("ClawHubExplicitOwnerRefBypassesAmbiguity", async () => {
+test("ClawHubExplicitOwnerRefBypassesAmbiguity", async () => {
   const calls: string[] = [];
   const server = await startServer((request) => {
     const u = new URL(request.url);

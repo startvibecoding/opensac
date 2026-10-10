@@ -17,11 +17,11 @@ import {
   statusPaused,
   statusUsageLimited,
 } from "../esm/state.ts";
-import type { AgentActivity } from "./activity.ts";
+import { type AgentActivity } from "./activity.ts";
 import { formatDuration } from "./formatters.ts";
 import { Translator } from "./i18n.ts";
 import { wrapPlainText } from "./renderutil.ts";
-import type { TUIEsmObjectiveView } from "./service.ts";
+import { type TUIEsmObjectiveView } from "./service.ts";
 
 /** Maps the JSON-safe Core ESM objective view onto the panel's Objective. */
 export function esmObjectiveFromView(view: TUIEsmObjectiveView): Objective {

@@ -4,13 +4,14 @@
 // fallback path is exercised here with a BigInt argument (which JSON.stringify
 // cannot serialize), preserving the same fallback contract.
 
-import { assert } from "@opensac/assert";
+import { assert } from "../compat/assert.ts";
 import {
   debugCompleteResponse,
   debugJSON,
   debugLogf,
   debugLogOnlyEnv,
 } from "./mod.ts";
+import { test } from "#testing";
 
 async function inTempDir(fn: () => void | Promise<void>): Promise<void> {
   const workDir = await Deno.makeTempDir();
@@ -27,7 +28,7 @@ async function readLog(workDir: string): Promise<string> {
   return await Deno.readTextFile(`${workDir}/debug.log`);
 }
 
-Deno.test("DebugJSONWritesRequestAndCompleteResponse", async () => {
+test("DebugJSONWritesRequestAndCompleteResponse", async () => {
   Deno.env.set("VIBECODING_DEBUG", "1");
   Deno.env.set(debugLogOnlyEnv, "1");
   try {
@@ -61,7 +62,7 @@ Deno.test("DebugJSONWritesRequestAndCompleteResponse", async () => {
   }
 });
 
-Deno.test("DebugLogfWritesOnlyWhenDebugEnabled", async () => {
+test("DebugLogfWritesOnlyWhenDebugEnabled", async () => {
   await inTempDir(async () => {
     Deno.env.set(debugLogOnlyEnv, "1");
     Deno.env.delete("VIBECODING_DEBUG");
@@ -93,7 +94,7 @@ Deno.test("DebugLogfWritesOnlyWhenDebugEnabled", async () => {
   });
 });
 
-Deno.test("DebugCompleteResponseLogsResponseWhenJSONMarshalFails", async () => {
+test("DebugCompleteResponseLogsResponseWhenJSONMarshalFails", async () => {
   Deno.env.set("VIBECODING_DEBUG", "1");
   Deno.env.set(debugLogOnlyEnv, "1");
   try {

@@ -6,10 +6,11 @@
 // runtime or at type-check time. This test is the only thing that turns that
 // convention into an enforced check.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { catalogs } from "./i18n.ts";
+import { test } from "#testing";
 
-Deno.test("the TUI catalogs define exactly the same message IDs", () => {
+test("the TUI catalogs define exactly the same message IDs", () => {
   const en = Object.keys(catalogs.en).sort();
   const zh = Object.keys(catalogs.zh).sort();
   const onlyEn = en.filter((id) => !(id in catalogs.zh));
@@ -27,7 +28,7 @@ Deno.test("the TUI catalogs define exactly the same message IDs", () => {
   assert(en.length > 0, "the catalogs must not be empty");
 });
 
-Deno.test("no catalog entry is an empty or whitespace-only string", () => {
+test("no catalog entry is an empty or whitespace-only string", () => {
   // An empty translation renders as a blank row rather than falling back, so it
   // is a defect of the same kind as a missing key.
   for (const language of ["en", "zh"] as const) {

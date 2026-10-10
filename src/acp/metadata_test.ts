@@ -1,6 +1,6 @@
 // Translated/focused tests for the ACP request-metadata projections.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import {
   formatEditorContext,
   requestEditorContext,
@@ -10,8 +10,9 @@ import {
   utf8Length,
   utf8Prefix,
 } from "./metadata.ts";
+import { test } from "#testing";
 
-Deno.test("request metadata accessors prefer the opensac namespace", () => {
+test("request metadata accessors prefer the opensac namespace", () => {
   const meta = {
     opensac: {
       workspace: { cwd: "/work", additionalDirectories: ["/extra"] },
@@ -36,7 +37,7 @@ Deno.test("request metadata accessors prefer the opensac namespace", () => {
   assertEquals(requestSurface(undefined), "");
 });
 
-Deno.test("formatEditorContext labels untrusted metadata and bounds the selection", () => {
+test("formatEditorContext labels untrusted metadata and bounds the selection", () => {
   assertEquals(formatEditorContext(undefined), "");
   const small = formatEditorContext({
     path: "/work/a.ts",
@@ -59,7 +60,7 @@ Deno.test("formatEditorContext labels untrusted metadata and bounds the selectio
   assertEquals(long.includes("[selection truncated]"), true);
 });
 
-Deno.test("utf8 helpers operate on byte length", () => {
+test("utf8 helpers operate on byte length", () => {
   assertEquals(utf8Length("本"), 3);
   assertEquals(utf8Prefix("a本b", 4), "a本");
   // A split multi-byte sequence degrades to the replacement character.

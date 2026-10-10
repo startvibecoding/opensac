@@ -1,0 +1,49 @@
+{
+  "name": "opensac-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenSAC terminal AI coding assistant (Node.js workspace)",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "imports": {
+    "#testing": "./src/testing/mod.ts",
+    "#testing/*": "./src/testing/*.ts"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "run": "npm run start",
+    "version": "node scripts/version.ts",
+    "gen:worker-sources": "node scripts/gen_worker_sources.ts",
+    "build:node": "node scripts/build_node.ts",
+    "pack:node": "npm run build:node && node scripts/pack_node.ts",
+    "publish:node": "node scripts/npm_publish_if_needed.ts --tag latest dist/node",
+    "install:cli": "npm link",
+    "test": "node --import ./scripts/test/preload.mjs --test",
+    "test:architecture": "node --import ./scripts/test/preload.mjs --test src/architecture/",
+    "check": "tsc -p tsconfig.json",
+    "typecheck": "npm run check",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "fuzz": "node --import ./scripts/test/preload.mjs --test --test-name-pattern=fuzz src/esm src/mcp src/util"
+  },
+  "dependencies": {
+    "@jsquash/webp": "^1.5.0",
+    "imagescript": "^1.0.14",
+    "ink": "^5.2.1",
+    "react": "^18.3.1",
+    "undici": "^6.21.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}

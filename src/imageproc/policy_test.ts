@@ -1,7 +1,8 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { type Family, type Hint, inferFamily, policyForHint } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("inferFamily from default vision model IDs", () => {
+test("inferFamily from default vision model IDs", () => {
   const cases: Array<[string, Hint, Family]> = [
     [
       "doubao seed turbo",
@@ -79,7 +80,7 @@ Deno.test("inferFamily from default vision model IDs", () => {
   }
 });
 
-Deno.test("policyForHint applies provider limits", () => {
+test("policyForHint applies provider limits", () => {
   const bedrock = policyForHint(
     {
       providerID: "amazon-bedrock",

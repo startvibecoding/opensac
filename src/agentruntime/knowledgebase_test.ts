@@ -8,8 +8,8 @@ import {
   assertEquals,
   assertInstanceOf,
   assertThrows,
-} from "@opensac/assert";
-import * as path from "@opensac/path";
+} from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
@@ -25,7 +25,7 @@ import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
 import { createRegistry } from "../tools/tool.ts";
 import { createMockProvider } from "../provider/mock.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   type ChatParams,
   type Model,
@@ -50,6 +50,7 @@ import {
   makeKnowledgeCapsule,
   prepareKnowledgeContext,
 } from "./knowledgebase.ts";
+import { test } from "#testing";
 
 function tempDir(): string {
   return Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
@@ -74,7 +75,7 @@ function writeFile(root: string, relative: string, body: string): void {
   Deno.writeTextFileSync(full, body);
 }
 
-Deno.test("knowledge base indexer stores queryable graph snapshot", async () => {
+test("knowledge base indexer stores queryable graph snapshot", async () => {
   const root = tempDir();
   const source = tempDir();
   writeFile(
@@ -124,7 +125,7 @@ Deno.test("knowledge base indexer stores queryable graph snapshot", async () => 
   assert(Deno.statSync(path.join(source, "docs", "auth.md")).isFile);
 });
 
-Deno.test("prepare knowledge context builds bounded cited reference", async () => {
+test("prepare knowledge context builds bounded cited reference", async () => {
   const sessionDir = tempDir();
   const source = tempDir();
   writeFile(
@@ -169,7 +170,7 @@ Deno.test("prepare knowledge context builds bounded cited reference", async () =
   );
 });
 
-Deno.test("knowledge base indexer ignores symlink and build output", async () => {
+test("knowledge base indexer ignores symlink and build output", async () => {
   const root = tempDir();
   const source = tempDir();
   const outside = path.join(tempDir(), "secret.md");
@@ -196,7 +197,7 @@ Deno.test("knowledge base indexer ignores symlink and build output", async () =>
   assertEquals(snapshot.fileCount, 1);
 });
 
-Deno.test("knowledge indexer rejects unsupported model links", () => {
+test("knowledge indexer rejects unsupported model links", () => {
   const graph: KnowledgeGraphSnapshot = {
     snapshot: {
       id: "snapshot",
@@ -271,7 +272,7 @@ Deno.test("knowledge indexer rejects unsupported model links", () => {
   assertEquals(graph.evidence.length, 0);
 });
 
-Deno.test("knowledge indexer clones unchanged file graph when another file changes", async () => {
+test("knowledge indexer clones unchanged file graph when another file changes", async () => {
   const sessionDir = tempDir();
   const source = tempDir();
   writeFile(
@@ -309,7 +310,7 @@ Deno.test("knowledge indexer clones unchanged file graph when another file chang
   assert(stable.nodes.length > 0);
 });
 
-Deno.test("knowledge base query matches chinese evidence", async () => {
+test("knowledge base query matches chinese evidence", async () => {
   const root = tempDir();
   const source = tempDir();
   writeFile(
@@ -346,7 +347,7 @@ Deno.test("knowledge base query matches chinese evidence", async () => {
   assertEquals(absent.chunks.length, 0);
 });
 
-Deno.test("knowledge base service set settings refreshes indexer factory", () => {
+test("knowledge base service set settings refreshes indexer factory", () => {
   const sessionDir = tempDir();
   const source = tempDir();
   writeFile(source, "notes.md", "# Notes\n\nAlpha is documented here.\n");
@@ -387,7 +388,7 @@ Deno.test("knowledge base service set settings refreshes indexer factory", () =>
   assertEquals(seen, ["first", "second"]);
 });
 
-Deno.test("make knowledge capsule enforces a zero budget", () => {
+test("make knowledge capsule enforces a zero budget", () => {
   const capsule = makeKnowledgeCapsule({
     knowledgeBase: {} as never,
     snapshot: {} as never,
@@ -472,7 +473,7 @@ class KnowledgeIndexerTestProvider implements Provider {
   }
 }
 
-Deno.test(
+test(
   "knowledge indexer adds only evidence-verified co-mention edges",
   async () => {
     const sessionDir = tempDir();
@@ -561,7 +562,7 @@ Deno.test(
   },
 );
 
-Deno.test(
+test(
   "knowledge librarian uses dedicated agent session and durable run",
   async () => {
     const sessionDir = tempDir();

@@ -5,11 +5,12 @@
 // semantics (late pushes are dropped while buffered events still drain), and
 // the AsyncIterable projection.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { EventChannel } from "./event_channel.ts";
 import { EVENT_AGENT_END, EVENT_AGENT_START } from "./events.ts";
+import { test } from "#testing";
 
-Deno.test("EventChannel buffers without bound and drains FIFO", async () => {
+test("EventChannel buffers without bound and drains FIFO", async () => {
   const channel = new EventChannel();
   // Documented deviation: the buffer is unbounded, so a stalled consumer must
   // not cause drops (Go bounds at 100 instead).
@@ -22,7 +23,7 @@ Deno.test("EventChannel buffers without bound and drains FIFO", async () => {
   assertEquals(seen, Array.from({ length: 256 }, (_, i) => i));
 });
 
-Deno.test("EventChannel hands a push to a waiting consumer", async () => {
+test("EventChannel hands a push to a waiting consumer", async () => {
   const channel = new EventChannel();
   const pending = channel.next();
   assertEquals(channel.push({ type: EVENT_AGENT_START }), true);
@@ -37,7 +38,7 @@ Deno.test("EventChannel hands a push to a waiting consumer", async () => {
   assertEquals(second.value.type, EVENT_AGENT_END);
 });
 
-Deno.test("EventChannel wakes concurrent waiters in registration order", async () => {
+test("EventChannel wakes concurrent waiters in registration order", async () => {
   const channel = new EventChannel();
   const wakeOrder: number[] = [];
   const first = channel.next().then((r) => {
@@ -54,7 +55,7 @@ Deno.test("EventChannel wakes concurrent waiters in registration order", async (
   assertEquals(wakeOrder, [1, 2]);
 });
 
-Deno.test("EventChannel drops pushes after close", async () => {
+test("EventChannel drops pushes after close", async () => {
   const channel = new EventChannel();
   channel.close();
   assert(channel.closed);
@@ -65,7 +66,7 @@ Deno.test("EventChannel drops pushes after close", async () => {
   assert(result.done);
 });
 
-Deno.test("EventChannel close finishes waiters and is idempotent", async () => {
+test("EventChannel close finishes waiters and is idempotent", async () => {
   const channel = new EventChannel();
   const pending = channel.next();
   channel.close();
@@ -74,7 +75,7 @@ Deno.test("EventChannel close finishes waiters and is idempotent", async () => {
   assert((await channel.next()).done);
 });
 
-Deno.test("EventChannel drains buffered events before finishing after close", async () => {
+test("EventChannel drains buffered events before finishing after close", async () => {
   const channel = new EventChannel();
   channel.push({ type: EVENT_AGENT_START });
   channel.push({ type: EVENT_AGENT_END });
@@ -88,7 +89,7 @@ Deno.test("EventChannel drains buffered events before finishing after close", as
   assert((await channel.next()).done);
 });
 
-Deno.test("EventChannel Symbol.dispose seals the channel", () => {
+test("EventChannel Symbol.dispose seals the channel", () => {
   const channel = new EventChannel();
   channel[Symbol.dispose]();
   assert(channel.closed);

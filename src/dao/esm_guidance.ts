@@ -16,7 +16,11 @@ const columns = `id, session_id AS sessionId,
   created_at AS createdAt, consumed_at AS consumedAt`;
 
 export class ESMGuidanceDAO {
-  constructor(private readonly db: DB | null) {}
+    private readonly db: DB | null;
+
+  constructor(db: DB | null) {
+    this.db = db;
+  }
 
   insert(executor: DB, record: ESMGuidanceRecord): void {
     execChanges(

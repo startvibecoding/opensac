@@ -6,14 +6,14 @@ import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
-} from "@opensac/assert";
-import type { ToolResult } from "../tools/tool.ts";
+} from "../compat/assert.ts";
+import { type ToolResult } from "../tools/tool.ts";
 import {
   createMemberMailbox,
   MEMBER_STATUS_DONE,
   MemberMailbox,
 } from "./mailbox.ts";
-import type { MemberCompletion } from "./mailbox.ts";
+import { type MemberCompletion } from "./mailbox.ts";
 import {
   createSubAgentWaitTool,
   resolveSubAgentWaitTimeoutMS,
@@ -21,6 +21,7 @@ import {
   subAgentWaitMaxTimeoutMS,
   subAgentWaitMinTimeoutMS,
 } from "./subagent_wait.ts";
+import { test } from "#testing";
 
 function completion(partial: Partial<MemberCompletion>): MemberCompletion {
   return {
@@ -49,7 +50,7 @@ function parse(t: ToolResult): WaitParsed {
   return JSON.parse(t.text) as WaitParsed;
 }
 
-Deno.test("subagent_wait tool metadata", () => {
+test("subagent_wait tool metadata", () => {
   const tool = createSubAgentWaitTool({});
   assertEquals(tool.name(), "subagent_wait");
   assert(tool.description() !== "");
@@ -65,7 +66,7 @@ Deno.test("subagent_wait tool metadata", () => {
   assert(schema.required === undefined || schema.required === null);
 });
 
-Deno.test("resolveSubAgentWaitTimeoutMS clamps", () => {
+test("resolveSubAgentWaitTimeoutMS clamps", () => {
   const cases: Array<[Record<string, unknown>, number]> = [
     [{}, subAgentWaitDefaultTimeoutMS],
     [{ timeout_ms: 10 }, subAgentWaitMinTimeoutMS],
@@ -90,7 +91,7 @@ Deno.test("resolveSubAgentWaitTimeoutMS clamps", () => {
   );
 });
 
-Deno.test("subagent_wait nil mailbox", async () => {
+test("subagent_wait nil mailbox", async () => {
   const tool = createSubAgentWaitTool({});
   const result = await tool.execute({}, {});
   const parsed = parse(result);
@@ -100,7 +101,7 @@ Deno.test("subagent_wait nil mailbox", async () => {
   assert(!result.text.includes("pending"));
 });
 
-Deno.test("subagent_wait pending summary excludes payload", async () => {
+test("subagent_wait pending summary excludes payload", async () => {
   const mbox: MemberMailbox = createMemberMailbox();
   mbox.enqueue(completion({
     memberId: "engineer",
@@ -129,7 +130,7 @@ Deno.test("subagent_wait pending summary excludes payload", async () => {
   assert(mbox.hasPending(), "wait must not drain the mailbox");
 });
 
-Deno.test("subagent_wait returns on activity", async () => {
+test("subagent_wait returns on activity", async () => {
   const mbox = createMemberMailbox();
   setTimeout(() => {
     mbox.enqueue(completion({
@@ -149,7 +150,7 @@ Deno.test("subagent_wait returns on activity", async () => {
   assertEquals(parsed.pending![0].status, "done");
 });
 
-Deno.test("subagent_wait timeout", async () => {
+test("subagent_wait timeout", async () => {
   const mbox = createMemberMailbox();
   const tool = createSubAgentWaitTool({ mailbox: mbox });
   const start = Date.now();
@@ -166,7 +167,7 @@ Deno.test("subagent_wait timeout", async () => {
   assertEquals(parsed.pending ?? [], []);
 });
 
-Deno.test("subagent_wait context canceled", async () => {
+test("subagent_wait context canceled", async () => {
   const mbox = createMemberMailbox();
   const controller = new AbortController();
   controller.abort();

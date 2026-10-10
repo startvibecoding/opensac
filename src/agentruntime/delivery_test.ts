@@ -1,7 +1,7 @@
 // internal/agentruntime/delivery_coordinator_test.go, plus focused coverage for
 // `deliveryOperationText`.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   ATTACHMENT_AUDIO,
   ATTACHMENT_IMAGE,
@@ -12,6 +12,7 @@ import {
   type DeliveryPlanRequest,
   planDelivery,
 } from "./delivery.ts";
+import { test } from "#testing";
 
 function attachment(
   overrides: Partial<SessionAttachment>,
@@ -34,7 +35,7 @@ function attachment(
   };
 }
 
-Deno.test("PlanDeliveryFallbackStaysAfterCaptionWhenMediaAlsoExists", () => {
+test("PlanDeliveryFallbackStaysAfterCaptionWhenMediaAlsoExists", () => {
   const now = new Date();
   const request: DeliveryPlanRequest = {
     sessionId: "session",
@@ -75,7 +76,7 @@ Deno.test("PlanDeliveryFallbackStaysAfterCaptionWhenMediaAlsoExists", () => {
   assertEquals(plan.operations[3].dependsOn, captionId);
 });
 
-Deno.test("PlanDeliveryRejectsForeignAttachment", () => {
+test("PlanDeliveryRejectsForeignAttachment", () => {
   const request: DeliveryPlanRequest = {
     sessionId: "session",
     runId: "run",
@@ -104,7 +105,7 @@ Deno.test("PlanDeliveryRejectsForeignAttachment", () => {
   assert(threw);
 });
 
-Deno.test("PlanDeliveryIsDeterministic", () => {
+test("PlanDeliveryIsDeterministic", () => {
   const make = (): DeliveryPlanRequest => ({
     sessionId: "session",
     runId: "run",
@@ -133,7 +134,7 @@ Deno.test("PlanDeliveryIsDeterministic", () => {
   assertEquals(first.plan.intent.status, "pending");
 });
 
-Deno.test("DeliveryOperationTextSelectsCaptionOrFallback", () => {
+test("DeliveryOperationTextSelectsCaptionOrFallback", () => {
   const payload = { caption: " the caption ", fallback: " the fallback " };
   assertEquals(deliveryOperationText(payload, "send_text"), "the caption");
   assertEquals(

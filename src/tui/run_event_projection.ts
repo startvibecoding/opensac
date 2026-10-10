@@ -4,7 +4,7 @@
 // canonical event semantics (never synthesizing a second success/failure
 // stream) so the controller renders service runs exactly like in-process runs.
 
-import type { CoreRuntimeEvent } from "../core/runtime.ts";
+import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import { deserializeAgentEvent } from "../agentruntime/session_executor.ts";
 import {
   type Event,

@@ -2,16 +2,15 @@
 // Go's archive/zip is replaced with the local zip reader in ./zip.ts. The
 // streaming copy limit is preserved by bounding the buffered download.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { hasSkillFile, MetadataError, readMetadata } from "./local.ts";
-import type {
-  DownloadResult,
-  DownloadSource,
-  Market,
-  MarketClient,
-  SkillDetail,
-  SkillId,
-} from "./types.ts";
+import {
+  type DownloadResult,
+  type DownloadSource,
+  type Market,
+  type MarketClient,
+  type SkillDetail,
+  type SkillId} from "./types.ts";
 import { createZip, readZipEntries, type ZipWriteEntry } from "./zip.ts";
 
 export const maxDownloadBytes = 50 << 20;

@@ -5,8 +5,8 @@
 // test belongs to the CLI slice. Fixtures bind a mock provider catalog so a
 // session runtime is fully configured and call the handlers directly.
 
-import { assert, assertEquals, assertStrictEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals, assertStrictEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   AcpServer,
   type AcpServerSink,
@@ -14,8 +14,8 @@ import {
   esmSteeringMessages,
 } from "./server.ts";
 import { type ACPRPCRequest } from "./mod.ts";
-import type { Settings } from "../config/settings.ts";
-import type { Model } from "../provider/types.ts";
+import { type Settings } from "../config/settings.ts";
+import { type Model } from "../provider/types.ts";
 import {
   streamDone,
   type StreamEvent,
@@ -23,10 +23,11 @@ import {
   streamTextDelta,
 } from "../provider/types.ts";
 import { createMockProvider } from "../provider/mock.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import { ESMStore } from "../esm/mod.ts";
 import { testModel } from "../agent/agent_testutil.ts";
 import { getActiveDurableRun } from "../agentruntime/run_queries.ts";
+import { test } from "#testing";
 
 class SyncBuffer implements AcpServerSink {
   #buf = "";
@@ -189,7 +190,7 @@ async function promptAdmissionReleased(
   }
 }
 
-Deno.test("esm steering injects a changed objective exactly once", () => {
+test("esm steering injects a changed objective exactly once", () => {
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-esm-" });
   const settings = { sessionDir: root } as unknown as Settings;
   const store = new ESMStore(root);
@@ -206,7 +207,7 @@ Deno.test("esm steering injects a changed objective exactly once", () => {
   assertEquals(callback!().length, 0);
 });
 
-Deno.test("esm steering absent without settings or session id", () => {
+test("esm steering absent without settings or session id", () => {
   assertStrictEquals(esmSteeringMessages(null, "sess"), undefined);
   const root = Deno.makeTempDirSync({ prefix: "opensac-acp-esm-" });
   assertStrictEquals(
@@ -215,7 +216,7 @@ Deno.test("esm steering absent without settings or session id", () => {
   );
 });
 
-Deno.test("requestQuestion resolves a selected option", async () => {
+test("requestQuestion resolves a selected option", async () => {
   const { server, sink } = createFixture();
   const pending = server.requestQuestion(
     undefined,
@@ -234,7 +235,7 @@ Deno.test("requestQuestion resolves a selected option", async () => {
   assertEquals(await pending, "beta");
 });
 
-Deno.test("requestQuestion returns empty for a non-option answer", async () => {
+test("requestQuestion returns empty for a non-option answer", async () => {
   const { server, sink } = createFixture();
   const pending = server.requestQuestion(
     undefined,
@@ -255,7 +256,7 @@ Deno.test("requestQuestion returns empty for a non-option answer", async () => {
   assertEquals(await pending, "");
 });
 
-Deno.test("$/cancel_request releases a pending question as cancelled", async () => {
+test("$/cancel_request releases a pending question as cancelled", async () => {
   const { server, sink } = createFixture();
   const pending = server.requestQuestion(
     undefined,
@@ -274,7 +275,7 @@ Deno.test("$/cancel_request releases a pending question as cancelled", async () 
   assertEquals(await pending, "");
 });
 
-Deno.test("requestQuestion is cancelled by an aborted run", async () => {
+test("requestQuestion is cancelled by an aborted run", async () => {
   const { server } = createFixture();
   const controller = new AbortController();
   const pending = server.requestQuestion(
@@ -288,7 +289,7 @@ Deno.test("requestQuestion is cancelled by an aborted run", async () => {
   assertEquals(await pending, "");
 });
 
-Deno.test("requestPermission resolves the allow-once option", async () => {
+test("requestPermission resolves the allow-once option", async () => {
   const { server, sink } = createFixture();
   const pending = server.requestPermissionContext(
     undefined,
@@ -310,7 +311,7 @@ Deno.test("requestPermission resolves the allow-once option", async () => {
   assertStrictEquals(await pending, true);
 });
 
-Deno.test("requestPermission denies a rejection or timeout", async () => {
+test("requestPermission denies a rejection or timeout", async () => {
   const { server, sink } = createFixture();
   const rejected = server.requestPermissionContext(
     undefined,
@@ -343,7 +344,7 @@ Deno.test("requestPermission denies a rejection or timeout", async () => {
   );
 });
 
-Deno.test("handlePrompt rejects malformed params and unknown sessions", async () => {
+test("handlePrompt rejects malformed params and unknown sessions", async () => {
   const { server, sink } = createFixture();
   await server.handlePrompt(rpc(1, "session/prompt", "not-an-object"));
   const invalid = responseOf(sink.toString())!;
@@ -364,7 +365,7 @@ Deno.test("handlePrompt rejects malformed params and unknown sessions", async ()
   );
 });
 
-Deno.test("handlePrompt rejects an empty prompt", async () => {
+test("handlePrompt rejects an empty prompt", async () => {
   const { server, sink, workDir } = createFixture();
   bindMockProvider(server, [
     { type: streamStart },
@@ -383,7 +384,7 @@ Deno.test("handlePrompt rejects an empty prompt", async () => {
   );
 });
 
-Deno.test("handlePrompt streams a completed turn and cleans up", async () => {
+test("handlePrompt streams a completed turn and cleans up", async () => {
   const { server, sink, workDir } = createFixture();
   bindMockProvider(server, [
     { type: streamStart },
@@ -423,7 +424,7 @@ Deno.test("handlePrompt streams a completed turn and cleans up", async () => {
   assertStrictEquals(rt.agent !== null, true);
 });
 
-Deno.test("handlePrompt rejects a second concurrent prompt", async () => {
+test("handlePrompt rejects a second concurrent prompt", async () => {
   const { server, sink, workDir } = createFixture();
   bindMockProvider(server, [
     { type: streamStart },
@@ -453,7 +454,7 @@ Deno.test("handlePrompt rejects a second concurrent prompt", async () => {
   server.sessions.set(sessionId, idle);
 });
 
-Deno.test("handlePrompt projects a missing-terminal stream as failed", async () => {
+test("handlePrompt projects a missing-terminal stream as failed", async () => {
   const { server, sink, workDir } = createFixture();
   // A provider that closes its stream without any terminal event.
   bindMockProvider(server, [{ type: streamStart }]);
@@ -471,7 +472,7 @@ Deno.test("handlePrompt projects a missing-terminal stream as failed", async () 
   assertEquals(error.code, -32000);
 });
 
-Deno.test(
+test(
   "handlePrompt teardown orders the terminal projection after the response and releases admission",
   async () => {
     const { server, sink, workDir, sessionDir } = createFixture();
@@ -534,7 +535,7 @@ Deno.test(
   },
 );
 
-Deno.test(
+test(
   "handlePrompt failed-run teardown terminalizes the run and releases admission",
   async () => {
     const { server, sink, workDir, sessionDir } = createFixture();
@@ -586,7 +587,7 @@ Deno.test(
   },
 );
 
-Deno.test(
+test(
   "handlePrompt teardown finalizes the run when the cancellation hook throws",
   async () => {
     const { server, sink, workDir, sessionDir } = createFixture();
@@ -646,7 +647,7 @@ class TerminalRunStatusFailingSink extends SyncBuffer {
   }
 }
 
-Deno.test(
+test(
   "handlePrompt teardown releases admission when the terminal projection write fails",
   async () => {
     const { server, workDir, sessionDir } = createFixture();

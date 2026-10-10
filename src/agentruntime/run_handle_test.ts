@@ -1,8 +1,9 @@
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { DecisionService } from "./decision.ts";
 import { RuntimeRun } from "./run_handle.ts";
+import { test } from "#testing";
 
-Deno.test("RuntimeRun owns shared decision registration and terminalization", () => {
+test("RuntimeRun owns shared decision registration and terminalization", () => {
   const decisions = new DecisionService();
   const run = new RuntimeRun({
     decisions,

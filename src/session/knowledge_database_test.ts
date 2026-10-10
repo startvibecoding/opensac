@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { KnowledgeBaseDAO } from "../dao/mod.ts";
 import {
@@ -22,8 +22,9 @@ import {
 import { knowledgeStoreSchema } from "./migrations.ts";
 import { openRootDB } from "./root_db.ts";
 import { writeRootDatabase } from "./database.ts";
+import { test } from "#testing";
 
-Deno.test("knowledge base uses dedicated SQLite database", () => {
+test("knowledge base uses dedicated SQLite database", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
@@ -113,7 +114,7 @@ Deno.test("knowledge base uses dedicated SQLite database", () => {
   }
 });
 
-Deno.test("knowledge snapshot retention keeps only active graph", () => {
+test("knowledge snapshot retention keeps only active graph", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
@@ -156,7 +157,7 @@ Deno.test("knowledge snapshot retention keeps only active graph", () => {
   }
 });
 
-Deno.test("knowledge base update invalidates and prunes graph", () => {
+test("knowledge base update invalidates and prunes graph", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
@@ -204,7 +205,7 @@ Deno.test("knowledge base update invalidates and prunes graph", () => {
   }
 });
 
-Deno.test("knowledge base migrates legacy session store into dedicated database", () => {
+test("knowledge base migrates legacy session store into dedicated database", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {
@@ -327,7 +328,7 @@ Deno.test("knowledge base migrates legacy session store into dedicated database"
   }
 });
 
-Deno.test("knowledge graph reuse plan clones only unchanged file subgraph", () => {
+test("knowledge graph reuse plan clones only unchanged file subgraph", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
   try {

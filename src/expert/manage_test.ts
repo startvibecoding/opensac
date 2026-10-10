@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   expertSchemaVersion,
   type ManagedBundle,
@@ -12,6 +12,7 @@ import {
   sourceProject,
   typeAgent,
 } from "./mod.ts";
+import { test } from "#testing";
 
 function managedAgentDraft(name: string): ManagedBundle {
   return {
@@ -41,7 +42,7 @@ function withTempDir(fn: (dir: string) => void): void {
   }
 }
 
-Deno.test("manager global create update delete", () => {
+test("manager global create update delete", () => {
   withTempDir((tmp) => {
     const globalDir = path.join(tmp, "experts");
     const manager = new Manager();
@@ -71,7 +72,7 @@ Deno.test("manager global create update delete", () => {
   });
 });
 
-Deno.test("manager project scope and invalid draft", () => {
+test("manager project scope and invalid draft", () => {
   withTempDir((project) => {
     withTempDir((globalTmp) => {
       const manager = new Manager(project);
@@ -107,7 +108,7 @@ Deno.test("manager project scope and invalid draft", () => {
   });
 });
 
-Deno.test("manager rejects builtin and preserves precedence", () => {
+test("manager rejects builtin and preserves precedence", () => {
   withTempDir((globalRoot) => {
     const prev = Deno.env.get("OPENSAC_DIR");
     Deno.env.set("OPENSAC_DIR", globalRoot);

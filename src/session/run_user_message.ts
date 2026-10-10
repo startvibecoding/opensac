@@ -8,15 +8,15 @@
 
 import { createHash } from "node:crypto";
 import { ConversationTurnDAO } from "../dao/mod.ts";
-import type { Tx } from "../dao/mod.ts";
-import type { Message } from "../provider/types.ts";
+import { type Tx } from "../dao/mod.ts";
+import { type Message } from "../provider/types.ts";
 import { entryMessage, type MessageEntry } from "./entry.ts";
 import {
   appendTurnEntryTx,
   currentLeafTx,
   stringPtr,
 } from "./conversation_turn.ts";
-import type { SessionRun } from "./run_store.ts";
+import { type SessionRun } from "./run_store.ts";
 
 /**
  * The deterministic transcript identity for a Run's admitted user message.

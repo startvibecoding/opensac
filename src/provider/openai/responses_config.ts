@@ -1,21 +1,19 @@
-import type { ResponsesConfig } from "../../config/mod.ts";
-import type {
-  ResponsesHostedToolsConfig,
-  ResponsesStructuredOutputConfig,
-} from "../../config/settings.ts";
+import { type ResponsesConfig } from "../../config/mod.ts";
+import {
+  type ResponsesHostedToolsConfig,
+  type ResponsesStructuredOutputConfig} from "../../config/settings.ts";
 import { hostedToolType as coreHostedToolType } from "../hosted_tools.ts";
-import type { ChatParams, Model, ToolDefinition } from "../types.ts";
+import { type ChatParams, type Model, type ToolDefinition } from "../types.ts";
 import {
   hostedRequestCapabilities,
   type HostedToolDescriptor,
   hostedToolTypes,
   type ResponsesHostedPolicy,
 } from "./hosted_registry.ts";
-import type {
-  ResponsesTextFormat,
-  ResponsesTool,
-  ResponsesWireConfig,
-} from "./responses.ts";
+import {
+  type ResponsesTextFormat,
+  type ResponsesTool,
+  type ResponsesWireConfig} from "./responses.ts";
 
 /**
  * Resolved from immutable model compatibility data for each request. Undefined

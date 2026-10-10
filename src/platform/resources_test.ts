@@ -1,14 +1,15 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { resourceUrl } from "./resources.ts";
+import { test } from "#testing";
 
-Deno.test("resourceUrl resolves the source layout", () => {
+test("resourceUrl resolves the source layout", () => {
   assertEquals(
     resourceUrl("stats/dashboard.html"),
     new URL("../../src/stats/dashboard.html", import.meta.url),
   );
 });
 
-Deno.test("resourceUrl resolves every bundled resource in the source layout", () => {
+test("resourceUrl resolves every bundled resource in the source layout", () => {
   // The DeepSeek tokenizer, the stats assets, and the BusyBox binaries each
   // live under a different src/ subtree. A regression that resolves one level
   // too high silently disabled every estimate and asset (the tokenizer load
@@ -26,7 +27,7 @@ Deno.test("resourceUrl resolves every bundled resource in the source layout", ()
   }
 });
 
-Deno.test("resourceUrl recognizes an installed package layout", () => {
+test("resourceUrl recognizes an installed package layout", () => {
   const dir = Deno.realPathSync(Deno.makeTempDirSync());
   try {
     const binDir = `${dir}/bin`;

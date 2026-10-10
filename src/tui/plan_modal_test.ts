@@ -1,18 +1,19 @@
 // Ctrl+T plan modal: shows the current task plan in the same framed box as
 // the Ctrl+O tool modal.
 
-import { assert, assertEquals, assertStringIncludes } from "@opensac/assert";
+import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService } from "./service.ts";
 import { defaultSettings } from "../config/settings.ts";
-import type { Event } from "../agent/events.ts";
+import { type Event } from "../agent/events.ts";
 import {
   EVENT_PLAN_UPDATE,
   EVENT_TOOL_EXECUTION_END,
   EVENT_TOOL_EXECUTION_START,
 } from "../agent/events.ts";
+import { test } from "#testing";
 
 function ev(partial: Partial<Event>): Event {
   return { ...partial } as Event;
@@ -41,7 +42,7 @@ function harness(): {
     createFakeTUIService(),
   );
   // Swap in the controller that owns the recorded plan state.
-  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (session as any).controller = controller;
   return { session, messages, controller };
 }
@@ -55,7 +56,7 @@ const plan = {
   ],
 };
 
-Deno.test("plan modal renders the current plan in a framed box", () => {
+test("plan modal renders the current plan in a framed box", () => {
   const { session, controller } = harness();
   controller.handleAgentEvent(
     ev({ type: EVENT_PLAN_UPDATE, toolCallId: "tc-plan", plan }),
@@ -71,7 +72,7 @@ Deno.test("plan modal renders the current plan in a framed box", () => {
   assert(view.includes("╯"));
 });
 
-Deno.test("tool rows keep the plan payload for rendering", () => {
+test("tool rows keep the plan payload for rendering", () => {
   const { session, controller } = harness();
   controller.handleAgentEvent(
     ev({
@@ -97,7 +98,7 @@ Deno.test("tool rows keep the plan payload for rendering", () => {
   assertEquals(session.planModalOpen, false);
 });
 
-Deno.test("opening the plan with no published plan only reports", () => {
+test("opening the plan with no published plan only reports", () => {
   const { session, messages } = harness();
   session.openPlanModal();
   assertEquals(session.planModalOpen, false);

@@ -10,14 +10,13 @@
 // `time.Duration.String` is reproduced by `goDurationString`; `context.Context`
 // maps to `ToolContext`/`AbortSignal`.
 
-import type {
-  ContentBlock,
-  Message,
-  ToolCallBlock,
-  ToolDefinition,
-  Usage,
-} from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import {
+  type ContentBlock,
+  type Message,
+  type ToolCallBlock,
+  type ToolDefinition,
+  type Usage} from "../provider/types.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   defaultProviderConfig,
   getProviderConfig,

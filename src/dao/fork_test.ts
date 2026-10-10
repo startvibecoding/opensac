@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import type { DB } from "../db/mod.ts";
 import {
   ForkDAO,
@@ -8,6 +8,7 @@ import {
   type SessionRunRecord,
 } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
+import { test } from "#testing";
 
 const SOURCE = "session-source";
 
@@ -56,7 +57,7 @@ function insertSourceSession(db: DB): void {
   );
 }
 
-Deno.test("fork DAO copies the source session row into the child", () => {
+test("fork DAO copies the source session row into the child", () => {
   const db = openTestDb();
   try {
     insertSourceSession(db);
@@ -84,7 +85,7 @@ Deno.test("fork DAO copies the source session row into the child", () => {
   }
 });
 
-Deno.test("fork DAO entry insertion, ordering, and current id", () => {
+test("fork DAO entry insertion, ordering, and current id", () => {
   const db = openTestDb();
   try {
     insertSourceSession(db);
@@ -125,7 +126,7 @@ Deno.test("fork DAO entry insertion, ordering, and current id", () => {
   }
 });
 
-Deno.test("fork DAO fingerprint counts open turns and active runs", () => {
+test("fork DAO fingerprint counts open turns and active runs", () => {
   const db = openTestDb();
   try {
     insertSourceSession(db);
@@ -197,7 +198,7 @@ Deno.test("fork DAO fingerprint counts open turns and active runs", () => {
   }
 });
 
-Deno.test("fork DAO deduplicates fork requests and detects title reuse", () => {
+test("fork DAO deduplicates fork requests and detects title reuse", () => {
   const db = openTestDb();
   try {
     insertSourceSession(db);
@@ -239,7 +240,7 @@ Deno.test("fork DAO deduplicates fork requests and detects title reuse", () => {
   }
 });
 
-Deno.test("fork DAO copies capabilities and project metadata to the child", () => {
+test("fork DAO copies capabilities and project metadata to the child", () => {
   const db = openTestDb();
   try {
     insertSourceSession(db);

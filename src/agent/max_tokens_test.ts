@@ -1,6 +1,7 @@
-import { assertEquals } from "@opensac/assert";
-import type { Model } from "../provider/types.ts";
+import { assertEquals } from "../compat/assert.ts";
+import { type Model } from "../provider/types.ts";
 import { resolveMaxTokens, resolveMaxTokensValue } from "./max_tokens.ts";
+import { test } from "#testing";
 
 function model(partial: Partial<Model>): Model {
   return {
@@ -16,7 +17,7 @@ function model(partial: Partial<Model>): Model {
   };
 }
 
-Deno.test("resolveMaxTokens uses model value", () => {
+test("resolveMaxTokens uses model value", () => {
   const m = model({
     contextWindow: 128000,
     maxTokens: 64000,
@@ -25,27 +26,27 @@ Deno.test("resolveMaxTokens uses model value", () => {
   assertEquals(resolveMaxTokens(m), 64000);
 });
 
-Deno.test("resolveMaxTokens uses conservative default for known model", () => {
+test("resolveMaxTokens uses conservative default for known model", () => {
   const m = model({ contextWindow: 128000, maxTokens: 64000 });
   assertEquals(resolveMaxTokens(m), 8192);
 });
 
-Deno.test("resolveMaxTokens uses native limit below default", () => {
+test("resolveMaxTokens uses native limit below default", () => {
   const m = model({ contextWindow: 8192, maxTokens: 4096 });
   assertEquals(resolveMaxTokens(m), 4096);
 });
 
-Deno.test("resolveMaxTokens returns zero when explicitly disabled", () => {
+test("resolveMaxTokens returns zero when explicitly disabled", () => {
   const m = model({ maxTokens: 0, maxTokensSet: true });
   assertEquals(resolveMaxTokens(m), 0);
 });
 
-Deno.test("resolveMaxTokens returns zero when unknown", () => {
+test("resolveMaxTokens returns zero when unknown", () => {
   assertEquals(resolveMaxTokens(null), 0);
   assertEquals(resolveMaxTokens(undefined), 0);
 });
 
-Deno.test("resolveMaxTokensValue prefers explicit", () => {
+test("resolveMaxTokensValue prefers explicit", () => {
   const m = model({ maxTokens: 64000 });
   assertEquals(resolveMaxTokensValue(4096, m), 4096);
 });

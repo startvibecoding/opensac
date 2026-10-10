@@ -3,11 +3,11 @@
 // ordering from the public `sdk/agent` event codes; `bridge.ts` maps between
 // the two. Field names are camelCase to match the rest of the TS port.
 
-import type { Attachment, Usage } from "../provider/types.ts";
-import type { ContextUsage } from "../context/mod.ts";
-import type { FileDiff, TaskPlan } from "../tools/mod.ts";
-import type { HostedItem, Message, ToolCallBlock } from "../provider/types.ts";
-import type { AgentID } from "../../sdk/agent/types.ts";
+import { type Attachment, type Usage } from "../provider/types.ts";
+import { type ContextUsage } from "../context/mod.ts";
+import { type FileDiff, type TaskPlan } from "../tools/mod.ts";
+import { type HostedItem, type Message, type ToolCallBlock } from "../provider/types.ts";
+import { type AgentID } from "../../sdk/agent/types.ts";
 
 /** EventType identifies the type of agent event. */
 export type EventType = number;

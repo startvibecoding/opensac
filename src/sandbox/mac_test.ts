@@ -2,11 +2,12 @@
 // The Go tests are darwin-only, but the profile builder and temp-profile
 // lifecycle are platform-neutral, so they run everywhere.
 
-import { assert, assertThrows } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertThrows } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { createMacSandbox, Level } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("mac sandbox profile uses options", () => {
+test("mac sandbox profile uses options", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const denied = path.join(project, "secret");
   const sb = createMacSandbox(project, Level.Standard, {
@@ -22,7 +23,7 @@ Deno.test("mac sandbox profile uses options", () => {
   assert(!profile.includes("(deny network*)"));
 });
 
-Deno.test("mac sandbox cleans up command profile", () => {
+test("mac sandbox cleans up command profile", () => {
   const project = Deno.makeTempDirSync({ prefix: "sbx-" });
   const sb = createMacSandbox(project, Level.Standard);
   const spec = sb.wrapCommand(undefined, "/bin/sh", "true", {

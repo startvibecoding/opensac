@@ -2,7 +2,7 @@
 // ThinkDelta was previously written both into the transcript-store streaming
 // row and into the activity timeline, producing two identical lines.
 
-import { assertEquals } from "@opensac/assert";
+import { assertEquals } from "../compat/assert.ts";
 import { App } from "./app.tsx";
 import { AppController } from "./app_controller.ts";
 import { EVENT_THINK_DELTA, EVENT_TURN_START } from "../agent/events.ts";
@@ -10,6 +10,7 @@ import React from "react";
 import { render } from "ink";
 
 import { Translator } from "./i18n.ts";
+import { test } from "#testing";
 
 function makeController(): AppController {
   const translator = new Translator("en");
@@ -34,7 +35,7 @@ function capture(controller: AppController): string {
     },
     on: () => {},
     off: () => {},
-    // deno-lint-ignore no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
   const instance = render(
     React.createElement(App, { controller, width: 100 }),
@@ -44,7 +45,7 @@ function capture(controller: AppController): string {
   return frames.join("\n");
 }
 
-Deno.test("active think block appears once, not twice", () => {
+test("active think block appears once, not twice", () => {
   const c = makeController();
   c.handleAgentEvent({ type: EVENT_TURN_START });
   c.handleAgentEvent(
@@ -61,7 +62,7 @@ Deno.test("active think block appears once, not twice", () => {
   assertEquals(occurrences, 1, `rendered ${occurrences} times:\n${frame}`);
 });
 
-Deno.test("multiple think deltas accumulate into one line", () => {
+test("multiple think deltas accumulate into one line", () => {
   const c = makeController();
   c.handleAgentEvent({ type: EVENT_TURN_START });
   const ev = (delta: string) =>

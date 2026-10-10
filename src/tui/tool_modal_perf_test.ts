@@ -8,7 +8,7 @@
 // streaming row rebuilds one block, a spinner tick touches only live rows, and
 // the cached window equals a body rebuilt from scratch.
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import {
   EVENT_STATUS,
   EVENT_TEXT_DELTA,
@@ -16,6 +16,7 @@ import {
 } from "../agentruntime/events.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService, type FakeTUIService } from "./service.ts";
+import { test } from "#testing";
 
 function makeSession(): { session: TUISession; service: FakeTUIService } {
   const service = createFakeTUIService();
@@ -54,7 +55,7 @@ function fillTranscript(session: TUISession, rounds: number): void {
   }
 }
 
-Deno.test("tool modal scroll rebuilds no transcript block", () => {
+test("tool modal scroll rebuilds no transcript block", () => {
   const { session } = makeSession();
   session.setTerminalSize(100, 30);
   fillTranscript(session, 6);
@@ -79,7 +80,7 @@ Deno.test("tool modal scroll rebuilds no transcript block", () => {
   );
 });
 
-Deno.test("tool modal streams one row without re-wrapping the transcript", () => {
+test("tool modal streams one row without re-wrapping the transcript", () => {
   const { session } = makeSession();
   session.setTerminalSize(100, 30);
   fillTranscript(session, 4);
@@ -102,7 +103,7 @@ Deno.test("tool modal streams one row without re-wrapping the transcript", () =>
   assertEquals(session.toolModalCacheStatsForTest().rebuiltBlocks, 1);
 });
 
-Deno.test("tool modal spinner tick touches only running rows", () => {
+test("tool modal spinner tick touches only running rows", () => {
   const { session } = makeSession();
   session.setTerminalSize(100, 30);
   fillTranscript(session, 3);
@@ -130,7 +131,7 @@ Deno.test("tool modal spinner tick touches only running rows", () => {
   assertEquals(session.toolModalCacheStatsForTest().rebuiltBlocks, 1);
 });
 
-Deno.test("sub-agent tab follows its activity stream", () => {
+test("sub-agent tab follows its activity stream", () => {
   const { session } = makeSession();
   session.setTerminalSize(100, 30);
   fillTranscript(session, 1);
@@ -159,7 +160,7 @@ Deno.test("sub-agent tab follows its activity stream", () => {
   );
 });
 
-Deno.test("tool modal releases its wrapped text when closed", () => {
+test("tool modal releases its wrapped text when closed", () => {
   const { session } = makeSession();
   session.setTerminalSize(100, 30);
   fillTranscript(session, 5);
@@ -187,7 +188,7 @@ Deno.test("tool modal releases its wrapped text when closed", () => {
   );
 });
 
-Deno.test("tool modal frame window matches a freshly built body", () => {
+test("tool modal frame window matches a freshly built body", () => {
   const { session } = makeSession();
   session.setTerminalSize(90, 26);
   fillTranscript(session, 3);
@@ -206,7 +207,7 @@ Deno.test("tool modal frame window matches a freshly built body", () => {
   assertEquals(session.toolModalView(), top, "rebuild from scratch is equal");
 });
 
-Deno.test("tool modal keeps tab bodies cached separately", () => {
+test("tool modal keeps tab bodies cached separately", () => {
   const { session } = makeSession();
   session.setTerminalSize(100, 30);
   fillTranscript(session, 2);

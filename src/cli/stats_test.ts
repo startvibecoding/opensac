@@ -2,15 +2,16 @@
 // projection (tabwriter alignment), formatter helpers, and the web-server
 // path with an injected serve function (no real browser or listener).
 
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import {
   defaultStatsOptions,
   executeStatsCommand,
   printStatsCLI,
 } from "./stats.ts";
-import type { Aggregate, RecentPage, Summary } from "../stats/stats.ts";
+import { type Aggregate, type RecentPage, type Summary } from "../stats/stats.ts";
 import { closeDatabases, openBunDatabase } from "../session/mod.ts";
+import { test } from "#testing";
 
 const summary: Summary = {
   totalRequests: 42,
@@ -75,7 +76,7 @@ const recent: RecentPage = {
   ],
 };
 
-Deno.test("printStatsCLI renders summary, aggregates, and recent rows", () => {
+test("printStatsCLI renders summary, aggregates, and recent rows", () => {
   const lines: string[] = [];
   printStatsCLI(
     (line) => void lines.push(line),
@@ -98,7 +99,7 @@ Deno.test("printStatsCLI renders summary, aggregates, and recent rows", () => {
   assert(text.includes("1.5s"));
 });
 
-Deno.test("printStatsCLI renders empty aggregates and zero time", () => {
+test("printStatsCLI renders empty aggregates and zero time", () => {
   const lines: string[] = [];
   const emptyRecent: RecentPage = { ...recent, items: [] };
   printStatsCLI(
@@ -119,7 +120,7 @@ Deno.test("printStatsCLI renders empty aggregates and zero time", () => {
   assertEquals((text.match(/No data/g) ?? []).length, 3);
 });
 
-Deno.test("default stats options match Go defaults", () => {
+test("default stats options match Go defaults", () => {
   const opts = defaultStatsOptions();
   assertEquals(opts.addr, "127.0.0.1:7878");
   assertEquals(opts.cli, false);
@@ -127,7 +128,7 @@ Deno.test("default stats options match Go defaults", () => {
   assertEquals(opts.dbPath, "");
 });
 
-Deno.test("executeStatsCommand --cli reads a real sessions.db via --db", () => {
+test("executeStatsCommand --cli reads a real sessions.db via --db", () => {
   const dir = Deno.makeTempDirSync();
   const dbPath = path.join(dir, "sessions.db");
   openBunDatabase(dbPath); // creates the shared schema
@@ -143,7 +144,7 @@ Deno.test("executeStatsCommand --cli reads a real sessions.db via --db", () => {
   closeDatabases();
 });
 
-Deno.test("executeStatsCommand web path invokes the injected serve hook", async () => {
+test("executeStatsCommand web path invokes the injected serve hook", async () => {
   const dir = Deno.makeTempDirSync();
   // Use the not-found path to validate option plumbing without a real database.
   let captured: unknown = null;

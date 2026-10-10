@@ -2,7 +2,7 @@
 // The Manager-based holder setup is replaced with a direct lease row so the
 // preflight itself is exercised without the not-yet-ported session Manager.
 
-import { assert, assertEquals, assertThrows } from "@opensac/assert";
+import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
 import { openRootDB, rootDBPath } from "./root_db.ts";
@@ -10,8 +10,9 @@ import {
   activeRuntimeLeases,
   describeActiveRuntimeLease,
 } from "./runtime_lease_status.ts";
+import { test } from "#testing";
 
-Deno.test("active runtime leases reports held holders", () => {
+test("active runtime leases reports held holders", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     // No database yet: nothing is held, and a read-only preflight must not
@@ -66,7 +67,7 @@ Deno.test("active runtime leases reports held holders", () => {
   }
 });
 
-Deno.test("active runtime leases never migrates the preflight database", () => {
+test("active runtime leases never migrates the preflight database", () => {
   const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const pathValue = rootDBPath(sessionDir);

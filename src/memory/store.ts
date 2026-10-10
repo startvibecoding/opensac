@@ -2,7 +2,7 @@
 // Package memory implements persistent memory storage: a human-readable
 // Markdown file (memory.md) managed through the ACP management plane.
 
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import { configDir, projectPath, projectPathFor } from "../config/mod.ts";
 
 /** The initial content for a new memory.md file. */

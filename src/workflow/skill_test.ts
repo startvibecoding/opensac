@@ -1,8 +1,9 @@
-import { assert, assertEquals } from "@opensac/assert";
-import * as path from "@opensac/path";
+import { assert, assertEquals } from "../compat/assert.ts";
+import * as path from "../compat/path.ts";
 import { ensureProjectSkill, skillName } from "./skill.ts";
+import { test } from "#testing";
 
-Deno.test("ensureProjectSkill creates workflow skill", async () => {
+test("ensureProjectSkill creates workflow skill", async () => {
   const root = await Deno.makeTempDir();
   try {
     const [skillPath, created] = await ensureProjectSkill(root);
@@ -109,7 +110,7 @@ Deno.test("ensureProjectSkill creates workflow skill", async () => {
   }
 });
 
-Deno.test("ensureProjectSkill does not overwrite existing skill", async () => {
+test("ensureProjectSkill does not overwrite existing skill", async () => {
   const root = await Deno.makeTempDir();
   try {
     const skillDir = path.join(root, ".skills", skillName);
@@ -128,7 +129,7 @@ Deno.test("ensureProjectSkill does not overwrite existing skill", async () => {
   }
 });
 
-Deno.test("ensureProjectSkill respects lowercase skill", async () => {
+test("ensureProjectSkill respects lowercase skill", async () => {
   const root = await Deno.makeTempDir();
   try {
     const skillDir = path.join(root, ".skills", skillName);

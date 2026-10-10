@@ -3,7 +3,7 @@
 // Protocols) and tool_launch_test.go
 // (TestExecuteBackgroundToolCallOrderedReleasesQueuedCalls).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createMockProvider, type MockProvider } from "../provider/mock.ts";
 import { createUserMessage, type ToolCallBlock } from "../provider/types.ts";
 import { createManager } from "../session/manager.ts";
@@ -22,8 +22,9 @@ import {
 import { createAgent, createAgentWithLoopConfig } from "./agent.ts";
 import { createToolLaunchOrder } from "./tool_launch.ts";
 import { testModel } from "./agent_testutil.ts";
+import { test } from "#testing";
 
-Deno.test(
+test(
   "buildBackgroundChatParams does not leak Responses options to other protocols",
   () => {
     for (const api of ["openai-chat", "anthropic-messages", "google-gemini"]) {
@@ -53,7 +54,7 @@ Deno.test(
   },
 );
 
-Deno.test(
+test(
   "buildBackgroundReplayParams drops remote lineage and replays local archive",
   () => {
     const workDir = Deno.makeTempDirSync();
@@ -78,7 +79,7 @@ Deno.test(
   },
 );
 
-Deno.test("responsesStateFallbackError is false without a supporting provider", () => {
+test("responsesStateFallbackError is false without a supporting provider", () => {
   const p: MockProvider = createMockProvider(
     "mock",
     [testModel("model-1", "Model 1")],
@@ -141,7 +142,7 @@ async function withTimeout<T>(
   ]);
 }
 
-Deno.test(
+test(
   "executeBackgroundToolCallOrdered releases the queued call after a parse failure",
   async () => {
     const tool = new OrderedProbeTool(1);

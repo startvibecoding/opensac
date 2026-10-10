@@ -2,15 +2,15 @@
 // The Go package had no dedicated test file; these pin the observable catalog
 // contract that ACP serializes.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
-import type { Model } from "../provider/types.ts";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
+import { type Model } from "../provider/types.ts";
 import {
   thinkingHigh,
   thinkingMax,
   thinkingMedium,
   thinkingOff,
 } from "../provider/types.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import { MODE_YOLO } from "./source.ts";
 import {
   CONFIG_OPTION_MODE,
@@ -20,6 +20,7 @@ import {
   sessionConfigOptionsWithProviders,
   validateThinkingLevel,
 } from "./session_options.ts";
+import { test } from "#testing";
 
 function model(id: string, name: string, reasoning = false): Model {
   return {
@@ -34,7 +35,7 @@ function model(id: string, name: string, reasoning = false): Model {
   };
 }
 
-Deno.test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
+test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
   const providers = {
     openai: {} as Provider,
     "test-api": {} as Provider,
@@ -75,7 +76,7 @@ Deno.test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
   ]);
 });
 
-Deno.test("SessionConfigOptionsOmitsThinkingForNonReasoningModel", () => {
+test("SessionConfigOptionsOmitsThinkingForNonReasoningModel", () => {
   const options = sessionConfigOptionsWithProviders(
     "test",
     {},
@@ -90,13 +91,13 @@ Deno.test("SessionConfigOptionsOmitsThinkingForNonReasoningModel", () => {
   );
 });
 
-Deno.test("ValidateThinkingLevelAcceptsKnownAndRejectsUnknown", () => {
+test("ValidateThinkingLevelAcceptsKnownAndRejectsUnknown", () => {
   assertEquals(validateThinkingLevel(""), thinkingMedium);
   assertEquals(validateThinkingLevel("high"), thinkingHigh);
   assertThrows(() => validateThinkingLevel("bogus"), Error);
 });
 
-Deno.test("ProviderDisplayNameCapitalizesAndPreservesAcronyms", () => {
+test("ProviderDisplayNameCapitalizesAndPreservesAcronyms", () => {
   assertEquals(providerDisplayName("openai"), "OpenAI");
   assertEquals(providerDisplayName("test-api"), "Test API");
   assertEquals(providerDisplayName("agentplan"), "AgentPlan");

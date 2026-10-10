@@ -1,10 +1,11 @@
 // (the Go package ships no Windows test,
 // so these cover the ported behaviour directly).
 
-import { assert, assertEquals } from "@opensac/assert";
+import { assert, assertEquals } from "../compat/assert.ts";
 import { createWinSandbox, Level } from "./mod.ts";
+import { test } from "#testing";
 
-Deno.test("win sandbox reports unavailable", () => {
+test("win sandbox reports unavailable", () => {
   const sb = createWinSandbox(Deno.cwd(), Level.Standard);
   assertEquals(sb.name(), "windows-sandbox");
   assertEquals(sb.level(), Level.Standard);
@@ -12,7 +13,7 @@ Deno.test("win sandbox reports unavailable", () => {
   assert(sb.availabilityError().message.includes("env-only isolation"));
 });
 
-Deno.test("win sandbox wrapCommand shell selection", () => {
+test("win sandbox wrapCommand shell selection", () => {
   const sb = createWinSandbox(Deno.cwd(), Level.Standard);
 
   const cmd = sb.wrapCommand(undefined, "", "echo hello", {});
@@ -23,7 +24,7 @@ Deno.test("win sandbox wrapCommand shell selection", () => {
   assertEquals(busybox.args, ["sh", "-c", "echo hello"]);
 });
 
-Deno.test("win sandbox buildEnv filters and overlays", () => {
+test("win sandbox buildEnv filters and overlays", () => {
   const sb = createWinSandbox(Deno.cwd(), Level.Standard);
   Deno.env.set("OPENSAC_SANDBOX_LEAK", "1");
   try {

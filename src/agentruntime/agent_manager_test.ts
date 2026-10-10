@@ -5,15 +5,16 @@
 // SessionRuntime slice; here we cover the dependency guards that do not build an
 // Agent.
 
-import { assertThrows } from "@opensac/assert";
+import { assertThrows } from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
-import type { Provider } from "../provider/provider.ts";
+import { type Provider } from "../provider/provider.ts";
 import {
   type AgentManagerOptions,
   type AgentManagerRuntime,
   createAgentManager,
 } from "./agent_manager.ts";
 import { SOURCE_UNKNOWN } from "./source.ts";
+import { test } from "#testing";
 
 function stubRuntime(): AgentManagerRuntime {
   return {
@@ -32,7 +33,7 @@ function stubRuntime(): AgentManagerRuntime {
   };
 }
 
-Deno.test("agentManagerRequiresSharedDependencies", () => {
+test("agentManagerRequiresSharedDependencies", () => {
   assertThrows(
     () => createAgentManager({} as unknown as AgentManagerOptions),
     Error,

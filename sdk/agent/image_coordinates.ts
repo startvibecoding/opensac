@@ -3,7 +3,7 @@
 // The public SDK boundary lives in `sdk/`; this module must not import from
 // `src/`.
 
-import type { ImageContent } from "./types.ts";
+import { type ImageContent } from "./types.ts";
 
 /**
  * Maps a point in the sent image coordinate space back to the original source

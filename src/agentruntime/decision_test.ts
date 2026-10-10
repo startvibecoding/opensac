@@ -1,7 +1,7 @@
 // decision_replay_test.go, decision_resolver_test.go, decision_contract_test.go,
 // and decision_rehydrate_test.go.
 
-import { assertEquals, assertThrows } from "@opensac/assert";
+import { assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   DECISION_APPROVAL,
   DECISION_QUESTION,
@@ -16,8 +16,9 @@ import {
   replayDecisions,
   replayDecisionsAt,
 } from "./decision_replay.ts";
+import { test } from "#testing";
 
-Deno.test("DecisionRecord keeps protocol-neutral payload", () => {
+test("DecisionRecord keeps protocol-neutral payload", () => {
   const request = {
     id: "approval-1",
     sessionId: "session-1",
@@ -40,7 +41,7 @@ Deno.test("DecisionRecord keeps protocol-neutral payload", () => {
   assertEquals(resolved.value, "approve_once");
 });
 
-Deno.test("ReplayDecisions omits expired pending", () => {
+test("ReplayDecisions omits expired pending", () => {
   const now = new Date();
   const records = [
     {
@@ -68,7 +69,7 @@ Deno.test("ReplayDecisions omits expired pending", () => {
   assertEquals(expired[0].id, "expired");
 });
 
-Deno.test("ExpiredDecisions honors later resolution", () => {
+test("ExpiredDecisions honors later resolution", () => {
   const now = new Date();
   const expired = expiredDecisions([
     {
@@ -90,7 +91,7 @@ Deno.test("ExpiredDecisions honors later resolution", () => {
   assertEquals(expired.length, 0);
 });
 
-Deno.test("ReplayDecisions pairs request and resolution", () => {
+test("ReplayDecisions pairs request and resolution", () => {
   const pending = replayDecisions([
     {
       id: "approval-1",
@@ -119,7 +120,7 @@ Deno.test("ReplayDecisions pairs request and resolution", () => {
   assertEquals(pending.get("question-1")?.kind, DECISION_QUESTION);
 });
 
-Deno.test("DecisionService bind and clearRunWithValue", () => {
+test("DecisionService bind and clearRunWithValue", () => {
   const service = new DecisionService();
   service.register({
     id: "question-1",
@@ -154,7 +155,7 @@ Deno.test("DecisionService bind and clearRunWithValue", () => {
   assertEquals(service.pending().length, 0);
 });
 
-Deno.test("DecisionService contract across kinds and runs", () => {
+test("DecisionService contract across kinds and runs", () => {
   const service = new DecisionService();
   const requests = [
     {
@@ -193,7 +194,7 @@ Deno.test("DecisionService contract across kinds and runs", () => {
   assertEquals(pending[0].id, "approval-2");
 });
 
-Deno.test("DecisionService concurrent first response wins", async () => {
+test("DecisionService concurrent first response wins", async () => {
   const service = new DecisionService();
   service.register({
     id: "approval-race",
@@ -221,7 +222,7 @@ Deno.test("DecisionService concurrent first response wins", async () => {
   assertEquals(service.pending().length, 0);
 });
 
-Deno.test("DecisionService rehydrate is sorted and idempotent", () => {
+test("DecisionService rehydrate is sorted and idempotent", () => {
   const service = new DecisionService();
   const requests = service.rehydrate([
     {
@@ -255,7 +256,7 @@ Deno.test("DecisionService rehydrate is sorted and idempotent", () => {
   assertEquals(again[0].id, "a");
 });
 
-Deno.test("DecisionService rehydrate rejects conflict", () => {
+test("DecisionService rehydrate rejects conflict", () => {
   const service = new DecisionService();
   service.rehydrate([
     {
@@ -279,7 +280,7 @@ Deno.test("DecisionService rehydrate rejects conflict", () => {
   );
 });
 
-Deno.test("DecisionService clearRun resumes bound waiters", () => {
+test("DecisionService clearRun resumes bound waiters", () => {
   const service = new DecisionService();
   service.register({
     id: "approval-clear",
@@ -309,7 +310,7 @@ Deno.test("DecisionService clearRun resumes bound waiters", () => {
   assertEquals(pending[0].id, "approval-sticky");
 });
 
-Deno.test("DecisionService failed commit retries without double resume", () => {
+test("DecisionService failed commit retries without double resume", () => {
   const service = new DecisionService();
   service.register({
     id: "approval-commit",

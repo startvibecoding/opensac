@@ -11,7 +11,7 @@
 // to `Date`; SHA-256/HMAC use `node:crypto`.
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import * as path from "@opensac/path";
+import * as path from "../compat/path.ts";
 import {
   type Database,
   InputResourceDAO,
@@ -31,10 +31,9 @@ import {
   validatePathComponent,
 } from "./attachment.ts";
 import { detectContentType } from "./media_type.ts";
-import type {
-  KnowledgeBaseReference,
-  KnowledgeCapsule,
-} from "./knowledge_context.ts";
+import {
+  type KnowledgeBaseReference,
+  type KnowledgeCapsule} from "./knowledge_context.ts";
 
 const VALID_INPUT_KINDS: ReadonlySet<string> = new Set([
   ATTACHMENT_IMAGE,
