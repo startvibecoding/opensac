@@ -4,6 +4,8 @@
 // rebuildable graph/FTS SQLite store (see knowledge_database.ts); the source
 // directory is read-only and canonical Runs remain in sessions.db.
 
+import { runtime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   KnowledgeBaseDAO,
@@ -383,7 +385,8 @@ function knowledgeFilesMatch(
   for (const record of records) {
     const file = byPath.get(record.relativePath);
     if (
-      !file || file.contentSha256 !== record.contentSha256 ||
+      !file ||
+      file.contentSha256 !== record.contentSha256 ||
       file.byteSize !== record.byteSize ||
       file.mediaType !== record.mediaType ||
       file.status !== record.status
@@ -486,7 +489,8 @@ function matchingKnowledgeFileRecords(
   for (const record of records) {
     const file = byPath.get(record.relativePath);
     if (
-      file && file.contentSha256 === record.contentSha256 &&
+      file &&
+      file.contentSha256 === record.contentSha256 &&
       file.byteSize === record.byteSize &&
       file.mediaType === record.mediaType &&
       file.status === record.status
@@ -574,8 +578,11 @@ function partitionKnowledgeFileGraphs(
     const fromPath = nodePath.get(edge.fromNodeId);
     const toPath = nodePath.get(edge.toNodeId);
     if (
-      p === undefined || fromPath === undefined || toPath === undefined ||
-      fromPath !== p || toPath !== p
+      p === undefined ||
+      fromPath === undefined ||
+      toPath === undefined ||
+      fromPath !== p ||
+      toPath !== p
     ) {
       continue;
     }
@@ -599,7 +606,8 @@ function partitionKnowledgeFileGraphs(
     if (item.nodeId !== "") {
       if (nodePath.get(item.nodeId) !== p) continue;
     } else if (
-      !retainedEdges.has(item.edgeId) || edgePath.get(item.edgeId) !== p
+      !retainedEdges.has(item.edgeId) ||
+      edgePath.get(item.edgeId) !== p
     ) {
       continue;
     }
@@ -707,8 +715,12 @@ export function queryKnowledgeGraph(
   };
   try {
     readKnowledgeBaseDatabase(sessionDir, baseID, (tx) => {
-      const active = new KnowledgeBaseDAO(tx)
-        .activeGraphProjection(tx, baseID, query, limit);
+      const active = new KnowledgeBaseDAO(tx).activeGraphProjection(
+        tx,
+        baseID,
+        query,
+        limit,
+      );
       if (active === undefined) throw new KnowledgeBaseNotFoundError();
       const { projection, indexed } = active;
       if (!indexed) throw new KnowledgeBaseUnindexedError();
@@ -830,9 +842,9 @@ export function validateKnowledgeBaseSpec(spec: KnowledgeBaseSpec): void {
   if (!path.isAbsolute(spec.rootDir)) {
     throw new Error("knowledge base root directory must be absolute");
   }
-  let info: Deno.FileInfo;
+  let info: FileInfo;
   try {
-    info = Deno.statSync(spec.rootDir);
+    info = runtime.statSync(spec.rootDir);
   } catch (err) {
     throw new Error(`knowledge base root directory: ${err}`);
   }
@@ -847,9 +859,9 @@ export function validateKnowledgeBaseSpec(spec: KnowledgeBaseSpec): void {
       break;
     default:
       throw new Error(
-        `unsupported knowledge base preprocess profile ${
-          JSON.stringify(spec.preprocessProfile)
-        }`,
+        `unsupported knowledge base preprocess profile ${JSON.stringify(
+          spec.preprocessProfile,
+        )}`,
       );
   }
   if (spec.mode === "") spec.mode = "yolo";
@@ -873,7 +885,8 @@ export function validateKnowledgeGraphSnapshot(
   }
   for (const file of graph.files) {
     if (
-      file.id === "" || file.snapshotId !== graph.snapshot.id ||
+      file.id === "" ||
+      file.snapshotId !== graph.snapshot.id ||
       file.relativePath === ""
     ) {
       throw new Error("invalid knowledge graph file");
@@ -881,8 +894,10 @@ export function validateKnowledgeGraphSnapshot(
   }
   for (const chunk of graph.chunks) {
     if (
-      chunk.id === "" || chunk.snapshotId !== graph.snapshot.id ||
-      chunk.fileId === "" || chunk.startLine <= 0 ||
+      chunk.id === "" ||
+      chunk.snapshotId !== graph.snapshot.id ||
+      chunk.fileId === "" ||
+      chunk.startLine <= 0 ||
       chunk.endLine < chunk.startLine
     ) {
       throw new Error("invalid knowledge graph chunk");
@@ -890,16 +905,20 @@ export function validateKnowledgeGraphSnapshot(
   }
   for (const node of graph.nodes) {
     if (
-      node.id === "" || node.snapshotId !== graph.snapshot.id ||
-      node.kind === "" || node.normalizedLabel === ""
+      node.id === "" ||
+      node.snapshotId !== graph.snapshot.id ||
+      node.kind === "" ||
+      node.normalizedLabel === ""
     ) {
       throw new Error("invalid knowledge graph node");
     }
   }
   for (const edge of graph.edges) {
     if (
-      edge.id === "" || edge.snapshotId !== graph.snapshot.id ||
-      edge.fromNodeId === "" || edge.toNodeId === "" ||
+      edge.id === "" ||
+      edge.snapshotId !== graph.snapshot.id ||
+      edge.fromNodeId === "" ||
+      edge.toNodeId === "" ||
       edge.relationType === ""
     ) {
       throw new Error("invalid knowledge graph edge");
@@ -907,7 +926,8 @@ export function validateKnowledgeGraphSnapshot(
   }
   for (const evidence of graph.evidence) {
     if (
-      evidence.id === "" || evidence.snapshotId !== graph.snapshot.id ||
+      evidence.id === "" ||
+      evidence.snapshotId !== graph.snapshot.id ||
       evidence.chunkId === "" ||
       ((evidence.nodeId ?? "") === "" && (evidence.edgeId ?? "") === "")
     ) {
@@ -985,9 +1005,10 @@ function knowledgeSnapshotFromRecord(
     nodeCount: record.nodeCount,
     edgeCount: record.edgeCount,
     startedAt: parseProjectTime(record.startedAt),
-    finishedAt: record.finishedAt === ""
-      ? undefined
-      : parseProjectTime(record.finishedAt),
+    finishedAt:
+      record.finishedAt === ""
+        ? undefined
+        : parseProjectTime(record.finishedAt),
     errorSummary: record.errorSummary,
   };
 }

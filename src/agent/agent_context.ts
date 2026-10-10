@@ -29,7 +29,7 @@ import {
 import { type ToolImage } from "./events.ts";
 
 /** Default auto-compaction threshold (fraction of the context window). */
-export const defaultAutoCompactionThreshold = 0.80;
+export const defaultAutoCompactionThreshold = 0.8;
 
 /** Safety margin reserved when clamping an output limit to the context window. */
 export const contextTokenSafetyMargin = 512;
@@ -67,7 +67,8 @@ export function toolResultImages(
   let images: ToolImage[] | undefined;
   for (const content of contents) {
     if (
-      content.type !== "image" || content.image === undefined ||
+      content.type !== "image" ||
+      content.image === undefined ||
       content.image.data === ""
     ) {
       continue;
@@ -127,8 +128,9 @@ export function encodedImagePayloadBytes(
   }
   // ImageContent.data already contains base64, so its string length is the
   // encoded payload that crosses JSON provider APIs.
-  return image.data.length + image.mimeType.length +
-    "data:;base64,".length + 128;
+  return (
+    image.data.length + image.mimeType.length + "data:;base64,".length + 128
+  );
 }
 
 function estimateToolDefinitionTokens(tools: ToolDefinition[]): number {
@@ -178,8 +180,8 @@ export function estimateGuardRequestTokens(
   tools: ToolDefinition[],
   estimator: TokenEstimator | null | undefined,
 ): number {
-  let total = estimateTextTokens(systemPrompt) +
-    estimateToolDefinitionTokens(tools);
+  let total =
+    estimateTextTokens(systemPrompt) + estimateToolDefinitionTokens(tools);
   for (const msg of messages) {
     total += estimateGuardToolResultTokens(msg, estimator);
   }
@@ -238,8 +240,8 @@ export function completeProviderUsage(
     usage.output = est.output;
   }
   if (usage.totalTokens <= 0) {
-    usage.totalTokens = usage.input + usage.cacheRead + usage.cacheWrite +
-      usage.output;
+    usage.totalTokens =
+      usage.input + usage.cacheRead + usage.cacheWrite + usage.output;
   }
   return usage;
 }
@@ -301,7 +303,8 @@ export function repairDanglingToolCalls(messages: Message[]): Message[] {
     const ids: string[] = [];
     for (const c of msg.contents ?? []) {
       if (
-        c.type === "toolCall" && c.toolCall !== undefined &&
+        c.type === "toolCall" &&
+        c.toolCall !== undefined &&
         c.toolCall.id !== ""
       ) {
         ids.push(c.toolCall.id);
@@ -315,7 +318,8 @@ export function repairDanglingToolCalls(messages: Message[]): Message[] {
     for (let j = i + 1; j < messages.length; j++) {
       const next = messages[j];
       if (
-        next.role !== "toolResult" || !pending.has(next.toolCallId ?? "") ||
+        next.role !== "toolResult" ||
+        !pending.has(next.toolCallId ?? "") ||
         consumed.has(j)
       ) {
         break;
@@ -347,7 +351,8 @@ export function repairDanglingToolCalls(messages: Message[]): Message[] {
       let name = "";
       for (const c of msg.contents ?? []) {
         if (
-          c.type === "toolCall" && c.toolCall !== undefined &&
+          c.type === "toolCall" &&
+          c.toolCall !== undefined &&
           c.toolCall.id === id
         ) {
           name = c.toolCall.name;
@@ -370,8 +375,10 @@ export function repairDanglingToolCalls(messages: Message[]): Message[] {
 
 /** Reports whether a tool result is a synthesized context-guard placeholder. */
 export function isContextGuardToolResult(msg: Message): boolean {
-  return msg.role === "toolResult" &&
-    (msg.content ?? "").startsWith("[Context guard]");
+  return (
+    msg.role === "toolResult" &&
+    (msg.content ?? "").startsWith("[Context guard]")
+  );
 }
 
 /** Builds the context-guard replacement for an oversized tool result. */
@@ -386,9 +393,9 @@ export function contextGuardToolResult(
   if (toolName === "") {
     toolName = "tool";
   }
-  const content = `[Context guard] The ${
-    JSON.stringify(toolName)
-  } tool output was omitted because sending it would exceed the model context window (estimated request: ${estimatedTokens} tokens; input budget: ${budgetTokens} tokens; context window: ${contextWindow}; reserved for output: ${reserveTokens}). Retry with a narrower scope: use read with offset/limit, grep/find with path/include/maxResults, or request smaller chunks and summarize incrementally.`;
+  const content = `[Context guard] The ${JSON.stringify(
+    toolName,
+  )} tool output was omitted because sending it would exceed the model context window (estimated request: ${estimatedTokens} tokens; input budget: ${budgetTokens} tokens; context window: ${contextWindow}; reserved for output: ${reserveTokens}). Retry with a narrower scope: use read with offset/limit, grep/find with path/include/maxResults, or request smaller chunks and summarize incrementally.`;
   return {
     role: "toolResult",
     content,
@@ -411,8 +418,8 @@ export function clampMaxTokensToContext(
   if (maxTokens <= 0 || contextWindow <= 0 || estimatedInputTokens <= 0) {
     return maxTokens;
   }
-  let available = contextWindow - estimatedInputTokens -
-    contextTokenSafetyMargin;
+  let available =
+    contextWindow - estimatedInputTokens - contextTokenSafetyMargin;
   if (available < 1) {
     available = 1;
   }
@@ -492,11 +499,13 @@ export function applyCacheMarkers(
         type: "ephemeral",
       };
     } else if ((msg.content ?? "") !== "") {
-      msg.contents = [{
-        type: "text",
-        text: msg.content,
-        cache_control: { type: "ephemeral" },
-      }];
+      msg.contents = [
+        {
+          type: "text",
+          text: msg.content,
+          cache_control: { type: "ephemeral" },
+        },
+      ];
       msg.content = "";
     }
   }
@@ -604,10 +613,14 @@ export function waitForStreamRecoveryRetry(
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => resolve(true), delayMs);
     if (ctx !== null && ctx !== undefined) {
-      ctx.addEventListener("abort", () => {
-        clearTimeout(timer);
-        resolve(true);
-      }, { once: true });
+      ctx.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          resolve(true);
+        },
+        { once: true },
+      );
     }
   });
 }

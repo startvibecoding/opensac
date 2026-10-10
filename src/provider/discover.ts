@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { type HttpClient } from "./http_client.ts";
 import { applyHeaders, createHttpClient } from "./http_client.ts";
 
@@ -43,7 +44,7 @@ export function modelsEndpoint(raw: string): string {
   } catch {
     throw new Error("baseUrl must be an absolute http(s) URL");
   }
-  if (u.protocol !== "http:" && u.protocol !== "https:" || u.host === "") {
+  if ((u.protocol !== "http:" && u.protocol !== "https:") || u.host === "") {
     throw new Error("baseUrl must be an absolute http(s) URL");
   }
   let path = u.pathname.replace(/\/+$/, "");
@@ -59,7 +60,7 @@ export function modelsEndpoint(raw: string): string {
 export function resolveSecretRef(value: string): string {
   const trimmed = value.trim();
   if (trimmed.startsWith("${") && trimmed.endsWith("}")) {
-    return Deno.env.get(trimmed.slice(2, -1)) ?? "";
+    return runtime.env.get(trimmed.slice(2, -1)) ?? "";
   }
   return trimmed;
 }
@@ -144,9 +145,10 @@ export async function discoverModels(
   opts: DiscoverModelsOptions,
 ): Promise<DiscoveredModel[]> {
   const endpoint = modelsEndpoint(opts.baseUrl);
-  const timeout = (opts.timeoutMs ?? 0) <= 0
-    ? defaultDiscoverTimeoutMs
-    : opts.timeoutMs as number;
+  const timeout =
+    (opts.timeoutMs ?? 0) <= 0
+      ? defaultDiscoverTimeoutMs
+      : (opts.timeoutMs as number);
   const client = createHttpClient(timeout, {
     proxyUrl: opts.httpProxy,
     forceHTTP11: opts.forceHTTP11,
@@ -202,8 +204,8 @@ export function parseDiscoveredModels(
   for (const raw of items) {
     if (raw == null || typeof raw !== "object") continue;
     const item = raw as Record<string, unknown>;
-    const str = (v: unknown): string => typeof v === "string" ? v : "";
-    const num = (v: unknown): number => typeof v === "number" ? v : 0;
+    const str = (v: unknown): string => (typeof v === "string" ? v : "");
+    const num = (v: unknown): number => (typeof v === "number" ? v : 0);
     const strArray = (v: unknown): string[] | undefined => {
       if (Array.isArray(v) && v.every((x) => typeof x === "string")) {
         return v as string[];
@@ -211,7 +213,8 @@ export function parseDiscoveredModels(
       return undefined;
     };
 
-    const id = normalizeDiscoveredModelId(str(item.id)) ||
+    const id =
+      normalizeDiscoveredModelId(str(item.id)) ||
       normalizeDiscoveredModelId(str(item.name));
     if (id === "") continue;
     if (seen.has(id)) continue;
@@ -223,8 +226,8 @@ export function parseDiscoveredModels(
     }
     if (name === "") name = id;
 
-    const input = strArray(item.input) ?? strArray(item.input_modalities) ??
-      ["text"];
+    const input = strArray(item.input) ??
+      strArray(item.input_modalities) ?? ["text"];
 
     let contextWindow = num(item.contextWindow);
     if (contextWindow === 0) contextWindow = num(item.context_length);
@@ -255,10 +258,7 @@ function normalizeDiscoveredModelId(value: string): string {
   return v.trim();
 }
 
-async function readLimited(
-  resp: Response,
-  limit: number,
-): Promise<Uint8Array> {
+async function readLimited(resp: Response, limit: number): Promise<Uint8Array> {
   const reader = resp.body?.getReader();
   if (reader == null) return new Uint8Array();
   const chunks: Uint8Array[] = [];
@@ -268,9 +268,8 @@ async function readLimited(
     if (done) break;
     if (value === undefined) continue;
     const remaining = limit - total;
-    const chunk = value.length > remaining
-      ? value.subarray(0, remaining)
-      : value;
+    const chunk =
+      value.length > remaining ? value.subarray(0, remaining) : value;
     chunks.push(chunk);
     total += chunk.length;
   }

@@ -211,16 +211,19 @@ function runeVisualWidth(ch: string): number {
 }
 
 function isCombiningRune(r: number): boolean {
-  return (r >= 0x0300 && r <= 0x036f) ||
+  return (
+    (r >= 0x0300 && r <= 0x036f) ||
     (r >= 0x1ab0 && r <= 0x1aff) ||
     (r >= 0x1dc0 && r <= 0x1dff) ||
     (r >= 0x20d0 && r <= 0x20ff) ||
     (r >= 0xfe00 && r <= 0xfe0f) ||
-    (r >= 0xfe20 && r <= 0xfe2f);
+    (r >= 0xfe20 && r <= 0xfe2f)
+  );
 }
 
 function isWideRune(r: number): boolean {
-  return (r >= 0x1100 && r <= 0x115f) ||
+  return (
+    (r >= 0x1100 && r <= 0x115f) ||
     (r >= 0x2329 && r <= 0x232a) ||
     (r >= 0x2e80 && r <= 0xa4cf) ||
     (r >= 0xac00 && r <= 0xd7a3) ||
@@ -231,7 +234,8 @@ function isWideRune(r: number): boolean {
     (r >= 0xffe0 && r <= 0xffe6) ||
     (r >= 0x1f300 && r <= 0x1f64f) ||
     (r >= 0x1f900 && r <= 0x1f9ff) ||
-    (r >= 0x20000 && r <= 0x3fffd);
+    (r >= 0x20000 && r <= 0x3fffd)
+  );
 }
 
 /** Removes all ANSI escape sequences from a string. */
@@ -696,7 +700,8 @@ export class Renderer {
     let p = n.parent;
     while (p) {
       if (
-        p.type === NodeType.UnorderedList || p.type === NodeType.OrderedList
+        p.type === NodeType.UnorderedList ||
+        p.type === NodeType.OrderedList
       ) {
         depth++;
       }
@@ -704,8 +709,8 @@ export class Renderer {
     }
     const indent = "  ".repeat(Math.max(0, depth - 1));
 
-    const isOrdered = n.parent !== undefined &&
-      n.parent.type === NodeType.OrderedList;
+    const isOrdered =
+      n.parent !== undefined && n.parent.type === NodeType.OrderedList;
     let marker = "";
     if (isOrdered) {
       const startNum = n.parent ? n.parent.startNum : 1;
@@ -826,14 +831,17 @@ export class Renderer {
       for (let lineIdx = 0; lineIdx < rowHeight; lineIdx++) {
         this.#buf += this.theme.tableBorder + "│";
         for (let i = 0; i < colCount; i++) {
-          const text = lineIdx < wrappedCells[i].length
-            ? wrappedCells[i][lineIdx]
-            : "";
+          const text =
+            lineIdx < wrappedCells[i].length ? wrappedCells[i][lineIdx] : "";
           let pad = colWidths[i] - visualWidth(text);
           if (pad < 0) pad = 0;
           if (isHeader) {
-            this.#buf += this.theme.tableHeaderText + " " + text +
-              " ".repeat(pad + 1) + ansiReset;
+            this.#buf +=
+              this.theme.tableHeaderText +
+              " " +
+              text +
+              " ".repeat(pad + 1) +
+              ansiReset;
           } else {
             this.#buf += " " + text + " ".repeat(pad + 1) + ansiReset;
           }

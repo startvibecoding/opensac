@@ -17,9 +17,14 @@ import {
   type SearchPage,
   type SkillDetail,
   type SkillSummary,
-  type UserSkillsQuery} from "../skillhub/mod.ts";
+  type UserSkillsQuery,
+} from "../skillhub/mod.ts";
 import { createLocalIndex } from "../skillhub/local.ts";
-import { type DialogController, type DialogItem, type DialogPage } from "./dialog.ts";
+import {
+  type DialogController,
+  type DialogItem,
+  type DialogPage,
+} from "./dialog.ts";
 import { type KeyEvent } from "./keys.ts";
 import type { Translator } from "./i18n.ts";
 import { ACCENT, BOLD, DIM, RESET } from "./theme.ts";
@@ -190,8 +195,10 @@ export class SkillHubPanel implements DialogController {
     this.#host.requestRender();
     // Categories are independent of the list; fetch once per market.
     if (
-      this.#tab === "browse" && this.#market !== OFFICIAL_TAB &&
-      this.#categories.length === 0 && this.#error === ""
+      this.#tab === "browse" &&
+      this.#market !== OFFICIAL_TAB &&
+      this.#categories.length === 0 &&
+      this.#error === ""
     ) {
       void this.#loadCategories();
     }
@@ -346,13 +353,13 @@ export class SkillHubPanel implements DialogController {
         this.#view = "detail";
         return true;
       case "up":
-        this.#scopeCursor = (this.#scopeCursor + scopes.length - 1) %
-          Math.max(scopes.length, 1);
+        this.#scopeCursor =
+          (this.#scopeCursor + scopes.length - 1) % Math.max(scopes.length, 1);
         this.#host.requestRender();
         return true;
       case "down":
-        this.#scopeCursor = (this.#scopeCursor + 1) %
-          Math.max(scopes.length, 1);
+        this.#scopeCursor =
+          (this.#scopeCursor + 1) % Math.max(scopes.length, 1);
         this.#host.requestRender();
         return true;
       case "enter": {
@@ -387,9 +394,8 @@ export class SkillHubPanel implements DialogController {
   }
 
   #move(delta: number): void {
-    const total = this.#tab === "installed"
-      ? this.#installed.length
-      : this.#items.length;
+    const total =
+      this.#tab === "installed" ? this.#installed.length : this.#items.length;
     if (total === 0) return;
     this.#cursor += delta;
     if (this.#cursor < 0) this.#cursor = total - 1;
@@ -599,29 +605,30 @@ export class SkillHubPanel implements DialogController {
     const tabs = this.#marketTabs();
     const mIdx = Math.max(tabs.indexOf(this.#market), 0);
     const tabParts = tabs.map((id, i) =>
-      i === mIdx ? `${ACCENT}${BOLD}[${id}]${RESET}` : `[${id}]`
+      i === mIdx ? `${ACCENT}${BOLD}[${id}]${RESET}` : `[${id}]`,
     );
     const catCount = this.#categories.length;
-    const catParts = catCount > 0
-      ? [
-        this.#categoryIndex === 0
-          ? `${ACCENT}${BOLD}${tr.text("skillhub.panel.cat.all")}${RESET}`
-          : tr.text("skillhub.panel.cat.all"),
-        ...this.#categories.map((c, i) =>
-          this.#categoryIndex === i + 1
-            ? `${ACCENT}${BOLD}${c.name}${RESET}`
-            : c.name
-        ),
-      ]
-      : [];
+    const catParts =
+      catCount > 0
+        ? [
+            this.#categoryIndex === 0
+              ? `${ACCENT}${BOLD}${tr.text("skillhub.panel.cat.all")}${RESET}`
+              : tr.text("skillhub.panel.cat.all"),
+            ...this.#categories.map((c, i) =>
+              this.#categoryIndex === i + 1
+                ? `${ACCENT}${BOLD}${c.name}${RESET}`
+                : c.name,
+            ),
+          ]
+        : [];
     body.push(
       `${DIM}${tr.text("skillhub.panel.tabs")}${RESET} ${tabParts.join(" ")}`,
     );
     if (catParts.length > 0) {
       body.push(
-        `${DIM}${tr.text("skillhub.panel.cats")}${RESET} ${
-          catParts.join(" · ")
-        }`,
+        `${DIM}${tr.text("skillhub.panel.cats")}${RESET} ${catParts.join(
+          " · ",
+        )}`,
       );
     }
     if (this.#query !== "") {
@@ -652,21 +659,21 @@ export class SkillHubPanel implements DialogController {
             row.scope,
             row.version,
             row.local ? tr.text("skillhub.panel.local") : marks.join(","),
-          ].filter((v) => v !== "").join(" · "),
+          ]
+            .filter((v) => v !== "")
+            .join(" · "),
         });
       });
       if (this.#installed.length > 12) {
         body.splice(
           body.length - 1,
           0,
-          `${DIM}${
-            tr.text(
-              "skillhub.panel.showing",
-              window[0] + 1,
-              window[1],
-              this.#installed.length,
-            )
-          }${RESET}`,
+          `${DIM}${tr.text(
+            "skillhub.panel.showing",
+            window[0] + 1,
+            window[1],
+            this.#installed.length,
+          )}${RESET}`,
         );
       }
     } else {
@@ -695,19 +702,19 @@ export class SkillHubPanel implements DialogController {
           description: [
             item.description,
             downloads > 0 ? tr.text("skillhub.panel.downloads", downloads) : "",
-          ].filter((v) => v !== "").join(" — "),
+          ]
+            .filter((v) => v !== "")
+            .join(" — "),
         });
       });
       if (this.#items.length > 0 || this.#totalPages > 1) {
         body.push(
-          `${DIM}${
-            tr.text(
-              "skillhub.panel.page",
-              this.#page,
-              this.#totalPages,
-              this.#items.length,
-            )
-          }${RESET}`,
+          `${DIM}${tr.text(
+            "skillhub.panel.page",
+            this.#page,
+            this.#totalPages,
+            this.#items.length,
+          )}${RESET}`,
         );
       }
     }
@@ -739,29 +746,23 @@ export class SkillHubPanel implements DialogController {
       body.push(`${BOLD}${d.displayName || d.name}${RESET} (${d.id})`);
       if (d.description !== "") body.push(d.description);
       body.push(
-        `${DIM}${
-          tr.text(
-            "skillhub.panel.meta",
-            d.market,
-            d.version,
-            d.author !== "" ? d.author : "-",
-            d.category !== "" ? d.category : "-",
-          )
-        }${RESET}`,
+        `${DIM}${tr.text(
+          "skillhub.panel.meta",
+          d.market,
+          d.version,
+          d.author !== "" ? d.author : "-",
+          d.category !== "" ? d.category : "-",
+        )}${RESET}`,
       );
       if (d.installed?.installed === true) {
         const st = d.installed;
         body.push(
-          `${GREEN_MARK}${
-            tr.text(
-              "skillhub.panel.installed_at",
-              st.scope,
-              st.version ?? "",
-              st.updateAvailable === true
-                ? tr.text("skillhub.panel.update")
-                : "",
-            )
-          }${RESET}`,
+          `${GREEN_MARK}${tr.text(
+            "skillhub.panel.installed_at",
+            st.scope,
+            st.version ?? "",
+            st.updateAvailable === true ? tr.text("skillhub.panel.update") : "",
+          )}${RESET}`,
         );
       }
       if (Array.isArray(d.tags) && d.tags.length > 0) {
@@ -785,10 +786,7 @@ export class SkillHubPanel implements DialogController {
     const item = this.#pendingInstall;
     return {
       title: tr.text("skillhub.panel.scope_title"),
-      body: [
-        tr.text("skillhub.panel.scope_body", item?.name ?? ""),
-        "",
-      ],
+      body: [tr.text("skillhub.panel.scope_body", item?.name ?? ""), ""],
       items: this.#scopeOptions().map((s, i) => ({
         ...s,
         current: i === this.#scopeCursor,
@@ -803,9 +801,8 @@ export class SkillHubPanel implements DialogController {
   }
 
   #clampCursor(): void {
-    const total = this.#tab === "installed"
-      ? this.#installed.length
-      : this.#items.length;
+    const total =
+      this.#tab === "installed" ? this.#installed.length : this.#items.length;
     if (this.#cursor >= total) this.#cursor = Math.max(total - 1, 0);
   }
 }
@@ -844,14 +841,16 @@ export function installedEntries(
   globalDir: string,
   projectDirs: string[],
 ): SkillHubInstalledEntry[] {
-  return createLocalIndex(globalDir, projectDirs).list().map((s) => ({
-    dir: s.dir,
-    scope: s.scope,
-    version: s.version ?? "",
-    market: s.market ?? "",
-    id: s.id ?? "",
-    name: s.name ?? s.dir,
-    local: s.local === true,
-    updateAvailable: s.updateAvailable === true,
-  }));
+  return createLocalIndex(globalDir, projectDirs)
+    .list()
+    .map((s) => ({
+      dir: s.dir,
+      scope: s.scope,
+      version: s.version ?? "",
+      market: s.market ?? "",
+      id: s.id ?? "",
+      name: s.name ?? s.dir,
+      local: s.local === true,
+      updateAvailable: s.updateAvailable === true,
+    }));
 }

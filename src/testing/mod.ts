@@ -1,21 +1,22 @@
 // Test compatibility surface for the Node.js test runner.
 //
-// The repository used to declare tests with `Deno.test(...)` under the Deno
+// The repository used to declare tests with `nodeRuntime.test(...)` under the Node
 // CLI. It now runs on `node:test`, and this module is the single owner of that
 // transition: every test file imports `test` from here (via `#testing`) rather
 // than reaching for a runtime global.
 //
-// `test()` keeps the Deno declaration shapes so the ~2300 existing call sites
+// `test()` keeps the Node declaration shapes so the ~2300 existing call sites
 // needed only an import change:
 //   test("name", fn)
 //   test({ name, ...options }, fn)
 //
-// Deno-only option fields (`sanitizeOps`, `sanitizeResources`, `ignore`) are
+// Node-only option fields (`sanitizeOps`, `sanitizeResources`, `ignore`) are
 // accepted and ignored: Node has no op/resource sanitizer, and leaks are caught
 // by explicit assertions instead. A `time` option maps onto Node's per-test
 // timeout; omitting it leaves Node's default of "no timeout" in place, which is
 // what the long-task continuity policy wants.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import nodeTest from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -25,18 +26,19 @@ export type TestContext = import("node:test").TestContext;
 /** Options accepted alongside a test name (superset of the node:test ones). */
 export interface TestOptions {
   name?: string;
+  fn?: TestBody;
   only?: boolean;
   skip?: boolean | string;
   todo?: boolean | string;
-  /** Execution budget in milliseconds (Deno semantics). */
+  /** Execution budget in milliseconds (Node semantics). */
   time?: number;
   concurrency?: number | boolean;
   signal?: AbortSignal;
-  /** @deprecated Deno-only op sanitizer toggle; kept for call-site parity. */
+  /** @deprecated Node-only op sanitizer toggle; kept for call-site parity. */
   sanitizeOps?: boolean;
-  /** @deprecated Deno-only resource sanitizer toggle; kept for call-site parity. */
+  /** @deprecated Node-only resource sanitizer toggle; kept for call-site parity. */
   sanitizeResources?: boolean;
-  /** @deprecated Deno-only lint escape; kept for call-site parity. */
+  /** @deprecated Node-only lint escape; kept for call-site parity. */
   ignore?: boolean;
 }
 
@@ -61,12 +63,13 @@ function normalize(
   if (typeof target === "string") {
     name = target;
   } else if (typeof target === "function") {
-    // Deno allows `test(function foo() {})`; the name comes from the function.
+    // Node allows `test(function foo() {})`; the name comes from the function.
     name = target.name || "anonymous";
     fn = fn ?? ((context: any) => (target as (...a: any[]) => any)(context));
   } else if (target && typeof target === "object") {
     const {
       name: optionName,
+      fn: optionFn,
       time,
       sanitizeOps: _sanitizeOps,
       sanitizeResources: _sanitizeResources,
@@ -74,6 +77,7 @@ function normalize(
       ...rest
     } = target;
     name = optionName ?? "";
+    fn = fn ?? optionFn;
     options = { ...rest };
     if (typeof time === "number" && time > 0) options.timeout = time;
   }
@@ -82,9 +86,33 @@ function normalize(
   return { name, options, fn };
 }
 
+/**
+ * Node's `t.step(...)` runs a named subtest. Node's test context exposes
+ * `t.test(...)` for the same purpose, so map one onto the other when the body
+ * receives a context that lacks `step`.
+ */
+function attachStep(context: any): any {
+  if (!context || typeof context === "object") {
+    if (
+      typeof context?.step !== "function" &&
+      typeof context?.test === "function"
+    ) {
+      try {
+        context.step = (name: string, body: (t: any) => unknown) =>
+          context.test(name, body);
+      } catch {
+        // A frozen context is fine; the body simply will not get `step`.
+      }
+    }
+  }
+  return context;
+}
+
 function declare(marker: Marker, target: TestTarget, body?: TestBody): void {
   const { name, options, fn } = normalize(target, body);
-  register(name, { ...marker, ...options }, fn);
+  register(name, { ...marker, ...options }, (context) =>
+    fn(attachStep(context)),
+  );
 }
 
 /** Registers one test with the Node test runner. */
@@ -104,7 +132,7 @@ test.skip = (target: TestTarget, body?: TestBody): void =>
 test.todo = (target: TestTarget, body?: TestBody): void =>
   declare({ todo: true }, target, body);
 
-/** Grouping and BDD aliases, mirroring the `Deno.test` suite helpers. */
+/** Grouping and BDD aliases, mirroring the `nodeRuntime.test` suite helpers. */
 test.describe = nodeTest.describe.bind(nodeTest);
 test.it = nodeTest.it.bind(nodeTest);
 test.suite = nodeTest.suite?.bind(nodeTest);
@@ -113,7 +141,7 @@ test.afterEach = nodeTest.afterEach?.bind(nodeTest);
 test.before = nodeTest.before?.bind(nodeTest);
 test.after = nodeTest.after?.bind(nodeTest);
 
-/** Waits `ms` with a real timer (replaces ad-hoc Deno sleep helpers). */
+/** Waits `ms` with a real timer (replaces ad-hoc Node sleep helpers). */
 export const sleep = delay;
 
 /** Minimal deferred promise for tests that wait on an event. */

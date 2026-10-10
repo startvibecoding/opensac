@@ -60,7 +60,8 @@ export async function runKnowledgeBaseCronJob(
   const snapshot = await job.wait(ctx);
   return {
     handled: true,
-    response: `indexed knowledge base ${id}: ${snapshot.fileCount} files, ` +
+    response:
+      `indexed knowledge base ${id}: ${snapshot.fileCount} files, ` +
       `${snapshot.chunkCount} chunks`,
   };
 }

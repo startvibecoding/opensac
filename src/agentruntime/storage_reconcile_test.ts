@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -23,8 +24,10 @@ function inputTestSession(): {
   workDir: string;
   sessionId: string;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-reconcile-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "opensac-reconcile-work-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-reconcile-" });
+  const workDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-reconcile-work-",
+  });
   const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
@@ -59,18 +62,18 @@ function writeArtifactDirectory(
   content: string,
 ): string {
   const dir = path.join(sessionDir, artifactStorageDirectoryName(), id);
-  Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  nodeRuntime.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, "content");
-  Deno.writeTextFileSync(file, content);
+  nodeRuntime.writeTextFileSync(file, content);
   const stamp = new Date(Date.now() - ageMs);
-  Deno.utimeSync(file, stamp, stamp);
-  Deno.utimeSync(dir, stamp, stamp);
+  nodeRuntime.utimeSync(file, stamp, stamp);
+  nodeRuntime.utimeSync(dir, stamp, stamp);
   return file;
 }
 
 function exists(p: string): boolean {
   try {
-    Deno.statSync(p);
+    nodeRuntime.statSync(p);
     return true;
   } catch {
     return false;
@@ -110,7 +113,7 @@ test("ReconcileArtifactStorageReclaimsOnlyAgedUnreferenced", async () => {
       artifactStorageDirectoryName(),
       "2123456789abcdef",
     );
-    Deno.mkdirSync(path.join(nested, "subdir"), { recursive: true });
+    nodeRuntime.mkdirSync(path.join(nested, "subdir"), { recursive: true });
 
     const report = await reconcileArtifactStorage(root, policy, now);
     assertEquals(report.removed, 1);
@@ -131,7 +134,7 @@ test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () => {
   const policy = defaultAttachmentPolicy();
   const now = new Date();
 
-  const missingDB = Deno.makeTempDirSync({ prefix: "opensac-nodb-" });
+  const missingDB = nodeRuntime.makeTempDirSync({ prefix: "opensac-nodb-" });
   const orphan = writeArtifactDirectory(
     missingDB,
     "0123456789abcdef",
@@ -147,14 +150,16 @@ test("ReconcileArtifactStorageFailsClosedWithoutKnownReferences", async () => {
   assertEquals(threw, true);
   assert(exists(orphan));
 
-  const corruptDB = Deno.makeTempDirSync({ prefix: "opensac-corruptdb-" });
+  const corruptDB = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-corruptdb-",
+  });
   const orphan2 = writeArtifactDirectory(
     corruptDB,
     "0123456789abcdef",
     policy.retention + artifactReconcileGraceMs + 60 * 60 * 1000,
     "bytes",
   );
-  Deno.writeTextFileSync(rootDBPath(corruptDB), "not a sqlite database");
+  nodeRuntime.writeTextFileSync(rootDBPath(corruptDB), "not a sqlite database");
   threw = false;
   try {
     await reconcileArtifactStorage(corruptDB, policy, now);
@@ -171,10 +176,12 @@ test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
   void sessionId;
   try {
     const policy = defaultAttachmentPolicy();
-    const victimDir = Deno.makeTempDirSync({ prefix: "opensac-victim-" });
+    const victimDir = nodeRuntime.makeTempDirSync({
+      prefix: "opensac-victim-",
+    });
     const victimFile = path.join(victimDir, "precious");
-    Deno.writeTextFileSync(victimFile, "do not delete");
-    Deno.mkdirSync(path.join(root, artifactStorageDirectoryName()), {
+    nodeRuntime.writeTextFileSync(victimFile, "do not delete");
+    nodeRuntime.mkdirSync(path.join(root, artifactStorageDirectoryName()), {
       recursive: true,
     });
     const link = path.join(
@@ -183,12 +190,12 @@ test("ReconcileArtifactStorageNeverFollowsSymlinks", async () => {
       "3123456789abcdef",
     );
     try {
-      Deno.symlinkSync(victimDir, link, { type: "dir" });
+      nodeRuntime.symlinkSync(victimDir, link, { type: "dir" });
     } catch {
       return; // platform cannot create a directory symlink
     }
     const stamp = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    Deno.utimeSync(victimFile, stamp, stamp);
+    nodeRuntime.utimeSync(victimFile, stamp, stamp);
 
     const report = await reconcileArtifactStorage(root, policy, new Date());
     assertEquals(report.removed, 0);
@@ -216,8 +223,8 @@ test("ReconcileArtifactStorageOpportunisticRunsOncePerInterval", async () => {
     // The throttle window suppresses the second immediate pass.
     assertEquals(exists(second), true);
 
-    artifactReconcileThrottle.lastNanos = (Date.now() - 2 * 60 * 60 * 1000) *
-      1e6;
+    artifactReconcileThrottle.lastNanos =
+      (Date.now() - 2 * 60 * 60 * 1000) * 1e6;
     reconcileArtifactStorageOpportunistic(root, policy);
     await waitFor(() => !exists(second));
     assertEquals(exists(second), false);
@@ -230,8 +237,8 @@ test("ReconcileArtifactStorageOpportunisticRunsOncePerInterval", async () => {
 test("ArtifactReclaimFloorIsRetentionPlusGrace", () => {
   const now = new Date(Date.UTC(2026, 0, 2, 3, 4, 5));
   const floor = artifactReclaimFloor(defaultAttachmentPolicy(), now);
-  const want = now.getTime() -
-    (7 * 24 * 60 * 60 * 1000 + artifactReconcileGraceMs);
+  const want =
+    now.getTime() - (7 * 24 * 60 * 60 * 1000 + artifactReconcileGraceMs);
   assertEquals(floor.getTime(), want);
 });
 

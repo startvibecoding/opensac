@@ -189,7 +189,7 @@ export class CoreSessionNotResidentError extends Error {
   override name = "CoreSessionNotResidentError";
   readonly code = CORE_ERROR_SESSION_NOT_RESIDENT;
 
-    readonly sessionId: string;
+  readonly sessionId: string;
 
   constructor(sessionId: string) {
     super(`session not found: ${sessionId}`);
@@ -210,9 +210,12 @@ function parseSessionConfigFields(
   object: Record<string, unknown>,
 ): CoreSessionConfigFields | undefined {
   const result: CoreSessionConfigFields = {};
-  for (
-    const key of ["providerName", "modelID", "mode", "thinkingLevel"] as const
-  ) {
+  for (const key of [
+    "providerName",
+    "modelID",
+    "mode",
+    "thinkingLevel",
+  ] as const) {
     const value = optionalString(object, key);
     if (value === null) return undefined;
     if (value !== undefined) result[key] = value;
@@ -223,21 +226,18 @@ function parseSessionConfigFields(
   return result;
 }
 
-export function parseSessionCreateParams(
-  params: CoreRpcParams | undefined,
-):
+export function parseSessionCreateParams(params: CoreRpcParams | undefined):
   | ({
-    workDir: string;
-    sessionId?: string;
-    source?: string;
-    approvalPolicy?: string;
-    questionPolicy?: string;
-  } & CoreSessionConfigFields)
+      workDir: string;
+      sessionId?: string;
+      source?: string;
+      approvalPolicy?: string;
+      questionPolicy?: string;
+    } & CoreSessionConfigFields)
   | undefined {
   const object = runtimeParamsObject(params);
-  const workDir = object === undefined
-    ? undefined
-    : requiredString(object, "workDir");
+  const workDir =
+    object === undefined ? undefined : requiredString(object, "workDir");
   if (object === undefined || workDir === undefined) return undefined;
   const fields = parseSessionConfigFields(object);
   if (fields === undefined) return undefined;
@@ -246,7 +246,9 @@ export function parseSessionCreateParams(
   const approvalPolicy = optionalString(object, "approvalPolicy");
   const questionPolicy = optionalString(object, "questionPolicy");
   if (
-    sessionId === null || source === null || approvalPolicy === null ||
+    sessionId === null ||
+    source === null ||
+    approvalPolicy === null ||
     questionPolicy === null
   ) {
     return undefined;
@@ -271,9 +273,8 @@ export function parseSessionIdParams(
   params: CoreRpcParams | undefined,
 ): { sessionId: string } | undefined {
   const object = runtimeParamsObject(params);
-  const sessionId = object === undefined
-    ? undefined
-    : requiredString(object, "sessionId");
+  const sessionId =
+    object === undefined ? undefined : requiredString(object, "sessionId");
   return sessionId === undefined ? undefined : { sessionId };
 }
 
@@ -324,19 +325,19 @@ export function parseRunParams(
     : { sessionId, runId };
 }
 
-export function parsePromptParams(
-  params: CoreRpcParams | undefined,
-): {
-  sessionId: string;
-  text: string;
-  attachments?: string[];
-  metadata?: Record<string, unknown>;
-  providerName?: string;
-  modelID?: string;
-  mode?: string;
-  thinkingLevel?: string;
-  preparedInputs?: CorePreparedInput[];
-} | undefined {
+export function parsePromptParams(params: CoreRpcParams | undefined):
+  | {
+      sessionId: string;
+      text: string;
+      attachments?: string[];
+      metadata?: Record<string, unknown>;
+      providerName?: string;
+      modelID?: string;
+      mode?: string;
+      thinkingLevel?: string;
+      preparedInputs?: CorePreparedInput[];
+    }
+  | undefined {
   const object = runtimeParamsObject(params);
   if (object === undefined) return undefined;
   const sessionId = requiredString(object, "sessionId");
@@ -370,7 +371,8 @@ export function parseSkillParams(
   const name = requiredString(object, "name");
   const active = object.active;
   if (
-    sessionId === undefined || name === undefined ||
+    sessionId === undefined ||
+    name === undefined ||
     typeof active !== "boolean"
   ) {
     return undefined;
@@ -379,15 +381,15 @@ export function parseSkillParams(
 }
 
 /** Parses one prepared-input materialization request. */
-export function parsePrepareParams(
-  params: CoreRpcParams | undefined,
-): {
-  sessionId: string;
-  name: string;
-  mediaType: string;
-  contentBase64: string;
-  kind?: string;
-} | undefined {
+export function parsePrepareParams(params: CoreRpcParams | undefined):
+  | {
+      sessionId: string;
+      name: string;
+      mediaType: string;
+      contentBase64: string;
+      kind?: string;
+    }
+  | undefined {
   const object = runtimeParamsObject(params);
   if (object === undefined) return undefined;
   const sessionId = requiredString(object, "sessionId");
@@ -396,8 +398,12 @@ export function parsePrepareParams(
   const contentBase64 = optionalString(object, "contentBase64");
   const kind = optionalString(object, "kind");
   if (
-    sessionId === undefined || name === undefined || mediaType === null ||
-    contentBase64 === null || contentBase64 === undefined || kind === null
+    sessionId === undefined ||
+    name === undefined ||
+    mediaType === null ||
+    contentBase64 === null ||
+    contentBase64 === undefined ||
+    kind === null
   ) {
     return undefined;
   }
@@ -473,7 +479,8 @@ export function parseCapabilitySetParams(
   const id = requiredString(object, "id");
   const enabled = object.enabled;
   if (
-    sessionId === undefined || id === undefined ||
+    sessionId === undefined ||
+    id === undefined ||
     typeof enabled !== "boolean"
   ) {
     return undefined;
@@ -491,22 +498,21 @@ const ESM_ACTIONS = new Set([
 ]);
 
 /** Parses one ESM supervisor mutation request. */
-export function parseEsmCommandParams(
-  params: CoreRpcParams | undefined,
-):
+export function parseEsmCommandParams(params: CoreRpcParams | undefined):
   | {
-    sessionId: string;
-    action: "create" | "edit" | "pause" | "resume" | "guide" | "clear";
-    objective?: string;
-    guide?: string;
-  }
+      sessionId: string;
+      action: "create" | "edit" | "pause" | "resume" | "guide" | "clear";
+      objective?: string;
+      guide?: string;
+    }
   | undefined {
   const object = runtimeParamsObject(params);
   if (object === undefined) return undefined;
   const sessionId = requiredString(object, "sessionId");
   const action = object.action;
   if (
-    sessionId === undefined || typeof action !== "string" ||
+    sessionId === undefined ||
+    typeof action !== "string" ||
     !ESM_ACTIONS.has(action)
   ) {
     return undefined;
@@ -517,28 +523,21 @@ export function parseEsmCommandParams(
   return {
     sessionId,
     action: action as
-      | "create"
-      | "edit"
-      | "pause"
-      | "resume"
-      | "guide"
-      | "clear",
+      "create" | "edit" | "pause" | "resume" | "guide" | "clear",
     ...(objective === undefined ? {} : { objective }),
     ...(guide === undefined ? {} : { guide }),
   };
 }
 
 /** Parses one transient side-query request. */
-export function parseTransientPromptParams(
-  params: CoreRpcParams | undefined,
-):
+export function parseTransientPromptParams(params: CoreRpcParams | undefined):
   | {
-    sessionId: string;
-    question: string;
-    providerName?: string;
-    modelID?: string;
-    thinkingLevel?: string;
-  }
+      sessionId: string;
+      question: string;
+      providerName?: string;
+      modelID?: string;
+      thinkingLevel?: string;
+    }
   | undefined {
   const object = runtimeParamsObject(params);
   if (object === undefined) return undefined;
@@ -562,16 +561,16 @@ export function parseTransientPromptParams(
   };
 }
 
-export function parseConfigParams(
-  params: CoreRpcParams | undefined,
-): {
-  sessionId: string;
-  mode?: string;
-  thinkingLevel?: string;
-  providerName?: string;
-  modelID?: string;
-  capabilities?: Record<string, boolean>;
-} | undefined {
+export function parseConfigParams(params: CoreRpcParams | undefined):
+  | {
+      sessionId: string;
+      mode?: string;
+      thinkingLevel?: string;
+      providerName?: string;
+      modelID?: string;
+      capabilities?: Record<string, boolean>;
+    }
+  | undefined {
   const object = runtimeParamsObject(params);
   if (object === undefined) return undefined;
   const sessionId = requiredString(object, "sessionId");
@@ -584,9 +583,12 @@ export function parseConfigParams(
     modelID?: string;
     capabilities?: Record<string, boolean>;
   } = { sessionId };
-  for (
-    const key of ["mode", "thinkingLevel", "providerName", "modelID"] as const
-  ) {
+  for (const key of [
+    "mode",
+    "thinkingLevel",
+    "providerName",
+    "modelID",
+  ] as const) {
     const value = object[key];
     if (value !== undefined) {
       if (typeof value !== "string") return undefined;
@@ -596,9 +598,11 @@ export function parseConfigParams(
   const capabilities = object.capabilities;
   if (capabilities !== undefined) {
     if (
-      capabilities === null || typeof capabilities !== "object" ||
+      capabilities === null ||
+      typeof capabilities !== "object" ||
       Array.isArray(capabilities)
-    ) return undefined;
+    )
+      return undefined;
     const parsed: Record<string, boolean> = {};
     for (const [key, value] of Object.entries(capabilities)) {
       if (typeof value !== "boolean") return undefined;
@@ -616,9 +620,7 @@ export type CoreSettingsReadScope = "effective" | "global";
 export type CoreSettingsWriteScope = "global" | "project";
 
 /** Parses the optional work directory carried by config-level requests. */
-function parseOptionalWorkDir(
-  object: Record<string, unknown>,
-): string | null {
+function parseOptionalWorkDir(object: Record<string, unknown>): string | null {
   const value = optionalString(object, "workDir");
   if (value === null) return null;
   return value ?? "";
@@ -658,14 +660,12 @@ export function parseSettingsReadParams(
 }
 
 /** Parses one settings-document sparse patch request. */
-export function parseSettingsUpdateParams(
-  params: CoreRpcParams | undefined,
-):
+export function parseSettingsUpdateParams(params: CoreRpcParams | undefined):
   | {
-    scope: CoreSettingsWriteScope;
-    updates: Record<string, unknown>;
-    workDir: string;
-  }
+      scope: CoreSettingsWriteScope;
+      updates: Record<string, unknown>;
+      workDir: string;
+    }
   | undefined {
   const object = runtimeParamsObject(params);
   if (object === undefined) return undefined;

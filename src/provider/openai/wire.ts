@@ -98,10 +98,7 @@ export function limitImageHistory(
  * `arguments` normally holds a decoded JSON value; a string is passed through
  * verbatim (this is how `invalidArguments` is represented after normalization).
  */
-export function toolArgumentsString(
-  args: unknown,
-  invalid?: string,
-): string {
+export function toolArgumentsString(args: unknown, invalid?: string): string {
   if (invalid !== undefined && invalid !== "") return invalid;
   if (args === undefined || args === null) return "";
   if (typeof args === "string") return args;

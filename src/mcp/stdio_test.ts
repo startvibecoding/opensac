@@ -2,6 +2,7 @@
 // Real stdio MCP handshakes against shell fixtures (Unix only), plus the
 // command-resolution and environment helpers.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { encodeBase64 } from "../compat/encoding.ts";
 import { Image } from "imagescript";
@@ -17,16 +18,16 @@ import {
 } from "./mcp.ts";
 import { test } from "#testing";
 
-const isWindows = Deno.build.os === "windows";
+const isWindows = runtime.build.os === "windows";
 
 function writeExecutable(filePath: string, content: string): void {
-  Deno.writeTextFileSync(filePath, content);
-  Deno.chmodSync(filePath, 0o755);
+  runtime.writeTextFileSync(filePath, content);
+  runtime.chmodSync(filePath, 0o755);
 }
 
 test("resolveMCPCommand uses configured PATH", () => {
   if (isWindows) return;
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const command = path.join(dir, "mcp-test-command");
   writeExecutable(command, "#!/bin/sh\nexit 0\n");
   const resolved = resolveMCPCommand("mcp-test-command", { PATH: dir });
@@ -35,8 +36,8 @@ test("resolveMCPCommand uses configured PATH", () => {
 
 test("mergeMCPEnvironment overrides inherited values", () => {
   if (isWindows) return;
-  const prev = Deno.env.get("MCP_TEST_INHERITED");
-  Deno.env.set("MCP_TEST_INHERITED", "old");
+  const prev = runtime.env.get("MCP_TEST_INHERITED");
+  runtime.env.set("MCP_TEST_INHERITED", "old");
   try {
     const env = mergeMCPEnvironment([
       { name: "MCP_TEST_INHERITED", value: "new" },
@@ -45,14 +46,14 @@ test("mergeMCPEnvironment overrides inherited values", () => {
     assertEquals(env["MCP_TEST_INHERITED"], "new");
     assertEquals(env["MCP_TEST_ADDED"], "added");
   } finally {
-    if (prev === undefined) Deno.env.delete("MCP_TEST_INHERITED");
-    else Deno.env.set("MCP_TEST_INHERITED", prev);
+    if (prev === undefined) runtime.env.delete("MCP_TEST_INHERITED");
+    else runtime.env.set("MCP_TEST_INHERITED", prev);
   }
 });
 
 test("MCP stdio command from PATH receives configured environment", async () => {
   if (isWindows) return;
-  const commandDir = Deno.makeTempDirSync();
+  const commandDir = runtime.makeTempDirSync();
   const commandPath = path.join(commandDir, "mcp-stdio-fixture");
   const fixture = String.raw`#!/bin/sh
 while IFS= read -r line; do
@@ -76,30 +77,35 @@ done
 `;
   writeExecutable(commandPath, fixture);
 
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    runtime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.registerDefaults();
   const sep = ":";
   const clients = await connectServers(
     new AbortController().signal,
-    [{
-      name: "path-fixture",
-      type: "stdio",
-      command: path.basename(commandPath),
-      env: [
-        {
-          name: "PATH",
-          value: commandDir + sep + (Deno.env.get("PATH") ?? ""),
-        },
-        { name: "MCP_FIXTURE_VALUE", value: "from-config" },
-      ],
-    }],
+    [
+      {
+        name: "path-fixture",
+        type: "stdio",
+        command: path.basename(commandPath),
+        env: [
+          {
+            name: "PATH",
+            value: commandDir + sep + (runtime.env.get("PATH") ?? ""),
+          },
+          { name: "MCP_FIXTURE_VALUE", value: "from-config" },
+        ],
+      },
+    ],
     registry,
     {},
   );
   try {
-    const envTool = registry.all().find((t: Tool) =>
-      t.name().includes("_env_echo")
-    );
+    const envTool = registry
+      .all()
+      .find((t: Tool) => t.name().includes("_env_echo"));
     assert(envTool, "stdio command did not register env_echo tool");
     const result = await envTool!.execute({}, {});
     assertEquals(result.text, "env:from-config");
@@ -117,10 +123,13 @@ test("MCP stdio image tool result carries image content", async () => {
   img.bitmap[3] = 255;
   const payload = encodeBase64(await img.encode());
 
-  const commandDir = Deno.makeTempDirSync();
+  const commandDir = runtime.makeTempDirSync();
   const commandPath = path.join(commandDir, "mcp-image-fixture");
-  const fixture = String.raw`#!/bin/sh
-png=` + payload + String.raw`
+  const fixture =
+    String.raw`#!/bin/sh
+png=` +
+    payload +
+    String.raw`
 while IFS= read -r line; do
   id=$(printf '%s\n' "$line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
   method=$(printf '%s\n' "$line" | sed -n 's/.*"method":"\([^"]*\)".*/\1/p')
@@ -142,28 +151,33 @@ done
 `;
   writeExecutable(commandPath, fixture);
 
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    runtime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.registerDefaults();
   const clients = await connectServers(
     new AbortController().signal,
-    [{
-      name: "image-fixture",
-      type: "stdio",
-      command: path.basename(commandPath),
-      env: [
-        {
-          name: "PATH",
-          value: commandDir + ":" + (Deno.env.get("PATH") ?? ""),
-        },
-      ],
-    }],
+    [
+      {
+        name: "image-fixture",
+        type: "stdio",
+        command: path.basename(commandPath),
+        env: [
+          {
+            name: "PATH",
+            value: commandDir + ":" + (runtime.env.get("PATH") ?? ""),
+          },
+        ],
+      },
+    ],
     registry,
     {},
   );
   try {
-    const imageTool = registry.all().find((t: Tool) =>
-      t.name().includes("_screenshot")
-    );
+    const imageTool = registry
+      .all()
+      .find((t: Tool) => t.name().includes("_screenshot"));
     assert(imageTool, "stdio fixture did not register its screenshot tool");
     const result = await imageTool!.execute({}, {});
     assert(result.text.includes("captured"), result.text);

@@ -148,10 +148,12 @@ export async function lintWorkflowSourceWithin(
   return res;
 }
 
-function workflowStateOf(err: unknown): {
-  status: string;
-  results?: Record<string, AgentResult>;
-} | undefined {
+function workflowStateOf(err: unknown):
+  | {
+      status: string;
+      results?: Record<string, AgentResult>;
+    }
+  | undefined {
   const state = (err as { workflowState?: unknown }).workflowState;
   if (state !== undefined && state !== null) {
     return state as { status: string; results?: Record<string, AgentResult> };
@@ -159,9 +161,7 @@ function workflowStateOf(err: unknown): {
   return undefined;
 }
 
-function sortedResultKeys(
-  results: Record<string, AgentResult>,
-): string[] {
+function sortedResultKeys(results: Record<string, AgentResult>): string[] {
   const keys = Object.keys(results);
   return sortedStrings(keys);
 }
@@ -224,11 +224,7 @@ export class RunTool implements Tool {
   #store?: Store;
   #active: ActiveRegistry;
 
-  constructor(
-    manager?: AgentManager,
-    store?: Store,
-    active?: ActiveRegistry,
-  ) {
+  constructor(manager?: AgentManager, store?: Store, active?: ActiveRegistry) {
     this.#manager = manager;
     this.#store = store;
     this.#active = active ?? createActiveRegistry();
@@ -279,9 +275,10 @@ export class RunTool implements Tool {
     };
   }
 
-  executionTimeout(
-    params: Record<string, unknown>,
-  ): { durationMs: number; provided: boolean } {
+  executionTimeout(params: Record<string, unknown>): {
+    durationMs: number;
+    provided: boolean;
+  } {
     const raw = params.timeoutSeconds;
     if (raw === undefined) return { durationMs: 0, provided: false };
     const seconds = numericParam(raw);
@@ -339,11 +336,15 @@ export class RunTool implements Tool {
               break;
           }
         }
-        forwardChildAgentEvent(sink, `workflow:${ev.runId}` as AgentID, {
-          type: eventType,
-          statusMessage: msg,
-          error: eventErr,
-        } as PublicEvent);
+        forwardChildAgentEvent(
+          sink,
+          `workflow:${ev.runId}` as AgentID,
+          {
+            type: eventType,
+            statusMessage: msg,
+            error: eventErr,
+          } as PublicEvent,
+        );
       },
     });
 
@@ -519,12 +520,14 @@ export function registerWorkflowTools(
 
 /** Serializes a completed workflow run into the `workflow_run` tool result. */
 export function runToolResult(state: RunState): ToolResult {
-  return createTextToolResult(JSON.stringify({
-    id: state.id,
-    name: state.name,
-    status: state.status,
-    results: summarizeResults(state),
-  }));
+  return createTextToolResult(
+    JSON.stringify({
+      id: state.id,
+      name: state.name,
+      status: state.status,
+      results: summarizeResults(state),
+    }),
+  );
 }
 
 /** Maps each stored result key to its terminal status. */

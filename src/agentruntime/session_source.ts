@@ -40,7 +40,9 @@ export function resolveManagerSource(
     input = { ...input, sessionHeader: manager.getHeader() };
     const header = input.sessionHeader;
     if (
-      header !== null && header !== undefined && header.id !== "" &&
+      header !== null &&
+      header !== undefined &&
+      header.id !== "" &&
       manager.getSessionDir() !== ""
     ) {
       return resolveSourceFromSession(

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -62,7 +63,7 @@ test("SkillHubDetailAcceptsCurrentVersionTagsAndStatsShape", async () => {
   const client = fakeHttpClient(() =>
     jsonResponse(
       `{"latestVersion":{"version":"1.0.0","createdAt":1774758863165},"owner":{"displayName":"claudiodrusus","handle":"claudiodrusus"},"skill":{"slug":"skill-1","displayName":"Skill 1","summary":"Generate QR codes","tags":{"latest":"1.0.0"},"stats":{"downloads":1238,"installs":43,"stars":2}}}`,
-    )
+    ),
   );
   const detail = await createSkillHubClient("https://api.test", client).detail(
     undefined,
@@ -134,7 +135,7 @@ test("ClawHubDetailAcceptsSlugEnvelope", async () => {
   const client = fakeHttpClient(() =>
     jsonResponse(
       `{"skill":{"slug":"drivethru-operations","displayName":"Drivethru Operations","summary":"Operations","updatedAt":1784072685483},"latestVersion":{"version":"0.1.0"},"owner":{"displayName":"zmtucker"},"moderation":{"verdict":"clean"}}`,
-    )
+    ),
   );
   const detail = await createClawHubClient("https://api.test", client).detail(
     undefined,
@@ -177,7 +178,7 @@ test("InstallValidatesArchiveAndWritesMetadata", async () => {
     version: "1.0.0",
   });
   client.archive = archive;
-  const target = path.join(await Deno.makeTempDir(), ".opensac", "skills");
+  const target = path.join(await runtime.makeTempDir(), ".opensac", "skills");
   const result = await installSkill(undefined, client, {
     market: "skillhub.cn",
     id: "test-skill",
@@ -186,7 +187,7 @@ test("InstallValidatesArchiveAndWritesMetadata", async () => {
   });
   assert(result.installed);
   assertEquals(result.dir, path.join(target, "test-skill"));
-  const data = await Deno.readTextFile(path.join(result.dir, "SKILL.md"));
+  const data = await runtime.readTextFile(path.join(result.dir, "SKILL.md"));
   assertEquals(data, "# Test\n");
   const metadata = readMetadata(result.dir);
   assertEquals(metadata.market, "skillhub.cn");
@@ -207,7 +208,7 @@ test("InstallValidatesArchiveAndWritesMetadata", async () => {
 });
 
 test("InstallRejectsTraversalAndLocalSkill", async () => {
-  const target = await Deno.makeTempDir();
+  const target = await runtime.makeTempDir();
   const traversal = await makeArchive({ "../outside/SKILL.md": "# bad" });
   const client = new FakeMarketClient();
   client.detailValue = emptyDetail({
@@ -227,11 +228,11 @@ test("InstallRejectsTraversalAndLocalSkill", async () => {
     InvalidArchiveError,
   );
   await assertRejects(
-    () => Deno.stat(path.join(path.dirname(target), "outside")),
-    Deno.errors.NotFound,
+    () => runtime.stat(path.join(path.dirname(target), "outside")),
+    runtime.errors.NotFound,
   );
 
-  await Deno.mkdir(path.join(target, "local"), { recursive: true });
+  await runtime.mkdir(path.join(target, "local"), { recursive: true });
   const local = new FakeMarketClient();
   local.detailValue = emptyDetail({
     market: "skillhub.cn",
@@ -262,7 +263,7 @@ test("InstallRejectsTraversalAndLocalSkill", async () => {
 });
 
 test("InstallUpdatesManagedSkillAndRejectsDifferentOwner", async () => {
-  const target = await Deno.makeTempDir();
+  const target = await runtime.makeTempDir();
   const client = new FakeMarketClient();
   client.detailValue = emptyDetail({
     market: "skillhub.cn",
@@ -294,12 +295,13 @@ test("InstallUpdatesManagedSkillAndRejectsDifferentOwner", async () => {
     overwrite: true,
   });
   assertEquals(
-    await Deno.readTextFile(path.join(updated.dir, "SKILL.md")),
+    await runtime.readTextFile(path.join(updated.dir, "SKILL.md")),
     "version two",
   );
   assertEquals(readMetadata(updated.dir).version, "2.0.0");
-  const backups = [...Deno.readDirSync(path.join(target, ".backup"))]
-    .filter((e) => e.name.startsWith("managed-"));
+  const backups = [...runtime.readDirSync(path.join(target, ".backup"))].filter(
+    (e) => e.name.startsWith("managed-"),
+  );
   assertEquals(backups.length, 1);
 
   writeMetadata(first.dir, {
@@ -307,49 +309,52 @@ test("InstallUpdatesManagedSkillAndRejectsDifferentOwner", async () => {
     id: "another",
     version: "1",
   });
-  const error = await assertRejects(
-    () =>
-      installSkill(undefined, client, {
-        market: "skillhub.cn",
-        id: "managed",
-        version: "3.0.0",
-        targetDir: target,
-        overwrite: true,
-      }),
+  const error = await assertRejects(() =>
+    installSkill(undefined, client, {
+      market: "skillhub.cn",
+      id: "managed",
+      version: "3.0.0",
+      targetDir: target,
+      overwrite: true,
+    }),
   );
   assertStringIncludes((error as Error).message, "managed by");
 });
 
 test("LocalIndexMarksAvailableUpdate", async () => {
-  const root = await Deno.makeTempDir();
+  const root = await runtime.makeTempDir();
   const dir = path.join(root, "go");
-  await Deno.mkdir(dir, { recursive: true });
+  await runtime.mkdir(dir, { recursive: true });
   writeMetadata(dir, { market: "skillhub.cn", id: "go", version: "1.0.0" });
   const index = new LocalIndex("", [root]);
-  const items: SkillSummary[] = [{
-    ...emptyDetail(),
-    market: "skillhub.cn",
-    id: "go",
-    version: "2.0.0",
-  }];
+  const items: SkillSummary[] = [
+    {
+      ...emptyDetail(),
+      market: "skillhub.cn",
+      id: "go",
+      version: "2.0.0",
+    },
+  ];
   index.apply(items);
   assertEquals(items[0].installed?.updateAvailable, true);
 });
 
 test("ServiceOfficialAggregatesAndAppliesInstalled", async () => {
-  const global = await Deno.makeTempDir();
+  const global = await runtime.makeTempDir();
   const dir = path.join(global, "go-expert");
-  await Deno.mkdir(dir, { recursive: true });
+  await runtime.mkdir(dir, { recursive: true });
   writeMetadata(dir, { market: "skillhub.cn", id: "go-expert", version: "1" });
   const client = new FakeMarketClient();
   client.users = {
-    one: [{
-      ...emptyDetail(),
-      market: "skillhub.cn",
-      id: "go-expert",
-      name: "Go",
-      downloads: 10,
-    }],
+    one: [
+      {
+        ...emptyDetail(),
+        market: "skillhub.cn",
+        id: "go-expert",
+        name: "Go",
+        downloads: 10,
+      },
+    ],
     two: [
       {
         ...emptyDetail(),
@@ -409,8 +414,10 @@ test("SkillHubCategories", async () => {
       `{"items":[{"key":"dev-programming","name":"开发编程","nameEn":"Development"}]}`,
     );
   });
-  const categories = await createSkillHubClient("https://api.test", client)
-    .categories(undefined);
+  const categories = await createSkillHubClient(
+    "https://api.test",
+    client,
+  ).categories(undefined);
   assertEquals(categories.length, 1);
   assertEquals(categories[0].key, "dev-programming");
 });
@@ -419,7 +426,7 @@ test("ClawHubCurrentListShapeParsesDownloadsAndVersion", async () => {
   const client = fakeHttpClient(() =>
     jsonResponse(
       `{"items":[{"slug":"tool","displayName":"Tool","tags":{"latest":"1.2.0"},"stats":{"downloads":1562,"installs":6,"stars":3},"latestVersion":{"version":"1.2.0"},"updatedAt":1784072685483}]}`,
-    )
+    ),
   );
   const page = await createClawHubClient("https://api.test", client).search(
     undefined,

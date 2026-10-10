@@ -5,6 +5,7 @@
 // additive extensions. Fixtures construct an `AcpServer`, bind an in-memory
 // sink, and call the handlers directly, mirroring the Go fixture server.
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -119,8 +120,10 @@ async function waitForEvent(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const count = sessionEventParams(parseMessages(output.toString()), event)
-      .length;
+    const count = sessionEventParams(
+      parseMessages(output.toString()),
+      event,
+    ).length;
     if (count >= want) return;
     await delay(5);
   }
@@ -130,13 +133,13 @@ async function waitForEvent(
 }
 
 function withEnv(name: string, value: string, fn: () => void): void {
-  const previous = Deno.env.get(name);
-  Deno.env.set(name, value);
+  const previous = runtime.env.get(name);
+  runtime.env.set(name, value);
   try {
     fn();
   } finally {
-    if (previous === undefined) Deno.env.delete(name);
-    else Deno.env.set(name, previous);
+    if (previous === undefined) runtime.env.delete(name);
+    else runtime.env.set(name, previous);
   }
 }
 
@@ -193,7 +196,7 @@ test("project handlers return structured errors without settings", () => {
 test("project create/list/rename/delete round trip", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
-  const sessionDir = Deno.makeTempDirSync();
+  const sessionDir = runtime.makeTempDirSync();
   server.settings = { sessionDir };
 
   server.handleProjectsCreate(
@@ -234,9 +237,9 @@ test("project create/list/rename/delete round trip", () => {
 test("workspace extend validates, merges, dedupes, and caps", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
-  server.cwd = Deno.makeTempDirSync();
-  const existing = Deno.makeTempDirSync();
-  const added = Deno.makeTempDirSync();
+  server.cwd = runtime.makeTempDirSync();
+  const existing = runtime.makeTempDirSync();
+  const added = runtime.makeTempDirSync();
 
   server.handleWorkspaceExtend(
     rpc(1, "opensac/workspace/extend", {
@@ -284,7 +287,7 @@ test("workspace extend validates, merges, dedupes, and caps", () => {
   // The window is capped at workspaceAdditionalDirectoryLimit.
   const many: string[] = [];
   for (let i = 0; i < workspaceAdditionalDirectoryLimit - 1; i++) {
-    many.push(Deno.makeTempDirSync());
+    many.push(runtime.makeTempDirSync());
   }
   output.reset();
   server.handleWorkspaceExtend(
@@ -297,17 +300,17 @@ test("workspace extend validates, merges, dedupes, and caps", () => {
 });
 
 test("workspace extend normalizes symlinks", () => {
-  const target = Deno.makeTempDirSync();
-  const link = path.join(Deno.makeTempDirSync(), "link");
+  const target = runtime.makeTempDirSync();
+  const link = path.join(runtime.makeTempDirSync(), "link");
   try {
-    Deno.symlinkSync(target, link);
+    runtime.symlinkSync(target, link);
   } catch {
     return; // symlinks unavailable
   }
-  const resolvedTarget = Deno.realPathSync(target);
+  const resolvedTarget = runtime.realPathSync(target);
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
-  server.cwd = Deno.makeTempDirSync();
+  server.cwd = runtime.makeTempDirSync();
   server.handleWorkspaceExtend(
     rpc(1, "opensac/workspace/extend", { additionalDirectories: [link] }),
   );
@@ -417,19 +420,16 @@ test("observeSubagentEvent projects started and a single terminal", () => {
   );
 
   // First child event projects "started"; later activity does not repeat it.
-  server.observeSubagentEvent(
-    "session-1",
-    {
-      type: EVENT_TEXT_DELTA,
-      agentId: "child-1",
-      textDelta: "child",
-      memberId: "engineer",
-      expertId: "software-company",
-      memberDisplayName: "工程师",
-      memberEmoji: "🛠️",
-      memberRole: "member",
-    } satisfies AgentEvent,
-  );
+  server.observeSubagentEvent("session-1", {
+    type: EVENT_TEXT_DELTA,
+    agentId: "child-1",
+    textDelta: "child",
+    memberId: "engineer",
+    expertId: "software-company",
+    memberDisplayName: "工程师",
+    memberEmoji: "🛠️",
+    memberRole: "member",
+  } satisfies AgentEvent);
   server.observeSubagentEvent("session-1", {
     type: EVENT_TOOL_EXECUTION_END,
     agentId: "child-1",
@@ -544,23 +544,21 @@ test("initialize declares the Phase 1 feature keys", () => {
     features: string[];
   };
   const features = new Set(namespace.features);
-  for (
-    const want of [
-      "runStatus",
-      "sessionMeta",
-      "projects",
-      "workspaceExtend",
-      "decisionDeadline",
-      "subagentEvents",
-      "toolResultImages",
-      "attachmentList",
-      "sessionListAll",
-      "sessionWorkDir",
-      // Phase 0 keys must survive the additive change.
-      "artifactProjection",
-      "attachmentFetch",
-    ]
-  ) {
+  for (const want of [
+    "runStatus",
+    "sessionMeta",
+    "projects",
+    "workspaceExtend",
+    "decisionDeadline",
+    "subagentEvents",
+    "toolResultImages",
+    "attachmentList",
+    "sessionListAll",
+    "sessionWorkDir",
+    // Phase 0 keys must survive the additive change.
+    "artifactProjection",
+    "attachmentFetch",
+  ]) {
     assert(features.has(want), `missing feature ${want}`);
   }
 });
@@ -645,7 +643,7 @@ test("initialize rejects a duplicate call", () => {
 // ─── doctor ─────────────────────────────────────────────────────────────────
 
 test("handleDoctor does not require a session", () => {
-  const configDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = createFixtureServer(output);
@@ -660,8 +658,8 @@ test("handleDoctor does not require a session", () => {
 });
 
 test("handleDoctor uses the server cwd when the request omits it", () => {
-  const configDir = Deno.makeTempDirSync();
-  const cwd = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const cwd = runtime.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = createFixtureServer(output);
@@ -693,8 +691,8 @@ test("initialize and doctor use the configured run version", () => {
 });
 
 test("doctor matches the shared doctor response", () => {
-  const configDir = Deno.makeTempDirSync();
-  const cwd = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const cwd = runtime.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const output = new SyncBuffer();
     const server = createFixtureServer(output);

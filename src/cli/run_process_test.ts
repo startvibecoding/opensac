@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Subprocess integration test (migrated shape of the Go
-// TestACPStdioProcessHelper family): spawns `deno run src/main.ts acp` in a
+// TestACPStdioProcessHelper family): spawns `node src/main.ts acp` in a
 // temp OPENSAC_DIR and verifies the initialize handshake over real stdio, the
 // startup error line for an unconfigured provider, and clean EOF shutdown.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { CorePaths } from "../core/paths.ts";
@@ -27,9 +28,9 @@ async function stopOwnedCore(configDir: string): Promise<void> {
     const registration = await new CoreRegistry(
       CorePaths.fromStateDir(configDir),
     ).read();
-    if (registration !== undefined && registration.pid !== Deno.pid) {
+    if (registration !== undefined && registration.pid !== runtime.pid) {
       try {
-        Deno.kill(registration.pid, "SIGTERM");
+        runtime.kill(registration.pid, "SIGTERM");
       } catch {
         // The Core may already have exited.
       }
@@ -44,16 +45,16 @@ async function runAcp(
   env: Record<string, string> = {},
   cwd?: string,
 ): Promise<SpawnResult> {
-  const command = new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", "--quiet", mainTs, "acp"],
+  const command = new runtime.Command(runtime.execPath(), {
+    args: [mainTs, "acp"],
     stdin: "piped",
     stdout: "piped",
     stderr: "piped",
-    env: { ...Deno.env.toObject(), ...env },
+    env: { ...runtime.env.toObject(), ...env },
     cwd,
   });
   const child = command.spawn();
-  const writer = child.stdin.getWriter();
+  const writer = child.stdin!.getWriter();
   for (const line of lines) await writer.write(new TextEncoder().encode(line));
   await writer.close();
   const [status, stdout, stderr] = await Promise.all([
@@ -69,12 +70,9 @@ async function runAcp(
   };
 }
 
-function writeSettings(
-  configDir: string,
-  data: Record<string, unknown>,
-): void {
-  Deno.mkdirSync(configDir, { recursive: true, mode: 0o700 });
-  Deno.writeTextFileSync(
+function writeSettings(configDir: string, data: Record<string, unknown>): void {
+  runtime.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+  runtime.writeTextFileSync(
     path.join(configDir, "settings.json"),
     JSON.stringify({
       core: { host: "127.0.0.1", port: 0, auth: false, passwords: [] },
@@ -85,8 +83,8 @@ function writeSettings(
 }
 
 test("acp subprocess completes initialize handshake", async () => {
-  const configDir = Deno.makeTempDirSync();
-  const homeDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const homeDir = runtime.makeTempDirSync();
   // Build a minimal settings blob around a provider whose presence is only
   // validated structurally; use the same defaults path as the CLI. If no
   // provider key exists, startup emits OPENSAC_ACP_ERROR instead, which the
@@ -105,11 +103,12 @@ test("acp subprocess completes initialize handshake", async () => {
       },
     },
   });
-  const initialize = JSON.stringify({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-  }) + "\n";
+  const initialize =
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+    }) + "\n";
   const result = await runAcp([initialize], {
     OPENSAC_DIR: configDir,
     HOME: homeDir,
@@ -131,8 +130,8 @@ test("acp subprocess completes initialize handshake", async () => {
 });
 
 test("acp subprocess rejects methods before initialize", async () => {
-  const configDir = Deno.makeTempDirSync();
-  const homeDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const homeDir = runtime.makeTempDirSync();
   writeSettings(configDir, {
     defaultProvider: "deepseek",
     defaultModel: "deepseek-chat",
@@ -145,11 +144,12 @@ test("acp subprocess rejects methods before initialize", async () => {
       },
     },
   });
-  const line = JSON.stringify({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "session/list",
-  }) + "\n";
+  const line =
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session/list",
+    }) + "\n";
   const result = await runAcp([line], {
     OPENSAC_DIR: configDir,
     HOME: homeDir,
@@ -160,15 +160,12 @@ test("acp subprocess rejects methods before initialize", async () => {
   assertEquals(message["id"], 1);
   const rpcError: Record<string, any> = message["error"];
   assertEquals(rpcError["code"], -32600);
-  assertEquals(
-    rpcError["message"],
-    "initialize must be called first",
-  );
+  assertEquals(rpcError["message"], "initialize must be called first");
 });
 
 test("acp subprocess exits cleanly at EOF after initialize", async () => {
-  const configDir = Deno.makeTempDirSync();
-  const homeDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const homeDir = runtime.makeTempDirSync();
   writeSettings(configDir, {
     defaultProvider: "deepseek",
     defaultModel: "deepseek-chat",
@@ -193,7 +190,9 @@ test("acp subprocess exits cleanly at EOF after initialize", async () => {
     OPENSAC_DIR: configDir,
     HOME: homeDir,
   });
-  const messages: Record<string, any>[] = result.output.trim().split("\n")
+  const messages: Record<string, any>[] = result.output
+    .trim()
+    .split("\n")
     .filter(Boolean)
     .map((l: string) => JSON.parse(l));
   const ids = messages.map((m) => m["id"]);
@@ -203,8 +202,8 @@ test("acp subprocess exits cleanly at EOF after initialize", async () => {
 });
 
 test("acp subprocess routes project extensions through Core", async () => {
-  const configDir = Deno.makeTempDirSync();
-  const homeDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const homeDir = runtime.makeTempDirSync();
   writeSettings(configDir, {
     defaultProvider: "deepseek",
     defaultModel: "deepseek-chat",
@@ -236,7 +235,9 @@ test("acp subprocess routes project extensions through Core", async () => {
     OPENSAC_DIR: configDir,
     HOME: homeDir,
   });
-  const messages: Record<string, any>[] = result.output.trim().split("\n")
+  const messages: Record<string, any>[] = result.output
+    .trim()
+    .split("\n")
     .filter(Boolean)
     .map((line: string) => JSON.parse(line));
   const created = messages.find((message) => message.id === 2);
@@ -246,12 +247,15 @@ test("acp subprocess routes project extensions through Core", async () => {
 });
 
 test("acp subprocess --help is served by the CLI parser", async () => {
-  const result = await runAcp([], {}, undefined);
+  const configDir = runtime.makeTempDirSync();
+  const homeDir = runtime.makeTempDirSync();
+  writeSettings(configDir, {});
+  const result = await runAcp([], { OPENSAC_DIR: configDir, HOME: homeDir });
   // Empty stdin with no provider is the startup path; --help is checked via a
   // direct command instead to avoid the ACP preflight.
   void result;
-  const command = new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", "--quiet", mainTs, "acp", "--help"],
+  const command = new runtime.Command(runtime.execPath(), {
+    args: [mainTs, "acp", "--help"],
     stdout: "piped",
     stderr: "piped",
   });

@@ -1,8 +1,7 @@
-// Project-owned replacement for the JSR `@std/assert` module, backed by
-// `node:assert/strict`. See `./path.ts` for the rationale.
+// Project-owned assertion helpers, backed by `node:assert/strict`. See
+// `./path.ts` for the rationale.
 //
-// Only the helpers this repository imports are provided. Semantics follow
-// `@std/assert`:
+// Only the helpers this repository imports are provided. Semantics:
 //   * an optional assertion `message` is appended to failure text;
 //   * `assertEquals`/`assertNotEquals` compare prototypes-agnostically (a
 //     null-prototype SQLite row equals a plain object), which `deepStrictEqual`
@@ -16,7 +15,7 @@ import { inspect } from "node:util";
 /** An error constructor or a `RegExp` matched against the error message. */
 type ErrorClass = (new (...args: never[]) => Error) | RegExp;
 
-/** Prototype-agnostic, strict deep equality (mirrors `@std/assert`). */
+/** Prototype-agnostic, strict deep equality. */
 function deepEqual(
   a: unknown,
   b: unknown,
@@ -37,16 +36,27 @@ function deepEqual(
     return a.every((value, index) => deepEqual(value, b[index], seen));
   }
   if (a instanceof Date || b instanceof Date) {
-    return a instanceof Date && b instanceof Date &&
-      Object.is(a.getTime(), b.getTime());
+    return (
+      a instanceof Date &&
+      b instanceof Date &&
+      Object.is(a.getTime(), b.getTime())
+    );
   }
   if (a instanceof RegExp || b instanceof RegExp) {
-    return a instanceof RegExp && b instanceof RegExp &&
-      a.source === b.source && a.flags === b.flags;
+    return (
+      a instanceof RegExp &&
+      b instanceof RegExp &&
+      a.source === b.source &&
+      a.flags === b.flags
+    );
   }
   if (a instanceof Error || b instanceof Error) {
-    return a instanceof Error && b instanceof Error &&
-      a.name === b.name && a.message === b.message;
+    return (
+      a instanceof Error &&
+      b instanceof Error &&
+      a.name === b.name &&
+      a.message === b.message
+    );
   }
   if (a instanceof Map || b instanceof Map) {
     if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) {
@@ -94,9 +104,10 @@ function inspectFailure(actual: unknown, expected: unknown): string {
     compact: false,
     sorted: true,
   } as const;
-  return `Values have different structure:\n\`\`\`\n${
-    inspect(actual, options)
-  }\n\`\`\` expected\n\`\`\`\n${inspect(expected, options)}\n\`\`\``;
+  return `Values have different structure:\n\`\`\`\n${inspect(
+    actual,
+    options,
+  )}\n\`\`\` expected\n\`\`\`\n${inspect(expected, options)}\n\`\`\``;
 }
 
 /** Asserts that `expr` is truthy. */
@@ -181,9 +192,9 @@ export function assertStringIncludes(
   message?: string,
 ): void {
   const ok = typeof actual === "string" && actual.includes(expected);
-  const fallback = `expected ${JSON.stringify(actual)} to include ${
-    JSON.stringify(expected)
-  }`;
+  const fallback = `expected ${JSON.stringify(actual)} to include ${JSON.stringify(
+    expected,
+  )}`;
   if (message === undefined) nodeAssert.ok(ok, fallback);
   else nodeAssert.ok(ok, message);
 }
@@ -205,15 +216,14 @@ function validateThrown(
   messageIncludes: string | undefined,
 ): void {
   const error = thrown as { message?: unknown };
-  const text = typeof error?.message === "string"
-    ? error.message
-    : String(thrown);
+  const text =
+    typeof error?.message === "string" ? error.message : String(thrown);
   if (errorClass instanceof RegExp) {
     if (!errorClass.test(text)) {
       nodeAssert.fail(
-        `expected thrown error message ${
-          JSON.stringify(text)
-        } to match ${errorClass.toString()}`,
+        `expected thrown error message ${JSON.stringify(
+          text,
+        )} to match ${errorClass.toString()}`,
       );
     }
   } else if (typeof errorClass === "function") {
@@ -225,9 +235,9 @@ function validateThrown(
   }
   if (messageIncludes !== undefined && !text.includes(messageIncludes)) {
     nodeAssert.fail(
-      `expected thrown error message ${JSON.stringify(text)} to include ${
-        JSON.stringify(messageIncludes)
-      }`,
+      `expected thrown error message ${JSON.stringify(text)} to include ${JSON.stringify(
+        messageIncludes,
+      )}`,
     );
   }
 }

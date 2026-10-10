@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   modelsEndpoint,
@@ -59,11 +60,11 @@ test("ParseDiscoveredModelsBareArray", () => {
 });
 
 test("ResolveSecretRef", () => {
-  Deno.env.set("OPENSAC_DISCOVER_TEST_KEY", "from-env");
+  runtime.env.set("OPENSAC_DISCOVER_TEST_KEY", "from-env");
   try {
     assertEquals(resolveSecretRef("${OPENSAC_DISCOVER_TEST_KEY}"), "from-env");
     assertEquals(resolveSecretRef(" literal "), "literal");
   } finally {
-    Deno.env.delete("OPENSAC_DISCOVER_TEST_KEY");
+    runtime.env.delete("OPENSAC_DISCOVER_TEST_KEY");
   }
 });

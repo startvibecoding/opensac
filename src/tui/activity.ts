@@ -350,19 +350,17 @@ export function formatActivityTool(
 ): string {
   if (!args || Object.keys(args).length === 0) return name;
   const parts: string[] = [];
-  for (
-    const key of [
-      "path",
-      "cmd",
-      "command",
-      "query",
-      "pattern",
-      "handle",
-      "message",
-      "source",
-      "task",
-    ]
-  ) {
+  for (const key of [
+    "path",
+    "cmd",
+    "command",
+    "query",
+    "pattern",
+    "handle",
+    "message",
+    "source",
+    "task",
+  ]) {
     if (key in args) {
       parts.push(
         `${key}=${JSON.stringify(truncatePlain(String(args[key]), 80))}`,
@@ -420,12 +418,10 @@ export function renderAgentActivity(
   if (act.kind) header += ` (${act.kind})`;
   if (act.state) header += ` [${act.state}]`;
   if (act.updatedAt && act.updatedAt.getTime() > 0) {
-    header += ` ${
-      tr.text(
-        "activity.updated",
-        formatActivityAge(act.updatedAt, now, tr),
-      )
-    }`;
+    header += ` ${tr.text(
+      "activity.updated",
+      formatActivityAge(act.updatedAt, now, tr),
+    )}`;
   }
   lines.push(header);
   if (act.lastToolName) {
@@ -501,8 +497,8 @@ export function renderActivitySummary(
   for (let i = store.order.length - 1; i >= 0 && lines.length < limit; i--) {
     const act = store.get(store.order[i]);
     if (!act) continue;
-    const detail = act.lastTool || act.lastResult || act.lastText ||
-      act.lastThink;
+    const detail =
+      act.lastTool || act.lastResult || act.lastText || act.lastThink;
     const state = act.state || "running";
     let line = `${act.agentId} [${state}]`;
     if (detail) line += ` ${detail}`;

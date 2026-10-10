@@ -1,6 +1,6 @@
 //
 // Go loads builtin bundles from an embed.FS and tests from testing/fstest.MapFS.
-// Deno has no io/fs, so a minimal read-only filesystem interface stands in for
+// Node has no io/fs, so a minimal read-only filesystem interface stands in for
 // it: file contents are text and paths are bundle-relative slash paths.
 
 /** One directory entry returned by ExpertFS.readDir. */

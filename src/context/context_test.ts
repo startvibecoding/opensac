@@ -87,10 +87,7 @@ class FixedTokenEstimator implements TokenEstimator {
   readonly tokensByContent: Map<string, number>;
   readonly defaultTokens: number;
 
-  constructor(
-    tokensByContent: Record<string, number>,
-    defaultTokens: number,
-  ) {
+  constructor(tokensByContent: Record<string, number>, defaultTokens: number) {
     this.tokensByContent = new Map(Object.entries(tokensByContent));
     this.defaultTokens = defaultTokens;
   }
@@ -157,14 +154,16 @@ test("EstimateTokens", () => {
       "assistant with tool call",
       msg({
         role: "assistant",
-        contents: [{
-          type: "toolCall",
-          toolCall: {
-            id: "call-1",
-            name: "bash",
-            arguments: JSON.parse('{"command":"ls -la"}'),
-          } as ToolCallBlock,
-        }],
+        contents: [
+          {
+            type: "toolCall",
+            toolCall: {
+              id: "call-1",
+              name: "bash",
+              arguments: JSON.parse('{"command":"ls -la"}'),
+            } as ToolCallBlock,
+          },
+        ],
       }),
       8,
     ],
@@ -299,12 +298,15 @@ test("FindCutPointWithEstimator", () => {
     msg({ role: "user", content: "recent" }),
     msg({ role: "assistant", content: "recent response" }),
   ];
-  const estimator = new FixedTokenEstimator({
-    "old": 1,
-    "old response": 1,
-    "recent": 40,
-    "recent response": 40,
-  }, 1);
+  const estimator = new FixedTokenEstimator(
+    {
+      old: 1,
+      "old response": 1,
+      recent: 40,
+      "recent response": 40,
+    },
+    1,
+  );
   const cutPoint = findCutPointWithEstimator(
     messages,
     0,
@@ -322,12 +324,7 @@ test("ResolveCompressionTemplate", () => {
     ["default empty", "", "default", "structured context checkpoint"],
     ["code", "code", "code", "structured coding checkpoint"],
     ["conversation", "conversation", "conversation", "conversation checkpoint"],
-    [
-      "unknown fallback",
-      "missing",
-      "default",
-      "structured context checkpoint",
-    ],
+    ["unknown fallback", "missing", "default", "structured context checkpoint"],
   ];
   for (const [name, template, wantName, wantText] of tests) {
     const tpl = resolveCompressionTemplate(template);
@@ -337,11 +334,13 @@ test("ResolveCompressionTemplate", () => {
 });
 
 test("CompactUsesConfiguredTemplate", async () => {
-  const p = new CompactRecordingProvider([model({
-    id: "m",
-    name: "m",
-    maxTokens: 1024,
-  })]);
+  const p = new CompactRecordingProvider([
+    model({
+      id: "m",
+      name: "m",
+      maxTokens: 1024,
+    }),
+  ]);
   const messages: Message[] = [
     msg({ role: "user", content: "old ".repeat(80) }),
     msg({ role: "assistant", content: "old response ".repeat(80) }),
@@ -367,11 +366,13 @@ test("CompactUsesConfiguredTemplate", async () => {
 });
 
 test("CompactCapsSummaryMaxTokens", async () => {
-  const p = new CompactRecordingProvider([model({
-    id: "m",
-    name: "m",
-    maxTokens: 16000,
-  })]);
+  const p = new CompactRecordingProvider([
+    model({
+      id: "m",
+      name: "m",
+      maxTokens: 16000,
+    }),
+  ]);
   const messages: Message[] = [
     msg({ role: "user", content: "old ".repeat(80) }),
     msg({ role: "assistant", content: "old response ".repeat(80) }),
@@ -391,11 +392,13 @@ test("CompactCapsSummaryMaxTokens", async () => {
 });
 
 test("CompactWithOptionsForceAllowsSummaryOnly", async () => {
-  const p = new CompactRecordingProvider([model({
-    id: "m",
-    name: "m",
-    maxTokens: 1024,
-  })]);
+  const p = new CompactRecordingProvider([
+    model({
+      id: "m",
+      name: "m",
+      maxTokens: 1024,
+    }),
+  ]);
   const messages: Message[] = [
     msg({ role: "user", content: "only current user" }),
     msg({ role: "assistant", content: "only current response" }),
@@ -415,11 +418,13 @@ test("CompactWithOptionsForceAllowsSummaryOnly", async () => {
 });
 
 test("GenerateSummaryUsesConfiguredUpdateTemplate", async () => {
-  const p = new CompactRecordingProvider([model({
-    id: "m",
-    name: "m",
-    maxTokens: 1024,
-  })]);
+  const p = new CompactRecordingProvider([
+    model({
+      id: "m",
+      name: "m",
+      maxTokens: 1024,
+    }),
+  ]);
   await generateSummaryInsertThenCompressWithTemplate(
     undefined,
     [msg({ role: "user", content: "new information" })],
@@ -439,10 +444,12 @@ test("GenerateSummaryUsesConfiguredUpdateTemplate", async () => {
 test("EstimateTokensImage", () => {
   const message = msg({
     role: "user",
-    contents: [{
-      type: "image",
-      image: { mimeType: "image/png", data: "base64data" },
-    }],
+    contents: [
+      {
+        type: "image",
+        image: { mimeType: "image/png", data: "base64data" },
+      },
+    ],
   });
   assertEquals(estimateTokens(message), 1200);
 });
@@ -450,10 +457,12 @@ test("EstimateTokensImage", () => {
 test("EstimateTokensLargeImageUsesPayloadSize", () => {
   const message = msg({
     role: "user",
-    contents: [{
-      type: "image",
-      image: { mimeType: "image/png", data: "a".repeat(20000) },
-    }],
+    contents: [
+      {
+        type: "image",
+        image: { mimeType: "image/png", data: "a".repeat(20000) },
+      },
+    ],
   });
   assertEquals(estimateTokens(message), 5000);
 });
@@ -461,15 +470,17 @@ test("EstimateTokensLargeImageUsesPayloadSize", () => {
 test("EstimateTokensImageUsesDimensions", () => {
   const message = msg({
     role: "user",
-    contents: [{
-      type: "image",
-      image: {
-        mimeType: "image/png",
-        data: "abc",
-        width: 1024,
-        height: 513,
+    contents: [
+      {
+        type: "image",
+        image: {
+          mimeType: "image/png",
+          data: "abc",
+          width: 1024,
+          height: 513,
+        },
       },
-    }],
+    ],
   });
   assertEquals(estimateTokens(message), 3200);
 });
@@ -586,11 +597,13 @@ test("CompactDoesNotResendPreviousSummaryAsConversationMessage", async () => {
     createUserMessage("recent question ".repeat(16)),
     createAssistantMessage([textBlock("recent answer ".repeat(16))]),
   ];
-  const p = new CompactRecordingProvider([model({
-    id: "model1",
-    name: "Model 1",
-    maxTokens: 1024,
-  })]);
+  const p = new CompactRecordingProvider([
+    model({
+      id: "model1",
+      name: "Model 1",
+      maxTokens: 1024,
+    }),
+  ]);
   await compact(
     undefined,
     messages,
@@ -774,14 +787,16 @@ test("SerializeConversationToolCall", () => {
   const result = serializeConversation([
     msg({
       role: "assistant",
-      contents: [{
-        type: "toolCall",
-        toolCall: {
-          id: "call-1",
-          name: "read",
-          arguments: { path: "foo.go" },
+      contents: [
+        {
+          type: "toolCall",
+          toolCall: {
+            id: "call-1",
+            name: "read",
+            arguments: { path: "foo.go" },
+          },
         },
-      }],
+      ],
     }),
   ]);
   assert(result.includes("[tool_call: read("));
@@ -807,10 +822,12 @@ test("SerializeConversationUserNonTextContentBlocks", () => {
   const result = serializeConversation([
     msg({
       role: "user",
-      contents: [{
-        type: "image",
-        image: { mimeType: "image/png", data: "abc" },
-      }],
+      contents: [
+        {
+          type: "image",
+          image: { mimeType: "image/png", data: "abc" },
+        },
+      ],
     }),
   ]);
   assert(result.includes("[image: image/png]"));
@@ -848,25 +865,35 @@ test("ShouldCompactExact", () => {
 
 test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
   const mdl = model({ id: "test-model" });
-  const p = createMockProvider("test", [mdl], [{
-    type: streamTextDelta,
-    textDelta: "concise tool summary",
-  }]);
+  const p = createMockProvider(
+    "test",
+    [mdl],
+    [
+      {
+        type: streamTextDelta,
+        textDelta: "concise tool summary",
+      },
+    ],
+  );
   const messages: Message[] = [
     msg({
       role: "assistant",
-      contents: [{
-        type: "toolCall",
-        toolCall: { id: "call-1", name: "read" },
-      }],
+      contents: [
+        {
+          type: "toolCall",
+          toolCall: { id: "call-1", name: "read" },
+        },
+      ],
     }),
     createToolResultMessage("call-1", "read", "a".repeat(50000), false),
     msg({
       role: "assistant",
-      contents: [{
-        type: "toolCall",
-        toolCall: { id: "call-2", name: "grep" },
-      }],
+      contents: [
+        {
+          type: "toolCall",
+          toolCall: { id: "call-2", name: "grep" },
+        },
+      ],
     }),
     createToolResultMessage("call-2", "grep", "b".repeat(50000), false),
   ];
@@ -889,10 +916,16 @@ test("CompressLargeToolResultsRunsParallelSubSummaries", async () => {
 
 test("CompressLargeToolResultsSkipsSmallResults", async () => {
   const mdl = model({ id: "test-model" });
-  const p: MockProvider = createMockProvider("test", [mdl], [{
-    type: streamTextDelta,
-    textDelta: "summary",
-  }]);
+  const p: MockProvider = createMockProvider(
+    "test",
+    [mdl],
+    [
+      {
+        type: streamTextDelta,
+        textDelta: "summary",
+      },
+    ],
+  );
   const messages: Message[] = [
     createToolResultMessage("call-1", "read", "small", false),
   ];
@@ -916,13 +949,7 @@ test("SummarizeToolResultUsesValidStandaloneUserMessage", async () => {
     "important file output",
     false,
   );
-  await summarizeToolResultOnce(
-    undefined,
-    message,
-    p,
-    p.models()[0],
-    "system",
-  );
+  await summarizeToolResultOnce(undefined, message, p, p.models()[0], "system");
   assertEquals(p.lastChat.messages.length, 1);
   const request = p.lastChat.messages[0];
   assertEquals(request.role, "user");

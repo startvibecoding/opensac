@@ -14,7 +14,8 @@ import {
   type StructuredOutputOptions,
   type ToolChoice,
   type ToolDefinition,
-  type Usage} from "../types.ts";
+  type Usage,
+} from "../types.ts";
 import {
   asJsonRecord,
   optNumber,
@@ -489,7 +490,7 @@ export async function* chatResponses(
       if (attempt < maxRetries && isRetryable(err, 0)) {
         const plan = retryPlan(attempt, maxRetries, baseDelayMs, err);
         yield plan.event;
-        if (!await waitOrAbort(params.abort, plan.delay)) {
+        if (!(await waitOrAbort(params.abort, plan.delay))) {
           yield {
             type: streamError,
             error: new Error("aborted"),
@@ -510,7 +511,7 @@ export async function* chatResponses(
       if (attempt < maxRetries && isRetryable(err, resp.status)) {
         const plan = retryPlan(attempt, maxRetries, baseDelayMs, err);
         yield plan.event;
-        if (!await waitOrAbort(params.abort, plan.delay)) {
+        if (!(await waitOrAbort(params.abort, plan.delay))) {
           yield {
             type: streamError,
             error: new Error("aborted"),
@@ -532,15 +533,13 @@ export async function* chatResponses(
     let streamErr: Error | undefined;
     let sawError = false;
     try {
-      for await (
-        const event of parseResponsesSSE(
-          p,
-          streamBody,
-          params,
-          diagnostics,
-          state,
-        )
-      ) {
+      for await (const event of parseResponsesSSE(
+        p,
+        streamBody,
+        params,
+        diagnostics,
+        state,
+      )) {
         yield event;
         if (event.type === streamError) sawError = true;
       }
@@ -553,11 +552,13 @@ export async function* chatResponses(
       return;
     }
     if (
-      attempt < maxRetries && !state.visibleOutput && isRetryable(streamErr, 0)
+      attempt < maxRetries &&
+      !state.visibleOutput &&
+      isRetryable(streamErr, 0)
     ) {
       const plan = retryPlan(attempt, maxRetries, baseDelayMs, streamErr);
       yield plan.event;
-      if (!await waitOrAbort(params.abort, plan.delay)) {
+      if (!(await waitOrAbort(params.abort, plan.delay))) {
         yield {
           type: streamError,
           error: new Error("aborted"),
@@ -599,7 +600,8 @@ function toWireRequest(req: ResponsesRequest): Record<string, unknown> {
   if (req.top_p !== undefined) out["top_p"] = req.top_p;
   if (req.store !== undefined) out["store"] = req.store;
   if (
-    req.previous_response_id !== undefined && req.previous_response_id !== ""
+    req.previous_response_id !== undefined &&
+    req.previous_response_id !== ""
   ) {
     out["previous_response_id"] = req.previous_response_id;
   }
@@ -674,7 +676,9 @@ function toWireTool(tool: ResponsesTool): Record<string, unknown> {
   };
   for (const [key, value] of Object.entries(tool.extra ?? {})) {
     if (
-      key === "type" || key === "name" || key === "description" ||
+      key === "type" ||
+      key === "name" ||
+      key === "description" ||
       key === "parameters"
     ) {
       continue;
@@ -728,7 +732,8 @@ export function buildResponsesRequest(
   }
 
   if (
-    p.responsesConfig !== undefined && p.responsesConfig.promptCacheEnabled &&
+    p.responsesConfig !== undefined &&
+    p.responsesConfig.promptCacheEnabled &&
     supportsPromptCacheKey(model)
   ) {
     reqBody.prompt_cache_key = responsesPromptCacheKey(p, modelID);
@@ -747,8 +752,10 @@ export function buildResponsesRequest(
   }
 
   if (
-    !p.disableReasoning && params.thinkingLevel !== thinkingOff &&
-    model !== undefined && model.reasoning
+    !p.disableReasoning &&
+    params.thinkingLevel !== thinkingOff &&
+    model !== undefined &&
+    model.reasoning
   ) {
     reqBody.reasoning = {
       effort: responsesReasoningEffort(params.thinkingLevel),
@@ -786,11 +793,11 @@ export function responsesRequestDiagnostics(
   const result: Array<Record<string, unknown>> = [];
   if (
     (params.temperature !== undefined || params.topP !== undefined) &&
-    req.temperature === undefined && req.top_p === undefined
+    req.temperature === undefined &&
+    req.top_p === undefined
   ) {
-    const reason = req.reasoning !== undefined
-      ? "reasoning_incompatible"
-      : "model_compat";
+    const reason =
+      req.reasoning !== undefined ? "reasoning_incompatible" : "model_compat";
     result.push({ field: "temperature/top_p", action: "omitted", reason });
   }
   if (
@@ -846,7 +853,8 @@ export function applyResponsesConfig(
   req.parallel_tool_calls = config.parallelToolCalls;
   req.max_tool_calls = config.maxToolCalls;
   if (
-    config.stateMode === "conversation" && (config.conversation ?? "") !== "" &&
+    config.stateMode === "conversation" &&
+    (config.conversation ?? "") !== "" &&
     (opts === undefined || opts.suppressConversation !== true)
   ) {
     req.conversation = config.conversation;
@@ -1003,11 +1011,10 @@ export function convertResponsesInput(
   return items;
 }
 
-function rawArguments(
-  toolCall: NonNullable<ContentBlock["toolCall"]>,
-): string {
+function rawArguments(toolCall: NonNullable<ContentBlock["toolCall"]>): string {
   if (
-    toolCall.invalidArguments !== undefined && toolCall.invalidArguments !== ""
+    toolCall.invalidArguments !== undefined &&
+    toolCall.invalidArguments !== ""
   ) {
     return toolCall.invalidArguments;
   }
@@ -1100,8 +1107,7 @@ export function responseCustomToolOutput(msg: Message): unknown {
         if (block.image != null && block.image.data !== "") {
           content.push({
             type: "input_image",
-            image_url:
-              `data:${block.image.mimeType};base64,${block.image.data}`,
+            image_url: `data:${block.image.mimeType};base64,${block.image.data}`,
             detail: normalizeImageDetail(block.image.detail ?? ""),
           });
         }
@@ -1109,7 +1115,8 @@ export function responseCustomToolOutput(msg: Message): unknown {
       case "file":
         if (
           block.file != null &&
-          ((block.file.id ?? "") !== "" || (block.file.url ?? "") !== "" ||
+          ((block.file.id ?? "") !== "" ||
+            (block.file.url ?? "") !== "" ||
             (block.file.data ?? "") !== "")
         ) {
           content.push({
@@ -1127,7 +1134,8 @@ export function responseCustomToolOutput(msg: Message): unknown {
   }
   if (content.length === 0) return msg.content ?? "";
   if (
-    (msg.content ?? "") !== "" && content.length === 1 &&
+    (msg.content ?? "") !== "" &&
+    content.length === 1 &&
     content[0].type !== "input_text"
   ) {
     content = [{ type: "input_text", text: msg.content }, ...content];
@@ -1144,12 +1152,12 @@ export function convertResponsesTools(
     if (t.kind === "hosted") {
       // Resolved via the shared hosted-tool registry in the caller; unknown
       // hosted tools are skipped so gateways never receive guesses.
-      const toolType = t.providerType === "responses" ||
-          t.providerType === "openai-responses"
-        ? (t.name === "web_search" || t.name === "openai_responses_web_search"
-          ? "web_search"
-          : t.name)
-        : "";
+      const toolType =
+        t.providerType === "responses" || t.providerType === "openai-responses"
+          ? t.name === "web_search" || t.name === "openai_responses_web_search"
+            ? "web_search"
+            : t.name
+          : "";
       if (toolType === "") continue;
       if (seenHosted.has(toolType)) continue;
       seenHosted.add(toolType);
@@ -1353,7 +1361,8 @@ export async function* parseResponsesSSE(
         case "response.reasoning_text.done":
         case "response.reasoning_summary_text.done":
           if (
-            !p.disableReasoning && (event.text ?? "") !== "" &&
+            !p.disableReasoning &&
+            (event.text ?? "") !== "" &&
             reasoning.length === 0
           ) {
             state.visibleOutput = true;
@@ -1431,7 +1440,8 @@ export async function* parseResponsesSSE(
           break;
       }
       if (
-        decodeErr !== undefined || event.type === "response.completed" ||
+        decodeErr !== undefined ||
+        event.type === "response.completed" ||
         event.type === "response.incomplete" ||
         event.type === "response.failed" ||
         event.type === "error"
@@ -1502,8 +1512,10 @@ export async function* parseResponsesSSE(
 
 /** Distinguishes terminal provider errors from transport/JSON failures. */
 function isTerminalResponsesEventError(err: Error): boolean {
-  return err.message.startsWith("responses error:") ||
-    err.message === "responses stream failed";
+  return (
+    err.message.startsWith("responses error:") ||
+    err.message === "responses stream failed"
+  );
 }
 
 function decodeArguments(raw: string | undefined): unknown {

@@ -1,5 +1,7 @@
 // Shared test helpers for src/skillhub (mirrors the Go _test.go fixtures).
 
+import { runtime } from "../platform/runtime.ts";
+import type { NetAddr } from "../platform/runtime.ts";
 import { type HttpClient } from "./http.ts";
 import {
   type Category,
@@ -12,7 +14,8 @@ import {
   type SkillDetail,
   type SkillFile,
   type SkillId,
-  type SkillSummary} from "./types.ts";
+  type SkillSummary,
+} from "./types.ts";
 import { createZip, type ZipWriteEntry } from "./zip.ts";
 
 /** Builds a JSON Response for the fake HTTP client. */
@@ -214,15 +217,18 @@ export class CountingClient implements MarketClient {
 export async function startServer(
   handler: (request: Request) => Response | Promise<Response>,
 ): Promise<{ url: string; close: () => Promise<void> }> {
-  let resolveAddr: (addr: Deno.NetAddr) => void = () => {};
-  const addrPromise = new Promise<Deno.NetAddr>((resolve) => {
+  let resolveAddr: (addr: NetAddr) => void = () => {};
+  const addrPromise = new Promise<NetAddr>((resolve) => {
     resolveAddr = resolve;
   });
-  const server = Deno.serve({
-    hostname: "127.0.0.1",
-    port: 0,
-    onListen: (addr) => resolveAddr(addr as Deno.NetAddr),
-  }, handler);
+  const server = runtime.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      onListen: (addr) => resolveAddr(addr as NetAddr),
+    },
+    handler,
+  );
   const addr = await addrPromise;
   return {
     url: `http://127.0.0.1:${addr.port}`,

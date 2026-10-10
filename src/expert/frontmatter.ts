@@ -38,34 +38,32 @@ export function parseFrontmatter(
     }
   }
   if (end < 0) {
-    throw new Error(
-      "unclosed frontmatter: missing terminating --- line",
-    );
+    throw new Error("unclosed frontmatter: missing terminating --- line");
   }
   const fm = createFrontmatter(fallbackName);
   parseFrontmatterFields(lines.slice(1, end), fm);
   if (fm.name.trim() === "") {
     fm.name = fallbackName;
   }
-  const prompt = lines.slice(end + 1).join("\n").trim();
+  const prompt = lines
+    .slice(end + 1)
+    .join("\n")
+    .trim();
   return { frontmatter: fm, prompt };
 }
 
 /** Splits content on \n and trims \r so CRLF files parse identically. */
 export function splitLines(content: string): string[] {
-  return content.split("\n").map((line) =>
-    line.endsWith("\r") ? line.slice(0, -1) : line
-  );
+  return content
+    .split("\n")
+    .map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
 }
 
 /**
  * Applies "key: value" lines to fm. Unknown keys and malformed lines are
  * ignored except for invalid integer fields, which are reported as errors.
  */
-export function parseFrontmatterFields(
-  lines: string[],
-  fm: Frontmatter,
-): void {
+export function parseFrontmatterFields(lines: string[], fm: Frontmatter): void {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (line === "" || line.startsWith("#")) {

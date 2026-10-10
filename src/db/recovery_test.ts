@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   closeAll,
@@ -107,20 +108,20 @@ test("migration recovery log observes and drains", () => {
 });
 
 test("removeDatabaseFiles removes the database and its sidecars", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-db-remove-test-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-db-remove-test-" });
   const path = `${dir}/sessions.db`;
   try {
     for (const suffix of ["", "-wal", "-shm", "-journal"]) {
-      Deno.writeTextFileSync(path + suffix, "x");
+      runtime.writeTextFileSync(path + suffix, "x");
     }
     removeDatabaseFiles(path);
     for (const suffix of ["", "-wal", "-shm", "-journal"]) {
       try {
-        Deno.statSync(path + suffix);
+        runtime.statSync(path + suffix);
         throw new Error(`expected ${path + suffix} to be removed`);
       } catch (err) {
         assert(
-          err instanceof Deno.errors.NotFound,
+          err instanceof runtime.errors.NotFound,
           `unexpected error for ${path + suffix}: ${err}`,
         );
       }
@@ -128,7 +129,7 @@ test("removeDatabaseFiles removes the database and its sidecars", () => {
     // Removing an already-removed database is not an error.
     removeDatabaseFiles(path);
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
     closeAll();
   }
 });
@@ -137,12 +138,11 @@ test("removeDatabaseFiles removes the database and its sidecars", () => {
 // path: the connection is snapshotted with VACUUM INTO, closed, and the
 // unrecoverable file set is deleted so the next open starts clean.
 test("recoverFromMigrationFailure snapshots and clears the database", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-db-recovery-test-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-db-recovery-test-" });
   const path = `${dir}/sessions.db`;
   try {
-    const connection = openStandalone(
-      path,
-      (conn) => conn.exec("CREATE TABLE legacy(a INTEGER)"),
+    const connection = openStandalone(path, (conn) =>
+      conn.exec("CREATE TABLE legacy(a INTEGER)"),
     );
     connection.run("INSERT INTO legacy VALUES (1)");
 
@@ -159,7 +159,7 @@ test("recoverFromMigrationFailure snapshots and clears the database", () => {
       `unexpected backup path ${recovery.backupPath}`,
     );
     assert(
-      Deno.statSync(recovery.backupPath).isFile,
+      runtime.statSync(recovery.backupPath).isFile,
       "the snapshot must exist",
     );
     let closed = false;
@@ -171,16 +171,16 @@ test("recoverFromMigrationFailure snapshots and clears the database", () => {
     assert(closed, "the failed connection must be closed");
 
     try {
-      Deno.statSync(path);
+      runtime.statSync(path);
       throw new Error("the unrecoverable database must be removed");
     } catch (err) {
       assert(
-        err instanceof Deno.errors.NotFound,
+        err instanceof runtime.errors.NotFound,
         `unexpected error for ${path}: ${err}`,
       );
     }
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
     closeAll();
   }
 });

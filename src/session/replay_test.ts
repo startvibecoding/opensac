@@ -53,10 +53,12 @@ test("content override replaces message but preserves the target entry ID", () =
     toolCallId: "call-1",
     toolName: "read",
     timestamp: new Date(),
-    contents: [{
-      type: "image",
-      image: { data: "AAAA", mimeType: "image/png", width: 4, height: 4 },
-    }],
+    contents: [
+      {
+        type: "image",
+        image: { data: "AAAA", mimeType: "image/png", width: 4, height: 4 },
+      },
+    ],
   };
   const replacement: Message = {
     role: "toolResult",

@@ -42,18 +42,16 @@ function isBedrockProvider(s: string): boolean {
 }
 
 function isGatewayProvider(s: string): boolean {
-  for (
-    const marker of [
-      "volcengine-agentplan",
-      "volcengine-codingplan",
-      "alibaba",
-      "bailian",
-      "dashscope",
-      "gitee",
-      "moark",
-      "opencode",
-    ]
-  ) {
+  for (const marker of [
+    "volcengine-agentplan",
+    "volcengine-codingplan",
+    "alibaba",
+    "bailian",
+    "dashscope",
+    "gitee",
+    "moark",
+    "opencode",
+  ]) {
     if (s.includes(marker)) return true;
   }
   return false;
@@ -74,7 +72,8 @@ export function inferFamily(h: Hint): Family {
       return "deepseek-gateway-vision";
     }
     if (
-      model.includes("doubao") || model.includes("seed-2") ||
+      model.includes("doubao") ||
+      model.includes("seed-2") ||
       model.includes("seed2")
     ) {
       return "doubao-seed";
@@ -87,7 +86,9 @@ export function inferFamily(h: Hint): Family {
     if (model.includes("glm")) return "glm";
     if (model.includes("mimo")) return "mimo";
     if (
-      model.includes("grok") || model.includes("x-ai") || model.includes("xai/")
+      model.includes("grok") ||
+      model.includes("x-ai") ||
+      model.includes("xai/")
     ) {
       return "grok";
     }
@@ -103,13 +104,15 @@ export function inferFamily(h: Hint): Family {
     if (model.includes("gemma")) return "gemma-vision";
     if (model.includes("gemini")) return "gemini";
     if (
-      model.includes("pixtral") || model.includes("mistral") ||
+      model.includes("pixtral") ||
+      model.includes("mistral") ||
       model.includes("devstral")
     ) {
       return "mistral";
     }
     if (
-      model.includes("claude") || model.includes("anthropic.claude") ||
+      model.includes("claude") ||
+      model.includes("anthropic.claude") ||
       model.includes("anthropic/claude")
     ) {
       if (isBedrockProvider(providerText) || model.startsWith("anthropic.")) {
@@ -118,8 +121,10 @@ export function inferFamily(h: Hint): Family {
       return "anthropic";
     }
     if (
-      model.startsWith("gpt-") || model.startsWith("o1") ||
-      model.startsWith("o3") || model.startsWith("o4") ||
+      model.startsWith("gpt-") ||
+      model.startsWith("o1") ||
+      model.startsWith("o3") ||
+      model.startsWith("o4") ||
       model.includes("openai/gpt-")
     ) {
       return "openai";
@@ -141,7 +146,8 @@ export function inferFamily(h: Hint): Family {
   }
   if (isBedrockProvider(providerText)) return "amazon-nova";
   if (
-    api.includes("google") || providerText.includes("google-gemini") ||
+    api.includes("google") ||
+    providerText.includes("google-gemini") ||
     providerText.includes("google-vertex")
   ) {
     return "gemini";
@@ -149,7 +155,8 @@ export function inferFamily(h: Hint): Family {
   if (providerText.includes("mistral")) return "mistral";
   if (providerText.includes("volcengine")) return "doubao-seed";
   if (
-    providerText.includes("alibaba") || providerText.includes("bailian") ||
+    providerText.includes("alibaba") ||
+    providerText.includes("bailian") ||
     providerText.includes("dashscope")
   ) {
     return "qwen";

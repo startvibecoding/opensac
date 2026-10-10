@@ -1,7 +1,8 @@
 //
 // The goja-specific `TestGojaUndefinedAndNullExportAsNil` is dropped (no goja
-// equivalent): the Deno worker already normalizes undefined/null to null.
+// equivalent): the Node worker already normalizes undefined/null to null.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   evalJsWorkflow,
@@ -56,7 +57,7 @@ test("resolveJsValue nested values and numbers", async () => {
     result: "findings",
     startedAt: new Date(),
   };
-  const got = await resolveJsValue(rt, undefined, value) as {
+  const got = (await resolveJsValue(rt, undefined, value)) as {
     object: { text: unknown; items: unknown[] };
   };
   assertEquals(got.object.text, "findings");
@@ -103,17 +104,14 @@ test("evalJsWorkflow cancellation interrupts runtime", async () => {
 
 test("evalJsWorkflowWithin times out runaway source", async () => {
   const started = Date.now();
-  const err = await assertRejects(
-    () => evalJsWorkflowWithin("while (true) {}", 50),
+  const err = await assertRejects(() =>
+    evalJsWorkflowWithin("while (true) {}", 50),
   );
   assert(
     err instanceof JsEvaluationTimeoutError,
     `error = ${err}, want JsEvaluationTimeoutError`,
   );
-  assert(
-    Date.now() - started < 5000,
-    "evaluation ran despite the 50ms budget",
-  );
+  assert(Date.now() - started < 5000, "evaluation ran despite the 50ms budget");
 });
 
 test("evalJsWorkflowWithin keeps completion behavior", async () => {
@@ -172,7 +170,7 @@ test("results and logs are deterministically ordered", async () => {
 });
 
 test("inlined workflow worker source stays in sync with js_worker.js", async () => {
-  const onDisk = await Deno.readTextFile(
+  const onDisk = await nodeRuntime.readTextFile(
     new URL("./js_worker.js", import.meta.url),
   );
   assertEquals(jsWorkerSource, onDisk);

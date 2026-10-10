@@ -1,5 +1,6 @@
 // (the tool-surface, status/send/destroy, and parameter-validation cases).
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -57,7 +58,7 @@ test("SubAgentToolsDescriptions", () => {
 test("SubAgentToolNamesMatchRegisteredTools", () => {
   const [, mgr] = createTestFactoryAndManager();
   const registry = createRegistry(
-    Deno.makeTempDirSync({ prefix: "opensac-agent-registry-" }),
+    runtime.makeTempDirSync({ prefix: "opensac-agent-registry-" }),
     createNoneSandbox(),
   );
   registerSubAgentTools(registry, mgr);
@@ -123,7 +124,7 @@ test("SubAgentSendToolNotFound", () => {
   const [, mgr] = createTestFactoryAndManager();
   const tool = new SubAgentSendTool(mgr);
   assertThrows(() =>
-    tool.execute({}, { handle: "nonexistent", message: "test" })
+    tool.execute({}, { handle: "nonexistent", message: "test" }),
   );
 });
 
@@ -175,7 +176,9 @@ async function waitForManagedAgentToStop(
     const st = mgr.status(id);
     if (
       st !== undefined &&
-      (st.state === "done" || st.state === "error" || st.state === "canceled" ||
+      (st.state === "done" ||
+        st.state === "error" ||
+        st.state === "canceled" ||
         st.state === "incomplete")
     ) {
       return;

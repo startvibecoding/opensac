@@ -7,6 +7,7 @@
 // byte) and forwards key events to {@link InputState}; results are dispatched
 // to the session.
 
+import { runtime } from "../platform/runtime.ts";
 import React, { useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useStdin } from "ink";
@@ -70,23 +71,24 @@ export function TuiShell({
         current.onExit();
       }
     };
-    // `Deno.addSignalListener("SIGINT")` throws on Windows, where the shim has
+    // `runtime.addSignalListener("SIGINT")` throws on Windows, where the shim has
     // no POSIX signal delivery to hook. In raw mode Ctrl+C arrives as the bare
     // 0x03 byte on stdin instead (Ink's own exit-on-Ctrl+C watch for the same
     // byte), so parse the emitted chunks and run the same handler. Signal
     // listening stays the primary path everywhere that supports it.
     let listening = false;
     try {
-      Deno.addSignalListener("SIGINT", onSignal);
+      runtime.addSignalListener("SIGINT", onSignal);
       listening = true;
     } catch {
       // Signal listeners are unsupported on this host (e.g. Windows).
     }
     const decoder = new TextDecoder();
     const onInputChunk = (chunk: unknown): void => {
-      const text = chunk instanceof Uint8Array
-        ? decoder.decode(chunk)
-        : String(chunk ?? "");
+      const text =
+        chunk instanceof Uint8Array
+          ? decoder.decode(chunk)
+          : String(chunk ?? "");
       if (text === "\x03") onSignal();
     };
     const emitter = internal_eventEmitter;
@@ -94,7 +96,7 @@ export function TuiShell({
       emitter.on("input", onInputChunk);
     }
     return () => {
-      if (listening) Deno.removeSignalListener("SIGINT", onSignal);
+      if (listening) runtime.removeSignalListener("SIGINT", onSignal);
       emitter?.off("input", onInputChunk);
     };
   }, [internal_eventEmitter]);
@@ -138,10 +140,13 @@ export function TuiShell({
       // Plain keystrokes and short text apply immediately; only a chunk that
       // could be part of a terminal-split paste (a newline, a bare Enter, or
       // text while events are already pending) waits for the idle window.
-      const couldBePaste = queueRef.current.length > 0 ||
-        events.some((ev) =>
-          (ev.type === "text" && (ev.paste || ev.text.includes("\n"))) ||
-          (ev.type === "key" && (ev.name === "enter" || ev.name === "newline"))
+      const couldBePaste =
+        queueRef.current.length > 0 ||
+        events.some(
+          (ev) =>
+            (ev.type === "text" && (ev.paste || ev.text.includes("\n"))) ||
+            (ev.type === "key" &&
+              (ev.name === "enter" || ev.name === "newline")),
         );
       if (!couldBePaste) {
         for (const ev of events) {
@@ -167,33 +172,35 @@ export function TuiShell({
 
   // Include `version` so React re-renders when the store changes externally.
   void version;
-  const overlayOpen = session.toolModalOpen || session.planModalOpen ||
-    session.esmPanelOpen || session.skillHubPanelOpen ||
-    session.skillMgrPanelOpen || session.dialogOpen;
+  const overlayOpen =
+    session.toolModalOpen ||
+    session.planModalOpen ||
+    session.esmPanelOpen ||
+    session.skillHubPanelOpen ||
+    session.skillMgrPanelOpen ||
+    session.dialogOpen;
 
   return (
     <Box flexDirection="column">
-      {React.createElement(App, {
-        controller,
-        header: session.header,
-        width,
-        compactMode: session.compactMode,
-        overlayOpen,
-      }) as ReactElement}
+      {
+        React.createElement(App, {
+          controller,
+          header: session.header,
+          width,
+          compactMode: session.compactMode,
+          overlayOpen,
+        }) as ReactElement
+      }
       {session.toolModalOpen && (
         <Panel text={session.toolModalView(spinnerFrame(spin))} />
       )}
       {session.planModalOpen && <Panel text={session.planModalView()} />}
       {session.esmPanelOpen && <Panel text={session.esmPanelView()} />}
       {session.skillHubPanelOpen && (
-        <Panel
-          text={session.skillHubPanelView()}
-        />
+        <Panel text={session.skillHubPanelView()} />
       )}
       {session.skillMgrPanelOpen && (
-        <Panel
-          text={session.skillMgrPanelView()}
-        />
+        <Panel text={session.skillMgrPanelView()} />
       )}
       {session.dialogOpen && <Panel text={session.dialogView(width)} />}
       {!session.dialogOpen && (
@@ -210,9 +217,9 @@ export function TuiShell({
           : session.translator.text("shell.hint")}
       </Text>
       <Text dimColor>
-        {`${session.header.providerName}/${session.header.modelName} · mode: ${session.mode}${
-          statusSuffix(controller)
-        }`}
+        {`${session.header.providerName}/${session.header.modelName} · mode: ${session.mode}${statusSuffix(
+          controller,
+        )}`}
       </Text>
     </Box>
   );
@@ -226,7 +233,9 @@ export function TuiShell({
  * frame out of Ink's layout and output diff entirely, which matters while the
  * spinner tick re-renders the whole shell.
  */
-const Panel = React.memo(function Panel({ text }: {
+const Panel = React.memo(function Panel({
+  text,
+}: {
   text: string;
 }): ReactElement {
   return (

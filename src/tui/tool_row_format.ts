@@ -51,8 +51,10 @@ export function toolPath(args: Record<string, unknown> | undefined): string {
 export function bashCommand(input: ToolRowInput): string {
   const c = input.toolArgs?.["command"];
   if (typeof c === "string" && c.trim() !== "") return c;
-  return toolSectionValue(input.fullContent, "[command]") ||
-    toolSectionValue(input.summary, "[command]");
+  return (
+    toolSectionValue(input.fullContent, "[command]") ||
+    toolSectionValue(input.summary, "[command]")
+  );
 }
 
 /** The [exit_code] section of the result, if present (Go bashExitCode). */
@@ -166,7 +168,8 @@ function outputLine(body: string | null): string | null {
 function bashExcerpt(input: ToolRowInput): string {
   for (const content of [input.fullContent, input.summary]) {
     if (content === "") continue;
-    const line = outputLine(toolSectionBody(content, "[stdout]")) ??
+    const line =
+      outputLine(toolSectionBody(content, "[stdout]")) ??
       outputLine(toolSectionBody(content, "[stderr]"));
     if (line !== null) return truncateRaw(line, 160);
   }
@@ -191,9 +194,10 @@ function runningLine(tr: Translator, input: ToolRowInput): string {
     case "find": {
       const pattern = input.toolArgs?.["pattern"];
       if (typeof pattern === "string") {
-        return `${header} ${spinnerMark(input)}running ${
-          truncateRaw(pattern, 120)
-        }`;
+        return `${header} ${spinnerMark(input)}running ${truncateRaw(
+          pattern,
+          120,
+        )}`;
       }
       break;
     }
@@ -256,10 +260,7 @@ function editHeader(tr: Translator, input: ToolRowInput): string {
  * renderExpandedToolResult + formatToolModalContent: a header line, the tool
  * arguments, `---` plus the full output, and the unified diff when present.
  */
-export function expandedToolRow(
-  tr: Translator,
-  input: ToolRowInput,
-): string {
+export function expandedToolRow(tr: Translator, input: ToolRowInput): string {
   if (input.status === "running") return runningLine(tr, input);
   if (
     input.toolName !== "bash" &&
@@ -281,10 +282,7 @@ export function expandedToolRow(
   }
 
   const parts: string[] = [];
-  const args = formatDetailedActivityTool(
-    input.toolName,
-    input.toolArgs,
-  );
+  const args = formatDetailedActivityTool(input.toolName, input.toolArgs);
   if (args.trim() !== "" && args !== input.toolName) parts.push(args);
   if (input.fullContent !== "") parts.push("---", input.fullContent);
   const unified = input.diff?.unified?.trim() ?? "";
@@ -418,7 +416,8 @@ export function formatToolRow(
 
   if (input.toolName === "edit" || input.toolName === "write") {
     if (
-      input.summary === "" && input.fullContent === "" &&
+      input.summary === "" &&
+      input.fullContent === "" &&
       input.diff === undefined
     ) {
       return `${toolHeader(input)} ...`;
@@ -449,7 +448,11 @@ export function defaultToolSummary(
       }
       break;
   }
-  const first = result.split("\n").find((l) => l.trim() !== "")?.trim() ?? "";
+  const first =
+    result
+      .split("\n")
+      .find((l) => l.trim() !== "")
+      ?.trim() ?? "";
   return truncateRaw(first, 50);
 }
 
@@ -473,9 +476,9 @@ export const MIN_TOOL_GROUP_SIZE = 2;
  * Empty member rows are dropped; `title` keeps the full group count.
  */
 export function formatToolGroup(title: string, members: string[]): string {
-  const bodies = members.map((m) => m.trimRight()).filter((m) =>
-    m.trim() !== ""
-  );
+  const bodies = members
+    .map((m) => m.trimRight())
+    .filter((m) => m.trim() !== "");
   const lines = [title];
   for (let i = 0; i < bodies.length; i++) {
     const branch = i === bodies.length - 1 ? "└─ " : "├─ ";
@@ -488,7 +491,12 @@ export function formatToolGroup(title: string, members: string[]): string {
 function treeIndentBlock(branch: string, body: string): string {
   const lines = body.split("\n");
   if (lines.length === 1) return branch + lines[0];
-  return branch +
+  return (
+    branch +
     lines[0] +
-    lines.slice(1).map((line) => `\n   ${line}`).join("");
+    lines
+      .slice(1)
+      .map((line) => `\n   ${line}`)
+      .join("")
+  );
 }

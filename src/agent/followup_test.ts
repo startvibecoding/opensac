@@ -21,14 +21,12 @@ test("composeFollowUps returns pending completions", async () => {
   const hook = composeFollowUps(mbox)!;
   assertEquals(await hook(undefined), null);
 
-  mbox.enqueue(
-    {
-      ...createMemberCompletion(),
-      memberId: "pm",
-      status: MEMBER_STATUS_DONE,
-      payload: "PRD 已完成",
-    },
-  );
+  mbox.enqueue({
+    ...createMemberCompletion(),
+    memberId: "pm",
+    status: MEMBER_STATUS_DONE,
+    payload: "PRD 已完成",
+  });
   const messages = await hook(undefined);
   assert(messages != null);
   assertEquals(messages!.length, 1);

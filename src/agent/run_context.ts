@@ -2,7 +2,7 @@
 //
 // Go threads `context.Context` through the agent loop and stores run-scoped
 // values in it (agent id, event sink, parent run context, parent mode,
-// iteration budget). Deno has no `context.Context`, and Go's `context.WithValue`
+// iteration budget). Node has no `context.Context`, and Go's `context.WithValue`
 // bag is an antipattern even there, so this module carries the caller's
 // `AbortSignal` plus explicit typed fields. It is internal to `src/agent`.
 

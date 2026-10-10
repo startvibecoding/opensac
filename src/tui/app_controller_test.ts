@@ -26,14 +26,19 @@ import {
 } from "../agent/events.ts";
 import { Translator } from "./i18n.ts";
 
-function controller(
-  leadAgentId?: string,
-): { c: AppController; messages: string[] } {
+function controller(leadAgentId?: string): {
+  c: AppController;
+  messages: string[];
+} {
   const messages: string[] = [];
-  const c = new AppController(new Translator("en"), {
-    onMessage: (_kind, text) => void messages.push(text),
-    scheduleRender: () => {},
-  }, { leadAgentId });
+  const c = new AppController(
+    new Translator("en"),
+    {
+      onMessage: (_kind, text) => void messages.push(text),
+      scheduleRender: () => {},
+    },
+    { leadAgentId },
+  );
   return { c, messages };
 }
 
@@ -122,61 +127,75 @@ test("background events route to the activity store, not the transcript", () => 
 
 test("tool events open and terminalize rows", () => {
   const { c } = controller("lead");
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_EXECUTION_START,
-    toolCallId: "t1",
-    toolName: "bash",
-    toolArgs: { cmd: "ls" },
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "t1",
+      toolName: "bash",
+      toolArgs: { cmd: "ls" },
+    }),
+  );
   assertEquals(c.store.toolResults[0].status, "running");
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_RESULT,
-    toolCallId: "t1",
-    toolName: "bash",
-    toolResult: "out",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_RESULT,
+      toolCallId: "t1",
+      toolName: "bash",
+      toolResult: "out",
+    }),
+  );
   assertEquals(c.store.toolResults[0].status, "completed");
 });
 
 test("tool terminal state distinguishes failed and interrupted results", () => {
   const { c } = controller("lead");
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_EXECUTION_START,
-    toolCallId: "failed-tool",
-    toolName: "read",
-  }));
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_EXECUTION_END,
-    toolCallId: "failed-tool",
-    toolName: "read",
-    toolResult: "tool failed",
-    toolExecutionState: "failed",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "failed-tool",
+      toolName: "read",
+    }),
+  );
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_END,
+      toolCallId: "failed-tool",
+      toolName: "read",
+      toolResult: "tool failed",
+      toolExecutionState: "failed",
+    }),
+  );
   assertEquals(c.store.toolResults[0].status, "completed");
   assertEquals(c.store.toolResults[0].executionState, "failed");
 
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_EXECUTION_START,
-    toolCallId: "stopped-tool",
-    toolName: "read",
-  }));
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_EXECUTION_END,
-    toolCallId: "stopped-tool",
-    toolName: "read",
-    toolResult: "stopped",
-    toolExecutionState: "interrupted",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "stopped-tool",
+      toolName: "read",
+    }),
+  );
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_END,
+      toolCallId: "stopped-tool",
+      toolName: "read",
+      toolResult: "stopped",
+      toolExecutionState: "interrupted",
+    }),
+  );
   assertEquals(c.store.toolResults[1].status, "interrupted");
   assertEquals(c.store.toolResults[1].executionState, "interrupted");
 });
 
 test("tool call event uses the embedded ToolCallBlock id/name", () => {
   const { c } = controller("lead");
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_CALL,
-    toolCall: { id: "tc-1", name: "read" },
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_CALL,
+      toolCall: { id: "tc-1", name: "read" },
+    }),
+  );
   assertEquals(c.store.toolResults[0].toolCallID, "tc-1");
   assertEquals(c.store.toolResults[0].toolName, "read");
 });
@@ -185,24 +204,30 @@ test("status messages become transcript rows; retry-status skipped", () => {
   const { c, messages } = controller("lead");
   c.handleAgentEvent(ev({ type: EVENT_STATUS, statusMessage: "thinking..." }));
   assertEquals(messages, ["thinking..."]);
-  c.handleAgentEvent(ev({
-    type: EVENT_STATUS,
-    retryStatus: true,
-    statusMessage: "internal",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_STATUS,
+      retryStatus: true,
+      statusMessage: "internal",
+    }),
+  );
   assertEquals(messages.length, 1);
 });
 
 test("routine lifecycle rows are full-view-only, important ones are not", () => {
   const { c, messages } = controller("lead");
-  c.handleAgentEvent(ev({
-    type: EVENT_STATUS,
-    statusMessage: "Context compacted: 1200 tokens",
-  }));
-  c.handleAgentEvent(ev({
-    type: EVENT_STATUS,
-    statusMessage: "Tool failed: permission denied",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_STATUS,
+      statusMessage: "Context compacted: 1200 tokens",
+    }),
+  );
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_STATUS,
+      statusMessage: "Tool failed: permission denied",
+    }),
+  );
   assertEquals(messages.length, 2);
   // The simple view drops routine lifecycle rows, but keeps them in the
   // transcript so the full view can replay them.
@@ -214,14 +239,18 @@ test("routine lifecycle rows are full-view-only, important ones are not", () => 
 
 test("hosted items only stay visible in the simple view once terminal", () => {
   const { c } = controller("lead");
-  c.handleAgentEvent(ev({
-    type: EVENT_HOSTED_ITEM,
-    hostedItem: { type: "image", status: "running" },
-  }));
-  c.handleAgentEvent(ev({
-    type: EVENT_HOSTED_ITEM,
-    hostedItem: { type: "image", status: "completed" },
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_HOSTED_ITEM,
+      hostedItem: { type: "image", status: "running" },
+    }),
+  );
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_HOSTED_ITEM,
+      hostedItem: { type: "image", status: "completed" },
+    }),
+  );
   assertEquals(c.store.isFullOnly(0), true);
   assertEquals(c.store.isFullOnly(1), false);
   assertEquals(c.store.messages[1], "hosted item [image]: completed");
@@ -275,7 +304,10 @@ test("cancellation maps to cancelled and adds a message", () => {
   c.attachRun(handle);
   c.handleAgentEvent(ev({ type: EVENT_RUN_FINISHED, status: TASK_CANCELED }));
   assertEquals(finished, ["cancelled"]);
-  assertEquals(messages.some((m) => m.toLowerCase().includes("cancel")), true);
+  assertEquals(
+    messages.some((m) => m.toLowerCase().includes("cancel")),
+    true,
+  );
 });
 
 test("legacy EVENT_DONE/EVENT_ERROR terminalize when RunFinished is absent", () => {
@@ -303,12 +335,14 @@ test("approval requests register a decision and queue", () => {
   const { c } = controller("lead");
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({
-    type: 15, // EVENT_TOOL_APPROVAL_REQUEST
-    approvalId: "ap-1",
-    approvalTool: "bash",
-    approvalArgs: { cmd: "rm" },
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: 15, // EVENT_TOOL_APPROVAL_REQUEST
+      approvalId: "ap-1",
+      approvalTool: "bash",
+      approvalArgs: { cmd: "rm" },
+    }),
+  );
   assertEquals(registrations, [{ id: "ap-1", kind: "approval" }]);
   // Enqueue + show-next consumes the queue into the shown slot (Go semantics)
   assertEquals(c.approvalQueue.length, 0);
@@ -321,27 +355,34 @@ test("member questions route to the lead mailbox path, not the human", () => {
   const { c, messages } = controller("lead");
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({
-    type: 17, // EVENT_QUESTION_REQUEST
-    agentId: "sub-1",
-    memberDisplayName: "Worker",
-    questionText: "what next?",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: 17, // EVENT_QUESTION_REQUEST
+      agentId: "sub-1",
+      memberDisplayName: "Worker",
+      questionText: "what next?",
+    }),
+  );
   assertEquals(registrations.length, 0); // never registered as human decision
   assertEquals(c.questionQueue.length, 0);
-  assertEquals(messages.some((m) => m.includes("Worker")), true);
+  assertEquals(
+    messages.some((m) => m.includes("Worker")),
+    true,
+  );
 });
 
 test("human questions register and queue", () => {
   const { c } = controller("lead");
   const { handle, registrations } = runHandle();
   c.attachRun(handle);
-  c.handleAgentEvent(ev({
-    type: 17,
-    questionId: "q-1",
-    questionText: "continue?",
-    questionOptions: ["yes", "no"],
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: 17,
+      questionId: "q-1",
+      questionText: "continue?",
+      questionOptions: ["yes", "no"],
+    }),
+  );
   assertEquals(registrations, [{ id: "q-1", kind: "question" }]);
   assertEquals(c.questionQueue.length, 0); // consumed by show-next
   assertEquals(c.shownQuestion?.questionID, "q-1");
@@ -428,12 +469,14 @@ test({
     c.handleAgentEvent(
       ev({ type: EVENT_TEXT_DELTA, textDelta: "streaming answer" }),
     );
-    c.handleAgentEvent(ev({
-      type: 15,
-      approvalId: "ap-1",
-      approvalTool: "bash",
-      approvalArgs: { cmd: "ls" },
-    }));
+    c.handleAgentEvent(
+      ev({
+        type: 15,
+        approvalId: "ap-1",
+        approvalTool: "bash",
+        approvalArgs: { cmd: "ls" },
+      }),
+    );
     const stdout = new FakeStdout();
     const instance = render(
       App({
@@ -504,12 +547,14 @@ test({
     c.handleAgentEvent(
       ev({ type: EVENT_TEXT_DELTA, textDelta: "hidden while open" }),
     );
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_EXECUTION_START,
-      toolCallId: "live-tool",
-      toolName: "bash",
-      toolArgs: { command: "never-render-behind-overlay" },
-    }));
+    c.handleAgentEvent(
+      ev({
+        type: EVENT_TOOL_EXECUTION_START,
+        toolCallId: "live-tool",
+        toolName: "bash",
+        toolArgs: { command: "never-render-behind-overlay" },
+      }),
+    );
     c.handleAgentEvent(ev({ type: EVENT_TURN_END }));
     instance.rerender(view(true));
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -554,22 +599,26 @@ test({
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_EXECUTION_START,
-      toolCallId: "failed-tool",
-      toolName: "bash",
-      toolArgs: { command: "overlay-tool-failure" },
-    }));
+    c.handleAgentEvent(
+      ev({
+        type: EVENT_TOOL_EXECUTION_START,
+        toolCallId: "failed-tool",
+        toolName: "bash",
+        toolArgs: { command: "overlay-tool-failure" },
+      }),
+    );
     instance.rerender(view(true));
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_EXECUTION_END,
-      toolCallId: "failed-tool",
-      toolName: "bash",
-      toolResult: "failed",
-      toolExecutionState: TOOL_EXECUTION_FAILED,
-    }));
+    c.handleAgentEvent(
+      ev({
+        type: EVENT_TOOL_EXECUTION_END,
+        toolCallId: "failed-tool",
+        toolName: "bash",
+        toolResult: "failed",
+        toolExecutionState: TOOL_EXECUTION_FAILED,
+      }),
+    );
     instance.rerender(view(true));
     await new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -577,11 +626,7 @@ test({
     instance.rerender(view(false));
     await new Promise((resolve) => setTimeout(resolve, 20));
     const closed = stdout.output.slice(closeStart);
-    assertEquals(
-      closed.match(/overlay-tool-failure/g)?.length ?? 0,
-      1,
-      closed,
-    );
+    assertEquals(closed.match(/overlay-tool-failure/g)?.length ?? 0, 1, closed);
     instance.unmount();
   },
 });
@@ -591,11 +636,13 @@ test("lead activity timeline tracks thinking and tools per turn", () => {
   c.attachRun(runHandle().handle);
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   c.handleAgentEvent(ev({ type: EVENT_THINK_DELTA, thinkDelta: "hmm" }));
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_CALL,
-    toolCall: { id: "t1", name: "bash" },
-    toolArgs: { command: "ls" },
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_CALL,
+      toolCall: { id: "t1", name: "bash" },
+      toolArgs: { command: "ls" },
+    }),
+  );
 
   // Tool still running: timeline shows thinking + running tool with live
   // elapsed timing.
@@ -609,11 +656,13 @@ test("lead activity timeline tracks thinking and tools per turn", () => {
   assertEquals(think?.status, "running");
   assertEquals(think?.content, "hmm");
 
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_RESULT,
-    toolCallId: "t1",
-    toolResult: "ok",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_RESULT,
+      toolCallId: "t1",
+      toolResult: "ok",
+    }),
+  );
   items = c.activityManager.buildTimeline();
   assertEquals(items.find((i) => i.type === "tool")?.status, "completed");
   assertEquals(items.find((i) => i.type === "tool")?.content, "ok");
@@ -632,11 +681,13 @@ test("run finish interrupts tools that never returned", () => {
   const { handle } = runHandle();
   c.attachRun(handle);
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_EXECUTION_START,
-    toolCallId: "t9",
-    toolName: "bash",
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "t9",
+      toolName: "bash",
+    }),
+  );
   c.handleAgentEvent(ev({ type: EVENT_RUN_FINISHED, status: TASK_CANCELED }));
   const tool = c.activityManager.buildTimeline().find((i) => i.type === "tool");
   assertEquals(tool?.status, "interrupted");
@@ -651,10 +702,12 @@ test("run finish interrupts tools that never returned", () => {
 test("new turn resets the activity timeline", () => {
   const { c } = controller("lead");
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
-  c.handleAgentEvent(ev({
-    type: EVENT_TOOL_CALL,
-    toolCall: { id: "a", name: "grep" },
-  }));
+  c.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_CALL,
+      toolCall: { id: "a", name: "grep" },
+    }),
+  );
   assertEquals(c.activityManager.buildTimeline().length, 1);
   c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
   assertEquals(c.activityManager.buildTimeline().length, 0);
@@ -667,12 +720,14 @@ test({
   async fn() {
     const { c } = controller("lead");
     c.handleAgentEvent(ev({ type: EVENT_TURN_START }));
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_EXECUTION_START,
-      toolCallId: "t-bash",
-      toolName: "bash",
-      toolArgs: { command: "cd /a/b & ls" },
-    }));
+    c.handleAgentEvent(
+      ev({
+        type: EVENT_TOOL_EXECUTION_START,
+        toolCallId: "t-bash",
+        toolName: "bash",
+        toolArgs: { command: "cd /a/b & ls" },
+      }),
+    );
     const stdout = new FakeStdout();
     const view = () =>
       App({
@@ -696,18 +751,22 @@ test({
     // Only a lone running call stays on the activity timeline: a call that
     // starts while a sibling runs joins the sibling's tree block instead
     // (see tool_group_test.ts).
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_RESULT,
-      toolCallId: "t-bash",
-      toolName: "bash",
-      toolResult: "ok",
-    }));
-    c.handleAgentEvent(ev({
-      type: EVENT_TOOL_EXECUTION_START,
-      toolCallId: "t-read",
-      toolName: "read",
-      toolArgs: { path: "src/main.ts" },
-    }));
+    c.handleAgentEvent(
+      ev({
+        type: EVENT_TOOL_RESULT,
+        toolCallId: "t-bash",
+        toolName: "bash",
+        toolResult: "ok",
+      }),
+    );
+    c.handleAgentEvent(
+      ev({
+        type: EVENT_TOOL_EXECUTION_START,
+        toolCallId: "t-read",
+        toolName: "read",
+        toolArgs: { path: "src/main.ts" },
+      }),
+    );
     instance.rerender(view());
     await new Promise((resolve) => setTimeout(resolve, 50));
     instance.unmount();

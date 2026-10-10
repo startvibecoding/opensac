@@ -108,7 +108,7 @@ export function sessionConfigOptionsWithProviders(
     modelChoices.push({ value, name });
   }
   modelChoices.sort((a, b) =>
-    a.value < b.value ? -1 : a.value > b.value ? 1 : 0
+    a.value < b.value ? -1 : a.value > b.value ? 1 : 0,
   );
   const providerNames: string[] = [];
   for (const rawName of Object.keys(providers)) {

@@ -1,5 +1,6 @@
 // Focused tests for the system-prompt builder.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { resolveBashShell } from "../platform/platform.ts";
 import { createBashTool } from "../tools/bash.ts";
@@ -118,10 +119,10 @@ test("a configured settings.shellPath reaches the tool and the prompt", () => {
   // Regression: `settings.shellPath` was dead config. It was persisted and shown
   // in the TUI, but nothing ever read it, so the user's chosen shell was
   // silently ignored.
-  const dir = Deno.makeTempDirSync({ prefix: ".opensac-shellpath-" });
+  const dir = runtime.makeTempDirSync({ prefix: ".opensac-shellpath-" });
   try {
     const custom = `${dir}/myshell`;
-    Deno.writeTextFileSync(custom, "#!/bin/sh\n");
+    runtime.writeTextFileSync(custom, "#!/bin/sh\n");
 
     const registry = createRegistryWithConfig({
       workDir: "/work",
@@ -148,6 +149,6 @@ test("a configured settings.shellPath reaches the tool and the prompt", () => {
       "prompt must advertise the configured shell",
     );
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 });

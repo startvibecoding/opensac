@@ -56,16 +56,18 @@ test("ResolveModelRejectsInvalidAndForeignModels", () => {
 });
 
 test("ConvertModelConfigsPreservesCompat", () => {
-  const models = convertModelConfigs("test", [{
-    id: "m1",
-    name: "M1",
-    reasoning: true,
-    compat: {
-      thinkingFormat: "deepseek",
-      supportsReasoningEffort: false,
-      maxTokensField: "max_completion_tokens",
+  const models = convertModelConfigs("test", [
+    {
+      id: "m1",
+      name: "M1",
+      reasoning: true,
+      compat: {
+        thinkingFormat: "deepseek",
+        supportsReasoningEffort: false,
+        maxTokensField: "max_completion_tokens",
+      },
     },
-  }]);
+  ]);
   assertEquals(models.length, 1);
   const compat = models[0].compat;
   assert(compat !== undefined);

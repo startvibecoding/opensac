@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -16,19 +17,19 @@ import {
 import { test } from "#testing";
 
 test("MCP path helpers", () => {
-  const prevWd = Deno.cwd();
-  const tmp = Deno.makeTempDirSync({ prefix: "mcp-" });
-  Deno.chdir(tmp);
+  const prevWd = runtime.cwd();
+  const tmp = runtime.makeTempDirSync({ prefix: "mcp-" });
+  runtime.chdir(tmp);
   try {
     assertEquals(path.basename(globalMCPPath()), "mcp.json");
     assertEquals(projectMCPPath(), path.join(projectDirName, "mcp.json"));
   } finally {
-    Deno.chdir(prevWd);
+    runtime.chdir(prevWd);
   }
 });
 
 test("save/load MCP config", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "mcp-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "mcp-" });
   const p = path.join(tmp, "mcp.json");
   const cfg: MCPConfig = {
     mcpServers: [{ name: "s1", type: "stdio", command: "/tmp/mcp" }],
@@ -37,7 +38,7 @@ test("save/load MCP config", () => {
   const got = loadMCPConfig(p);
   assertEquals(got.mcpServers!.length, 1);
   assertEquals(got.mcpServers![0].name, "s1");
-  assertEquals(Deno.statSync(p).mode! & 0o777, 0o600);
+  assertEquals(runtime.statSync(p).mode! & 0o777, 0o600);
 
   cfg.mcpServers![0].name = "updated";
   saveMCPConfig(p, cfg);
@@ -63,11 +64,11 @@ test("load MCP config not found", () => {
   let threw = false;
   try {
     loadMCPConfig(
-      path.join(Deno.makeTempDirSync({ prefix: "mcp-" }), "missing.json"),
+      path.join(runtime.makeTempDirSync({ prefix: "mcp-" }), "missing.json"),
     );
   } catch (err) {
     threw = true;
-    assert(err instanceof Deno.errors.NotFound);
+    assert(err instanceof runtime.errors.NotFound);
   }
   assert(threw);
 });
@@ -80,10 +81,10 @@ test("MCP server enabled additive field", () => {
   };
   assert(mcpServerEnabled(legacy));
   // Legacy entries must not grow an enabled key.
-  const tmp = Deno.makeTempDirSync({ prefix: "mcp-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "mcp-" });
   const p = path.join(tmp, "mcp.json");
   saveMCPConfig(p, { mcpServers: [legacy] });
-  assert(!Deno.readTextFileSync(p).includes('"enabled"'));
+  assert(!runtime.readTextFileSync(p).includes('"enabled"'));
 
   assert(!mcpServerEnabled({ name: "off", enabled: false }));
   assert(mcpServerEnabled({ name: "on", enabled: true }));

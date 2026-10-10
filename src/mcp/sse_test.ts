@@ -1,7 +1,8 @@
 //
 // The legacy HTTP+SSE transport maps `httptest` + `http.Flusher` to a
-// `Deno.serve` response backed by a manually-driven `ReadableStream`.
+// `runtime.serve` response backed by a manually-driven `ReadableStream`.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
@@ -16,10 +17,23 @@ interface RawServer {
   close: () => Promise<void>;
 }
 
-function startJSONServer(handler: Handler): RawServer {
+async function startJSONServer(handler: Handler): Promise<RawServer> {
   const ac = new AbortController();
-  const server = Deno.serve(
-    { hostname: "127.0.0.1", port: 0, signal: ac.signal },
+  let port = 0;
+  let resolvePort!: () => void;
+  const portReady = new Promise<void>((resolve) => {
+    resolvePort = resolve;
+  });
+  const server = runtime.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      signal: ac.signal,
+      onListen: (address) => {
+        port = address.port;
+        resolvePort();
+      },
+    },
     async (raw) => {
       let req: RPCRequest;
       try {
@@ -32,9 +46,9 @@ function startJSONServer(handler: Handler): RawServer {
       return Response.json(result);
     },
   );
-  const addr = server.addr as Deno.NetAddr;
+  await portReady;
   return {
-    url: `http://127.0.0.1:${addr.port}`,
+    url: `http://127.0.0.1:${port}`,
     close: async () => {
       ac.abort();
       await server.finished;
@@ -49,15 +63,26 @@ function ok(id: unknown, result: unknown): Record<string, unknown> {
 }
 
 test("MCP server SSE call flow", async () => {
-  let streamController:
-    | ReadableStreamDefaultController<Uint8Array>
-    | undefined;
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
   const streamReady = Promise.withResolvers<void>();
   const messageReqs: RPCRequest[] = [];
 
   const streamAC = new AbortController();
-  const streamServer = Deno.serve(
-    { hostname: "127.0.0.1", port: 0, signal: streamAC.signal },
+  let streamPort = 0;
+  let resolveStreamPort!: () => void;
+  const streamPortReady = new Promise<void>((resolve) => {
+    resolveStreamPort = resolve;
+  });
+  const streamServer = runtime.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      signal: streamAC.signal,
+      onListen: (address) => {
+        streamPort = address.port;
+        resolveStreamPort();
+      },
+    },
     (raw) => {
       if (raw.method !== "GET") return new Response("no", { status: 405 });
       const body = new ReadableStream<Uint8Array>({
@@ -78,9 +103,8 @@ test("MCP server SSE call flow", async () => {
       });
     },
   );
-  const streamURL = `http://127.0.0.1:${
-    (streamServer.addr as Deno.NetAddr).port
-  }`;
+  await streamPortReady;
+  const streamURL = `http://127.0.0.1:${streamPort}`;
 
   const writeSSE = (v: unknown) => {
     if (!streamController) return;
@@ -93,7 +117,7 @@ test("MCP server SSE call flow", async () => {
     }
   };
 
-  const messageServer = startJSONServer((req) => {
+  const messageServer = await startJSONServer((req) => {
     messageReqs.push(req);
     switch (req.method) {
       case "initialize":
@@ -102,11 +126,13 @@ test("MCP server SSE call flow", async () => {
         return ok(req.id, {});
       case "tools/list":
         return ok(req.id, {
-          tools: [{
-            name: "echo",
-            description: "sse echo",
-            inputSchema: { type: "object" },
-          }],
+          tools: [
+            {
+              name: "echo",
+              description: "sse echo",
+              inputSchema: { type: "object" },
+            },
+          ],
         });
       case "resources/list":
         return ok(req.id, { resources: [] });
@@ -120,26 +146,31 @@ test("MCP server SSE call flow", async () => {
     }
   });
 
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    runtime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.registerDefaults();
   let clients;
   try {
     clients = await connectServers(
       new AbortController().signal,
-      [{
-        name: "sse-server",
-        type: "sse",
-        url: streamURL,
-        messageUrl: messageServer.url,
-      }],
+      [
+        {
+          name: "sse-server",
+          type: "sse",
+          url: streamURL,
+          messageUrl: messageServer.url,
+        },
+      ],
       registry,
       {},
     );
     await streamReady.promise;
 
-    const echoTool = registry.all().find((t: Tool) =>
-      t.name().includes("_echo")
-    );
+    const echoTool = registry
+      .all()
+      .find((t: Tool) => t.name().includes("_echo"));
     assert(echoTool, "expected sse echo tool registration");
     const out = await echoTool!.execute({}, {});
     assert(out.text.includes("sse-ok"), out.text);
@@ -154,15 +185,26 @@ test("MCP server SSE call flow", async () => {
 });
 
 test("MCP server SSE notification callback", async () => {
-  let streamController:
-    | ReadableStreamDefaultController<Uint8Array>
-    | undefined;
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
   const streamReady = Promise.withResolvers<void>();
   const gotMethods: string[] = [];
 
   const streamAC = new AbortController();
-  const streamServer = Deno.serve(
-    { hostname: "127.0.0.1", port: 0, signal: streamAC.signal },
+  let streamPort = 0;
+  let resolveStreamPort!: () => void;
+  const streamPortReady = new Promise<void>((resolve) => {
+    resolveStreamPort = resolve;
+  });
+  const streamServer = runtime.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      signal: streamAC.signal,
+      onListen: (address) => {
+        streamPort = address.port;
+        resolveStreamPort();
+      },
+    },
     (raw) => {
       if (raw.method !== "GET") return new Response("no", { status: 405 });
       const body = new ReadableStream<Uint8Array>({
@@ -179,11 +221,10 @@ test("MCP server SSE notification callback", async () => {
       });
     },
   );
-  const streamURL = `http://127.0.0.1:${
-    (streamServer.addr as Deno.NetAddr).port
-  }`;
+  await streamPortReady;
+  const streamURL = `http://127.0.0.1:${streamPort}`;
 
-  const messageServer = startJSONServer((req) => {
+  const messageServer = await startJSONServer((req) => {
     switch (req.method) {
       case "initialize":
         return ok(req.id, { protocolVersion: "2025-11-25" });
@@ -198,18 +239,23 @@ test("MCP server SSE notification callback", async () => {
     }
   });
 
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    runtime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.registerDefaults();
   let clients;
   try {
     clients = await connectServers(
       new AbortController().signal,
-      [{
-        name: "notify-sse",
-        type: "sse",
-        url: streamURL,
-        messageUrl: messageServer.url,
-      }],
+      [
+        {
+          name: "notify-sse",
+          type: "sse",
+          url: streamURL,
+          messageUrl: messageServer.url,
+        },
+      ],
       registry,
       {
         onNotification: (_serverName, method) => {
@@ -221,13 +267,11 @@ test("MCP server SSE notification callback", async () => {
 
     streamController!.enqueue(
       encoder.encode(
-        `data: ${
-          JSON.stringify({
-            jsonrpc: "2.0",
-            method: "notifications/progress",
-            params: { progress: 0.5 },
-          })
-        }\n\n`,
+        `data: ${JSON.stringify({
+          jsonrpc: "2.0",
+          method: "notifications/progress",
+          params: { progress: 0.5 },
+        })}\n\n`,
       ),
     );
 

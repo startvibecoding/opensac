@@ -3,6 +3,7 @@
 // `AcpServer`, bind an in-memory sink, and call `handleAgentEvent` directly,
 // mirroring the Go fixture server.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertStrictEquals } from "../compat/assert.ts";
 import {
   AcpServer,
@@ -150,16 +151,13 @@ test("handleAgentEvent projects tool-result images", () => {
   const output = new SyncBuffer();
   const server = createFixtureServer(output);
   const payload = btoa("screenshot-bytes");
-  server.handleAgentEvent(
-    "session-1",
-    {
-      type: EVENT_TOOL_EXECUTION_END,
-      toolCallId: "call-read",
-      toolName: "read",
-      toolResult: "image attached",
-      toolImages: [{ mimeType: "image/png", data: payload }],
-    } satisfies AgentEvent,
-  );
+  server.handleAgentEvent("session-1", {
+    type: EVENT_TOOL_EXECUTION_END,
+    toolCallId: "call-read",
+    toolName: "read",
+    toolResult: "image attached",
+    toolImages: [{ mimeType: "image/png", data: payload }],
+  } satisfies AgentEvent);
   const messages = parseMessages(output.toString());
   assertEquals(messages.length, 1);
   assertEquals(messages[0].method, "session/update");
@@ -422,17 +420,18 @@ test("usage event emits a cumulative usage update", () => {
     },
   });
   update = lastUpdate(output.toString());
-  meta =
-    (update._meta as Record<string, Record<string, number>>)["opensac.dev"];
+  meta = (update._meta as Record<string, Record<string, number>>)[
+    "opensac.dev"
+  ];
   assertEquals(meta.cacheRead, 100);
   assertEquals(meta.cacheWrite, 8);
   assertEquals(meta.totalInputTokens, 122);
 });
 
 test("persisted session usage shares the usage-update baseline", () => {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-usage-" });
+  const root = runtime.makeTempDirSync({ prefix: "opensac-acp-usage-" });
   const sessionDir = `${root}/sessions`;
-  Deno.mkdirSync(sessionDir, { recursive: true });
+  runtime.mkdirSync(sessionDir, { recursive: true });
   const mgr = createSession({
     workDir: root,
     sessionDir,
@@ -456,10 +455,12 @@ test("persisted session usage shares the usage-update baseline", () => {
     }),
   ];
   for (const usage of history) {
-    const msg: Message = createAssistantMessage([{
-      type: "text",
-      text: "done",
-    }]);
+    const msg: Message = createAssistantMessage([
+      {
+        type: "text",
+        text: "done",
+      },
+    ]);
     msg.usage = usage;
     mgr.appendMessage(msg);
   }
@@ -503,7 +504,7 @@ test("persisted session usage shares the usage-update baseline", () => {
   assertEquals(meta.cacheWrite, 8);
   const cost = reloaded.cost as Record<string, unknown>;
   assertEquals(cost.amount, 0.75);
-  Deno.removeSync(root, { recursive: true });
+  runtime.removeSync(root, { recursive: true });
 });
 
 test("terminal run events project the structured status", () => {

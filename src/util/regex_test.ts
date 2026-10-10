@@ -25,16 +25,14 @@ test("compileUserRegExp rejects oversized patterns", () => {
 });
 
 test("compileUserRegExp rejects nested unbounded quantifiers", () => {
-  for (
-    const evil of [
-      "(a+)+",
-      "(a*)*",
-      "(a+)+$",
-      "([a-z]+)*x",
-      "(a|b*)*",
-      "(a{2,})*",
-    ]
-  ) {
+  for (const evil of [
+    "(a+)+",
+    "(a*)*",
+    "(a+)+$",
+    "([a-z]+)*x",
+    "(a|b*)*",
+    "(a{2,})*",
+  ]) {
     assertThrows(
       () => compileUserRegExp(evil),
       UserRegExpError,
@@ -59,9 +57,7 @@ test("compileUserRegExp reports JS syntax errors as UserRegExpError", () => {
 });
 
 test("glob-generated patterns compile unchanged and skip user limits", () => {
-  for (
-    const glob of ["**/*.ts", "src/**/mod.ts", "*.js", "!node_modules/**"]
-  ) {
+  for (const glob of ["**/*.ts", "src/**/mod.ts", "*.js", "!node_modules/**"]) {
     const source = globToRegex(glob.startsWith("!") ? glob.slice(1) : glob);
     compileGeneratedRegExp(source);
   }

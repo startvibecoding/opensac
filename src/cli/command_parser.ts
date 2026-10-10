@@ -1,6 +1,6 @@
 // Project-owned command-line parser for the OpenSAC CLI.
 //
-// This replaces the JSR `@cliffy/command` dependency with a small, Node-free
+// This replaces the external `@cliffy/command` dependency with a small, Node-free
 // implementation of exactly the surface `command.ts` uses: chained
 // `.name/.version/.description/.noExit/.option/.arguments/.command/.action`
 // builders, per-option `action` callbacks that receive the parsed flags object,

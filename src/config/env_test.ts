@@ -1,6 +1,7 @@
 // (the Go package ships no env test, so these
 // cover the ported behaviour directly).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -18,14 +19,14 @@ import {
 import { test } from "#testing";
 
 function withConfigDir(fn: (tmp: string) => void): void {
-  const tmp = Deno.makeTempDirSync({ prefix: "env-" });
-  const prevDir = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", path.join(tmp, "config"));
+  const tmp = runtime.makeTempDirSync({ prefix: "env-" });
+  const prevDir = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", path.join(tmp, "config"));
   try {
     fn(tmp);
   } finally {
-    if (prevDir === undefined) Deno.env.delete("OPENSAC_DIR");
-    else Deno.env.set("OPENSAC_DIR", prevDir);
+    if (prevDir === undefined) runtime.env.delete("OPENSAC_DIR");
+    else runtime.env.set("OPENSAC_DIR", prevDir);
   }
 }
 
@@ -71,8 +72,8 @@ test("env save orders keys", () => {
     const c: EnvConfig = { vars: {} };
     saveEnv(c);
     applyEnvPatch(c, { Z: "1", A: "2" }, []);
-    const text = Deno.readTextFileSync(globalEnvPath());
+    const text = runtime.readTextFileSync(globalEnvPath());
     assert(text.indexOf('"A"') < text.indexOf('"Z"'));
-    assertEquals(Deno.statSync(globalEnvPath()).mode! & 0o777, 0o600);
+    assertEquals(runtime.statSync(globalEnvPath()).mode! & 0o777, 0o600);
   });
 });

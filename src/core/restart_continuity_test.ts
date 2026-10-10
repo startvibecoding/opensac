@@ -6,6 +6,7 @@
 // answers from the same canonical state. This test drives the TUI and ACP
 // projections over one restarted Core so only the wire shape differs.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { ACPBridgeClient } from "../acp/bridge_client.ts";
 import { SOURCE_ACP } from "../agentruntime/source.ts";
@@ -53,7 +54,7 @@ async function register(
     id: "core-restart",
     version: VERSION,
     protocolVersion: PROTOCOL_VERSION,
-    pid: Deno.pid,
+    pid: nodeRuntime.pid,
     host: "127.0.0.1",
     port: handle.address.port,
     startedAt: 1_700_000_000_000,
@@ -63,10 +64,10 @@ async function register(
 test("TUI and ACP keep their session when the Core restarts underneath them", async () => {
   await withIsolatedConfig(async () => {
     const settings = defaultSettings();
-    const workDir = await Deno.makeTempDir({
+    const workDir = await nodeRuntime.makeTempDir({
       prefix: "opensac-restart-",
     });
-    const stateDir = await Deno.makeTempDir({
+    const stateDir = await nodeRuntime.makeTempDir({
       prefix: "opensac-restart-state-",
     });
     const hostOptions = {
@@ -152,8 +153,8 @@ test("TUI and ACP keep their session when the Core restarts underneath them", as
       await second?.stop();
       await before?.close();
       await after?.close();
-      await Deno.remove(workDir, { recursive: true });
-      await Deno.remove(stateDir, { recursive: true });
+      await nodeRuntime.remove(workDir, { recursive: true });
+      await nodeRuntime.remove(stateDir, { recursive: true });
       closeDatabases();
     }
   });
@@ -162,10 +163,10 @@ test("TUI and ACP keep their session when the Core restarts underneath them", as
 test("a session deleted while the client was away fails instead of looping", async () => {
   await withIsolatedConfig(async () => {
     const settings = defaultSettings();
-    const workDir = await Deno.makeTempDir({
+    const workDir = await nodeRuntime.makeTempDir({
       prefix: "opensac-restart-gone-",
     });
-    const stateDir = await Deno.makeTempDir({
+    const stateDir = await nodeRuntime.makeTempDir({
       prefix: "opensac-restart-gone-state-",
     });
     const hostOptions = {
@@ -211,8 +212,8 @@ test("a session deleted while the client was away fails instead of looping", asy
       await client.close();
       await second.stop();
       await after.close();
-      await Deno.remove(workDir, { recursive: true });
-      await Deno.remove(stateDir, { recursive: true });
+      await nodeRuntime.remove(workDir, { recursive: true });
+      await nodeRuntime.remove(stateDir, { recursive: true });
       closeDatabases();
     }
   });

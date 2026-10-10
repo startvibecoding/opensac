@@ -3,6 +3,7 @@
 // selected here. Platforms without a dedicated backend fall back to the no-op
 // sandbox so commands run without sandbox restrictions.
 
+import { runtime } from "../platform/runtime.ts";
 import { type Options, type Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
 import { createBwrapSandbox } from "./bwrap.ts";
@@ -19,7 +20,7 @@ export function createPlatformSandbox(
   level: Level,
   opts: Options = {},
 ): Sandbox {
-  switch (Deno.build.os) {
+  switch (runtime.build.os) {
     case "linux":
       return createBwrapSandbox(projectDir, level, opts);
     case "darwin":

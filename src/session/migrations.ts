@@ -221,26 +221,27 @@ const schemaMigrations: SchemaMigration[] = [
     name: "add_session_fork_and_runtime_lease_state",
     apply: (conn) => {
       if (tableExists(conn, "sessions")) {
-        for (
-          const column of [
-            {
-              name: "fork_boundary_seq",
-              definition: "INTEGER NOT NULL DEFAULT 0",
-            },
-            { name: "seed_length", definition: "INTEGER NOT NULL DEFAULT 0" },
-            { name: "fork_kind", definition: "TEXT NOT NULL DEFAULT ''" },
-          ]
-        ) {
+        for (const column of [
+          {
+            name: "fork_boundary_seq",
+            definition: "INTEGER NOT NULL DEFAULT 0",
+          },
+          { name: "seed_length", definition: "INTEGER NOT NULL DEFAULT 0" },
+          { name: "fork_kind", definition: "TEXT NOT NULL DEFAULT ''" },
+        ]) {
           addColumnIfMissing(conn, "sessions", column.name, column.definition);
         }
       }
       if (tableExists(conn, "sub_session")) {
-        for (
-          const column of ["fork_boundary_seq", "seed_length", "fork_kind"]
-        ) {
-          const definition = column !== "fork_kind"
-            ? "INTEGER NOT NULL DEFAULT 0"
-            : "TEXT NOT NULL DEFAULT ''";
+        for (const column of [
+          "fork_boundary_seq",
+          "seed_length",
+          "fork_kind",
+        ]) {
+          const definition =
+            column !== "fork_kind"
+              ? "INTEGER NOT NULL DEFAULT 0"
+              : "TEXT NOT NULL DEFAULT ''";
           addColumnIfMissing(conn, "sub_session", column, definition);
         }
       }
@@ -337,19 +338,17 @@ const schemaMigrations: SchemaMigration[] = [
 				context_usage_json TEXT NOT NULL DEFAULT '{}'
 			)`);
       }
-      for (
-        const column of [
-          { name: "intent_id", definition: "TEXT NOT NULL DEFAULT ''" },
-          { name: "retry_of", definition: "TEXT NOT NULL DEFAULT ''" },
-          { name: "attempt", definition: "INTEGER NOT NULL DEFAULT 1" },
-          { name: "error_info_json", definition: "TEXT NOT NULL DEFAULT '{}'" },
-          { name: "progress_json", definition: "TEXT NOT NULL DEFAULT '{}'" },
-          {
-            name: "context_usage_json",
-            definition: "TEXT NOT NULL DEFAULT '{}'",
-          },
-        ]
-      ) {
+      for (const column of [
+        { name: "intent_id", definition: "TEXT NOT NULL DEFAULT ''" },
+        { name: "retry_of", definition: "TEXT NOT NULL DEFAULT ''" },
+        { name: "attempt", definition: "INTEGER NOT NULL DEFAULT 1" },
+        { name: "error_info_json", definition: "TEXT NOT NULL DEFAULT '{}'" },
+        { name: "progress_json", definition: "TEXT NOT NULL DEFAULT '{}'" },
+        {
+          name: "context_usage_json",
+          definition: "TEXT NOT NULL DEFAULT '{}'",
+        },
+      ]) {
         addColumnIfMissing(
           conn,
           "session_runs",
@@ -671,13 +670,11 @@ function createResponseRuntimeTables(conn: DB): void {
     },
     {
       name: "idx_response_turns_session_id",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_response_turns_session_id ON response_turns(session_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_response_turns_session_id ON response_turns(session_id)`,
     },
     {
       name: "idx_response_turns_response_id",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_response_turns_response_id ON response_turns(response_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_response_turns_response_id ON response_turns(response_id)`,
     },
     {
       name: "response_items",
@@ -696,13 +693,11 @@ function createResponseRuntimeTables(conn: DB): void {
     },
     {
       name: "idx_response_items_session_turn",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_response_items_session_turn ON response_items(session_id, local_turn_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_response_items_session_turn ON response_items(session_id, local_turn_id)`,
     },
     {
       name: "idx_response_items_response_id",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_response_items_response_id ON response_items(response_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_response_items_response_id ON response_items(response_id)`,
     },
     {
       name: "tool_execution_records",
@@ -729,13 +724,11 @@ function createResponseRuntimeTables(conn: DB): void {
     },
     {
       name: "idx_tool_execution_records_session_turn",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_tool_execution_records_session_turn ON tool_execution_records(session_id, local_turn_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_tool_execution_records_session_turn ON tool_execution_records(session_id, local_turn_id)`,
     },
     {
       name: "idx_tool_execution_records_provider_call",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_tool_execution_records_provider_call ON tool_execution_records(provider, api, provider_call_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_tool_execution_records_provider_call ON tool_execution_records(provider, api, provider_call_id)`,
     },
     {
       name: "response_runs",
@@ -757,13 +750,11 @@ function createResponseRuntimeTables(conn: DB): void {
     },
     {
       name: "idx_response_runs_session_id",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_response_runs_session_id ON response_runs(session_id)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_response_runs_session_id ON response_runs(session_id)`,
     },
     {
       name: "idx_response_runs_state",
-      sql:
-        `CREATE INDEX IF NOT EXISTS idx_response_runs_state ON response_runs(state)`,
+      sql: `CREATE INDEX IF NOT EXISTS idx_response_runs_state ON response_runs(state)`,
     },
   ];
   for (const stmt of statements) stmt.sql && conn.exec(stmt.sql);
@@ -805,12 +796,14 @@ function ensureSchemaMigrationsTable(db: DB): void {
     if (exists) {
       const columns = tableColumns(tx, "schema_migrations");
       if (
-        columns.has("name") && columns.has("applied_at") &&
+        columns.has("name") &&
+        columns.has("applied_at") &&
         !columns.has("version")
       ) {
         tx.exec(`ALTER TABLE schema_migrations ADD COLUMN version INTEGER`);
       } else if (
-        !columns.has("version") || !columns.has("name") ||
+        !columns.has("version") ||
+        !columns.has("name") ||
         !columns.has("applied_at")
       ) {
         const legacy = `schema_migrations_legacy_${Date.now() * 1_000_000}`;
@@ -829,8 +822,8 @@ function ensureSchemaMigrationsTable(db: DB): void {
  */
 export function applySchemaMigrations(db: DB): void {
   ensureSchemaMigrationsTable(db);
-  const migrations = [...schemaMigrations].sort((a, b) =>
-    a.version - b.version
+  const migrations = [...schemaMigrations].sort(
+    (a, b) => a.version - b.version,
   );
   for (const migration of migrations) {
     runInTx(db, (tx) => {
@@ -858,9 +851,9 @@ export function applySchemaMigrations(db: DB): void {
         migration.apply(tx);
       } catch (err) {
         throw new Error(
-          `apply schema migration ${migration.version} (${migration.name}): ${
-            message(err)
-          }`,
+          `apply schema migration ${migration.version} (${migration.name}): ${message(
+            err,
+          )}`,
           { cause: err },
         );
       }

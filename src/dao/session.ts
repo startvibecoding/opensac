@@ -79,7 +79,7 @@ const capabilityEventColumns = `seq, session_id AS sessionId, id,
   old_value AS oldValue, new_value AS newValue, timestamp, data`;
 
 export class SessionDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -188,11 +188,10 @@ export class SessionDAO {
     sessionId: string,
     expertId: string,
   ): void {
-    execChanges(
-      executor,
-      `UPDATE ${table} SET expert_id = ? WHERE id = ?`,
-      [expertId, sessionId],
-    );
+    execChanges(executor, `UPDATE ${table} SET expert_id = ? WHERE id = ?`, [
+      expertId,
+      sessionId,
+    ]);
   }
 
   updateSessionCwd(
@@ -201,11 +200,10 @@ export class SessionDAO {
     sessionId: string,
     cwd: string,
   ): void {
-    execChanges(
-      executor,
-      `UPDATE ${table} SET cwd = ? WHERE id = ?`,
-      [cwd, sessionId],
-    );
+    execChanges(executor, `UPDATE ${table} SET cwd = ? WHERE id = ?`, [
+      cwd,
+      sessionId,
+    ]);
   }
 
   currentLeaf(
@@ -214,12 +212,14 @@ export class SessionDAO {
     sessionId: string,
     excludedType: string,
   ): string {
-    return queryOptional<{ id: string }>(
-      executor,
-      `SELECT id FROM ${table} WHERE session_id = ? AND type != ?
+    return (
+      queryOptional<{ id: string }>(
+        executor,
+        `SELECT id FROM ${table} WHERE session_id = ? AND type != ?
        ORDER BY seq DESC LIMIT 1`,
-      [sessionId, excludedType],
-    )?.id ?? "";
+        [sessionId, excludedType],
+      )?.id ?? ""
+    );
   }
 
   insertEntry(
@@ -261,11 +261,13 @@ export class SessionDAO {
 
   count(filter: SessionListFilter): number {
     const { where, params } = sessionListWhere(filter);
-    return queryOptional<{ n: number }>(
-      this.requireDb(),
-      `SELECT COUNT(*) AS n FROM sessions AS s${where}`,
-      params,
-    )?.n ?? 0;
+    return (
+      queryOptional<{ n: number }>(
+        this.requireDb(),
+        `SELECT COUNT(*) AS n FROM sessions AS s${where}`,
+        params,
+      )?.n ?? 0
+    );
   }
 
   findExact(table: string, id: string): string | undefined {
@@ -350,11 +352,9 @@ export class SessionDAO {
       [sessionId],
     );
     for (const table of tables) {
-      execChanges(
-        executor,
-        `DELETE FROM ${table} WHERE session_id = ?`,
-        [sessionId],
-      );
+      execChanges(executor, `DELETE FROM ${table} WHERE session_id = ?`, [
+        sessionId,
+      ]);
     }
     execChanges(executor, `DELETE FROM sessions WHERE id = ?`, [sessionId]);
   }
@@ -431,17 +431,16 @@ export class SessionDAO {
   }
 
   maxRunEventSeq(runId: string): number {
-    return queryOptional<{ seq: number }>(
-      this.requireDb(),
-      `SELECT COALESCE(MAX(seq), 0) AS seq FROM session_run_events WHERE run_id = ?`,
-      [runId],
-    )?.seq ?? 0;
+    return (
+      queryOptional<{ seq: number }>(
+        this.requireDb(),
+        `SELECT COALESCE(MAX(seq), 0) AS seq FROM session_run_events WHERE run_id = ?`,
+        [runId],
+      )?.seq ?? 0
+    );
   }
 
-  insertCapabilityEvent(
-    executor: DB,
-    row: SessionCapabilityEventRecord,
-  ): void {
+  insertCapabilityEvent(executor: DB, row: SessionCapabilityEventRecord): void {
     execChanges(
       executor,
       `INSERT INTO session_capability_events
@@ -580,9 +579,10 @@ function nullableSessionString(value: string): string | null {
   return value === "" ? null : value;
 }
 
-function sessionListWhere(
-  filter: SessionListFilter,
-): { where: string; params: (string | number)[] } {
+function sessionListWhere(filter: SessionListFilter): {
+  where: string;
+  params: (string | number)[];
+} {
   const clauses: string[] = [];
   const params: (string | number)[] = [];
   if (filter.cwd) {

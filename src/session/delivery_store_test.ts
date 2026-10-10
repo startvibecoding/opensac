@@ -3,6 +3,7 @@
 // completed Run through `CreateSessionRun`. This port uses a
 // literal session ID with the same completed Run.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { createSessionRun, type SessionRun } from "./run_store.ts";
@@ -56,7 +57,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 function deliveryFixture(): { sessionDir: string; sessionId: string } {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-delivery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-delivery-" });
   const sessionId = "delivery-session";
   const started = new Date();
   createSessionRun(
@@ -73,9 +74,7 @@ function deliveryFixture(): { sessionDir: string; sessionId: string } {
   return { sessionDir, sessionId };
 }
 
-function operation(
-  overrides: Partial<DeliveryOperation>,
-): DeliveryOperation {
+function operation(overrides: Partial<DeliveryOperation>): DeliveryOperation {
   return {
     id: "",
     intentId: "",
@@ -388,10 +387,7 @@ test("delivery failure cascades to dependent operation", () => {
       "provider_rejected",
       null,
     );
-    const dependent = getDeliveryOperation(
-      sessionDir,
-      plan.operations[1].id,
-    )!;
+    const dependent = getDeliveryOperation(sessionDir, plan.operations[1].id)!;
     assertEquals(dependent.status, "failed");
     assertEquals(dependent.failureCode, "dependency_failed");
     assertEquals(intentStatus(sessionDir, plan.intent.id), "failed");
@@ -424,10 +420,7 @@ test("uncertain delivery cascades uncertain dependent", () => {
       "provider_timeout",
       null,
     );
-    const dependent = getDeliveryOperation(
-      sessionDir,
-      plan.operations[1].id,
-    )!;
+    const dependent = getDeliveryOperation(sessionDir, plan.operations[1].id)!;
     assertEquals(dependent.status, "uncertain");
     assertEquals(dependent.failureCode, "dependency_uncertain");
     assertEquals(intentStatus(sessionDir, plan.intent.id), "uncertain");
@@ -535,10 +528,9 @@ test("list failed transient delivery operations", () => {
         new Date().toISOString(),
       );
     });
-    assertEquals(
-      listFailedTransientDeliveryOperations(sessionDir, "wechat"),
-      ["delivery-op-caption"],
-    );
+    assertEquals(listFailedTransientDeliveryOperations(sessionDir, "wechat"), [
+      "delivery-op-caption",
+    ]);
     assertEquals(
       listFailedTransientDeliveryOperations(sessionDir, "feishu"),
       [],

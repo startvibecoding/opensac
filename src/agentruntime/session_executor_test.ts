@@ -1,4 +1,4 @@
-// deno-lint-ignore-file require-await -- async fake driver models the Promise-based executor seam
+/* eslint-disable @typescript-eslint/require-await */ // async fake driver models the Promise-based executor seam
 import { assertEquals } from "../compat/assert.ts";
 import {
   EVENT_QUESTION_REQUEST,

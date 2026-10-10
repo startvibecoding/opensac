@@ -19,9 +19,9 @@ test("RuntimeRun owns shared decision registration and terminalization", () => {
   run.resolveDecision("approval-1", "approval", "true");
   run.clearDecisions("completed");
   assertEquals(
-    run.registerDecision("approval-1", "approval")?.includes(
-      "already resolved",
-    ),
+    run
+      .registerDecision("approval-1", "approval")
+      ?.includes("already resolved"),
     true,
   );
 });

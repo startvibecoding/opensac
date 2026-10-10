@@ -9,7 +9,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | "timeout"> {
   return Promise.race([
     p,
     new Promise<"timeout">((resolve) =>
-      setTimeout(() => resolve("timeout"), ms)
+      setTimeout(() => resolve("timeout"), ms),
     ),
   ]);
 }

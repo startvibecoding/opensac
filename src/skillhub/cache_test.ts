@@ -9,7 +9,8 @@ import {
   type Category,
   type SearchPage,
   type SkillDetail,
-  type SkillSummary} from "./types.ts";
+  type SkillSummary,
+} from "./types.ts";
 import { test } from "#testing";
 
 function summary(overrides: Partial<SkillSummary> = {}): SkillSummary {
@@ -86,10 +87,12 @@ test("memory cache stores clones so callers cannot mutate the cache", () => {
 
 test("cloneSearchPage deep-clones nested tags and installed state", () => {
   const original: SearchPage = {
-    items: [summary({
-      tags: ["a", "b"],
-      installed: { installed: true, scope: "project", dir: "/tmp/x" },
-    })],
+    items: [
+      summary({
+        tags: ["a", "b"],
+        installed: { installed: true, scope: "project", dir: "/tmp/x" },
+      }),
+    ],
   };
   const cloned = cloneSearchPage(original);
   cloned.items[0].tags?.push("c");
@@ -100,11 +103,13 @@ test("cloneSearchPage deep-clones nested tags and installed state", () => {
 });
 
 test("cloneCategories deep-clones nested children", () => {
-  const original: Category[] = [{
-    key: "root",
-    name: "Root",
-    children: [{ key: "child", name: "Child" }],
-  }];
+  const original: Category[] = [
+    {
+      key: "root",
+      name: "Root",
+      children: [{ key: "child", name: "Child" }],
+    },
+  ];
   const cloned = cloneCategories(original);
   cloned[0].children?.push({ key: "extra", name: "Extra" });
   cloned[0].children![0].name = "mutated";
@@ -125,9 +130,6 @@ test("cloneSkillDetail clones files and download sources", () => {
   cloned.downloadSources![0].url = "https://evil.example.com";
 
   assertEquals(detail.files?.length, 1);
-  assertEquals(
-    detail.downloadSources?.[0].url,
-    "https://example.com/a.zip",
-  );
+  assertEquals(detail.downloadSources?.[0].url, "https://example.com/a.zip");
   assert(cloned.files !== detail.files);
 });

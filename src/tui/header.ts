@@ -73,9 +73,7 @@ export function renderHeader(
   const available = width - logoW - gap - 4; // border chars
   if (displayWidth(line3) > available && available > 3) {
     const truncated = truncateDisplay(cwd, available);
-    infoPanel = roundedBox(
-      [line1, line2, truncated, renameNotice].join("\n"),
-    );
+    infoPanel = roundedBox([line1, line2, truncated, renameNotice].join("\n"));
   }
 
   const panelLines = infoPanel.split("\n");

@@ -1,3 +1,5 @@
+import { runtime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 import { CoreRegistry } from "./registry.ts";
@@ -42,8 +44,8 @@ export class CoreLockBusyError extends Error {
     options?: ErrorOptions,
     detail?: CoreLockBusyDetail,
   ) {
-    const resolved: CoreLockBusyDetail = detail ??
-      (metadata === undefined ? "unknown-owner" : "held");
+    const resolved: CoreLockBusyDetail =
+      detail ?? (metadata === undefined ? "unknown-owner" : "held");
     super(coreLockBusyMessage(lockPath, metadata, resolved), options);
     this.name = "CoreLockBusyError";
     this.lockPath = lockPath;
@@ -126,7 +128,7 @@ export class CoreLock {
 
     const lockDir = paths.lockFile;
     throwIfAborted(signal);
-    await Deno.mkdir(path.dirname(lockDir), {
+    await runtime.mkdir(path.dirname(lockDir), {
       recursive: true,
       mode: 0o700,
     });
@@ -135,15 +137,15 @@ export class CoreLock {
       const token = createOwnerToken();
       const metadata: CoreLockMetadata = {
         token,
-        pid: Deno.pid,
-        hostname: Deno.hostname(),
+        pid: runtime.pid,
+        hostname: runtime.hostname(),
         timestamp: Date.now(),
       };
 
       try {
         // This deliberately does not use a file-existence check: mkdir is the
         // cross-process atomic acquisition primitive.
-        await Deno.mkdir(lockDir, { mode: 0o700 });
+        await runtime.mkdir(lockDir, { mode: 0o700 });
         try {
           throwIfAborted(signal);
           await writeMetadata(lockDir, metadata);
@@ -156,7 +158,7 @@ export class CoreLock {
         }
         return new CoreLockHandle(paths, token);
       } catch (error) {
-        if (!(error instanceof Deno.errors.AlreadyExists)) throw error;
+        if (!(error instanceof runtime.errors.AlreadyExists)) throw error;
 
         let existing: CoreLockMetadata | undefined;
         try {
@@ -227,11 +229,11 @@ export class CoreLock {
       throw new TypeError("CoreLock.inspect requires CorePaths");
     }
     const lockDir = paths.lockFile;
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = await Deno.lstat(lockDir);
+      info = await runtime.lstat(lockDir);
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return { state: "free" };
+      if (error instanceof runtime.errors.NotFound) return { state: "free" };
       throw error;
     }
     if (!info.isDirectory) {
@@ -264,12 +266,14 @@ export class CoreLock {
     }
     return {
       state: "orphan",
-      reason: classification.status === "missing"
-        ? "missing-metadata"
-        : "unreadable-metadata",
+      reason:
+        classification.status === "missing"
+          ? "missing-metadata"
+          : "unreadable-metadata",
       ...(ageMs === undefined ? {} : { ageMs }),
       reclaimableByConsent,
-      reclaimableAutomatically: classification.status === "missing" &&
+      reclaimableAutomatically:
+        classification.status === "missing" &&
         reclaimableByConsent &&
         (ageMs ?? 0) >= ORPHAN_RECLAIM_GRACE_MS,
     };
@@ -297,18 +301,18 @@ export class CoreLock {
 export type CoreLockInspection =
   | { state: "free" }
   | {
-    state: "held";
-    owner: CoreLockMetadata;
-    reclaimableByConsent: boolean;
-    reclaimableAutomatically: boolean;
-  }
+      state: "held";
+      owner: CoreLockMetadata;
+      reclaimableByConsent: boolean;
+      reclaimableAutomatically: boolean;
+    }
   | {
-    state: "orphan";
-    reason: "missing-metadata" | "unreadable-metadata" | "not-a-directory";
-    ageMs?: number;
-    reclaimableByConsent: boolean;
-    reclaimableAutomatically: boolean;
-  };
+      state: "orphan";
+      reason: "missing-metadata" | "unreadable-metadata" | "not-a-directory";
+      ageMs?: number;
+      reclaimableByConsent: boolean;
+      reclaimableAutomatically: boolean;
+    };
 
 type MetadataClassification =
   | { status: "ok"; metadata: CoreLockMetadata }
@@ -366,11 +370,11 @@ async function reclaimOrphanLock(
   if (auto && first.status !== "missing") return false;
   if (!(await noLiveRegistration(paths))) return false;
   if (auto) {
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = await Deno.lstat(lockDir);
+      info = await runtime.lstat(lockDir);
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return false;
+      if (error instanceof runtime.errors.NotFound) return false;
       throw error;
     }
     if (
@@ -397,10 +401,10 @@ async function reclaimOrphanLock(
 
     const quarantine = uniqueSibling(lockDir, "orphan");
     try {
-      await Deno.rename(lockDir, quarantine);
+      await runtime.rename(lockDir, quarantine);
       moved = true;
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return false;
+      if (error instanceof runtime.errors.NotFound) return false;
       throw error;
     }
     // Only the uniquely named quarantine is removed. If it unexpectedly gained
@@ -430,11 +434,11 @@ interface OrphanDecision {
  * auto-removed.
  */
 async function orphanDecision(lockDir: string): Promise<OrphanDecision> {
-  let info: Deno.FileInfo;
+  let info: FileInfo;
   try {
-    info = await Deno.lstat(lockDir);
+    info = await runtime.lstat(lockDir);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
+    if (error instanceof runtime.errors.NotFound) {
       return { isOrphan: false, status: "absent" };
     }
     throw error;
@@ -471,10 +475,10 @@ async function claimStaleLock(
 
     const quarantine = uniqueSibling(lockDir, "stale");
     try {
-      await Deno.rename(lockDir, quarantine);
+      await runtime.rename(lockDir, quarantine);
       moved = true;
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return false;
+      if (error instanceof runtime.errors.NotFound) return false;
       throw error;
     }
 
@@ -499,29 +503,29 @@ async function acquireReclaimClaim(
   for (let attempt = 0; attempt < 2; attempt++) {
     const metadata: CoreLockMetadata = {
       token: createOwnerToken(),
-      pid: Deno.pid,
-      hostname: Deno.hostname(),
+      pid: runtime.pid,
+      hostname: runtime.hostname(),
       timestamp: Date.now(),
     };
     try {
-      await Deno.mkdir(claimDir, { mode: 0o700 });
+      await runtime.mkdir(claimDir, { mode: 0o700 });
     } catch (error) {
-      if (!(error instanceof Deno.errors.AlreadyExists)) throw error;
+      if (!(error instanceof runtime.errors.AlreadyExists)) throw error;
       const existing = await readMetadataFile(
         path.join(claimDir, RECLAIM_META_FILE),
       );
       if (
         existing === undefined ||
-        existing.hostname !== Deno.hostname() ||
+        existing.hostname !== runtime.hostname() ||
         processLiveness(existing.pid) !== "dead"
       ) {
         return undefined;
       }
       const quarantine = uniqueSibling(claimDir, "stale-claim");
       try {
-        await Deno.rename(claimDir, quarantine);
+        await runtime.rename(claimDir, quarantine);
       } catch (renameError) {
-        if (renameError instanceof Deno.errors.NotFound) continue;
+        if (renameError instanceof runtime.errors.NotFound) continue;
         throw renameError;
       }
       await removeDirectoryBestEffort(quarantine);
@@ -529,14 +533,11 @@ async function acquireReclaimClaim(
     }
 
     try {
-      await Deno.writeTextFile(
+      await runtime.writeTextFile(
         path.join(claimDir, RECLAIM_META_FILE),
         `${JSON.stringify(metadata, null, 2)}\n`,
       );
-      await Deno.chmod(
-        path.join(claimDir, RECLAIM_META_FILE),
-        0o600,
-      );
+      await runtime.chmod(path.join(claimDir, RECLAIM_META_FILE), 0o600);
       return metadata;
     } catch (error) {
       await removeDirectoryBestEffort(claimDir);
@@ -568,18 +569,18 @@ async function writeMetadata(
   lockDir: string,
   metadata: CoreLockMetadata,
 ): Promise<void> {
-  const temporary = await Deno.makeTempFile({
+  const temporary = await runtime.makeTempFile({
     dir: lockDir,
     prefix: ".core-lock-meta-",
     suffix: ".tmp",
   });
   try {
-    await Deno.writeTextFile(
+    await runtime.writeTextFile(
       temporary,
       `${JSON.stringify(metadata, null, 2)}\n`,
     );
-    await Deno.chmod(temporary, 0o600);
-    await Deno.rename(temporary, path.join(lockDir, META_FILE));
+    await runtime.chmod(temporary, 0o600);
+    await runtime.rename(temporary, path.join(lockDir, META_FILE));
   } catch (error) {
     await removeFileBestEffort(temporary);
     throw error;
@@ -597,9 +598,9 @@ async function readMetadataFile(
 ): Promise<CoreLockMetadata | undefined> {
   let text: string;
   try {
-    text = await Deno.readTextFile(metadataFile);
+    text = await runtime.readTextFile(metadataFile);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return undefined;
+    if (error instanceof runtime.errors.NotFound) return undefined;
     throw error;
   }
 
@@ -622,10 +623,15 @@ function parseMetadata(value: unknown): CoreLockMetadata {
   const hostname = object.hostname;
   const timestamp = object.timestamp;
   if (
-    typeof token !== "string" || token.trim() === "" ||
-    typeof pid !== "number" || !Number.isInteger(pid) || pid < 1 ||
-    typeof hostname !== "string" || hostname.trim() === "" ||
-    typeof timestamp !== "number" || !Number.isFinite(timestamp) ||
+    typeof token !== "string" ||
+    token.trim() === "" ||
+    typeof pid !== "number" ||
+    !Number.isInteger(pid) ||
+    pid < 1 ||
+    typeof hostname !== "string" ||
+    hostname.trim() === "" ||
+    typeof timestamp !== "number" ||
+    !Number.isFinite(timestamp) ||
     timestamp < 0
   ) {
     throw new TypeError("Core lock metadata has an invalid shape");
@@ -639,7 +645,7 @@ async function canReclaim(
 ): Promise<boolean> {
   // A hostname mismatch means the local process table says nothing about the
   // owner. Never guess based on age in that case.
-  if (metadata.hostname !== Deno.hostname()) return false;
+  if (metadata.hostname !== runtime.hostname()) return false;
   if (processLiveness(metadata.pid) !== "dead") return false;
 
   let registration;
@@ -661,10 +667,10 @@ function processLiveness(pid: number): "alive" | "dead" | "unknown" {
   try {
     // Signal 0 performs the permission/existence check without delivering a
     // signal to the process.
-    Deno.kill(pid, 0);
+    runtime.kill(pid, 0);
     return "alive";
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return "dead";
+    if (error instanceof runtime.errors.NotFound) return "dead";
     return "unknown";
   }
 }
@@ -708,9 +714,9 @@ async function removeOwnedLock(
   // lock at the original path.
   const quarantine = uniqueSibling(lockDir, "release");
   try {
-    await Deno.rename(lockDir, quarantine);
+    await runtime.rename(lockDir, quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return false;
+    if (error instanceof runtime.errors.NotFound) return false;
     throw error;
   }
 
@@ -727,7 +733,7 @@ async function removeOwnedLock(
 
 async function removeDirectoryBestEffort(directory: string): Promise<void> {
   try {
-    await Deno.remove(directory, { recursive: true });
+    await runtime.remove(directory, { recursive: true });
   } catch {
     // Preserve the metadata write error; the empty lock is safer than
     // pretending acquisition completed.
@@ -736,7 +742,7 @@ async function removeDirectoryBestEffort(directory: string): Promise<void> {
 
 async function removeFileBestEffort(filePath: string): Promise<void> {
   try {
-    await Deno.remove(filePath);
+    await runtime.remove(filePath);
   } catch {
     // Best-effort cleanup for a failed atomic write.
   }
@@ -744,7 +750,9 @@ async function removeFileBestEffort(filePath: string): Promise<void> {
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
-    throw signal.reason ??
-      new DOMException("Core lock acquisition aborted", "AbortError");
+    throw (
+      signal.reason ??
+      new DOMException("Core lock acquisition aborted", "AbortError")
+    );
   }
 }

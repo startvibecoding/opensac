@@ -1,11 +1,17 @@
 //
 // The Go original tracks temporary Seatbelt profiles in a map keyed by
-// *exec.Cmd and removes them from CleanupCommand. Deno has no such handle, so
+// *exec.Cmd and removes them from CleanupCommand. Node has no such handle, so
 // the removal is attached to the returned CommandSpec's `cleanup` hook instead.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { lookPathSync, shellArgs, tempDir } from "../platform/platform.ts";
-import { type CommandSpec, type ExecOpts, type Options, type Sandbox } from "./sandbox.ts";
+import {
+  type CommandSpec,
+  type ExecOpts,
+  type Options,
+  type Sandbox,
+} from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
 
 /** Implements sandboxing using macOS sandbox-exec (Seatbelt). */
@@ -33,7 +39,7 @@ export class MacSandbox implements Sandbox {
     // Verify that the host accepts a real profile, rather than only checking
     // that the legacy executable exists.
     try {
-      const result = new Deno.Command(execPath, {
+      const result = new runtime.Command(execPath, {
         args: ["-p", "(version 1) (allow default)", "/usr/bin/true"],
         stdout: "null",
         stderr: "null",
@@ -65,13 +71,13 @@ export class MacSandbox implements Sandbox {
     // Create a temporary profile file with a unique name to avoid races.
     let profilePath: string;
     try {
-      profilePath = Deno.makeTempFileSync({
+      profilePath = runtime.makeTempFileSync({
         dir: tempDir(),
         prefix: "vibecoding-sandbox-",
         suffix: ".sb",
       });
-      Deno.writeTextFileSync(profilePath, profile);
-      Deno.chmodSync(profilePath, 0o600);
+      runtime.writeTextFileSync(profilePath, profile);
+      runtime.chmodSync(profilePath, 0o600);
     } catch {
       // Fallback: a command that will fail, matching the Go implementation.
       return { program: "false", args: [] };
@@ -83,7 +89,7 @@ export class MacSandbox implements Sandbox {
       env: [...envEntries(), ...mapEnv(opts.envVars)],
       cleanup: () => {
         try {
-          Deno.removeSync(profilePath);
+          runtime.removeSync(profilePath);
         } catch {
           // Removing an already-removed profile is a no-op.
         }
@@ -102,9 +108,12 @@ export class MacSandbox implements Sandbox {
 
     // Allow process execution for common shells and tools.
     b += "(allow process-exec\n";
-    for (
-      const bin of ["/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]
-    ) {
+    for (const bin of [
+      "/bin",
+      "/usr/bin",
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+    ]) {
       b += `    (subpath "${bin}")\n`;
     }
     b += ")\n";
@@ -113,7 +122,7 @@ export class MacSandbox implements Sandbox {
     if (this.#projectDir !== "") allowedPaths.push(this.#projectDir);
     allowedPaths.push(tempDir());
 
-    const home = Deno.env.get("HOME") ?? "";
+    const home = runtime.env.get("HOME") ?? "";
     if (home !== "") {
       allowedPaths.push(
         path.join(home, ".config"),
@@ -127,8 +136,8 @@ export class MacSandbox implements Sandbox {
     allowedPaths.push(...(opts.readOnlyPaths ?? []));
 
     for (let p of allowedPaths) {
-      const strictProject = this.#level === Level.Strict &&
-        path.normalize(p) === this.#projectDir;
+      const strictProject =
+        this.#level === Level.Strict && path.normalize(p) === this.#projectDir;
       p = seatbeltQuotePath(p);
       if (p === "") continue;
       if (strictProject) {
@@ -168,7 +177,7 @@ function seatbeltQuotePath(p: string): string {
 }
 
 function envEntries(): string[] {
-  return Object.entries(Deno.env.toObject()).map(([k, v]) => `${k}=${v}`);
+  return Object.entries(runtime.env.toObject()).map(([k, v]) => `${k}=${v}`);
 }
 
 function mapEnv(envVars: Record<string, string> | undefined): string[] {

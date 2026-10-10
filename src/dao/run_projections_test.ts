@@ -129,9 +129,7 @@ test("project DAO metadata batch counts and clear", () => {
       records[0].sessionId === "session-a" &&
         records[1].sessionId === "session-c",
     );
-    assert(
-      records[0].projectId === "project-1" && records[0].pinned === 1,
-    );
+    assert(records[0].projectId === "project-1" && records[0].pinned === 1);
 
     let counts = projectDAO.sessionCountsByProject();
     assertEquals(counts.get("project-1"), 2);

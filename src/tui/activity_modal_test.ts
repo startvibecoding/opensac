@@ -35,17 +35,23 @@ test("activity store ignores lead and approval/question events", () => {
     false,
   );
   assertEquals(
-    AgentActivityStore.isBackgroundAgentEvent({
-      type: EVENT_TEXT_DELTA,
-      agentId: "a1",
-    }, "a1"),
+    AgentActivityStore.isBackgroundAgentEvent(
+      {
+        type: EVENT_TEXT_DELTA,
+        agentId: "a1",
+      },
+      "a1",
+    ),
     false,
   );
   assertEquals(
-    AgentActivityStore.isBackgroundAgentEvent({
-      type: EVENT_TEXT_DELTA,
-      agentId: "a1",
-    }, "lead"),
+    AgentActivityStore.isBackgroundAgentEvent(
+      {
+        type: EVENT_TEXT_DELTA,
+        agentId: "a1",
+      },
+      "lead",
+    ),
     true,
   );
   assertEquals(
@@ -78,18 +84,24 @@ test("activity store folds deltas, tools, and terminal states", () => {
     },
     now,
   );
-  store.record({
-    type: EVENT_TOOL_RESULT,
-    agentId: "a1",
-    toolName: "read_file",
-    toolResult: " contents ",
-  }, now);
-  store.record({
-    type: EVENT_RUN_FINISHED,
-    agentId: "a1",
-    status: TASK_FAILED,
-    error: new Error("boom"),
-  }, now);
+  store.record(
+    {
+      type: EVENT_TOOL_RESULT,
+      agentId: "a1",
+      toolName: "read_file",
+      toolResult: " contents ",
+    },
+    now,
+  );
+  store.record(
+    {
+      type: EVENT_RUN_FINISHED,
+      agentId: "a1",
+      status: TASK_FAILED,
+      error: new Error("boom"),
+    },
+    now,
+  );
 
   const act = store.get("a1")!;
   assertEquals(act.state, "error");
@@ -226,17 +238,23 @@ test("formatActivityAge renders seconds and minutes", () => {
 test("activity store resolves i18n lines through its translator", () => {
   const store = new AgentActivityStore(new Translator("zh"));
   const now = new Date();
-  store.record({
-    type: EVENT_TOOL_CALL,
-    agentId: "a1",
-    toolName: "bash",
-    toolArgs: { command: "ls" },
-  }, now);
-  store.record({
-    type: EVENT_RUN_FINISHED,
-    agentId: "a1",
-    status: TASK_CANCELED,
-  }, now);
+  store.record(
+    {
+      type: EVENT_TOOL_CALL,
+      agentId: "a1",
+      toolName: "bash",
+      toolArgs: { command: "ls" },
+    },
+    now,
+  );
+  store.record(
+    {
+      type: EVENT_RUN_FINISHED,
+      agentId: "a1",
+      status: TASK_CANCELED,
+    },
+    now,
+  );
   store.record({ type: EVENT_DONE, agentId: "a2" }, now);
   assertEquals(
     store.get("a1")!.events[0].text.startsWith("工具已开始："),
@@ -357,13 +375,15 @@ test("tool modal renders framed content with title and position", () => {
   assertEquals(raw.includes("Esc:close"), false);
   const wide = new ToolModalState(140, 40);
   wide.setTargets([{ id: "lead", kind: "main" }]);
-  const wideView = wide.render(lines, new Translator("en"), {
-    availableHeight: 40,
-  }).replace(
-    // eslint-disable-next-line no-control-regex
-    /\u001B\[[0-9;]*m/g,
-    "",
-  );
+  const wideView = wide
+    .render(lines, new Translator("en"), {
+      availableHeight: 40,
+    })
+    .replace(
+      // eslint-disable-next-line no-control-regex
+      /\u001B\[[0-9;]*m/g,
+      "",
+    );
   assertEquals(wideView.includes("Esc:close"), true);
   // All framed rows share the same width
   const widths = new Set(out.map((l) => l.length));

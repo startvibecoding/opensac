@@ -45,8 +45,8 @@ export function presetModelConfig(
   for (const pid of providerIDs) {
     const pc = catalog[pid];
     if (!pc) continue;
-    const match = pc.models.find((m) =>
-      m.id.toLowerCase() === trimmed.toLowerCase()
+    const match = pc.models.find(
+      (m) => m.id.toLowerCase() === trimmed.toLowerCase(),
     );
     if (match) return completeModelPreset({ ...match }, trimmed);
   }
@@ -74,9 +74,10 @@ function completeModelPreset(
     ...model,
     id: requestedID,
     name: model.name?.trim() || requestedID,
-    contextWindow: (model.contextWindow ?? 0) > 0
-      ? model.contextWindow
-      : DEFAULT_MODEL_CONTEXT_WINDOW,
+    contextWindow:
+      (model.contextWindow ?? 0) > 0
+        ? model.contextWindow
+        : DEFAULT_MODEL_CONTEXT_WINDOW,
     input: model.input?.length ? model.input : ["text"],
   };
 }

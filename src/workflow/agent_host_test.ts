@@ -1,6 +1,7 @@
 // the workflow
 // AgentHost binding to AgentManager and the end-to-end workflow_run tool.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
 import { createMockProvider } from "../provider/mock.ts";
@@ -60,10 +61,10 @@ function buildManager() {
     [probeModel()],
     streamWith("audit complete"),
   );
-  const sandboxMgr = newSandboxManager(Deno.makeTempDirSync());
+  const sandboxMgr = newSandboxManager(runtime.makeTempDirSync());
   sandboxMgr.setLevel(Level.None);
   const settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync();
+  settings.sessionDir = runtime.makeTempDirSync();
   const opts: AgentFactoryOptions = {
     multiAgentEnabled: true,
     delegateEnabled: false,
@@ -147,10 +148,12 @@ test("workflow_run tool executes a read-only audit end to end", async () => {
   const active = createActiveRegistry();
   const tool = createRunTool(manager, store, active);
 
-  const result = await tool.execute({}, {
-    source:
-      `workflow("readonly audit", {concurrency:2, phases:[phase("scan", parallel(agent("api", {mode:"plan", tools:["read","grep"], prompt:"audit api"}), agent("agent", {mode:"plan", tools:["read","grep"], prompt:"audit agent"}))), phase("verify", agent("cross-check", {mode:"plan", tools:["read"], prompt:"cross-check findings"}))]});`,
-  });
+  const result = await tool.execute(
+    {},
+    {
+      source: `workflow("readonly audit", {concurrency:2, phases:[phase("scan", parallel(agent("api", {mode:"plan", tools:["read","grep"], prompt:"audit api"}), agent("agent", {mode:"plan", tools:["read","grep"], prompt:"audit agent"}))), phase("verify", agent("cross-check", {mode:"plan", tools:["read"], prompt:"cross-check findings"}))]});`,
+    },
+  );
 
   const parsed = JSON.parse(result.text) as {
     id: string;

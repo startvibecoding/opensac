@@ -5,7 +5,6 @@
 
 /** Identifies the kind of AST node. Values mirror the Go iota block. */
 export const NodeType = {
-
   // Block nodes
   Document: 0,
   Heading: 1,

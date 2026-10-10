@@ -49,7 +49,8 @@ export function validateAttachmentReferenceForResolver(ref: string): void {
       (code >= 0x61 && code <= 0x7a) || // a-z
       (code >= 0x41 && code <= 0x5a) || // A-Z
       (code >= 0x30 && code <= 0x39) || // 0-9
-      char === "_" || char === "-"
+      char === "_" ||
+      char === "-"
     ) {
       continue;
     }

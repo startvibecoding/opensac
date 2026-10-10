@@ -2,6 +2,7 @@
 // lifecycle (settings, lock, registration, HTTP listener, and cleanup); the
 // Core server itself deliberately owns only the listener.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import {
   configDir,
   defaultSettings,
@@ -108,9 +109,9 @@ type CoreServerStartable = CoreServerLike | CoreServerHandle;
 export type CoreServerFactory =
   | CoreServerStartable
   | ((
-    options: CoreServerOptions,
-    signal?: AbortSignal,
-  ) => CoreServerStartable | Promise<CoreServerStartable>);
+      options: CoreServerOptions,
+      signal?: AbortSignal,
+    ) => CoreServerStartable | Promise<CoreServerStartable>);
 
 /** Inputs used by the identity-safe discovery seam. */
 export interface CoreCommandDiscoveryOptions {
@@ -151,15 +152,12 @@ export interface CoreCommandDependencies {
   /** Object-shaped lock dependency, matching the CoreLock class API. */
   lock?:
     | {
-      acquire(
-        paths: CorePaths,
-        signal?: AbortSignal,
-      ): MaybePromise<CoreLockLike>;
-    }
-    | ((
-      paths: CorePaths,
-      signal?: AbortSignal,
-    ) => MaybePromise<CoreLockLike>);
+        acquire(
+          paths: CorePaths,
+          signal?: AbortSignal,
+        ): MaybePromise<CoreLockLike>;
+      }
+    | ((paths: CorePaths, signal?: AbortSignal) => MaybePromise<CoreLockLike>);
   /** Create a registry facade for the paths. */
   registry?: CoreRegistryLike | ((paths: CorePaths) => CoreRegistryLike);
   /** Alias for registry. */
@@ -236,24 +234,22 @@ function createLazyProductionRuntimeHost(
     signal: AbortSignal,
   ): Promise<string> => {
     if (signal.aborted) throw new Error("cron run aborted");
-    const current = runtimeHost ?? await load();
+    const current = runtimeHost ?? (await load());
     const session = job.sessionId
       ? await current.openSession({ sessionId: job.sessionId })
       : await current.createSession({
-        workDir: job.workDir ?? Deno.cwd(),
-      });
+          workDir: job.workDir ?? nodeRuntime.cwd(),
+        });
     try {
       const accepted = await current.prompt({
         sessionId: session.sessionId,
         text: job.prompt ?? "",
       });
       let response = "";
-      for await (
-        const event of current.subscribeRunEvents(
-          session.sessionId,
-          accepted.runId,
-        )
-      ) {
+      for await (const event of current.subscribeRunEvents(
+        session.sessionId,
+        accepted.runId,
+      )) {
         if (event.eventType === "text_delta") {
           const text = event.payload.text;
           if (typeof text === "string") response += text;
@@ -280,7 +276,7 @@ function createLazyProductionRuntimeHost(
     hostPromise ??= import("../core/runtime_host.ts").then(async (module) => {
       const runtime = await module.createCoreRuntimeHost({
         source: SOURCE_UNKNOWN,
-        workDir: Deno.cwd(),
+        workDir: nodeRuntime.cwd(),
         settings,
         providerName: settings.defaultProvider ?? "",
         modelID: settings.defaultModel ?? "",
@@ -290,11 +286,11 @@ function createLazyProductionRuntimeHost(
           triggerCronJob: triggerCron,
           cronRunning: () => cronScheduler?.isRunning() ?? false,
           knowledgeServiceFactory: (currentSettings) =>
-            knowledgeService ??= createKnowledgeBaseService(
+            (knowledgeService ??= createKnowledgeBaseService(
               currentSettings.sessionDir ?? "",
               defaultKnowledgeBaseIndexPolicy(),
               currentSettings,
-            ),
+            )),
           setSessionSkill: async (sessionId, name, active) => {
             const host = runtimeHost;
             if (host === undefined) {
@@ -328,11 +324,11 @@ function createLazyProductionRuntimeHost(
           try {
             const knowledge = await runKnowledgeBaseCronJob(
               jobSignal,
-              knowledgeService ??= createKnowledgeBaseService(
+              (knowledgeService ??= createKnowledgeBaseService(
                 settings.sessionDir ?? "",
                 defaultKnowledgeBaseIndexPolicy(),
                 settings,
-              ),
+              )),
               job.id ?? "",
             );
             if (knowledge.handled) {
@@ -659,7 +655,7 @@ export async function startCoreCommand(
       id,
       version,
       protocolVersion,
-      pid: deps.pid ?? Deno.pid,
+      pid: deps.pid ?? nodeRuntime.pid,
       host: resolvedConfig.host,
       connectHost: registrationConnectHost(resolvedConfig.host),
       port: server.address.port,
@@ -714,9 +710,11 @@ export async function runCoreCommand(
   };
   if (externalSignal !== undefined) {
     if (externalSignal.aborted) relayExternalAbort();
-    else {externalSignal.addEventListener("abort", relayExternalAbort, {
+    else {
+      externalSignal.addEventListener("abort", relayExternalAbort, {
         once: true,
-      });}
+      });
+    }
   }
 
   const addSignal = deps.addSignalListener ?? defaultAddSignalListener;
@@ -833,8 +831,7 @@ export interface CoreStopDependencies {
   paths?: (stateDir: string) => CorePaths;
   /** Registry facade used for registration identity and exit observation. */
   registry?:
-    | CoreStopRegistryLike
-    | ((paths: CorePaths) => CoreStopRegistryLike);
+    CoreStopRegistryLike | ((paths: CorePaths) => CoreStopRegistryLike);
   /** Alias for registry. */
   createRegistry?: (paths: CorePaths) => CoreStopRegistryLike;
   /** Create the lifecycle client used for discovery and shutdown. */
@@ -882,7 +879,8 @@ export async function stopCoreCommand(
   const version = resolveVersion(options, {});
   const protocolVersion = resolveProtocolVersion(options, {});
   const registry = resolveStopRegistry(paths, deps);
-  const kill = deps.kill ?? ((pid, signalName) => Deno.kill(pid, signalName));
+  const kill =
+    deps.kill ?? ((pid, signalName) => nodeRuntime.kill(pid, signalName));
 
   const client = await (deps.createClient ?? createStopClient)({
     paths,
@@ -896,9 +894,8 @@ export async function stopCoreCommand(
     if (discovery.status === "missing") {
       return { status: "absent", exited: true, signalled: false };
     }
-    const registration = "registration" in discovery
-      ? discovery.registration
-      : undefined;
+    const registration =
+      "registration" in discovery ? discovery.registration : undefined;
 
     if (discovery.status === "stale") {
       if (
@@ -929,8 +926,9 @@ export async function stopCoreCommand(
     try {
       await client.shutdown(signal);
     } catch (error) {
-      const replaceable = isMethodNotFound(error) &&
-        await isCurrentRegistration(registry, registration);
+      const replaceable =
+        isMethodNotFound(error) &&
+        (await isCurrentRegistration(registry, registration));
       if (!replaceable) throw error;
       // Older Core builds predate `core.shutdown`. Their endpoint identity was
       // verified by discovery and SIGTERM is that process's clean stop path
@@ -952,9 +950,7 @@ export async function stopCoreCommand(
   }
 }
 
-function createStopClient(
-  options: CoreStopClientOptions,
-): CoreStopClient {
+function createStopClient(options: CoreStopClientOptions): CoreStopClient {
   return new CoreClient({
     stateDir: options.paths.stateDir,
     version: options.version,
@@ -1215,11 +1211,7 @@ export async function statusCoreCommand(
   const client = await createLifecycleClient(context, deps, signal);
   try {
     const discovery = await client.discover(signal);
-    return projectStatus(
-      discovery,
-      context.config.auth,
-      deps.now ?? Date.now,
-    );
+    return projectStatus(discovery, context.config.auth, deps.now ?? Date.now);
   } finally {
     await client.close();
   }
@@ -1372,9 +1364,10 @@ export async function listCoreCommand(
   try {
     const discovery = await client.discover(signal);
     if (discovery.status !== "ready") {
-      const hint = discovery.status === "missing"
-        ? '; run "opensac core start" first'
-        : "";
+      const hint =
+        discovery.status === "missing"
+          ? '; run "opensac core start" first'
+          : "";
       throw new Error(
         `Cannot list clients: OpenSAC Core is not ready (${discovery.status})${hint}`,
         "error" in discovery && discovery.error instanceof Error
@@ -1402,9 +1395,8 @@ function assertPairable(
   discovery: CoreDiscoveryResult,
 ): asserts discovery is Extract<CoreDiscoveryResult, { status: "ready" }> {
   if (discovery.status === "ready") return;
-  const hint = discovery.status === "missing"
-    ? '; run "opensac core start" first'
-    : "";
+  const hint =
+    discovery.status === "missing" ? '; run "opensac core start" first' : "";
   throw new Error(
     `Cannot pair: OpenSAC Core is not ready (${discovery.status})${hint}`,
     "error" in discovery && discovery.error instanceof Error
@@ -1479,10 +1471,7 @@ function createListClient(
     ...(signal === undefined ? {} : { signal }),
   };
   return (deps.createClient ?? defaultLifecycleClient)(options) as
-    | Promise<
-      CoreListClientSurface
-    >
-    | CoreListClientSurface;
+    Promise<CoreListClientSurface> | CoreListClientSurface;
 }
 
 function parseCoreClientsResult(value: unknown): CoreListClient[] {
@@ -1495,7 +1484,9 @@ function parseCoreClientsResult(value: unknown): CoreListClient[] {
   }
   return clients.map((client) => {
     if (
-      client === null || typeof client !== "object" || Array.isArray(client)
+      client === null ||
+      typeof client !== "object" ||
+      Array.isArray(client)
     ) {
       throw new Error("Core client entry has an invalid shape");
     }
@@ -1510,7 +1501,8 @@ function parseCoreClientsResult(value: unknown): CoreListClient[] {
     }
     const subscriptions = record.subscriptions.map((subscription) => {
       if (
-        subscription === null || typeof subscription !== "object" ||
+        subscription === null ||
+        typeof subscription !== "object" ||
         Array.isArray(subscription)
       ) {
         throw new Error("Core client subscription entry has an invalid shape");
@@ -1563,8 +1555,8 @@ async function repairOrphanLockBeforeLaunch(
   }
 
   if (accept) {
-    const reclaim = deps.reclaimOrphanLock ??
-      ((p, s) => CoreLock.reclaimOrphan(p, s));
+    const reclaim =
+      deps.reclaimOrphanLock ?? ((p, s) => CoreLock.reclaimOrphan(p, s));
     const removed = await reclaim(paths, signal);
     if (removed) {
       await writeCoreStdout(
@@ -1585,14 +1577,16 @@ function orphanLockPrompt(
   paths: CorePaths,
   info: Extract<CoreLockInspection, { state: "orphan" }>,
 ): string {
-  const what = info.reason === "missing-metadata"
-    ? "no owner metadata (a Core crashed before it could claim it)"
-    : info.reason === "unreadable-metadata"
-    ? "unreadable owner metadata"
-    : "is not a lock directory";
-  const age = info.ageMs === undefined
-    ? ""
-    : ` (left ${Math.round(info.ageMs / 1000)}s ago)`;
+  const what =
+    info.reason === "missing-metadata"
+      ? "no owner metadata (a Core crashed before it could claim it)"
+      : info.reason === "unreadable-metadata"
+        ? "unreadable owner metadata"
+        : "is not a lock directory";
+  const age =
+    info.ageMs === undefined
+      ? ""
+      : ` (left ${Math.round(info.ageMs / 1000)}s ago)`;
   return (
     `Detected a stale Core lock at ${paths.lockFile} with ${what}${age}, and ` +
     "no running Core is registered. Remove it and continue starting the Core?"
@@ -1601,7 +1595,7 @@ function orphanLockPrompt(
 
 function defaultLockRepairInteractive(): boolean {
   try {
-    return Deno.stdin.isTerminal?.() === true;
+    return nodeRuntime.stdin.isTerminal?.() === true;
   } catch {
     return false;
   }
@@ -1609,7 +1603,7 @@ function defaultLockRepairInteractive(): boolean {
 
 async function writeCoreStdout(text: string): Promise<void> {
   try {
-    await Deno.stdout.write(new TextEncoder().encode(text));
+    await nodeRuntime.stdout.write(new TextEncoder().encode(text));
   } catch {
     // A non-writable stdout must not fail the repair itself.
   }
@@ -1625,7 +1619,7 @@ async function promptLockRepairConfirm(message: string): Promise<boolean> {
 async function readStdinLine(): Promise<string> {
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
-    reader = Deno.stdin.readable.getReader();
+    reader = nodeRuntime.stdin.readable.getReader();
   } catch {
     return "";
   }
@@ -1676,24 +1670,25 @@ function projectStatus(
   auth: boolean,
   now: () => number,
 ): CoreStatusOutcome {
-  const registration = "registration" in discovery
-    ? discovery.registration
-    : undefined;
+  const registration =
+    "registration" in discovery ? discovery.registration : undefined;
   const reason = statusReason(discovery);
   return {
     status: discovery.status,
     running: discovery.status === "ready",
     auth,
     ...(discovery.status === "ready" ? { url: discovery.url } : {}),
-    ...(registration === undefined ? {} : {
-      pid: registration.pid,
-      version: registration.version,
-      protocolVersion: registration.protocolVersion,
-      startedAt: registration.startedAt,
-      ...(discovery.status === "ready"
-        ? { uptimeMs: Math.max(0, now() - registration.startedAt) }
-        : {}),
-    }),
+    ...(registration === undefined
+      ? {}
+      : {
+          pid: registration.pid,
+          version: registration.version,
+          protocolVersion: registration.protocolVersion,
+          startedAt: registration.startedAt,
+          ...(discovery.status === "ready"
+            ? { uptimeMs: Math.max(0, now() - registration.startedAt) }
+            : {}),
+        }),
     ...(reason === undefined ? {} : { reason }),
   };
 }
@@ -1762,8 +1757,14 @@ function resolveVersion(
   options: CoreCommandOptions,
   deps: CoreCommandDependencies,
 ): string {
-  const version = options.version ?? deps.version ??
-    Deno.env.get("OPENSAC_CORE_VERSION") ?? currentVersion();
+  const version =
+    // A launcher sets `OPENSAC_CORE_VERSION` to pin the child Core to the
+    // version its client expects, so it wins over the CLI's app-version
+    // default.
+    nodeRuntime.env.get("OPENSAC_CORE_VERSION") ??
+    options.version ??
+    deps.version ??
+    currentVersion();
   if (typeof version !== "string" || version.trim() === "") {
     throw new TypeError("Core command version must be a non-empty string");
   }
@@ -1774,18 +1775,19 @@ function resolveProtocolVersion(
   options: CoreCommandOptions,
   deps: CoreCommandDependencies,
 ): number {
-  const protocolVersion = options.protocolVersion ?? deps.protocolVersion ??
+  const protocolVersion =
+    options.protocolVersion ??
+    deps.protocolVersion ??
     Number(
-      Deno.env.get("OPENSAC_CORE_PROTOCOL_VERSION") ?? CORE_PROTOCOL_VERSION,
+      nodeRuntime.env.get("OPENSAC_CORE_PROTOCOL_VERSION") ??
+        CORE_PROTOCOL_VERSION,
     );
   if (
     typeof protocolVersion !== "number" ||
     !Number.isInteger(protocolVersion) ||
     protocolVersion < 0
   ) {
-    throw new TypeError(
-      "Core command protocolVersion must be an integer >= 0",
-    );
+    throw new TypeError("Core command protocolVersion must be an integer >= 0");
   }
   return protocolVersion;
 }
@@ -1805,10 +1807,7 @@ function resolveRegistry(
 
 function resolveLockAcquirer(
   deps: CoreCommandDependencies,
-): (
-  paths: CorePaths,
-  signal?: AbortSignal,
-) => MaybePromise<CoreLockLike> {
+): (paths: CorePaths, signal?: AbortSignal) => MaybePromise<CoreLockLike> {
   if (deps.acquireLock !== undefined) return deps.acquireLock;
   if (deps.lockAcquire !== undefined) return deps.lockAcquire;
   if (deps.createLock !== undefined) return deps.createLock;
@@ -1870,15 +1869,12 @@ async function discoverExistingCore(
     }
   }
 
-  if (
-    result.status === "ready" &&
-    deps.probeRegisteredCore !== undefined
-  ) {
+  if (result.status === "ready" && deps.probeRegisteredCore !== undefined) {
     let probeResult: boolean;
     try {
       probeResult = await awaitAbortable(
         Promise.resolve().then(() =>
-          deps.probeRegisteredCore!(options.paths, options.config)
+          deps.probeRegisteredCore!(options.paths, options.config),
         ),
         signal,
       );
@@ -1941,8 +1937,10 @@ async function discoverForLockRace(
 }
 
 function isCoreLockBusyError(error: unknown): boolean {
-  return error instanceof CoreLockBusyError ||
-    (error instanceof Error && error.name === "CoreLockBusyError");
+  return (
+    error instanceof CoreLockBusyError ||
+    (error instanceof Error && error.name === "CoreLockBusyError")
+  );
 }
 
 function staleDiscovery(
@@ -1976,9 +1974,8 @@ async function startServer(
 ): Promise<CoreServerHandle> {
   const source = deps.createServer ?? deps.startServer ?? deps.server;
   if (source === undefined) return await new CoreServer(options).start(signal);
-  const value = typeof source === "function"
-    ? await source(options, signal)
-    : await source;
+  const value =
+    typeof source === "function" ? await source(options, signal) : await source;
   if (isServerStartable(value)) return await value.start(signal);
   return value;
 }
@@ -1986,8 +1983,9 @@ async function startServer(
 function isServerStartable(
   value: CoreServerStartable,
 ): value is CoreServerLike {
-  return isObject(value) && "start" in value &&
-    typeof value.start === "function";
+  return (
+    isObject(value) && "start" in value && typeof value.start === "function"
+  );
 }
 
 function createRegistrationId(deps: CoreCommandDependencies): string {
@@ -2004,8 +2002,9 @@ function createUuid(): string {
   } catch {
     const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+      "",
+    );
   }
 }
 
@@ -2031,18 +2030,21 @@ function ownedCoreHandle(
   let stopping = false;
   let monitorTask: Promise<void> | undefined;
   const interval = normalizeMonitorInterval(monitorIntervalMs);
-  const monitorTimer = interval === undefined ? undefined : setInterval(() => {
-    if (stopping || monitorTask !== undefined) return;
-    const task = checkOwnership().finally(() => {
-      if (monitorTask === task) monitorTask = undefined;
-    });
-    monitorTask = task;
-  }, interval);
+  const monitorTimer =
+    interval === undefined
+      ? undefined
+      : setInterval(() => {
+          if (stopping || monitorTask !== undefined) return;
+          const task = checkOwnership().finally(() => {
+            if (monitorTask === task) monitorTask = undefined;
+          });
+          monitorTask = task;
+        }, interval);
   if (monitorTimer !== undefined) {
     // A monitor must never keep a test runner or an embedding process alive
     // after its owner has been explicitly stopped.
     try {
-      Deno.unrefTimer(monitorTimer);
+      nodeRuntime.unrefTimer(monitorTimer);
     } catch {
       // Older restricted runtimes may not expose timer unref.
     }
@@ -2095,9 +2097,10 @@ function ownedCoreHandle(
 
     let registrationCurrent = true;
     try {
-      registrationCurrent = registry.isCurrent === undefined
-        ? true
-        : await registry.isCurrent(registration);
+      registrationCurrent =
+        registry.isCurrent === undefined
+          ? true
+          : await registry.isCurrent(registration);
     } catch {
       // A registration read that throws is not proof of ownership loss. Do
       // not consult the lock and destroy a still-owned process on uncertainty.
@@ -2106,9 +2109,8 @@ function ownedCoreHandle(
 
     let lockCurrent = true;
     try {
-      lockCurrent = lock.isCurrent === undefined
-        ? true
-        : await lock.isCurrent();
+      lockCurrent =
+        lock.isCurrent === undefined ? true : await lock.isCurrent();
     } catch {
       // A known registration loss remains definitive even when the lock read
       // is unreadable. Stop through the same idempotent cleanup path; an
@@ -2193,17 +2195,20 @@ async function portConflictError(
   const endpoint = `${config.host}:${config.port}`;
   let healthy = false;
   try {
-    const discovery = knownDiscovery ?? await discoverExistingCore(
-      {
-        paths,
-        stateDir: paths.stateDir,
-        config,
-        ...identity,
-      },
-      deps,
-      signal,
-    );
-    healthy = discovery.status === "ready" &&
+    const discovery =
+      knownDiscovery ??
+      (await discoverExistingCore(
+        {
+          paths,
+          stateDir: paths.stateDir,
+          config,
+          ...identity,
+        },
+        deps,
+        signal,
+      ));
+    healthy =
+      discovery.status === "ready" &&
       registrationMatchesConfiguredEndpoint(discovery.registration, config);
   } catch (probeError) {
     if (signal?.aborted) throw probeError;
@@ -2220,13 +2225,15 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isAddressInUse(error: unknown): boolean {
-  if (error instanceof Deno.errors.AddrInUse) return true;
+  if (error instanceof nodeRuntime.errors.AddrInUse) return true;
   const code = isObject(error) ? error.code : undefined;
   if (code === "addr_in_use" || code === "EADDRINUSE") return true;
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  return message.includes("address already in use") ||
+  return (
+    message.includes("address already in use") ||
     message.includes("address in use") ||
-    message.includes("bind: address");
+    message.includes("bind: address")
+  );
 }
 
 async function cleanupFailedStartup(
@@ -2278,14 +2285,14 @@ function defaultAddSignalListener(
   signal: CoreSignal,
   handler: () => void,
 ): void {
-  Deno.addSignalListener(signal, handler);
+  nodeRuntime.addSignalListener(signal, handler);
 }
 
 function defaultRemoveSignalListener(
   signal: CoreSignal,
   handler: () => void,
 ): void {
-  Deno.removeSignalListener(signal, handler);
+  nodeRuntime.removeSignalListener(signal, handler);
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -2293,8 +2300,9 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 function abortReason(signal: AbortSignal): unknown {
-  return signal.reason ??
-    new DOMException("Core startup aborted", "AbortError");
+  return (
+    signal.reason ?? new DOMException("Core startup aborted", "AbortError")
+  );
 }
 
 function isAbortError(error: unknown): boolean {

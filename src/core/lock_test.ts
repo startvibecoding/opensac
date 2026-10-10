@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
@@ -8,12 +9,12 @@ import { test } from "#testing";
 async function withStateDir(
   test: (paths: CorePaths, registry: CoreRegistry) => Promise<void>,
 ): Promise<void> {
-  const stateDir = await Deno.makeTempDir({ prefix: "opensac-core-lock-" });
+  const stateDir = await runtime.makeTempDir({ prefix: "opensac-core-lock-" });
   try {
     const paths = CorePaths.fromStateDir(stateDir);
     await test(paths, new CoreRegistry(paths));
   } finally {
-    await Deno.remove(stateDir, { recursive: true });
+    await runtime.remove(stateDir, { recursive: true });
   }
 }
 
@@ -25,7 +26,7 @@ function registration(
     id,
     version: "0.1.0",
     protocolVersion: 1,
-    pid: Deno.pid,
+    pid: runtime.pid,
     host: "127.0.0.1",
     port: 4096,
     startedAt: 1_700_000_000_000,
@@ -42,8 +43,8 @@ async function seedLock(
     timestamp: number;
   },
 ): Promise<void> {
-  await Deno.mkdir(paths.lockFile, { mode: 0o700 });
-  await Deno.writeTextFile(
+  await runtime.mkdir(paths.lockFile, { mode: 0o700 });
+  await runtime.writeTextFile(
     path.join(paths.lockFile, "meta.json"),
     JSON.stringify(metadata),
   );
@@ -53,13 +54,13 @@ test("CoreLock uses a private lock directory and releases it", async () => {
   await withStateDir(async (paths) => {
     const handle = await CoreLock.acquire(paths);
     try {
-      const info = await Deno.stat(paths.lockFile);
+      const info = await runtime.stat(paths.lockFile);
       assert(info.isDirectory);
       const metadata = JSON.parse(
-        await Deno.readTextFile(path.join(paths.lockFile, "meta.json")),
+        await runtime.readTextFile(path.join(paths.lockFile, "meta.json")),
       );
-      assertEquals(metadata.pid, Deno.pid);
-      assertEquals(metadata.hostname, Deno.hostname());
+      assertEquals(metadata.pid, runtime.pid);
+      assertEquals(metadata.hostname, runtime.hostname());
       assertEquals(typeof metadata.token, "string");
       assert(metadata.token.length > 0);
       assertEquals(typeof metadata.timestamp, "number");
@@ -98,10 +99,7 @@ test("two CoreLock acquisitions cannot succeed until release", async () => {
   await withStateDir(async (paths) => {
     const first = await CoreLock.acquire(paths);
     try {
-      await assertRejects(
-        () => CoreLock.acquire(paths),
-        CoreLockBusyError,
-      );
+      await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
     } finally {
       await first.release();
     }
@@ -115,8 +113,8 @@ test("CoreLock release is token protected and idempotent", async () => {
   await withStateDir(async (paths) => {
     const handle = await CoreLock.acquire(paths);
     const metadataPath = path.join(paths.lockFile, "meta.json");
-    const original = JSON.parse(await Deno.readTextFile(metadataPath));
-    await Deno.writeTextFile(
+    const original = JSON.parse(await runtime.readTextFile(metadataPath));
+    await runtime.writeTextFile(
       metadataPath,
       JSON.stringify({ ...original, token: "another-owner" }),
     );
@@ -133,7 +131,7 @@ test("CoreLock recovers a demonstrably dead owner with no healthy registration",
     await seedLock(paths, {
       token: "stale-token",
       pid: 999_999_99,
-      hostname: Deno.hostname(),
+      hostname: runtime.hostname(),
       timestamp: 1,
     });
 
@@ -152,7 +150,7 @@ test("CoreLock recovers when the registered process is also dead", async () => {
     await seedLock(paths, {
       token: "stale-token",
       pid: 999_999_99,
-      hostname: Deno.hostname(),
+      hostname: runtime.hostname(),
       timestamp: 1,
     });
 
@@ -167,14 +165,11 @@ test("CoreLock refuses stale recovery while a registered process may be healthy"
     await seedLock(paths, {
       token: "stale-token",
       pid: 999_999_99,
-      hostname: Deno.hostname(),
+      hostname: runtime.hostname(),
       timestamp: 1,
     });
 
-    await assertRejects(
-      () => CoreLock.acquire(paths),
-      CoreLockBusyError,
-    );
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
     assertEquals(await exists(paths.lockFile), true);
   });
 });
@@ -183,31 +178,25 @@ test("CoreLock does not reclaim an old timestamp for a live owner", async () => 
   await withStateDir(async (paths) => {
     await seedLock(paths, {
       token: "live-token",
-      pid: Deno.pid,
-      hostname: Deno.hostname(),
+      pid: runtime.pid,
+      hostname: runtime.hostname(),
       timestamp: 1,
     });
 
-    await assertRejects(
-      () => CoreLock.acquire(paths),
-      CoreLockBusyError,
-    );
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
     assertEquals(await exists(paths.lockFile), true);
   });
 });
 
 test("CoreLock treats unreadable owner metadata as busy", async () => {
   await withStateDir(async (paths) => {
-    await Deno.mkdir(paths.lockFile, { mode: 0o700 });
-    await Deno.writeTextFile(
+    await runtime.mkdir(paths.lockFile, { mode: 0o700 });
+    await runtime.writeTextFile(
       path.join(paths.lockFile, "meta.json"),
       "{not-json",
     );
 
-    await assertRejects(
-      () => CoreLock.acquire(paths),
-      CoreLockBusyError,
-    );
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
     assertEquals(await exists(paths.lockFile), true);
   });
 });
@@ -217,12 +206,12 @@ test("concurrent stale recovery never removes a re-acquired lock", async () => {
     await seedLock(paths, {
       token: "stale-token",
       pid: 999_999_99,
-      hostname: Deno.hostname(),
+      hostname: runtime.hostname(),
       timestamp: 1,
     });
 
-    const originalRemove = Deno.remove;
-    const originalRename = Deno.rename;
+    const originalRemove = runtime.remove;
+    const originalRename = runtime.rename;
     let releaseCleanup!: () => void;
     let signalCleanup!: (kind: "remove" | "rename") => void;
     const cleanupGate = new Promise<void>((resolve) => {
@@ -233,16 +222,18 @@ test("concurrent stale recovery never removes a re-acquired lock", async () => {
     });
     let hooked = false;
 
-    Deno.remove =
-      (async (target: string, options?: { recursive?: boolean }) => {
-        if (!hooked && target === paths.lockFile && options?.recursive) {
-          hooked = true;
-          signalCleanup("remove");
-          await cleanupGate;
-        }
-        return originalRemove(target, options);
-      }) as typeof Deno.remove;
-    Deno.rename = (async (oldPath: string, newPath: string) => {
+    runtime.remove = (async (
+      target: string,
+      options?: { recursive?: boolean },
+    ) => {
+      if (!hooked && target === paths.lockFile && options?.recursive) {
+        hooked = true;
+        signalCleanup("remove");
+        await cleanupGate;
+      }
+      return originalRemove(target, options);
+    }) as typeof runtime.remove;
+    runtime.rename = (async (oldPath: string, newPath: string) => {
       if (!hooked && oldPath === paths.lockFile) {
         const result = await originalRename(oldPath, newPath);
         hooked = true;
@@ -251,14 +242,12 @@ test("concurrent stale recovery never removes a re-acquired lock", async () => {
         return result;
       }
       return originalRename(oldPath, newPath);
-    }) as typeof Deno.rename;
+    }) as typeof runtime.rename;
 
     let first:
-      | Promise<Awaited<ReturnType<typeof CoreLock.acquire>>>
-      | undefined;
+      Promise<Awaited<ReturnType<typeof CoreLock.acquire>>> | undefined;
     let second:
-      | Promise<Awaited<ReturnType<typeof CoreLock.acquire>>>
-      | undefined;
+      Promise<Awaited<ReturnType<typeof CoreLock.acquire>>> | undefined;
     try {
       first = CoreLock.acquire(paths);
       const cleanupKind = await cleanupStarted;
@@ -272,15 +261,13 @@ test("concurrent stale recovery never removes a re-acquired lock", async () => {
       releaseCleanup();
 
       const results = await Promise.allSettled([first, second]);
-      const owners = results.filter(
-        (result) => result.status === "fulfilled",
-      );
+      const owners = results.filter((result) => result.status === "fulfilled");
       assertEquals(owners.length, 1);
       for (const owner of owners) await owner.value.release();
     } finally {
       releaseCleanup();
-      Deno.remove = originalRemove;
-      Deno.rename = originalRename;
+      runtime.remove = originalRemove;
+      runtime.rename = originalRename;
     }
   });
 });
@@ -294,22 +281,16 @@ test("CoreLock fails closed when owner liveness cannot be established", async ()
       timestamp: 1,
     });
 
-    await assertRejects(
-      () => CoreLock.acquire(paths),
-      CoreLockBusyError,
-    );
+    await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
     assertEquals(await exists(paths.lockFile), true);
   });
 });
 
-async function seedOrphanLock(
-  paths: CorePaths,
-  ageMs = 0,
-): Promise<void> {
-  await Deno.mkdir(paths.lockFile, { mode: 0o700 });
+async function seedOrphanLock(paths: CorePaths, ageMs = 0): Promise<void> {
+  await runtime.mkdir(paths.lockFile, { mode: 0o700 });
   if (ageMs > 0) {
     const past = new Date(Date.now() - ageMs);
-    await Deno.utime(paths.lockFile, past, past);
+    await runtime.utime(paths.lockFile, past, past);
   }
 }
 
@@ -358,12 +339,12 @@ test("CoreLock.acquire will not auto-heal malformed metadata or a live registrat
   await withStateDir(async (paths, registry) => {
     // Malformed metadata is never auto-healed, even past the grace window: it
     // is an unreadable-ownership signal that requires explicit human consent.
-    await Deno.mkdir(paths.lockFile, { mode: 0o700 });
+    await runtime.mkdir(paths.lockFile, { mode: 0o700 });
     const metaPath = path.join(paths.lockFile, "meta.json");
-    await Deno.writeTextFile(metaPath, "{not-json");
+    await runtime.writeTextFile(metaPath, "{not-json");
     const past = new Date(Date.now() - 60_000);
-    await Deno.utime(metaPath, past, past);
-    await Deno.utime(paths.lockFile, past, past);
+    await runtime.utime(metaPath, past, past);
+    await runtime.utime(paths.lockFile, past, past);
     await assertRejects(() => CoreLock.acquire(paths), CoreLockBusyError);
     assertEquals(await exists(paths.lockFile), true);
     await handleMalformedLock(paths);
@@ -405,10 +386,10 @@ test("CoreLock.reclaimOrphan refuses consent removal while a live Core is regist
 async function waitForFile(filePath: string): Promise<void> {
   for (let attempt = 0; attempt < 1000; attempt++) {
     try {
-      await Deno.lstat(filePath);
+      await runtime.lstat(filePath);
       return;
     } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      if (!(error instanceof runtime.errors.NotFound)) throw error;
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
@@ -417,10 +398,10 @@ async function waitForFile(filePath: string): Promise<void> {
 
 async function exists(filePath: string): Promise<boolean> {
   try {
-    await Deno.lstat(filePath);
+    await runtime.lstat(filePath);
     return true;
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return false;
+    if (error instanceof runtime.errors.NotFound) return false;
     throw error;
   }
 }

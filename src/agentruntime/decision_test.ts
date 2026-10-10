@@ -31,12 +31,16 @@ test("DecisionRecord keeps protocol-neutral payload", () => {
   assertEquals(record.kind, request.kind);
   assertEquals((record.payload as Record<string, unknown>)["tool"], "bash");
 
-  const resolved = createDecisionResolutionRecord(request, {
-    id: request.id,
-    kind: request.kind,
-    status: "resolved",
-    value: "approve_once",
-  }, { action: "approve_once" });
+  const resolved = createDecisionResolutionRecord(
+    request,
+    {
+      id: request.id,
+      kind: request.kind,
+      status: "resolved",
+      value: "approve_once",
+    },
+    { action: "approve_once" },
+  );
   assertEquals(resolved.status, "resolved");
   assertEquals(resolved.value, "approve_once");
 });
@@ -71,23 +75,26 @@ test("ReplayDecisions omits expired pending", () => {
 
 test("ExpiredDecisions honors later resolution", () => {
   const now = new Date();
-  const expired = expiredDecisions([
-    {
-      id: "approval-1",
-      sessionId: "",
-      runId: "run-1",
-      kind: DECISION_APPROVAL,
-      status: "pending",
-      expiresAt: new Date(now.getTime() - 1000),
-    },
-    {
-      id: "approval-1",
-      sessionId: "",
-      runId: "run-1",
-      kind: DECISION_APPROVAL,
-      status: "resolved",
-    },
-  ], now);
+  const expired = expiredDecisions(
+    [
+      {
+        id: "approval-1",
+        sessionId: "",
+        runId: "run-1",
+        kind: DECISION_APPROVAL,
+        status: "pending",
+        expiresAt: new Date(now.getTime() - 1000),
+      },
+      {
+        id: "approval-1",
+        sessionId: "",
+        runId: "run-1",
+        kind: DECISION_APPROVAL,
+        status: "resolved",
+      },
+    ],
+    now,
+  );
   assertEquals(expired.length, 0);
 });
 
@@ -183,7 +190,7 @@ test("DecisionService contract across kinds and runs", () => {
       id: "approval-1",
       kind: DECISION_QUESTION,
       status: "resolved",
-    })
+    }),
   );
   assertEquals(service.pending().length, requests.length);
 
@@ -216,7 +223,8 @@ test("DecisionService concurrent first response wins", async () => {
         } catch {
           return false;
         }
-      })),
+      }),
+    ),
   );
   assertEquals(results.filter(Boolean).length, 1);
   assertEquals(service.pending().length, 0);
@@ -276,7 +284,7 @@ test("DecisionService rehydrate rejects conflict", () => {
         kind: DECISION_APPROVAL,
         status: "pending",
       },
-    ])
+    ]),
   );
 });
 
@@ -328,7 +336,7 @@ test("DecisionService failed commit retries without double resume", () => {
       () => {
         throw new Error("persist failed");
       },
-    )
+    ),
   );
   assertEquals(resumes, 1);
   assertEquals(service.pending().length, 1);

@@ -1,10 +1,11 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertStringIncludes } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { extractSection, Store } from "./store.ts";
 import { test } from "#testing";
 
 test("StoreReadWrite", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const store = new Store(p, "");
@@ -23,7 +24,7 @@ test("StoreReadWrite", () => {
 });
 
 test("StoreReadSection", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -41,7 +42,7 @@ test("StoreReadSection", () => {
 
 - always read before edit
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   let section = store.readSection("User Profile");
@@ -56,7 +57,7 @@ test("StoreReadSection", () => {
 });
 
 test("StoreAdd", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -67,7 +68,7 @@ test("StoreAdd", () => {
 
 ## Working Memory
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   store.add("Working Memory", "new fact");
@@ -78,7 +79,7 @@ test("StoreAdd", () => {
 });
 
 test("StoreUpdate", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -87,7 +88,7 @@ test("StoreUpdate", () => {
 
 - version is v0.1.26
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   store.update("Working Memory", "v0.1.26", "v0.1.27");
@@ -98,7 +99,7 @@ test("StoreUpdate", () => {
 });
 
 test("StoreUpdateOnlyWithinSection", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -111,7 +112,7 @@ test("StoreUpdateOnlyWithinSection", () => {
 
 - shared fact
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   store.update("Working Memory", "shared fact", "working fact");
@@ -122,7 +123,7 @@ test("StoreUpdateOnlyWithinSection", () => {
 });
 
 test("StoreDelete", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -133,7 +134,7 @@ test("StoreDelete", () => {
 - fact two
 - fact three
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   store.delete("Working Memory", "fact two");
@@ -145,7 +146,7 @@ test("StoreDelete", () => {
 });
 
 test("StoreDeleteOnlyWithinSection", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -158,7 +159,7 @@ test("StoreDeleteOnlyWithinSection", () => {
 
 - shared fact
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   store.delete("Working Memory", "shared fact");
@@ -170,19 +171,19 @@ test("StoreDeleteOnlyWithinSection", () => {
 });
 
 test("StoreWriteAllUsesReadPath", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
-  Deno.writeTextFileSync(p, "# old", { mode: 0o600 });
+  runtime.writeTextFileSync(p, "# old", { mode: 0o600 });
   const store = new Store(p, "");
 
   store.writeAll("# new");
 
-  const got = Deno.readTextFileSync(p);
+  const got = runtime.readTextFileSync(p);
   assertEquals(got, "# new");
 });
 
 test("StoreAddNewSection", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const p = path.join(dir, "memory.md");
 
   const md = `# Agent Memory
@@ -191,7 +192,7 @@ test("StoreAddNewSection", () => {
 
 - likes Go
 `;
-  Deno.writeTextFileSync(p, md, { mode: 0o600 });
+  runtime.writeTextFileSync(p, md, { mode: 0o600 });
   const store = new Store(p, "");
 
   store.add("Custom Section", "custom fact");

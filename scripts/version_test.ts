@@ -1,18 +1,16 @@
+import { runtime } from "../src/platform/runtime.ts";
 import { assertEquals } from "../src/compat/assert.ts";
 import { join } from "../src/compat/path.ts";
 import {
-import { test } from "#testing";
   packageVersion,
   pickLatestVersionTag,
   resolveBuildVersion,
   toPackageVersion,
 } from "./version.ts";
+import { test } from "#testing";
 
 test("PickLatestVersionTagTakesNewestFirst", () => {
-  assertEquals(
-    pickLatestVersionTag("v0.3.0\nv0.2.1\nv0.2.0\n"),
-    "v0.3.0",
-  );
+  assertEquals(pickLatestVersionTag("v0.3.0\nv0.2.1\nv0.2.0\n"), "v0.3.0");
 });
 
 test("PickLatestVersionTagSkipsBlankLines", () => {
@@ -24,56 +22,55 @@ test("PickLatestVersionTagIsEmptyWithoutTags", () => {
   assertEquals(pickLatestVersionTag("\n \n"), "");
 });
 
-test("PackageVersionReadsDenoJson", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
+test("PackageVersionReadsPackageJson", async () => {
+  const dir = await runtime.makeTempDir({ prefix: "opensac-build-test-" });
   try {
-    await Deno.writeTextFile(
-      join(dir, "deno.json"),
+    await runtime.writeTextFile(
+      join(dir, "package.json"),
       JSON.stringify({ name: "opensac", version: "1.4.2" }),
     );
     assertEquals(await packageVersion(dir), "1.4.2");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await runtime.remove(dir, { recursive: true });
   }
 });
 
 test("PackageVersionIsEmptyWithoutManifest", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
+  const dir = await runtime.makeTempDir({ prefix: "opensac-build-test-" });
   try {
     assertEquals(await packageVersion(dir), "");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await runtime.remove(dir, { recursive: true });
   }
 });
 
 test("ResolveBuildVersionPrefersGitTag", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
+  const dir = await runtime.makeTempDir({ prefix: "opensac-build-test-" });
   try {
-    await Deno.writeTextFile(
-      join(dir, "deno.json"),
+    await runtime.writeTextFile(
+      join(dir, "package.json"),
       JSON.stringify({ version: "1.4.2" }),
     );
-    const version = await resolveBuildVersion(
-      dir,
-      () => Promise.resolve("v9.9.9\n"),
+    const version = await resolveBuildVersion(dir, () =>
+      Promise.resolve("v9.9.9\n"),
     );
     assertEquals(version, "v9.9.9");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await runtime.remove(dir, { recursive: true });
   }
 });
 
 test("ResolveBuildVersionFallsBackToPackageVersion", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "opensac-build-test-" });
+  const dir = await runtime.makeTempDir({ prefix: "opensac-build-test-" });
   try {
-    await Deno.writeTextFile(
-      join(dir, "deno.json"),
+    await runtime.writeTextFile(
+      join(dir, "package.json"),
       JSON.stringify({ version: "1.4.2" }),
     );
     const version = await resolveBuildVersion(dir, () => Promise.resolve(""));
     assertEquals(version, "1.4.2");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await runtime.remove(dir, { recursive: true });
   }
 });
 

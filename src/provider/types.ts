@@ -267,7 +267,9 @@ export function classifyTurn(
   stopReason: string,
 ): TurnClassification {
   if (
-    text !== "" || think !== "" || (toolCalls != null && toolCalls.length > 0)
+    text !== "" ||
+    think !== "" ||
+    (toolCalls != null && toolCalls.length > 0)
   ) {
     return turnMeaningful;
   }

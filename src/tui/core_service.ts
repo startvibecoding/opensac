@@ -9,7 +9,8 @@
 import {
   type CoreRuntimeEvent,
   type CoreRunView,
-  type CoreSessionView} from "../core/runtime.ts";
+  type CoreSessionView,
+} from "../core/runtime.ts";
 import { type Settings } from "../config/settings.ts";
 import { CORE_RUNTIME_METHODS } from "../core/runtime_protocol.ts";
 import {
@@ -57,7 +58,8 @@ import {
   type TUISettingsWriteScope,
   type TUISkillInput,
   type TUISkillView,
-  type TUITranscriptMessage} from "./service.ts";
+  type TUITranscriptMessage,
+} from "./service.ts";
 
 /** Message for service methods the shared Core does not expose yet. */
 export const TUI_CAPABILITY_UNAVAILABLE =
@@ -214,7 +216,8 @@ export function createCoreClientTUIService(
     // rejection and no decision could ever be received again.
     void bridge.catch(() => {
       if (
-        generation === decisionBridgeGeneration && decisionBridge === bridge
+        generation === decisionBridgeGeneration &&
+        decisionBridge === bridge
       ) {
         decisionBridge = undefined;
         // The dial itself failed (the Core was still down): keep retrying with
@@ -223,10 +226,7 @@ export function createCoreClientTUIService(
         decisionBridgeAttempts += 1;
         armDecisionBridgeRedial(
           generation,
-          Math.min(
-            REDIAL_BASE_MS * 2 ** decisionBridgeAttempts,
-            REDIAL_MAX_MS,
-          ),
+          Math.min(REDIAL_BASE_MS * 2 ** decisionBridgeAttempts, REDIAL_MAX_MS),
         );
       }
     });
@@ -265,9 +265,10 @@ export function createCoreClientTUIService(
       return toSessionView(raw, now);
     },
 
-    async openSession(
-      input: { sessionId: string; workDir?: string },
-    ): Promise<TUISessionView> {
+    async openSession(input: {
+      sessionId: string;
+      workDir?: string;
+    }): Promise<TUISessionView> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionOpen,
         input.workDir === undefined || input.workDir === ""
@@ -289,22 +290,24 @@ export function createCoreClientTUIService(
       });
     },
 
-    async listPersistedSessions(
-      input?: { workDir?: string },
-    ): Promise<TUISessionListEntry[]> {
+    async listPersistedSessions(input?: {
+      workDir?: string;
+    }): Promise<TUISessionListEntry[]> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionListPersisted,
-        input?.workDir === undefined ? workDirParams() : {
-          workDir: input.workDir,
-        },
+        input?.workDir === undefined
+          ? workDirParams()
+          : {
+              workDir: input.workDir,
+            },
       );
       if (!Array.isArray(raw)) throw invalidView("session list");
       return raw.map((entry) => toSessionListEntry(entry, now));
     },
 
-    async getTranscript(
-      input: { sessionId: string },
-    ): Promise<TUITranscriptMessage[]> {
+    async getTranscript(input: {
+      sessionId: string;
+    }): Promise<TUITranscriptMessage[]> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionTranscript,
         { sessionId: input.sessionId },
@@ -359,9 +362,7 @@ export function createCoreClientTUIService(
       return toRunView(raw, now);
     },
 
-    async setSessionConfig(
-      input: TUISessionConfig,
-    ): Promise<TUISessionView> {
+    async setSessionConfig(input: TUISessionConfig): Promise<TUISessionView> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionConfigSet,
         {
@@ -382,9 +383,7 @@ export function createCoreClientTUIService(
       return toSessionView(raw, now);
     },
 
-    async setSkillActive(
-      input: TUISkillInput,
-    ): Promise<TUISessionView> {
+    async setSkillActive(input: TUISkillInput): Promise<TUISessionView> {
       await client.call<unknown>(CORE_RUNTIME_METHODS.sessionSkillSet, {
         sessionId: input.sessionId,
         name: input.name,
@@ -397,9 +396,7 @@ export function createCoreClientTUIService(
       return toSessionView(raw, now);
     },
 
-    async listSkills(
-      input: { sessionId: string },
-    ): Promise<TUISkillView[]> {
+    async listSkills(input: { sessionId: string }): Promise<TUISkillView[]> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionSkillsList,
         { sessionId: input.sessionId },
@@ -422,9 +419,9 @@ export function createCoreClientTUIService(
       return Promise.reject(new TUIServiceError(TUI_CAPABILITY_UNAVAILABLE));
     },
 
-    async listAttachments(
-      input: { sessionId: string },
-    ): Promise<TUIAttachmentView[]> {
+    async listAttachments(input: {
+      sessionId: string;
+    }): Promise<TUIAttachmentView[]> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.attachmentList,
         { sessionId: input.sessionId },
@@ -437,9 +434,8 @@ export function createCoreClientTUIService(
         return {
           attachmentId: asString(record.attachmentId, "attachment"),
           name: asString(record.filename, "attachment"),
-          mediaType: typeof record.mediaType === "string"
-            ? record.mediaType
-            : "",
+          mediaType:
+            typeof record.mediaType === "string" ? record.mediaType : "",
           size: typeof record.size === "number" ? record.size : 0,
         } satisfies TUIAttachmentView;
       });
@@ -478,9 +474,10 @@ export function createCoreClientTUIService(
         return {
           name: asString(provider.name, "provider"),
           apiKeyConfigured: provider.apiKeyConfigured === true,
-          modelCount: typeof provider.modelCount === "number"
-            ? provider.modelCount
-            : modelsRaw.length,
+          modelCount:
+            typeof provider.modelCount === "number"
+              ? provider.modelCount
+              : modelsRaw.length,
           models: modelsRaw.map((model) => {
             const record = asRecord(model, "model");
             return {
@@ -500,16 +497,16 @@ export function createCoreClientTUIService(
         webSearchEnabled: object.webSearchEnabled === true,
         skillsDisabled: Array.isArray(object.skillsDisabled)
           ? object.skillsDisabled.filter(
-            (entry): entry is string => typeof entry === "string",
-          )
+              (entry): entry is string => typeof entry === "string",
+            )
           : [],
         providers,
       };
     },
 
-    async getSettings(
-      input?: { scope?: TUISettingsReadScope },
-    ): Promise<Settings> {
+    async getSettings(input?: {
+      scope?: TUISettingsReadScope;
+    }): Promise<Settings> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.settingsGet, {
         scope: input?.scope ?? "effective",
         ...workDirParams(),
@@ -546,14 +543,11 @@ export function createCoreClientTUIService(
       modelID: string;
     }): Promise<void> {
       // Rethrow the original Core error: the dialog renders the raw cause.
-      await client.call<unknown>(
-        CORE_RUNTIME_METHODS.modelValidate,
-        {
-          providerID: input.providerID,
-          modelID: input.modelID,
-          ...workDirParams(),
-        },
-      );
+      await client.call<unknown>(CORE_RUNTIME_METHODS.modelValidate, {
+        providerID: input.providerID,
+        modelID: input.modelID,
+        ...workDirParams(),
+      });
     },
 
     async listEnv(): Promise<Record<string, string>> {
@@ -561,18 +555,18 @@ export function createCoreClientTUIService(
       return projectEnvDocument(raw);
     },
 
-    async updateEnv(
-      input: { vars: Record<string, string> },
-    ): Promise<Record<string, string>> {
+    async updateEnv(input: {
+      vars: Record<string, string>;
+    }): Promise<Record<string, string>> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.envUpdate, {
         vars: input.vars,
       });
       return projectEnvDocument(raw);
     },
 
-    async getSessionContext(
-      input: { sessionId: string },
-    ): Promise<TUISessionContextView> {
+    async getSessionContext(input: {
+      sessionId: string;
+    }): Promise<TUISessionContextView> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionContextGet,
         { sessionId: input.sessionId },
@@ -600,9 +594,9 @@ export function createCoreClientTUIService(
       return projectSessionContext(raw);
     },
 
-    async listExperts(
-      input: { sessionId: string },
-    ): Promise<TUIExpertSummaryView[]> {
+    async listExperts(input: {
+      sessionId: string;
+    }): Promise<TUIExpertSummaryView[]> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.expertList, {
         sessionId: input.sessionId,
       });
@@ -624,9 +618,10 @@ export function createCoreClientTUIService(
       });
     },
 
-    async showExpert(
-      input: { sessionId: string; expertId: string },
-    ): Promise<TUIExpertBundleView> {
+    async showExpert(input: {
+      sessionId: string;
+      expertId: string;
+    }): Promise<TUIExpertBundleView> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.expertShow, {
         sessionId: input.sessionId,
         expertId: input.expertId,
@@ -634,9 +629,9 @@ export function createCoreClientTUIService(
       return projectExpertBundle(raw);
     },
 
-    async expertState(
-      input: { sessionId: string },
-    ): Promise<TUIExpertStateView> {
+    async expertState(input: {
+      sessionId: string;
+    }): Promise<TUIExpertStateView> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.expertState, {
         sessionId: input.sessionId,
       });
@@ -671,9 +666,9 @@ export function createCoreClientTUIService(
       return toSessionView(raw, now);
     },
 
-    async capabilities(
-      input: { sessionId: string },
-    ): Promise<TUICapabilityView> {
+    async capabilities(input: {
+      sessionId: string;
+    }): Promise<TUICapabilityView> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionCapabilities,
         { sessionId: input.sessionId },
@@ -681,9 +676,7 @@ export function createCoreClientTUIService(
       return projectCapabilities(raw);
     },
 
-    async listAgents(
-      input: { sessionId: string },
-    ): Promise<TUIAgentView[]> {
+    async listAgents(input: { sessionId: string }): Promise<TUIAgentView[]> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.agentList, {
         sessionId: input.sessionId,
       });
@@ -715,21 +708,20 @@ export function createCoreClientTUIService(
       sessionId: string;
       enabled: boolean;
     }): Promise<{ enabled: boolean }> {
-      const raw = await client.call<unknown>(
-        CORE_RUNTIME_METHODS.delegateSet,
-        { sessionId: input.sessionId, enabled: input.enabled },
-      );
+      const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.delegateSet, {
+        sessionId: input.sessionId,
+        enabled: input.enabled,
+      });
       const object = asRecord(raw, "delegate state");
       return { enabled: object.enabled === true };
     },
 
-    async delegateState(
-      input: { sessionId: string },
-    ): Promise<{ enabled: boolean }> {
-      const raw = await client.call<unknown>(
-        CORE_RUNTIME_METHODS.delegateGet,
-        { sessionId: input.sessionId },
-      );
+    async delegateState(input: {
+      sessionId: string;
+    }): Promise<{ enabled: boolean }> {
+      const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.delegateGet, {
+        sessionId: input.sessionId,
+      });
       const object = asRecord(raw, "delegate state");
       return { enabled: object.enabled === true };
     },
@@ -750,9 +742,7 @@ export function createCoreClientTUIService(
       return projectCapabilities(raw);
     },
 
-    async esmState(
-      input: { sessionId: string },
-    ): Promise<TUIEsmView> {
+    async esmState(input: { sessionId: string }): Promise<TUIEsmView> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.esmState, {
         sessionId: input.sessionId,
       });
@@ -771,9 +761,9 @@ export function createCoreClientTUIService(
       return projectEsmView(raw);
     },
 
-    async esmContinue(
-      input: { sessionId: string },
-    ): Promise<TUIEsmContinuation> {
+    async esmContinue(input: {
+      sessionId: string;
+    }): Promise<TUIEsmContinuation> {
       const raw = await client.call<unknown>(CORE_RUNTIME_METHODS.esmContinue, {
         sessionId: input.sessionId,
       });
@@ -809,9 +799,7 @@ export function createCoreClientTUIService(
       return { answer: asString(object.answer, "transient answer") };
     },
 
-    async compact(
-      input: { sessionId: string },
-    ): Promise<TUICompactAccepted> {
+    async compact(input: { sessionId: string }): Promise<TUICompactAccepted> {
       const raw = await client.call<unknown>(
         CORE_RUNTIME_METHODS.sessionCompact,
         { sessionId: input.sessionId },
@@ -851,12 +839,14 @@ export function createCoreClientTUIService(
         throw decisionNotFoundError(input.requestId);
       }
       pendingDecisions.delete(input.requestId);
-      pending.connection.respond(coreResult(
-        pending.id,
-        input.kind === "approval"
-          ? { approved: input.approved === true }
-          : { answer: input.answer ?? "" },
-      ));
+      pending.connection.respond(
+        coreResult(
+          pending.id,
+          input.kind === "approval"
+            ? { approved: input.approved === true }
+            : { answer: input.answer ?? "" },
+        ),
+      );
       await Promise.resolve();
     },
   };
@@ -867,42 +857,41 @@ function projectDecisionRequest(
   request: CoreRpcRequest,
 ): TUIDecisionRequest | undefined {
   const params = (request.params ?? {}) as Record<string, unknown>;
-  const sessionId = typeof params.sessionId === "string"
-    ? params.sessionId
-    : "";
+  const sessionId =
+    typeof params.sessionId === "string" ? params.sessionId : "";
   const runId = typeof params.runId === "string" ? params.runId : "";
   if (request.method === "approval.request") {
-    const requestId = typeof params.approvalId === "string"
-      ? params.approvalId
-      : `${runId}:approval`;
+    const requestId =
+      typeof params.approvalId === "string"
+        ? params.approvalId
+        : `${runId}:approval`;
     return {
       requestId,
       sessionId,
       runId,
       kind: "approval",
-      toolName: typeof params.approvalTool === "string"
-        ? params.approvalTool
-        : "",
+      toolName:
+        typeof params.approvalTool === "string" ? params.approvalTool : "",
       ...(isRecord(params.approvalArgs) ? { args: params.approvalArgs } : {}),
     };
   }
   if (request.method === "question.request") {
-    const requestId = typeof params.questionId === "string"
-      ? params.questionId
-      : `${runId}:question`;
+    const requestId =
+      typeof params.questionId === "string"
+        ? params.questionId
+        : `${runId}:question`;
     const options = Array.isArray(params.questionOptions)
-      ? params.questionOptions.filter((entry): entry is string =>
-        typeof entry === "string"
-      )
+      ? params.questionOptions.filter(
+          (entry): entry is string => typeof entry === "string",
+        )
       : undefined;
     return {
       requestId,
       sessionId,
       runId,
       kind: "question",
-      question: typeof params.questionText === "string"
-        ? params.questionText
-        : "",
+      question:
+        typeof params.questionText === "string" ? params.questionText : "",
       ...(options === undefined ? {} : { options }),
       ...(typeof params.questionContext === "string"
         ? { context: params.questionContext }
@@ -937,11 +926,17 @@ async function* streamRunEvents(
   let lastSequence = cursor;
   let consecutiveFailures = 0;
   while (true) {
-    const outcome = yield* streamRunEventsOnce(client, sessionId, runId, () => {
-      return lastSequence;
-    }, (sequence) => {
-      lastSequence = sequence;
-    });
+    const outcome = yield* streamRunEventsOnce(
+      client,
+      sessionId,
+      runId,
+      () => {
+        return lastSequence;
+      },
+      (sequence) => {
+        lastSequence = sequence;
+      },
+    );
     switch (outcome.kind) {
       case "finished":
         return;
@@ -1082,12 +1077,15 @@ async function* streamRunEventsOnce(
 function failedStream(error: unknown): StreamOutcome {
   return {
     kind: "failed",
-    error: error instanceof TUIServiceError ? error : new TUIServiceError(
-      `the Core event stream failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      { cause: error },
-    ),
+    error:
+      error instanceof TUIServiceError
+        ? error
+        : new TUIServiceError(
+            `the Core event stream failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            { cause: error },
+          ),
   };
 }
 
@@ -1127,10 +1125,7 @@ function toSessionListEntry(
   };
 }
 
-function toSessionView(
-  raw: unknown,
-  now: () => Date,
-): TUISessionView {
+function toSessionView(raw: unknown, now: () => Date): TUISessionView {
   const object = asRecord(raw, "session");
   const capabilitiesRaw = object.capabilities ?? {};
   const capabilitiesRecord = asRecord(capabilitiesRaw, "session");
@@ -1150,12 +1145,14 @@ function toSessionView(
     mode: asString(object.mode, "session"),
     thinkingLevel: asString(object.thinkingLevel, "session"),
     capabilities,
-    approvalPolicy: typeof object.approvalPolicy === "string"
-      ? object.approvalPolicy
-      : "runtime",
-    questionPolicy: typeof object.questionPolicy === "string"
-      ? object.questionPolicy
-      : "runtime",
+    approvalPolicy:
+      typeof object.approvalPolicy === "string"
+        ? object.approvalPolicy
+        : "runtime",
+    questionPolicy:
+      typeof object.questionPolicy === "string"
+        ? object.questionPolicy
+        : "runtime",
     createdAt: asDate(object.createdAt, now),
     updatedAt: asDate(object.updatedAt, now),
   };
@@ -1180,8 +1177,11 @@ function toRunView(raw: unknown, now: () => Date): TUIRunView {
   const object = asRecord(raw, "run");
   const status = object.status;
   if (
-    status !== "running" && status !== "completed" && status !== "cancelled" &&
-    status !== "failed" && status !== "timed_out"
+    status !== "running" &&
+    status !== "completed" &&
+    status !== "cancelled" &&
+    status !== "failed" &&
+    status !== "timed_out"
   ) {
     throw invalidView("run");
   }
@@ -1218,9 +1218,10 @@ function projectProviderCatalog(raw: unknown[]): TUIProviderCatalogEntry[] {
       isDefault: object.isDefault === true,
       api: asString(object.api, "provider catalog entry"),
       baseUrl: asString(object.baseUrl, "provider catalog entry"),
-      modelCount: typeof object.modelCount === "number"
-        ? object.modelCount
-        : modelsRaw.length,
+      modelCount:
+        typeof object.modelCount === "number"
+          ? object.modelCount
+          : modelsRaw.length,
       models: modelsRaw.map((model) => {
         const record = asRecord(model, "model");
         return {
@@ -1270,9 +1271,10 @@ function projectEsmView(raw: unknown): TUIEsmView {
   const object = asRecord(raw, "esm view");
   const objective = object.objective;
   return {
-    objective: objective === null || objective === undefined
-      ? null
-      : projectEsmObjective(objective),
+    objective:
+      objective === null || objective === undefined
+        ? null
+        : projectEsmObjective(objective),
     workerRunning: object.workerRunning === true,
     activeAgentId: asString(object.activeAgentId, "esm view"),
   };
@@ -1299,7 +1301,7 @@ function projectEsmObjective(raw: unknown): TUIEsmObjectiveView {
     phase: asString(object.phase, "esm objective"),
     progressSummary: asString(object.progressSummary, "esm objective"),
     remainingWork: remainingWork.map((entry) =>
-      asString(entry, "esm objective")
+      asString(entry, "esm objective"),
     ),
     rejectionCount: asNumber(object.rejectionCount, "esm objective"),
     rejectionRunId: asString(object.rejectionRunId, "esm objective"),
@@ -1352,10 +1354,7 @@ function projectExpertBundle(raw: unknown): TUIExpertBundleView {
   };
 }
 
-function asRecord(
-  value: unknown,
-  kind = "response",
-): Record<string, unknown> {
+function asRecord(value: unknown, kind = "response"): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw invalidView(kind);
   }

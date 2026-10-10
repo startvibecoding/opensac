@@ -6,6 +6,7 @@
 // constructs Runtime implementations itself.
 // React createElement is used because this module is plain TS (no .tsx).
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import React from "react";
 import { render } from "ink";
 import process from "node:process";
@@ -54,9 +55,10 @@ export function tuiResumeOptions(flags: {
 }): { continueLast: boolean; resumeSession: string } {
   // An explicit target wins over "the most recent one"; `-r` wins over
   // `--session` because it names the session rather than a file to use.
-  const target = (flags.resume ?? "").trim() !== ""
-    ? (flags.resume ?? "").trim()
-    : (flags.session ?? "").trim();
+  const target =
+    (flags.resume ?? "").trim() !== ""
+      ? (flags.resume ?? "").trim()
+      : (flags.session ?? "").trim();
   return {
     continueLast: target === "" && flags.continueSession === true,
     resumeSession: target,
@@ -66,7 +68,7 @@ export function tuiResumeOptions(flags: {
 /** Best-effort terminal column count for layout. */
 function terminalWidth(): number {
   try {
-    const size = Deno.consoleSize();
+    const size = nodeRuntime.consoleSize();
     if (size && size.columns >= 20) return size.columns;
   } catch {
     // Non-TTY: fall back to the default width.
@@ -77,7 +79,7 @@ function terminalWidth(): number {
 /** Best-effort terminal row count for panel/modal layouts. */
 function terminalHeight(): number {
   try {
-    const size = Deno.consoleSize();
+    const size = nodeRuntime.consoleSize();
     if (size && size.rows >= 12) return size.rows;
   } catch {
     // Non-TTY: fall back to the default height.
@@ -141,7 +143,7 @@ export async function runInteractiveAction(
   settings: Settings,
   deps: { isTerminal?: () => boolean } = {},
 ): Promise<void> {
-  const isTerminal = deps.isTerminal ?? (() => Deno.stdin.isTerminal());
+  const isTerminal = deps.isTerminal ?? (() => nodeRuntime.stdin.isTerminal());
   if (!isTerminal()) {
     // Ink's reconciler crashes on non-TTY stdin; fail before it starts so a
     // piped/CI invocation gets one actionable message instead of a stack.
@@ -149,7 +151,7 @@ export async function runInteractiveAction(
       "interactive mode requires a terminal (TTY); use -P for non-interactive runs",
     );
   }
-  const workDir = options.workDir !== "" ? options.workDir : Deno.cwd();
+  const workDir = options.workDir !== "" ? options.workDir : nodeRuntime.cwd();
   // The TUI is a thin client of the shared Core: discover or auto-start it
   // exactly like `opensac acp` and project every run through its JSON-RPC
   // protocol plus the canonical event stream.
@@ -171,9 +173,10 @@ export async function runInteractiveAction(
   });
   if (discovery.status !== "ready") {
     await core.close();
-    const hint = discovery.status === "incompatible"
-      ? '; run "opensac core stop" to replace it'
-      : "";
+    const hint =
+      discovery.status === "incompatible"
+        ? '; run "opensac core stop" to replace it'
+        : "";
     throw new Error(`Core is not ready: ${discovery.status}${hint}`);
   }
   const service = createCoreClientTUIService(core, { workDir });
@@ -241,9 +244,9 @@ export async function runInteractiveAction(
   };
   let removeResizeListener = () => {};
   try {
-    Deno.addSignalListener("SIGWINCH", onResize);
+    nodeRuntime.addSignalListener("SIGWINCH", onResize);
     removeResizeListener = () =>
-      Deno.removeSignalListener("SIGWINCH", onResize);
+      nodeRuntime.removeSignalListener("SIGWINCH", onResize);
   } catch {
     // SIGWINCH unsupported (e.g. Windows): keep the startup width.
   }
@@ -305,17 +308,23 @@ export async function runInteractiveAction(
 
 /** Re-executes the current CLI entrypoint with the same arguments (/reload). */
 async function reloadProcess(): Promise<void> {
-  const executable = Deno.execPath();
+  const executable = nodeRuntime.execPath();
   const name = executable.split(/[\\/]/).pop()?.toLowerCase() ?? "";
   const isNode = name === "node" || name.startsWith("node.");
-  const command = new Deno.Command(isNode ? process.execPath : executable, {
-    args: isNode
-      ? [fileURLToPath(new URL("../main.ts", import.meta.url)), ...Deno.args]
-      : Deno.args,
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  const command = new nodeRuntime.Command(
+    isNode ? process.execPath : executable,
+    {
+      args: isNode
+        ? [
+            fileURLToPath(new URL("../main.ts", import.meta.url)),
+            ...nodeRuntime.args,
+          ]
+        : nodeRuntime.args,
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    },
+  );
   const status = await command.spawn().status;
   if (!status.success) {
     throw new Error(`reload exited with code ${status.code}`);

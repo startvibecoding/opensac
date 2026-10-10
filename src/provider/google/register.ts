@@ -1,3 +1,4 @@
+import { runtime } from "../../platform/runtime.ts";
 import {
   type ModelCompat as ConfigModelCompat,
   type ModelConfig,
@@ -13,19 +14,17 @@ import {
 } from "./provider.ts";
 
 /** Resolves `${VAR}`/`!shell` API key references in a provider config. */
-export function resolveAPIKey(
-  cfg: ProviderConfig | null | undefined,
-): string {
+export function resolveAPIKey(cfg: ProviderConfig | null | undefined): string {
   if (cfg == null) return "";
   const key = cfg.apiKey ?? "";
   if (key.startsWith("!")) {
-    if (Deno.env.get("VIBECODING_ALLOW_SHELL_CONFIG") !== "1") {
+    if (runtime.env.get("VIBECODING_ALLOW_SHELL_CONFIG") !== "1") {
       return key;
     }
     return resolveProviderShellCommand(key.slice(1));
   }
   if (key.startsWith("${") && key.endsWith("}")) {
-    return Deno.env.get(key.slice(2, -1)) ?? "";
+    return runtime.env.get(key.slice(2, -1)) ?? "";
   }
   return key;
 }
@@ -33,10 +32,11 @@ export function resolveAPIKey(
 function resolveProviderShellCommand(cmd: string): string {
   if (cmd === "") return "";
   try {
-    const [program, args] = Deno.build.os === "windows"
-      ? ["powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", cmd]]
-      : ["sh", ["-c", cmd]];
-    const result = new Deno.Command(program, {
+    const [program, args] =
+      runtime.build.os === "windows"
+        ? ["powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", cmd]]
+        : ["sh", ["-c", cmd]];
+    const result = new runtime.Command(program, {
       args,
       stdout: "piped",
       stderr: "null",
@@ -119,23 +119,23 @@ function cloneBool(v: boolean | undefined): boolean | undefined {
 }
 
 // Mirrors the Go init(): register the Gemini and Vertex provider factories.
-register(
-  "google-gemini",
-  (cfg) =>
-    cfg == null ? createGeminiProvider("", "") : createGeminiProvider(
-      resolveAPIKey(cfg),
-      cfg.baseUrl ?? "",
-      convertModels("google-gemini", cfg.models),
-      { proxyUrl: cfg.httpProxy ?? "" },
-    ),
+register("google-gemini", (cfg) =>
+  cfg == null
+    ? createGeminiProvider("", "")
+    : createGeminiProvider(
+        resolveAPIKey(cfg),
+        cfg.baseUrl ?? "",
+        convertModels("google-gemini", cfg.models),
+        { proxyUrl: cfg.httpProxy ?? "" },
+      ),
 );
-register(
-  "google-vertex",
-  (cfg) =>
-    cfg == null ? createVertexProvider("", "") : createVertexProvider(
-      resolveAPIKey(cfg),
-      cfg.baseUrl ?? "",
-      convertModels("google-vertex", cfg.models),
-      { proxyUrl: cfg.httpProxy ?? "" },
-    ),
+register("google-vertex", (cfg) =>
+  cfg == null
+    ? createVertexProvider("", "")
+    : createVertexProvider(
+        resolveAPIKey(cfg),
+        cfg.baseUrl ?? "",
+        convertModels("google-vertex", cfg.models),
+        { proxyUrl: cfg.httpProxy ?? "" },
+      ),
 );

@@ -26,16 +26,14 @@ export interface ChannelToolConfig {
  * Validates a channel binding identity. An empty channel type normalizes to
  * "local".
  */
-export function validateBinding(
-  channelType: string,
-  channelId: string,
-): void {
+export function validateBinding(channelType: string, channelId: string): void {
   if (channelType === "") channelType = "local";
   if (channelType === "local" && channelId !== "") {
     throw new Error("local session cannot have channel ID");
   }
   if (
-    channelType !== "local" && channelType !== "wechat" &&
+    channelType !== "local" &&
+    channelType !== "wechat" &&
     channelType !== "feishu"
   ) {
     throw new Error(`unsupported channel type ${JSON.stringify(channelType)}`);

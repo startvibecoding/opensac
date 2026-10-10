@@ -240,26 +240,26 @@ test("commandSuggestionItemsForInput gates on slash and newline", () => {
   // The full spec table + query; prefix filtering happens in Suggest.filter
   assertEquals(names?.items.length, 33);
   const s = new Suggest(60).setItems(names!.items).update(names!.query);
-  assertEquals(s.filtered.map((i) => i.label), ["/mode", "/model"]);
+  assertEquals(
+    s.filtered.map((i) => i.label),
+    ["/mode", "/model"],
+  );
 });
 
 test("commandArgumentSuggestionItems suggests known arguments", () => {
   const mode = commandArgumentSuggestionItems("/mode ");
-  assertEquals(mode.map((i) => i.value), [
-    "/mode plan",
-    "/mode agent",
-    "/mode yolo",
-    "/mode os",
-  ]);
+  assertEquals(
+    mode.map((i) => i.value),
+    ["/mode plan", "/mode agent", "/mode yolo", "/mode os"],
+  );
   const modeP = commandArgumentSuggestionItems("/mode p");
   assertEquals(modeP.length, 4); // full list; dropdown filters by prefix
 
   const tuilang = commandArgumentSuggestionItems("/tuilang global ");
-  assertEquals(tuilang.map((i) => i.value), [
-    "/tuilang global auto",
-    "/tuilang global zh",
-    "/tuilang global en",
-  ]);
+  assertEquals(
+    tuilang.map((i) => i.value),
+    ["/tuilang global auto", "/tuilang global zh", "/tuilang global en"],
+  );
 
   const unknown = commandArgumentSuggestionItems("/bogus ");
   assertEquals(unknown, []);

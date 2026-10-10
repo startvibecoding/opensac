@@ -118,9 +118,9 @@ export class Suggest {
 
     if (hasMore) {
       const indicator = "  ↑↓ more";
-      const padded = indicator + " ".repeat(
-        Math.max(contentWidth - displayWidth(indicator), 0),
-      );
+      const padded =
+        indicator +
+        " ".repeat(Math.max(contentWidth - displayWidth(indicator), 0));
       lines.push(`${DIM}${padded}${RESET}`);
     }
 
@@ -149,9 +149,10 @@ export class Suggest {
       this.#cursor = clampCursor(this.#cursor, this.#filtered.length);
       return;
     }
-    const matched = this.#items.filter((item) =>
-      item.label.toLowerCase().startsWith(q) ||
-      item.value.toLowerCase().startsWith(q)
+    const matched = this.#items.filter(
+      (item) =>
+        item.label.toLowerCase().startsWith(q) ||
+        item.value.toLowerCase().startsWith(q),
     );
     this.#filtered = matched;
     this.#visible = matched.length > 0;

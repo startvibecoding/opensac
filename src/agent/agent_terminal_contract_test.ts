@@ -3,6 +3,7 @@
 // emitted before the legacy terminal events and followed by EVENT_AGENT_END; the
 // terminal status distinguishes success/failed/incomplete/canceled.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { type Model, type StreamEvent, type Usage } from "../provider/types.ts";
 import {
@@ -72,7 +73,7 @@ function createTerminalContractAgent(
   };
   return createAgentWithLoopConfig(
     cfg,
-    createRegistry(Deno.makeTempDirSync(), createNoneSandbox()),
+    createRegistry(runtime.makeTempDirSync(), createNoneSandbox()),
   );
 }
 
@@ -90,7 +91,8 @@ function requireSingleRunFinished(events: Event[]): Event {
   const finishedIdx = events.findIndex((e) => e.type === EVENT_RUN_FINISHED);
   for (const ev of events.slice(finishedIdx + 1)) {
     if (
-      ev.type !== EVENT_DONE && ev.type !== EVENT_ERROR &&
+      ev.type !== EVENT_DONE &&
+      ev.type !== EVENT_ERROR &&
       ev.type !== EVENT_AGENT_END
     ) {
       throw new Error(`non-terminal event ${ev.type} after EVENT_RUN_FINISHED`);
@@ -108,12 +110,15 @@ function requireSingleRunFinished(events: Event[]): Event {
 }
 
 test("run finished success on normal completion", async () => {
-  const agent = createTerminalContractAgent([
-    { type: streamStart },
-    { type: streamTextDelta, textDelta: "hello" },
-    { type: streamUsage, usage: { input: 5, output: 2 } as Usage },
-    { type: streamDone, stopReason: "stop" },
-  ], 3);
+  const agent = createTerminalContractAgent(
+    [
+      { type: streamStart },
+      { type: streamTextDelta, textDelta: "hello" },
+      { type: streamUsage, usage: { input: 5, output: 2 } as Usage },
+      { type: streamDone, stopReason: "stop" },
+    ],
+    3,
+  );
   const events = await collectRunEvents(agent.run("hi"));
   const finished = requireSingleRunFinished(events);
   assertEquals(finished.status, TASK_SUCCESS);
@@ -124,14 +129,17 @@ test("run finished success on normal completion", async () => {
 });
 
 test("run finished failed on stream error", async () => {
-  const agent = createTerminalContractAgent([
-    { type: streamStart },
-    {
-      type: streamError,
-      error: new Error("provider returned a permanent failure"),
-      stopReason: "error",
-    },
-  ], 3);
+  const agent = createTerminalContractAgent(
+    [
+      { type: streamStart },
+      {
+        type: streamError,
+        error: new Error("provider returned a permanent failure"),
+        stopReason: "error",
+      },
+    ],
+    3,
+  );
   const events = await collectRunEvents(agent.run("hi"));
   const finished = requireSingleRunFinished(events);
   assertEquals(finished.status, TASK_FAILED);
@@ -139,19 +147,22 @@ test("run finished failed on stream error", async () => {
 });
 
 test("run projects provider retry metadata", async () => {
-  const agent = createTerminalContractAgent([
-    { type: streamStart },
-    {
-      type: streamRetry,
-      retryAttempt: 2,
-      retryMaxAttempts: 4,
-      retryAfterMs: 1250,
-      error: new Error("Retrying (2/4): service unavailable"),
-      retryDetail: "service unavailable (HTTP 503)",
-    },
-    { type: streamTextDelta, textDelta: "recovered" },
-    { type: streamDone, stopReason: "stop" },
-  ], 3);
+  const agent = createTerminalContractAgent(
+    [
+      { type: streamStart },
+      {
+        type: streamRetry,
+        retryAttempt: 2,
+        retryMaxAttempts: 4,
+        retryAfterMs: 1250,
+        error: new Error("Retrying (2/4): service unavailable"),
+        retryDetail: "service unavailable (HTTP 503)",
+      },
+      { type: streamTextDelta, textDelta: "recovered" },
+      { type: streamDone, stopReason: "stop" },
+    ],
+    3,
+  );
   const events = await collectRunEvents(agent.run("hi"));
   let statusIndex = -1;
   let retryIndex = -1;
@@ -187,15 +198,18 @@ test("run projects provider retry metadata", async () => {
 });
 
 test("run finished incomplete on max iterations", async () => {
-  const agent = createTerminalContractAgent([
-    { type: streamStart },
-    {
-      type: streamToolCall,
-      toolCall: { id: "call_1", name: "unknown_tool", arguments: {} },
-    },
-    { type: streamUsage, usage: { input: 10, output: 3 } as Usage },
-    { type: streamDone, stopReason: "tool_use" },
-  ], 1);
+  const agent = createTerminalContractAgent(
+    [
+      { type: streamStart },
+      {
+        type: streamToolCall,
+        toolCall: { id: "call_1", name: "unknown_tool", arguments: {} },
+      },
+      { type: streamUsage, usage: { input: 10, output: 3 } as Usage },
+      { type: streamDone, stopReason: "tool_use" },
+    ],
+    1,
+  );
   const events = await collectRunEvents(agent.run("loop forever"));
   const finished = requireSingleRunFinished(events);
   assertEquals(finished.status, TASK_INCOMPLETE);
@@ -234,23 +248,33 @@ class BlockingTool implements Tool {
 }
 
 test("run finished canceled on abort", async () => {
-  const provider = new MockProvider("mock", [terminalModel()], [
-    { type: streamStart },
-    {
-      type: streamToolCall,
-      toolCall: { id: "call_1", name: "workflow_run", arguments: {} },
-    },
-    { type: streamDone, stopReason: "tool_use" },
-  ]);
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const provider = new MockProvider(
+    "mock",
+    [terminalModel()],
+    [
+      { type: streamStart },
+      {
+        type: streamToolCall,
+        toolCall: { id: "call_1", name: "workflow_run", arguments: {} },
+      },
+      { type: streamDone, stopReason: "tool_use" },
+    ],
+  );
+  const registry = createRegistry(
+    runtime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.register(new BlockingTool());
-  const agent = createAgentWithLoopConfig({
-    provider,
-    model: provider.models()[0],
-    mode: "yolo",
-    toolExecutionMode: "sequential",
-    maxIterations: 10,
-  }, registry);
+  const agent = createAgentWithLoopConfig(
+    {
+      provider,
+      model: provider.models()[0],
+      mode: "yolo",
+      toolExecutionMode: "sequential",
+      maxIterations: 10,
+    },
+    registry,
+  );
 
   const events: Event[] = [];
   const iterator = agent.run("test")[Symbol.asyncIterator]();

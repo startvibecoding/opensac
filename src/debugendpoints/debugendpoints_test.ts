@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import {
   ADDR_ENV,
@@ -18,24 +19,24 @@ test("ServesExpvarsWithSQLiteStats", async () => {
 });
 
 test("ListenAddrDefaultsToLocalhost", () => {
-  const prev = Deno.env.get(ADDR_ENV);
-  Deno.env.set(ADDR_ENV, "");
+  const prev = runtime.env.get(ADDR_ENV);
+  runtime.env.set(ADDR_ENV, "");
   try {
     assertEquals(debugListenAddr(), DEFAULT_ADDR);
   } finally {
-    if (prev === undefined) Deno.env.delete(ADDR_ENV);
-    else Deno.env.set(ADDR_ENV, prev);
+    if (prev === undefined) runtime.env.delete(ADDR_ENV);
+    else runtime.env.set(ADDR_ENV, prev);
   }
 });
 
 test("ListenAddrUsesEnvOverride", () => {
-  const prev = Deno.env.get(ADDR_ENV);
-  Deno.env.set(ADDR_ENV, "127.0.0.1:0");
+  const prev = runtime.env.get(ADDR_ENV);
+  runtime.env.set(ADDR_ENV, "127.0.0.1:0");
   try {
     assertEquals(debugListenAddr(), "127.0.0.1:0");
   } finally {
-    if (prev === undefined) Deno.env.delete(ADDR_ENV);
-    else Deno.env.set(ADDR_ENV, prev);
+    if (prev === undefined) runtime.env.delete(ADDR_ENV);
+    else runtime.env.set(ADDR_ENV, prev);
   }
 });
 
@@ -46,11 +47,11 @@ test("ServesPprofIndex", () => {
 });
 
 test("StartServesDebugServer", async () => {
-  const prev = Deno.env.get(ADDR_ENV);
-  Deno.env.set(ADDR_ENV, "127.0.0.1:0");
+  const prev = runtime.env.get(ADDR_ENV);
+  runtime.env.set(ADDR_ENV, "127.0.0.1:0");
   resetDebugServer();
   try {
-    const { addr, error } = start();
+    const { addr, error } = await start();
     if (error) throw error;
     const resp = await fetch(`http://${addr}/debug/pprof/`, {
       signal: AbortSignal.timeout(5000),
@@ -58,7 +59,7 @@ test("StartServesDebugServer", async () => {
     assertEquals(resp.status, 200);
     await resp.body?.cancel();
   } finally {
-    if (prev === undefined) Deno.env.delete(ADDR_ENV);
-    else Deno.env.set(ADDR_ENV, prev);
+    if (prev === undefined) runtime.env.delete(ADDR_ENV);
+    else runtime.env.set(ADDR_ENV, prev);
   }
 });

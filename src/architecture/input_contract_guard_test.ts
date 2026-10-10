@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert } from "../compat/assert.ts";
 import { fromFileUrl, join } from "../compat/path.ts";
 import { test } from "#testing";
@@ -33,11 +34,7 @@ const checks: ContractCheck[] = [
   },
   {
     path: "src/cli/main_util.ts",
-    requires: [
-      ".acceptInput(",
-      ".buildUserMessage(",
-      "runWithUserMessage(",
-    ],
+    requires: [".acceptInput(", ".buildUserMessage(", "runWithUserMessage("],
   },
   {
     path: "src/acp/acp.ts",
@@ -54,7 +51,7 @@ test("frontend input contract guard", async (t) => {
     await t.step(check.path, () => {
       let src: string;
       try {
-        src = Deno.readTextFileSync(join(projectRoot, check.path));
+        src = nodeRuntime.readTextFileSync(join(projectRoot, check.path));
       } catch {
         // Downstream adapter module not ported yet; enforced once it lands.
         return;
@@ -62,9 +59,9 @@ test("frontend input contract guard", async (t) => {
       for (const required of check.requires) {
         assert(
           src.includes(required),
-          `${check.path} is missing required Runtime input contract call ${
-            JSON.stringify(required)
-          }`,
+          `${check.path} is missing required Runtime input contract call ${JSON.stringify(
+            required,
+          )}`,
         );
       }
     });

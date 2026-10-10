@@ -40,7 +40,10 @@ test("ActivityManager marks errored and interrupted tools", () => {
   assertEquals(items.find((i) => i.id === "t2")?.status, "interrupted");
   // getActiveTools reports only running tools.
   am.startToolExecution("t3", "ls");
-  assertEquals(am.getActiveTools().map((t) => t.id), ["t3"]);
+  assertEquals(
+    am.getActiveTools().map((t) => t.id),
+    ["t3"],
+  );
   assertEquals(am.hasRunningActivities(), true);
 });
 
@@ -71,7 +74,10 @@ test("ActivityManager tracks thinking blocks and clears per turn", () => {
   am.completeThinking("turn");
   am.startToolExecution("t1", "bash");
   items = am.buildTimeline();
-  assertEquals(items.find((i) => i.type === "thinking"), undefined);
+  assertEquals(
+    items.find((i) => i.type === "thinking"),
+    undefined,
+  );
   assertEquals(items.length, 1); // only the tool
   assertEquals(items[0].type, "tool");
 

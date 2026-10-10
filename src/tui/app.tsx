@@ -101,7 +101,9 @@ export function App(props: AppProps): ReactElement {
         <Text color="cyan" bold>
           {props.label ?? "OpenSAC"}
         </Text>
-        {props.visibleRows?.map((row) => <Text key={row.id}>{row.text}</Text>)}
+        {props.visibleRows?.map((row) => (
+          <Text key={row.id}>{row.text}</Text>
+        ))}
       </Box>
     );
   }
@@ -160,9 +162,9 @@ function ControllerApp({
   // reaches a terminal state.
   const slotStart = activeSlotStart(controller);
   const runningTools = new Set(
-    store.toolResults.filter((r) => r.status === "running").map((r) =>
-      r.msgIndex
-    ),
+    store.toolResults
+      .filter((r) => r.status === "running")
+      .map((r) => r.msgIndex),
   );
   const committed: TranscriptRow[] = [];
   const streaming: TranscriptRow[] = [];
@@ -171,9 +173,9 @@ function ControllerApp({
   // block stays in the managed view until every member is terminal, then
   // commits to scrollback as a single unit (Go printToolGroupOnce).
   const groupedToolIds = new Set(
-    store.toolResults.filter((r) => store.isMultiToolGroup(r.groupID)).map((
-      r,
-    ) => r.toolCallID),
+    store.toolResults
+      .filter((r) => store.isMultiToolGroup(r.groupID))
+      .map((r) => r.toolCallID),
   );
   const seenGroups = new Set<number>();
   for (let i = 0; i < store.messages.length; i++) {
@@ -186,7 +188,8 @@ function ControllerApp({
       seenGroups.add(groupID);
       const members = store.toolGroupMembers(groupID);
       const row = toolGroupRow(store, groupID, members, compactMode);
-      const settled = !members.some((m) => m.status === "running") &&
+      const settled =
+        !members.some((m) => m.status === "running") &&
         members.every((m) => m.msgIndex < slotStart);
       if (settled) committed.push(row);
       else streaming.push(row);
@@ -213,31 +216,32 @@ function ControllerApp({
   // Live per-turn activity timeline (running tools + thinking) tracked by
   // the controller from the agent event stream. Terminal tool rows belong to
   // <Static> once complete, so only running items remain in the managed view.
-  const activities = controller.activityManager.buildTimeline().filter(
-    (activity) =>
+  const activities = controller.activityManager
+    .buildTimeline()
+    .filter((activity) =>
       activity.type !== "tool"
-        // Grouped running calls are listed by the batch's tree block, so the
-        // timeline keeps only the tools that are not part of a batch.
-        ? true
+        ? // Grouped running calls are listed by the batch's tree block, so the
+          // timeline keeps only the tools that are not part of a batch.
+          true
         : activity.status === "running" &&
           !groupedToolIds.has(activity.toolUseId ?? activity.id),
-  );
+    );
 
   const headerLines = header
     ? renderHeader(
-      width,
-      header.version,
-      header.providerName,
-      header.modelName,
-      header.cwd,
-    )
-      .split("\n")
-      .filter((l) => l !== "")
-      .map((line, i): TranscriptRow => ({
-        id: `header-${i}`,
-        text: line,
-        kind: "header",
-      }))
+        width,
+        header.version,
+        header.providerName,
+        header.modelName,
+        header.cwd,
+      )
+        .split("\n")
+        .filter((l) => l !== "")
+        .map((line, i): TranscriptRow => ({
+          id: `header-${i}`,
+          text: line,
+          kind: "header",
+        }))
     : [];
   const committedAll = [...headerLines, ...committed];
   // Ink's <Static> prints only the tail it has not seen (it advances by item
@@ -264,41 +268,36 @@ function ControllerApp({
         {(row) => renderRow(row, false, store, width)}
       </Static>
 
-      {
-        /* Live activity timeline (running tools + thinking).
+      {/* Live activity timeline (running tools + thinking).
           Rows receive width-4: 1-col left indent (marginLeft) + 3 cols of
-          margin slack so a full-width row never touches the terminal edge. */
-      }
+          margin slack so a full-width row never touches the terminal edge. */}
       {!overlayOpen && activities.length > 0 && (
         <Box flexDirection="column" marginLeft={1} marginBottom={1}>
-          {activities.map((activity) => (
-            activity.type === "tool"
-              ? (
-                <CompactToolRow
-                  key={activity.id}
-                  toolName={activity.toolName ?? activity.type}
-                  toolInput={activity.toolInput}
-                  status={activity.status as
-                    | "running"
-                    | "completed"
-                    | "error"
-                    | "interrupted"}
-                  intent={activity.intent}
-                  elapsedMs={activity.elapsedMs}
-                  width={width - 4}
-                />
-              )
-              : (
-                <CompactThinkingRow
-                  key={activity.id}
-                  content={activity.content ?? ""}
-                  isStreaming={activity.status === "running"}
-                  elapsedMs={activity.elapsedMs}
-                  translator={controller.translator}
-                  width={width - 4}
-                />
-              )
-          ))}
+          {activities.map((activity) =>
+            activity.type === "tool" ? (
+              <CompactToolRow
+                key={activity.id}
+                toolName={activity.toolName ?? activity.type}
+                toolInput={activity.toolInput}
+                status={
+                  activity.status as
+                    "running" | "completed" | "error" | "interrupted"
+                }
+                intent={activity.intent}
+                elapsedMs={activity.elapsedMs}
+                width={width - 4}
+              />
+            ) : (
+              <CompactThinkingRow
+                key={activity.id}
+                content={activity.content ?? ""}
+                isStreaming={activity.status === "running"}
+                elapsedMs={activity.elapsedMs}
+                translator={controller.translator}
+                width={width - 4}
+              />
+            ),
+          )}
         </Box>
       )}
 
@@ -306,11 +305,13 @@ function ControllerApp({
         streaming.map((row) => renderRow(row, true, store, width))}
       {controller.shownApproval !== undefined && renderApproval(controller)}
       {controller.shownQuestion !== undefined && renderQuestion(controller)}
-      {!overlayOpen && controller.coreConnectionNotice !== "" && (
-        controller.coreConnection === "reconnecting"
-          ? <Text color="yellow">{controller.coreConnectionNotice}</Text>
-          : <Text dimColor>{controller.coreConnectionNotice}</Text>
-      )}
+      {!overlayOpen &&
+        controller.coreConnectionNotice !== "" &&
+        (controller.coreConnection === "reconnecting" ? (
+          <Text color="yellow">{controller.coreConnectionNotice}</Text>
+        ) : (
+          <Text dimColor>{controller.coreConnectionNotice}</Text>
+        ))}
       {!overlayOpen && controller.isThinking && (
         <Text dimColor>
           ~ {controller.translator.text("thinking.in_progress")}
@@ -341,7 +342,9 @@ function renderQuestion(controller: AppController): ReactElement {
   return (
     <Box flexDirection="column" borderStyle="round">
       <Text bold>{question.question}</Text>
-      {(question.options ?? []).map((opt) => <Text key={opt}>- {opt}</Text>)}
+      {(question.options ?? []).map((opt) => (
+        <Text key={opt}>- {opt}</Text>
+      ))}
     </Box>
   );
 }
@@ -368,16 +371,32 @@ function renderRow(
     );
   }
   if (row.kind === "tool") {
-    return <Text key={row.id} color="cyan">{row.text}</Text>;
+    return (
+      <Text key={row.id} color="cyan">
+        {row.text}
+      </Text>
+    );
   }
   if (row.kind === "status") {
-    return <Text key={row.id} dimColor>{row.text}</Text>;
+    return (
+      <Text key={row.id} dimColor>
+        {row.text}
+      </Text>
+    );
   }
   if (row.kind === "error") {
-    return <Text key={row.id} color="red">{row.text}</Text>;
+    return (
+      <Text key={row.id} color="red">
+        {row.text}
+      </Text>
+    );
   }
   if (row.kind === "warning") {
-    return <Text key={row.id} color="yellow">{row.text}</Text>;
+    return (
+      <Text key={row.id} color="yellow">
+        {row.text}
+      </Text>
+    );
   }
   if (row.kind === "assistant") {
     const markdown = streaming
@@ -474,7 +493,9 @@ function rowTextAt(
       },
       compact,
     );
-    const warning = tool.status === "interrupted" || tool.toolError !== "" ||
+    const warning =
+      tool.status === "interrupted" ||
+      tool.toolError !== "" ||
       tool.executionState === TOOL_EXECUTION_FAILED ||
       tool.executionState === TOOL_EXECUTION_INTERRUPTED;
     return {
@@ -496,8 +517,8 @@ function rowTextAt(
 /** First message index eligible for scrollback commit. */
 function activeSlotStart(controller: AppController): number {
   const { currentAssistantIdx, currentThinkIdx } = controller.store;
-  const candidates = [currentAssistantIdx, currentThinkIdx].filter((i) =>
-    i >= 0
+  const candidates = [currentAssistantIdx, currentThinkIdx].filter(
+    (i) => i >= 0,
   );
   return candidates.length > 0
     ? Math.min(...candidates)
@@ -524,6 +545,8 @@ export function headerWidth(props: AppProps): number {
       props.header.providerName,
       props.header.modelName,
       props.header.cwd,
-    ).split("\n").map(displayWidth),
+    )
+      .split("\n")
+      .map(displayWidth),
   );
 }

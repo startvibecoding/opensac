@@ -1,4 +1,4 @@
-// Project-owned replacement for the JSR `@std/path/posix` module, backed by
+// Project-owned replacement for the standard `path.posix` module, backed by
 // `node:path`'s `posix` namespace. See `./path.ts` for the rationale.
 
 import { posix } from "node:path";

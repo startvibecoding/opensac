@@ -35,9 +35,10 @@ export function resolveAttachmentWithMetadata(
   signal: AbortSignal | undefined,
   attachment: Attachment,
 ): Promise<AttachmentContent> {
-  const containerID = typeof attachment.metadata?.["containerId"] === "string"
-    ? attachment.metadata!["containerId"] as string
-    : "";
+  const containerID =
+    typeof attachment.metadata?.["containerId"] === "string"
+      ? (attachment.metadata!["containerId"] as string)
+      : "";
   return resolveAttachmentWithContainer(
     p,
     signal,
@@ -56,15 +57,15 @@ async function resolveAttachmentWithContainer(
     throw new Error("OpenAI attachment resolver is unavailable");
   }
   validateAttachmentReferenceForResolver(ref);
-  let endpoint = `${p.baseURL.replace(/\/+$/, "")}/files/${
-    encodeURIComponent(ref)
-  }/content`;
+  let endpoint = `${p.baseURL.replace(/\/+$/, "")}/files/${encodeURIComponent(
+    ref,
+  )}/content`;
   if (containerID !== "") {
     try {
       validateAttachmentReferenceForResolver(containerID);
-      endpoint = `${p.baseURL.replace(/\/+$/, "")}/containers/${
-        encodeURIComponent(containerID)
-      }/files/${encodeURIComponent(ref)}/content`;
+      endpoint = `${p.baseURL.replace(/\/+$/, "")}/containers/${encodeURIComponent(
+        containerID,
+      )}/files/${encodeURIComponent(ref)}/content`;
     } catch {
       // keep the Files API endpoint
     }

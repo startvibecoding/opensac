@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   configDir as platformConfigDirImpl,
@@ -338,14 +339,14 @@ function cloneResponsesConfig(src: ResponsesConfig): ResponsesConfig {
     toolControl: src.toolControl ? { ...src.toolControl } : undefined,
     hostedTools: src.hostedTools
       ? {
-        ...src.hostedTools,
-        webSearch: cloneAnyMap(src.hostedTools.webSearch),
-        fileSearch: cloneAnyMap(src.hostedTools.fileSearch),
-        codeInterpreter: cloneAnyMap(src.hostedTools.codeInterpreter),
-        computerUse: cloneAnyMap(src.hostedTools.computerUse),
-        imageGeneration: cloneAnyMap(src.hostedTools.imageGeneration),
-        remoteMCP: cloneAnyMapSlice(src.hostedTools.remoteMCP),
-      }
+          ...src.hostedTools,
+          webSearch: cloneAnyMap(src.hostedTools.webSearch),
+          fileSearch: cloneAnyMap(src.hostedTools.fileSearch),
+          codeInterpreter: cloneAnyMap(src.hostedTools.codeInterpreter),
+          computerUse: cloneAnyMap(src.hostedTools.computerUse),
+          imageGeneration: cloneAnyMap(src.hostedTools.imageGeneration),
+          remoteMCP: cloneAnyMapSlice(src.hostedTools.remoteMCP),
+        }
       : undefined,
   };
 }
@@ -508,11 +509,7 @@ function put(o: Record<string, unknown>, k: string, v: unknown): void {
   if (v !== undefined) o[k] = v;
 }
 
-function putNonEmpty(
-  o: Record<string, unknown>,
-  k: string,
-  v: unknown,
-): void {
+function putNonEmpty(o: Record<string, unknown>, k: string, v: unknown): void {
   if (!isEmptyValue(v)) o[k] = v;
 }
 
@@ -1001,9 +998,10 @@ export function parseSettings(
   base: Settings,
   data: string | Record<string, unknown>,
 ): Settings {
-  const raw = typeof data === "string"
-    ? JSON.parse(data) as Record<string, unknown>
-    : data;
+  const raw =
+    typeof data === "string"
+      ? (JSON.parse(data) as Record<string, unknown>)
+      : data;
 
   const result: Settings = {
     ...base,
@@ -1020,8 +1018,7 @@ export function parseSettings(
     if (objectKeys) {
       (result as Record<string, unknown>)[k] = mergeObjectInto(
         (result as Record<string, unknown>)[k] as
-          | Record<string, unknown>
-          | undefined,
+          Record<string, unknown> | undefined,
         v,
         objectKeys,
       );
@@ -1031,11 +1028,9 @@ export function parseSettings(
   const providersRaw = raw["providers"];
   if (providersRaw !== null && typeof providersRaw === "object") {
     if (!result.providers) result.providers = {};
-    for (
-      const [id, pd] of Object.entries(
-        providersRaw as Record<string, unknown>,
-      )
-    ) {
+    for (const [id, pd] of Object.entries(
+      providersRaw as Record<string, unknown>,
+    )) {
       let pc = result.providers[id];
       if (!pc) pc = { models: [] };
       parseProviderConfigInto(pc, (pd ?? {}) as Record<string, unknown>);
@@ -1071,21 +1066,21 @@ export function projectSettingsPath(): string {
 
 function readTextFileIfExists(p: string): string | undefined {
   try {
-    return Deno.readTextFileSync(p);
+    return nodeRuntime.readTextFileSync(p);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return undefined;
+    if (err instanceof nodeRuntime.errors.NotFound) return undefined;
     throw err;
   }
 }
 
 function applyEnvOverrides(s: Settings): void {
-  const provider = Deno.env.get("VIBECODING_PROVIDER") ?? "";
+  const provider = nodeRuntime.env.get("VIBECODING_PROVIDER") ?? "";
   if (provider !== "") s.defaultProvider = provider;
-  const model = Deno.env.get("VIBECODING_MODEL") ?? "";
+  const model = nodeRuntime.env.get("VIBECODING_MODEL") ?? "";
   if (model !== "") s.defaultModel = model;
-  const mode = Deno.env.get("VIBECODING_MODE") ?? "";
+  const mode = nodeRuntime.env.get("VIBECODING_MODE") ?? "";
   if (mode !== "") s.defaultMode = mode;
-  const thinking = Deno.env.get("VIBECODING_THINKING") ?? "";
+  const thinking = nodeRuntime.env.get("VIBECODING_THINKING") ?? "";
   if (thinking !== "") s.defaultThinkingLevel = thinking;
 }
 
@@ -1150,14 +1145,14 @@ export function loadSettingsWithMeta(): {
   try {
     meta.createdGlobalConfig = ensureConfigExists();
   } catch (err) {
-    Deno.stderr.writeSync(
+    nodeRuntime.stderr.writeSync(
       new TextEncoder().encode(`Warning: could not create config: ${err}\n`),
     );
   }
 
   const globalPath = globalSettingsPath();
   if (Verbose) {
-    Deno.stderr.writeSync(
+    nodeRuntime.stderr.writeSync(
       new TextEncoder().encode(
         `[config] Loading global settings: ${globalPath}\n`,
       ),
@@ -1169,7 +1164,7 @@ export function loadSettingsWithMeta(): {
       s = parseSettings(s, globalData);
     } catch (err) {
       backupCorruptSettings(globalPath);
-      Deno.stderr.writeSync(
+      nodeRuntime.stderr.writeSync(
         new TextEncoder().encode(
           `Warning: invalid global settings backed up; using defaults: ${err}\n`,
         ),
@@ -1184,7 +1179,7 @@ export function loadSettingsWithMeta(): {
       s = parseSettings(s, projectData);
     } catch (err) {
       backupCorruptSettings(projectPathValue);
-      Deno.stderr.writeSync(
+      nodeRuntime.stderr.writeSync(
         new TextEncoder().encode(
           `Warning: invalid project settings backed up and ignored: ${err}\n`,
         ),
@@ -1192,11 +1187,11 @@ export function loadSettingsWithMeta(): {
     }
   } else if (Verbose) {
     if (readTextFileIfExists(projectPath("setting.json")) !== undefined) {
-      Deno.stderr.writeSync(
+      nodeRuntime.stderr.writeSync(
         new TextEncoder().encode(
-          `[config] Found ${
-            projectPath("setting.json")
-          } (singular) — expected ${projectPathValue} (plural). Please rename the file.\n`,
+          `[config] Found ${projectPath(
+            "setting.json",
+          )} (singular) — expected ${projectPathValue} (plural). Please rename the file.\n`,
         ),
       );
     }
@@ -1210,12 +1205,12 @@ function backupCorruptSettings(p: string): string {
   const absolutePath = path.resolve(p);
   const stamp = formatStamp(new Date());
   let backupPath = `${absolutePath}.bak_${stamp}`;
-  for (let i = 1;; i++) {
+  for (let i = 1; ; i++) {
     if (!existsSync(backupPath)) break;
     backupPath = `${absolutePath}.bak_${stamp}_${i}`;
   }
-  Deno.renameSync(absolutePath, backupPath);
-  Deno.stderr.writeSync(
+  nodeRuntime.renameSync(absolutePath, backupPath);
+  nodeRuntime.stderr.writeSync(
     new TextEncoder().encode(
       `Warning: corrupt settings backed up to ${backupPath}\n`,
     ),
@@ -1225,14 +1220,14 @@ function backupCorruptSettings(p: string): string {
 
 function formatStamp(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${
-    pad(d.getHours())
-  }${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(
+    d.getHours(),
+  )}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
 function existsSync(p: string): boolean {
   try {
-    Deno.statSync(p);
+    nodeRuntime.statSync(p);
     return true;
   } catch {
     return false;
@@ -1244,10 +1239,10 @@ function ensureConfigExists(): boolean {
   const settingsPath = globalSettingsPath();
   if (existsSync(settingsPath)) return false;
 
-  Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  nodeRuntime.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const data = marshalSettings(defaultSettingsFile());
-  Deno.writeTextFileSync(settingsPath, data, { mode: 0o600 });
-  Deno.stderr.writeSync(
+  nodeRuntime.writeTextFileSync(settingsPath, data, { mode: 0o600 });
+  nodeRuntime.stderr.writeSync(
     new TextEncoder().encode(`Created default config: ${settingsPath}\n`),
   );
   return true;
@@ -1352,20 +1347,20 @@ export function saveGlobalSettingsPatch(
 
 function writeGlobalSettingsData(data: string): void {
   const dir = configDir();
-  Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  nodeRuntime.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const settingsPath = globalSettingsPath();
-  const tmpName = Deno.makeTempFileSync({
+  const tmpName = nodeRuntime.makeTempFileSync({
     dir,
     prefix: "settings-",
     suffix: ".tmp",
   });
   try {
-    Deno.writeTextFileSync(tmpName, data);
-    Deno.chmodSync(tmpName, 0o600);
-    Deno.renameSync(tmpName, settingsPath);
+    nodeRuntime.writeTextFileSync(tmpName, data);
+    nodeRuntime.chmodSync(tmpName, 0o600);
+    nodeRuntime.renameSync(tmpName, settingsPath);
   } catch (err) {
     try {
-      Deno.removeSync(tmpName);
+      nodeRuntime.removeSync(tmpName);
     } catch {
       // already gone
     }
@@ -1392,7 +1387,7 @@ export function saveProjectSettingsPatchFor(
   if (Object.keys(updates).length === 0) return;
   const settingsPath = projectPathFor(cwd, "settings.json");
   const projectDir = path.dirname(settingsPath);
-  Deno.mkdirSync(projectDir, { recursive: true, mode: 0o700 });
+  nodeRuntime.mkdirSync(projectDir, { recursive: true, mode: 0o700 });
   let existing: Record<string, unknown> = {};
   const data = readTextFileIfExists(settingsPath);
   if (data !== undefined) {
@@ -1423,7 +1418,7 @@ export function saveProjectSettings(s: Settings): void {
   if (!s) throw new Error("settings is required");
   const settingsPath = projectSettingsPath();
   const projectDir = path.dirname(settingsPath);
-  Deno.mkdirSync(projectDir, { recursive: true, mode: 0o700 });
+  nodeRuntime.mkdirSync(projectDir, { recursive: true, mode: 0o700 });
   writeProjectSettingsData(projectDir, settingsPath, marshalSettings(s));
 }
 
@@ -1432,18 +1427,18 @@ function writeProjectSettingsData(
   settingsPath: string,
   data: string,
 ): void {
-  const tmpName = Deno.makeTempFileSync({
+  const tmpName = nodeRuntime.makeTempFileSync({
     dir,
     prefix: "settings-",
     suffix: ".tmp",
   });
   try {
-    Deno.writeTextFileSync(tmpName, data);
-    Deno.chmodSync(tmpName, 0o600);
-    Deno.renameSync(tmpName, settingsPath);
+    nodeRuntime.writeTextFileSync(tmpName, data);
+    nodeRuntime.chmodSync(tmpName, 0o600);
+    nodeRuntime.renameSync(tmpName, settingsPath);
   } catch (err) {
     try {
-      Deno.removeSync(tmpName);
+      nodeRuntime.removeSync(tmpName);
     } catch {
       // already gone
     }
@@ -1456,20 +1451,18 @@ export function isProjectDir(p: string): boolean {
   p = p.trim();
   if (p === "") return false;
   try {
-    if (!Deno.statSync(p).isDirectory) return false;
+    if (!nodeRuntime.statSync(p).isDirectory) return false;
   } catch {
     return false;
   }
-  for (
-    const marker of [
-      ".git",
-      projectDirName,
-      "go.mod",
-      "package.json",
-      "pyproject.toml",
-      "Cargo.toml",
-    ]
-  ) {
+  for (const marker of [
+    ".git",
+    projectDirName,
+    "go.mod",
+    "package.json",
+    "pyproject.toml",
+    "Cargo.toml",
+  ]) {
     if (existsSync(path.join(p, marker))) return true;
   }
   return false;
@@ -1491,7 +1484,7 @@ export function resolveKey(s: Settings, providerName: string): string {
   }
 
   const envVar = providerToEnvVar(providerName);
-  const v = Deno.env.get(envVar) ?? "";
+  const v = nodeRuntime.env.get(envVar) ?? "";
   if (v !== "") return v;
   return "";
 }
@@ -1523,13 +1516,14 @@ export function providerToEnvVar(name: string): string {
 /** Resolves `${VAR}` and `!shell` references in a config value. */
 export function resolveKeyValue(key: string): string {
   if (key.startsWith("!")) {
-    if (Deno.env.get("VIBECODING_ALLOW_SHELL_CONFIG") !== "1") return key;
+    if (nodeRuntime.env.get("VIBECODING_ALLOW_SHELL_CONFIG") !== "1")
+      return key;
     return resolveShellCommand(key.slice(1));
   }
   let envName = key;
   if (key.startsWith("${") && key.endsWith("}")) envName = key.slice(2, -1);
   if (!envName.includes(" ")) {
-    const v = Deno.env.get(envName) ?? "";
+    const v = nodeRuntime.env.get(envName) ?? "";
     if (v !== "") return v;
   }
   return key;
@@ -1541,7 +1535,7 @@ function resolveShellCommand(cmd: string): string {
     const [program, args] = isWindows()
       ? ["powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", cmd]]
       : ["sh", ["-c", cmd]];
-    const result = new Deno.Command(program, {
+    const result = new nodeRuntime.Command(program, {
       args,
       stdout: "piped",
       stderr: "null",
@@ -1617,7 +1611,9 @@ export function isAttachmentStorageReclaimEnabled(
   s: Settings | undefined,
 ): boolean {
   if (
-    !s || !s.maintenance || s.maintenance.reclaimAttachmentStorage === undefined
+    !s ||
+    !s.maintenance ||
+    s.maintenance.reclaimAttachmentStorage === undefined
   ) {
     return true;
   }
@@ -1687,9 +1683,8 @@ export function normalizeWebSearchSettings(
   if (cfg.enabled === undefined) cfg.enabled = false;
   if (!cfg.provider) cfg.provider = "openai";
   if (!cfg.providerType) {
-    cfg.providerType = cfg.provider === "anthropic"
-      ? "anthropic-messages"
-      : "openai-responses";
+    cfg.providerType =
+      cfg.provider === "anthropic" ? "anthropic-messages" : "openai-responses";
   }
   return cfg;
 }
@@ -1792,12 +1787,14 @@ export function mergeProviderConfig(
   const result = cloneProviderConfig(base)!;
   const fs = overlay.fieldSet;
   if (
-    configFieldWasSet(fs, "apiKey") || (fs === undefined && !!overlay.apiKey)
+    configFieldWasSet(fs, "apiKey") ||
+    (fs === undefined && !!overlay.apiKey)
   ) {
     result.apiKey = overlay.apiKey;
   }
   if (
-    configFieldWasSet(fs, "baseUrl") || (fs === undefined && !!overlay.baseUrl)
+    configFieldWasSet(fs, "baseUrl") ||
+    (fs === undefined && !!overlay.baseUrl)
   ) {
     result.baseUrl = overlay.baseUrl;
   }
@@ -1805,7 +1802,8 @@ export function mergeProviderConfig(
     result.api = overlay.api;
   }
   if (
-    configFieldWasSet(fs, "vendor") || (fs === undefined && !!overlay.vendor)
+    configFieldWasSet(fs, "vendor") ||
+    (fs === undefined && !!overlay.vendor)
   ) {
     result.vendor = overlay.vendor;
   }
@@ -1870,7 +1868,8 @@ function responsesConfigHasValues(c: ResponsesConfig): boolean {
   const so = c.structuredOutput ?? {};
   const tc = c.toolControl ?? {};
   const ht = c.hostedTools ?? {};
-  return c.reasoningSummary !== undefined ||
+  return (
+    c.reasoningSummary !== undefined ||
     c.reasoningContext !== undefined ||
     c.reasoningMode !== undefined ||
     c.promptCacheEnabled !== undefined ||
@@ -1899,7 +1898,8 @@ function responsesConfigHasValues(c: ResponsesConfig): boolean {
     Object.keys(ht.codeInterpreter ?? {}).length > 0 ||
     Object.keys(ht.computerUse ?? {}).length > 0 ||
     Object.keys(ht.imageGeneration ?? {}).length > 0 ||
-    (ht.remoteMCP?.length ?? 0) > 0;
+    (ht.remoteMCP?.length ?? 0) > 0
+  );
 }
 
 /**
@@ -2025,9 +2025,7 @@ export function skillsDisabled(s: Settings | undefined): string[] | undefined {
 }
 
 /** Normalizes the local tool execution mode. */
-export function toolExecutionEffectiveMode(
-  s: ToolExecutionSettings,
-): string {
+export function toolExecutionEffectiveMode(s: ToolExecutionSettings): string {
   return (s.mode ?? "").trim().toLowerCase() === "sequential"
     ? "sequential"
     : "parallel";

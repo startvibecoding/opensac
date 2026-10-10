@@ -80,8 +80,11 @@ export function parseAttachmentTimestamp(value: string): Date {
  */
 export function validatePathComponent(value: string): void {
   if (
-    value === "" || value === "." || value === ".." ||
-    value.includes("/") || value.includes("\\")
+    value === "" ||
+    value === "." ||
+    value === ".." ||
+    value.includes("/") ||
+    value.includes("\\")
   ) {
     throw new Error("invalid attachment path component");
   }

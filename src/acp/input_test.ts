@@ -1,6 +1,7 @@
 // Translated tests from internal/acp/acp_artifact_test.go and
 // internal/acp/acp_mcp_test.go for the ACP prompt/input conversion layer.
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { encodeBase64 } from "../compat/encoding.ts";
 import { join } from "../compat/path.ts";
@@ -17,10 +18,10 @@ import {
 import { test } from "#testing";
 
 test("promptToIngresses normalizes every declared capability", () => {
-  const workspace = Deno.makeTempDirSync();
+  const workspace = runtime.makeTempDirSync();
   const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
   const pngPath = join(workspace, "pixel.png");
-  Deno.writeFileSync(pngPath, pngBytes);
+  runtime.writeFileSync(pngPath, pngBytes);
 
   const { text, ingresses } = promptToIngresses(
     [
@@ -58,9 +59,9 @@ test("promptToIngresses normalizes every declared capability", () => {
 });
 
 test("promptToIngresses reads a local resource link over Runtime", async () => {
-  const workspace = Deno.makeTempDirSync();
+  const workspace = runtime.makeTempDirSync();
   const path = join(workspace, "notes.md");
-  Deno.writeFileSync(path, new TextEncoder().encode("hello"));
+  runtime.writeFileSync(path, new TextEncoder().encode("hello"));
 
   const { text, ingresses } = promptToIngresses(
     [
@@ -86,7 +87,7 @@ test("promptToIngresses reads a local resource link over Runtime", async () => {
 });
 
 test("promptToIngresses rejects a remote resource URI", () => {
-  const workspace = Deno.makeTempDirSync();
+  const workspace = runtime.makeTempDirSync();
   assertThrows(
     () =>
       promptToIngresses(
@@ -124,23 +125,23 @@ test("promptToText rejects non-text and promptToRunInput rejects resources", () 
 });
 
 test("resolveACPResourcePath confines resources to the workspace", () => {
-  const workspace = Deno.makeTempDirSync();
-  const outside = Deno.makeTempDirSync();
+  const workspace = runtime.makeTempDirSync();
+  const outside = runtime.makeTempDirSync();
   const outsideFile = join(outside, "secret.txt");
-  Deno.writeFileSync(outsideFile, new TextEncoder().encode("x"));
+  runtime.writeFileSync(outsideFile, new TextEncoder().encode("x"));
   assertThrows(
     () => resolveACPResourcePath(`file://${outsideFile}`, workspace, []),
     ACPPromptContentError,
   );
 
   const localFile = join(workspace, "ok.txt");
-  Deno.writeFileSync(localFile, new TextEncoder().encode("ok"));
+  runtime.writeFileSync(localFile, new TextEncoder().encode("ok"));
   const resolved = resolveACPResourcePath(
     `file://localhost${localFile}`,
     workspace,
     [],
   );
-  assertEquals(resolved, Deno.realPathSync(localFile));
+  assertEquals(resolved, runtime.realPathSync(localFile));
 
   assertThrows(
     () => resolveACPResourcePath("https://example.com/a", workspace, []),
@@ -181,14 +182,16 @@ test("acpPromptRequestSnapshot requires a materializer for resources", () => {
     () => {
       acpPromptRequestSnapshot(null, "hi", {
         text: "hi",
-        resources: [{
-          resourceId: "r1",
-          kind: "file",
-          relativePath: "a",
-          filename: "a",
-          mediaType: "text/plain",
-          bytes: 1,
-        }],
+        resources: [
+          {
+            resourceId: "r1",
+            kind: "file",
+            relativePath: "a",
+            filename: "a",
+            mediaType: "text/plain",
+            bytes: 1,
+          },
+        ],
         knowledgeBaseReferences: [],
         knowledgeCapsules: [],
         idempotencyKey: "",
@@ -202,13 +205,15 @@ test("acpPromptRequestSnapshot requires a materializer for resources", () => {
     text: "hi",
     resources: [],
     knowledgeBaseReferences: [{ knowledgeBaseId: "kb1", required: true }],
-    knowledgeCapsules: [{
-      knowledgeBaseId: "kb1",
-      knowledgeBaseName: "Docs",
-      snapshotId: "snap-1",
-      text: "body",
-      citations: [],
-    }],
+    knowledgeCapsules: [
+      {
+        knowledgeBaseId: "kb1",
+        knowledgeBaseName: "Docs",
+        snapshotId: "snap-1",
+        text: "body",
+        citations: [],
+      },
+    ],
     idempotencyKey: "",
   });
   const parsed = JSON.parse(snapshot) as {

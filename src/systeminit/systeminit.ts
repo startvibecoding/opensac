@@ -5,8 +5,7 @@
 /** The slash command that triggers system initialization. */
 export const COMMAND = "/systeminit";
 
-const baseInstructions =
-  `You are setting up this project for future AI coding agents by creating a high-quality AGENTS.md file at the repository root.
+const baseInstructions = `You are setting up this project for future AI coding agents by creating a high-quality AGENTS.md file at the repository root.
 
 First, investigate the project thoroughly:
 - Detect the primary language(s), frameworks, and project layout.

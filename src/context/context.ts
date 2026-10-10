@@ -51,9 +51,10 @@ export function calculateContextTokens(
  * EstimateContextTokens estimates context tokens from messages using the
  * shared local tokenizer and provider usage when available.
  */
-export function estimateContextTokens(
-  messages: Message[],
-): { tokens: number; lastUsageIndex: number } {
+export function estimateContextTokens(messages: Message[]): {
+  tokens: number;
+  lastUsageIndex: number;
+} {
   return estimateContextTokensWithEstimator(messages, genericTokenEstimator);
 }
 
@@ -72,7 +73,8 @@ export function contextUsageFromMessages(
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (
-      msg.role === "assistant" && msg.usage !== undefined &&
+      msg.role === "assistant" &&
+      msg.usage !== undefined &&
       calculateContextTokens(msg.usage) > 0
     ) {
       last = i;
@@ -131,7 +133,8 @@ export function estimateContextTokensWithEstimator(
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (
-      msg.role === "assistant" && msg.usage !== undefined &&
+      msg.role === "assistant" &&
+      msg.usage !== undefined &&
       calculateContextTokens(msg.usage) > 0
     ) {
       lastUsageIndex = i;

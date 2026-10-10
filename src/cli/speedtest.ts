@@ -88,9 +88,7 @@ const VALID_THINKING_LEVELS: ThinkingLevel[] = [
   "max",
 ];
 
-export function parseSpeedtestThinkingLevel(
-  level: string,
-): ThinkingLevel {
+export function parseSpeedtestThinkingLevel(level: string): ThinkingLevel {
   const normalized = level.trim() as ThinkingLevel;
   if (VALID_THINKING_LEVELS.includes(normalized)) return normalized;
   throw new Error(
@@ -139,7 +137,7 @@ export function collectSpeedtestTargets(
   targets.sort((a, b) =>
     a.provider !== b.provider
       ? a.provider.localeCompare(b.provider)
-      : a.modelId.localeCompare(b.modelId)
+      : a.modelId.localeCompare(b.modelId),
   );
   return targets;
 }
@@ -268,7 +266,8 @@ export async function runSpeedtestRequest(
 
   let maxTokens = opts.maxTokens;
   if (
-    model !== undefined && (model.maxTokens ?? 0) > 0 &&
+    model !== undefined &&
+    (model.maxTokens ?? 0) > 0 &&
     maxTokens > (model.maxTokens ?? 0)
   ) {
     maxTokens = model.maxTokens ?? maxTokens;
@@ -298,14 +297,18 @@ export async function runSpeedtestRequest(
   for await (const ev of stream) {
     if (ev.type === streamTextDelta) {
       if (
-        ev.textDelta !== undefined && ev.textDelta !== "" && firstTokenAt < 0
+        ev.textDelta !== undefined &&
+        ev.textDelta !== "" &&
+        firstTokenAt < 0
       ) {
         firstTokenAt = performance.now();
       }
       output += ev.textDelta ?? "";
     } else if (ev.type === streamThinkDelta) {
       if (
-        ev.thinkDelta !== undefined && ev.thinkDelta !== "" && firstTokenAt < 0
+        ev.thinkDelta !== undefined &&
+        ev.thinkDelta !== "" &&
+        firstTokenAt < 0
       ) {
         firstTokenAt = performance.now();
       }
@@ -428,7 +431,7 @@ export function printSpeedtestResults(
       formatSpeedtestDuration(result.totalDurationMs),
       formatSpeedtestOutput(result.outputTokens, result.estimatedTokens),
       formatSpeedtestStatus(result),
-    ].join("\t")
+    ].join("\t"),
   );
   for (const line of alignTabColumns([header, ...rows])) write(line);
 }
@@ -443,9 +446,11 @@ function alignTabColumns(lines: string[]): string[] {
     });
   }
   return split.map((cells) =>
-    cells.map((cell, i) =>
-      i === cells.length - 1 ? cell : cell.padEnd(widths[i] + 2, " ")
-    ).join("")
+    cells
+      .map((cell, i) =>
+        i === cells.length - 1 ? cell : cell.padEnd(widths[i] + 2, " "),
+      )
+      .join(""),
   );
 }
 
@@ -502,8 +507,8 @@ export async function executeSpeedtestCommand(
     ...partial,
   };
   const write = flags.write ?? ((line: string) => console.log(line));
-  const writeError = flags.writeError ??
-    ((line: string) => console.error(line));
+  const writeError =
+    flags.writeError ?? ((line: string) => console.error(line));
 
   if (flags.maxTokens <= 0) {
     throw new Error("--max-tokens must be greater than 0");
@@ -551,17 +556,15 @@ export async function executeSpeedtestCommand(
           flags.timeoutMs,
           flags.runs,
         );
-        result.networkLatencyMs = flags.measureNetwork !== undefined
-          ? flags.measureNetwork(target.provider)
-          : 0;
+        result.networkLatencyMs =
+          flags.measureNetwork !== undefined
+            ? flags.measureNetwork(target.provider)
+            : 0;
         results.push(result);
       } else {
-        const created = create(
-          settings,
-          target.provider,
-          target.modelId,
-          { requireModel: true },
-        );
+        const created = create(settings, target.provider, target.modelId, {
+          requireModel: true,
+        });
         const result = await runSpeedtestRuns(
           created.provider,
           created.model,
@@ -570,9 +573,10 @@ export async function executeSpeedtestCommand(
           flags.timeoutMs,
           flags.runs,
         );
-        result.networkLatencyMs = flags.measureNetwork !== undefined
-          ? flags.measureNetwork(target.provider)
-          : 0;
+        result.networkLatencyMs =
+          flags.measureNetwork !== undefined
+            ? flags.measureNetwork(target.provider)
+            : 0;
         results.push(result);
       }
     } catch (err) {

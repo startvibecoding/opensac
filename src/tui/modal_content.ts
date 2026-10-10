@@ -115,7 +115,7 @@ export class ModalContentCache implements ModalContentView {
       let entry = this.#entries.get(block.key);
       if (entry === undefined || entry.sig !== block.sig) {
         if (entry !== undefined) this.#chars -= entry.chars;
-        else this.#entries.set(block.key, entry = {} as CacheEntry);
+        else this.#entries.set(block.key, (entry = {} as CacheEntry));
         const lines = wrapBlockLines(block.build(), width);
         entry.sig = block.sig;
         entry.lines = lines;

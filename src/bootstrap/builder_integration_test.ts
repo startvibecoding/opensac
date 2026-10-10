@@ -3,6 +3,7 @@
 // public `Builder` constructs a real Agent, and the built agent must run one
 // full turn against a scripted public Provider through the bridge.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   eventAgentEnd,
@@ -40,7 +41,7 @@ test("bootstrap facade registers the internal agent builder", () => {
       models: () => [testModel],
       getModel: (id) => (id === testModel.id ? testModel : undefined),
     })
-    .withWorkDir(Deno.makeTempDirSync())
+    .withWorkDir(runtime.makeTempDirSync())
     .build();
 
   // Go asserts the returned Agent is the internal implementation: it carries a
@@ -61,7 +62,7 @@ test("built agent runs one turn through the provider bridge", async () => {
       models: () => [testModel],
       getModel: (id) => (id === testModel.id ? testModel : undefined),
     })
-    .withWorkDir(Deno.makeTempDirSync())
+    .withWorkDir(runtime.makeTempDirSync())
     .build();
 
   let text = "";

@@ -7,8 +7,8 @@
 // This script is a release tool: `make node-publish*` is the only intended
 // entry point, and it publishes to the configured registry.
 
+import { runtime } from "../src/platform/runtime.ts";
 import { join, resolve } from "../src/compat/path.ts";
-import { isMainModule } from "../src/platform/node_compat.ts";
 
 export interface NpmPackageJson {
   name: string;
@@ -53,18 +53,16 @@ export function packumentUrl(registry: string, name: string): string {
  * published" and then republish over a live version.
  */
 export function authHeader(
-  env: { get(key: string): string | undefined } = Deno.env,
+  env: { get(key: string): string | undefined } = runtime.env,
 ): Record<string, string> {
   const token = env.get("NODE_AUTH_TOKEN") ?? env.get("NPM_TOKEN") ?? "";
   return token === "" ? {} : { Authorization: `Bearer ${token}` };
 }
 
 /** Reads `name` and `version` from a package manifest. */
-export function readPackageJson(
-  packageDir: string,
-): Promise<NpmPackageJson> {
+export function readPackageJson(packageDir: string): Promise<NpmPackageJson> {
   const manifestPath = join(packageDir, "package.json");
-  return Deno.readTextFile(manifestPath).then((text) => {
+  return runtime.readTextFile(manifestPath).then((text) => {
     const parsed = JSON.parse(text) as Partial<NpmPackageJson>;
     if (!parsed.name || !parsed.version) {
       throw new Error(`${manifestPath} must contain a name and a version`);
@@ -99,9 +97,9 @@ export async function isPublished(
   }
   // The packument lists every published version, so membership is the answer.
   // A body that is not the expected shape is a failure, not "not published".
-  const body = await response.json().catch(() => null) as
-    | { versions?: Record<string, unknown> }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    versions?: Record<string, unknown>;
+  } | null;
   const versions = body?.versions;
   if (versions === undefined || versions === null) {
     throw new Error(
@@ -161,7 +159,7 @@ export async function publishIfNeeded(
   options: PublishOptions,
   fetchImpl: typeof fetch = fetch,
 ): Promise<PublishResult> {
-  const packageDir = resolve(options.packageDir ?? Deno.cwd());
+  const packageDir = resolve(options.packageDir ?? runtime.cwd());
   const pkg = await readPackageJson(packageDir);
   const label = `${pkg.name}@${pkg.version}`;
 
@@ -179,7 +177,7 @@ export async function publishIfNeeded(
     ...(options.extraArgs ?? []),
   ];
   console.log(`  Publishing ${label} with tag ${options.tag}...`);
-  const status = await new Deno.Command(npm, {
+  const status = await new runtime.Command(npm, {
     args,
     cwd: packageDir,
     stdin: "inherit",
@@ -192,23 +190,24 @@ export async function publishIfNeeded(
   return { label, published: true };
 }
 
-if (isMainModule(import.meta.url)) {
-  const parsed = parseArgs(Deno.args, {
-    registry: Deno.env.get("NPM_REGISTRY") ??
-      Deno.env.get("npm_config_registry") ??
+if (import.meta.main) {
+  const parsed = parseArgs(runtime.args, {
+    registry:
+      runtime.env.get("NPM_REGISTRY") ??
+      runtime.env.get("npm_config_registry") ??
       "https://registry.npmjs.org",
     tag: "latest",
   });
   try {
     const result = await publishIfNeeded({
       ...parsed,
-      npm: Deno.env.get("NPM") ?? "npm",
+      npm: runtime.env.get("NPM") ?? "npm",
     });
     if (!result.published) {
       console.log(`  Skipping ${result.label}: ${result.reason}`);
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    Deno.exit(1);
+    runtime.exit(1);
   }
 }

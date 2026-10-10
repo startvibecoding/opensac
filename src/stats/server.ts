@@ -1,7 +1,9 @@
 //
 // `net/http.ServeMux` maps to a small path router over the standard web
-// Request/Response API; `http.Server` maps to `Deno.serve`.
+// Request/Response API; `http.Server` maps to `runtime.serve`.
 
+import { runtime } from "../platform/runtime.ts";
+import type { HttpServer } from "../platform/runtime.ts";
 import { dashboardHTML, opensacPNG, opensacSmallICO } from "./assets.ts";
 import {
   createStatsQueryExecutor,
@@ -51,7 +53,8 @@ function parseDateOnly(value: string): Date | null {
   const day = Number(m[3]);
   const d = new Date(Date.UTC(year, month - 1, day));
   if (
-    d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 ||
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() !== month - 1 ||
     d.getUTCDate() !== day
   ) {
     return null;
@@ -63,7 +66,7 @@ function parseDateOnly(value: string): Date | null {
 export class Server {
   #executor: StatsQueryExecutor;
   #addr: string;
-  #httpServer: Deno.HttpServer | null = null;
+  #httpServer: HttpServer | null = null;
 
   constructor(db: DB, addr: string, options: ServerOptions = {}) {
     // By default queries run in an offline-scan worker so a slow aggregate
@@ -102,22 +105,22 @@ export class Server {
     }
     if (p === "/api/summary") {
       return await this.#json(() =>
-        this.#executor.summary(parseQueryParams(url.searchParams))
+        this.#executor.summary(parseQueryParams(url.searchParams)),
       );
     }
     if (p === "/api/timeseries") {
       return await this.#json(() =>
-        this.#executor.timeSeries(parseQueryParams(url.searchParams))
+        this.#executor.timeSeries(parseQueryParams(url.searchParams)),
       );
     }
     if (p === "/api/by-provider") {
       return await this.#json(() =>
-        this.#executor.byProvider(parseQueryParams(url.searchParams))
+        this.#executor.byProvider(parseQueryParams(url.searchParams)),
       );
     }
     if (p === "/api/by-model") {
       return await this.#json(() =>
-        this.#executor.byModel(parseQueryParams(url.searchParams))
+        this.#executor.byModel(parseQueryParams(url.searchParams)),
       );
     }
     if (p === "/api/recent") {
@@ -135,7 +138,7 @@ export class Server {
         if (!isNaN(n) && n > 0) pageSize = n;
       }
       return await this.#json(() =>
-        this.#executor.recentFiltered(q, page, pageSize)
+        this.#executor.recentFiltered(q, page, pageSize),
       );
     }
     return new Response("404 page not found\n", { status: 404 });
@@ -156,13 +159,18 @@ export class Server {
   }
 
   /** Starts the HTTP server. */
-  start(): void {
+  async start(): Promise<void> {
     const { hostname, port } = splitAddr(this.#addr);
-    console.log(`[stats] dashboard listening on http://${this.#addr}`);
-    this.#httpServer = Deno.serve(
-      { hostname, port },
+    let resolveBound!: () => void;
+    const bound = new Promise<void>((resolve) => {
+      resolveBound = resolve;
+    });
+    this.#httpServer = runtime.serve(
+      { hostname, port, onListen: () => resolveBound() },
       (req) => this.handle(req),
     );
+    await bound;
+    console.log(`[stats] dashboard listening on http://${this.#addr}`);
   }
 
   /** Gracefully stops the HTTP server and releases the query executor. */
@@ -187,14 +195,16 @@ export class Server {
   /** The bound address, available after {@link start}. */
   boundAddr(): string {
     const addr = this.#httpServer?.addr as
-      | { hostname?: string; port?: number }
-      | undefined;
+      { hostname?: string; port?: number } | undefined;
     if (
-      addr && typeof addr.hostname === "string" && typeof addr.port === "number"
+      addr &&
+      typeof addr.hostname === "string" &&
+      typeof addr.port === "number"
     ) {
-      const host = addr.hostname === "0.0.0.0" || addr.hostname === "::"
-        ? "127.0.0.1"
-        : addr.hostname;
+      const host =
+        addr.hostname === "0.0.0.0" || addr.hostname === "::"
+          ? "127.0.0.1"
+          : addr.hostname;
       return `${host}:${addr.port}`;
     }
     return this.#addr;

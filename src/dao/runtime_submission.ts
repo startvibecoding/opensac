@@ -17,7 +17,7 @@ const columns = `id, session_id AS sessionId, scope, key_hash AS keyHash,
   run_id AS runId, created_at AS createdAt`;
 
 export class RuntimeSubmissionDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;

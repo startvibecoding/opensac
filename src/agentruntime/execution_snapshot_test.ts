@@ -4,6 +4,7 @@
 // and verified-remote snapshot states. Raw SQL lease fixtures are allowed in
 // tests (the DAO/DB rule governs production code). `time.Time` maps to `Date`.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { createManager } from "../session/manager.ts";
 import {
@@ -116,12 +117,12 @@ function baseSessionRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 function initSession(sessionDir: string, id: string): void {
-  const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+  const manager = createManager(runtime.makeTempDirSync(), sessionDir);
   manager.initWithID(id);
 }
 
 test("inspectSessionExecutionTracksLocalLifecycle", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-local");
     const lease = acquireExecutionAdmission(sessionDir, "snapshot-local");
@@ -222,7 +223,7 @@ test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () => {
     },
   ];
   for (const testCase of cases) {
-    const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
+    const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-snapshot-" });
     try {
       initSession(sessionDir, "snapshot-state");
       const now = new Date();
@@ -283,7 +284,7 @@ test("inspectSessionExecutionDistinguishesExternalLegacyAndOrphaned", () => {
 });
 
 test("inspectSessionExecutionProjectsMutationAsReserved", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-reserved");
     const lease = acquireMutation(sessionDir, "snapshot-reserved");
@@ -302,60 +303,57 @@ test("inspectSessionExecutionProjectsMutationAsReserved", () => {
   }
 });
 
-test(
-  "inspectSessionExecutionRequiresCanonicalRemoteRecordForDetachedState",
-  () => {
-    const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
-    try {
-      initSession(sessionDir, "snapshot-remote");
-      const now = new Date();
-      saveSessionRun(
-        sessionDir,
-        baseSessionRun({
-          id: "run-remote",
-          sessionId: "snapshot-remote",
-          source: "responses_background",
-          status: "running",
-          startedAt: now,
-          updatedAt: now,
-        }),
-      );
-
-      let snapshot = inspectSessionExecution(sessionDir, "snapshot-remote");
-      assertEquals(snapshot.state, SESSION_EXECUTION_ORPHANED);
-
-      const remote: ResponseRun = {
-        id: 0,
+test("inspectSessionExecutionRequiresCanonicalRemoteRecordForDetachedState", () => {
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-snapshot-" });
+  try {
+    initSession(sessionDir, "snapshot-remote");
+    const now = new Date();
+    saveSessionRun(
+      sessionDir,
+      baseSessionRun({
+        id: "run-remote",
         sessionId: "snapshot-remote",
-        localRunId: "provider-run",
-        localTurnId: "run-remote",
-        messageId: null,
-        responseId: "resp-1",
-        provider: "openai",
-        api: "openai-responses",
-        state: "in_progress",
-        pollingUrl: "",
-        lastEventSequence: null,
-        cancelRequested: false,
-        createdAt: now,
+        source: "responses_background",
+        status: "running",
+        startedAt: now,
         updatedAt: now,
-      };
-      saveResponseRun(sessionDir, remote);
+      }),
+    );
 
-      snapshot = inspectSessionExecution(sessionDir, "snapshot-remote");
-      assertEquals(snapshot.state, SESSION_EXECUTION_DETACHED);
-      assert(snapshot.running, "detached remote run should be running");
-      assert(snapshot.canCancelRemote, "detached remote run must allow cancel");
-      assert(!snapshot.canSubmit, "detached remote run must not allow submit");
-      assertEquals(snapshot.remoteRunId, "provider-run");
-    } finally {
-      closeDatabases();
-    }
-  },
-);
+    let snapshot = inspectSessionExecution(sessionDir, "snapshot-remote");
+    assertEquals(snapshot.state, SESSION_EXECUTION_ORPHANED);
+
+    const remote: ResponseRun = {
+      id: 0,
+      sessionId: "snapshot-remote",
+      localRunId: "provider-run",
+      localTurnId: "run-remote",
+      messageId: null,
+      responseId: "resp-1",
+      provider: "openai",
+      api: "openai-responses",
+      state: "in_progress",
+      pollingUrl: "",
+      lastEventSequence: null,
+      cancelRequested: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    saveResponseRun(sessionDir, remote);
+
+    snapshot = inspectSessionExecution(sessionDir, "snapshot-remote");
+    assertEquals(snapshot.state, SESSION_EXECUTION_DETACHED);
+    assert(snapshot.running, "detached remote run should be running");
+    assert(snapshot.canCancelRemote, "detached remote run must allow cancel");
+    assert(!snapshot.canSubmit, "detached remote run must not allow submit");
+    assertEquals(snapshot.remoteRunId, "provider-run");
+  } finally {
+    closeDatabases();
+  }
+});
 
 test("reattachDurableRunPromotesRecoveryLeaseAndRegistersLocal", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-snapshot-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-snapshot-" });
   try {
     initSession(sessionDir, "snapshot-reattach");
     const now = new Date();

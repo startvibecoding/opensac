@@ -20,7 +20,10 @@ test("EventChannel buffers without bound and drains FIFO", async () => {
   channel.close();
   const seen: number[] = [];
   for await (const ev of channel) seen.push(ev.type);
-  assertEquals(seen, Array.from({ length: 256 }, (_, i) => i));
+  assertEquals(
+    seen,
+    Array.from({ length: 256 }, (_, i) => i),
+  );
 });
 
 test("EventChannel hands a push to a waiting consumer", async () => {

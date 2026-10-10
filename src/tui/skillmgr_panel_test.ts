@@ -192,10 +192,7 @@ test("skillmgr reports a list failure as an error settle", async () => {
 
 test("skillmgr windows long lists around the cursor", async () => {
   const host = new FakeHost();
-  host.skills = Array.from(
-    { length: 30 },
-    (_, i) => skill({ name: `s${i}` }),
-  );
+  host.skills = Array.from({ length: 30 }, (_, i) => skill({ name: `s${i}` }));
   const panel = await open(host);
   let view = panel.view(100);
   assertStringIncludes(view, "s0");

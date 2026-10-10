@@ -7,7 +7,7 @@
 // Deviation: Go's `(*SessionRuntime)` methods that only compute values live as
 // standalone helpers here so the SessionRuntime class body (which owns the
 // runtime-bound publish path) stays smaller; Go's `sync.RWMutex` is dropped
-// because Deno is single-threaded.
+// because Node is single-threaded.
 
 import { type MemberDef, MemberMailbox } from "../agent/mod.ts";
 import { Center } from "../expert/center.ts";
@@ -92,9 +92,9 @@ export function resolveBoundExpertBundle(
   const bundle = new Center(workDir).get(expertID);
   if (bundle.invalid) {
     throw new Error(
-      `expert bundle ${
-        JSON.stringify(expertID)
-      } is invalid: ${bundle.invalidReason}`,
+      `expert bundle ${JSON.stringify(
+        expertID,
+      )} is invalid: ${bundle.invalidReason}`,
     );
   }
   return bundle;
@@ -288,11 +288,13 @@ export function expertConfigOption(
   workDir: string,
   current: string,
 ): SessionConfigOption {
-  const choices: SessionConfigOptionChoice[] = [{
-    value: "",
-    name: "No expert",
-    description: "Use the standard session identity",
-  }];
+  const choices: SessionConfigOptionChoice[] = [
+    {
+      value: "",
+      name: "No expert",
+      description: "Use the standard session identity",
+    },
+  ];
   for (const summary of listExperts(workDir)) {
     if (summary.invalid || summary.name.trim() === "") {
       continue;
@@ -300,9 +302,8 @@ export function expertConfigOption(
     let name = summary.displayName.en.trim();
     if (name === "") name = summary.displayName.zh.trim();
     if (name === "") name = summary.name;
-    const kind = summary.expertType === typeTeam
-      ? "Expert team"
-      : "Single expert";
+    const kind =
+      summary.expertType === typeTeam ? "Expert team" : "Single expert";
     choices.push({ value: summary.name, name, description: kind });
   }
   return {

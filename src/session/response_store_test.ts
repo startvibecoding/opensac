@@ -4,6 +4,7 @@
 // enforcement is off and a session with no lease row skips lease validation, so
 // these tests use a literal session ID and exercise the store directly.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -30,7 +31,7 @@ import { test } from "#testing";
 const sessionID = "session-response-store";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  return nodeRuntime.makeTempDirSync({ prefix: "opensac-session-" });
 }
 
 function decode(value: Uint8Array | null): string {
@@ -150,7 +151,7 @@ test("response runtime store persists summaries items runs and deduplication", (
 
     const collision = { ...record, argsHash: "different-hash" };
     const collisionErr = tryRun(() =>
-      claimToolExecutionRecord(sessionDir, collision)
+      claimToolExecutionRecord(sessionDir, collision),
     );
     assert(collisionErr !== null);
     assert(collisionErr!.message.includes("execution key collision"));

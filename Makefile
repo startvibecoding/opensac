@@ -1,15 +1,15 @@
 # opensac build system.
 #
-# `deno task` remains the interface for day-to-day development; this Makefile is
-# the interface for releases. A release is a single platform-independent npm
-# package (plain JS, bundled with esbuild and run on Node), not per-platform
-# compiled binaries: `node-build` produces $(NODE_DIR), `node-pack` inspects it,
-# and the `node-publish-*` targets push it to a registry.
+# `npm run` is the interface for day-to-day development; this Makefile is the
+# interface for releases. A release is a single platform-independent npm package
+# (plain JS, bundled with esbuild and run on Node), not per-platform compiled
+# binaries: `node-build` produces $(NODE_DIR), `node-pack` inspects it, and the
+# `node-publish-*` targets push it to a registry.
 #
 # Publish targets are slow and hit a shared registry. Run them only when you
 # intend to cut a release.
 
-DENO ?= deno
+NODE ?= node
 NPM ?= npm
 DOCKER ?= docker
 DOCKER_IMAGE ?= ghcr.io/startvibecoding/opensac
@@ -25,8 +25,8 @@ DOCKER_TAG ?= local
 NODE_SCOPE ?=
 
 # The product version follows the newest `v*` git tag, falling back to the
-# deno.json version, and is embedded into the published package at build time.
-VERSION := $(shell $(DENO) run -A scripts/version.ts 2>/dev/null)
+# package.json version, and is embedded into the published package at build time.
+VERSION := $(shell $(NODE) scripts/version.ts 2>/dev/null)
 
 .PHONY: help node-build node-pack node-publish node-publish-pre \
         node-publish-github install run test test-arch test-all check lint \
@@ -44,7 +44,7 @@ help:
 	@echo "  (npmjs publishes opensac-installer; the bare name 'opensac' collides with 'openai')"
 	@echo ""
 	@echo "Development targets:"
-	@echo "  install          Install the CLI globally from source"
+	@echo "  install          Link the CLI globally from source"
 	@echo "  run              Start the TUI from source"
 	@echo "  test             Run the test suite"
 	@echo "  test-arch        Run the architecture guard tests"
@@ -65,31 +65,31 @@ help:
 # Release
 
 node-build:
-	$(DENO) task build:node
+	$(NPM) run build:node
 	@if [ -n "$(NODE_SCOPE)" ]; then \
-		$(DENO) run -A scripts/build_node.ts --scope=$(NODE_SCOPE); \
+		$(NODE) scripts/build_node.ts --scope=$(NODE_SCOPE); \
 	fi
 
 node-pack:
-	$(DENO) task pack:node
+	$(NPM) run pack:node
 
 node-publish:
 	@if [ -n "$(NODE_SCOPE)" ]; then \
-		$(DENO) run -A scripts/build_node.ts --scope=$(NODE_SCOPE); \
+		$(NODE) scripts/build_node.ts --scope=$(NODE_SCOPE); \
 	else \
-		$(DENO) task build:node; \
+		$(NPM) run build:node; \
 	fi
-	$(DENO) run -A scripts/npm_publish_if_needed.ts \
+	$(NODE) scripts/npm_publish_if_needed.ts \
 		--tag latest --registry $(NPM_REGISTRY) $(NODE_DIR) \
 		$(if $(NODE_SCOPE),-- --access public)
 
 node-publish-pre:
 	@if [ -n "$(NODE_SCOPE)" ]; then \
-		$(DENO) run -A scripts/build_node.ts --scope=$(NODE_SCOPE); \
+		$(NODE) scripts/build_node.ts --scope=$(NODE_SCOPE); \
 	else \
-		$(DENO) task build:node; \
+		$(NPM) run build:node; \
 	fi
-	$(DENO) run -A scripts/npm_publish_if_needed.ts \
+	$(NODE) scripts/npm_publish_if_needed.ts \
 		--tag next --registry $(NPM_REGISTRY) $(NODE_DIR) \
 		$(if $(NODE_SCOPE),-- --access public)
 
@@ -98,42 +98,42 @@ node-publish-github:
 		echo "NODE_SCOPE is required, e.g. make node-publish-github NODE_SCOPE=@owner"; \
 		exit 1; \
 	fi
-	$(DENO) run -A scripts/build_node.ts --scope=$(NODE_SCOPE)
-	$(DENO) run -A scripts/npm_publish_if_needed.ts \
+	$(NODE) scripts/build_node.ts --scope=$(NODE_SCOPE)
+	$(NODE) scripts/npm_publish_if_needed.ts \
 		--tag latest --registry $(NPM_REGISTRY_GITHUB) $(NODE_DIR)
 
 # Development
 
 install:
-	$(DENO) task install
+	$(NPM) link
 
 run:
-	$(DENO) task run
+	$(NPM) start
 
 test:
-	$(DENO) task test
+	$(NPM) test
 
 test-arch:
-	$(DENO) task test:architecture
+	$(NPM) run test:architecture
 
-# `deno task test` already includes src/architecture; this alias exists so a
-# release checklist can name the guard explicitly.
+# `npm test` already includes src/architecture; this alias exists so a release
+# checklist can name the guard explicitly.
 test-all: test test-arch
 
 check:
-	$(DENO) task check
+	$(NPM) run check
 
 lint:
-	$(DENO) task lint
+	$(NPM) run lint
 
 fmt:
-	$(DENO) fmt
+	$(NPM) run fmt
 
 check-fmt:
-	$(DENO) fmt --check
+	$(NPM) run fmt:check
 
 fuzz:
-	$(DENO) task fuzz
+	$(NPM) run fuzz
 
 version:
 	@echo $(VERSION)

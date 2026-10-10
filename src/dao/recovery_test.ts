@@ -5,9 +5,7 @@ import { test } from "#testing";
 
 const SESSION = "session-recovery";
 
-function record(
-  overrides: Partial<RecoveryRecord> = {},
-): RecoveryRecord {
+function record(overrides: Partial<RecoveryRecord> = {}): RecoveryRecord {
   return {
     runId: "run-recovery",
     sessionId: SESSION,
@@ -75,16 +73,7 @@ test("recovery DAO update matches run and session together", () => {
     dao.upsert(db, record());
 
     assertEquals(
-      dao.update(
-        db,
-        "run-recovery",
-        SESSION,
-        "completed",
-        "",
-        null,
-        50,
-        60,
-      ),
+      dao.update(db, "run-recovery", SESSION, "completed", "", null, 50, 60),
       true,
     );
     const updated = dao.find(db, "run-recovery");

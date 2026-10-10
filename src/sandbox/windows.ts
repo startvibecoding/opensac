@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { shellArgs } from "../platform/platform.ts";
 import { type CommandSpec, type ExecOpts, type Sandbox } from "./sandbox.ts";
@@ -117,5 +118,5 @@ function splitEnvVar(s: string): [string, string | undefined] {
 }
 
 function envEntries(): string[] {
-  return Object.entries(Deno.env.toObject()).map(([k, v]) => `${k}=${v}`);
+  return Object.entries(runtime.env.toObject()).map(([k, v]) => `${k}=${v}`);
 }

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -8,7 +9,9 @@ import {
 import { test } from "#testing";
 
 test("ESM guidance lifecycle", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-esm-guidance-" });
+  const sessionDir = runtime.makeTempDirSync({
+    prefix: "opensac-esm-guidance-",
+  });
   try {
     // Ensures the schema exists before querying.
     assertEquals(listESMGuidance(sessionDir, "missing", "pending", 10), []);
@@ -21,12 +24,7 @@ test("ESM guidance lifecycle", () => {
       createdAt: new Date(0),
     });
 
-    let items = listESMGuidance(
-      sessionDir,
-      "guidance-session",
-      "pending",
-      10,
-    );
+    let items = listESMGuidance(sessionDir, "guidance-session", "pending", 10);
     assertEquals(items.length, 1);
     assertEquals(items[0].guidance, "run the focused tests");
 

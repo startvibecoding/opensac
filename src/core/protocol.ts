@@ -60,9 +60,7 @@ export interface CoreRpcNotification {
 
 /** One decoded Core JSON-RPC envelope. */
 export type CoreRpcMessage =
-  | CoreRpcRequest
-  | CoreRpcResponse
-  | CoreRpcNotification;
+  CoreRpcRequest | CoreRpcResponse | CoreRpcNotification;
 
 /** Health information returned by the Core health method. */
 export interface CoreHealth {
@@ -119,9 +117,11 @@ function hasOwn(object: CoreRpcObject, key: string): boolean {
 }
 
 function isCoreRpcId(value: unknown): value is CoreRpcId {
-  return value === null ||
+  return (
+    value === null ||
     typeof value === "string" ||
-    (typeof value === "number" && Number.isFinite(value));
+    (typeof value === "number" && Number.isFinite(value))
+  );
 }
 
 function isStructuredParams(value: unknown): value is CoreRpcParams {
@@ -157,10 +157,10 @@ function parseError(value: unknown): CoreRpcError | undefined {
   if (object === undefined || !isErrorObject(object)) return undefined;
   return hasOwn(object, "data")
     ? {
-      code: object.code,
-      message: object.message,
-      data: object.data,
-    }
+        code: object.code,
+        message: object.message,
+        data: object.data,
+      }
     : { code: object.code, message: object.message };
 }
 

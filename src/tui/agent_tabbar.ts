@@ -16,12 +16,7 @@ import {
 } from "./theme.ts";
 
 export type AgentTabState =
-  | "running"
-  | "ready"
-  | "done"
-  | "error"
-  | "canceled"
-  | "";
+  "running" | "ready" | "done" | "error" | "canceled" | "";
 
 /** One tab snapshot; `id` is the canonical AgentID. */
 export interface AgentTab {
@@ -74,9 +69,8 @@ export function renderAgentTabBar(
   const rendered = tabs.map((tab) => {
     const icon = stateIcon(tab.state);
     const label = tr.text("tool.modal.agent_tab", icon, tab.id);
-    const withState = tab.state !== ""
-      ? `${label} (${localizedState(tr, tab.state)})`
-      : label;
+    const withState =
+      tab.state !== "" ? `${label} (${localizedState(tr, tab.state)})` : label;
     return tab.id === activeID
       ? `${accent}${bold}${withState}${reset}`
       : `${dim}${withState}${reset}`;

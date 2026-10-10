@@ -4,6 +4,7 @@
 // durable intent round trip and the atomic intent/Run/event/turn admission
 // contract against the ported implementation.
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -65,7 +66,7 @@ function baseIntent(overrides: Partial<ExecutionIntent>): ExecutionIntent {
 }
 
 test("execution intent round trips through durable storage", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     saveExecutionIntent(
       sessionDir,
@@ -97,7 +98,7 @@ test("execution intent round trips through durable storage", () => {
 });
 
 test("execution intent admission rejects mismatched identity", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     assertThrows(
       () =>
@@ -132,7 +133,7 @@ test("execution intent admission rejects mismatched identity", () => {
 });
 
 test("execution intent atomically admits run, event, and turn", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-intent-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-intent-" });
   try {
     const now = new Date();
     const eventId = createExecutionIntentAndSessionRunEvent(

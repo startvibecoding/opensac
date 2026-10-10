@@ -5,7 +5,7 @@ import { render } from "ink";
 import { App } from "./mod.ts";
 import { test } from "#testing";
 
-test("ink and react load under Deno", () => {
+test("ink and react load under Node", () => {
   assertEquals(typeof render, "function");
   assertEquals(typeof App, "function");
 });

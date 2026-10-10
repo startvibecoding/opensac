@@ -93,14 +93,16 @@ export function reserveRuntimeSubmissionTx(
   if (existing !== null) {
     throw new RuntimeSubmissionError(
       existing,
-      existing.requestFingerprint !== "" && fingerprint !== "" &&
+      existing.requestFingerprint !== "" &&
+        fingerprint !== "" &&
         existing.requestFingerprint !== fingerprint,
     );
   }
 
-  const createdAt = run.startedAt && !Number.isNaN(run.startedAt.getTime())
-    ? run.startedAt
-    : new Date();
+  const createdAt =
+    run.startedAt && !Number.isNaN(run.startedAt.getTime())
+      ? run.startedAt
+      : new Date();
   try {
     new RuntimeSubmissionDAO(null).insert(tx, {
       id: generateID(),
@@ -120,7 +122,8 @@ export function reserveRuntimeSubmissionTx(
     if (winner !== null) {
       throw new RuntimeSubmissionError(
         winner,
-        winner.requestFingerprint !== "" && fingerprint !== "" &&
+        winner.requestFingerprint !== "" &&
+          fingerprint !== "" &&
           winner.requestFingerprint !== fingerprint,
       );
     }

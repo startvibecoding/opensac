@@ -10,9 +10,7 @@ import { type Market, type MarketClient } from "./types.ts";
  * Custom IDs are reserved for future adapters and are ignored rather than
  * silently treating an incompatible API as SkillHub or ClawHub.
  */
-export function clientsForSettings(
-  settings: SkillHubSettings,
-): MarketClient[] {
+export function clientsForSettings(settings: SkillHubSettings): MarketClient[] {
   const markets = settings.markets ?? [];
   if (markets.length === 0) {
     return [

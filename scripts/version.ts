@@ -1,12 +1,12 @@
 // Release-version resolution shared by the Node build (`build_node.ts`) and the
 // Makefile. The product version follows the newest `v*` git tag, falling back to
-// the `deno.json` version for a source tree without tags, so the published npm
-// package and any local build agree.
+// the `package.json` version for a source tree without tags, so the published
+// npm package and any local build agree.
 //
-// Prints the resolved version with `deno task version` / `deno run scripts/version.ts`.
+// Prints the resolved version with `npm run version` / `node scripts/version.ts`.
 
+import { runtime } from "../src/platform/runtime.ts";
 import { fromFileUrl, join, resolve } from "../src/compat/path.ts";
-import { isMainModule } from "../src/platform/node_compat.ts";
 
 /**
  * Picks the newest tag from `git tag --list 'v*' --sort=-v:refname` output.
@@ -23,7 +23,7 @@ export function pickLatestVersionTag(listOutput: string): string {
 /** Reads the newest `v*` tag, or "" when git or the tags are unavailable. */
 export async function latestVersionTag(repoDir: string): Promise<string> {
   try {
-    const output = await new Deno.Command("git", {
+    const output = await new runtime.Command("git", {
       args: ["tag", "--list", "v*", "--sort=-v:refname"],
       cwd: repoDir,
       stdout: "piped",
@@ -36,10 +36,10 @@ export async function latestVersionTag(repoDir: string): Promise<string> {
   }
 }
 
-/** Reads the `version` field of the repository `deno.json`, if present. */
+/** Reads the `version` field of the repository `package.json`, if present. */
 export async function packageVersion(repoDir: string): Promise<string> {
   try {
-    const text = await Deno.readTextFile(join(repoDir, "deno.json"));
+    const text = await runtime.readTextFile(join(repoDir, "package.json"));
     const parsed = JSON.parse(text) as { version?: unknown };
     return typeof parsed.version === "string" ? parsed.version.trim() : "";
   } catch {
@@ -49,7 +49,7 @@ export async function packageVersion(repoDir: string): Promise<string> {
 
 /**
  * Resolves the version to embed: the newest `v*` git tag, falling back to the
- * `deno.json` version for builds from a source tree without tags.
+ * `package.json` version for builds from a source tree without tags.
  */
 export async function resolveBuildVersion(
   repoDir: string,
@@ -62,12 +62,13 @@ export async function resolveBuildVersion(
 
 /** Strips the `v` prefix and any `-dirty` suffix from a build version. */
 export function toPackageVersion(buildVersion: string): string {
-  return buildVersion.trim()
+  return buildVersion
+    .trim()
     .replace(/^v/, "")
     .replace(/-dirty$/, "");
 }
 
-if (isMainModule(import.meta.url)) {
+if (import.meta.main) {
   const repoDir = resolve(fromFileUrl(new URL("..", import.meta.url)));
   console.log(await resolveBuildVersion(repoDir));
 }

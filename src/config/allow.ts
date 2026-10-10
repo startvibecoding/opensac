@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { optBoolean, optStringArray, parseJsonRecord } from "../util/json.ts";
 import { configDir } from "./settings.ts";
@@ -46,7 +47,7 @@ export function loadAllow(): AllowConfig {
 
   // Global: only autoEdit is honored.
   try {
-    const data = Deno.readTextFileSync(globalAllowPath());
+    const data = nodeRuntime.readTextFileSync(globalAllowPath());
     const v = readAllowAutoEdit(data);
     if (v !== undefined) c.autoEdit = v;
   } catch {
@@ -55,7 +56,7 @@ export function loadAllow(): AllowConfig {
 
   // Project: overrides autoEdit and is the sole source of editPaths.
   try {
-    const data = Deno.readTextFileSync(projectAllowPath());
+    const data = nodeRuntime.readTextFileSync(projectAllowPath());
     const p = parseJsonRecord(data);
     if (p) {
       const v = readAllowAutoEdit(data);
@@ -237,7 +238,8 @@ export function saveGlobalAutoEditValue(v: boolean): void {
 function writeGlobalAllowAutoEdit(v: boolean): void {
   let existing: Record<string, unknown> = {};
   try {
-    existing = parseJsonRecord(Deno.readTextFileSync(globalAllowPath())) ?? {};
+    existing =
+      parseJsonRecord(nodeRuntime.readTextFileSync(globalAllowPath())) ?? {};
   } catch {
     existing = {};
   }
@@ -272,8 +274,8 @@ function writeProjectAllowFile(
 
 function writeJSONFile(p: string, v: unknown): void {
   const dir = path.dirname(p);
-  if (dir !== "") Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  Deno.writeTextFileSync(p, JSON.stringify(v, null, 2), { mode: 0o600 });
+  if (dir !== "") nodeRuntime.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  nodeRuntime.writeTextFileSync(p, JSON.stringify(v, null, 2), { mode: 0o600 });
 }
 
 /**

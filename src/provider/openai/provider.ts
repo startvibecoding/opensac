@@ -4,6 +4,7 @@
 // <-chan StreamEvent` maps to `chat(params): AsyncIterable<StreamEvent>` and
 // `context.Context`/the abort channel map to `params.abort` (AbortSignal).
 
+import { runtime as nodeRuntime } from "../../platform/runtime.ts";
 import { wrapError } from "../errors.ts";
 import { type ResponsesConfig } from "../../config/mod.ts";
 import { BaseProvider } from "../base.ts";
@@ -116,7 +117,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
   ) {
     super(name, models);
     if (baseURL === "") baseURL = "https://api.openai.com/v1";
-    if (apiKey === "") apiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+    if (apiKey === "") apiKey = nodeRuntime.env.get("OPENAI_API_KEY") ?? "";
     this.apiKey = apiKey;
     this.baseURL = baseURL.replace(/\/+$/, "");
     this.client = client;
@@ -127,7 +128,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
     this.maxImagesPerRequest = 0;
     this.responsesConfig = { promptCacheEnabled: true, background: false };
 
-    const disableReasoning = Deno.env.get("OPENAI_DISABLE_REASONING") ?? "";
+    const disableReasoning =
+      nodeRuntime.env.get("OPENAI_DISABLE_REASONING") ?? "";
     if (disableReasoning === "1" || disableReasoning === "true") {
       this.disableReasoning = true;
     }
@@ -168,19 +170,24 @@ export class Provider extends BaseProvider implements ProviderInterface {
     if (err === undefined || err === null) {
       return responseStateFailureRequestFailed;
     }
-    const message = (err instanceof Error ? err.message : String(err))
-      .toLowerCase();
+    const message = (
+      err instanceof Error ? err.message : String(err)
+    ).toLowerCase();
     if (
-      message.includes("api error 401") || message.includes("api error 403") ||
-      message.includes("unauthorized") || message.includes("forbidden") ||
+      message.includes("api error 401") ||
+      message.includes("api error 403") ||
+      message.includes("unauthorized") ||
+      message.includes("forbidden") ||
       message.includes("permission")
     ) {
       return responseStateFailurePermission;
     }
     if (
-      message.includes("api error 404") || message.includes("api error 410") ||
+      message.includes("api error 404") ||
+      message.includes("api error 410") ||
       (message.includes("previous_response_id") &&
-        (message.includes("expired") || message.includes("not found") ||
+        (message.includes("expired") ||
+          message.includes("not found") ||
           message.includes("invalid")))
     ) {
       return responseStateFailureExpired;
@@ -229,15 +236,17 @@ export class Provider extends BaseProvider implements ProviderInterface {
    * durable background run manager.
    */
   responsesBackgroundEnabled(): boolean {
-    return this.responsesConfig !== undefined &&
-      this.responsesConfig.background === true;
+    return (
+      this.responsesConfig !== undefined &&
+      this.responsesConfig.background === true
+    );
   }
 
   responsesHostedTimeout(): number {
     if (this.responsesConfig === undefined) return 0;
-    return this.responsesConfig.hostedPolicies?.["code_interpreter"]
-      ?.timeoutMs ??
-      0;
+    return (
+      this.responsesConfig.hostedPolicies?.["code_interpreter"]?.timeoutMs ?? 0
+    );
   }
 
   /** Disables reasoning_content support for incompatible APIs. */
@@ -350,8 +359,10 @@ export class Provider extends BaseProvider implements ProviderInterface {
     }
 
     if (
-      !this.disableReasoning && params.thinkingLevel !== thinkingOff &&
-      model !== undefined && model.reasoning
+      !this.disableReasoning &&
+      params.thinkingLevel !== thinkingOff &&
+      model !== undefined &&
+      model.reasoning
     ) {
       const format = this.thinkingFormatForModel(model);
       switch (format) {
@@ -444,7 +455,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
         if (attempt < maxRetries && isRetryable(err, 0)) {
           const plan = retryPlan(attempt, maxRetries, baseDelayMs, err);
           yield plan.event;
-          if (!await waitOrAbort(params.abort, plan.delay)) {
+          if (!(await waitOrAbort(params.abort, plan.delay))) {
             yield {
               type: streamError,
               error: new Error("aborted"),
@@ -462,7 +473,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
         const bodyBytes = await resp.text();
         debugJSON("OpenAI response JSON", bodyBytes);
         if (
-          resp.status === 400 && !completionTokenFallbackUsed &&
+          resp.status === 400 &&
+          !completionTokenFallbackUsed &&
           params.maxTokens > 0 &&
           maxTokensField(model) !== "max_completion_tokens" &&
           isMaxTokensUnsupportedResponse(bodyBytes)
@@ -474,13 +486,11 @@ export class Provider extends BaseProvider implements ProviderInterface {
           attempt--;
           continue;
         }
-        const httpErr = new Error(
-          `HTTP ${resp.status}: ${bodyBytes}`,
-        );
+        const httpErr = new Error(`HTTP ${resp.status}: ${bodyBytes}`);
         if (attempt < maxRetries && isRetryable(httpErr, resp.status)) {
           const plan = retryPlan(attempt, maxRetries, baseDelayMs, httpErr);
           yield plan.event;
-          if (!await waitOrAbort(params.abort, plan.delay)) {
+          if (!(await waitOrAbort(params.abort, plan.delay))) {
             yield {
               type: streamError,
               error: new Error("aborted"),
@@ -512,12 +522,13 @@ export class Provider extends BaseProvider implements ProviderInterface {
       }
       if (streamErr === undefined) return;
       if (
-        attempt < maxRetries && !state.visibleOutput &&
+        attempt < maxRetries &&
+        !state.visibleOutput &&
         isRetryable(streamErr, 0)
       ) {
         const plan = retryPlan(attempt, maxRetries, baseDelayMs, streamErr);
         yield plan.event;
-        if (!await waitOrAbort(params.abort, plan.delay)) {
+        if (!(await waitOrAbort(params.abort, plan.delay))) {
           yield {
             type: streamError,
             error: new Error("aborted"),
@@ -588,8 +599,10 @@ export class Provider extends BaseProvider implements ProviderInterface {
           }
         }
         if (
-          !this.disableReasoning && delta.reasoning_content !== undefined &&
-          delta.reasoning_content !== null && delta.reasoning_content !== ""
+          !this.disableReasoning &&
+          delta.reasoning_content !== undefined &&
+          delta.reasoning_content !== null &&
+          delta.reasoning_content !== ""
         ) {
           state.visibleOutput = true;
           reasoning += delta.reasoning_content;
@@ -616,9 +629,10 @@ export class Provider extends BaseProvider implements ProviderInterface {
           }
           const argsText = tc.function?.arguments;
           if (argsText !== undefined && argsText !== null && argsText !== "") {
-            const encoded = typeof argsText === "string"
-              ? argsText
-              : JSON.stringify(argsText);
+            const encoded =
+              typeof argsText === "string"
+                ? argsText
+                : JSON.stringify(argsText);
             toolCallBuffers.set(
               idx,
               (toolCallBuffers.get(idx) ?? "") + encoded,
@@ -626,7 +640,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
           }
         }
         if (
-          choice.finish_reason !== undefined && choice.finish_reason !== null
+          choice.finish_reason !== undefined &&
+          choice.finish_reason !== null
         ) {
           stopReason = choice.finish_reason;
         }
@@ -821,7 +836,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
         }
       }
       if (
-        msg.role === "assistant" && forceAssistantReasoning &&
+        msg.role === "assistant" &&
+        forceAssistantReasoning &&
         om.reasoning_content === undefined
       ) {
         om.reasoning_content = "";
@@ -840,9 +856,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
   maxImagesPerRequestForRequest(_params?: ChatParams): number {
     if (this.maxImagesPerRequest !== 0) return this.maxImagesPerRequest;
     const baseURL = this.baseURL.toLowerCase();
-    if (
-      baseURL.includes("api.moark.com") || baseURL.includes("ai.gitee.com")
-    ) {
+    if (baseURL.includes("api.moark.com") || baseURL.includes("ai.gitee.com")) {
       return 5;
     }
     return 0;
@@ -910,16 +924,20 @@ export class Provider extends BaseProvider implements ProviderInterface {
     if (model !== undefined) {
       const modelID = model.id.toLowerCase();
       if (
-        modelID.includes("kimi") || modelID === "k3" ||
+        modelID.includes("kimi") ||
+        modelID === "k3" ||
         modelID.startsWith("k3-")
       ) {
         return true;
       }
     }
     const lowerBaseURL = this.baseURL.toLowerCase();
-    return lowerBaseURL.includes("deepseek") ||
+    return (
+      lowerBaseURL.includes("deepseek") ||
       lowerBaseURL.includes("xiaomimimo") ||
-      lowerBaseURL.includes("moonshot") || lowerBaseURL.includes("kimi.com");
+      lowerBaseURL.includes("moonshot") ||
+      lowerBaseURL.includes("kimi.com")
+    );
   }
 }
 
@@ -1147,7 +1165,8 @@ export function toWireChatRequest(
     out["max_tokens"] = req.max_tokens;
   }
   if (
-    req.max_completion_tokens !== undefined && req.max_completion_tokens > 0
+    req.max_completion_tokens !== undefined &&
+    req.max_completion_tokens > 0
   ) {
     out["max_completion_tokens"] = req.max_completion_tokens;
   }
@@ -1230,7 +1249,8 @@ export function mergeOpenAIUsage(
   }
   if (
     src.prompt_tokens_details != null &&
-    src.prompt_tokens_details.cached_tokens > 0 && dst.cacheRead === 0
+    src.prompt_tokens_details.cached_tokens > 0 &&
+    dst.cacheRead === 0
   ) {
     dst.cacheRead = src.prompt_tokens_details.cached_tokens;
   }
@@ -1327,15 +1347,20 @@ export function qwenThinkingBudget(level: ThinkingLevel): number {
 
 export function isQwenModel(modelID: string): boolean {
   const lower = modelID.toLowerCase();
-  return lower.includes("qwen3.6") || lower.includes("qwen3.7") ||
-    lower.includes("qwen3.8");
+  return (
+    lower.includes("qwen3.6") ||
+    lower.includes("qwen3.7") ||
+    lower.includes("qwen3.8")
+  );
 }
 
 export function isDoubaoSeedModel(modelID: string): boolean {
   const lower = modelID.toLowerCase();
-  return lower.includes("doubao-seed-2.1") ||
+  return (
+    lower.includes("doubao-seed-2.1") ||
     lower.includes("doubao-seed-2-1") ||
-    lower.includes("doubao-seed-evolving");
+    lower.includes("doubao-seed-evolving")
+  );
 }
 
 export function supportsReasoningEffort(model: Model | undefined): boolean {
@@ -1347,9 +1372,11 @@ export function supportsReasoningEffort(model: Model | undefined): boolean {
 
 export function isMaxTokensUnsupportedResponse(body: string): boolean {
   const message = body.toLowerCase();
-  return message.includes("max_tokens") &&
+  return (
+    message.includes("max_tokens") &&
     (message.includes("max_completion_tokens") ||
-      message.includes("not supported"));
+      message.includes("not supported"))
+  );
 }
 
 export function maxTokensField(model: Model | undefined): string {
@@ -1362,8 +1389,12 @@ export function maxTokensField(model: Model | undefined): string {
   }
   const id = model.id.trim().toLowerCase();
   if (
-    id.includes("gpt-5") || id.startsWith("o1") || id.startsWith("o3") ||
-    id.startsWith("o4") || id.includes("/o1") || id.includes("/o3") ||
+    id.includes("gpt-5") ||
+    id.startsWith("o1") ||
+    id.startsWith("o3") ||
+    id.startsWith("o4") ||
+    id.includes("/o1") ||
+    id.includes("/o3") ||
     id.includes("/o4")
   ) {
     return "max_completion_tokens";
@@ -1383,7 +1414,8 @@ export function normalizeToolResultSequence(input: Message[]): Message[] {
     if (msg.role !== "assistant") continue;
     for (const block of msg.contents ?? []) {
       if (
-        block.type === "toolCall" && block.toolCall != null &&
+        block.type === "toolCall" &&
+        block.toolCall != null &&
         block.toolCall.id !== ""
       ) {
         hasAssistantToolCalls = true;
@@ -1403,7 +1435,8 @@ export function normalizeToolResultSequence(input: Message[]): Message[] {
     const calls = new Map<string, string>();
     for (const block of msg.contents ?? []) {
       if (
-        block.type === "toolCall" && block.toolCall != null &&
+        block.type === "toolCall" &&
+        block.toolCall != null &&
         block.toolCall.id !== ""
       ) {
         calls.set(block.toolCall.id, block.toolCall.name);
@@ -1422,7 +1455,8 @@ export function normalizeToolResultSequence(input: Message[]): Message[] {
     }
     for (const block of msg.contents ?? []) {
       if (
-        block.type !== "toolCall" || block.toolCall == null ||
+        block.type !== "toolCall" ||
+        block.toolCall == null ||
         block.toolCall.id === ""
       ) {
         continue;

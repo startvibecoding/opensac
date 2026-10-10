@@ -1,10 +1,9 @@
 name: CI
 
 # The release pipelines build straight from a tag, so without this gate a tag
-# can publish binaries, npm packages, and images that were never tested. This
-# workflow runs the same checks `make test-all check lint check-fmt` does on the
-# tree a release is cut from, so a red main is visible before anything is
-# published.
+# can publish npm packages and images that were never tested. This workflow runs
+# the same checks `make test-all check lint check-fmt` does on the tree a release
+# is cut from, so a red main is visible before anything is published.
 
 on:
   push:
@@ -18,7 +17,7 @@ permissions:
   contents: read
 
 env:
-  DENO_VERSION: "2.9.7"
+  NODE_VERSION: "22"
 
 jobs:
   verify:
@@ -28,37 +27,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       # Type check first: it is the cheapest signal and fails loudly on a broken
       # import graph before the slower suites run.
       - name: Type check
-        run: deno task check
+        run: npm run check
 
       - name: Lint
-        run: deno task lint
+        run: npm run lint
 
       - name: Format
-        run: deno fmt --check
+        run: npm run fmt:check
 
       # Architecture guards live under src/ and therefore also run inside
-      # `deno task test`; they are named separately so a boundary regression
-      # points at the guard rather than at whichever runtime test caught it.
+      # `npm test`; they are named separately so a boundary regression points at
+      # the guard rather than at whichever runtime test caught it.
       - name: Architecture guards
-        run: deno task test:architecture
+        run: npm run test:architecture
 
       - name: Test
-        run: deno task test
+        run: npm test
 
       # The published artifact is a platform-independent Node package; build it
       # here so a broken build pipeline fails CI rather than a release.
       - name: Build the Node package
-        run: deno task build:node
+        run: npm run build:node

@@ -16,10 +16,12 @@
 //
 // Deviations: `context.Context` maps to an optional `AbortSignal`; `[]byte`
 // maps to `Uint8Array`; `time.Time` maps to `Date`; SHA-256 uses `node:crypto`;
-// `os`/`filepath` map to Deno and `@std/path`; `filepath.WalkDir` maps to a
-// sorted recursive `Deno.readDirSync` walk; `mime.TypeByExtension` falls back to
+// `os`/`filepath` map to Node and `src/compat/path.ts`; `filepath.WalkDir` maps to a
+// sorted recursive `nodeRuntime.readDirSync` walk; `mime.TypeByExtension` falls back to
 // a fixed extension table.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import { createHash } from "node:crypto";
 import * as path from "../compat/path.ts";
 import { type Settings } from "../config/settings.ts";
@@ -294,9 +296,8 @@ export class KnowledgeBaseService {
       } catch (err) {
         bodyErr = toError(err);
       }
-      const state: RunState = bodyErr !== null
-        ? RUN_STATE_FAILED
-        : RUN_STATE_COMPLETED;
+      const state: RunState =
+        bodyErr !== null ? RUN_STATE_FAILED : RUN_STATE_COMPLETED;
       const message = bodyErr?.message ?? "";
       let finishErr: Error | null = null;
       try {
@@ -626,11 +627,11 @@ export class KnowledgeBaseService {
     full: string,
   ): KnowledgeSourceFile | null {
     throwIfAborted(ctx);
-    const stat = Deno.statSync(full);
+    const stat = nodeRuntime.statSync(full);
     if (stat.size > this.policy.maxFileBytes) return null;
-    const resolved = Deno.realPathSync(full);
+    const resolved = nodeRuntime.realPathSync(full);
     const rel = knowledgeRelativeResolved(root, resolved);
-    const data = Deno.readFileSync(resolved);
+    const data = nodeRuntime.readFileSync(resolved);
     const text = decodeIndexableUtf8(data);
     if (text === null) return null;
     const normalized = text.replaceAll("\r\n", "\n").replace(/^\ufeff/, "");
@@ -644,9 +645,10 @@ export class KnowledgeBaseService {
   }
 
   /** Reports the live progress of a running scan, if any. */
-  indexProgress(
-    knowledgeBaseID: string,
-  ): { progress: KnowledgeIndexProgress; running: boolean } {
+  indexProgress(knowledgeBaseID: string): {
+    progress: KnowledgeIndexProgress;
+    running: boolean;
+  } {
     const job = this.indexJobs.get(knowledgeBaseID);
     if (job === undefined) {
       return { progress: emptyProgress(), running: false };
@@ -717,17 +719,15 @@ export class KnowledgeBaseService {
    * no provider factory or settings are configured, preserving the
    * deterministic path for knowledge bases created before the role existed.
    */
-  resolveKnowledgeIndexer(
-    base: KnowledgeBase,
-  ): KnowledgeIndexerBinding | null {
+  resolveKnowledgeIndexer(base: KnowledgeBase): KnowledgeIndexerBinding | null {
     const settings = this.currentSettings();
     if (settings === null || this.providerFactory === null) return null;
     if (base.provider.trim() === "" && base.model.trim() === "") return null;
     if (base.provider.trim() === "" || base.model.trim() === "") {
       throw new Error(
-        `knowledge base ${
-          JSON.stringify(base.name)
-        } must configure provider and model together`,
+        `knowledge base ${JSON.stringify(
+          base.name,
+        )} must configure provider and model together`,
       );
     }
     const { provider, model } = this.providerFactory(
@@ -757,7 +757,9 @@ export class KnowledgeBaseService {
   ): Promise<void> {
     if (graph === null || binding === null) return;
     if (
-      execution === null || manager === null || manager.getHeader() === null
+      execution === null ||
+      manager === null ||
+      manager.getHeader() === null
     ) {
       throw new Error("knowledge indexer execution session is unavailable");
     }
@@ -812,7 +814,8 @@ export class KnowledgeBaseService {
         } else if (event.type === EVENT_RUN_FINISHED) {
           terminal = true;
           if (!taskStatusIsSuccessful(event.status ?? "")) {
-            runErr = event.error ??
+            runErr =
+              event.error ??
               new Error(
                 `knowledge indexer finished with status ${event.status}`,
               );
@@ -855,9 +858,9 @@ export class KnowledgeBaseService {
     }
     if (base.provider.trim() === "" || base.model.trim() === "") {
       throw new Error(
-        `knowledge base ${
-          JSON.stringify(base.name)
-        } must configure provider and model together`,
+        `knowledge base ${JSON.stringify(
+          base.name,
+        )} must configure provider and model together`,
       );
     }
     const { provider, providerName, model } = caller.resolveProviderModel(
@@ -986,9 +989,10 @@ export class KnowledgeBaseService {
           execution.setAgent(a);
           const response: string[] = [];
           let terminal = false;
-          for await (
-            const event of a.runWithUserMessage(userMessage, runSignal)
-          ) {
+          for await (const event of a.runWithUserMessage(
+            userMessage,
+            runSignal,
+          )) {
             const observation = execution.observeAgentEvent(event);
             if (observation.error !== undefined && bodyErr === null) {
               bodyErr = new Error(displayErrorMessage(observation.error));
@@ -998,9 +1002,11 @@ export class KnowledgeBaseService {
             } else if (event.type === EVENT_RUN_FINISHED) {
               terminal = true;
               if (
-                !taskStatusIsSuccessful(event.status ?? "") && bodyErr === null
+                !taskStatusIsSuccessful(event.status ?? "") &&
+                bodyErr === null
               ) {
-                bodyErr = event.error ??
+                bodyErr =
+                  event.error ??
                   new Error(
                     `librarian run finished with status ${event.status}`,
                   );
@@ -1080,7 +1086,8 @@ export function createKnowledgeBaseService(
     throw new Error("knowledge base session directory is required");
   }
   if (
-    policy.maxFiles <= 0 || policy.maxFileBytes <= 0 ||
+    policy.maxFiles <= 0 ||
+    policy.maxFileBytes <= 0 ||
     policy.maxChunkBytes <= 0
   ) {
     throw new Error("knowledge base index limits must be positive");
@@ -1141,9 +1148,9 @@ export function prepareKnowledgeContext(
     if (graph.chunks.length === 0) {
       if (reference.required) {
         throw new Error(
-          `knowledge base ${
-            JSON.stringify(base.name)
-          } has no matching indexed evidence`,
+          `knowledge base ${JSON.stringify(
+            base.name,
+          )} has no matching indexed evidence`,
         );
       }
       continue;
@@ -1208,9 +1215,9 @@ export async function prepareKnowledgeContextWithLibrarian(
     if (graph.chunks.length === 0) {
       if (reference.required) {
         throw new Error(
-          `knowledge base ${
-            JSON.stringify(base.name)
-          } has no matching indexed evidence`,
+          `knowledge base ${JSON.stringify(
+            base.name,
+          )} has no matching indexed evidence`,
         );
       }
       continue;
@@ -1303,11 +1310,9 @@ export function makeKnowledgeCapsule(
     let excerpt = chunk.text.trim();
     if (byteLength(excerpt) > maxKnowledgeExcerptChars) {
       excerpt =
-        truncateKnowledgeText(excerpt, maxKnowledgeExcerptChars).trim() +
-        "…";
+        truncateKnowledgeText(excerpt, maxKnowledgeExcerptChars).trim() + "…";
     }
-    let entry =
-      `Source: ${relativePath} (lines ${chunk.startLine}-${chunk.endLine})\n${excerpt}\n`;
+    let entry = `Source: ${relativePath} (lines ${chunk.startLine}-${chunk.endLine})\n${excerpt}\n`;
     if (length + byteLength(entry) > limit) {
       const space = limit - length;
       if (space <= 0) break;
@@ -1546,13 +1551,13 @@ function normalizeKnowledgeLabel(value: string): string {
 function resolveKnowledgeBaseRoot(base: KnowledgeBase): string {
   let root: string;
   try {
-    root = Deno.realPathSync(base.rootDir);
+    root = nodeRuntime.realPathSync(base.rootDir);
   } catch (err) {
     throw new Error(`resolve knowledge base root: ${toError(err).message}`);
   }
-  let stat: Deno.FileInfo;
+  let stat: FileInfo;
   try {
-    stat = Deno.statSync(root);
+    stat = nodeRuntime.statSync(root);
   } catch (err) {
     throw new Error(`stat knowledge base root: ${toError(err).message}`);
   }
@@ -1563,7 +1568,7 @@ function resolveKnowledgeBaseRoot(base: KnowledgeBase): string {
 }
 
 function knowledgeRelativePath(root: string, full: string): string {
-  const resolved = Deno.realPathSync(full);
+  const resolved = nodeRuntime.realPathSync(full);
   return knowledgeRelativeResolved(root, resolved);
 }
 
@@ -1592,8 +1597,8 @@ function* walkKnowledgeTree(
   root: string,
   ctx: AbortSignal | undefined,
 ): Generator<string> {
-  const entries = [...Deno.readDirSync(root)].sort((a, b) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+  const entries = [...nodeRuntime.readDirSync(root)].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
   );
   for (const entry of entries) {
     throwIfAborted(ctx);

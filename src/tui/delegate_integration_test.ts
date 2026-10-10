@@ -4,7 +4,12 @@
 // The Core-side delegate tool registration is covered by
 // `src/core/runtime_host_test.ts`.
 
-import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { runtime } from "../platform/runtime.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "../compat/assert.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService, type FakeTUIService } from "./service.ts";
 import { dispatchCommand } from "./commands.ts";
@@ -18,7 +23,7 @@ function makeSession(): { session: TUISession; service: FakeTUIService } {
       model: "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
       multiAgent: true,
     },
@@ -36,20 +41,14 @@ test("delegate on/off toggle flows through the service", async () => {
     assertStringIncludes(result.message ?? "", "ON");
     const sessionId = session.serviceSessionID;
     assert(sessionId !== "", "service session must be bound");
-    assertEquals(
-      (await service.delegateState({ sessionId })).enabled,
-      true,
-    );
+    assertEquals((await service.delegateState({ sessionId })).enabled, true);
 
     // status reflects the service-owned state; off clears it again.
     const status = await dispatchCommand("/delegate", session);
     assertStringIncludes(status.message ?? "", "ON");
     const off = await dispatchCommand("/delegate off", session);
     assertEquals(off.error, undefined);
-    assertEquals(
-      (await service.delegateState({ sessionId })).enabled,
-      false,
-    );
+    assertEquals((await service.delegateState({ sessionId })).enabled, false);
   } finally {
     await session.close();
   }

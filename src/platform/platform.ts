@@ -1,6 +1,7 @@
 //
 // Package platform provides cross-platform compatibility utilities.
 
+import * as runtime from "./runtime.ts";
 import * as path from "../compat/path.ts";
 import { resourceUrl } from "./resources.ts";
 
@@ -10,9 +11,9 @@ const APP_DIR_NAME = "opensac";
 // OS detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Maps Deno's OS identifier to Go's GOOS value. */
+/** Maps Node's OS identifier to Go's GOOS value. */
 function goos(): string {
-  const o: string = Deno.build.os;
+  const o: string = runtime.build.os;
   switch (o) {
     case "windows":
       return "windows";
@@ -112,9 +113,9 @@ export function isUnix(): boolean {
 // Architecture detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Maps Deno's architecture identifier to Go's GOARCH value. */
+/** Maps Node's architecture identifier to Go's GOARCH value. */
 function goarch(): string {
-  const a: string = Deno.build.arch;
+  const a: string = runtime.build.arch;
   switch (a) {
     case "x86_64":
       return "amd64";
@@ -200,11 +201,10 @@ export function isLittleEndian(): boolean {
 
 /** Returns the user's home directory. */
 export function homeDir(): string {
-  const home = Deno.env.get("HOME") ??
-    Deno.env.get("USERPROFILE") ?? "";
+  const home = runtime.env.get("HOME") ?? runtime.env.get("USERPROFILE") ?? "";
   if (home !== "") return home;
   try {
-    const cwd = Deno.cwd();
+    const cwd = runtime.cwd();
     if (cwd !== "") return cwd;
   } catch {
     // ignore
@@ -216,13 +216,9 @@ export function homeDir(): string {
 export function configDir(): string {
   // OPENSAC_DIR is the primary override; MOTHX_DIR is kept as a legacy
   // fallback for environments configured before the rename.
-  const dir = Deno.env.get("OPENSAC_DIR") ?? Deno.env.get("MOTHX_DIR");
+  const dir = runtime.env.get("OPENSAC_DIR") ?? runtime.env.get("MOTHX_DIR");
   if (dir) return dir;
-  return configDirForOS(
-    goos(),
-    homeDir(),
-    Deno.env.get("APPDATA") ?? "",
-  );
+  return configDirForOS(goos(), homeDir(), runtime.env.get("APPDATA") ?? "");
 }
 
 function configDirForOS(
@@ -241,8 +237,10 @@ function configDirForOS(
 
 /** Reports whether the user selected a custom config dir. */
 export function configDirOverridden(): boolean {
-  return ((Deno.env.get("OPENSAC_DIR") ?? Deno.env.get("MOTHX_DIR")) ??
-    "") !== "";
+  return (
+    (runtime.env.get("OPENSAC_DIR") ?? runtime.env.get("MOTHX_DIR") ?? "") !==
+    ""
+  );
 }
 
 /** Returns the platform-specific data directory. */
@@ -254,14 +252,15 @@ export function dataDir(): string {
 export function cacheDir(): string {
   switch (goos()) {
     case "windows": {
-      const localAppData = Deno.env.get("LOCALAPPDATA");
+      const localAppData = runtime.env.get("LOCALAPPDATA");
       if (localAppData) return path.join(localAppData, APP_DIR_NAME, "cache");
       return path.join(homeDir(), "AppData", "Local", APP_DIR_NAME, "cache");
     }
     case "darwin":
       return path.join(homeDir(), "Library", "Caches", APP_DIR_NAME);
-    default: { // linux, BSD, Solaris, illumos, AIX, and others
-      const cacheHome = Deno.env.get("XDG_CACHE_HOME");
+    default: {
+      // linux, BSD, Solaris, illumos, AIX, and others
+      const cacheHome = runtime.env.get("XDG_CACHE_HOME");
       if (cacheHome) return path.join(cacheHome, APP_DIR_NAME);
       return path.join(homeDir(), ".cache", APP_DIR_NAME);
     }
@@ -279,11 +278,14 @@ export function openFile(p: string): void {
       candidates = [["cmd", "/c", "start", "", p]];
       break;
     default:
-      candidates = [["xdg-open", p], ["gio", "open", p]];
+      candidates = [
+        ["xdg-open", p],
+        ["gio", "open", p],
+      ];
   }
   for (const candidate of candidates) {
     if (lookPathSync(candidate[0]) === null) continue;
-    const cmd = new Deno.Command(candidate[0], {
+    const cmd = new runtime.Command(candidate[0], {
       args: candidate.slice(1),
       stdout: "null",
       stderr: "null",
@@ -310,14 +312,10 @@ export function skillsDir(): string {
 
 /** Returns the default shell for the current platform. */
 export function defaultShell(): string {
-  const shell = Deno.env.get("SHELL") ?? "";
+  const shell = runtime.env.get("SHELL") ?? "";
   if (isExecutableAbsolutePath(shell)) return shell;
 
-  return defaultShellForOS(
-    goos(),
-    isExecutableAbsolutePath,
-    lookPathSync,
-  );
+  return defaultShellForOS(goos(), isExecutableAbsolutePath, lookPathSync);
 }
 
 /**
@@ -378,7 +376,7 @@ export function defaultShellForOS(
 function isExecutableAbsolutePath(p: string): boolean {
   if (p === "" || !path.isAbsolute(p)) return false;
   try {
-    const info = Deno.statSync(p);
+    const info = runtime.statSync(p);
     if (info.isDirectory) return false;
     return ((info.mode ?? 0) & 0o111) !== 0;
   } catch {
@@ -388,10 +386,10 @@ function isExecutableAbsolutePath(p: string): boolean {
 
 /** Searches `PATH` for `name`. Returns the resolved path or null. */
 export function lookPathSync(name: string): string | null {
-  const pathEnv = Deno.env.get("PATH") ?? "";
+  const pathEnv = runtime.env.get("PATH") ?? "";
   const sep = isWindows() ? ";" : ":";
   const exts = isWindows()
-    ? (Deno.env.get("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD").split(";")
+    ? (runtime.env.get("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD").split(";")
     : [""];
   for (const dir of pathEnv.split(sep)) {
     if (dir === "") continue;
@@ -428,7 +426,7 @@ export function isValidShell(p: string): boolean {
   const name = shellBasename(p);
   if (!validShellNames.has(name)) return false;
   try {
-    const info = Deno.statSync(p);
+    const info = runtime.statSync(p);
     return info.isFile;
   } catch {
     return false;
@@ -484,7 +482,7 @@ export function resolveShellForOS(resolution: ShellResolution): string {
 /** Reports whether a path is an existing regular file usable as a shell. */
 function isShellFile(p: string): boolean {
   try {
-    return Deno.statSync(p).isFile;
+    return runtime.statSync(p).isFile;
   } catch {
     return false;
   }
@@ -500,7 +498,7 @@ export function resolveBashShell(configuredShell = ""): string {
     goos: goos(),
     busyboxPath: isWindows() ? windowsBusyboxPath().path : "",
     defaultShell: defaultShell(),
-    shellEnv: Deno.env.get("SHELL") ?? "",
+    shellEnv: runtime.env.get("SHELL") ?? "",
     isValidShell,
     configuredShell,
   });
@@ -567,9 +565,9 @@ export function commonPaths(): Record<string, string> {
       return {
         home: homeDir(),
         temp: tempDir(),
-        appData: Deno.env.get("APPDATA") ?? "",
-        localApp: Deno.env.get("LOCALAPPDATA") ?? "",
-        programFiles: Deno.env.get("ProgramFiles") ?? "",
+        appData: runtime.env.get("APPDATA") ?? "",
+        localApp: runtime.env.get("LOCALAPPDATA") ?? "",
+        programFiles: runtime.env.get("ProgramFiles") ?? "",
       };
     case "darwin":
       return {
@@ -664,8 +662,11 @@ export function defaultEnvVars(): string[] {
 
 /** Returns the platform-specific temp directory. */
 export function tempDir(): string {
-  const env = Deno.env.get("TMPDIR") ?? Deno.env.get("TEMP") ??
-    Deno.env.get("TMP") ?? "";
+  const env =
+    runtime.env.get("TMPDIR") ??
+    runtime.env.get("TEMP") ??
+    runtime.env.get("TMP") ??
+    "";
   if (env !== "") return env;
   return isWindows() ? "C:\\Windows\\Temp" : "/tmp";
 }
@@ -725,14 +726,14 @@ function busyboxAssetForArch(): { name: string; data: Uint8Array } | undefined {
     case "amd64":
       return {
         name: "busybox64u.exe",
-        data: Deno.readFileSync(
+        data: runtime.readFileSync(
           resourceUrl("platform/busybox_assets/busybox64u.exe"),
         ),
       };
     case "386":
       return {
         name: "busybox32u.exe",
-        data: Deno.readFileSync(
+        data: runtime.readFileSync(
           resourceUrl("platform/busybox_assets/busybox32u.exe"),
         ),
       };
@@ -746,27 +747,27 @@ function ensureWindowsBusyboxPath(): string {
   if (asset === undefined) return "";
 
   const dir = path.join(configDir(), "bin");
-  Deno.mkdirSync(dir, { recursive: true });
+  runtime.mkdirSync(dir, { recursive: true });
 
   const target = path.join(dir, asset.name);
   try {
-    const info = Deno.statSync(target);
+    const info = runtime.statSync(target);
     if (info.isDirectory) {
       throw new Error(`busybox path is a directory: ${target}`);
     }
     return target;
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) {
+    if (!(err instanceof runtime.errors.NotFound)) {
       throw err;
     }
   }
 
-  const tmp = Deno.makeTempFileSync({ dir, prefix: ".busybox-" });
+  const tmp = runtime.makeTempFileSync({ dir, prefix: ".busybox-" });
   try {
-    Deno.writeFileSync(tmp, asset.data);
-    Deno.chmodSync(tmp, 0o755);
+    runtime.writeFileSync(tmp, asset.data);
+    runtime.chmodSync(tmp, 0o755);
     try {
-      Deno.renameSync(tmp, target);
+      runtime.renameSync(tmp, target);
     } catch (err) {
       // A concurrent parent/Core process, or a BusyBox that is currently
       // running and holding the image open on Windows, can make the rename
@@ -777,7 +778,7 @@ function ensureWindowsBusyboxPath(): string {
     }
   } finally {
     try {
-      Deno.removeSync(tmp);
+      runtime.removeSync(tmp);
     } catch {
       // Best-effort cleanup. A successful rename already moved the file, so the
       // temp path is normally gone by now.
@@ -786,9 +787,9 @@ function ensureWindowsBusyboxPath(): string {
   return target;
 }
 
-function statFileIfPresent(p: string): Deno.FileInfo | undefined {
+function statFileIfPresent(p: string): runtime.FileInfo | undefined {
   try {
-    const info = Deno.statSync(p);
+    const info = runtime.statSync(p);
     return info.isFile ? info : undefined;
   } catch {
     return undefined;

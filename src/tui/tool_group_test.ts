@@ -31,7 +31,10 @@ test("calls that overlap share one parallel group", () => {
   s.appendToolExecutionStart("t2", "read", { path: "/tmp/file.go" });
   s.appendToolExecutionStart("t3", "grep", { pattern: "needle" });
 
-  assertEquals(s.toolResults.map((r) => r.groupID), [1, 1, 1]);
+  assertEquals(
+    s.toolResults.map((r) => r.groupID),
+    [1, 1, 1],
+  );
   assertEquals(s.isMultiToolGroup(1), true);
   assertEquals(
     s.toolGroupMembers(1).map((r) => r.toolCallID),
@@ -70,11 +73,17 @@ test("resetting the transcript restarts group numbering", () => {
   const s = store();
   s.appendToolExecutionStart("t1", "bash");
   s.appendToolExecutionStart("t2", "bash");
-  assertEquals(s.toolResults.map((r) => r.groupID), [1, 1]);
+  assertEquals(
+    s.toolResults.map((r) => r.groupID),
+    [1, 1],
+  );
   s.resetTranscriptState();
   s.appendToolExecutionStart("t3", "bash");
   s.appendToolExecutionStart("t4", "bash");
-  assertEquals(s.toolResults.map((r) => r.groupID), [1, 1]);
+  assertEquals(
+    s.toolResults.map((r) => r.groupID),
+    [1, 1],
+  );
 });
 
 // ── tree block shape ────────────────────────────────────────────────────────

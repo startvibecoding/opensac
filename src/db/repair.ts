@@ -10,9 +10,9 @@ export interface IndexRepair {
 
 /** Returns the one-line operator-facing summary of a repair. */
 export function describeIndexRepair(r: IndexRepair): string {
-  return `rebuilt stale SQLite indexes in ${r.path} after an integrity check reported ${
-    JSON.stringify(r.cause)
-  }`;
+  return `rebuilt stale SQLite indexes in ${r.path} after an integrity check reported ${JSON.stringify(
+    r.cause,
+  )}`;
 }
 
 const indexRepairLog: IndexRepair[] = [];

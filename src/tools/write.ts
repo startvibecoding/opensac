@@ -1,6 +1,7 @@
 // (the write tool; diff/atomic helpers live
 // in io_helpers.ts).
 
+import { runtime } from "../platform/runtime.ts";
 import {
   buildFileDiff,
   type FileDiff,
@@ -78,7 +79,7 @@ export class WriteTool implements Tool {
     let oldContent = "";
     let oldExists = false;
     try {
-      oldContent = new TextDecoder().decode(Deno.readFileSync(p));
+      oldContent = new TextDecoder().decode(runtime.readFileSync(p));
       oldExists = true;
     } catch {
       // new file
@@ -97,9 +98,9 @@ export class WriteTool implements Tool {
       diff.oldText = null;
     }
     return createDiffToolResult(
-      `File written: ${p} (${utf8Length(content)} bytes)\n${
-        formatFileDiffSummary(diff)
-      }`,
+      `File written: ${p} (${utf8Length(content)} bytes)\n${formatFileDiffSummary(
+        diff,
+      )}`,
       diff,
     );
   }

@@ -28,10 +28,7 @@ import { type SessionRunEvent } from "./session_events.ts";
 
 /** The lifecycle state of a durable recovery attempt. */
 export type SessionRunRecoveryState =
-  | "recovering"
-  | "failed"
-  | "completed"
-  | "detached_remote";
+  "recovering" | "failed" | "completed" | "detached_remote";
 
 /**
  * The durable diagnostic and retry state for orphan reconciliation. It never
@@ -150,14 +147,7 @@ export function markSessionRunRecoveryComplete(
   sessionId: string,
   runId: string,
 ): void {
-  updateSessionRunRecovery(
-    sessionDir,
-    sessionId,
-    runId,
-    "completed",
-    "",
-    null,
-  );
+  updateSessionRunRecovery(sessionDir, sessionId, runId, "completed", "", null);
 }
 
 /**
@@ -177,15 +167,14 @@ export function convergeSessionRunRecovery(
 ): void {
   const run = { ...runInput };
   if (
-    run.id.trim() === "" || run.sessionId.trim() === "" ||
+    run.id.trim() === "" ||
+    run.sessionId.trim() === "" ||
     run.status.trim() === ""
   ) {
     throw new Error("recovered run identity and terminal status are required");
   }
   if (isNonTerminalSessionRunStatus(run.status)) {
-    throw new Error(
-      `recovered run status must be terminal: ${run.status}`,
-    );
+    throw new Error(`recovered run status must be terminal: ${run.status}`);
   }
   const terminalEvent = { ...terminalEventInput };
   if (terminalEvent.id === "" || terminalEvent.eventType === "") {
@@ -259,9 +248,12 @@ export function convergeSessionRunRecovery(
     insertEvent(terminalEvent);
 
     const rows = new RecoveryDAO(null).listOpenTurns(tx, run.sessionId);
-    const openTurns = rows.filter((row) =>
-      row.runId === run.id ||
-      (row.runId === "" && run.intentId !== "" && row.intentId === run.intentId)
+    const openTurns = rows.filter(
+      (row) =>
+        row.runId === run.id ||
+        (row.runId === "" &&
+          run.intentId !== "" &&
+          row.intentId === run.intentId),
     );
     for (const turn of openTurns) {
       const parentId = currentLeafTx(tx, run.sessionId);
@@ -299,9 +291,7 @@ export function convergeSessionRunRecovery(
       completed,
     );
     if (!updated) {
-      throw new Error(
-        `session recovery record not found: ${run.id}`,
-      );
+      throw new Error(`session recovery record not found: ${run.id}`);
     }
   });
 }
@@ -364,13 +354,11 @@ function recoveryFromRecord(record: RecoveryRecord): SessionRunRecovery {
     attempt: record.attempt,
     previousLeaseEpoch: record.previousLeaseEpoch,
     lastError: record.lastError,
-    nextRetryAt: record.nextRetryAt !== null
-      ? new Date(record.nextRetryAt * 1000)
-      : null,
+    nextRetryAt:
+      record.nextRetryAt !== null ? new Date(record.nextRetryAt * 1000) : null,
     startedAt: new Date(record.startedAt * 1000),
     updatedAt: new Date(record.updatedAt * 1000),
-    completedAt: record.completedAt !== null
-      ? new Date(record.completedAt * 1000)
-      : null,
+    completedAt:
+      record.completedAt !== null ? new Date(record.completedAt * 1000) : null,
   };
 }

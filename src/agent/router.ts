@@ -1,6 +1,6 @@
 //
 // Routes public `sdk/agent` events from agents to consumers (UI, parent
-// agents). Concurrency guards are dropped (Deno is single-threaded).
+// agents). Concurrency guards are dropped (Node is single-threaded).
 
 import { type AgentID, type Event } from "../../sdk/agent/types.ts";
 

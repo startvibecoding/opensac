@@ -12,6 +12,6 @@ external programs consume the published package.
 Run:
 
 ```sh
-deno run -A examples/custom_provider.ts
-OPENAI_API_KEY=sk-... deno run -A examples/builtin_provider.ts
+node --import ./scripts/test/preload.mjs examples/custom_provider.ts
+OPENAI_API_KEY=sk-... node --import ./scripts/test/preload.mjs examples/builtin_provider.ts
 ```

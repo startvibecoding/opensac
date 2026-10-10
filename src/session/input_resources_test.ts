@@ -1,5 +1,6 @@
 // Test for the ported internal/session/input_resources.go public surface.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -9,7 +10,7 @@ import {
 import { test } from "#testing";
 
 test("input resource events round-trip in durable order", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     saveInputResourceEvent(sessionDir, {
       id: "evt-1",
@@ -49,7 +50,7 @@ test("input resource events round-trip in durable order", () => {
 });
 
 test("input resource event identity is validated", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     assertThrows(() =>
       saveInputResourceEvent(sessionDir, {
@@ -60,7 +61,7 @@ test("input resource event identity is validated", () => {
         eventType: "input_resource_created",
         status: "",
         timestamp: new Date(),
-      })
+      }),
     );
   } finally {
     closeAll();

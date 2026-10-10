@@ -1,6 +1,6 @@
 //
 // Deviation: Go's `context.Canceled` / `context.DeadlineExceeded` map to
-// `AbortError` / `TimeoutError` named errors because Deno has no `context`
+// `AbortError` / `TimeoutError` named errors because Node has no `context`
 // package.
 
 import { assert, assertEquals } from "../compat/assert.ts";
@@ -76,10 +76,7 @@ test("SharedFailureContractAcrossAdapters", () => {
         requestId: "req-1",
       },
     );
-    assert(
-      info.code === "provider_unavailable",
-      `${name}: code ${info.code}`,
-    );
+    assert(info.code === "provider_unavailable", `${name}: code ${info.code}`);
     assert(info.failureClass === FAILURE_TRANSIENT);
     assert(info.retryMode === RETRY_AUTOMATIC);
     assert(info.retryable === true);

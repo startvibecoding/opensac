@@ -10,7 +10,8 @@ import {
   type Header,
   type ModeChangeEntry,
   type ModelChangeEntry,
-  type ThinkingLevelChangeEntry} from "./entry.ts";
+  type ThinkingLevelChangeEntry,
+} from "./entry.ts";
 import {
   entryAdditionalDirectories,
   entryCompaction,
@@ -86,7 +87,7 @@ interface StoredEntry {
 /**
  * In-memory implementation of Store for testing. It does not persist data to
  * disk. The Go `sync.RWMutex` is unnecessary here because every method is
- * synchronous on Deno's single-threaded event loop.
+ * synchronous on Node's single-threaded event loop.
  */
 export class MemoryStore implements Store {
   #header: Header | null = null;

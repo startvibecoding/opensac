@@ -169,7 +169,9 @@ export function generateID(): string {
     crypto.getRandomValues(b);
   } catch {
     // Fallback to timestamp-based ID on crypto failure.
-    return (BigInt(Date.now()) * 1000000n).toString(16).padStart(16, "0")
+    return (BigInt(Date.now()) * 1000000n)
+      .toString(16)
+      .padStart(16, "0")
       .slice(-16);
   }
   return toHex(b);

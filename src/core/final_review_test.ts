@@ -1,3 +1,5 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { Addr, NetAddr } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -53,7 +55,7 @@ function registration(
     id: "final-review-core",
     version: VERSION,
     protocolVersion: PROTOCOL_VERSION,
-    pid: Deno.pid,
+    pid: nodeRuntime.pid,
     host: "127.0.0.1",
     port,
     startedAt: 1_700_000_000_000,
@@ -64,20 +66,20 @@ function registration(
 async function withStateDir(
   test: (stateDir: string, paths: CorePaths) => Promise<void>,
 ): Promise<void> {
-  const stateDir = await Deno.makeTempDir({
+  const stateDir = await nodeRuntime.makeTempDir({
     prefix: "opensac-core-final-review-",
   });
   try {
     await test(stateDir, CorePaths.fromStateDir(stateDir));
   } finally {
-    await Deno.remove(stateDir, { recursive: true });
+    await nodeRuntime.remove(stateDir, { recursive: true });
   }
 }
 
 async function waitFor(
   predicate: () => boolean | Promise<boolean>,
   description: string,
-  timeoutMs = 2_000,
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -89,10 +91,10 @@ async function waitFor(
 
 async function exists(filePath: string): Promise<boolean> {
   try {
-    await Deno.lstat(filePath);
+    await nodeRuntime.lstat(filePath);
     return true;
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return false;
+    if (error instanceof nodeRuntime.errors.NotFound) return false;
     throw error;
   }
 }
@@ -101,11 +103,11 @@ async function startProbe(
   handler: (request: Request) => Response | Promise<Response>,
   hostname = "127.0.0.1",
 ): Promise<CoreServerHandle> {
-  let resolveAddress!: (address: Deno.Addr) => void;
-  const addressReady = new Promise<Deno.Addr>((resolve) => {
+  let resolveAddress!: (address: Addr) => void;
+  const addressReady = new Promise<Addr>((resolve) => {
     resolveAddress = resolve;
   });
-  const server = Deno.serve(
+  const server = nodeRuntime.serve(
     {
       hostname,
       port: 0,
@@ -113,7 +115,7 @@ async function startProbe(
     },
     handler,
   );
-  const address = await addressReady as Deno.NetAddr;
+  const address = (await addressReady) as NetAddr;
   return {
     address,
     url: `http://${
@@ -130,63 +132,65 @@ async function runSourceEntry(
   stateDir: string,
   port: number,
 ): Promise<{ ok: boolean; message?: string; url?: string; typed: boolean }> {
-  const scriptDir = await Deno.makeTempDir({
+  const scriptDir = await nodeRuntime.makeTempDir({
     prefix: ".opensac-core-source-launcher-",
-    dir: Deno.cwd(),
+    dir: nodeRuntime.cwd(),
   });
   const resultFile = path.join(scriptDir, "result.json");
   const script = path.join(scriptDir, "entry.ts");
   const clientModule = new URL("./client.ts", import.meta.url).href;
   const commandModule = new URL("../cli/core.ts", import.meta.url).href;
+  const runtimeModule = new URL("../platform/runtime.ts", import.meta.url).href;
   try {
-    await Deno.writeTextFile(
+    await nodeRuntime.writeTextFile(
       script,
       [
-        `import { CoreClient, CoreLauncherError, CoreStartupError } from ${
-          JSON.stringify(clientModule)
-        };`,
+        `import { runtime as nodeRuntime } from ${JSON.stringify(runtimeModule)};`,
+        `import { CoreClient, CoreLauncherError, CoreStartupError } from ${JSON.stringify(
+          clientModule,
+        )};`,
         `import { startCoreCommand } from ${JSON.stringify(commandModule)};`,
-        `const stateDir = Deno.args[0];`,
-        `const fixedPort = Deno.args[0] === "core" ? Number(Deno.env.get("OPENSAC_TEST_FIXED_PORT") ?? "0") : Number(Deno.args[1]);`,
-        `const resultFile = Deno.args[2];`,
+        `const stateDir = nodeRuntime.args[0];`,
+        `const fixedPort = nodeRuntime.args[0] === "core" ? Number(nodeRuntime.env.get("OPENSAC_TEST_FIXED_PORT") ?? "0") : Number(nodeRuntime.args[1]);`,
+        `const resultFile = nodeRuntime.args[2];`,
         `const version = ${JSON.stringify(VERSION)};`,
         `const protocolVersion = ${PROTOCOL_VERSION};`,
         `const coreConfig = { host: "127.0.0.1", port: fixedPort, auth: false, passwords: [] };`,
-        `if (Deno.args[0] === "core") {`,
-        `  const handle = await startCoreCommand({ stateDir: Deno.env.get("OPENSAC_DIR") ?? stateDir, config: coreConfig, version, protocolVersion });`,
+        `if (nodeRuntime.args[0] === "core") {`,
+        `  const handle = await startCoreCommand({ stateDir: nodeRuntime.env.get("OPENSAC_DIR") ?? stateDir, config: coreConfig, version, protocolVersion });`,
         `  let resolveStop;`,
         `  const stopped = new Promise((resolve) => { resolveStop = resolve; });`,
         `  const onSignal = () => resolveStop();`,
-        `  Deno.addSignalListener("SIGTERM", onSignal);`,
-        `  Deno.addSignalListener("SIGINT", onSignal);`,
+        `  nodeRuntime.addSignalListener("SIGTERM", onSignal);`,
+        `  nodeRuntime.addSignalListener("SIGINT", onSignal);`,
         `  await stopped;`,
-        `  Deno.removeSignalListener("SIGTERM", onSignal);`,
-        `  Deno.removeSignalListener("SIGINT", onSignal);`,
+        `  nodeRuntime.removeSignalListener("SIGTERM", onSignal);`,
+        `  nodeRuntime.removeSignalListener("SIGINT", onSignal);`,
         `  await handle.stop();`,
         `} else {`,
-        `  Deno.env.set("OPENSAC_TEST_FIXED_PORT", String(fixedPort));`,
-        `  const client = new CoreClient({ stateDir, version, protocolVersion, config: coreConfig, startTimeoutMs: 3000 });`,
+        `  nodeRuntime.env.set("OPENSAC_TEST_FIXED_PORT", String(fixedPort));`,
+        `  const client = new CoreClient({ stateDir, version, protocolVersion, config: coreConfig, startTimeoutMs: 30000 });`,
         `  try {`,
         `    const result = await client.ensureStarted();`,
         `    if (result.status !== "ready") throw new Error("source launcher did not become ready");`,
         `    const response = await fetch(new URL("/health", result.url));`,
         `    if (!response.ok) throw new Error("source launcher health failed");`,
-        `    Deno.kill(result.registration.pid, "SIGTERM");`,
+        `    nodeRuntime.kill(result.registration.pid, "SIGTERM");`,
         `    await new Promise((resolve) => setTimeout(resolve, 100));`,
         `    await client.close();`,
-        `    await Deno.writeTextFile(resultFile, JSON.stringify({ ok: true, typed: false, url: result.url }));`,
+        `    await nodeRuntime.writeTextFile(resultFile, JSON.stringify({ ok: true, typed: false, url: result.url }));`,
         `  } catch (error) {`,
         `    const typed = error instanceof CoreStartupError && error.cause instanceof CoreLauncherError;`,
-        `    await Deno.writeTextFile(resultFile, JSON.stringify({ ok: false, typed, message: error instanceof Error ? error.message : String(error) }));`,
+        `    await nodeRuntime.writeTextFile(resultFile, JSON.stringify({ ok: false, typed, message: error instanceof Error ? error.message : String(error) }));`,
         `  }`,
         `}`,
       ].join("\n"),
     );
 
-    const child = new Deno.Command(Deno.execPath(), {
-      args: ["run", "-A", script, stateDir, String(port), resultFile],
+    const child = new nodeRuntime.Command(nodeRuntime.execPath(), {
+      args: [script, stateDir, String(port), resultFile],
       env: {
-        ...Deno.env.toObject(),
+        ...nodeRuntime.env.toObject(),
         OPENSAC_DIR: stateDir,
       },
       stdin: "null",
@@ -199,7 +203,7 @@ async function runSourceEntry(
       child.status,
     ]);
     assertEquals(status.success, true, `${stdout}\n${stderr}`);
-    const result = JSON.parse(await Deno.readTextFile(resultFile)) as {
+    const result = JSON.parse(await nodeRuntime.readTextFile(resultFile)) as {
       ok: boolean;
       typed: boolean;
       message?: string;
@@ -207,7 +211,7 @@ async function runSourceEntry(
     };
     return result;
   } finally {
-    await Deno.remove(scriptDir, { recursive: true });
+    await nodeRuntime.remove(scriptDir, { recursive: true });
   }
 }
 
@@ -215,31 +219,33 @@ async function makeCoreLifecycleScript(port = 0): Promise<{
   directory: string;
   script: string;
 }> {
-  const directory = await Deno.makeTempDir({
+  const directory = await nodeRuntime.makeTempDir({
     prefix: ".opensac-core-lifecycle-",
-    dir: Deno.cwd(),
+    dir: nodeRuntime.cwd(),
   });
   const script = path.join(directory, "lifecycle.ts");
   const commandModule = new URL("../cli/core.ts", import.meta.url).href;
-  await Deno.writeTextFile(
+  const runtimeModule = new URL("../platform/runtime.ts", import.meta.url).href;
+  await nodeRuntime.writeTextFile(
     script,
     [
+      `import { runtime as nodeRuntime } from ${JSON.stringify(runtimeModule)};`,
       `import { startCoreCommand } from ${JSON.stringify(commandModule)};`,
-      `const [mode, stateDir, resultFile] = Deno.args;`,
+      `const [mode, stateDir, resultFile] = nodeRuntime.args;`,
       `const version = ${JSON.stringify(VERSION)};`,
       `const protocolVersion = ${PROTOCOL_VERSION};`,
       `const config = { host: "127.0.0.1", port: ${port}, auth: false, passwords: [] };`,
       `const handle = await startCoreCommand({ stateDir, config, version, protocolVersion });`,
-      `await Deno.writeTextFile(resultFile, JSON.stringify({ url: handle.url }));`,
+      `await nodeRuntime.writeTextFile(resultFile, JSON.stringify({ url: handle.url }));`,
       `if (mode === "hold") {`,
       `  let resolveStop;`,
       `  const stopped = new Promise((resolve) => { resolveStop = resolve; });`,
       `  const onSignal = () => resolveStop();`,
-      `  Deno.addSignalListener("SIGTERM", onSignal);`,
-      `  Deno.addSignalListener("SIGINT", onSignal);`,
+      `  nodeRuntime.addSignalListener("SIGTERM", onSignal);`,
+      `  nodeRuntime.addSignalListener("SIGINT", onSignal);`,
       `  await stopped;`,
-      `  Deno.removeSignalListener("SIGTERM", onSignal);`,
-      `  Deno.removeSignalListener("SIGINT", onSignal);`,
+      `  nodeRuntime.removeSignalListener("SIGTERM", onSignal);`,
+      `  nodeRuntime.removeSignalListener("SIGINT", onSignal);`,
       `}`,
       `await handle.stop();`,
     ].join("\n"),
@@ -253,8 +259,8 @@ async function runLifecycleProcess(
   stateDir: string,
   resultFile: string,
 ): Promise<{ url: string }> {
-  const child = new Deno.Command(Deno.execPath(), {
-    args: ["run", "-A", script, mode, stateDir, resultFile],
+  const child = new nodeRuntime.Command(nodeRuntime.execPath(), {
+    args: [script, mode, stateDir, resultFile],
     stdin: "null",
     stdout: "piped",
     stderr: "piped",
@@ -265,7 +271,9 @@ async function runLifecycleProcess(
     child.status,
   ]);
   assertEquals(status.success, true, `${stdout}\n${stderr}`);
-  return JSON.parse(await Deno.readTextFile(resultFile)) as { url: string };
+  return JSON.parse(await nodeRuntime.readTextFile(resultFile)) as {
+    url: string;
+  };
 }
 
 test("final review: two processes reuse a healthy Core before and after lock acquisition", async () => {
@@ -274,22 +282,15 @@ test("final review: two processes reuse a healthy Core before and after lock acq
     const holdResult = path.join(lifecycle.directory, "hold.json");
     const reuseResult = path.join(lifecycle.directory, "reuse.json");
     const afterResult = path.join(lifecycle.directory, "after.json");
-    const hold = new Deno.Command(Deno.execPath(), {
-      args: [
-        "run",
-        "-A",
-        lifecycle.script,
-        "hold",
-        stateDir,
-        holdResult,
-      ],
+    const hold = new nodeRuntime.Command(nodeRuntime.execPath(), {
+      args: [lifecycle.script, "hold", stateDir, holdResult],
       stdin: "null",
       stdout: "null",
       stderr: "null",
     }).spawn();
     try {
       await waitFor(async () => await exists(holdResult), "first Core process");
-      const first = JSON.parse(await Deno.readTextFile(holdResult)) as {
+      const first = JSON.parse(await nodeRuntime.readTextFile(holdResult)) as {
         url: string;
       };
       const reused = await runLifecycleProcess(
@@ -303,7 +304,7 @@ test("final review: two processes reuse a healthy Core before and after lock acq
         (await new CoreRegistry(paths).read())?.id !== undefined,
         true,
       );
-      assertEquals((await Deno.lstat(paths.lockFile)).isDirectory, true);
+      assertEquals((await nodeRuntime.lstat(paths.lockFile)).isDirectory, true);
 
       hold.kill("SIGTERM");
       await hold.status;
@@ -326,18 +327,18 @@ test("final review: two processes reuse a healthy Core before and after lock acq
         // The process may already have exited.
       }
       await hold.status.catch(() => undefined);
-      await Deno.remove(lifecycle.directory, { recursive: true });
+      await nodeRuntime.remove(lifecycle.directory, { recursive: true });
     }
   });
 });
 
 test("final review: fixed-port processes reuse a healthy Core", async () => {
   await withStateDir(async (stateDir, paths) => {
-    let resolveAddress!: (address: Deno.Addr) => void;
-    const addressReady = new Promise<Deno.Addr>((resolve) => {
+    let resolveAddress!: (address: Addr) => void;
+    const addressReady = new Promise<Addr>((resolve) => {
       resolveAddress = resolve;
     });
-    const reservation = Deno.serve(
+    const reservation = nodeRuntime.serve(
       {
         hostname: "127.0.0.1",
         port: 0,
@@ -345,7 +346,7 @@ test("final review: fixed-port processes reuse a healthy Core", async () => {
       },
       () => new Response("reservation"),
     );
-    const address = await addressReady as Deno.NetAddr;
+    const address = (await addressReady) as NetAddr;
     await reservation.shutdown();
     await reservation.finished;
 
@@ -353,8 +354,8 @@ test("final review: fixed-port processes reuse a healthy Core", async () => {
     const holdResult = path.join(lifecycle.directory, "hold.json");
     const reuseResult = path.join(lifecycle.directory, "reuse.json");
     const afterResult = path.join(lifecycle.directory, "after.json");
-    const hold = new Deno.Command(Deno.execPath(), {
-      args: ["run", "-A", lifecycle.script, "hold", stateDir, holdResult],
+    const hold = new nodeRuntime.Command(nodeRuntime.execPath(), {
+      args: [lifecycle.script, "hold", stateDir, holdResult],
       stdin: "null",
       stdout: "null",
       stderr: "null",
@@ -364,7 +365,7 @@ test("final review: fixed-port processes reuse a healthy Core", async () => {
         async () => await exists(holdResult),
         "fixed-port Core process",
       );
-      const first = JSON.parse(await Deno.readTextFile(holdResult)) as {
+      const first = JSON.parse(await nodeRuntime.readTextFile(holdResult)) as {
         url: string;
       };
       const reused = await runLifecycleProcess(
@@ -394,7 +395,7 @@ test("final review: fixed-port processes reuse a healthy Core", async () => {
         // The process may already have exited.
       }
       await hold.status.catch(() => undefined);
-      await Deno.remove(lifecycle.directory, { recursive: true });
+      await nodeRuntime.remove(lifecycle.directory, { recursive: true });
     }
   });
 });
@@ -422,49 +423,39 @@ test("final review: wildcard listeners expose connectable loopback URLs", async 
   }
 });
 
-test("final review: source launcher grants the child explicit permissions", () => {
-  const args = defaultLauncherArgs(Deno.execPath());
-  for (
-    const permission of [
-      "--allow-read",
-      "--allow-write",
-      "--allow-net",
-      "--allow-env",
-      // The child is the runtime host, so it must be able to run the same
-      // programs the parent runs (shell tools, git, MCP servers, sandbox).
-      "--allow-run",
-      "--allow-ffi",
-      "--allow-sys",
-    ]
-  ) {
-    assertEquals(args.includes(permission), true, permission);
-  }
-  assertEquals(args.includes("core"), true);
+test("final review: source launcher uses the Node entrypoint", () => {
+  const args = defaultLauncherArgs(nodeRuntime.execPath());
+  // The source launcher runs the repository entrypoint; Node needs no
+  // permission flags, so there must be no `--allow-*` arguments.
+  assertEquals(args.at(-1), "core");
+  assertEquals(args[0].endsWith("main.ts"), true, args[0]);
+  assertEquals(
+    args.some((arg) => arg.startsWith("--allow-")),
+    false,
+  );
 });
 
 test("final review: source launcher child can spawn a subprocess", async () => {
-  // Regression: the child permissions omitted `--allow-run`, so a globally
-  // installed `opensac` reported `Requires run access to "/bin/bash"` for
-  // every tool even though the parent shim had full access.
-  const args = defaultLauncherArgs(Deno.execPath());
   const script = path.join(
-    await Deno.makeTempDir({ prefix: ".opensac-core-run-" }),
+    await nodeRuntime.makeTempDir({ prefix: ".opensac-core-run-" }),
     "spawn.ts",
   );
-  await Deno.writeTextFile(
+  const runtimeModule = new URL("../platform/runtime.ts", import.meta.url).href;
+  await nodeRuntime.writeTextFile(
     script,
-    `const command = new Deno.Command(Deno.execPath(), {
-      args: ["eval", "console.log('child-ok')"],
+    `import { runtime as nodeRuntime } from ${JSON.stringify(runtimeModule)};
+    const command = new nodeRuntime.Command(nodeRuntime.execPath(), {
+      args: ["--eval", "console.log('child-ok')"],
       stdout: "piped",
       stderr: "piped",
     });
     const output = await command.output();
-    await Deno.writeTextFile(Deno.args[0], new TextDecoder().decode(output.stdout));
+    await nodeRuntime.writeTextFile(nodeRuntime.args[0], new TextDecoder().decode(output.stdout));
     `,
   );
   const resultFile = `${script}.out`;
-  const child = new Deno.Command(Deno.execPath(), {
-    args: ["run", ...args.slice(0, -2), script, resultFile],
+  const child = new nodeRuntime.Command(nodeRuntime.execPath(), {
+    args: [script, resultFile],
     stdin: "null",
     stdout: "piped",
     stderr: "piped",
@@ -475,10 +466,7 @@ test("final review: source launcher child can spawn a subprocess", async () => {
     child.status,
   ]);
   assertEquals(status.success, true, `${stdout}\n${stderr}`);
-  assertEquals(
-    (await Deno.readTextFile(resultFile)).trim(),
-    "child-ok",
-  );
+  assertEquals((await nodeRuntime.readTextFile(resultFile)).trim(), "child-ok");
 });
 
 test("final review: real source launcher starts and stops a Core child", async () => {
@@ -494,11 +482,11 @@ test("final review: real source launcher starts and stops a Core child", async (
 });
 
 test("final review: default launcher reports a typed fixed-port child failure", async () => {
-  let resolveAddress!: (address: Deno.Addr) => void;
-  const addressReady = new Promise<Deno.Addr>((resolve) => {
+  let resolveAddress!: (address: Addr) => void;
+  const addressReady = new Promise<Addr>((resolve) => {
     resolveAddress = resolve;
   });
-  const occupied = Deno.serve(
+  const occupied = nodeRuntime.serve(
     {
       hostname: "127.0.0.1",
       port: 0,
@@ -506,7 +494,7 @@ test("final review: default launcher reports a typed fixed-port child failure", 
     },
     () => new Response("occupied"),
   );
-  const address = await addressReady as Deno.NetAddr;
+  const address = (await addressReady) as NetAddr;
   try {
     await withStateDir(async (stateDir) => {
       const result = await runSourceEntry(stateDir, address.port);
@@ -561,12 +549,11 @@ test("final review: client rejects a fixed endpoint port mismatch before probing
   await withStateDir(async (stateDir, paths) => {
     const handle = await startProbe(() => new Response("wrong endpoint"));
     try {
-      await new CoreRegistry(paths).write(
-        registration(handle.address.port),
-      );
-      const mismatchPort = handle.address.port === 65_535
-        ? handle.address.port - 1
-        : handle.address.port + 1;
+      await new CoreRegistry(paths).write(registration(handle.address.port));
+      const mismatchPort =
+        handle.address.port === 65_535
+          ? handle.address.port - 1
+          : handle.address.port + 1;
       const client = new CoreClient({
         stateDir,
         version: VERSION,
@@ -618,14 +605,12 @@ test("final review: CoreClient rejects a specific registration for wildcard conf
 
 test("final review: endpoint compatibility separates wildcard bind policy", () => {
   const fixed = (host: string) => config({ host, port: 4096 });
-  for (
-    const [registrationHost, configuredHost] of [
-      ["127.0.0.1", "0.0.0.0"],
-      ["::1", "::"],
-      ["0.0.0.0", "::1"],
-      ["::", "127.0.0.1"],
-    ] as const
-  ) {
+  for (const [registrationHost, configuredHost] of [
+    ["127.0.0.1", "0.0.0.0"],
+    ["::1", "::"],
+    ["0.0.0.0", "::1"],
+    ["::", "127.0.0.1"],
+  ] as const) {
     assertEquals(
       registrationMatchesConfiguredEndpoint(
         registration(4096, { host: registrationHost }),
@@ -636,14 +621,12 @@ test("final review: endpoint compatibility separates wildcard bind policy", () =
     );
   }
 
-  for (
-    const [registrationHost, configuredHost] of [
-      ["0.0.0.0", "127.0.0.1"],
-      ["::", "::1"],
-      ["0.0.0.0", "0.0.0.0"],
-      ["::", "::"],
-    ] as const
-  ) {
+  for (const [registrationHost, configuredHost] of [
+    ["0.0.0.0", "127.0.0.1"],
+    ["::", "::1"],
+    ["0.0.0.0", "0.0.0.0"],
+    ["::", "::"],
+  ] as const) {
     assertEquals(
       registrationMatchesConfiguredEndpoint(
         registration(4096, { host: registrationHost }),
@@ -674,12 +657,10 @@ test("final review: endpoint compatibility separates wildcard bind policy", () =
 });
 
 test("final review: production registration records a connect host", async () => {
-  for (
-    const [host, connectHost] of [
-      ["0.0.0.0", "127.0.0.1"],
-      ["::", "::1"],
-    ] as const
-  ) {
+  for (const [host, connectHost] of [
+    ["0.0.0.0", "127.0.0.1"],
+    ["::", "::1"],
+  ] as const) {
     await withStateDir(async (stateDir, paths) => {
       const handle = await startCoreCommand({
         stateDir,
@@ -700,12 +681,10 @@ test("final review: production registration records a connect host", async () =>
 });
 
 test("final review: command refuses wildcard reuse of a specific Core", async () => {
-  for (
-    const [specificHost, wildcardHost] of [
-      ["127.0.0.1", "0.0.0.0"],
-      ["::1", "::"],
-    ] as const
-  ) {
+  for (const [specificHost, wildcardHost] of [
+    ["127.0.0.1", "0.0.0.0"],
+    ["::1", "::"],
+  ] as const) {
     await withStateDir(async (stateDir) => {
       const first = await startCoreCommand({
         stateDir,
@@ -801,7 +780,7 @@ test("final review: late launcher registration is identity-cleaned after startup
       version: VERSION,
       protocolVersion: PROTOCOL_VERSION,
       config: config(),
-      startTimeoutMs: 20,
+      startTimeoutMs: 100,
       launcher: async (signal) => {
         launchStarted();
         await new Promise<void>((resolve) => {
@@ -837,7 +816,7 @@ test("final review: close does not wait forever for an uncooperative launcher", 
       version: VERSION,
       protocolVersion: PROTOCOL_VERSION,
       config: config(),
-      startTimeoutMs: 20,
+      startTimeoutMs: 100,
       launcher: () => new Promise<void>(() => {}),
     });
     await assertRejects(() => client.ensureStarted(), CoreStartupError);
@@ -873,9 +852,12 @@ test("final review: external abort reaches the launcher signal", async () => {
     await started;
     controller.abort();
     const outcome = await Promise.race([
-      pending.then(() => "settled", () => "settled"),
+      pending.then(
+        () => "settled",
+        () => "settled",
+      ),
       new Promise<string>((resolve) =>
-        setTimeout(() => resolve("still-pending"), 100)
+        setTimeout(() => resolve("still-pending"), 100),
       ),
     ]);
     assertEquals(outcome, "settled");
@@ -888,7 +870,7 @@ test("final review: CoreClient classifies valid and malformed 403 bodies", async
   await withStateDir(async (stateDir, paths) => {
     let mode: "forbid" | "ready" | "malformed" = "forbid";
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -900,22 +882,26 @@ test("final review: CoreClient classifies valid and malformed 403 bodies", async
       }
       if (body.method === CORE_METHODS.info) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            version: VERSION,
-            protocolVersion: PROTOCOL_VERSION,
-            coreProtocolVersion: 1,
-            features: [],
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              version: VERSION,
+              protocolVersion: PROTOCOL_VERSION,
+              coreProtocolVersion: 1,
+              features: [],
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
       if (body.method === CORE_METHODS.health) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            healthy: true,
-            version: VERSION,
-            protocolVersion: PROTOCOL_VERSION,
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              healthy: true,
+              version: VERSION,
+              protocolVersion: PROTOCOL_VERSION,
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
@@ -965,28 +951,32 @@ test("final review: stored abort cancels a response while JSON is decoding", asy
   await withStateDir(async (stateDir, paths) => {
     const controller = new AbortController();
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
       if (body.method === CORE_METHODS.info) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            version: VERSION,
-            protocolVersion: PROTOCOL_VERSION,
-            coreProtocolVersion: 1,
-            features: [],
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              version: VERSION,
+              protocolVersion: PROTOCOL_VERSION,
+              coreProtocolVersion: 1,
+              features: [],
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
       if (body.method === CORE_METHODS.health) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            healthy: true,
-            version: VERSION,
-            protocolVersion: PROTOCOL_VERSION,
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              healthy: true,
+              version: VERSION,
+              protocolVersion: PROTOCOL_VERSION,
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
@@ -1061,8 +1051,9 @@ test("final review: stalled response bodies are bounded and cleaned up", async (
         controller.enqueue(new TextEncoder().encode('{"jsonrpc":'));
       },
     });
-    const handle = await startProbe(() =>
-      new Response(body, { headers: { "content-type": "application/json" } })
+    const handle = await startProbe(
+      () =>
+        new Response(body, { headers: { "content-type": "application/json" } }),
     );
     try {
       await new CoreRegistry(paths).write(registration(handle.address.port));
@@ -1071,7 +1062,7 @@ test("final review: stalled response bodies are bounded and cleaned up", async (
         version: VERSION,
         protocolVersion: PROTOCOL_VERSION,
         config: config(),
-        startTimeoutMs: 25,
+        startTimeoutMs: 100,
         launcher: () => Promise.resolve(),
       });
       await assertRejects(() => client.ensureStarted(), CoreStartupError);
@@ -1142,7 +1133,7 @@ test("final review: an owned Core stops when registration ownership is replaced"
         const done = await Promise.race([
           handle.done,
           new Promise<undefined>((resolve) =>
-            setTimeout(() => resolve(undefined), 5)
+            setTimeout(() => resolve(undefined), 5),
           ),
         ]);
         return done !== undefined;
@@ -1197,7 +1188,7 @@ test("final review: registration loss stops even when lock read is unreadable", 
         const done = await Promise.race([
           handle.done,
           new Promise<undefined>((resolve) =>
-            setTimeout(() => resolve(undefined), 5)
+            setTimeout(() => resolve(undefined), 5),
           ),
         ]);
         return done !== undefined;
@@ -1229,14 +1220,14 @@ test("final review: an owned Core stops when lock ownership is replaced", async 
     );
     const oldLock = path.join(path.dirname(paths.lockFile), ".old-core.lock");
     try {
-      await Deno.rename(paths.lockFile, oldLock);
-      await Deno.mkdir(paths.lockFile, { mode: 0o700 });
-      await Deno.writeTextFile(
+      await nodeRuntime.rename(paths.lockFile, oldLock);
+      await nodeRuntime.mkdir(paths.lockFile, { mode: 0o700 });
+      await nodeRuntime.writeTextFile(
         path.join(paths.lockFile, "meta.json"),
         JSON.stringify({
           token: "foreign-lock-token",
-          pid: Deno.pid,
-          hostname: Deno.hostname(),
+          pid: nodeRuntime.pid,
+          hostname: nodeRuntime.hostname(),
           timestamp: Date.now(),
         }),
       );
@@ -1244,46 +1235,49 @@ test("final review: an owned Core stops when lock ownership is replaced", async 
         const done = await Promise.race([
           handle.done,
           new Promise<undefined>((resolve) =>
-            setTimeout(() => resolve(undefined), 5)
+            setTimeout(() => resolve(undefined), 5),
           ),
         ]);
         return done !== undefined;
       }, "lock ownership monitor shutdown");
       assertEquals(await handle.done, 0);
-      assertEquals((await Deno.lstat(paths.lockFile)).isDirectory, true);
+      assertEquals((await nodeRuntime.lstat(paths.lockFile)).isDirectory, true);
     } finally {
       await handle.stop().catch(() => undefined);
       await handle.done.catch(() => undefined);
-      await Deno.remove(oldLock, { recursive: true }).catch(() => undefined);
+      await nodeRuntime
+        .remove(oldLock, { recursive: true })
+        .catch(() => undefined);
     }
   });
 });
 
 test("final review: registry recovers an incomplete transition marker", async () => {
   await withStateDir(async (stateDir, paths) => {
-    const scriptDir = await Deno.makeTempDir({
+    const scriptDir = await nodeRuntime.makeTempDir({
       prefix: "opensac-core-incomplete-transition-",
     });
     const script = path.join(scriptDir, "crash.ts");
     try {
-      await Deno.writeTextFile(
+      await nodeRuntime.writeTextFile(
         script,
         [
-          "const stateDir = Deno.args[0];",
+          `import { runtime as nodeRuntime } from ${JSON.stringify(new URL("../platform/runtime.ts", import.meta.url).href)};`,
+          "const stateDir = nodeRuntime.args[0];",
           "const intent = `${stateDir}/.core-registry-transition.intent`;",
           "const transition = `${stateDir}/.core-registry-transition.lock`;",
-          "await Deno.writeTextFile(intent, JSON.stringify({",
+          "await nodeRuntime.writeTextFile(intent, JSON.stringify({",
           '  token: "crashed-transition-intent",',
-          "  pid: Deno.pid,",
-          "  hostname: Deno.hostname(),",
+          "  pid: nodeRuntime.pid,",
+          "  hostname: nodeRuntime.hostname(),",
           "  timestamp: Date.now(),",
           "}));",
-          "await Deno.mkdir(transition, { recursive: true, mode: 0o700 });",
-          'Deno.kill(Deno.pid, "SIGKILL");',
+          "await nodeRuntime.mkdir(transition, { recursive: true, mode: 0o700 });",
+          'nodeRuntime.kill(nodeRuntime.pid, "SIGKILL");',
         ].join("\n"),
       );
-      const child = new Deno.Command(Deno.execPath(), {
-        args: ["run", "-A", script, stateDir],
+      const child = new nodeRuntime.Command(nodeRuntime.execPath(), {
+        args: [script, stateDir],
         stdout: "null",
         stderr: "piped",
       }).spawn();
@@ -1291,9 +1285,11 @@ test("final review: registry recovers an incomplete transition marker", async ()
       const status = await child.status;
       assertEquals(status.success, false, stderr);
       assertEquals(
-        (await Deno.lstat(
-          path.join(stateDir, ".core-registry-transition.lock"),
-        )).isDirectory,
+        (
+          await nodeRuntime.lstat(
+            path.join(stateDir, ".core-registry-transition.lock"),
+          )
+        ).isDirectory,
         true,
       );
 
@@ -1303,28 +1299,22 @@ test("final review: registry recovers an incomplete transition marker", async ()
         "final-review-core",
       );
     } finally {
-      await Deno.remove(scriptDir, { recursive: true });
+      await nodeRuntime.remove(scriptDir, { recursive: true });
     }
   });
 });
 
 test("final review: live incomplete transition ownership remains fail-closed", async () => {
   await withStateDir(async (stateDir, paths) => {
-    const transitionDir = path.join(
-      stateDir,
-      ".core-registry-transition.lock",
-    );
-    const intentPath = path.join(
-      stateDir,
-      ".core-registry-transition.intent",
-    );
-    await Deno.mkdir(transitionDir, { mode: 0o700 });
-    await Deno.writeTextFile(
+    const transitionDir = path.join(stateDir, ".core-registry-transition.lock");
+    const intentPath = path.join(stateDir, ".core-registry-transition.intent");
+    await nodeRuntime.mkdir(transitionDir, { mode: 0o700 });
+    await nodeRuntime.writeTextFile(
       intentPath,
       JSON.stringify({
         token: "live-transition-intent",
-        pid: Deno.pid,
-        hostname: Deno.hostname(),
+        pid: nodeRuntime.pid,
+        hostname: nodeRuntime.hostname(),
         timestamp: Date.now(),
       }),
     );
@@ -1334,38 +1324,39 @@ test("final review: live incomplete transition ownership remains fail-closed", a
         Error,
         "busy",
       );
-      assertEquals((await Deno.lstat(transitionDir)).isDirectory, true);
+      assertEquals((await nodeRuntime.lstat(transitionDir)).isDirectory, true);
     } finally {
-      await Deno.remove(intentPath);
-      await Deno.remove(transitionDir, { recursive: true });
+      await nodeRuntime.remove(intentPath);
+      await nodeRuntime.remove(transitionDir, { recursive: true });
     }
   });
 });
 
 test("final review: registry recovers a transition marker left by a crashed subprocess", async () => {
   await withStateDir(async (stateDir, paths) => {
-    const scriptDir = await Deno.makeTempDir({
+    const scriptDir = await nodeRuntime.makeTempDir({
       prefix: "opensac-core-transition-crash-",
     });
     const script = path.join(scriptDir, "crash.ts");
     try {
-      await Deno.writeTextFile(
+      await nodeRuntime.writeTextFile(
         script,
         [
-          "const stateDir = Deno.args[0];",
+          `import { runtime as nodeRuntime } from ${JSON.stringify(new URL("../platform/runtime.ts", import.meta.url).href)};`,
+          "const stateDir = nodeRuntime.args[0];",
           "const transition = `${stateDir}/.core-registry-transition.lock`;",
-          "await Deno.mkdir(transition, { recursive: true, mode: 0o700 });",
-          "await Deno.writeTextFile(`${transition}/owner.json`, JSON.stringify({",
+          "await nodeRuntime.mkdir(transition, { recursive: true, mode: 0o700 });",
+          "await nodeRuntime.writeTextFile(`${transition}/owner.json`, JSON.stringify({",
           '  token: "crashed-transition",',
-          "  pid: Deno.pid,",
-          "  hostname: Deno.hostname(),",
+          "  pid: nodeRuntime.pid,",
+          "  hostname: nodeRuntime.hostname(),",
           "  timestamp: Date.now(),",
           "}));",
-          'Deno.kill(Deno.pid, "SIGKILL");',
+          'nodeRuntime.kill(nodeRuntime.pid, "SIGKILL");',
         ].join("\n"),
       );
-      const child = new Deno.Command(Deno.execPath(), {
-        args: ["run", "-A", script, stateDir],
+      const child = new nodeRuntime.Command(nodeRuntime.execPath(), {
+        args: [script, stateDir],
         stdout: "null",
         stderr: "piped",
       }).spawn();
@@ -1373,9 +1364,11 @@ test("final review: registry recovers a transition marker left by a crashed subp
       const status = await child.status;
       assertEquals(status.success, false, stderr);
       assertEquals(
-        (await Deno.lstat(
-          path.join(stateDir, ".core-registry-transition.lock"),
-        )).isDirectory,
+        (
+          await nodeRuntime.lstat(
+            path.join(stateDir, ".core-registry-transition.lock"),
+          )
+        ).isDirectory,
         true,
       );
 
@@ -1385,7 +1378,7 @@ test("final review: registry recovers a transition marker left by a crashed subp
         "final-review-core",
       );
     } finally {
-      await Deno.remove(scriptDir, { recursive: true });
+      await nodeRuntime.remove(scriptDir, { recursive: true });
     }
   });
 });

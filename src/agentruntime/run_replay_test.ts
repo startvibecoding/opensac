@@ -60,14 +60,17 @@ test("ReplayRunEvents reconstructs terminal state", () => {
 });
 
 test("ReplayRunEvents keeps pending run non-terminal", () => {
-  const replay = replayRunEvents([
-    event({
-      sessionId: "session-1",
-      runId: "run-1",
-      eventType: "started",
-      status: "running",
-    }),
-  ], "run-1");
+  const replay = replayRunEvents(
+    [
+      event({
+        sessionId: "session-1",
+        runId: "run-1",
+        eventType: "started",
+        status: "running",
+      }),
+    ],
+    "run-1",
+  );
   assertEquals(replay.status, RUN_STATE_RUNNING);
   assertEquals(replay.terminal, false);
 });

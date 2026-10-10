@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { createKnowledgeBase, getKnowledgeBase } from "../session/mod.ts";
 import {
@@ -12,7 +13,9 @@ import {
 import { test } from "#testing";
 
 test("run knowledge base cron job routes namespaced jobs only", async () => {
-  const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
+  const sessionDir = runtime.makeTempDirSync({
+    dir: runtime.env.get("TMPDIR"),
+  });
   const service = createKnowledgeBaseService(
     sessionDir,
     defaultKnowledgeBaseIndexPolicy(),
@@ -52,9 +55,11 @@ test("run knowledge base cron job routes namespaced jobs only", async () => {
 });
 
 test("run knowledge base cron job indexes through canonical background path", async () => {
-  const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
-  const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
-  Deno.writeTextFileSync(
+  const sessionDir = runtime.makeTempDirSync({
+    dir: runtime.env.get("TMPDIR"),
+  });
+  const source = runtime.makeTempDirSync({ dir: runtime.env.get("TMPDIR") });
+  runtime.writeTextFileSync(
     `${source}/guide.md`,
     "# Guide\n\nScheduled scans reuse the canonical index path.\n",
   );
@@ -92,8 +97,10 @@ test("run knowledge base cron job indexes through canonical background path", as
 });
 
 test("run knowledge base cron job honors context cancellation", async () => {
-  const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
-  const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
+  const sessionDir = runtime.makeTempDirSync({
+    dir: runtime.env.get("TMPDIR"),
+  });
+  const source = runtime.makeTempDirSync({ dir: runtime.env.get("TMPDIR") });
   const base = createKnowledgeBase(sessionDir, {
     name: "Cancelled",
     rootDir: source,

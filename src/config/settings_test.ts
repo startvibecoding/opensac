@@ -1,5 +1,6 @@
 // settings_sparse_test.go, settings_maintenance_test.go, manage_additions_test.go.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -53,27 +54,25 @@ const SAVED_ENV = [
 ];
 
 function withConfigDir(fn: (tmp: string) => void): void {
-  const tmp = Deno.makeTempDirSync({ prefix: "cfg-" });
-  const prevWd = Deno.cwd();
-  const saved = SAVED_ENV.map((k) => [k, Deno.env.get(k)] as const);
-  Deno.env.set("OPENSAC_DIR", path.join(tmp, "config"));
-  for (
-    const k of [
-      "VIBECODING_PROVIDER",
-      "VIBECODING_MODEL",
-      "VIBECODING_MODE",
-      "VIBECODING_THINKING",
-    ]
-  ) {
-    Deno.env.delete(k);
+  const tmp = nodeRuntime.makeTempDirSync({ prefix: "cfg-" });
+  const prevWd = nodeRuntime.cwd();
+  const saved = SAVED_ENV.map((k) => [k, nodeRuntime.env.get(k)] as const);
+  nodeRuntime.env.set("OPENSAC_DIR", path.join(tmp, "config"));
+  for (const k of [
+    "VIBECODING_PROVIDER",
+    "VIBECODING_MODEL",
+    "VIBECODING_MODE",
+    "VIBECODING_THINKING",
+  ]) {
+    nodeRuntime.env.delete(k);
   }
   try {
     fn(tmp);
   } finally {
-    Deno.chdir(prevWd);
+    nodeRuntime.chdir(prevWd);
     for (const [k, v] of saved) {
-      if (v === undefined) Deno.env.delete(k);
-      else Deno.env.set(k, v);
+      if (v === undefined) nodeRuntime.env.delete(k);
+      else nodeRuntime.env.set(k, v);
     }
   }
 }
@@ -93,31 +92,29 @@ test("defaultSettings", () => {
 
   assert(Object.keys(s.providers!).length >= 35);
   assertEquals(s.providers!.openai.maxImagesPerRequest, 1500);
-  for (
-    const name of [
-      "openai",
-      "anthropic",
-      "xiaomi",
-      "google-gemini",
-      "google-vertex",
-      "openrouter",
-      "openrouter-free-models",
-      "minimax",
-      "zai",
-      "modelscope",
-      "alibaba-standard",
-      "alibaba-coding-plan",
-      "alibaba-token-plan",
-      "moark",
-      "groq",
-      "moonshotai",
-      "xai",
-      "together",
-      "fireworks",
-      "kimi-coding",
-      "xiaomi-token-plan-cn",
-    ]
-  ) {
+  for (const name of [
+    "openai",
+    "anthropic",
+    "xiaomi",
+    "google-gemini",
+    "google-vertex",
+    "openrouter",
+    "openrouter-free-models",
+    "minimax",
+    "zai",
+    "modelscope",
+    "alibaba-standard",
+    "alibaba-coding-plan",
+    "alibaba-token-plan",
+    "moark",
+    "groq",
+    "moonshotai",
+    "xai",
+    "together",
+    "fireworks",
+    "kimi-coding",
+    "xiaomi-token-plan-cn",
+  ]) {
     assert(s.providers![name], `missing provider ${name}`);
   }
   assertEquals(
@@ -138,7 +135,9 @@ test("defaultSettings", () => {
   assert(k3 && k3.reasoning && k3.contextWindow === 1000000);
   const k3256 = kimi.models.find((m) => m.id === "k3-256k");
   assert(
-    k3256 && k3256.reasoning && k3256.contextWindow === 262144 &&
+    k3256 &&
+      k3256.reasoning &&
+      k3256.contextWindow === 262144 &&
       k3256.maxTokens === undefined,
   );
 
@@ -241,7 +240,7 @@ test("getProviderConfig and getModelConfig", () => {
 test("moark/gitee model maxTokens table", () => {
   const s = defaultSettings();
   const want: Record<string, number> = {
-    "auto": 0,
+    auto: 0,
     "glm-5.1": 131072,
     "qwen3.5-flash": 65536,
     "qwen3.6-flash": 65536,
@@ -332,8 +331,8 @@ test("xiaomi mimo-v2.6, bai channel, and model ordering", () => {
   assertEquals(bai.api, "openai-chat");
   assertEquals(bai.models[0].id, "minimax-m3");
 
-  const agentPlan = s.providers!["volcengine-agentplan"].models.map((m) =>
-    m.id
+  const agentPlan = s.providers!["volcengine-agentplan"].models.map(
+    (m) => m.id,
   );
   assertEquals(
     agentPlan[agentPlan.indexOf("deepseek-v4-flash") + 1],
@@ -343,9 +342,10 @@ test("xiaomi mimo-v2.6, bai channel, and model ordering", () => {
 
 test("volcengine plan models use shared maxTokens", () => {
   const s = defaultSettings();
-  for (
-    const providerName of ["volcengine-agentplan", "volcengine-codingplan"]
-  ) {
+  for (const providerName of [
+    "volcengine-agentplan",
+    "volcengine-codingplan",
+  ]) {
     const p = s.providers![providerName];
     assert(p, `missing ${providerName}`);
     for (const model of p.models) {
@@ -372,7 +372,7 @@ test("authored setting round trip", () => {
 
 test("resolveKey and resolveKeyValue", () => {
   const s = defaultSettings();
-  Deno.env.set("OPENSAC_TEST_KEY", "secret-value");
+  nodeRuntime.env.set("OPENSAC_TEST_KEY", "secret-value");
   try {
     const derived = {
       ...s,
@@ -383,15 +383,15 @@ test("resolveKey and resolveKeyValue", () => {
     assertEquals(resolveKey(derived, "test"), "secret-value");
 
     // provider name derivation: "my-provider" -> MY_PROVIDER_API_KEY
-    Deno.env.set("MY_PROVIDER_API_KEY", "derived-key");
+    nodeRuntime.env.set("MY_PROVIDER_API_KEY", "derived-key");
     assertEquals(resolveKey({ providers: {} }, "my-provider"), "derived-key");
-    Deno.env.delete("MY_PROVIDER_API_KEY");
+    nodeRuntime.env.delete("MY_PROVIDER_API_KEY");
 
     assertEquals(resolveKeyValue("${NOPE_UNSET}"), "${NOPE_UNSET}");
     assertEquals(resolveKeyValue("plain"), "plain");
     assertEquals(resolveKeyValue("!echo hi"), "!echo hi"); // shell opt-in disabled
   } finally {
-    Deno.env.delete("OPENSAC_TEST_KEY");
+    nodeRuntime.env.delete("OPENSAC_TEST_KEY");
   }
 });
 
@@ -448,7 +448,10 @@ test("mergeModelConfigs keeps builtin-only models", () => {
   ];
   const runtime: ModelConfig[] = [{ id: "b", name: "B-runtime" }];
   const merged = mergeModelConfigs(builtin, runtime);
-  assertEquals(merged.map((m) => m.id), ["b", "a"]);
+  assertEquals(
+    merged.map((m) => m.id),
+    ["b", "a"],
+  );
   assertEquals(merged[0].name, "B-runtime");
 });
 
@@ -481,8 +484,8 @@ test("resolveModelConfig tracks explicit zero maxTokens", () => {
 test("loadGlobalSettingsSparse does not expand defaults", () => {
   withConfigDir((tmp) => {
     const p = path.join(tmp, "config", "settings.json");
-    Deno.mkdirSync(path.dirname(p), { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(path.dirname(p), { recursive: true });
+    nodeRuntime.writeTextFileSync(
       p,
       JSON.stringify({
         providers: {
@@ -506,8 +509,8 @@ test("loadGlobalSettingsSparse does not expand defaults", () => {
 test("saveGlobalSettingsPatch preserves sparse file", () => {
   withConfigDir((tmp) => {
     const p = path.join(tmp, "config", "settings.json");
-    Deno.mkdirSync(path.dirname(p), { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(path.dirname(p), { recursive: true });
+    nodeRuntime.writeTextFileSync(
       p,
       JSON.stringify({
         providers: {
@@ -522,26 +525,22 @@ test("saveGlobalSettingsPatch preserves sparse file", () => {
       }),
     );
     saveGlobalSettingsPatch({ defaultMode: "yolo" });
-    const text = Deno.readTextFileSync(p);
-    for (
-      const want of [
-        `"defaultMode": "yolo"`,
-        `"defaultProvider": "xiaomi"`,
-        `"xiaomi"`,
-      ]
-    ) {
+    const text = nodeRuntime.readTextFileSync(p);
+    for (const want of [
+      `"defaultMode": "yolo"`,
+      `"defaultProvider": "xiaomi"`,
+      `"xiaomi"`,
+    ]) {
       assert(text.includes(want), `missing ${want}`);
     }
-    for (
-      const unexpected of [
-        `"deepseek-openai"`,
-        `"statusLine"`,
-        `"contextFiles"`,
-        `"compaction"`,
-        `"sandbox"`,
-        `"maxOutputTokens"`,
-      ]
-    ) {
+    for (const unexpected of [
+      `"deepseek-openai"`,
+      `"statusLine"`,
+      `"contextFiles"`,
+      `"compaction"`,
+      `"sandbox"`,
+      `"maxOutputTokens"`,
+    ]) {
       assert(!text.includes(unexpected), `unexpected ${unexpected}`);
     }
   });
@@ -550,41 +549,37 @@ test("saveGlobalSettingsPatch preserves sparse file", () => {
 test("loadSettingsWithMeta creates sparse default file", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "project");
-    Deno.mkdirSync(project, { recursive: true });
-    Deno.chdir(project);
+    nodeRuntime.mkdirSync(project, { recursive: true });
+    nodeRuntime.chdir(project);
     const { settings, meta } = loadSettingsWithMeta();
     assert(meta.createdGlobalConfig);
     assert(settings.providers!["deepseek-openai"]);
-    const text = Deno.readTextFileSync(globalSettingsPath());
-    for (
-      const unexpected of [
-        `"providers"`,
-        `"anthropic"`,
-        `"google-gemini"`,
-        `"xiaomi"`,
-      ]
-    ) {
+    const text = nodeRuntime.readTextFileSync(globalSettingsPath());
+    for (const unexpected of [
+      `"providers"`,
+      `"anthropic"`,
+      `"google-gemini"`,
+      `"xiaomi"`,
+    ]) {
       assert(!text.includes(unexpected), `unexpected ${unexpected}`);
     }
-    for (
-      const want of [
-        `"defaultProvider": "deepseek-openai"`,
-        `"defaultModel": "deepseek-v4-flash"`,
-        `"defaultMode": "yolo"`,
-        `"statusLine"`,
-        `"webSearch"`,
-        `"contextFiles"`,
-        `"compaction"`,
-        `"sandbox"`,
-        `"sessionDir"`,
-        `"theme": "dark"`,
-        `"retry"`,
-        `"maxRetries": 5`,
-        `"baseDelayMs": 3000`,
-        `"approval"`,
-        `"confirmBeforeWrite": true`,
-      ]
-    ) {
+    for (const want of [
+      `"defaultProvider": "deepseek-openai"`,
+      `"defaultModel": "deepseek-v4-flash"`,
+      `"defaultMode": "yolo"`,
+      `"statusLine"`,
+      `"webSearch"`,
+      `"contextFiles"`,
+      `"compaction"`,
+      `"sandbox"`,
+      `"sessionDir"`,
+      `"theme": "dark"`,
+      `"retry"`,
+      `"maxRetries": 5`,
+      `"baseDelayMs": 3000`,
+      `"approval"`,
+      `"confirmBeforeWrite": true`,
+    ]) {
       assert(text.includes(want), `missing ${want}`);
     }
   });
@@ -622,11 +617,13 @@ test("maintenance defaults and sparse patch", () => {
 test("loadSettings project supports false and zero overrides", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "project");
-    Deno.mkdirSync(project, { recursive: true });
-    Deno.chdir(project);
-    Deno.env.set("OPENSAC_DIR", path.join(tmp, "config2"));
-    Deno.mkdirSync(path.dirname(projectSettingsPath()), { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(project, { recursive: true });
+    nodeRuntime.chdir(project);
+    nodeRuntime.env.set("OPENSAC_DIR", path.join(tmp, "config2"));
+    nodeRuntime.mkdirSync(path.dirname(projectSettingsPath()), {
+      recursive: true,
+    });
+    nodeRuntime.writeTextFileSync(
       projectSettingsPath(),
       JSON.stringify({
         maxContextTokens: 0,
@@ -662,7 +659,7 @@ test("skills sparse round trip", () => {
     assertEquals(skillsDisabled(effective), ["gen-skill"]);
 
     saveGlobalSettingsPatch({ skills: null });
-    const raw = JSON.parse(Deno.readTextFileSync(globalSettingsPath()));
+    const raw = JSON.parse(nodeRuntime.readTextFileSync(globalSettingsPath()));
     assert(!("skills" in raw));
   });
 });
@@ -670,29 +667,29 @@ test("skills sparse round trip", () => {
 test("loadSettingsFor applies env overrides and project settings", () => {
   withConfigDir((tmp) => {
     const project = path.join(tmp, "proj");
-    Deno.mkdirSync(path.join(project, ".opensac"), { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(path.join(project, ".opensac"), { recursive: true });
+    nodeRuntime.writeTextFileSync(
       path.join(project, ".opensac", "settings.json"),
       JSON.stringify({ theme: "light", defaultModel: "proj-model" }),
     );
-    Deno.env.set("VIBECODING_PROVIDER", "proj-provider");
+    nodeRuntime.env.set("VIBECODING_PROVIDER", "proj-provider");
     try {
       const s = loadSettingsFor(project);
       assertEquals(s.theme, "light");
       assertEquals(s.defaultModel, "proj-model");
       assertEquals(s.defaultProvider, "proj-provider");
     } finally {
-      Deno.env.delete("VIBECODING_PROVIDER");
+      nodeRuntime.env.delete("VIBECODING_PROVIDER");
     }
   });
 });
 
 test("isProjectDir", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "proj-" });
+  const tmp = nodeRuntime.makeTempDirSync({ prefix: "proj-" });
   assertEquals(isProjectDir(""), false);
   assertEquals(isProjectDir(path.join(tmp, "missing")), false);
   assertEquals(isProjectDir(tmp), false);
-  Deno.mkdirSync(path.join(tmp, "go.mod"));
+  nodeRuntime.mkdirSync(path.join(tmp, "go.mod"));
   assertEquals(isProjectDir(tmp), true);
 });
 
@@ -724,8 +721,8 @@ test("parseSettings merges nested objects field-by-field", () => {
 test("saveGlobalSettingsPatch rejects invalid existing json", () => {
   withConfigDir((tmp) => {
     const p = path.join(tmp, "config", "settings.json");
-    Deno.mkdirSync(path.dirname(p), { recursive: true });
-    Deno.writeTextFileSync(p, "{not json");
+    nodeRuntime.mkdirSync(path.dirname(p), { recursive: true });
+    nodeRuntime.writeTextFileSync(p, "{not json");
     assertThrows(() => saveGlobalSettingsPatch({ theme: "dark" }));
   });
 });

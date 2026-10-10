@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertRejects } from "../compat/assert.ts";
 import { defaultAttachmentPolicy } from "./attachment.ts";
 import {
@@ -18,8 +19,8 @@ import { closeDatabases } from "../session/root_db.ts";
 import { test } from "#testing";
 
 function makeSessionRoot(): string {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-maint-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "opensac-maint-work-" });
+  const root = runtime.makeTempDirSync({ prefix: "opensac-maint-" });
+  const workDir = runtime.makeTempDirSync({ prefix: "opensac-maint-work-" });
   const manager = createManager(workDir, root);
   manager.init();
   return root;
@@ -33,12 +34,12 @@ function writeArtifactDirectory(
   content: string,
 ): string {
   const dir = `${sessionDir}/${artifactStorageDirectoryName()}/${id}`;
-  Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  runtime.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = `${dir}/content`;
-  Deno.writeTextFileSync(path, content, { mode: 0o600 });
+  runtime.writeTextFileSync(path, content, { mode: 0o600 });
   const stamp = new Date(Date.now() - ageMs);
-  Deno.utimeSync(path, stamp, stamp);
-  Deno.utimeSync(dir, stamp, stamp);
+  runtime.utimeSync(path, stamp, stamp);
+  runtime.utimeSync(dir, stamp, stamp);
   return path;
 }
 
@@ -56,7 +57,7 @@ test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
       makeSessionRoot(),
       MAINTENANCE_CRON_JOB_PREFIX + "unknown-task",
       policy,
-    )
+    ),
   )) as Error;
   assert(
     unknown.message.includes("unknown maintenance job"),
@@ -64,11 +65,7 @@ test("RunMaintenanceCronJobClaimsTheWholeNamespace", async () => {
   );
 
   await assertRejects(() =>
-    runMaintenanceCronJob(
-      "",
-      maintenanceStorageReconcileJobID(),
-      policy,
-    )
+    runMaintenanceCronJob("", maintenanceStorageReconcileJobID(), policy),
   );
 });
 
@@ -92,7 +89,7 @@ test("RunMaintenanceCronJobHonorsTheDisabledPolicy", async () => {
     outcome.response.includes("disabled"),
     `response = ${outcome.response}, want an explicit skip reason`,
   );
-  assert(Deno.statSync(aged), "a disabled policy still reclaimed storage");
+  assert(runtime.statSync(aged), "a disabled policy still reclaimed storage");
 });
 
 test("maintenancePolicyFromSettings", () => {
@@ -153,7 +150,7 @@ test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
   );
   let exists = true;
   try {
-    Deno.statSync(aged);
+    runtime.statSync(aged);
   } catch {
     exists = false;
   }
@@ -162,7 +159,7 @@ test("RunMaintenanceCronJobReclaimsAgedAttachmentStorage", async () => {
   const dir = `${root}/${artifactStorageDirectoryName()}/6123456789abcdef`;
   let dirExists = true;
   try {
-    Deno.statSync(dir);
+    runtime.statSync(dir);
   } catch {
     dirExists = false;
   }

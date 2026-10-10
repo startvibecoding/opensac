@@ -1,4 +1,11 @@
-import { Registry, type Tool, type ToolContext, type ToolResult } from "./tool.ts";
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry, FileInfo } from "../platform/runtime.ts";
+import {
+  Registry,
+  type Tool,
+  type ToolContext,
+  type ToolResult,
+} from "./tool.ts";
 import { createTextToolResult } from "./tool.ts";
 
 /** Lists directory contents. */
@@ -37,10 +44,7 @@ export class LsTool implements Tool {
     };
   }
 
-  execute(
-    _ctx: ToolContext,
-    params: Record<string, unknown>,
-  ): ToolResult {
+  execute(_ctx: ToolContext, params: Record<string, unknown>): ToolResult {
     let dirPath = this.#registry.getWorkDir();
     const v = params["path"];
     if (typeof v === "string" && v !== "") {
@@ -51,9 +55,9 @@ export class LsTool implements Tool {
       }
     }
 
-    let entries: Deno.DirEntry[];
+    let entries: DirEntry[];
     try {
-      entries = [...Deno.readDirSync(dirPath)];
+      entries = [...runtime.readDirSync(dirPath)];
     } catch (err) {
       throw new Error(`read directory: ${messageOf(err)}`);
     }
@@ -68,9 +72,9 @@ export class LsTool implements Tool {
       const name = entry.name;
       if (name.startsWith(".")) continue;
 
-      let info: Deno.FileInfo;
+      let info: FileInfo;
       try {
-        info = Deno.statSync(join(dirPath, name));
+        info = runtime.statSync(join(dirPath, name));
       } catch {
         continue;
       }
@@ -90,7 +94,7 @@ export class LsTool implements Tool {
 }
 
 function join(dir: string, name: string): string {
-  const sep = Deno.build.os === "windows" ? "\\" : "/";
+  const sep = runtime.build.os === "windows" ? "\\" : "/";
   return dir.endsWith(sep) ? dir + name : dir + sep + name;
 }
 

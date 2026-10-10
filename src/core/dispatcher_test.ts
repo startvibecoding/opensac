@@ -1,4 +1,4 @@
-// deno-lint-ignore-file require-await -- async fake host models the Promise-based Runtime seam
+/* eslint-disable @typescript-eslint/require-await */ // async fake host models the Promise-based Runtime seam
 import { assert, assertEquals } from "../compat/assert.ts";
 import { CoreRuntimeDispatcher } from "./dispatcher.ts";
 import { CoreEventStream } from "./event_stream.ts";
@@ -6,9 +6,7 @@ import { type CoreRpcParams } from "./protocol.ts";
 import { type CoreRuntimeHost } from "./runtime.ts";
 import { test } from "#testing";
 
-function testHost(
-  extension?: CoreRuntimeHost["extension"],
-): CoreRuntimeHost {
+function testHost(extension?: CoreRuntimeHost["extension"]): CoreRuntimeHost {
   return {
     async createSession(input) {
       return {
@@ -194,12 +192,15 @@ test("CoreRuntimeDispatcher dispatches session.create and preserves request id",
     host: testHost(),
     events: new CoreEventStream(),
   });
-  const response = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "session.create",
-    params: { workDir: "/tmp/project" },
-  }, new AbortController().signal);
+  const response = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.create",
+      params: { workDir: "/tmp/project" },
+    },
+    new AbortController().signal,
+  );
 
   assertEquals(response?.id, 1);
   assertEquals(
@@ -214,36 +215,44 @@ test("CoreRuntimeDispatcher dispatches session.listPersisted listings", async ()
     ...testHost(),
     async listPersistedSessions(input: { workDir?: string }) {
       seen.push({ ...input });
-      return [{
-        sessionId: "session-9",
-        workDir: input.workDir ?? "",
-        modTime: new Date(0),
-        messageCount: 2,
-        preview: "hello",
-      }];
+      return [
+        {
+          sessionId: "session-9",
+          workDir: input.workDir ?? "",
+          modTime: new Date(0),
+          messageCount: 2,
+          preview: "hello",
+        },
+      ];
     },
   };
   const dispatcher = new CoreRuntimeDispatcher({
     host,
     events: new CoreEventStream(),
   });
-  const response = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "session.listPersisted",
-    params: { workDir: "/tmp/project" },
-  }, new AbortController().signal);
+  const response = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.listPersisted",
+      params: { workDir: "/tmp/project" },
+    },
+    new AbortController().signal,
+  );
   assertEquals(seen, [{ workDir: "/tmp/project" }]);
   assertEquals(
     (response?.result as Array<{ sessionId: string }>)[0].sessionId,
     "session-9",
   );
   // Missing params mean "the Core host's own work directory".
-  await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: 2,
-    method: "session.listPersisted",
-  }, new AbortController().signal);
+  await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.listPersisted",
+    },
+    new AbortController().signal,
+  );
   assertEquals(seen[1], {});
 });
 
@@ -260,12 +269,15 @@ test("CoreRuntimeDispatcher routes session.transcript to the durable projection"
     host,
     events: new CoreEventStream(),
   });
-  const response = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "session.transcript",
-    params: { sessionId: "session-9" },
-  }, new AbortController().signal);
+  const response = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.transcript",
+      params: { sessionId: "session-9" },
+    },
+    new AbortController().signal,
+  );
   assertEquals(seen, [{ sessionId: "session-9" }]);
   assertEquals(response?.result, [{ role: "user", text: "earlier turn" }]);
 });
@@ -290,10 +302,12 @@ test("run.events.subscribe attributes the subscription to the calling client", a
   const listed = events.listClients();
   assertEquals(listed.length, 1);
   assertEquals(listed[0]?.clientId, "client-7");
-  assertEquals(listed[0]?.subscriptions, [{
-    sessionId: "session-1",
-    runId: "run-1",
-  }]);
+  assertEquals(listed[0]?.subscriptions, [
+    {
+      sessionId: "session-1",
+      runId: "run-1",
+    },
+  ]);
 
   // A caller that sends no identity still subscribes; it just cannot be
   // attributed, which must not silently steal another client's subscription.
@@ -352,12 +366,15 @@ test("CoreRuntimeDispatcher sends extension methods to the Core extension handle
     }),
     events: new CoreEventStream(),
   });
-  const response = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: "extension",
-    method: "project.list",
-    params: {},
-  }, new AbortController().signal);
+  const response = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: "extension",
+      method: "project.list",
+      params: {},
+    },
+    new AbortController().signal,
+  );
   assertEquals(response?.id, "extension");
   assertEquals(response?.result, { ok: true });
   assertEquals(calls, ["project.list"]);
@@ -367,26 +384,35 @@ test("CoreRuntimeDispatcher returns stable errors and no response for notificati
     host: testHost(),
     events: new CoreEventStream(),
   });
-  const unknown = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: "unknown",
-    method: "does.not.exist",
-  }, new AbortController().signal);
+  const unknown = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: "unknown",
+      method: "does.not.exist",
+    },
+    new AbortController().signal,
+  );
   assertEquals(unknown?.error?.code, -32601);
 
-  const invalid = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: "invalid",
-    method: "session.create",
-    params: { workDir: 42 },
-  }, new AbortController().signal);
+  const invalid = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: "invalid",
+      method: "session.create",
+      params: { workDir: 42 },
+    },
+    new AbortController().signal,
+  );
   assertEquals(invalid?.error?.code, -32602);
 
-  const notification = await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    method: "session.close",
-    params: { sessionId: "session-1" },
-  }, new AbortController().signal);
+  const notification = await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      method: "session.close",
+      params: { sessionId: "session-1" },
+    },
+    new AbortController().signal,
+  );
   assertEquals(notification, undefined);
 });
 
@@ -409,33 +435,39 @@ test("CoreRuntimeDispatcher forwards neutral policy and content fields to the ho
     events: new CoreEventStream(),
   });
 
-  await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "session.create",
-    params: {
-      workDir: "/tmp/project",
-      providerName: "test-provider",
-      modelID: "test-model",
-      mode: "agent",
-      thinkingLevel: "",
-      capabilities: { multiAgent: true },
-      source: "cli",
-      approvalPolicy: "print",
-      questionPolicy: "unattended",
+  await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.create",
+      params: {
+        workDir: "/tmp/project",
+        providerName: "test-provider",
+        modelID: "test-model",
+        mode: "agent",
+        thinkingLevel: "",
+        capabilities: { multiAgent: true },
+        source: "cli",
+        approvalPolicy: "print",
+        questionPolicy: "unattended",
+      },
     },
-  }, new AbortController().signal);
-  await dispatcher.dispatch({
-    jsonrpc: "2.0",
-    id: 2,
-    method: "session.prompt",
-    params: {
-      sessionId: "session-1",
-      text: "hello",
-      attachments: ["image-1"],
-      metadata: { source: "cli" },
+    new AbortController().signal,
+  );
+  await dispatcher.dispatch(
+    {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.prompt",
+      params: {
+        sessionId: "session-1",
+        text: "hello",
+        attachments: ["image-1"],
+        metadata: { source: "cli" },
+      },
     },
-  }, new AbortController().signal);
+    new AbortController().signal,
+  );
 
   // These fields were previously dropped by the param parsers, silently
   // ignoring ACP --mode/--thinking and prompt attachments on the Core RPC.
@@ -472,34 +504,35 @@ test("CoreRuntimeDispatcher rejects malformed neutral fields instead of dropping
     events: new CoreEventStream(),
   });
 
-  for (
-    const params of [
+  for (const params of [
+    {
+      workDir: "/tmp",
+      mode: 5,
+    },
+    {
+      workDir: "/tmp",
+      capabilities: { multiAgent: "yes" },
+    },
+    {
+      sessionId: "session-1",
+      text: "hello",
+      attachments: ["ok", 3],
+    },
+    {
+      sessionId: "session-1",
+      text: "hello",
+      metadata: [1, 2],
+    },
+  ]) {
+    const response = await dispatcher.dispatch(
       {
-        workDir: "/tmp",
-        mode: 5,
+        jsonrpc: "2.0",
+        id: 9,
+        method: "workDir" in params ? "session.create" : "session.prompt",
+        params: params as Record<string, unknown>,
       },
-      {
-        workDir: "/tmp",
-        capabilities: { multiAgent: "yes" },
-      },
-      {
-        sessionId: "session-1",
-        text: "hello",
-        attachments: ["ok", 3],
-      },
-      {
-        sessionId: "session-1",
-        text: "hello",
-        metadata: [1, 2],
-      },
-    ]
-  ) {
-    const response = await dispatcher.dispatch({
-      jsonrpc: "2.0",
-      id: 9,
-      method: "workDir" in params ? "session.create" : "session.prompt",
-      params: params as Record<string, unknown>,
-    }, new AbortController().signal);
+      new AbortController().signal,
+    );
     assertEquals(response?.error?.code, -32602);
   }
 });
@@ -565,11 +598,7 @@ test("CoreRuntimeDispatcher routes the settings, catalog, env, and context surfa
     host,
     events: new CoreEventStream(),
   });
-  const call = (
-    id: number,
-    method: string,
-    params?: Record<string, unknown>,
-  ) =>
+  const call = (id: number, method: string, params?: Record<string, unknown>) =>
     dispatcher.dispatch(
       {
         jsonrpc: "2.0",
@@ -626,11 +655,14 @@ test("CoreRuntimeDispatcher routes the settings, catalog, env, and context surfa
     ],
     ["providerCatalog", { workDir: "/w" }],
     ["validateProviderModel", { providerID: "p", modelID: "m", workDir: "/w" }],
-    ["validateProviderModel", {
-      providerID: "nope",
-      modelID: "m",
-      workDir: "",
-    }],
+    [
+      "validateProviderModel",
+      {
+        providerID: "nope",
+        modelID: "m",
+        workDir: "",
+      },
+    ],
     ["envDocument", {}],
     ["updateEnvDocument", { vars: { A: "1" } }],
     ["sessionContext", { sessionId: "s1" }],
@@ -691,11 +723,7 @@ test("CoreRuntimeDispatcher routes expert and fork requests", async () => {
     host,
     events: new CoreEventStream(),
   });
-  const call = (
-    id: number,
-    method: string,
-    params?: Record<string, unknown>,
-  ) =>
+  const call = (id: number, method: string, params?: Record<string, unknown>) =>
     dispatcher.dispatch(
       {
         jsonrpc: "2.0",
@@ -774,43 +802,48 @@ test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and tran
   });
   const signal = new AbortController().signal;
   const call = (id: number | string, method: string, params?: CoreRpcParams) =>
-    dispatcher.dispatch(
-      { jsonrpc: "2.0", id, method, params },
-      signal,
-    );
+    dispatcher.dispatch({ jsonrpc: "2.0", id, method, params }, signal);
 
   assertEquals(
     (await call(1, "agent.list", { sessionId: "session-1" }))?.result,
     [],
   );
   assertEquals(
-    (await call(2, "agent.destroy", {
-      sessionId: "session-1",
-      agentId: "a1",
-    }))?.result,
+    (
+      await call(2, "agent.destroy", {
+        sessionId: "session-1",
+        agentId: "a1",
+      })
+    )?.result,
     null,
   );
   assertEquals(
-    (await call(3, "delegate.set", {
-      sessionId: "session-1",
-      enabled: true,
-    }))?.result,
+    (
+      await call(3, "delegate.set", {
+        sessionId: "session-1",
+        enabled: true,
+      })
+    )?.result,
     { enabled: true },
   );
   assertEquals(
-    (await call(4, "session.capability.set", {
-      sessionId: "session-1",
-      id: "browser",
-      enabled: true,
-    }))?.result,
+    (
+      await call(4, "session.capability.set", {
+        sessionId: "session-1",
+        id: "browser",
+        enabled: true,
+      })
+    )?.result,
     {},
   );
   assertEquals(
-    (await call(5, "esm.update", {
-      sessionId: "session-1",
-      action: "create",
-      objective: "ship",
-    }))?.result,
+    (
+      await call(5, "esm.update", {
+        sessionId: "session-1",
+        action: "create",
+        objective: "ship",
+      })
+    )?.result,
     { objective: null, workerRunning: false, activeAgentId: "" },
   );
   assertEquals(
@@ -822,10 +855,12 @@ test("CoreRuntimeDispatcher forwards the advanced agent, delegate, ESM, and tran
     null,
   );
   assertEquals(
-    (await call(8, "transient.prompt", {
-      sessionId: "session-1",
-      question: "what?",
-    }))?.result,
+    (
+      await call(8, "transient.prompt", {
+        sessionId: "session-1",
+        question: "what?",
+      })
+    )?.result,
     { answer: "side" },
   );
   assertEquals(
@@ -891,12 +926,15 @@ test("session.open tolerates a blank workDir and keeps a real one", async () => 
     events: new CoreEventStream(),
   });
   const call = (params: Record<string, unknown>) =>
-    dispatcher.dispatch({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "session.open",
-      params,
-    }, new AbortController().signal);
+    dispatcher.dispatch(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "session.open",
+        params,
+      },
+      new AbortController().signal,
+    );
 
   // A front end that serializes an unset directory must not silently scope the
   // open to a path that cannot match any session's cwd.

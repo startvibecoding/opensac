@@ -32,7 +32,8 @@ export function mapACPExtensionToCore(
   if (request.method === "opensac/manage/cron/create") {
     const cronParams = { ...params };
     if (
-      cronParams.cwd === undefined && cronParams.workDir === undefined &&
+      cronParams.cwd === undefined &&
+      cronParams.workDir === undefined &&
       context.workDir !== ""
     ) {
       cronParams.cwd = context.workDir;
@@ -45,16 +46,17 @@ export function mapACPExtensionToCore(
   ) {
     const memoryParams = { ...params };
     if (
-      memoryParams.cwd === undefined && memoryParams.workDir === undefined &&
+      memoryParams.cwd === undefined &&
+      memoryParams.workDir === undefined &&
       context.workDir !== ""
     ) {
       memoryParams.cwd = context.workDir;
     }
     return requestCore(
       id,
-      `manage.${
-        request.method.slice("opensac/manage/".length).replaceAll("/", ".")
-      }`,
+      `manage.${request.method
+        .slice("opensac/manage/".length)
+        .replaceAll("/", ".")}`,
       memoryParams,
     );
   }
@@ -64,7 +66,8 @@ export function mapACPExtensionToCore(
     );
     const skillHubParams = { ...params };
     if (
-      skillHubMethod !== "get" && skillHubMethod !== "patch" &&
+      skillHubMethod !== "get" &&
+      skillHubMethod !== "patch" &&
       skillHubParams.cwd === undefined &&
       skillHubParams.workDir === undefined &&
       context.workDir !== ""
@@ -73,36 +76,36 @@ export function mapACPExtensionToCore(
     }
     return requestCore(
       id,
-      `manage.${
-        request.method.slice("opensac/manage/".length).replaceAll("/", ".")
-      }`,
+      `manage.${request.method
+        .slice("opensac/manage/".length)
+        .replaceAll("/", ".")}`,
       skillHubParams,
     );
   }
   if (request.method.startsWith("opensac/manage/")) {
     return requestCore(
       id,
-      `manage.${
-        request.method.slice("opensac/manage/".length).replaceAll("/", ".")
-      }`,
+      `manage.${request.method
+        .slice("opensac/manage/".length)
+        .replaceAll("/", ".")}`,
       params,
     );
   }
   if (request.method.startsWith("opensac/projects/")) {
     return requestCore(
       id,
-      `project.${
-        request.method.slice("opensac/projects/".length).replaceAll("/", ".")
-      }`,
+      `project.${request.method
+        .slice("opensac/projects/".length)
+        .replaceAll("/", ".")}`,
       params,
     );
   }
   if (request.method.startsWith("opensac/attachment/")) {
     return requestCore(
       id,
-      `attachment.${
-        request.method.slice("opensac/attachment/".length).replaceAll("/", ".")
-      }`,
+      `attachment.${request.method
+        .slice("opensac/attachment/".length)
+        .replaceAll("/", ".")}`,
       params,
     );
   }

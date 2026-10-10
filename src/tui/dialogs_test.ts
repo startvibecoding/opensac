@@ -1,7 +1,12 @@
 // Focused tests for the interactive dialog framework and the concrete panels:
 // cursor/search/input handling, and that each dialog mutates real state.
 
-import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { runtime } from "../platform/runtime.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "../compat/assert.ts";
 import { Dialog } from "./dialog.ts";
 import {
   AuthDialog,
@@ -19,7 +24,8 @@ import { type KeyEvent, splitInputChunk } from "./keys.ts";
 import { type TUISessionListEntry } from "./service.ts";
 import {
   type TUIProviderCatalogEntry,
-  type TUISettingsWriteScope} from "./service.ts";
+  type TUISettingsWriteScope,
+} from "./service.ts";
 import { test } from "#testing";
 
 interface Recorder {
@@ -28,9 +34,10 @@ interface Recorder {
   switched: string[];
   created: number;
   deleted: string[];
-  saved: Array<
-    { scope: TUISettingsWriteScope; updates: Record<string, unknown> }
-  >;
+  saved: Array<{
+    scope: TUISettingsWriteScope;
+    updates: Record<string, unknown>;
+  }>;
   savedEnv: Array<Record<string, string>>;
   validated: Array<[string, string]>;
   renders: number;
@@ -60,7 +67,7 @@ function host(overrides: Partial<DialogHost> = {}): {
   };
   const base: DialogHost = {
     translator: new Translator("en"),
-    workDir: Deno.cwd(),
+    workDir: runtime.cwd(),
     providerName: settings.defaultProvider ?? "",
     modelID: settings.defaultModel ?? "",
     allow: {},
@@ -106,18 +113,20 @@ function providerCatalog(
   settings: ReturnType<typeof defaultSettings>,
 ): TUIProviderCatalogEntry[] {
   const id = settings.defaultProvider ?? "";
-  return [{
-    id,
-    configured: true,
-    isDefault: true,
-    api: "openai-chat",
-    baseUrl: "",
-    modelCount: 1,
-    models: resolvedModels(settings, id).map((m) => ({
-      id: m.id,
-      name: m.name,
-    })),
-  }];
+  return [
+    {
+      id,
+      configured: true,
+      isDefault: true,
+      api: "openai-chat",
+      baseUrl: "",
+      modelCount: 1,
+      models: resolvedModels(settings, id).map((m) => ({
+        id: m.id,
+        name: m.name,
+      })),
+    },
+  ];
 }
 
 function feed(dialog: Dialog, chunk: string): void {
@@ -219,8 +228,8 @@ function defaultModelData(): {
 
 test("default-model dialog steps provider then model and persists", async () => {
   const { host: h, rec } = host();
-  const dialog = new Dialog((d) =>
-    new DefaultModelDialog(h, d, "global", defaultModelData())
+  const dialog = new Dialog(
+    (d) => new DefaultModelDialog(h, d, "global", defaultModelData()),
   );
   // Pick the first provider (deepseek-openai), then the first model.
   feed(dialog, "\r");
@@ -237,8 +246,8 @@ test("default-model dialog steps provider then model and persists", async () => 
 
 test("default-model dialog escape steps back from the model view", () => {
   const { host: h } = host();
-  const dialog = new Dialog((d) =>
-    new DefaultModelDialog(h, d, "global", defaultModelData())
+  const dialog = new Dialog(
+    (d) => new DefaultModelDialog(h, d, "global", defaultModelData()),
   );
   feed(dialog, "\r"); // into model view
   feed(dialog, "\x1b"); // back to provider view
@@ -322,14 +331,14 @@ test("auth dialog escape steps back through views", () => {
 test("sessions dialog lists, switches, and deletes", async () => {
   const detail = (id: string, count: number): TUISessionListEntry => ({
     sessionId: id,
-    workDir: Deno.cwd(),
+    workDir: runtime.cwd(),
     modTime: new Date(),
     messageCount: count,
     preview: "",
   });
   const { host: h, rec } = host();
-  const dialog = new Dialog((d) =>
-    new SessionsDialog(h, d, [detail("s1", 1), detail("s2", 2)])
+  const dialog = new Dialog(
+    (d) => new SessionsDialog(h, d, [detail("s1", 1), detail("s2", 2)]),
   );
   // The seeded rows render with their message counts.
   assertStringIncludes(dialog.view(90), "s2  2 msgs");

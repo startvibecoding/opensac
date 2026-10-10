@@ -97,9 +97,8 @@ export class DeliveryCoordinator {
 
   constructor(sessionDir: string, owner: string) {
     this.sessionDir = sessionDir;
-    this.owner = owner.trim() === ""
-      ? "delivery-worker-" + generateID()
-      : owner;
+    this.owner =
+      owner.trim() === "" ? "delivery-worker-" + generateID() : owner;
     this.leaseMs = 30_000;
     this.retryWindowMs = DEFAULT_DELIVERY_RETRY_WINDOW_MS;
     this.maxRetries = 0;
@@ -169,10 +168,7 @@ export class DeliveryCoordinator {
    * are converted to bounded `retry_wait`; callers can explicitly return
    * `status: "uncertain"` when the provider result is ambiguous.
    */
-  async reconcileDue(
-    now: Date,
-    execute: DeliveryExecutor,
-  ): Promise<number> {
+  async reconcileDue(now: Date, execute: DeliveryExecutor): Promise<number> {
     if (!execute) {
       throw new Error("delivery coordinator and executor are required");
     }
@@ -205,7 +201,8 @@ export class DeliveryCoordinator {
         );
       }
       if (
-        result.status === "retry_wait" && this.retryExhausted(operation, now)
+        result.status === "retry_wait" &&
+        this.retryExhausted(operation, now)
       ) {
         result.status = "failed";
         result.nextAttemptAt = null;
@@ -243,9 +240,10 @@ export class DeliveryCoordinator {
     if (this.maxRetries > 0 && operation.attemptCount >= this.maxRetries) {
       return true;
     }
-    const window = this.retryWindowMs > 0
-      ? this.retryWindowMs
-      : DEFAULT_DELIVERY_RETRY_WINDOW_MS;
+    const window =
+      this.retryWindowMs > 0
+        ? this.retryWindowMs
+        : DEFAULT_DELIVERY_RETRY_WINDOW_MS;
     let start = operation.createdAt;
     if (operation.retryWindowStartedAt !== null) {
       // An explicit retry restarts the budget instead of counting from the

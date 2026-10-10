@@ -1,7 +1,7 @@
-// Static architecture guards for the Deno/TypeScript port.
+// Static architecture guards for the Node/TypeScript port.
 //
-// This is the Deno counterpart of the Go `internal/architecture` package. The
-// Go guards parse Go source with `go/ast`; the Deno guards scan `.ts`/`.tsx`
+// This is the Node counterpart of the Go `internal/architecture` package. The
+// Go guards parse Go source with `go/ast`; the Node guards scan `.ts`/`.tsx`
 // source lines with a small, dependency-free reader. The rules are the same:
 // no direct Agent construction or canonical Run persistence outside
 // `src/agentruntime`, one DB→DAO direction, one decision-envelope owner, no
@@ -9,9 +9,11 @@
 // the public SDK boundary.
 //
 // The scanner is deliberately source-level so fixtures can be scanned without
-// running `deno info`; the whole-repo tests call the same functions against the
-// real tree.
+// resolving the module graph; the whole-repo tests call the same functions
+// against the real tree.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import { dirname, join, relative } from "../compat/path.ts";
 
 export interface Violation {
@@ -92,11 +94,14 @@ const CORE_ALLOWED_LOCAL_FILES = new Set([
   "src/skillhub/mod.ts",
   "src/memory/store.ts",
   "src/stats/stats.ts",
+  // The shared Node runtime helpers (fs/env/process/net) every module uses.
+  "src/platform/runtime.ts",
 ]);
-// The Node-backed `@opensac/*` compat modules plus npm packages are the
-// external dependencies a reviewed Core file may carry; JSR and `@std/*` are
-// no longer used, so a reintroduction is flagged.
-const CORE_ALLOWED_EXTERNAL_PREFIXES = ["@opensac/", "npm:"];
+// Node builtins are the external dependencies a reviewed Core file may carry.
+// The project-owned compat shims under `src/compat/` are a local dependency
+// (allowed in `isAllowedCoreImport`); registry-map imports are no longer used,
+// so a reintroduction is flagged.
+const CORE_ALLOWED_EXTERNAL_PREFIXES = ["node:"];
 
 // Every SQLite spelling that turns foreign key enforcement ON: `foreign_keys(1)`
 // /`(ON)`/`(TRUE)` DSN pragmas and `PRAGMA foreign_keys = 1/ON/TRUE`,
@@ -183,8 +188,11 @@ const BARE_CREATE_SESSION = /(?<![.\w$])createSession\s*\(/;
 /** Reports whether a production file belongs to the TUI/CLI front-end graph. */
 export function isTuiFrontendPath(rel: string): boolean {
   const slash = toSlash(rel);
-  return slash.startsWith("src/tui/") ||
-    slash === "src/cli/root_tui.ts" || slash === "src/cli/root_print.ts";
+  return (
+    slash.startsWith("src/tui/") ||
+    slash === "src/cli/root_tui.ts" ||
+    slash === "src/cli/root_print.ts"
+  );
 }
 
 const CANONICAL_RUN_PERSISTENCE = [
@@ -267,10 +275,7 @@ function isCoreBoundaryAllowlisted(rel: string): boolean {
   );
 }
 
-function isForbiddenCoreRuntimeImport(
-  rel: string,
-  specifier: string,
-): boolean {
+function isForbiddenCoreRuntimeImport(rel: string, specifier: string): boolean {
   if (toSlash(rel) === "src/core/runtime_host.ts") return false;
   const target = resolveImportTarget(rel, specifier);
   if (target === undefined) return false;
@@ -283,17 +288,23 @@ function isAllowedCoreImport(rel: string, specifier: string): boolean {
   const target = resolveImportTarget(rel, specifier);
   if (target !== undefined) {
     if (toSlash(rel) === "src/core/runtime_host.ts") {
-      return target.startsWith("src/core/") ||
+      return (
+        target.startsWith("src/core/") ||
+        target.startsWith("src/compat/") ||
         CORE_ALLOWED_LOCAL_FILES.has(target) ||
         CORE_FORBIDDEN_RUNTIME_ROOTS.some(
           (root) => target === root || target.startsWith(`${root}/`),
-        );
+        )
+      );
     }
-    return target.startsWith("src/core/") ||
-      CORE_ALLOWED_LOCAL_FILES.has(target);
+    return (
+      target.startsWith("src/core/") ||
+      target.startsWith("src/compat/") ||
+      CORE_ALLOWED_LOCAL_FILES.has(target)
+    );
   }
   return CORE_ALLOWED_EXTERNAL_PREFIXES.some((prefix) =>
-    specifier.startsWith(prefix)
+    specifier.startsWith(prefix),
   );
 }
 
@@ -318,9 +329,9 @@ function isGuardPackage(rel: string): boolean {
 export function walkSourceFiles(root: string): string[] {
   const out: string[] = [];
   const visit = (dir: string): void => {
-    let entries: Deno.DirEntry[];
+    let entries: DirEntry[];
     try {
-      entries = [...Deno.readDirSync(dir)];
+      entries = [...nodeRuntime.readDirSync(dir)];
     } catch {
       return;
     }
@@ -385,7 +396,8 @@ function hasNonLiteralDynamicImport(src: string): boolean {
     if (src[open] !== "(") continue;
     const close = findClosingParenthesis(src, open + 1);
     if (
-      close === undefined || !isPlainStringLiteral(src.slice(open + 1, close))
+      close === undefined ||
+      !isPlainStringLiteral(src.slice(open + 1, close))
     ) {
       return true;
     }
@@ -562,7 +574,8 @@ function scanFile(rel: string, src: string): Violation[] {
     for (const specifier of importSpecifiers(src)) {
       const target = resolveImportTarget(rel, specifier);
       if (
-        target !== undefined && ACP_FORBIDDEN_RUNTIME_ROOTS.some(
+        target !== undefined &&
+        ACP_FORBIDDEN_RUNTIME_ROOTS.some(
           (root) => target === root || target.startsWith(`${root}/`),
         )
       ) {
@@ -597,17 +610,18 @@ function scanFile(rel: string, src: string): Violation[] {
 
   if (isTuiFrontendPath(rel)) {
     const slash = toSlash(rel);
-    const banned = slash === "src/tui/service.ts"
-      ? TUI_SERVICE_FORBIDDEN_IMPORT_ROOTS
-      : slash === "src/cli/root_print.ts"
-      ? CLI_PRINT_FORBIDDEN_IMPORT_ROOTS
-      : TUI_FORBIDDEN_IMPORT_ROOTS;
+    const banned =
+      slash === "src/tui/service.ts"
+        ? TUI_SERVICE_FORBIDDEN_IMPORT_ROOTS
+        : slash === "src/cli/root_print.ts"
+          ? CLI_PRINT_FORBIDDEN_IMPORT_ROOTS
+          : TUI_FORBIDDEN_IMPORT_ROOTS;
     for (const specifier of importSpecifiers(src)) {
       const target = resolveImportTarget(rel, specifier);
       if (
         target !== undefined &&
         banned.some((root) =>
-          root.endsWith("/") ? target.startsWith(root) : target === root
+          root.endsWith("/") ? target.startsWith(root) : target === root,
         )
       ) {
         add(
@@ -634,9 +648,7 @@ function scanFile(rel: string, src: string): Violation[] {
         );
       }
     }
-    if (
-      TUI_ENTRY_FILES.includes(slash) && BARE_CREATE_SESSION.test(src)
-    ) {
+    if (TUI_ENTRY_FILES.includes(slash) && BARE_CREATE_SESSION.test(src)) {
       add(
         "TUI front-end constructs createSession; persisted session identity is Core-owned",
       );
@@ -659,9 +671,7 @@ function scanFile(rel: string, src: string): Violation[] {
     }
     if (DIRECT_SQL_CALL.test(src)) {
       const match = src.match(DIRECT_SQL_CALL);
-      add(
-        `direct database ${match?.[2] ?? "call"}; move SQL into src/dao`,
-      );
+      add(`direct database ${match?.[2] ?? "call"}; move SQL into src/dao`);
     }
   }
 
@@ -687,7 +697,9 @@ function scanFile(rel: string, src: string): Violation[] {
   }
 
   if (
-    isAgentRuntime(rel) || isAgentPackage(rel) || isGuardPackage(rel) ||
+    isAgentRuntime(rel) ||
+    isAgentPackage(rel) ||
+    isGuardPackage(rel) ||
     isSessionPackage(rel)
   ) {
     return violations;
@@ -735,13 +747,13 @@ export function productionViolations(root: string): Violation[] {
     const rel = relativeSlash(root, file);
     if (isTestPath(rel)) continue;
     if (isGuardPackage(rel)) continue;
-    const src = Deno.readTextFileSync(file);
+    const src = nodeRuntime.readTextFileSync(file);
     violations.push(...scanFile(rel, src));
   }
   violations.sort((a, b) =>
     a.file === b.file
       ? a.message.localeCompare(b.message)
-      : a.file.localeCompare(b.file)
+      : a.file.localeCompare(b.file),
   );
   return violations;
 }
@@ -749,7 +761,7 @@ export function productionViolations(root: string): Violation[] {
 /** TUI/CLI front-end ownership violations (the Task 6/7 boundary). */
 export function tuiBoundaryViolations(root: string): Violation[] {
   return productionViolations(root).filter((violation) =>
-    isTuiFrontendPath(violation.file)
+    isTuiFrontendPath(violation.file),
   );
 }
 
@@ -761,11 +773,13 @@ export function publicSdkInternalImports(root: string, dir: string): string[] {
   for (const file of walkSourceFiles(base)) {
     const rel = relativeSlash(root, file);
     if (isTestPath(rel)) continue;
-    const src = Deno.readTextFileSync(file);
+    const src = nodeRuntime.readTextFileSync(file);
     for (const specifier of importSpecifiers(src)) {
       if (
-        specifier.includes("/src/") || specifier.startsWith("src/") ||
-        specifier === "src" || specifier.includes("../src/")
+        specifier.includes("/src/") ||
+        specifier.startsWith("src/") ||
+        specifier === "src" ||
+        specifier.includes("../src/")
       ) {
         violations.push(`${rel} imports ${specifier}`);
       }
@@ -806,16 +820,14 @@ function isLegacyTestExempt(rel: string): boolean {
   return legacyTestExemptDirs.some((prefix) => toSlash(rel).startsWith(prefix));
 }
 
-export function legacyTestBoundaryViolations(
-  root: string,
-): Violation[] {
+export function legacyTestBoundaryViolations(root: string): Violation[] {
   const violations: Violation[] = [];
   for (const file of walkSourceFiles(root)) {
     const rel = relativeSlash(root, file);
     if (!isTestPath(rel)) continue;
     if (rel in legacyTestAllowlist) continue;
     if (isLegacyTestExempt(rel)) continue;
-    const src = Deno.readTextFileSync(file);
+    const src = nodeRuntime.readTextFileSync(file);
     const details: string[] = [];
     for (const name of callNames(src, CANONICAL_RUN_PERSISTENCE)) {
       details.push(

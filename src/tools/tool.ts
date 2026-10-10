@@ -2,7 +2,7 @@
 // The tool contract, result types, and the per-session tool Registry. This is
 // the hub the agent/runtime uses to enumerate and construct tools.
 //
-// Deviations from Go: the `sync.RWMutex` is dropped (Deno is single-threaded);
+// Deviations from Go: the `sync.RWMutex` is dropped (Node is single-threaded);
 // `context.Context` maps to a `ToolContext` carrying an `AbortSignal`, the
 // stable operation ID, and the interactive question asker; `json.RawMessage`
 // parameter schemas map to plain JSON values; and `Execute` is uniformly
@@ -24,7 +24,8 @@ import { homeDir } from "../platform/platform.ts";
 import {
   type ContentBlock,
   type ImageContent,
-  type ToolDefinition} from "../provider/types.ts";
+  type ToolDefinition,
+} from "../provider/types.ts";
 import { type Sandbox } from "../sandbox/mod.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import { createBashTool } from "./bash.ts";
@@ -159,10 +160,7 @@ export function createInsertToolResult(
 }
 
 /** Creates a tool result carrying a structured task plan. */
-export function createPlanToolResult(
-  text: string,
-  plan: TaskPlan,
-): ToolResult {
+export function createPlanToolResult(text: string, plan: TaskPlan): ToolResult {
   return { text, plan };
 }
 
@@ -203,9 +201,10 @@ export interface Tool {
  * agent-level deadline while preserving parent cancellation.
  */
 export interface ExecutionTimeoutProvider {
-  executionTimeout(
-    params: Record<string, unknown>,
-  ): { durationMs: number; provided: boolean };
+  executionTimeout(params: Record<string, unknown>): {
+    durationMs: number;
+    provided: boolean;
+  };
 }
 
 /** Converts a Tool to a provider `ToolDefinition`. */
@@ -445,17 +444,17 @@ export class Registry {
   registerFiltered(toolNames: string[]): void {
     const bashTool = createBashTool(this, this.#jobManager);
     const factories: Record<string, () => Tool> = {
-      "read": () => new ReadTool(this),
-      "ls": () => new LsTool(this),
-      "grep": () => new GrepTool(this),
-      "find": () => new FindTool(this),
-      "plan": () => new PlanTool(this),
-      "write": () => new WriteTool(this),
-      "edit": () => new EditTool(this),
-      "insert": () => new InsertTool(this),
-      "bash": () => bashTool,
-      "jobs": () => new JobsTool(this, bashTool),
-      "kill": () => new KillTool(this, bashTool),
+      read: () => new ReadTool(this),
+      ls: () => new LsTool(this),
+      grep: () => new GrepTool(this),
+      find: () => new FindTool(this),
+      plan: () => new PlanTool(this),
+      write: () => new WriteTool(this),
+      edit: () => new EditTool(this),
+      insert: () => new InsertTool(this),
+      bash: () => bashTool,
+      jobs: () => new JobsTool(this, bashTool),
+      kill: () => new KillTool(this, bashTool),
     };
     if (this.#skillsMgr !== undefined) {
       factories["skill_ref"] = () =>

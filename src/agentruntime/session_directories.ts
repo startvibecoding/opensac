@@ -1,6 +1,6 @@
 //
 // Validates the ACP directory-root contract: absolute, cleaned, deterministic
-// and duplicate-free paths. `path/filepath` maps to `@std/path`.
+// and duplicate-free paths. `path/filepath` maps to `src/compat/path.ts`.
 
 import { isAbsolute, normalize } from "../compat/path.ts";
 
@@ -30,7 +30,7 @@ export function normalizeAdditionalDirectories(
 }
 
 /**
- * Mirrors `filepath.Clean`'s trailing-separator removal; `@std/path.normalize`
+ * Mirrors `filepath.Clean`'s trailing-separator removal; `src/compat/path.ts.normalize`
  * preserves a trailing slash.
  */
 function cleanPath(value: string): string {

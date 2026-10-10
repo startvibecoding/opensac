@@ -4,6 +4,7 @@
 // coordinator's startup scan, wake-driven convergence, idempotent start, and
 // coordinated stop over the shared recovery path.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
@@ -44,7 +45,7 @@ function durableRun(overrides: Partial<DurableRun>): DurableRun {
 }
 
 function initSession(sessionDir: string, id: string): void {
-  createManager(Deno.makeTempDirSync(), sessionDir).initWithID(id);
+  createManager(nodeRuntime.makeTempDirSync(), sessionDir).initWithID(id);
 }
 
 function delay(ms: number): Promise<void> {
@@ -64,18 +65,22 @@ async function waitFor(
 }
 
 test("RecoveryCoordinatorStartupScanConvergesThenWakeReconverges", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-coordinator-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-coordinator-",
+  });
   const store = new RunStore(sessionDir);
   const coordinator = new RecoveryCoordinator(sessionDir, {
     scanIntervalMs: 60_000,
   });
   try {
     initSession(sessionDir, "coordinator-session");
-    store.create(durableRun({
-      id: "coordinator-run",
-      sessionId: "coordinator-session",
-      source: "tui",
-    }));
+    store.create(
+      durableRun({
+        id: "coordinator-run",
+        sessionId: "coordinator-session",
+        source: "tui",
+      }),
+    );
     await coordinator.start();
     assertEquals(
       getSessionRun(sessionDir, "coordinator-run")!.status,
@@ -88,15 +93,17 @@ test("RecoveryCoordinatorStartupScanConvergesThenWakeReconverges", async () => {
 
     // A second orphan admitted after startup converges only after a wake.
     const guard = acquireExecutionAdmission(sessionDir, "coordinator-session");
-    store.create(durableRun({
-      id: "coordinator-run-2",
-      sessionId: "coordinator-session",
-      source: "tui",
-    }));
+    store.create(
+      durableRun({
+        id: "coordinator-run-2",
+        sessionId: "coordinator-session",
+        source: "tui",
+      }),
+    );
     guard.release();
     coordinator.wake();
-    const converged = await waitFor(() =>
-      getSessionRun(sessionDir, "coordinator-run-2")!.status === "failed"
+    const converged = await waitFor(
+      () => getSessionRun(sessionDir, "coordinator-run-2")!.status === "failed",
     );
     assert(converged, "wake did not converge the newly admitted orphan");
 

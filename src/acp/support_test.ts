@@ -86,10 +86,7 @@ test("tool titles and stop reasons project faithfully", () => {
     "grep: pattern=x path=/a",
   );
   assertEquals(toolTitle("bash", {}), "bash");
-  assertEquals(
-    truncateTitle("x".repeat(200)).length,
-    160,
-  );
+  assertEquals(truncateTitle("x".repeat(200)).length, 160);
   assertEquals(normalizeStopReason("tool_use"), "end_turn");
   assertEquals(normalizeStopReason("max_tokens"), "max_tokens");
   assertEquals(normalizeStopReason("cancelled"), "cancelled");
@@ -126,11 +123,10 @@ test("replayMessageID is stable and messageUpdates matches roles", () => {
     ],
   };
   const updates = messageUpdates(registry, "s1", assistant, "e1");
-  assertEquals(updates.map((update) => update.sessionUpdate), [
-    "agent_thought_chunk",
-    "agent_message_chunk",
-    "tool_call",
-  ]);
+  assertEquals(
+    updates.map((update) => update.sessionUpdate),
+    ["agent_thought_chunk", "agent_message_chunk", "tool_call"],
+  );
   assertEquals(updates[2].toolCallId, "t1");
   assertEquals(updates[2].title, "bash: ls");
 
@@ -173,17 +169,14 @@ test("transcriptPage windows canonical messages", () => {
   assertEquals(page.sessionId, "s1");
   assertEquals(page.updates.length, 2);
   assertEquals(page.nextCursor, encodeTranscriptCursor(3));
-  assertEquals(
-    (page.updates[0].content as { text: string }).text,
-    "m3",
-  );
+  assertEquals((page.updates[0].content as { text: string }).text, "m3");
 
   const first = transcriptPage("s1", manager, "", 0, registry);
   assertEquals(first.updates.length, 5);
   assertEquals(first.nextCursor, undefined);
 
   assertThrows(() =>
-    transcriptPage("s1", manager, encodeTranscriptCursor(99), 2, registry)
+    transcriptPage("s1", manager, encodeTranscriptCursor(99), 2, registry),
   );
 });
 
@@ -214,24 +207,24 @@ test("elicitation and question projections", () => {
     questionAnswer({ action: "accept", content: { answer: "yes" } }, true),
     { answer: "yes", status: "resolved" },
   );
-  assertEquals(
-    questionAnswer({ answer: "legacy" }, true),
-    { answer: "legacy", status: "resolved" },
-  );
-  assertEquals(
-    questionAnswer({ action: "cancel" }, true),
-    { answer: "", status: "cancelled" },
-  );
-  assertEquals(
-    questionAnswer({ ok: true, answer: " yes " }, false),
-    { answer: "yes", status: "resolved" },
-  );
-  assertEquals(
-    questionAnswer({ ok: true, answers: ["two"] }, false),
-    { answer: "two", status: "resolved" },
-  );
-  assertEquals(
-    questionAnswer({ cancelled: true }, false),
-    { answer: "", status: "cancelled" },
-  );
+  assertEquals(questionAnswer({ answer: "legacy" }, true), {
+    answer: "legacy",
+    status: "resolved",
+  });
+  assertEquals(questionAnswer({ action: "cancel" }, true), {
+    answer: "",
+    status: "cancelled",
+  });
+  assertEquals(questionAnswer({ ok: true, answer: " yes " }, false), {
+    answer: "yes",
+    status: "resolved",
+  });
+  assertEquals(questionAnswer({ ok: true, answers: ["two"] }, false), {
+    answer: "two",
+    status: "resolved",
+  });
+  assertEquals(questionAnswer({ cancelled: true }, false), {
+    answer: "",
+    status: "cancelled",
+  });
 });

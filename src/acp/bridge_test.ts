@@ -1,4 +1,4 @@
-// deno-lint-ignore-file require-await -- async fake methods model Promise-returning seams
+/* eslint-disable @typescript-eslint/require-await */ // async fake methods model Promise-returning seams
 import { assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
 import { type CoreRuntimeEvent } from "../core/runtime.ts";
@@ -33,7 +33,7 @@ class FakeBridgeClient implements BridgeCoreClient {
   }
   onEvent(listener: (event: CoreRuntimeEvent) => void): () => void {
     this.eventListener = listener;
-    return () => this.eventListener = undefined;
+    return () => (this.eventListener = undefined);
   }
   onReverseRequest(
     listener: (
@@ -41,7 +41,7 @@ class FakeBridgeClient implements BridgeCoreClient {
     ) => void,
   ): () => void {
     this.reverseListener = listener;
-    return () => this.reverseListener = undefined;
+    return () => (this.reverseListener = undefined);
   }
   respondToReverseRequest(
     response: import("../core/protocol.ts").CoreRpcResponse,
@@ -75,10 +75,12 @@ test("ACPBridge maps session/prompt to Core and forwards Core events", async () 
   });
 
   await bridge.handle(request("session/new", '"1"', { cwd: "/tmp" }));
-  await bridge.handle(request("session/prompt", '"2"', {
-    sessionId: "session-1",
-    prompt: [{ type: "text", text: "hello" }],
-  }));
+  await bridge.handle(
+    request("session/prompt", '"2"', {
+      sessionId: "session-1",
+      prompt: [{ type: "text", text: "hello" }],
+    }),
+  );
   client.eventListener?.({
     sessionId: "session-1",
     runId: "run-1",
@@ -89,10 +91,10 @@ test("ACPBridge maps session/prompt to Core and forwards Core events", async () 
   });
 
   await Promise.resolve();
-  assertEquals(client.calls.map((call) => call.method), [
-    "session.create",
-    "session.prompt",
-  ]);
+  assertEquals(
+    client.calls.map((call) => call.method),
+    ["session.create", "session.prompt"],
+  );
   assertEquals(JSON.parse(output[1]).id, "2");
   assertEquals(JSON.parse(output[2]).method, "session/update");
   assertEquals(
@@ -115,20 +117,24 @@ test("ACPBridge maps session updates to Core replay and cancel to run.cancel", a
     },
   });
 
-  await bridge.handle(request("session/updates", '"3"', {
-    sessionId: "session-1",
-    runId: "run-1",
-    cursor: 2,
-  }));
-  await bridge.handle(request("session/cancel", '"4"', {
-    sessionId: "session-1",
-    runId: "run-1",
-  }));
+  await bridge.handle(
+    request("session/updates", '"3"', {
+      sessionId: "session-1",
+      runId: "run-1",
+      cursor: 2,
+    }),
+  );
+  await bridge.handle(
+    request("session/cancel", '"4"', {
+      sessionId: "session-1",
+      runId: "run-1",
+    }),
+  );
 
-  assertEquals(client.calls.map((call) => call.method), [
-    "run.events.replay",
-    "run.cancel",
-  ]);
+  assertEquals(
+    client.calls.map((call) => call.method),
+    ["run.events.replay", "run.cancel"],
+  );
   await bridge.close();
 });
 test("ACPBridge gates pre-initialize methods and correlates reverse responses", async () => {

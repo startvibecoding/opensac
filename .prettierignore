@@ -1,0 +1,26 @@
+# Build output and vendored/generated files stay out of the formatter, matching
+# the exclude list this replaced.
+dist/
+bin/
+node_modules/
+coverage/
+
+src/platform/busybox_assets/
+src/context/tokenizerdata/
+src/expert/builtin/
+src/skills/builtin/
+src/stats/dashboard.html
+
+# Generated from the `.js` worker sources by `npm run gen:worker-sources`.
+src/util/regex_worker_source.ts
+src/workflow/js_worker_source.ts
+
+# Markdown is checked for content, not formatted.
+*.md
+
+# Vendored skills contain their own HTML/JS tooling.
+skills/
+docs/
+.opensac/
+
+package-lock.json

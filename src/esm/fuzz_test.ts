@@ -1,5 +1,5 @@
 //
-// Deno ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
+// Node ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
 // property test over the same seeds plus generated inputs.
 
 import { assert } from "../compat/assert.ts";
@@ -18,15 +18,13 @@ import {
 import { test } from "#testing";
 
 function* candidates(): Generator<string> {
-  for (
-    const seed of [
-      '{"status":"continue","summary":"working"}',
-      '{"verdict":"pass","review":"verified","requirements_checked":["tests"]}',
-      '{"decision":"resume","summary":"continue work"}',
-      '```json\n{"status":"blocked_candidate","summary":"blocked","blockers":["missing access"]}\n```',
-      '{"status":"continue","summary":"quote: \\" and brace: }"}',
-    ]
-  ) {
+  for (const seed of [
+    '{"status":"continue","summary":"working"}',
+    '{"verdict":"pass","review":"verified","requirements_checked":["tests"]}',
+    '{"decision":"resume","summary":"continue work"}',
+    '```json\n{"status":"blocked_candidate","summary":"blocked","blockers":["missing access"]}\n```',
+    '{"status":"continue","summary":"quote: \\" and brace: }"}',
+  ]) {
     yield seed;
   }
   const alphabet = '{}[]":, abcXYZ019_-\\"';
@@ -79,9 +77,9 @@ test("ParseReports fuzz invariants", () => {
         );
       } else {
         throw new Error(
-          `accepted invalid recovery decision ${
-            JSON.stringify(report.decision)
-          }`,
+          `accepted invalid recovery decision ${JSON.stringify(
+            report.decision,
+          )}`,
         );
       }
     } catch {

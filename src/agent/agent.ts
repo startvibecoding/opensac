@@ -19,8 +19,8 @@
 //     raced against the agent abort signal and the run-context signal. The
 //     `Run*` entry points, `loop`, `emitRunFinished`, and the tool-execution /
 //     compaction / response-state paths remain deferred (see
-//     docs/proposal/go-to-deno-migration.md backlog #19).
-//   - `sync.RWMutex`/`sync/atomic` are dropped (Deno is single-threaded);
+//     docs/proposal/go-to-typescript-migration.md backlog #19).
+//   - `sync.RWMutex`/`sync/atomic` are dropped (Node is single-threaded);
 //     `atomic.Int64`/`Int32` map to plain number fields.
 //   - `time.Now().UnixNano()` agent IDs map to a millisecond clock plus a
 //     monotonic counter so generated IDs stay unique within a process.
@@ -190,7 +190,11 @@ import {
   createRegistry,
   type Tool,
 } from "../tools/tool.ts";
-import { type FileDiff, type QuestionAsker, type TaskPlan } from "../tools/mod.ts";
+import {
+  type FileDiff,
+  type QuestionAsker,
+  type TaskPlan,
+} from "../tools/mod.ts";
 import { createNoneSandbox } from "../sandbox/none.ts";
 import { contextWithGitAccess, gitAccessRequired } from "../sandbox/git.ts";
 import { Level } from "../sandbox/sandbox.ts";
@@ -583,7 +587,7 @@ function responseStateModeOf(
   if (p === undefined) return undefined;
   const candidate = p as unknown as Partial<ResponseStateModeProviderLike>;
   return typeof candidate.responseStateMode === "function"
-    ? candidate as ResponseStateModeProviderLike
+    ? (candidate as ResponseStateModeProviderLike)
     : undefined;
 }
 
@@ -594,7 +598,7 @@ function responseStateFallbackOf(
   if (p === undefined) return undefined;
   const candidate = p as unknown as Partial<ResponseStateFallbackProviderLike>;
   return typeof candidate.responseStateFallbackError === "function"
-    ? candidate as ResponseStateFallbackProviderLike
+    ? (candidate as ResponseStateFallbackProviderLike)
     : undefined;
 }
 
@@ -603,11 +607,9 @@ function responseStateFailureOf(
   p: Provider | undefined,
 ): ResponseStateFailureClassifierLike | undefined {
   if (p === undefined) return undefined;
-  const candidate = p as unknown as Partial<
-    ResponseStateFailureClassifierLike
-  >;
+  const candidate = p as unknown as Partial<ResponseStateFailureClassifierLike>;
   return typeof candidate.responseStateFailureClass === "function"
-    ? candidate as ResponseStateFailureClassifierLike
+    ? (candidate as ResponseStateFailureClassifierLike)
     : undefined;
 }
 
@@ -882,8 +884,11 @@ export class Agent {
     const contextWindow = model.contextWindow;
     if (contextWindow <= 0) return undefined;
     const estimator = resolveTokenEstimator(
-      this.config.compactionSettings ??
-        { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+      this.config.compactionSettings ?? {
+        enabled: false,
+        reserveTokens: 0,
+        keepRecentTokens: 0,
+      },
       model,
     );
     const usage = contextUsageFromMessages(this.#messages, estimator);
@@ -947,7 +952,8 @@ export class Agent {
     }
     const model = this.config.model;
     if (
-      model !== undefined && model.contextWindow > 0 &&
+      model !== undefined &&
+      model.contextWindow > 0 &&
       reserve >= model.contextWindow
     ) {
       return Math.floor(model.contextWindow / 2);
@@ -990,8 +996,11 @@ export class Agent {
     reserveTokens: number,
   ): string | undefined {
     const estimator = resolveTokenEstimator(
-      this.config.compactionSettings ??
-        { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+      this.config.compactionSettings ?? {
+        enabled: false,
+        reserveTokens: 0,
+        keepRecentTokens: 0,
+      },
       this.config.model ?? null,
     );
     let bestIndex = -1;
@@ -1034,8 +1043,11 @@ export class Agent {
       return maxTokens;
     }
     const estimator = resolveTokenEstimator(
-      this.config.compactionSettings ??
-        { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+      this.config.compactionSettings ?? {
+        enabled: false,
+        reserveTokens: 0,
+        keepRecentTokens: 0,
+      },
       model,
     );
     const estimatedTokens = estimateChatRequestTokens(
@@ -1062,7 +1074,8 @@ export class Agent {
     }
     for (let i = messages.length - 1; i >= 0; i--) {
       if (
-        messages[i].systemInjected === true && messages[i].role === "user" &&
+        messages[i].systemInjected === true &&
+        messages[i].role === "user" &&
         (messages[i].content ?? "").startsWith("## Goal")
       ) {
         return messages[i].content ?? "";
@@ -1082,8 +1095,11 @@ export class Agent {
     return hasCompactableMessages(
       messages,
       model,
-      this.config.compactionSettings ??
-        { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+      this.config.compactionSettings ?? {
+        enabled: false,
+        reserveTokens: 0,
+        keepRecentTokens: 0,
+      },
       this.previousCompactionSummary(messages),
     );
   }
@@ -1267,11 +1283,7 @@ export class Agent {
       approvalArgs: args,
     });
 
-    const approved = await this.#raceCancellation(
-      decision,
-      false,
-      ctx?.signal,
-    );
+    const approved = await this.#raceCancellation(decision, false, ctx?.signal);
     this.#pendingApprovals.delete(approvalId);
     return approved;
   }
@@ -1405,7 +1417,8 @@ export class Agent {
       limit = model.maxTokens;
     }
     if (
-      model !== undefined && model.contextWindow > 0 &&
+      model !== undefined &&
+      model.contextWindow > 0 &&
       limit > model.contextWindow
     ) {
       limit = model.contextWindow;
@@ -1494,10 +1507,7 @@ export class Agent {
   }
 
   /** Processes an already-built user message and streams events back. */
-  runWithUserMessage(
-    msg: Message,
-    abort?: AbortSignal,
-  ): AsyncIterable<Event> {
+  runWithUserMessage(msg: Message, abort?: AbortSignal): AsyncIterable<Event> {
     const channel = new EventChannel();
     const ctx = createRunContext(abort);
     void this.#runUserMessageTask(ctx, msg, channel);
@@ -1581,17 +1591,20 @@ export class Agent {
         }
         const [normalized] = normalizeMessage(msg);
         let msgIndex = this.#messages.length;
-        const userEntryLoaded = this.config.runtimeOwnsUserEntry === true &&
+        const userEntryLoaded =
+          this.config.runtimeOwnsUserEntry === true &&
           (this.config.userEntryId ?? "") !== "" &&
-          msgIndex > 0 && this.#messageIds.length === msgIndex &&
+          msgIndex > 0 &&
+          this.#messageIds.length === msgIndex &&
           this.#messageIds[msgIndex - 1] === this.config.userEntryId;
         if (userEntryLoaded) {
           msgIndex--;
         } else {
           this.#messages = [...this.#messages, normalized];
-          const entryId = this.config.runtimeOwnsUserEntry === true
-            ? (this.config.userEntryId ?? "")
-            : "";
+          const entryId =
+            this.config.runtimeOwnsUserEntry === true
+              ? (this.config.userEntryId ?? "")
+              : "";
           this.#messageIds = [...this.#messageIds, entryId];
           this.#context.messages = [...this.#context.messages, normalized];
         }
@@ -1801,17 +1814,20 @@ export class Agent {
     const registry = createRegistry(workDir, createNoneSandbox());
     let model = this.config.model;
     if (model !== undefined) model = { ...model, contextWindow: 0 };
-    const child = createAgentWithLoopConfig({
-      provider: this.config.provider,
-      vendor: this.config.vendor,
-      model,
-      mode: this.config.mode,
-      thinkingLevel: this.config.thinkingLevel,
-      maxTokens,
-      compactionSettings: emptyCompactionSettings,
-      maxIterations: 1,
-      toolExecutionMode: "sequential",
-    }, registry);
+    const child = createAgentWithLoopConfig(
+      {
+        provider: this.config.provider,
+        vendor: this.config.vendor,
+        model,
+        mode: this.config.mode,
+        thinkingLevel: this.config.thinkingLevel,
+        maxTokens,
+        compactionSettings: emptyCompactionSettings,
+        maxIterations: 1,
+        toolExecutionMode: "sequential",
+      },
+      registry,
+    );
     child.#frozenSystemPrompt = this.#frozenSystemPrompt;
     child.#frozenToolDefs = [];
     child.#context.systemPrompt = this.#frozenSystemPrompt;
@@ -2031,12 +2047,9 @@ export class Agent {
    * still exceeds the budget after the guard has omitted every compactable
    * tool result.
    */
-  prepareRequestMessages(
-    sessionContextMsg: Message,
-    ch: EventSink,
-  ): Message[] {
-    const [budgetTokens, reserveTokens, contextWindow, ok] = this
-      .requestTokenBudget();
+  prepareRequestMessages(sessionContextMsg: Message, ch: EventSink): Message[] {
+    const [budgetTokens, reserveTokens, contextWindow, ok] =
+      this.requestTokenBudget();
     if (!ok) return this.buildRequestMessages(sessionContextMsg);
     const estimator = resolveTokenEstimator(
       this.config.compactionSettings ?? emptyCompactionSettings,
@@ -2143,10 +2156,10 @@ export class Agent {
         },
       );
       removeListeners();
-      const firstKeptEntryId = result.firstKeptIndex >= 0 &&
-          result.firstKeptIndex < msgIds.length
-        ? msgIds[result.firstKeptIndex]
-        : "";
+      const firstKeptEntryId =
+        result.firstKeptIndex >= 0 && result.firstKeptIndex < msgIds.length
+          ? msgIds[result.firstKeptIndex]
+          : "";
       const summaryMsg = createSystemInjectedUserMessage(result.summary);
       const keptMessages = cloneMessagesWithoutUsage(
         msgs.slice(result.firstKeptIndex),
@@ -2219,15 +2232,13 @@ export class Agent {
     state.contextOverflowRetried = true;
     this.sendEvent(ch, {
       type: EVENT_STATUS,
-      statusMessage:
-        `Context too large (${cause.message}); compacting context and retrying...`,
+      statusMessage: `Context too large (${cause.message}); compacting context and retrying...`,
     });
     const err = await this.compact(ctx, ch, true);
     if (err !== undefined) {
       this.sendEvent(ch, {
         type: EVENT_STATUS,
-        statusMessage:
-          `Context compaction failed (${err.message}); dropping oldest messages to fit the context window...`,
+        statusMessage: `Context compaction failed (${err.message}); dropping oldest messages to fit the context window...`,
       });
       this.truncateHistoryForOverflow(ch);
     }
@@ -2296,10 +2307,9 @@ export class Agent {
         } catch (err) {
           this.sendEvent(ch, {
             type: EVENT_STATUS,
-            statusMessage:
-              `Warning: failed to persist image removal for entry ${o.entryId}: ${
-                (err as Error).message
-              }`,
+            statusMessage: `Warning: failed to persist image removal for entry ${o.entryId}: ${
+              (err as Error).message
+            }`,
           });
         }
       }
@@ -2307,15 +2317,13 @@ export class Agent {
       if (hasVisibleOutput) {
         this.sendEvent(ch, {
           type: EVENT_STATUS,
-          statusMessage:
-            `The provider rejected ${removed} image(s) during content inspection and removed them from ${scope}; the current turn cannot be safely retried because it already produced output.`,
+          statusMessage: `The provider rejected ${removed} image(s) during content inspection and removed them from ${scope}; the current turn cannot be safely retried because it already produced output.`,
         });
         return false;
       }
       this.sendEvent(ch, {
         type: EVENT_STATUS,
-        statusMessage:
-          `The provider rejected ${removed} image(s) during content inspection; removed them from ${scope} and retrying without them.`,
+        statusMessage: `The provider rejected ${removed} image(s) during content inspection; removed them from ${scope} and retrying without them.`,
       });
       this.sendEvent(ch, {
         type: EVENT_RETRY,
@@ -2345,11 +2353,9 @@ export class Agent {
     if (!isStreamTimeoutError(cause)) return false;
     if (textContent !== "" || thinkContent !== "") return false;
     state.streamTimeoutRetries += 1;
-    let msg =
-      `⚠️ 供应商响应超时（长时间未收到数据），正在自动重试第 ${state.streamTimeoutRetries} 次…`;
+    let msg = `⚠️ 供应商响应超时（长时间未收到数据），正在自动重试第 ${state.streamTimeoutRetries} 次…`;
     if (maxRetries > 0) {
-      msg =
-        `⚠️ 供应商响应超时（长时间未收到数据），正在自动重试第 ${state.streamTimeoutRetries}/${maxRetries} 次…`;
+      msg = `⚠️ 供应商响应超时（长时间未收到数据），正在自动重试第 ${state.streamTimeoutRetries}/${maxRetries} 次…`;
     }
     const delay = streamRecoveryRetryDelay(state.streamTimeoutRetries);
     this.sendEvent(ch, { type: EVENT_STATUS, statusMessage: msg });
@@ -2381,7 +2387,8 @@ export class Agent {
     if (cause === undefined) return false;
     const streamTimeout = isStreamTimeoutError(cause);
     if (
-      !streamTimeout && maxRetries > 0 &&
+      !streamTimeout &&
+      maxRetries > 0 &&
       state.streamFailureRetries >= maxRetries
     ) {
       return false;
@@ -2468,11 +2475,11 @@ export class Agent {
     const fits = (candidate: Message[]): boolean =>
       target > 0 &&
       estimateChatRequestTokens(
-          this.#frozenSystemPrompt,
-          candidate,
-          this.#frozenToolDefs,
-          estimator,
-        ) <= target;
+        this.#frozenSystemPrompt,
+        candidate,
+        this.#frozenToolDefs,
+        estimator,
+      ) <= target;
     let cut = -1;
     for (let i = 1; i < msgs.length; i++) {
       if (msgs[i].role !== "user" && msgs[i].role !== "assistant") continue;
@@ -2502,8 +2509,7 @@ export class Agent {
     }
     if (cut < 0) return;
     const kept = cloneMessagesWithoutUsage(msgs.slice(cut));
-    const note =
-      `[Context recovery] The provider rejected the request for exceeding the context window and automatic summarization failed, so ${cut} older messages were dropped without a summary to recover. Earlier context is no longer available.`;
+    const note = `[Context recovery] The provider rejected the request for exceeding the context window and automatic summarization failed, so ${cut} older messages were dropped without a summary to recover. Earlier context is no longer available.`;
     const newMessages = [createSystemInjectedUserMessage(note), ...kept];
     const newIds: string[] = [""];
     if (cut < msgIds.length) newIds.push(...msgIds.slice(cut));
@@ -2529,8 +2535,7 @@ export class Agent {
     }
     this.sendEvent(ch, {
       type: EVENT_STATUS,
-      statusMessage:
-        `Context recovery: dropped ${cut} oldest messages after provider context overflow`,
+      statusMessage: `Context recovery: dropped ${cut} oldest messages after provider context overflow`,
     });
   }
 
@@ -2682,22 +2687,27 @@ export class Agent {
       }
       const modelId = this.config.model?.id ?? "";
       if (
-        archive.status === "completed" && archive.responseId !== "" &&
+        archive.status === "completed" &&
+        archive.responseId !== "" &&
         archive.stateMode === "previous_response_id"
       ) {
         responseSummaryFields.lineageExpectedVersion = expectedStateVersion;
         try {
-          const advanced = compareAndSwapResponseSessionState(sessionDir, {
-            sessionId: header.id,
-            stateMode: archive.stateMode,
-            previousResponseId: archive.responseId,
-            conversationId: archive.conversationId,
-            provider: provider.name(),
-            api: provider.api(),
-            model: modelId,
-            version: expectedStateVersion,
-            updatedAt: now,
-          }, expectedStateVersion);
+          const advanced = compareAndSwapResponseSessionState(
+            sessionDir,
+            {
+              sessionId: header.id,
+              stateMode: archive.stateMode,
+              previousResponseId: archive.responseId,
+              conversationId: archive.conversationId,
+              provider: provider.name(),
+              api: provider.api(),
+              model: modelId,
+              version: expectedStateVersion,
+              updatedAt: now,
+            },
+            expectedStateVersion,
+          );
           responseSummaryFields.lineageUpdate = advanced
             ? "advanced"
             : "conflict";
@@ -2766,9 +2776,7 @@ export class Agent {
   ): ResponseStateFailureClass {
     const session = this.config.session;
     const provider = this.config.provider;
-    if (
-      session === undefined || provider === undefined || localTurnId === ""
-    ) {
+    if (session === undefined || provider === undefined || localTurnId === "") {
       return responseStateFailureRequestFailed;
     }
     const header = session.getHeader();
@@ -2850,17 +2858,14 @@ export class Agent {
   ): Promise<Message[]> {
     const order = createToolLaunchOrder(toolCalls.length);
     const indexes = toolCalls.map((_, i) => i);
-    return await boundedParallel(
-      this.maxToolConcurrency(),
-      indexes,
-      (index) =>
-        this.executeSingleToolCall(
-          ctx,
-          toolCalls[index],
-          localTurnId,
-          ch,
-          order === null ? null : order.handle(index),
-        ),
+    return await boundedParallel(this.maxToolConcurrency(), indexes, (index) =>
+      this.executeSingleToolCall(
+        ctx,
+        toolCalls[index],
+        localTurnId,
+        ch,
+        order === null ? null : order.handle(index),
+      ),
     );
   }
 
@@ -2908,14 +2913,14 @@ export class Agent {
     try {
       // Parse arguments
       let params: Record<string, unknown> = {};
-      const argsRaw = (tc.invalidArguments ?? "") !== ""
-        ? tc.invalidArguments
-        : tc.arguments;
+      const argsRaw =
+        (tc.invalidArguments ?? "") !== "" ? tc.invalidArguments : tc.arguments;
       if (typeof argsRaw === "string" && argsRaw.length > 0) {
         try {
           const parsed = JSON.parse(argsRaw);
           if (
-            parsed !== null && typeof parsed === "object" &&
+            parsed !== null &&
+            typeof parsed === "object" &&
             !Array.isArray(parsed)
           ) {
             params = parsed as Record<string, unknown>;
@@ -2933,16 +2938,18 @@ export class Agent {
           return toolResult(errMsg, undefined, true);
         }
       } else if (
-        argsRaw !== null && argsRaw !== undefined &&
-        typeof argsRaw === "object" && !Array.isArray(argsRaw)
+        argsRaw !== null &&
+        argsRaw !== undefined &&
+        typeof argsRaw === "object" &&
+        !Array.isArray(argsRaw)
       ) {
         params = argsRaw as Record<string, unknown>;
       }
       // Tool registration is the execution authorization boundary.
       if (!this.isToolRegisteredForRun(tc.name)) {
-        const errMsg = `tool ${
-          JSON.stringify(tc.name)
-        } is not registered for this run`;
+        const errMsg = `tool ${JSON.stringify(
+          tc.name,
+        )} is not registered for this run`;
         this.sendEvent(ch, {
           type: EVENT_TOOL_EXECUTION_END,
           toolCallId: tc.id,
@@ -2962,9 +2969,9 @@ export class Agent {
       });
       if (launch !== null) launch.markStarted();
       if (this.config.mode === "os" && tc.name !== "bash") {
-        const errMsg = `tool ${
-          JSON.stringify(tc.name)
-        } is unavailable in OS mode; only bash is registered`;
+        const errMsg = `tool ${JSON.stringify(
+          tc.name,
+        )} is unavailable in OS mode; only bash is registered`;
         this.sendEvent(ch, {
           type: EVENT_TOOL_EXECUTION_END,
           toolCallId: tc.id,
@@ -2997,9 +3004,10 @@ export class Agent {
           context: this.getContext(),
         });
         if (blockResult !== undefined && blockResult.block) {
-          const reason = blockResult.reason === ""
-            ? "Tool execution was blocked"
-            : blockResult.reason;
+          const reason =
+            blockResult.reason === ""
+              ? "Tool execution was blocked"
+              : blockResult.reason;
           this.sendEvent(ch, {
             type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
@@ -3014,8 +3022,10 @@ export class Agent {
       // Git metadata one-shot approval.
       let gitAccessApproved = false;
       if (
-        tc.name === "bash" && this.config.mode !== "yolo" &&
-        this.config.mode !== "os" && this.config.sandboxMgr !== undefined &&
+        tc.name === "bash" &&
+        this.config.mode !== "yolo" &&
+        this.config.mode !== "os" &&
+        this.config.sandboxMgr !== undefined &&
         this.config.sandboxMgr.level() !== Level.None
       ) {
         const command = bashCommandArg(params);
@@ -3104,9 +3114,8 @@ export class Agent {
             allowReadOnlyRecovery,
           );
         } catch (thrown) {
-          const claimErr = thrown instanceof Error
-            ? thrown
-            : new Error(String(thrown));
+          const claimErr =
+            thrown instanceof Error ? thrown : new Error(String(thrown));
           const errMsg = `record tool execution: ${claimErr.message}`;
           this.sendEvent(ch, {
             type: EVENT_TOOL_EXECUTION_END,
@@ -3133,9 +3142,10 @@ export class Agent {
             reusedErr = gated.error;
             if (gated.error !== undefined) reusedResult.toolKind = tc.kind;
           }
-          const executionState = reusedResult.isError === true
-            ? TOOL_EXECUTION_FAILED
-            : TOOL_EXECUTION_REUSED;
+          const executionState =
+            reusedResult.isError === true
+              ? TOOL_EXECUTION_FAILED
+              : TOOL_EXECUTION_REUSED;
           this.sendEvent(ch, {
             type: EVENT_TOOL_EXECUTION_END,
             toolCallId: tc.id,
@@ -3176,9 +3186,10 @@ export class Agent {
             sideEffecting,
           });
           if (blockResult !== undefined && blockResult.block) {
-            const reason = blockResult.reason === ""
-              ? "Tool execution was blocked before the side effect fence"
-              : blockResult.reason;
+            const reason =
+              blockResult.reason === ""
+                ? "Tool execution was blocked before the side effect fence"
+                : blockResult.reason;
             this.sendEvent(ch, {
               type: EVENT_TOOL_EXECUTION_END,
               toolCallId: tc.id,
@@ -3238,18 +3249,16 @@ export class Agent {
         resultContents = gated.contents;
         isError = gated.isError;
         if (gated.error !== undefined) err = gated.error;
-        const terminalState = isError || err !== undefined
-          ? TOOL_EXECUTION_FAILED
-          : TOOL_EXECUTION_COMPLETED;
+        const terminalState =
+          isError || err !== undefined
+            ? TOOL_EXECUTION_FAILED
+            : TOOL_EXECUTION_COMPLETED;
         if (claimed !== null && this.config.session !== undefined) {
           try {
             updateToolExecutionRecord(this.config.session.getSessionDir(), {
               ...claimed,
               executionState: "completed",
-              resultSummary: toolExecutionResultSummary(
-                resultContent,
-                isError,
-              ),
+              resultSummary: toolExecutionResultSummary(resultContent, isError),
               completedAt: new Date(),
             });
           } catch (updateErr) {
@@ -3332,7 +3341,9 @@ export class Agent {
     const session = this.config.session;
     const provider = this.config.provider;
     if (
-      session === undefined || provider === undefined || localTurnId === "" ||
+      session === undefined ||
+      provider === undefined ||
+      localTurnId === "" ||
       tc.id === ""
     ) {
       return { kind: "skipped" };
@@ -3347,8 +3358,16 @@ export class Agent {
       throw new Error(`normalize tool arguments: ${e}`);
     }
     const argsHash = createHash("sha256").update(normalizedArgs).digest("hex");
-    const keyInput = header.id + "\u0000" + localTurnId + "\u0000" + tc.id +
-      "\u0000" + tc.name + "\u0000" + argsHash;
+    const keyInput =
+      header.id +
+      "\u0000" +
+      localTurnId +
+      "\u0000" +
+      tc.id +
+      "\u0000" +
+      tc.name +
+      "\u0000" +
+      argsHash;
     const keyHash = createHash("sha256").update(keyInput).digest("hex");
     const sessionDir = session.getSessionDir();
     const record: ToolExecutionRecord = {
@@ -3388,7 +3407,8 @@ export class Agent {
       message.toolKind = tc.kind;
       return { kind: "reused", message };
     }
-    const canRecover = allowReadOnlyRecovery &&
+    const canRecover =
+      allowReadOnlyRecovery &&
       ((isReadOnlyToolName(tc.name) && !stored.sideEffecting) ||
         stored.executionState === "retry_requested");
     if (canRecover) {
@@ -3463,9 +3483,10 @@ export class Agent {
     this.setRunContext(runCtx);
     try {
       let consecutiveNoText = 0;
-      const maxConsecutiveNoText = (this.config.maxConsecutiveNoText ?? 0) <= 0
-        ? 95
-        : this.config.maxConsecutiveNoText as number;
+      const maxConsecutiveNoText =
+        (this.config.maxConsecutiveNoText ?? 0) <= 0
+          ? 95
+          : (this.config.maxConsecutiveNoText as number);
       const maxConsecutiveNoTextAfterWarning = 5;
       let warningIssued = false;
       let contextPressureFired = false;
@@ -3487,7 +3508,7 @@ export class Agent {
       let responsesReplayFallback = false;
       let lastRenewals = 0;
 
-      for (let i = 0;; i++) {
+      for (let i = 0; ; i++) {
         let limit = this.config.maxIterations ?? 0;
         if (budget !== undefined) {
           budget.setTurn(i);
@@ -3560,9 +3581,8 @@ export class Agent {
         try {
           allMessages = this.prepareRequestMessages(sessionContextMsg, ch);
         } catch (thrown) {
-          const err = thrown instanceof Error
-            ? thrown
-            : new Error(String(thrown));
+          const err =
+            thrown instanceof Error ? thrown : new Error(String(thrown));
           if (await this.tryRecoverContextOverflow(runCtx, ch, state, err)) {
             continue;
           }
@@ -3706,34 +3726,35 @@ export class Agent {
                   }
                   if (toolCallIds.has(toolCall.id)) continue;
                   toolCallIds.add(toolCall.id);
-                  const hadEmptyArgs = typeof toolCall.arguments === "string" &&
+                  const hadEmptyArgs =
+                    typeof toolCall.arguments === "string" &&
                     toolCall.arguments.length === 0;
                   let args: Record<string, unknown> | null = null;
                   let argErr: Error | null = null;
                   try {
                     args = normalizeToolCallArguments(toolCall);
                   } catch (thrown) {
-                    argErr = thrown instanceof Error
-                      ? thrown
-                      : new Error(String(thrown));
+                    argErr =
+                      thrown instanceof Error
+                        ? thrown
+                        : new Error(String(thrown));
                   }
                   if (hadEmptyArgs && argErr === null) {
                     state.toolArgumentNotices.push(
-                      `Tool ${
-                        JSON.stringify(toolCall.name)
-                      } streamed no JSON arguments. The runtime normalized the call to the safe fallback {}. Treat the tool result below as authoritative; use explicit valid JSON arguments for any follow-up call.`,
+                      `Tool ${JSON.stringify(
+                        toolCall.name,
+                      )} streamed no JSON arguments. The runtime normalized the call to the safe fallback {}. Treat the tool result below as authoritative; use explicit valid JSON arguments for any follow-up call.`,
                     );
                   }
                   if (argErr !== null) {
                     state.toolArgumentNotices.push(
-                      `Tool ${
-                        JSON.stringify(toolCall.name)
-                      } returned malformed JSON arguments (${argErr.message}). The original arguments were not executed; the safe fallback was {}. Treat this tool call as failed and reconstruct valid JSON before trying again. Do not assume any side effect occurred.`,
+                      `Tool ${JSON.stringify(
+                        toolCall.name,
+                      )} returned malformed JSON arguments (${argErr.message}). The original arguments were not executed; the safe fallback was {}. Treat this tool call as failed and reconstruct valid JSON before trying again. Do not assume any side effect occurred.`,
                     );
                     this.sendEvent(ch, {
                       type: EVENT_STATUS,
-                      statusMessage:
-                        `Warning: failed to parse tool arguments: ${argErr.message}`,
+                      statusMessage: `Warning: failed to parse tool arguments: ${argErr.message}`,
                     });
                   }
                   toolCalls.push(toolCall);
@@ -3749,9 +3770,8 @@ export class Agent {
                 break;
               case streamDone:
                 stopReason = event.stopReason ?? "";
-                attachments = event.attachments === undefined
-                  ? []
-                  : [...event.attachments];
+                attachments =
+                  event.attachments === undefined ? [] : [...event.attachments];
                 break;
               case streamError:
                 streamErr = event.error;
@@ -3787,9 +3807,8 @@ export class Agent {
             }
           }
         } catch (thrown) {
-          streamErr = thrown instanceof Error
-            ? thrown
-            : new Error(String(thrown));
+          streamErr =
+            thrown instanceof Error ? thrown : new Error(String(thrown));
         }
 
         if (streamErr !== undefined) {
@@ -3809,9 +3828,7 @@ export class Agent {
           }
           let failureClass: ResponseStateFailureClass =
             responseStateFailureRequestFailed;
-          if (
-            responseTurnId !== "" && responseState.remoteStateActive
-          ) {
+          if (responseTurnId !== "" && responseState.remoteStateActive) {
             failureClass = this.recordResponsesStateFailure(
               responseTurnId,
               responseState,
@@ -3844,12 +3861,7 @@ export class Agent {
           }
           if (
             isContextOverflowError(streamErr) &&
-            await this.tryRecoverContextOverflow(
-              runCtx,
-              ch,
-              state,
-              streamErr,
-            )
+            (await this.tryRecoverContextOverflow(runCtx, ch, state, streamErr))
           ) {
             continue;
           }
@@ -3857,8 +3869,7 @@ export class Agent {
             this.tryRecoverContentRejection(
               ch,
               state,
-              textContent !== "" || thinkContent !== "" ||
-                toolCalls.length > 0,
+              textContent !== "" || thinkContent !== "" || toolCalls.length > 0,
               streamErr,
             )
           ) {
@@ -3880,7 +3891,7 @@ export class Agent {
           }
           if (
             !responseState.remoteStateActive &&
-            await this.tryContinueStreamFailure(
+            (await this.tryContinueStreamFailure(
               runCtx,
               ch,
               state,
@@ -3890,7 +3901,7 @@ export class Agent {
               thinkSignature,
               toolCalls,
               streamErr,
-            )
+            ))
           ) {
             i--;
             continue;
@@ -3926,7 +3937,8 @@ export class Agent {
 
         if (isOutputTruncationReason(stopReason)) {
           if (
-            !escalated && this.config.maxTokensUserSet !== true &&
+            !escalated &&
+            this.config.maxTokensUserSet !== true &&
             (this.config.model === undefined ||
               this.config.model.maxTokensSet !== true)
           ) {
@@ -3945,7 +3957,8 @@ export class Agent {
             }
           }
           if (
-            escalated && toolCalls.length === 0 &&
+            escalated &&
+            toolCalls.length === 0 &&
             recoveryAttempts < maxOutputRecoveryAttempts
           ) {
             recoveryAttempts++;
@@ -3992,8 +4005,7 @@ export class Agent {
             toolCalls,
             usage,
             stopReason,
-          ) ===
-            turnEmpty
+          ) === turnEmpty
         ) {
           emptyResponseRetries++;
           if (emptyResponseRetries <= maxEmptyResponseRetries) {
@@ -4017,9 +4029,9 @@ export class Agent {
             continue;
           }
           const err = new Error(
-            `provider returned an empty response ${emptyResponseRetries} times in a row; last usage: ${
-              formatUsage(usage)
-            }, stopReason: ${JSON.stringify(stopReason)}`,
+            `provider returned an empty response ${emptyResponseRetries} times in a row; last usage: ${formatUsage(
+              usage,
+            )}, stopReason: ${JSON.stringify(stopReason)}`,
           );
           this.#emitRunFinished(
             ch,
@@ -4076,8 +4088,10 @@ export class Agent {
         usage = completeProviderUsage(usage, estimatedUsage) ?? undefined;
         assistantMsg.usage = usage;
         persistedAssistantMsg.usage = usage;
-        const deferAssistantEntry = this.config.runtimeOwnsTurnEnd === true &&
-          this.config.session !== undefined && toolCalls.length === 0;
+        const deferAssistantEntry =
+          this.config.runtimeOwnsTurnEnd === true &&
+          this.config.session !== undefined &&
+          toolCalls.length === 0;
         let assistantEntryId = "";
         if (deferAssistantEntry) {
           assistantEntryId = runAssistantEntryID(this.config.runId ?? "");
@@ -4086,9 +4100,7 @@ export class Agent {
         this.#messages = [...this.#messages, assistantMsg];
         this.#messageIds = [...this.#messageIds, assistantEntryId];
         this.#context.messages = [...this.#context.messages, assistantMsg];
-        if (
-          this.config.session !== undefined && !deferAssistantEntry
-        ) {
+        if (this.config.session !== undefined && !deferAssistantEntry) {
           let msgId: string;
           try {
             msgId = this.config.session.appendMessage(persistedAssistantMsg);
@@ -4188,9 +4200,9 @@ export class Agent {
             ch({
               type: EVENT_ERROR,
               error: new Error(
-                `provider output truncated (stop reason ${
-                  JSON.stringify(stopReason)
-                })`,
+                `provider output truncated (stop reason ${JSON.stringify(
+                  stopReason,
+                )})`,
               ),
               stopReason: "output_limit",
             });
@@ -4258,9 +4270,7 @@ export class Agent {
             );
             ch({
               type: EVENT_ERROR,
-              error: new Error(
-                `save tool result to session: ${cause.message}`,
-              ),
+              error: new Error(`save tool result to session: ${cause.message}`),
             });
             ch(this.agentEndEvent());
             return;
@@ -4296,10 +4306,10 @@ export class Agent {
 
         if (textContent === "") {
           consecutiveNoText++;
-          let threshold = consecutiveNoText >= maxConsecutiveNoText &&
-              !warningIssued
-            ? maxConsecutiveNoText
-            : maxConsecutiveNoTextAfterWarning;
+          let threshold =
+            consecutiveNoText >= maxConsecutiveNoText && !warningIssued
+              ? maxConsecutiveNoText
+              : maxConsecutiveNoTextAfterWarning;
           if (!warningIssued) threshold = maxConsecutiveNoText;
           if (consecutiveNoText >= threshold) {
             if (!warningIssued) {
@@ -4323,9 +4333,8 @@ export class Agent {
                 try {
                   msgId = this.config.session.appendMessage(warningMsg);
                 } catch (err) {
-                  const cause = err instanceof Error
-                    ? err
-                    : new Error(String(err));
+                  const cause =
+                    err instanceof Error ? err : new Error(String(err));
                   this.#emitRunFinished(
                     ch,
                     TASK_FAILED,
@@ -4378,13 +4387,14 @@ export class Agent {
           let threshold = this.config.contextPressureThreshold ?? 0;
           if (threshold <= 0) threshold = 0.55;
           if (
-            contextUsage !== undefined && contextUsage.percent !== undefined &&
+            contextUsage !== undefined &&
+            contextUsage.percent !== undefined &&
             contextUsage.percent >= threshold * 100
           ) {
             contextPressureFired = true;
-            const warnMsg = `[Context Pressure] ${
-              Math.round(contextUsage.percent)
-            }% of context window used (${contextUsage.totalTokens}/${contextUsage.contextWindow} tokens). Compaction will trigger soon. Consider saving important context to memory.md and wrapping up the current task.`;
+            const warnMsg = `[Context Pressure] ${Math.round(
+              contextUsage.percent,
+            )}% of context window used (${contextUsage.totalTokens}/${contextUsage.contextWindow} tokens). Compaction will trigger soon. Consider saving important context to memory.md and wrapping up the current task.`;
             this.sendEvent(ch, {
               type: EVENT_CONTEXT_PRESSURE,
               pressureMessage: warnMsg,
@@ -4397,20 +4407,18 @@ export class Agent {
 
         if (!budgetPressureFired) {
           let threshold = this.config.budgetPressureThreshold ?? 0;
-          if (threshold <= 0) threshold = 0.20;
+          if (threshold <= 0) threshold = 0.2;
           if (limit > 0) {
             const remaining = (limit - i) / limit;
             if (remaining <= threshold) {
               budgetPressureFired = true;
               const remainingTurns = limit - i;
-              let warnMsg =
-                `[Budget Pressure] ${remainingTurns}/${limit} turns remaining (${
-                  Math.round(remaining * 100)
-                }%). Complete the current task and summarize progress.`;
+              let warnMsg = `[Budget Pressure] ${remainingTurns}/${limit} turns remaining (${Math.round(
+                remaining * 100,
+              )}%). Complete the current task and summarize progress.`;
               if (budget !== undefined) {
                 if (budget.canRenew()) {
-                  warnMsg +=
-                    ` If the task is genuinely unfinished, call ${ITERATION_BUDGET_TOOL_NAME} with a concrete reason.`;
+                  warnMsg += ` If the task is genuinely unfinished, call ${ITERATION_BUDGET_TOOL_NAME} with a concrete reason.`;
                 } else {
                   warnMsg +=
                     " The iteration budget can no longer be extended; finish the task and summarize progress.";
@@ -4564,8 +4572,11 @@ export function createAgent(
   registry: Registry | undefined,
 ): Agent {
   const compactionSettings = normalizeCompactionSettings(
-    cfg.compactionSettings ??
-      { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+    cfg.compactionSettings ?? {
+      enabled: false,
+      reserveTokens: 0,
+      keepRecentTokens: 0,
+    },
   );
   const normalized: Config = { ...cfg, compactionSettings };
   configureRegistryImageHint(normalized, registry);
@@ -4596,8 +4607,11 @@ export function createAgentWithLoopConfig(
   const forced = (cfg.forcedMode ?? "").trim();
   if (forced !== "") normalized.mode = forced;
   normalized.compactionSettings = normalizeCompactionSettings(
-    cfg.compactionSettings ??
-      { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+    cfg.compactionSettings ?? {
+      enabled: false,
+      reserveTokens: 0,
+      keepRecentTokens: 0,
+    },
   );
   configureRegistryImageHint(normalized, registry);
   if ((normalized.maxIterations ?? 0) === 0) normalized.maxIterations = 200;
@@ -4631,8 +4645,11 @@ function finishConstruction(
   const agent = new Agent(id, cfg.parentId ?? "", cfg, registry);
   // Build the frozen system prompt once at construction time (R2.1).
   agent.buildFrozenPrompt();
-  const ctx = agent.getContext() ??
-    { systemPrompt: "", messages: [], tools: [] };
+  const ctx = agent.getContext() ?? {
+    systemPrompt: "",
+    messages: [],
+    tools: [],
+  };
   ctx.systemPrompt = agent.frozenSystemPrompt();
   ctx.tools = agent.frozenToolDefinitions();
   agent.setContext(ctx);

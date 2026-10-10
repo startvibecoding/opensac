@@ -50,14 +50,20 @@ test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
   );
 
   const provider = options.find((o) => o.id === CONFIG_OPTION_PROVIDER)!;
-  assertEquals(provider.options!.map((c) => c.value), ["openai", "test-api"]);
-  assertEquals(provider.options!.map((c) => c.name), ["OpenAI", "Test API"]);
+  assertEquals(
+    provider.options!.map((c) => c.value),
+    ["openai", "test-api"],
+  );
+  assertEquals(
+    provider.options!.map((c) => c.name),
+    ["OpenAI", "Test API"],
+  );
 
   const modelOption = options.find((o) => o.id === "model")!;
-  assertEquals(modelOption.options!.map((c) => c.value), [
-    "test/a",
-    "test/z",
-  ]);
+  assertEquals(
+    modelOption.options!.map((c) => c.value),
+    ["test/a", "test/z"],
+  );
 
   const mode = options.find((o) => o.id === CONFIG_OPTION_MODE)!;
   assertEquals(mode.currentValue, MODE_YOLO);
@@ -65,15 +71,18 @@ test("SessionConfigOptionsWithProvidersBuildsSortedCatalog", () => {
   // Thinking level appears only for a reasoning model.
   const thinking = options.find((o) => o.id === CONFIG_OPTION_THINKING_LEVEL)!;
   assertEquals(thinking.currentValue, thinkingHigh);
-  assertEquals(thinking.options!.map((c) => c.value), [
-    thinkingOff,
-    "minimal",
-    "low",
-    thinkingMedium,
-    thinkingHigh,
-    "xhigh",
-    thinkingMax,
-  ]);
+  assertEquals(
+    thinking.options!.map((c) => c.value),
+    [
+      thinkingOff,
+      "minimal",
+      "low",
+      thinkingMedium,
+      thinkingHigh,
+      "xhigh",
+      thinkingMax,
+    ],
+  );
 });
 
 test("SessionConfigOptionsOmitsThinkingForNonReasoningModel", () => {

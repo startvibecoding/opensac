@@ -16,7 +16,13 @@
 // recoverable failures. A query failure surfaces unchanged in both placements.
 
 import { runStatsCall, type StatsCall } from "./stats_call.ts";
-import { type Aggregate, DB, type Query, type RecentPage, type Summary } from "./stats.ts";
+import {
+  type Aggregate,
+  DB,
+  type Query,
+  type RecentPage,
+  type Summary,
+} from "./stats.ts";
 
 /** Per-call wall-clock budget for one worker request. */
 export const statsQueryTimeoutMs = 30_000;

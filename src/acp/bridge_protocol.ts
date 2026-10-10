@@ -72,10 +72,10 @@ export function mapACPRequestToCore(
         text: promptText(params.prompt ?? params.text),
         ...(Array.isArray(params.attachments)
           ? {
-            attachments: params.attachments.filter((v): v is string =>
-              typeof v === "string"
-            ),
-          }
+              attachments: params.attachments.filter(
+                (v): v is string => typeof v === "string",
+              ),
+            }
           : {}),
       });
     case "session/updates":
@@ -152,11 +152,12 @@ export function mapCoreEventToACP(event: CoreRuntimeEvent): ACPNotification {
 export function mapCoreReverseRequestToACP(
   request: CoreServerRequest,
 ): ACPRPCRequest {
-  const method = request.method === "approval.request"
-    ? "session/requestPermission"
-    : request.method === "question.request"
-    ? "session/requestQuestion"
-    : request.method;
+  const method =
+    request.method === "approval.request"
+      ? "session/requestPermission"
+      : request.method === "question.request"
+        ? "session/requestQuestion"
+        : request.method;
   return {
     jsonrpc: "2.0",
     idRaw: JSON.stringify(request.id),
@@ -172,25 +173,28 @@ function projectUpdate(event: CoreRuntimeEvent): Record<string, unknown> {
       return {
         sessionUpdate: "agent_message_chunk",
         messageId: stringValue(payload.messageId) ?? `acp_${event.runId}_text`,
-        content: payload.content ??
-          { type: "text", text: stringValue(payload.text) ?? "" },
+        content: payload.content ?? {
+          type: "text",
+          text: stringValue(payload.text) ?? "",
+        },
         runId: event.runId,
       };
     case "reasoning_delta":
       return {
         sessionUpdate: "agent_thought_chunk",
-        messageId: stringValue(payload.messageId) ??
-          `acp_${event.runId}_thought`,
-        content: payload.content ??
-          { type: "text", text: stringValue(payload.text) ?? "" },
+        messageId:
+          stringValue(payload.messageId) ?? `acp_${event.runId}_thought`,
+        content: payload.content ?? {
+          type: "text",
+          text: stringValue(payload.text) ?? "",
+        },
         runId: event.runId,
       };
     case "tool_call":
     case "tool_call_update":
       return {
-        sessionUpdate: event.eventType === "tool_call"
-          ? "tool_call"
-          : "tool_call_update",
+        sessionUpdate:
+          event.eventType === "tool_call" ? "tool_call" : "tool_call_update",
         toolCallId: stringValue(payload.toolCallId) ?? "",
         ...(stringValue(payload.status) === undefined
           ? {}
@@ -269,10 +273,12 @@ function optionalString(
 function promptText(value: unknown): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
-  return value.map((block) => {
-    if (typeof block === "string") return block;
-    if (block === null || typeof block !== "object") return "";
-    const text = (block as Record<string, unknown>).text;
-    return typeof text === "string" ? text : "";
-  }).join("");
+  return value
+    .map((block) => {
+      if (typeof block === "string") return block;
+      if (block === null || typeof block !== "object") return "";
+      const text = (block as Record<string, unknown>).text;
+      return typeof text === "string" ? text : "";
+    })
+    .join("");
 }

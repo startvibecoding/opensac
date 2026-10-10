@@ -4,10 +4,7 @@
 // the Ink tool-result components.
 
 /** ANSI escape sequence (CSI and simple two-byte forms) for width 0. */
-const ansiRe = new RegExp(
-  "\u001B(?:\\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])",
-  "g",
-);
+const ansiRe = new RegExp("\u001B(?:\\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])", "g");
 
 /**
  * Returns the terminal display width of `s` in cells: CJK and other
@@ -29,7 +26,8 @@ export function runeWidth(cp: number): number {
   // Zero-width: combining marks and common format characters
   if (
     (cp >= 0x0300 && cp <= 0x036f) || // combining diacritical marks
-    cp === 0x200b || cp === 0xfeff // zero-width space / BOM
+    cp === 0x200b ||
+    cp === 0xfeff // zero-width space / BOM
   ) {
     return 0;
   }
@@ -193,7 +191,7 @@ export interface CacheUsageInput {
  */
 export function cacheHitPercent(u: CacheUsageInput): number {
   if (u.totalInputTokens <= 0) return -1;
-  const pct = u.totalCacheRead / u.totalInputTokens * 100;
+  const pct = (u.totalCacheRead / u.totalInputTokens) * 100;
   return Math.min(pct, 100);
 }
 

@@ -43,9 +43,8 @@ export async function acquireExecutionAdmission(
   sessionId: string,
   options: ExecutionAdmissionOptions = {},
 ): Promise<RuntimeLeaseGuard> {
-  const pollInterval = (options.pollIntervalMs ?? 0) > 0
-    ? options.pollIntervalMs!
-    : 50;
+  const pollInterval =
+    (options.pollIntervalMs ?? 0) > 0 ? options.pollIntervalMs! : 50;
   for (;;) {
     let guard: RuntimeLeaseGuard;
     try {
@@ -89,9 +88,8 @@ export async function acquireSessionMutation(
   sessionId: string,
   options: ExecutionAdmissionOptions = {},
 ): Promise<RuntimeLeaseGuard> {
-  const pollInterval = (options.pollIntervalMs ?? 0) > 0
-    ? options.pollIntervalMs!
-    : 50;
+  const pollInterval =
+    (options.pollIntervalMs ?? 0) > 0 ? options.pollIntervalMs! : 50;
   for (;;) {
     let guard: RuntimeLeaseGuard;
     try {

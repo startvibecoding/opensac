@@ -75,6 +75,9 @@ export function isStreamTimeoutError(err: unknown): boolean {
   if (err instanceof DOMException && err.name === "TimeoutError") return true;
   if (err instanceof Error && err.name === "TimeoutError") return true;
   const s = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  return s.includes("deadline exceeded") || s.includes("timed out") ||
-    s.includes("timeout");
+  return (
+    s.includes("deadline exceeded") ||
+    s.includes("timed out") ||
+    s.includes("timeout")
+  );
 }

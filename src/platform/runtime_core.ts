@@ -1,14 +1,14 @@
-// Node-backed implementation of the `Deno` global namespace surface.
+// Node-backed implementation of the runtime file/env/process surface.
 //
-// This repository no longer depends on the Deno CLI or its package registry.
-// The single owner of the `Deno.*` API vocabulary is `src/platform/node_compat.ts`:
-// it installs the namespace below as a process global before any application
-// module loads, then layers the richer APIs (`Command`, `serve`, `connect`,
-// `createHttpClient`, …) on top. Nothing else may define a second `Deno` object.
+// This repository runs on the Node runtime, with no external runtime or
+// package-registry dependency.
+// This module is the base layer that `src/platform/runtime.ts` merges with
+// `src/platform/runtime_net.ts` and exposes as the `runtime` object every module
+// imports. Nothing else defines a second runtime object.
 //
 // Scope: only the file/env/process/system surface that this codebase actually
 // calls, backed by `node:fs`, `node:fs/promises`, `node:process`, and `node:os`.
-// Anything beyond it belongs in `node_compat.ts`.
+// Networking and process spawning live in `runtime_net.ts`.
 
 import * as nodeFs from "node:fs";
 import {
@@ -19,7 +19,6 @@ import {
   link,
   lstat as lstatAsync,
   mkdir,
-  open,
   readFile,
   realpath,
   rename,
@@ -31,15 +30,20 @@ import {
 } from "node:fs/promises";
 import * as nodeOs from "node:os";
 import { join } from "node:path";
+import { Readable, Writable } from "node:stream";
 
 type AnyRecord = Record<string, any>;
 
 // ─── Errors ───────────────────────────────────────────────────────────────
 
-function denoErrorClass(name: string): any {
+function errorClass(name: string): any {
   const Ctor = class extends Error {
     constructor(message: string, options?: { cause?: unknown }) {
       super(message);
+      // The classes are named after the error kind (`NotFound`, …) and
+      // code checks `err.name === "NotFound"`; set the instance name, not just
+      // the constructor's.
+      this.name = name;
       if (options && "cause" in options) {
         Object.defineProperty(this, "cause", {
           value: options.cause,
@@ -53,30 +57,33 @@ function denoErrorClass(name: string): any {
   return Ctor;
 }
 
-/** Deno-named error classes, mapped onto Node's `fs`/`net` error codes. */
+/** Error classes named after the error kind, mapped onto Node `fs`/`net` codes. */
 export const errors = {
-  NotFound: denoErrorClass("NotFound"),
-  AlreadyExists: denoErrorClass("AlreadyExists"),
-  PermissionDenied: denoErrorClass("PermissionDenied"),
-  BadResource: denoErrorClass("BadResource"),
-  AddrInUse: denoErrorClass("AddrInUse"),
-  AddrNotAvailable: denoErrorClass("AddrNotAvailable"),
-  ConnectionRefused: denoErrorClass("ConnectionRefused"),
-  ConnectionReset: denoErrorClass("ConnectionReset"),
-  BrokenPipe: denoErrorClass("BrokenPipe"),
-  NotSupported: denoErrorClass("NotSupported"),
-  Interrupted: denoErrorClass("Interrupted"),
-  IsADirectory: denoErrorClass("IsADirectory"),
-  NotADirectory: denoErrorClass("NotADirectory"),
-  InvalidData: denoErrorClass("InvalidData"),
-  TimedOut: denoErrorClass("TimedOut"),
-  UnexpectedEof: denoErrorClass("UnexpectedEof"),
-  WriteZero: denoErrorClass("WriteZero"),
-  ResourceBusy: denoErrorClass("ResourceBusy"),
+  NotFound: errorClass("NotFound"),
+  AlreadyExists: errorClass("AlreadyExists"),
+  PermissionDenied: errorClass("PermissionDenied"),
+  BadResource: errorClass("BadResource"),
+  AddrInUse: errorClass("AddrInUse"),
+  AddrNotAvailable: errorClass("AddrNotAvailable"),
+  ConnectionRefused: errorClass("ConnectionRefused"),
+  ConnectionReset: errorClass("ConnectionReset"),
+  BrokenPipe: errorClass("BrokenPipe"),
+  NotSupported: errorClass("NotSupported"),
+  Interrupted: errorClass("Interrupted"),
+  IsADirectory: errorClass("IsADirectory"),
+  NotADirectory: errorClass("NotADirectory"),
+  InvalidData: errorClass("InvalidData"),
+  TimedOut: errorClass("TimedOut"),
+  UnexpectedEof: errorClass("UnexpectedEof"),
+  WriteZero: errorClass("WriteZero"),
+  ResourceBusy: errorClass("ResourceBusy"),
 };
 
 const ERROR_CODE_MAP: Record<string, any> = {
   ENOENT: errors.NotFound,
+  // `process.kill(pid, 0)` reports a missing process as ESRCH; the runtime surfaces
+  // that as NotFound, and liveness checks rely on it.
+  ESRCH: errors.NotFound,
   EEXIST: errors.AlreadyExists,
   EACCES: errors.PermissionDenied,
   EPERM: errors.PermissionDenied,
@@ -96,8 +103,8 @@ const ERROR_CODE_MAP: Record<string, any> = {
   EBUSY: errors.ResourceBusy,
 };
 
-/** Rewrites a Node syscall error into its Deno-named equivalent. */
-export function toDenoError(error: unknown): unknown {
+/** Rewrites a Node syscall error into its named error class. */
+export function toRuntimeError(error: unknown): unknown {
   if (!(error instanceof Error)) return error;
   const code = (error as AnyRecord).code as string | undefined;
   if (!code) return error;
@@ -118,19 +125,19 @@ function wrapSync<T extends (...args: any[]) => any>(fn: T): T {
     try {
       return fn.apply(this, args);
     } catch (error) {
-      throw toDenoError(error);
+      throw toRuntimeError(error);
     }
   } as T;
 }
 
 function wrapAsync<F extends (...args: any[]) => Promise<any>>(fn: F): F {
-  return (async function (this: any, ...args: any[]) {
+  return async function (this: any, ...args: any[]) {
     try {
       return await fn.apply(this, args);
     } catch (error) {
-      throw toDenoError(error);
+      throw toRuntimeError(error);
     }
-  }) as F;
+  } as F;
 }
 
 // ─── Small helpers ─────────────────────────────────────────────────────────
@@ -144,12 +151,21 @@ function p(path: string | URL): string {
 
 function optsToFlags(options: AnyRecord = {}): string {
   if (typeof options.flag === "string") return options.flag;
+  // `createNew` is exclusive-create (O_EXCL); Node spells it "wx".
+  if (options.createNew) return options.read && !options.write ? "wx+" : "wx";
   if (options.read && options.write) return options.append ? "a+" : "r+";
   if (options.write) {
     if (options.append) return "a";
     return options.truncate === false ? "r+" : "w";
   }
+  if (options.create) return "w";
   return "r";
+}
+
+/** Maps the write-file options onto Node's `writeFile` flag/mode. */
+function writeFlags(options: AnyRecord = {}): { flag: string; mode?: number } {
+  const flag = options.createNew ? "wx" : options.append ? "a" : "w";
+  return options.mode === undefined ? { flag } : { flag, mode: options.mode };
 }
 
 function tempName(options: AnyRecord = {}): string {
@@ -163,7 +179,7 @@ function tempPath(options: AnyRecord = {}): string {
   return join(options.dir ?? nodeOs.tmpdir(), tempName(options));
 }
 
-type StatsLike = ReturnType<typeof nodeFs.statSync>;
+type StatsLike = nodeFs.Stats;
 
 function fileInfo(stat: StatsLike): AnyRecord {
   return {
@@ -209,7 +225,7 @@ function bytes(data: Uint8Array | string): Uint8Array | Buffer {
 // ─── FsFile ────────────────────────────────────────────────────────────────
 
 /**
- * Deno-style file handle over a Node file descriptor. Node tracks no portable
+ * File handle over a Node file descriptor. Node tracks no portable
  * read/write cursor for an O_RDONLY/O_RDWR descriptor opened through libuv, so
  * the cursor is maintained here: every read/write/seek goes through explicit
  * positional I/O against `#pos`.
@@ -233,6 +249,10 @@ class NodeFsFile {
     return this.#filePath;
   }
 
+  get readable(): ReadableStream<Uint8Array> {
+    return this.readableWebStream();
+  }
+
   #assertOpen(): void {
     if (this.#closed) throw new errors.BadResource("File is closed");
   }
@@ -243,7 +263,13 @@ class NodeFsFile {
 
   readSync(buffer: Uint8Array): number | null {
     this.#assertOpen();
-    const n = nodeFs.readSync(this.#fd, buffer, 0, buffer.byteLength, this.#pos);
+    const n = nodeFs.readSync(
+      this.#fd,
+      buffer,
+      0,
+      buffer.byteLength,
+      this.#pos,
+    );
     if (n === 0) return null;
     this.#pos += n;
     return n;
@@ -253,7 +279,7 @@ class NodeFsFile {
   async readFile(size?: number): Promise<Uint8Array | null> {
     if (size === undefined) {
       const data = await readFile(this.#filePath).catch((error) => {
-        throw toDenoError(error);
+        throw toRuntimeError(error);
       });
       return new Uint8Array(data);
     }
@@ -275,22 +301,22 @@ class NodeFsFile {
   writeSync(data: Uint8Array | string): number {
     this.#assertOpen();
     const chunk = bytes(data);
-    const n = nodeFs.writeSync(
-      this.#fd,
-      chunk,
-      0,
-      chunk.byteLength,
-      this.#pos,
-    );
+    const n = nodeFs.writeSync(this.#fd, chunk, 0, chunk.byteLength, this.#pos);
     this.#pos += n;
     return n;
   }
 
-  seek(offset: number | { offset: number; whence: number }, whence = 0): Promise<number> {
+  seek(
+    offset: number | { offset: number; whence: number },
+    whence = 0,
+  ): Promise<number> {
     return Promise.resolve(this.seekSync(offset, whence));
   }
 
-  seekSync(offset: number | { offset: number; whence: number }, whence = 0): number {
+  seekSync(
+    offset: number | { offset: number; whence: number },
+    whence = 0,
+  ): number {
     this.#assertOpen();
     const delta = typeof offset === "number" ? offset : offset.offset;
     const mode = typeof offset === "number" ? whence : offset.whence;
@@ -367,11 +393,12 @@ class NodeFsFile {
     return {
       kind: direct ? "raw" : "bytes",
       async write(chunk: Uint8Array | string) {
-        if (direct) await self.write(chunk);
+        const data = bytes(chunk);
+        if (direct) await self.write(data);
         else {
-          const next = new Uint8Array(pending.byteLength + chunk.byteLength);
+          const next = new Uint8Array(pending.byteLength + data.byteLength);
           next.set(pending, 0);
-          next.set(chunk, pending.byteLength);
+          next.set(data, pending.byteLength);
           pending = next;
           if (pending.byteLength >= 64 * 1024) await flush();
         }
@@ -407,8 +434,38 @@ class NodeFsFile {
     this.#closed = true;
     try {
       nodeFs.closeSync(this.#fd);
-    } catch { /* already closed by the OS */ }
+    } catch {
+      /* already closed by the OS */
+    }
   }
+}
+
+// Lazily built so importing the runtime does not hold a stdin stream (and,
+// with it, an open handle) alive for processes that never read input.
+let stdinReadableStream: ReadableStream<Uint8Array> | undefined;
+
+function stdinReadable(): ReadableStream<Uint8Array> {
+  if (stdinReadableStream !== undefined) return stdinReadableStream;
+  stdinReadableStream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      ensureStdin();
+      while (stdinBuffer.length === 0 && !stdinClosed) {
+        await new Promise<void>((resolveWake) => {
+          const wake = () => {
+            stdinWaiters.delete(wake);
+            resolveWake();
+          };
+          stdinWaiters.add(wake);
+        });
+      }
+      if (stdinBuffer.length === 0) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(takeStdin(64 * 1024));
+    },
+  });
+  return stdinReadableStream;
 }
 
 // ─── Std streams ───────────────────────────────────────────────────────────
@@ -473,22 +530,27 @@ async function* stdinLines(): AsyncIterableIterator<string> {
 }
 
 function outputStream(fd: 1 | 2) {
-  let queue: Promise<unknown> = Promise.resolve();
+  let queue: Promise<number> = Promise.resolve(0);
   const writeChunk = (data: Uint8Array | string): Promise<number> => {
     const chunk = bytes(data);
     queue = queue.then(
       () =>
         new Promise<number>((res, rej) => {
           nodeFs.write(fd, chunk, 0, chunk.byteLength, null, (error, n) =>
-            error ? rej(toDenoError(error)) : res(n));
+            error ? rej(toRuntimeError(error)) : res(n),
+          );
         }),
     );
     return queue;
   };
   return {
-    writable: true,
+    writable: Writable.toWeb(
+      fd === 1 ? process.stdout : process.stderr,
+    ) as unknown as WritableStream<Uint8Array>,
     readable: false,
     rid: fd,
+    isTerminal: () =>
+      Boolean((fd === 1 ? process.stdout : process.stderr).isTTY),
     write: writeChunk,
     writeSync(data: Uint8Array | string): number {
       const chunk = bytes(data);
@@ -502,12 +564,12 @@ function outputStream(fd: 1 | 2) {
 
 // ─── Namespace ─────────────────────────────────────────────────────────────
 
-/** The Node-backed `Deno` namespace installed by `node_compat.ts`. */
-export const denoNamespace: AnyRecord = {
+/** The Node-backed runtime core, merged into `runtime` by `runtime.ts`. */
+export const runtimeCore: AnyRecord = {
   version: {
-    // Not a real Deno: the marker keeps `doctor`/telemetry honest about which
-    // runtime is hosting the process.
-    deno: "0.0.0+opensac-node",
+    // The runtime name keeps `doctor`/telemetry honest about which runtime is
+    // hosting the process.
+    node: process.version,
     v8: process.versions.v8 ?? "",
     typescript: process.version,
   },
@@ -548,14 +610,18 @@ export const denoNamespace: AnyRecord = {
   },
   memoryUsage: () => {
     const m = process.memoryUsage();
-    return { total: m.heapTotal, used: m.heapUsed, free: m.heapTotal - m.heapUsed };
+    return {
+      total: m.heapTotal,
+      used: m.heapUsed,
+      free: m.heapTotal - m.heapUsed,
+    };
   },
   consoleSize: () => ({
     columns: process.stdout.columns || 80,
     rows: process.stdout.rows || 24,
   }),
   isatty: (ridOrStream?: unknown) => {
-    // Deno's `isatty(0)`/`isatty(1)`/`isatty(2)` take a resource id; anything
+    // isatty(0)/isatty(1)/isatty(2) take a resource id; anything
     // else (including no argument) is treated as stdout.
     if (ridOrStream === 0) return Boolean(process.stdin.isTTY);
     if (ridOrStream === 2) return Boolean(process.stderr.isTTY);
@@ -567,12 +633,13 @@ export const denoNamespace: AnyRecord = {
   removeSignalListener: (signal: string, handler: () => void) => {
     process.off(signal as NodeJS.Signals, handler);
   },
-  kill: (pid: number, signal: number | string = "SIGTERM") => {
+  kill: wrapSync((pid: number, signal: number | string = "SIGTERM") => {
     process.kill(pid, signal as NodeJS.Signals);
-  },
+  }),
   stdin: {
-    readable: true,
-    writable: false,
+    get readable() {
+      return stdinReadable();
+    },
     rid: 0,
     isTerminal: () => Boolean(process.stdin.isTTY),
     read: (buffer: Uint8Array) => Promise.resolve(stdinReadInto(buffer)),
@@ -612,7 +679,9 @@ export const denoNamespace: AnyRecord = {
         void (async () => {
           const parts: string[] = [];
           for await (const line of stdinLines()) parts.push(line);
-          resolveText(parts.length === 0 && stdinClosed ? null : parts.join("\n"));
+          resolveText(
+            parts.length === 0 && stdinClosed ? null : parts.join("\n"),
+          );
         })();
       }),
     readTextSync: (): string | null => {
@@ -631,10 +700,18 @@ export const denoNamespace: AnyRecord = {
   },
 
   // Filesystem: metadata.
-  stat: wrapAsync(async (path: string | URL) => fileInfo(await statAsync(p(path)))),
-  statSync: wrapSync((path: string | URL) => fileInfo(nodeFs.statSync(p(path)))),
-  lstat: wrapAsync(async (path: string | URL) => lstatInfo(await lstatAsync(p(path)))),
-  lstatSync: wrapSync((path: string | URL) => lstatInfo(nodeFs.lstatSync(p(path)))),
+  stat: wrapAsync(async (path: string | URL) =>
+    fileInfo(await statAsync(p(path))),
+  ),
+  statSync: wrapSync((path: string | URL) =>
+    fileInfo(nodeFs.statSync(p(path))),
+  ),
+  lstat: wrapAsync(async (path: string | URL) =>
+    lstatInfo(await lstatAsync(p(path))),
+  ),
+  lstatSync: wrapSync((path: string | URL) =>
+    lstatInfo(nodeFs.lstatSync(p(path))),
+  ),
   tryStat: (path: string | URL) => {
     try {
       return fileInfo(nodeFs.statSync(p(path)));
@@ -654,32 +731,58 @@ export const denoNamespace: AnyRecord = {
 
   // Filesystem: directories and links.
   mkdir: wrapAsync((path: string | URL, options: AnyRecord = {}) =>
-    mkdir(p(path), { recursive: options.recursive !== false, mode: options.mode })),
+    mkdir(p(path), {
+      recursive: options.recursive === true,
+      mode: options.mode,
+    }),
+  ),
   mkdirSync: wrapSync((path: string | URL, options: AnyRecord = {}) => {
-    nodeFs.mkdirSync(p(path), { recursive: options.recursive !== false, mode: options.mode });
+    nodeFs.mkdirSync(p(path), {
+      recursive: options.recursive === true,
+      mode: options.mode,
+    });
   }),
   remove: wrapAsync((path: string | URL, options: AnyRecord = {}) =>
-    rm(p(path), { recursive: !!options.recursive, force: true })),
+    rm(p(path), {
+      recursive: !!options.recursive,
+      force: true,
+      maxRetries: 3,
+    }),
+  ),
   removeSync: wrapSync((path: string | URL, options: AnyRecord = {}) => {
-    nodeFs.rmSync(p(path), { recursive: !!options.recursive, force: true });
+    nodeFs.rmSync(p(path), {
+      recursive: !!options.recursive,
+      force: true,
+      maxRetries: 3,
+    });
   }),
-  rename: wrapAsync((from: string | URL, to: string | URL) => rename(p(from), p(to))),
+  rename: wrapAsync((from: string | URL, to: string | URL) =>
+    rename(p(from), p(to)),
+  ),
   renameSync: wrapSync((from: string | URL, to: string | URL) => {
     nodeFs.renameSync(p(from), p(to));
   }),
-  copyFile: wrapAsync((from: string | URL, to: string | URL) => copyFile(p(from), p(to))),
+  copyFile: wrapAsync((from: string | URL, to: string | URL) =>
+    copyFile(p(from), p(to)),
+  ),
   copyFileSync: wrapSync((from: string | URL, to: string | URL) => {
     nodeFs.copyFileSync(p(from), p(to));
   }),
-  symlink: wrapAsync((target: string, path: string | URL) => symlink(target, p(path))),
-  symlinkSync: wrapSync((target: string, path: string | URL, options: AnyRecord = {}) => {
-    nodeFs.symlinkSync(
-      target,
-      p(path),
-      options?.type ?? (process.platform === "win32" ? "junction" : "file"),
-    );
-  }),
-  link: wrapAsync((from: string | URL, to: string | URL) => link(p(from), p(to))),
+  symlink: wrapAsync((target: string, path: string | URL) =>
+    symlink(target, p(path)),
+  ),
+  symlinkSync: wrapSync(
+    (target: string, path: string | URL, options: AnyRecord = {}) => {
+      nodeFs.symlinkSync(
+        target,
+        p(path),
+        options?.type ?? (process.platform === "win32" ? "junction" : "file"),
+      );
+    },
+  ),
+  link: wrapAsync((from: string | URL, to: string | URL) =>
+    link(p(from), p(to)),
+  ),
   linkSync: wrapSync((from: string | URL, to: string | URL) => {
     nodeFs.linkSync(p(from), p(to));
   }),
@@ -687,16 +790,24 @@ export const denoNamespace: AnyRecord = {
   chmodSync: wrapSync((path: string | URL, mode: number) => {
     nodeFs.chmodSync(p(path), mode);
   }),
-  chown: wrapAsync((path: string | URL, uid: number | null, gid: number | null) =>
-    chown(p(path), uid ?? -1, gid ?? -1)),
-  chownSync: wrapSync((path: string | URL, uid: number | null, gid: number | null) => {
-    nodeFs.chownSync(p(path), uid ?? -1, gid ?? -1);
-  }),
-  utime: wrapAsync((path: string | URL, atime: Date | null, mtime: Date | null) =>
-    utimes(p(path), atime ?? new Date(), mtime ?? new Date())),
-  utimeSync: wrapSync((path: string | URL, atime: Date | null, mtime: Date | null) => {
-    nodeFs.utimesSync(p(path), atime ?? new Date(), mtime ?? new Date());
-  }),
+  chown: wrapAsync(
+    (path: string | URL, uid: number | null, gid: number | null) =>
+      chown(p(path), uid ?? -1, gid ?? -1),
+  ),
+  chownSync: wrapSync(
+    (path: string | URL, uid: number | null, gid: number | null) => {
+      nodeFs.chownSync(p(path), uid ?? -1, gid ?? -1);
+    },
+  ),
+  utime: wrapAsync(
+    (path: string | URL, atime: Date | null, mtime: Date | null) =>
+      utimes(p(path), atime ?? new Date(), mtime ?? new Date()),
+  ),
+  utimeSync: wrapSync(
+    (path: string | URL, atime: Date | null, mtime: Date | null) => {
+      nodeFs.utimesSync(p(path), atime ?? new Date(), mtime ?? new Date());
+    },
+  ),
   readDir: wrapSync((path: string | URL) => {
     const entries = nodeFs.readdirSync(p(path), { withFileTypes: true });
     const iterator = entries.map(dirEntry)[Symbol.iterator]();
@@ -706,37 +817,74 @@ export const denoNamespace: AnyRecord = {
       return: () => Promise.resolve({ done: true as const, value: undefined }),
     };
   }),
-  readDirSync: (path: string | URL) =>
-    nodeFs.readdirSync(p(path), { withFileTypes: true }).map(dirEntry)[Symbol.iterator](),
+  readDirSync: wrapSync((path: string | URL) => {
+    const entries = nodeFs
+      .readdirSync(p(path), { withFileTypes: true })
+      .map(dirEntry);
+    return entries[Symbol.iterator]();
+  }),
 
   // Filesystem: file contents.
-  readFile: wrapAsync(async (path: string | URL) => new Uint8Array(await readFile(p(path)))),
-  readFileSync: wrapSync((path: string | URL) =>
-    new Uint8Array(nodeFs.readFileSync(p(path)))),
+  readFile: wrapAsync(
+    async (path: string | URL) => new Uint8Array(await readFile(p(path))),
+  ),
+  readFileSync: wrapSync(
+    (path: string | URL) => new Uint8Array(nodeFs.readFileSync(p(path))),
+  ),
   readTextFile: wrapAsync((path: string | URL) => readFile(p(path), "utf8")),
-  readTextFileSync: wrapSync((path: string | URL) => nodeFs.readFileSync(p(path), "utf8")),
-  writeFile: wrapAsync((path: string | URL, data: Uint8Array | string) =>
-    writeFile(p(path), bytes(data) as any)),
-  writeFileSync: wrapSync((path: string | URL, data: Uint8Array | string) => {
-    nodeFs.writeFileSync(p(path), bytes(data) as any);
-  }),
-  writeTextFile: wrapAsync((path: string | URL, data: string) => writeFile(p(path), data)),
-  writeTextFileSync: wrapSync((path: string | URL, data: string) => {
-    nodeFs.writeFileSync(p(path), data);
-  }),
+  readTextFileSync: wrapSync((path: string | URL) =>
+    nodeFs.readFileSync(p(path), "utf8"),
+  ),
+  writeFile: wrapAsync(
+    (path: string | URL, data: Uint8Array | string, options: AnyRecord = {}) =>
+      writeFile(p(path), bytes(data) as any, writeFlags(options)),
+  ),
+  writeFileSync: wrapSync(
+    (
+      path: string | URL,
+      data: Uint8Array | string,
+      options: AnyRecord = {},
+    ) => {
+      nodeFs.writeFileSync(p(path), bytes(data) as any, writeFlags(options));
+    },
+  ),
+  writeTextFile: wrapAsync(
+    (path: string | URL, data: string, options: AnyRecord = {}) =>
+      writeFile(p(path), data, writeFlags(options)),
+  ),
+  writeTextFileSync: wrapSync(
+    (path: string | URL, data: string, options: AnyRecord = {}) => {
+      nodeFs.writeFileSync(p(path), data, writeFlags(options));
+    },
+  ),
   appendFile: wrapAsync((path: string | URL, data: Uint8Array | string) =>
-    appendFile(p(path), bytes(data) as any)),
+    appendFile(p(path), bytes(data) as any),
+  ),
   appendFileSync: wrapSync((path: string | URL, data: Uint8Array | string) => {
     nodeFs.appendFileSync(p(path), bytes(data) as any);
   }),
-  open: wrapAsync(async (path: string | URL, options: AnyRecord = {}) =>
-    new NodeFsFile((await open(p(path), optsToFlags(options), options.mode)).fd, p(path))),
-  openSync: wrapSync((path: string | URL, options: AnyRecord = {}) =>
-    new NodeFsFile(nodeFs.openSync(p(path), optsToFlags(options), options.mode), p(path))),
-  create: wrapAsync(async (path: string | URL) =>
-    new NodeFsFile((await open(p(path), "w")).fd, p(path))),
-  createSync: wrapSync((path: string | URL) =>
-    new NodeFsFile(nodeFs.openSync(p(path), "w"), p(path))),
+  open: wrapAsync(
+    async (path: string | URL, options: AnyRecord = {}) =>
+      new NodeFsFile(
+        nodeFs.openSync(p(path), optsToFlags(options), options.mode),
+        p(path),
+      ),
+  ),
+  openSync: wrapSync(
+    (path: string | URL, options: AnyRecord = {}) =>
+      new NodeFsFile(
+        nodeFs.openSync(p(path), optsToFlags(options), options.mode),
+        p(path),
+      ),
+  ),
+  create: wrapAsync(
+    async (path: string | URL) =>
+      new NodeFsFile(nodeFs.openSync(p(path), "w"), p(path)),
+  ),
+  createSync: wrapSync(
+    (path: string | URL) =>
+      new NodeFsFile(nodeFs.openSync(p(path), "w"), p(path)),
+  ),
 
   // Temp files.
   makeTempDir: wrapAsync(async (options: AnyRecord = {}) => {

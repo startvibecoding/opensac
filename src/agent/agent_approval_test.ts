@@ -12,7 +12,10 @@ function approval(a: ApprovalSettings): Settings {
   return { approval: a };
 }
 
-function cfg(mode: string, settings: Settings): {
+function cfg(
+  mode: string,
+  settings: Settings,
+): {
   mode: string;
   settings: Settings;
 } {
@@ -50,9 +53,11 @@ test("needsApproval: edit-path whitelist", () => {
       path: "internal/agent/agent.go",
     }),
   );
-  assert(needsApproval(cfgAllow("agent", settings, allow), "edit", {
-    path: "cmd/main.go",
-  }));
+  assert(
+    needsApproval(cfgAllow("agent", settings, allow), "edit", {
+      path: "cmd/main.go",
+    }),
+  );
 });
 
 test("needsApproval: edit-path plan mode unaffected", () => {

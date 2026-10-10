@@ -6,11 +6,14 @@
 // durable attachment row.
 //
 // Deviations: `context.Context` maps to an optional `AbortSignal`; `[]byte`
-// maps to `Uint8Array`; `io.ReadCloser` maps to a `Deno.FsFile`; `time.Time`
+// maps to `Uint8Array`; `io.ReadCloser` maps to a `FsFile`; `time.Time`
 // maps to `Date` (RFC3339 strings in the durable columns); SHA-256 uses
 // `node:crypto`. `AcceptProviderAttachment` and the artifact collector remain
 // with the `SessionRuntime` slice.
 
+import { runtime } from "../platform/runtime.ts";
+import { SeekMode } from "../platform/runtime.ts";
+import type { FileInfo, FsFile } from "../platform/runtime.ts";
 import { createHash } from "node:crypto";
 import * as path from "../compat/path.ts";
 import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
@@ -118,9 +121,10 @@ export class AttachmentService {
     // pass beside it reclaims storage whose rows are gone.
     reconcileArtifactStorageOpportunistic(this.sessionDir, this.policy);
 
-    const maxBytes = ingress.kind === ATTACHMENT_IMAGE
-      ? this.policy.maxImageBytes
-      : this.policy.maxFileBytes;
+    const maxBytes =
+      ingress.kind === ATTACHMENT_IMAGE
+        ? this.policy.maxImageBytes
+        : this.policy.maxFileBytes;
     if (ingress.sizeHint > maxBytes) {
       throw new Error(`attachment exceeds ${maxBytes} bytes`);
     }
@@ -129,11 +133,11 @@ export class AttachmentService {
     validatePathComponent(sessionID);
     validatePathComponent(attachmentID);
     const dir = path.join(this.sessionDir, "artifacts", attachmentID);
-    await Deno.mkdir(dir, { recursive: true, mode: 0o700 });
-    const tmpName = await Deno.makeTempFile({ dir, prefix: ".incoming-" });
+    await runtime.mkdir(dir, { recursive: true, mode: 0o700 });
+    const tmpName = await runtime.makeTempFile({ dir, prefix: ".incoming-" });
     const removeTmp = () => {
       try {
-        Deno.removeSync(tmpName);
+        runtime.removeSync(tmpName);
       } catch {
         // already gone
       }
@@ -176,7 +180,8 @@ export class AttachmentService {
     }
     if (ingress.kind === ATTACHMENT_IMAGE) {
       if (
-        detectErr !== null || !detectedType.toLowerCase().startsWith("image/")
+        detectErr !== null ||
+        !detectedType.toLowerCase().startsWith("image/")
       ) {
         removeTmp();
         if (detectErr !== null) {
@@ -199,7 +204,7 @@ export class AttachmentService {
       .join("/");
     const finalPath = path.join(dir, "content");
     try {
-      await Deno.rename(tmpName, finalPath);
+      await runtime.rename(tmpName, finalPath);
     } catch (err) {
       removeTmp();
       throw new Error(`commit attachment: ${err}`);
@@ -242,7 +247,7 @@ export class AttachmentService {
       });
     } catch (err) {
       try {
-        Deno.removeSync(finalPath);
+        runtime.removeSync(finalPath);
       } catch {
         // already gone
       }
@@ -273,7 +278,7 @@ export class AttachmentService {
   async Open(
     sessionID: string,
     attachmentID: string,
-  ): Promise<{ record: SessionAttachment; file: Deno.FsFile }> {
+  ): Promise<{ record: SessionAttachment; file: FsFile }> {
     const record = this.get(sessionID, attachmentID);
     if (
       record.expiresAt.getTime() !== 0 &&
@@ -282,9 +287,9 @@ export class AttachmentService {
       throw new Error(`attachment ${attachmentID} has expired`);
     }
     const filePath = this.storagePath(record.storageKey);
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = await Deno.lstat(filePath);
+      info = await runtime.lstat(filePath);
     } catch (err) {
       throw new Error(`open attachment: ${err}`);
     }
@@ -296,7 +301,7 @@ export class AttachmentService {
         `attachment ${attachmentID} failed integrity check: size mismatch`,
       );
     }
-    const file = await Deno.open(filePath, { read: true });
+    const file = await runtime.open(filePath, { read: true });
     const hash = createHash("sha256");
     const buf = new Uint8Array(64 * 1024);
     while (true) {
@@ -310,7 +315,7 @@ export class AttachmentService {
         `attachment ${attachmentID} failed integrity check: hash mismatch`,
       );
     }
-    await file.seek(0, Deno.SeekMode.Start);
+    await file.seek(0, SeekMode.Start);
     return { record, file };
   }
 
@@ -318,9 +323,7 @@ export class AttachmentService {
    * Expires and removes private attachment content whose TTL has elapsed. It is
    * deliberately tolerant of an already-missing file.
    */
-  async CleanupExpired(
-    _signal?: AbortSignal,
-  ): Promise<{ count: number }> {
+  async CleanupExpired(_signal?: AbortSignal): Promise<{ count: number }> {
     const now = new Date();
     const expired: Array<{ id: string; storageKey: string }> = [];
     writeRootDatabase(this.sessionDir, (tx) => {
@@ -333,15 +336,15 @@ export class AttachmentService {
     for (const item of expired) {
       const filePath = this.storagePath(item.storageKey);
       try {
-        await Deno.remove(filePath);
+        await runtime.remove(filePath);
       } catch (err) {
-        if (!(err instanceof Deno.errors.NotFound)) {
+        if (!(err instanceof runtime.errors.NotFound)) {
           throw new Error(`remove expired attachment ${item.id}: ${err}`);
         }
       }
       // Ignore a non-empty/missing parent so a retry remains safe.
       try {
-        await Deno.remove(path.dirname(filePath));
+        await runtime.remove(path.dirname(filePath));
       } catch {
         // deliberately ignored
       }
@@ -356,7 +359,8 @@ export class AttachmentService {
     const joined = path.join(this.sessionDir, ...storageKey.split("/"));
     const rel = path.relative(this.sessionDir, joined);
     if (
-      rel === ".." || rel.startsWith(`..${path.SEPARATOR}`) ||
+      rel === ".." ||
+      rel.startsWith(`..${path.SEPARATOR}`) ||
       path.isAbsolute(rel)
     ) {
       throw new Error("invalid attachment storage key");
@@ -373,7 +377,9 @@ export class AttachmentService {
     validatePathComponent(sessionID);
     validatePathComponent(attachmentID);
     if (
-      status !== "accepted" && status !== "generated" && status !== "expired"
+      status !== "accepted" &&
+      status !== "generated" &&
+      status !== "expired"
     ) {
       throw new Error(`invalid attachment status "${status}"`);
     }
@@ -418,7 +424,7 @@ async function copyLimited(
   stream: ArtifactStream,
   maxBytes: number,
 ): Promise<{ written: number; digest: string }> {
-  const file = await Deno.open(targetPath, {
+  const file = await runtime.open(targetPath, {
     write: true,
     create: true,
     truncate: true,
@@ -428,18 +434,16 @@ async function copyLimited(
   let written = 0;
   const limit = maxBytes + 1;
   try {
-    const source = stream.bytes !== undefined
-      ? singleChunk(stream.bytes)
-      : stream.stream;
+    const source =
+      stream.bytes !== undefined ? singleChunk(stream.bytes) : stream.stream;
     if (source === undefined) {
       throw new Error("attachment source is empty");
     }
     let remaining = limit;
     for await (const chunk of source) {
       if (remaining <= 0) break;
-      const take = chunk.length > remaining
-        ? chunk.subarray(0, remaining)
-        : chunk;
+      const take =
+        chunk.length > remaining ? chunk.subarray(0, remaining) : chunk;
       let offset = 0;
       while (offset < take.length) {
         const n = await file.write(take.subarray(offset));

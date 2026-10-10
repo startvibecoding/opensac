@@ -2,7 +2,7 @@
 //
 // Every provider used to own a private `wrapError` that flattened the original
 // error into a new message and dropped it. That made a transport failure
-// unreachable to retry classification: Deno reports a failed request as
+// unreachable to retry classification: Node reports a failed request as
 // `TypeError: fetch failed` whose only real reason (connection refused, DNS
 // failure, blocked port) lives on `cause`, so flattening turned a retryable
 // stall into the opaque, unclassifiable string "send request: fetch failed".
@@ -41,7 +41,7 @@ export function errorChainText(err: unknown): string {
 
 /**
  * The underlying reason carried by the cause chain, trimmed of the noisy
- * `error sending request for url (...)` framing Deno adds. Used to make the
+ * `error sending request for url (...)` framing Node adds. Used to make the
  * message the user sees actionable rather than "fetch failed".
  *
  * It walks the whole chain rather than reading one level, because a provider can
@@ -58,9 +58,12 @@ function rootCauseDetail(err: unknown): string {
   let current: unknown = err.cause;
   while (current != null && !seen.has(current)) {
     seen.add(current);
-    const message = current instanceof Error
-      ? current.message
-      : (typeof current === "object" ? String(current) : String(current));
+    const message =
+      current instanceof Error
+        ? current.message
+        : typeof current === "object"
+          ? String(current)
+          : String(current);
     const trimmed = message.trim();
     if (trimmed !== "" && trimmed !== "[object Object]") deepest = trimmed;
     current = (current as { cause?: unknown }).cause;
@@ -85,9 +88,10 @@ function rootCauseDetail(err: unknown): string {
 export function wrapError(context: string, err: unknown): Error {
   const message = err instanceof Error ? err.message : String(err);
   const detail = rootCauseDetail(err);
-  const text = detail !== "" && !message.includes(detail)
-    ? `${context}: ${message}: ${detail}`
-    : `${context}: ${message}`;
+  const text =
+    detail !== "" && !message.includes(detail)
+      ? `${context}: ${message}: ${detail}`
+      : `${context}: ${message}`;
   return new Error(text, { cause: err });
 }
 
@@ -96,7 +100,7 @@ export function wrapError(context: string, err: unknown): Error {
  * cause chain a `wrapError` produced. Matched case-insensitively.
  *
  * This is the single owner of the phrase set. It keys on the stable underlying
- * fault every provider preserves (`fetch failed`, the Deno socket/DNS/TLS
+ * fault every provider preserves (`fetch failed`, the Node socket/DNS/TLS
  * reasons, the HTTP 4xx/5xx gateway framing) rather than the *stage prefix* a
  * particular provider adds. The prefixes genuinely differ — `send request` for
  * OpenAI/Google, `send` for Anthropic, `stream read error` for a mid-stream

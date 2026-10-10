@@ -248,8 +248,8 @@ export function calculateCost(
   u.cost.output = (u.outputTokens * outputPrice) / 1_000_000;
   u.cost.cacheRead = (u.cacheRead * cacheReadPrice) / 1_000_000;
   u.cost.cacheWrite = (u.cacheWrite * cacheWritePrice) / 1_000_000;
-  u.cost.total = u.cost.input + u.cost.output + u.cost.cacheRead +
-    u.cost.cacheWrite;
+  u.cost.total =
+    u.cost.input + u.cost.output + u.cost.cacheRead + u.cost.cacheWrite;
 }
 
 /** Attachment is a provider-neutral citation, file, image, or artifact. */

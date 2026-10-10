@@ -3,6 +3,7 @@
 // `scripts/build_node.ts` copies them beside the bundle so the same path
 // resolves in dev and in the published package.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { resourceUrl } from "../platform/resources.ts";
 
 let cachedHTML: string | null = null;
@@ -12,7 +13,7 @@ let cachedPNG: Uint8Array | null = null;
 /** The embedded dashboard HTML. */
 export function dashboardHTML(): string {
   if (cachedHTML === null) {
-    cachedHTML = Deno.readTextFileSync(
+    cachedHTML = nodeRuntime.readTextFileSync(
       resourceUrl("stats/dashboard.html"),
     );
   }
@@ -22,7 +23,7 @@ export function dashboardHTML(): string {
 /** The embedded small favicon (ICO). */
 export function opensacSmallICO(): Uint8Array {
   if (cachedICO === null) {
-    cachedICO = Deno.readFileSync(
+    cachedICO = nodeRuntime.readFileSync(
       resourceUrl("stats/opensac-small.ico"),
     );
   }
@@ -32,7 +33,7 @@ export function opensacSmallICO(): Uint8Array {
 /** The embedded dashboard logo (PNG). */
 export function opensacPNG(): Uint8Array {
   if (cachedPNG === null) {
-    cachedPNG = Deno.readFileSync(resourceUrl("stats/opensac.png"));
+    cachedPNG = nodeRuntime.readFileSync(resourceUrl("stats/opensac.png"));
   }
   return cachedPNG;
 }

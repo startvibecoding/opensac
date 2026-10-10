@@ -114,9 +114,10 @@ function createMockAnthropicProvider(
 ): Provider {
   const client: HttpClient = {
     fetch(_input, init) {
-      const headers = init?.headers instanceof Headers
-        ? init.headers
-        : new Headers(init?.headers);
+      const headers =
+        init?.headers instanceof Headers
+          ? init.headers
+          : new Headers(init?.headers);
       const body = typeof init?.body === "string" ? init.body : "";
       const captured: CapturedRequest = { headers, body };
       if (check !== undefined) check(captured);
@@ -225,13 +226,15 @@ test("AnthropicDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   p.client = {
     fetch() {
       attempts++;
-      return Promise.resolve(fakeResponse(
-        200,
-        sseBody(
-          'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}\n',
-          streamErr,
+      return Promise.resolve(
+        fakeResponse(
+          200,
+          sseBody(
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}\n',
+            streamErr,
+          ),
         ),
-      ));
+      );
     },
     close() {},
   };
@@ -273,11 +276,13 @@ test("AnthropicProviderHTTPProxy", () => {
 // ─── tool_choice / tool calls ────────────────────────────────────────────────
 
 test("AnthropicParallelToolUseRequest", async () => {
-  const tools: ToolDefinition[] = [{
-    name: "read",
-    description: "",
-    parameters: { type: "object" },
-  }];
+  const tools: ToolDefinition[] = [
+    {
+      name: "read",
+      description: "",
+      parameters: { type: "object" },
+    },
+  ];
 
   let bodies: CapturedRequest[] = [];
   let p = createMockAnthropicProvider(
@@ -285,12 +290,16 @@ test("AnthropicParallelToolUseRequest", async () => {
     'data: {"type":"message_stop"}\n',
     bodies,
   );
-  let req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "mock",
-    messages: [createUserMessage("use the tools")],
-    tools,
-  }, bodies);
+  let req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "mock",
+      messages: [createUserMessage("use the tools")],
+      tools,
+    },
+    bodies,
+  );
   let choice = req.tool_choice as Record<string, unknown> | undefined;
   assert(choice !== undefined);
   assertEquals(choice!.type, "auto");
@@ -302,13 +311,17 @@ test("AnthropicParallelToolUseRequest", async () => {
     'data: {"type":"message_stop"}\n',
     bodies,
   );
-  req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "mock",
-    messages: [createUserMessage("use the tool")],
-    tools,
-    responseOptions: { parallelTools: false },
-  }, bodies);
+  req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "mock",
+      messages: [createUserMessage("use the tool")],
+      tools,
+      responseOptions: { parallelTools: false },
+    },
+    bodies,
+  );
   choice = req.tool_choice as Record<string, unknown> | undefined;
   assert(choice !== undefined);
   assertEquals(choice!.disable_parallel_tool_use, true);
@@ -319,12 +332,16 @@ test("AnthropicParallelToolUseRequest", async () => {
     'data: {"type":"message_stop"}\n',
     bodies,
   );
-  req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "mock",
-    messages: [createUserMessage("use the tool")],
-    tools,
-  }, bodies);
+  req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "mock",
+      messages: [createUserMessage("use the tool")],
+      tools,
+    },
+    bodies,
+  );
   assertEquals(req.tool_choice, undefined);
 
   bodies = [];
@@ -333,29 +350,39 @@ test("AnthropicParallelToolUseRequest", async () => {
     'data: {"type":"message_stop"}\n',
     bodies,
   );
-  req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "mock",
-    messages: [createUserMessage("use the tool")],
-    tools,
-    responseOptions: { parallelTools: true },
-  }, bodies);
+  req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "mock",
+      messages: [createUserMessage("use the tool")],
+      tools,
+      responseOptions: { parallelTools: true },
+    },
+    bodies,
+  );
   assertEquals(req.tool_choice, undefined);
 
   bodies = [];
   p = createMockAnthropicProvider(
-    [m("mock", {
-      compat: { supportsParallelToolCalls: true, supportsToolChoice: false },
-    })],
+    [
+      m("mock", {
+        compat: { supportsParallelToolCalls: true, supportsToolChoice: false },
+      }),
+    ],
     'data: {"type":"message_stop"}\n',
     bodies,
   );
-  req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "mock",
-    messages: [createUserMessage("use the tool")],
-    tools,
-  }, bodies);
+  req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "mock",
+      messages: [createUserMessage("use the tool")],
+      tools,
+    },
+    bodies,
+  );
   assertEquals(req.tool_choice, undefined);
 });
 
@@ -365,22 +392,21 @@ test("MergeToolCallInputPreservesInitialOnMalformedStream", () => {
 });
 
 test("AnthropicStreamMultipleToolCallsWithInitialInput", async () => {
-  const sse = [
-    'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":"read","input":{"path":"a"}}}',
-    'data: {"type":"content_block_stop","index":0}',
-    'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"call-2","name":"read","input":{"path":"b"}}}',
-    'data: {"type":"content_block_stop","index":1}',
-    'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
-  ].join("\n") + "\n";
+  const sse =
+    [
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":"read","input":{"path":"a"}}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"call-2","name":"read","input":{"path":"b"}}}',
+      'data: {"type":"content_block_stop","index":1}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+    ].join("\n") + "\n";
   const p = createMockAnthropicProvider([m("mock")], sse);
   const calls: ToolCallBlock[] = [];
-  for (
-    const event of await chatAndCollect(p, {
-      ...abortParams(),
-      modelId: "mock",
-      messages: [createUserMessage("read both")],
-    })
-  ) {
+  for (const event of await chatAndCollect(p, {
+    ...abortParams(),
+    modelId: "mock",
+    messages: [createUserMessage("read both")],
+  })) {
     if (event.type === streamToolCall && event.toolCall !== undefined) {
       calls.push(event.toolCall);
     }
@@ -420,15 +446,19 @@ test("ConvertMessagesPreservesCacheControlOnSingleTextBlock", () => {
   const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   p.setCacheControlEnabled(boolPtr(true));
   const msgs = p.convertMessages({
-    messages: [{
-      role: "user",
-      contents: [{
-        type: "text",
-        text: "cached text",
-        cache_control: { type: "ephemeral" },
-      }],
-      timestamp: new Date(),
-    }],
+    messages: [
+      {
+        role: "user",
+        contents: [
+          {
+            type: "text",
+            text: "cached text",
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        timestamp: new Date(),
+      },
+    ],
   } as ChatParams);
   assertEquals(msgs.length, 1);
   const blocks = msgs[0].content as unknown as Array<Record<string, unknown>>;
@@ -441,15 +471,19 @@ test("ConvertMessagesOmitsCacheControlWhenDisabled", () => {
   const p = createAnthropicProvider("fake-key", "https://api.anthropic.com");
   p.setCacheControlEnabled(boolPtr(false));
   const msgs = p.convertMessages({
-    messages: [{
-      role: "user",
-      contents: [{
-        type: "text",
-        text: "cached text",
-        cache_control: { type: "ephemeral" },
-      }],
-      timestamp: new Date(),
-    }],
+    messages: [
+      {
+        role: "user",
+        contents: [
+          {
+            type: "text",
+            text: "cached text",
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        timestamp: new Date(),
+      },
+    ],
   } as ChatParams);
   assertEquals(msgs[0].content, "cached text");
 });
@@ -465,15 +499,19 @@ test("ChatRequestPreservesCacheControlOnSingleTextBlock", async () => {
   await chatAndCollect(p, {
     ...abortParams(),
     modelId: "claude-test",
-    messages: [{
-      role: "user",
-      contents: [{
-        type: "text",
-        text: "cached text",
-        cache_control: { type: "ephemeral" },
-      }],
-      timestamp: new Date(),
-    }],
+    messages: [
+      {
+        role: "user",
+        contents: [
+          {
+            type: "text",
+            text: "cached text",
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        timestamp: new Date(),
+      },
+    ],
   });
   const req = JSON.parse(bodies[0].body) as Record<string, unknown>;
   const messages = req.messages as Array<Record<string, unknown>>;
@@ -528,13 +566,15 @@ test("ChatRequestHostedWebSearchTool", async () => {
     ...abortParams(),
     modelId: "claude-test",
     messages: [createUserMessage("search the web")],
-    tools: [{
-      name: "web_search",
-      description: "",
-      kind: "hosted",
-      provider: "anthropic",
-      providerType: "messages",
-    }],
+    tools: [
+      {
+        name: "web_search",
+        description: "",
+        kind: "hosted",
+        provider: "anthropic",
+        providerType: "messages",
+      },
+    ],
   });
   const req = JSON.parse(bodies[0].body) as Record<string, unknown>;
   const tools = req.tools as Array<Record<string, unknown>>;
@@ -672,10 +712,12 @@ test("AnthropicThinkingAdaptiveForOpus47", async () => {
 
 test("AnthropicThinkingAdaptiveFromModelCompat", async () => {
   const req = await captureThinking(
-    [m("custom-adaptive", {
-      reasoning: true,
-      compat: { forceAdaptiveThinking: true },
-    })],
+    [
+      m("custom-adaptive", {
+        reasoning: true,
+        compat: { forceAdaptiveThinking: true },
+      }),
+    ],
     "",
     {
       modelId: "custom-adaptive",
@@ -792,17 +834,13 @@ test("AnthropicCache_FirstWinsOnConflict", async () => {
 // ─── sampling params suppression ─────────────────────────────────────────────
 
 test("AnthropicThinkingDropsSamplingParams", async () => {
-  const req = await captureThinking(
-    [m("mock", { reasoning: true })],
-    "",
-    {
-      modelId: "mock",
-      messages: [createUserMessage("hi")],
-      thinkingLevel: thinkingMedium,
-      temperature: 0.7,
-      topP: 0.9,
-    },
-  );
+  const req = await captureThinking([m("mock", { reasoning: true })], "", {
+    modelId: "mock",
+    messages: [createUserMessage("hi")],
+    thinkingLevel: thinkingMedium,
+    temperature: 0.7,
+    topP: 0.9,
+  });
   assert(req.thinking !== undefined);
   assertEquals(req.temperature, undefined);
   assertEquals(req.top_p, undefined);

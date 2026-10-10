@@ -1,4 +1,4 @@
-// deno-lint-ignore-file require-await -- async fake methods model Promise-returning seams
+/* eslint-disable @typescript-eslint/require-await */ // async fake methods model Promise-returning seams
 import { assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
 import { CoreClient, type CoreEventConnection } from "../core/client.ts";
@@ -33,8 +33,8 @@ class FakeEventConnection implements CoreEventConnection {
   readonly responses: unknown[] = [];
   notificationListener:
     | ((
-      notification: import("../core/protocol.ts").CoreRpcNotification,
-    ) => void)
+        notification: import("../core/protocol.ts").CoreRpcNotification,
+      ) => void)
     | undefined;
   requestListener:
     | ((request: import("../core/protocol.ts").CoreRpcRequest) => void)
@@ -52,13 +52,13 @@ class FakeEventConnection implements CoreEventConnection {
     ) => void,
   ) {
     this.notificationListener = listener;
-    return () => this.notificationListener = undefined;
+    return () => (this.notificationListener = undefined);
   }
   onRequest(
     listener: (request: import("../core/protocol.ts").CoreRpcRequest) => void,
   ) {
     this.requestListener = listener;
-    return () => this.requestListener = undefined;
+    return () => (this.requestListener = undefined);
   }
   onClose(_listener: () => void) {
     return () => {};
@@ -88,15 +88,19 @@ test("ACPBridgeClient connects, subscribes, replays, and closes only the client"
   await bridge.replay("session-1", "run-1", 4);
   await bridge.close();
 
-  assertEquals(core.calls, [{
-    method: "session.create",
-    params: { workDir: "/tmp" },
-  }]);
-  assertEquals(core.eventConnection.subscriptions, [{
-    sessionId: "session-1",
-    runId: "run-1",
-    cursor: 4,
-  }]);
+  assertEquals(core.calls, [
+    {
+      method: "session.create",
+      params: { workDir: "/tmp" },
+    },
+  ]);
+  assertEquals(core.eventConnection.subscriptions, [
+    {
+      sessionId: "session-1",
+      runId: "run-1",
+      cursor: 4,
+    },
+  ]);
   assertEquals(core.closed, 1);
 });
 

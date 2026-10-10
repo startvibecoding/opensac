@@ -4,6 +4,7 @@
 // listing/detail projection, open/reload, sub-agent table isolation, deletion,
 // content overrides, and additional-directory bindings.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { closeAll } from "../db/mod.ts";
@@ -53,14 +54,14 @@ function textBlock(text: string): ContentBlock {
 }
 
 function withTempDir(fn: (dir: string, sessionDir: string) => void): void {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-session-test-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-session-test-" });
   const sessionDir = path.join(dir, "sessions");
   try {
     fn(dir, sessionDir);
   } finally {
     closeAll();
     try {
-      Deno.removeSync(dir, { recursive: true });
+      runtime.removeSync(dir, { recursive: true });
     } catch {
       // best-effort cleanup
     }
@@ -78,7 +79,7 @@ function countRows(
 }
 
 test("session manager: new", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   try {
     const sessionDir = path.join(dir, "sessions");
     const m = createManager("/tmp/test", sessionDir);
@@ -88,7 +89,7 @@ test("session manager: new", () => {
     const defaulted = createManager("/tmp/test", "");
     assert(defaulted.sessionDir !== "");
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 });
 
@@ -101,17 +102,17 @@ test("session manager: init", () => {
     assertEquals(header!.version, 3);
     assertEquals(header!.cwd, "/tmp/test");
     assert(header!.id !== "");
-    assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
+    assert(runtime.statSync(path.join(sessionDir, "sessions.db")));
   });
 });
 
 test("session manager: init with duplicate ID does not merge entries", () => {
   withTempDir((_dir, sessionDir) => {
-    const first = createManager(Deno.makeTempDirSync(), sessionDir);
+    const first = createManager(runtime.makeTempDirSync(), sessionDir);
     first.initWithID("duplicate-session");
     first.appendMessage(createUserMessage("first conversation"));
 
-    const second = createManager(Deno.makeTempDirSync(), sessionDir);
+    const second = createManager(runtime.makeTempDirSync(), sessionDir);
     assertThrows(
       () => second.initWithID("duplicate-session"),
       SessionIDExistsError,
@@ -144,7 +145,7 @@ test("session manager: append message auto-initializes", () => {
     assert(id !== "");
     assert(m.getHeader() !== null);
     assert(m.getFile() !== "");
-    assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
+    assert(runtime.statSync(path.join(sessionDir, "sessions.db")));
   });
 });
 
@@ -359,7 +360,7 @@ test("session manager: continue recent creates a new session", () => {
     const m = continueRecent("/tmp/nonexistent", sessionDir);
     assert(m.getFile() !== "");
     assert(m.getHeader() !== null);
-    assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
+    assert(runtime.statSync(path.join(sessionDir, "sessions.db")));
     m.appendMessage(createUserMessage("Hello"));
   });
 });
@@ -389,8 +390,8 @@ test("session manager: open by path or id rejects ambiguous prefix", () => {
     for (const id of ["abcdef01", "abcdef02"]) {
       createManager("/tmp/test", sessionDir).initWithID(id);
     }
-    const err = assertThrows(
-      () => openByPathOrID("/tmp/test", sessionDir, "abc"),
+    const err = assertThrows(() =>
+      openByPathOrID("/tmp/test", sessionDir, "abc"),
     );
     assert((err as Error).message.includes("ambiguous"));
   });
@@ -402,7 +403,7 @@ test("session manager: open by ID recreates missing handle", () => {
     m.initWithID("custom-session-123");
     const reopened = openByID("/tmp/test", sessionDir, "custom-session-123");
     assertEquals(reopened.getHeader()!.id, "custom-session-123");
-    assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
+    assert(runtime.statSync(path.join(sessionDir, "sessions.db")));
   });
 });
 
@@ -416,15 +417,15 @@ test("session manager: open by ID exact ignores cwd", () => {
 });
 
 test("session manager: load rejects session not registered in DB", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   try {
     const handlePath = path.join(dir, "session.db");
-    Deno.writeTextFileSync(handlePath, "nonexistent-session-id");
+    runtime.writeTextFileSync(handlePath, "nonexistent-session-id");
     const err = assertThrows(() => openSession(handlePath));
     assert((err as Error).message.includes("not registered in DB"));
   } finally {
     closeAll();
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 });
 
@@ -578,7 +579,7 @@ test("session manager: delete session", () => {
   withTempDir((_dir, sessionDir) => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
-    assert(Deno.statSync(path.join(sessionDir, "sessions.db")));
+    assert(runtime.statSync(path.join(sessionDir, "sessions.db")));
     deleteSession(m.getFile(), sessionDir);
     assertEquals(listForDir("/tmp/test", sessionDir).length, 0);
   });
@@ -592,7 +593,7 @@ test("session manager: delete non-existent session is idempotent", () => {
 
 test("session manager: delete refuses an execution owner", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = createManager(Deno.makeTempDirSync(), sessionDir);
+    const m = createManager(runtime.makeTempDirSync(), sessionDir);
     m.init();
     const guard = acquireExecutionAdmission(sessionDir, m.getHeader()!.id);
     try {
@@ -612,7 +613,7 @@ test("session manager: delete refuses an execution owner", () => {
 test("session manager: delete rejects path outside session dir", () => {
   withTempDir((dir, sessionDir) => {
     const outside = path.join(dir, "outside.db");
-    Deno.writeTextFileSync(outside, "session-id");
+    runtime.writeTextFileSync(outside, "session-id");
     assertThrows(() => deleteSession(outside, sessionDir));
   });
 });
@@ -622,7 +623,7 @@ test("session manager: delete rejects shared DB", () => {
     const m = createManager("/tmp/test", sessionDir);
     m.init();
     const sharedDB = path.join(sessionDir, "sessions.db");
-    assert(Deno.statSync(sharedDB));
+    assert(runtime.statSync(sharedDB));
     assertThrows(() => deleteSession(sharedDB, sessionDir));
   });
 });
@@ -696,10 +697,7 @@ test("session manager: list all detailed across work dirs with search and count"
     assertEquals(countWithMessages(sessionDir), 1);
     assertEquals(listAll(sessionDir, [withMessagesOnly()]).length, 1);
     assertEquals(listAll(sessionDir, [withSearch("Alpha")]).length, 1);
-    assertEquals(
-      listAllDetailed(sessionDir, [withSearch("beta")]).length,
-      1,
-    );
+    assertEquals(listAllDetailed(sessionDir, [withSearch("beta")]).length, 1);
   });
 });
 
@@ -757,9 +755,9 @@ test("session manager: entries survive reopen durably", () => {
 });
 
 test("session manager: additional directories replay preserves leaf", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   try {
-    const m = createManager(Deno.makeTempDirSync(), dir);
+    const m = createManager(runtime.makeTempDirSync(), dir);
     m.initWithID("session-directories");
     m.appendModelChange("provider", "model");
     assert(m.getLeafID() !== null);
@@ -772,7 +770,7 @@ test("session manager: additional directories replay preserves leaf", () => {
     assertEquals(entry!.directories, ["/tmp/extra"]);
   } finally {
     closeAll();
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 });
 
@@ -794,7 +792,7 @@ function imageToolResultMessage(): Message {
 
 test("session manager: content override replaces message on replay", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = createManager(Deno.makeTempDirSync(), sessionDir);
+    const m = createManager(runtime.makeTempDirSync(), sessionDir);
     m.init();
     m.appendMessage(createUserMessage("look at this"));
     const target = imageToolResultMessage();
@@ -802,8 +800,7 @@ test("session manager: content override replaces message on replay", () => {
 
     const replacement: Message = { ...target };
     replacement.contents = undefined;
-    replacement.content =
-      `${target.content}\n\n[image unavailable] 1 image(s) could not be sent to the model`;
+    replacement.content = `${target.content}\n\n[image unavailable] 1 image(s) could not be sent to the model`;
     m.appendContentOverride(
       targetID,
       replacement,
@@ -838,10 +835,10 @@ test("session manager: content override replaces message on replay", () => {
 
 test("session manager: content override rejects unknown target", () => {
   withTempDir((_dir, sessionDir) => {
-    const m = createManager(Deno.makeTempDirSync(), sessionDir);
+    const m = createManager(runtime.makeTempDirSync(), sessionDir);
     m.init();
     assertThrows(() =>
-      m.appendContentOverride("missing", createUserMessage("x"), "reason", "")
+      m.appendContentOverride("missing", createUserMessage("x"), "reason", ""),
     );
   });
 });

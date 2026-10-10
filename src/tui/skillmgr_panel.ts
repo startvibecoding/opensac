@@ -51,10 +51,7 @@ export class SkillMgrPanel {
   #applying = false;
   #closed = false;
 
-  constructor(
-    host: SkillMgrPanelHost,
-    dialog: { close(): void },
-  ) {
+  constructor(host: SkillMgrPanelHost, dialog: { close(): void }) {
     this.#host = host;
     this.#dialog = dialog;
     this.#locked = new Set(host.lockedNames());
@@ -245,22 +242,22 @@ export class SkillMgrPanel {
       }
       if (this.#items.length > SKILL_MGR_VISIBLE_ROWS) {
         lines.push(
-          `${DIM}${
-            tr.text(
-              "skillmgr.showing",
-              start + 1,
-              end,
-              this.#items.length,
-            )
-          }${RESET}`,
+          `${DIM}${tr.text(
+            "skillmgr.showing",
+            start + 1,
+            end,
+            this.#items.length,
+          )}${RESET}`,
         );
       }
     }
     lines.push(
       `${DIM}${"─".repeat(Math.min(contentWidth, 40))}${RESET}`,
-      `${DIM}${
-        tr.text("skillmgr.counter", this.#activeCount(), this.#items.length)
-      }${RESET}`,
+      `${DIM}${tr.text(
+        "skillmgr.counter",
+        this.#activeCount(),
+        this.#items.length,
+      )}${RESET}`,
     );
     return frame(lines, width);
   }
@@ -272,8 +269,7 @@ export class SkillMgrPanel {
       ? ` ${DIM}(${this.#host.translator.text("skillmgr.builtin")})${RESET}`
       : "";
     const name = current ? `${ACCENT}${BOLD}${skill.name}${RESET}` : skill.name;
-    const label =
-      `${pointer}${check} ${name} (${skill.source})${lock}: ${skill.description}`;
+    const label = `${pointer}${check} ${name} (${skill.source})${lock}: ${skill.description}`;
     return truncateDisplay(label, contentWidth);
   }
 

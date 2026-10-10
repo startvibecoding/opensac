@@ -21,7 +21,8 @@ import {
   type TUIService,
   type TUISessionView,
   type TUISettingsView,
-  type TUITranscriptMessage} from "./service.ts";
+  type TUITranscriptMessage,
+} from "./service.ts";
 import { SOURCE_TUI } from "../agentruntime/source.ts";
 import {
   isDecisionNotFound,
@@ -146,9 +147,9 @@ export function tuiTranslatorFromSettings(settings: {
   );
   if (!valid) {
     console.error(
-      `Warning: invalid tuilang ${
-        JSON.stringify(settings.tuilang)
-      }; using auto`,
+      `Warning: invalid tuilang ${JSON.stringify(
+        settings.tuilang,
+      )}; using auto`,
     );
   }
   return translator;
@@ -253,14 +254,11 @@ export class TUISession implements CommandHost {
   /** The content cache used by the most recent frame (test/profiling aid). */
   #lastModalCache: ModalContentCache | undefined;
 
-  constructor(
-    options: TUISessionOptions,
-    service: TUIService,
-  ) {
+  constructor(options: TUISessionOptions, service: TUIService) {
     this.#service = service;
     this.#workDir = options.workDir;
-    this.#coreReconnectNoticeMs = options.coreReconnectNoticeMs ??
-      CORE_RECONNECT_NOTICE_MS;
+    this.#coreReconnectNoticeMs =
+      options.coreReconnectNoticeMs ?? CORE_RECONNECT_NOTICE_MS;
     this.#continueLast = options.continueLast ?? false;
     this.#resumeSession = (options.resumeSession ?? "").trim();
     this.#multiAgent = options.multiAgent ?? false;
@@ -318,20 +316,19 @@ export class TUISession implements CommandHost {
     }
     if (this.#modelID === "") this.#modelID = settingsView.defaultModel;
     if (this.#mode === "") {
-      this.#mode = settingsView.defaultMode !== ""
-        ? settingsView.defaultMode
-        : "yolo";
+      this.#mode =
+        settingsView.defaultMode !== "" ? settingsView.defaultMode : "yolo";
     }
     if (this.#thinking === "") this.#thinking = settingsView.thinkingLevel;
     this.refreshHeader();
     await this.#openInitialSession();
     this.#stopDecisions = this.#service.onDecisionRequest((request) =>
-      this.#handleDecisionRequest(request)
+      this.#handleDecisionRequest(request),
     );
     // A Core restart is invisible from here until the shared connection says
     // so, so tell the user instead of letting the next prompt look frozen.
     this.#stopConnectionState = this.#service.onConnectionState((state) =>
-      this.#handleConnectionState(state)
+      this.#handleConnectionState(state),
     );
   }
 
@@ -489,9 +486,10 @@ export class TUISession implements CommandHost {
    * projects into the controller, supervisor messages become status rows.
    */
   async #consumeEsmEvents(sessionId: string, runId: string): Promise<void> {
-    for await (
-      const event of this.#service.subscribeRunEvents(sessionId, runId)
-    ) {
+    for await (const event of this.#service.subscribeRunEvents(
+      sessionId,
+      runId,
+    )) {
       const payload = event.payload ?? {};
       switch (event.eventType) {
         case "esm_status": {
@@ -541,9 +539,10 @@ export class TUISession implements CommandHost {
     runId: string,
   ): Promise<CoreRuntimeEvent | undefined> {
     let terminal: CoreRuntimeEvent | undefined;
-    for await (
-      const event of this.#service.subscribeRunEvents(sessionId, runId)
-    ) {
+    for await (const event of this.#service.subscribeRunEvents(
+      sessionId,
+      runId,
+    )) {
       if (event.terminal) {
         terminal = event;
         break;
@@ -634,8 +633,8 @@ export class TUISession implements CommandHost {
     // settings projection; the dialog/bridge keeps no private provider catalog.
     const settings = await this.#service.settings();
     this.#settingsView = settings;
-    const provider = settings.providers.find((entry) =>
-      entry.name === this.#providerName
+    const provider = settings.providers.find(
+      (entry) => entry.name === this.#providerName,
     );
     const model = provider?.models.find((entry) => entry.id === modelID);
     if (model === undefined) {
@@ -850,16 +849,11 @@ export class TUISession implements CommandHost {
     const panel = this.#skillHubPanel;
     if (panel === undefined) return "";
     const page = panel.page();
-    const lines = [
-      page.title,
-      "",
-      ...page.body ?? [],
-    ];
+    const lines = [page.title, "", ...(page.body ?? [])];
     for (const item of page.items) {
       const idx = Number.parseInt(item.value, 10);
-      const pointer = idx === panel.cursor
-        ? `${ACCENT}${BOLD}› ${RESET}`
-        : "  ";
+      const pointer =
+        idx === panel.cursor ? `${ACCENT}${BOLD}› ${RESET}` : "  ";
       lines.push(`${pointer}${item.label}`);
       if (item.description !== undefined && item.description !== "") {
         lines.push(`    ${DIM}${item.description}${RESET}`);
@@ -909,7 +903,7 @@ export class TUISession implements CommandHost {
           projectSkillDirs(this.#workDir),
         ),
       activateSkill: (name) => this.activateSkill(name),
-      defaultScope: () => isProjectDir(this.#workDir) ? "project" : "global",
+      defaultScope: () => (isProjectDir(this.#workDir) ? "project" : "global"),
       targetDir: (scope) =>
         scope === "project"
           ? projectSkillDirs(this.#workDir)[0]
@@ -982,7 +976,7 @@ export class TUISession implements CommandHost {
   #skillMgrPanelHost(): SkillMgrPanelHost {
     return {
       translator: this.translator,
-      // No feature-forced builtin skills in the Deno port yet: workflow and
+      // No feature-forced builtin skills in the Node port yet: workflow and
       // browser capabilities own tools, not skill activations. The locked
       // projection stays available for parity with the mothx panel.
       lockedNames: () => [],
@@ -1044,8 +1038,8 @@ export class TUISession implements CommandHost {
       allow: loadAllow(),
       currentSessionID: () => this.currentSessionID(),
       listModels: (providerName) =>
-        this.#settingsView?.providers.find((entry) =>
-          entry.name === providerName
+        this.#settingsView?.providers.find(
+          (entry) => entry.name === providerName,
         )?.models ?? [],
       applyModel: (providerName, modelID) =>
         this.applyModelBinding(providerName, modelID),
@@ -1145,9 +1139,7 @@ export class TUISession implements CommandHost {
 
   async openModelDialog(): Promise<CommandResult> {
     await Promise.resolve();
-    this.#openDialog(
-      new Dialog((d) => new ModelDialog(this.dialogHost, d)),
-    );
+    this.#openDialog(new Dialog((d) => new ModelDialog(this.dialogHost, d)));
     return {};
   }
 
@@ -1157,12 +1149,13 @@ export class TUISession implements CommandHost {
       this.#service.getSettings(),
     ]);
     this.#openDialog(
-      new Dialog((d) =>
-        new DefaultModelDialog(this.dialogHost, d, scope, {
-          catalog,
-          defaultProvider: settings.defaultProvider ?? "",
-          defaultModel: settings.defaultModel ?? "",
-        })
+      new Dialog(
+        (d) =>
+          new DefaultModelDialog(this.dialogHost, d, scope, {
+            catalog,
+            defaultProvider: settings.defaultProvider ?? "",
+            defaultModel: settings.defaultModel ?? "",
+          }),
       ),
     );
     return {};
@@ -1189,8 +1182,8 @@ export class TUISession implements CommandHost {
   async openAuthDialog(initialProvider?: string): Promise<CommandResult> {
     const settings = await this.#service.getSettings();
     this.#openDialog(
-      new Dialog((d) =>
-        new AuthDialog(this.dialogHost, d, settings, initialProvider)
+      new Dialog(
+        (d) => new AuthDialog(this.dialogHost, d, settings, initialProvider),
       ),
     );
     return {};
@@ -1329,12 +1322,10 @@ export class TUISession implements CommandHost {
     });
     this.controller.attachRun(run);
     try {
-      for await (
-        const event of this.#service.subscribeRunEvents(
-          sessionId,
-          accepted.runId,
-        )
-      ) {
+      for await (const event of this.#service.subscribeRunEvents(
+        sessionId,
+        accepted.runId,
+      )) {
         const agentEvent = coreEventToAgentEvent(event);
         if (agentEvent !== undefined) {
           this.controller.handleAgentEvent(agentEvent);
@@ -1412,12 +1403,8 @@ export class TUISession implements CommandHost {
   async #openInitialSession(): Promise<void> {
     const target = this.#resumeSession;
     if (target !== "") {
-      const {
-        sessionId,
-        workDir,
-        failure,
-        view,
-      } = await this.#resolveResumeTarget(target);
+      const { sessionId, workDir, failure, view } =
+        await this.#resolveResumeTarget(target);
       if (sessionId !== "") {
         await this.resumePersistedSession(sessionId, workDir, view);
         return;
@@ -1461,8 +1448,7 @@ export class TUISession implements CommandHost {
   ): Promise<void> {
     // A caller that already opened the session to resolve the target passes the
     // view down rather than making the Core serve the same open twice.
-    const view = resolvedView ??
-      await this.#openScoped(sessionId, workDir);
+    const view = resolvedView ?? (await this.#openScoped(sessionId, workDir));
     this.adoptSession(view);
     // A persisted session mode wins; an empty one falls back to the yolo
     // product default (the Runtime re-resolves source-forced modes).
@@ -1487,9 +1473,9 @@ export class TUISession implements CommandHost {
       // The reprint is presentation; a failed read must not make the resumed
       // session unusable, so it says so and carries on with live turns.
       this.controller.addMessage(
-        `${this.translator.text("session.history_unavailable")}: ${
-          errorMessage(error)
-        }`,
+        `${this.translator.text("session.history_unavailable")}: ${errorMessage(
+          error,
+        )}`,
         "warning",
       );
       this.requestRender();
@@ -1509,11 +1495,7 @@ export class TUISession implements CommandHost {
       // One status row saying what was restored, so the reprint is never
       // mistaken for a fresh empty session.
       this.controller.addMessage(
-        this.translator.text(
-          "session.resumed",
-          sessionId,
-          messages.length,
-        ),
+        this.translator.text("session.resumed", sessionId, messages.length),
         "status",
       );
     }
@@ -1556,9 +1538,7 @@ export class TUISession implements CommandHost {
    * is unknown while the Core is merely unreachable would send them to retry a
    * name that was fine.
    */
-  async #resolveResumeTarget(
-    target: string,
-  ): Promise<{
+  async #resolveResumeTarget(target: string): Promise<{
     sessionId: string;
     workDir: string;
     failure: string;
@@ -1568,10 +1548,10 @@ export class TUISession implements CommandHost {
       const latest = await this.#newestPersistedSession(target);
       return latest.sessionId === ""
         ? {
-          sessionId: "",
-          workDir: target,
-          failure: `no session recorded under ${target}`,
-        }
+            sessionId: "",
+            workDir: target,
+            failure: `no session recorded under ${target}`,
+          }
         : { ...latest, failure: "" };
     }
     try {
@@ -1679,16 +1659,14 @@ export class TUISession implements CommandHost {
       answer: value,
     });
     this.controller.resolveQuestion(shown.questionID);
-    this.controller.addMessage(
-      value === "" ? "Answered" : value,
-      "plain",
-    );
+    this.controller.addMessage(value === "" ? "Answered" : value, "plain");
   }
 
   /** Escape: abort a pending request, else clear the draft (Go KeyEsc). */
   handleEscape(): void {
     if (
-      this.#busy || this.controller.shownApproval ||
+      this.#busy ||
+      this.controller.shownApproval ||
       this.controller.shownQuestion
     ) {
       this.cancelRun();
@@ -1763,7 +1741,8 @@ export class TUISession implements CommandHost {
 
   openToolModal(): void {
     const store = this.controller.store;
-    const hasContent = store.messages.length > 0 ||
+    const hasContent =
+      store.messages.length > 0 ||
       store.toolResults.length > 0 ||
       this.controller.activities.order.length > 0;
     if (!hasContent) {
@@ -1790,9 +1769,8 @@ export class TUISession implements CommandHost {
       if (id === "" || id === lead || seen.has(id)) continue;
       seen.add(id);
       const act = this.controller.activities.get(id);
-      const state = act !== undefined && act.state !== ""
-        ? ` ${act.state}`
-        : "";
+      const state =
+        act !== undefined && act.state !== "" ? ` ${act.state}` : "";
       targets.push({
         id: `agent:${id}`,
         label: `${id}${state}`,
@@ -1833,10 +1811,7 @@ export class TUISession implements CommandHost {
    * frame is taller than the terminal).
    */
   #panelAvailableHeight(): number {
-    const editorRows = Math.max(
-      this.input.editor.view().split("\n").length,
-      1,
-    );
+    const editorRows = Math.max(this.input.editor.view().split("\n").length, 1);
     return Math.max(this.#termHeight - 6 - editorRows, 6);
   }
 
@@ -1897,8 +1872,9 @@ export class TUISession implements CommandHost {
   }
 
   planModalPageSize(): number {
-    return this.#planModal?.pageSizeFor(false, this.#panelAvailableHeight()) ??
-      1;
+    return (
+      this.#planModal?.pageSizeFor(false, this.#panelAvailableHeight()) ?? 1
+    );
   }
 
   scrollPlanModal(delta: number): void {
@@ -1934,22 +1910,27 @@ export class TUISession implements CommandHost {
     const width = ToolModalState.contentWidthFor(this.#termWidth);
     this.#syncModalCacheScope(width);
     const cache = this.#modalCacheFor("plan");
-    const text = plan === undefined
-      ? this.translator.text("plan.modal.no_plan")
-      : renderTaskPlanLines(plan, this.translator).join("\n");
-    const blocks: ModalBlock[] = [{
-      key: "plan",
-      sig: `${planSignature(plan)}@${width}`,
-      build: () => text,
-    }];
+    const text =
+      plan === undefined
+        ? this.translator.text("plan.modal.no_plan")
+        : renderTaskPlanLines(plan, this.translator).join("\n");
+    const blocks: ModalBlock[] = [
+      {
+        key: "plan",
+        sig: `${planSignature(plan)}@${width}`,
+        build: () => text,
+      },
+    ];
     return cache.refresh(blocks, width, this.#modalCacheGenerationSeen);
   }
 
   toolModalPageSize(): number {
-    return this.#toolModal?.pageSizeFor(
-      (this.#toolModal.targets.length ?? 0) > 1,
-      this.#panelAvailableHeight(),
-    ) ?? 1;
+    return (
+      this.#toolModal?.pageSizeFor(
+        (this.#toolModal.targets.length ?? 0) > 1,
+        this.#panelAvailableHeight(),
+      ) ?? 1
+    );
   }
 
   scrollToolModal(delta: number): void {
@@ -2023,10 +2004,10 @@ export class TUISession implements CommandHost {
     // wrap width, and the spinner frame, so that tuple fully identifies a body:
     // repeating the frame inside it costs nothing at all (a scroll only changes
     // the window the renderer asks the cache to slice).
-    const frameKey =
-      `${target.id}|${store.generation}|${store.revision}|${width}|${spinner}|${this.controller.activities.revision}`;
+    const frameKey = `${target.id}|${store.generation}|${store.revision}|${width}|${spinner}|${this.controller.activities.revision}`;
     if (
-      frameKey === this.#lastModalFrameKey && this.#lastModalCache !== undefined
+      frameKey === this.#lastModalFrameKey &&
+      this.#lastModalCache !== undefined
     ) {
       // The frame is served entirely from cache: nothing was rebuilt.
       this.#lastFrameRebuilt = 0;
@@ -2102,8 +2083,8 @@ export class TUISession implements CommandHost {
         tool.diff === undefined
           ? "-"
           : `${tool.diff.added}/${tool.diff.deleted}/${
-            tool.diff.unified?.length ?? 0
-          }/${tool.diff.truncated === true}`,
+              tool.diff.unified?.length ?? 0
+            }/${tool.diff.truncated === true}`,
         tool.plan === undefined ? "-" : planSignature(tool.plan),
         argsFingerprint(tool.toolArgs),
         width,
@@ -2165,17 +2146,16 @@ export class TUISession implements CommandHost {
   }
 
   /** Blocks for one sub-agent tab: the full activity snapshot as one block. */
-  #agentActivityBlock(
-    agentId: string,
-    width: number,
-  ): ModalBlock[] {
+  #agentActivityBlock(agentId: string, width: number): ModalBlock[] {
     const act = this.controller.activities.get(agentId);
     const sig = `${agentActivitySignature(act)}@${width}`;
-    return [{
-      key: "activity",
-      sig,
-      build: () => renderAgentActivity(act, agentId, this.translator),
-    }];
+    return [
+      {
+        key: "activity",
+        sig,
+        build: () => renderAgentActivity(act, agentId, this.translator),
+      },
+    ];
   }
 
   /**
@@ -2188,7 +2168,8 @@ export class TUISession implements CommandHost {
     if (
       this.#modalCacheWidth === width &&
       this.#modalCacheGenerationSeen === generation
-    ) return;
+    )
+      return;
     this.#modalCaches.clear();
     this.#modalCacheWidth = width;
     this.#modalCacheGenerationSeen = generation;
@@ -2226,9 +2207,9 @@ export class TUISession implements CommandHost {
     }
     const assistant = store.assistantRaw(idx);
     if (assistant !== "") {
-      return `${
-        this.translator.text("transcript.assistant_prefix")
-      }\n${assistant}`;
+      return `${this.translator.text(
+        "transcript.assistant_prefix",
+      )}\n${assistant}`;
     }
     const think = store.thinkRaw(idx);
     if (think !== "") {
@@ -2261,9 +2242,8 @@ export class TUISession implements CommandHost {
     void this.#service
       .esmState({ sessionId })
       .then((view) => {
-        this.#esmObjective = view.objective === null
-          ? null
-          : esmObjectiveFromView(view.objective);
+        this.#esmObjective =
+          view.objective === null ? null : esmObjectiveFromView(view.objective);
         if (view.activeAgentId !== "") {
           this.#esmActiveAgentId = view.activeAgentId;
         }
@@ -2299,11 +2279,9 @@ export class TUISession implements CommandHost {
       const pad = " ".repeat(Math.max(inner - 2 - displayWidth(l), 0));
       return `│ ${l}${pad} │`;
     });
-    return [
-      `╭${"─".repeat(inner)}╮`,
-      ...body,
-      `╰${"─".repeat(inner)}╯`,
-    ].join("\n");
+    return [`╭${"─".repeat(inner)}╮`, ...body, `╰${"─".repeat(inner)}╯`].join(
+      "\n",
+    );
   }
 
   /** Visible rows for the ESM panel, adapted to the terminal height. */
@@ -2321,9 +2299,10 @@ export class TUISession implements CommandHost {
       this.translator,
       {
         activeAgentId,
-        activity: activeAgentId !== ""
-          ? this.controller.activities.get(activeAgentId)
-          : undefined,
+        activity:
+          activeAgentId !== ""
+            ? this.controller.activities.get(activeAgentId)
+            : undefined,
       },
     );
   }
@@ -2378,11 +2357,14 @@ export class TUISession implements CommandHost {
 
   /** Re-reads the Core-owned settings projection after a settings edit. */
   reloadSettings(): void {
-    void this.#service.settings().then((view) => {
-      this.#settingsView = view;
-    }).catch((error) => {
-      this.controller.addMessage(errorMessage(error), "error");
-    });
+    void this.#service
+      .settings()
+      .then((view) => {
+        this.#settingsView = view;
+      })
+      .catch((error) => {
+        this.controller.addMessage(errorMessage(error), "error");
+      });
   }
 
   /** Updates the header shown by the shell after a model/provider change. */
@@ -2407,19 +2389,14 @@ export type { KeyEvent };
  * re-serialized for every modal frame, and an argument change always arrives
  * with a status/content change, which the signature also carries.
  */
-function argsFingerprint(
-  args: Record<string, unknown> | undefined,
-): string {
+function argsFingerprint(args: Record<string, unknown> | undefined): string {
   if (args === undefined) return "-";
   const names: string[] = [];
   let lengths = 0;
   for (const [key, value] of Object.entries(args)) {
     names.push(key);
-    lengths += typeof value === "string"
-      ? value.length
-      : value === undefined
-      ? 0
-      : 1;
+    lengths +=
+      typeof value === "string" ? value.length : value === undefined ? 0 : 1;
   }
   return `${names.join(",")}:${lengths}`;
 }
@@ -2447,8 +2424,12 @@ function planSignature(plan: TaskPlan | undefined): string {
   if (plan === undefined) return "-";
   let acc = 0;
   for (const step of plan.steps) {
-    acc = (acc + step.title.length * 31 + step.status.length * 7 +
-      charCodeSum(step.status)) >>> 0;
+    acc =
+      (acc +
+        step.title.length * 31 +
+        step.status.length * 7 +
+        charCodeSum(step.status)) >>>
+      0;
   }
   return `${plan.title.length}|${plan.note.length}|${plan.steps.length}|${acc}`;
 }

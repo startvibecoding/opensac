@@ -59,8 +59,7 @@ const intentColumns = `id, session_id AS sessionId, run_id AS runId, platform,
   transport_context AS transportContext, status, created_at AS createdAt,
   updated_at AS updatedAt`;
 
-const operationColumns =
-  `id, intent_id AS intentId, operation_key AS operationKey,
+const operationColumns = `id, intent_id AS intentId, operation_key AS operationKey,
   artifact_id AS artifactId, operation_kind AS operationKind, sequence,
   depends_on AS dependsOn, idempotency_key AS idempotencyKey,
   payload_digest AS payloadDigest, status, provider_asset_id AS providerAssetId,
@@ -72,18 +71,20 @@ const operationColumns =
   created_at AS createdAt, updated_at AS updatedAt`;
 
 export class DeliveryDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
   }
 
   runExists(executor: DB, sessionId: string, runId: string): boolean {
-    return queryAll<{ id: string }>(
-      executor,
-      `SELECT id FROM session_runs WHERE id = ? AND session_id = ? LIMIT 1`,
-      [runId, sessionId],
-    ).length > 0;
+    return (
+      queryAll<{ id: string }>(
+        executor,
+        `SELECT id FROM session_runs WHERE id = ? AND session_id = ? LIMIT 1`,
+        [runId, sessionId],
+      ).length > 0
+    );
   }
 
   attachmentExists(
@@ -92,12 +93,14 @@ export class DeliveryDAO {
     runId: string,
     artifactId: string,
   ): boolean {
-    return queryAll<{ id: string }>(
-      executor,
-      `SELECT id FROM session_attachments
+    return (
+      queryAll<{ id: string }>(
+        executor,
+        `SELECT id FROM session_attachments
        WHERE id = ? AND session_id = ? AND run_id = ? LIMIT 1`,
-      [artifactId, sessionId, runId],
-    ).length > 0;
+        [artifactId, sessionId, runId],
+      ).length > 0
+    );
   }
 
   insertIntent(executor: DB, record: DeliveryIntentRecord): number {
@@ -437,15 +440,16 @@ export class DeliveryDAO {
     executor: DB,
     intentId: string,
   ): { total: number; terminal: number; failed: number; uncertain: number } {
-    const row = queryOptional<Record<string, unknown>>(
-      executor,
-      `SELECT COUNT(*) AS total,
+    const row =
+      queryOptional<Record<string, unknown>>(
+        executor,
+        `SELECT COUNT(*) AS total,
         SUM(CASE WHEN status IN ('uploaded','delivered','unsupported') THEN 1 ELSE 0 END) AS terminal,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
         SUM(CASE WHEN status = 'uncertain' THEN 1 ELSE 0 END) AS uncertain
        FROM delivery_operations WHERE intent_id = ?`,
-      [intentId],
-    ) ?? {};
+        [intentId],
+      ) ?? {};
     return {
       total: Number(row.total ?? 0),
       terminal: Number(row.terminal ?? 0),
@@ -516,9 +520,7 @@ export function isTransientDeliveryFailure(failureCode: string): boolean {
   return transientDeliveryFailureCodes().includes(failureCode);
 }
 
-function bindOperation(
-  r: DeliveryOperationRecord,
-): (string | number | null)[] {
+function bindOperation(r: DeliveryOperationRecord): (string | number | null)[] {
   return [
     r.id,
     r.intentId,

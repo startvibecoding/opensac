@@ -1,12 +1,13 @@
 //
-// Deno is single-threaded, so the Go sync.Mutex is dropped. Entries are cloned
+// Node is single-threaded, so the Go sync.Mutex is dropped. Entries are cloned
 // on read/write to preserve the Go value-copy semantics.
 
 import {
   type Category,
   type SearchPage,
   type SkillDetail,
-  type SkillSummary} from "./types.ts";
+  type SkillSummary,
+} from "./types.ts";
 
 interface CacheEntry<T> {
   value: T;

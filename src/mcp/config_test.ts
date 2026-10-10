@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { type MCPServer, saveMCPConfig } from "../config/mcp.ts";
@@ -42,10 +43,10 @@ test("isTemplateServer", () => {
 });
 
 test("loadConfiguredServers skips disabled entries", () => {
-  const configDir = Deno.makeTempDirSync();
-  const projectDir = Deno.makeTempDirSync();
-  const prev = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", configDir);
+  const configDir = runtime.makeTempDirSync();
+  const projectDir = runtime.makeTempDirSync();
+  const prev = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", configDir);
   try {
     saveMCPConfig(path.join(configDir, "mcp.json"), {
       mcpServers: [
@@ -64,8 +65,8 @@ test("loadConfiguredServers skips disabled entries", () => {
       ],
     });
     const projectConfigPath = path.join(projectDir, ".opensac", "mcp.json");
-    Deno.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
-    Deno.writeTextFileSync(
+    runtime.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
+    runtime.writeTextFileSync(
       projectConfigPath,
       `{"mcpServers":[{"name":"legacy","type":"stdio","command":"legacy-command"}]}`,
     );
@@ -75,7 +76,7 @@ test("loadConfiguredServers skips disabled entries", () => {
     assertEquals(servers[1].name, "legacy");
     assert(true);
   } finally {
-    if (prev === undefined) Deno.env.delete("OPENSAC_DIR");
-    else Deno.env.set("OPENSAC_DIR", prev);
+    if (prev === undefined) runtime.env.delete("OPENSAC_DIR");
+    else runtime.env.set("OPENSAC_DIR", prev);
   }
 });

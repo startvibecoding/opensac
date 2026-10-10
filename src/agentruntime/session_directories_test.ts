@@ -5,14 +5,12 @@ import { normalizeAdditionalDirectories } from "./session_directories.ts";
 import { test } from "#testing";
 
 test("NormalizeAdditionalDirectories cleans, dedupes, and sorts", () => {
-  assertEquals(
-    normalizeAdditionalDirectories(["/b/./x", "/a", "/b/y"]),
-    ["/a", "/b/x", "/b/y"],
-  );
-  assertEquals(
-    normalizeAdditionalDirectories(["/a", "/a/", "/a"]),
-    ["/a"],
-  );
+  assertEquals(normalizeAdditionalDirectories(["/b/./x", "/a", "/b/y"]), [
+    "/a",
+    "/b/x",
+    "/b/y",
+  ]);
+  assertEquals(normalizeAdditionalDirectories(["/a", "/a/", "/a"]), ["/a"]);
   assertEquals(normalizeAdditionalDirectories([]), []);
 });
 

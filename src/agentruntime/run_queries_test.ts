@@ -3,6 +3,7 @@
 // runs through the session layer directly (the `RunStore` wrapper lands with the
 // `ExecutionRuntime` slice).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -49,14 +50,16 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 test("AnnotateDurableRunError only terminalizes empty errors", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
+  const sessionDir = runtime.makeTempDirSync({
+    prefix: "opensac-agentruntime-",
+  });
   try {
     createSessionRun(
       sessionDir,
       baseRun({
         id: "run-annotate",
         sessionId: "session-annotate",
-        workDir: Deno.makeTempDirSync(),
+        workDir: runtime.makeTempDirSync(),
         source: "responses_background",
         mode: "yolo",
         status: "running",
@@ -105,7 +108,9 @@ test("AnnotateDurableRunError only terminalizes empty errors", () => {
 });
 
 test("ListLatestDurableRunsBySessions projects newest run per session", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
+  const sessionDir = runtime.makeTempDirSync({
+    prefix: "opensac-agentruntime-",
+  });
   try {
     const now = Date.now();
     createSessionRun(
@@ -113,7 +118,7 @@ test("ListLatestDurableRunsBySessions projects newest run per session", () => {
       baseRun({
         id: "run-page-a1",
         sessionId: "session-page-a",
-        workDir: Deno.makeTempDirSync(),
+        workDir: runtime.makeTempDirSync(),
         source: "acp",
         mode: "yolo",
         status: "running",
@@ -132,7 +137,7 @@ test("ListLatestDurableRunsBySessions projects newest run per session", () => {
       baseRun({
         id: "run-page-a2",
         sessionId: "session-page-a",
-        workDir: Deno.makeTempDirSync(),
+        workDir: runtime.makeTempDirSync(),
         source: "acp",
         mode: "yolo",
         status: "running",
@@ -144,7 +149,7 @@ test("ListLatestDurableRunsBySessions projects newest run per session", () => {
       baseRun({
         id: "run-page-b",
         sessionId: "session-page-b",
-        workDir: Deno.makeTempDirSync(),
+        workDir: runtime.makeTempDirSync(),
         source: "acp",
         mode: "yolo",
         status: "running",

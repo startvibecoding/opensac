@@ -11,19 +11,19 @@
 # terminal for the Ink TUI, so the container exposes the Core HTTP API and the
 # user mounts the workspace they want the agent to work in.
 
-ARG DENO_VERSION=2.9.7
+ARG NODE_VERSION=22
 ARG VERSION=unknown
 
-FROM denoland/deno:alpine-${DENO_VERSION} AS builder
+FROM node:${NODE_VERSION}-bookworm-slim AS builder
 WORKDIR /src
-# Deno's dependency graph changes far less often than the sources, so caching it
+# The dependency graph changes far less often than the sources, so caching it
 # behind its own layer keeps most source edits from re-resolving the world.
-COPY deno.json deno.lock ./
-RUN deno install --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 # Build the platform-independent package, then drop the build-time
 # node_modules/lock so the runtime image installs only the runtime dependencies.
-RUN deno task build:node \
+RUN npm run build:node \
     && rm -rf dist/node/node_modules dist/node/package-lock.json
 
 # The Core binds 127.0.0.1 by default, which nothing outside the container can

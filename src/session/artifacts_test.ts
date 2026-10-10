@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertFalse } from "../compat/assert.ts";
 import { AttachmentDAO, type AttachmentRecord } from "../dao/mod.ts";
 import { closeAll } from "../db/mod.ts";
@@ -26,7 +27,7 @@ function record(overrides: Partial<AttachmentRecord>): AttachmentRecord {
 }
 
 test("list generated artifacts filters status and session in creation order", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-artifacts";
     const otherSessionId = "session-artifacts-other";

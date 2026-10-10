@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import {
   type RunEvent,
@@ -18,7 +19,7 @@ class RecordingRunEventSink implements RunEventSink {
 
 test("SessionRunEventSink RecordJSON", () => {
   const sink = new SessionRunEventSink(
-    Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" }),
+    nodeRuntime.makeTempDirSync({ prefix: "opensac-agentruntime-" }),
   );
   sink.recordJSON(
     "session-1",
@@ -50,39 +51,39 @@ test("RunEvent carries protocol-neutral data", () => {
 });
 
 test("SessionRunEventSink preserves insertion order", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-agentruntime-",
+  });
   const sink = new SessionRunEventSink(sessionDir);
-  for (
-    const event of [
-      {
-        sessionId: "session-1",
-        runId: "run-1",
-        eventType: "started",
-        source: "runtime",
-        status: "running",
-        model: "",
-        mode: "",
-      },
-      {
-        sessionId: "session-1",
-        runId: "run-1",
-        eventType: "decision_pending",
-        source: "runtime",
-        status: "pending",
-        model: "",
-        mode: "",
-      },
-      {
-        sessionId: "session-1",
-        runId: "run-1",
-        eventType: "finished",
-        source: "runtime",
-        status: "completed",
-        model: "",
-        mode: "",
-      },
-    ]
-  ) {
+  for (const event of [
+    {
+      sessionId: "session-1",
+      runId: "run-1",
+      eventType: "started",
+      source: "runtime",
+      status: "running",
+      model: "",
+      mode: "",
+    },
+    {
+      sessionId: "session-1",
+      runId: "run-1",
+      eventType: "decision_pending",
+      source: "runtime",
+      status: "pending",
+      model: "",
+      mode: "",
+    },
+    {
+      sessionId: "session-1",
+      runId: "run-1",
+      eventType: "finished",
+      source: "runtime",
+      status: "completed",
+      model: "",
+      mode: "",
+    },
+  ]) {
     sink.record(event);
   }
   const events = listSessionRunEvents(sessionDir, "session-1");

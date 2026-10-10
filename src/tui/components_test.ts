@@ -143,11 +143,13 @@ test("renderAgentTabBar renders tabs with state and active highlight", () => {
   // Bottom border row
   const [row, border] = bar.split("\n");
   assertEquals(
-    displayWidth(border.replace(
-      // eslint-disable-next-line no-control-regex
-      /\u001B\[[0-9;]*m/g,
-      "",
-    )),
+    displayWidth(
+      border.replace(
+        // eslint-disable-next-line no-control-regex
+        /\u001B\[[0-9;]*m/g,
+        "",
+      ),
+    ),
     120,
   );
   assert(row.includes("lead"));

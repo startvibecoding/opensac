@@ -198,10 +198,9 @@ test("acpPlanEntriesMapsStepStatuses", () => {
     { content: "d", priority: "medium", status: "completed" },
   ]);
   assertEquals(acpPlanMeta({ title: "", note: "", steps: [] }), undefined);
-  assertEquals(
-    acpPlanMeta({ title: "T", note: "N", steps: [] }),
-    { [opensacExtensionNamespace]: { title: "T", note: "N" } },
-  );
+  assertEquals(acpPlanMeta({ title: "T", note: "N", steps: [] }), {
+    [opensacExtensionNamespace]: { title: "T", note: "N" },
+  });
 });
 
 test("formatACPPlanRendersStepsAndNote", () => {
@@ -323,7 +322,10 @@ test("requestQuestionPayloadForTrimsOptions", () => {
   });
   assertEquals(payload, {
     prompt: "Choose",
-    options: [{ id: "a", label: "a" }, { id: "b", label: "b" }],
+    options: [
+      { id: "a", label: "a" },
+      { id: "b", label: "b" },
+    ],
     multi: false,
     title: "OpenSAC",
     placeholder: "why",

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -21,10 +22,7 @@ function shadowManifest(name: string, displayZh: string): string {
 }`;
 }
 
-function shadowFiles(
-  name: string,
-  displayZh: string,
-): Record<string, string> {
+function shadowFiles(name: string, displayZh: string): Record<string, string> {
   return {
     "expert.json": shadowManifest(name, displayZh),
     "agents/solo.md": "---\nname: solo\n---\nsolo body\n",
@@ -40,28 +38,28 @@ function writeLayerBundle(
   const dir = path.join(layerDir, name);
   for (const [rel, content] of Object.entries(files)) {
     const p = path.join(dir, rel);
-    Deno.mkdirSync(path.dirname(p), { recursive: true });
-    Deno.writeTextFileSync(p, content);
+    runtime.mkdirSync(path.dirname(p), { recursive: true });
+    runtime.writeTextFileSync(p, content);
   }
 }
 
 function withTempDir(fn: (dir: string) => void): void {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   try {
     fn(dir);
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 }
 
 function withEnv(key: string, value: string, fn: () => void): void {
-  const prev = Deno.env.get(key);
-  Deno.env.set(key, value);
+  const prev = runtime.env.get(key);
+  runtime.env.set(key, value);
   try {
     fn();
   } finally {
-    if (prev === undefined) Deno.env.delete(key);
-    else Deno.env.set(key, prev);
+    if (prev === undefined) runtime.env.delete(key);
+    else runtime.env.set(key, prev);
   }
 }
 
@@ -142,9 +140,7 @@ test("center list shadow and sort", () => {
         }
 
         // Without the project layer, global shadows builtin; builtin survives.
-        const byName2 = new Map(
-          new Center().list().map((s) => [s.name, s]),
-        );
+        const byName2 = new Map(new Center().list().map((s) => [s.name, s]));
         const fe = byName2.get("frontend-developer")!;
         assertEquals(fe.source, sourceGlobal);
         assertEquals(fe.displayName.zh, "全局前端");

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -23,22 +24,24 @@ function managedAgentDraft(name: string): ManagedBundle {
       expertType: typeAgent,
       agentName: "lead",
       displayName: { zh: "测试主角", en: "Test Lead" },
-      members: [{
-        id: "lead",
-        name: { zh: "主角", en: "Lead" },
-        role: roleLead,
-      }],
+      members: [
+        {
+          id: "lead",
+          name: { zh: "主角", en: "Lead" },
+          role: roleLead,
+        },
+      ],
     },
     agents: { lead: "---\nname: lead\n---\nYou are the lead.\n" },
   };
 }
 
 function withTempDir(fn: (dir: string) => void): void {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   try {
     fn(dir);
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 }
 
@@ -53,7 +56,7 @@ test("manager global create update delete", () => {
     assertEquals(created.scope, SCOPE_GLOBAL);
     assertEquals(created.manifest.name, "desktop-team");
     assertEquals(
-      Deno.statSync(path.join(globalDir, "desktop-team", manifestFileName))
+      runtime.statSync(path.join(globalDir, "desktop-team", manifestFileName))
         .isFile,
       true,
     );
@@ -64,7 +67,7 @@ test("manager global create update delete", () => {
     manager.delete(SCOPE_GLOBAL, "desktop-team");
     let exists = true;
     try {
-      Deno.statSync(path.join(globalDir, "desktop-team"));
+      runtime.statSync(path.join(globalDir, "desktop-team"));
     } catch {
       exists = false;
     }
@@ -86,7 +89,7 @@ test("manager project scope and invalid draft", () => {
         "project-team",
         manifestFileName,
       );
-      assert(Deno.statSync(projectPath).isFile);
+      assert(runtime.statSync(projectPath).isFile);
 
       const invalid = managedAgentDraft("bad-team");
       invalid.agents["lead"] = "---\nname: other\n---\nwrong identity\n";
@@ -99,7 +102,7 @@ test("manager project scope and invalid draft", () => {
       assert(threw, "Create accepted invalid agent frontmatter");
       let exists = true;
       try {
-        Deno.statSync(path.join(manager.globalDir, "bad-team"));
+        runtime.statSync(path.join(manager.globalDir, "bad-team"));
       } catch {
         exists = false;
       }
@@ -110,8 +113,8 @@ test("manager project scope and invalid draft", () => {
 
 test("manager rejects builtin and preserves precedence", () => {
   withTempDir((globalRoot) => {
-    const prev = Deno.env.get("OPENSAC_DIR");
-    Deno.env.set("OPENSAC_DIR", globalRoot);
+    const prev = runtime.env.get("OPENSAC_DIR");
+    runtime.env.set("OPENSAC_DIR", globalRoot);
     try {
       withTempDir((project) => {
         const manager = new Manager(project);
@@ -141,8 +144,8 @@ test("manager rejects builtin and preserves precedence", () => {
         assert(false, "frontend-developer missing from effective list");
       });
     } finally {
-      if (prev === undefined) Deno.env.delete("OPENSAC_DIR");
-      else Deno.env.set("OPENSAC_DIR", prev);
+      if (prev === undefined) runtime.env.delete("OPENSAC_DIR");
+      else runtime.env.set("OPENSAC_DIR", prev);
     }
   });
 });

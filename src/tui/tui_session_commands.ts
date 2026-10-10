@@ -3,13 +3,15 @@
 // TUI language, cron management, /systeminit prompt submission, clipboard
 // image attachment, and the /btw side query.
 //
-// Each function is a thin translation of the Go handler onto the Deno port's
+// Each function is a thin translation of the Go handler onto the Node port's
 // shared modules. The TUI never builds provider content, opens raw databases,
 // or owns a second agent loop: clipboard bytes go through Runtime
 // `prepareInput`, /systeminit reuses the shared prompt path, /btw runs as a
 // Core-owned transient side query, and cron goes through the shared SQLite
 // store.
 
+import { runtime } from "../platform/runtime.ts";
+import type { CommandOutput } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { encodeBase64 } from "../compat/encoding.ts";
 import {
@@ -81,7 +83,7 @@ export class TuiSessionCommands {
     // only renders it and never reads provider credentials itself.
     const view = await this.#session.service.settings();
     const sorted = [...view.providers].sort((a, b) =>
-      a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
     );
     if (sorted.length === 0) return tr.text("auth.no_providers");
     const lines = [tr.text("auth.providers_title", sorted.length)];
@@ -150,8 +152,8 @@ export class TuiSessionCommands {
 
   async tuiLang(parts: string[]): Promise<CommandResult> {
     const tr = this.#session.translator;
-    const configured = (await this.#session.service.getSettings()).tuilang ??
-      "auto";
+    const configured =
+      (await this.#session.service.getSettings()).tuilang ?? "auto";
     if (parts.length === 1) {
       // Go MsgTUILangStatus: configured, effective language, UTC offset, and
       // whether the value comes from project or global settings.
@@ -215,9 +217,7 @@ export class TuiSessionCommands {
       try {
         // The shared session store root comes from the one config resolver
         // (`config.getSessionDir`), never from a session/persistence handle.
-        this.#cronStore = createSQLiteCronStore(
-          getSessionDir(loadSettings()),
-        );
+        this.#cronStore = createSQLiteCronStore(getSessionDir(loadSettings()));
       } catch {
         this.#cronStore = undefined;
       }
@@ -263,11 +263,12 @@ export class TuiSessionCommands {
           if (jobs.length === 0) return { message: tr.text("cron.list_empty") };
           const lines = [tr.text("cron.list_title", jobs.length)];
           for (const job of jobs) {
-            const status = job.lastStatus === "failed"
-              ? "[failed]"
-              : job.enabled === false
-              ? "[paused]"
-              : "[ok]";
+            const status =
+              job.lastStatus === "failed"
+                ? "[failed]"
+                : job.enabled === false
+                  ? "[paused]"
+                  : "[ok]";
             lines.push(
               tr.text(
                 "cron.entry",
@@ -350,7 +351,10 @@ export class TuiSessionCommands {
     if (this.#session.busy) {
       return { message: tr.text("systeminit.running"), error: true };
     }
-    const extra = cmd.trim().replace(/^\/systeminit/, "").trim();
+    const extra = cmd
+      .trim()
+      .replace(/^\/systeminit/, "")
+      .trim();
     if (this.#session.mode === "plan") {
       this.#session.setMode("agent");
       this.#session.controller.addMessage(
@@ -359,8 +363,8 @@ export class TuiSessionCommands {
       );
     }
     // The question tool is only available in plan/agent modes.
-    const interactive = this.#session.mode !== "yolo" &&
-      this.#session.mode !== "os";
+    const interactive =
+      this.#session.mode !== "yolo" && this.#session.mode !== "os";
     const prompt = systemInitPrompt(interactive, extra);
     await this.#session.submitPrompt(prompt);
     return {
@@ -454,7 +458,10 @@ export class TuiSessionCommands {
 
   async handleBTW(cmd: string): Promise<CommandResult> {
     const tr = this.#session.translator;
-    const question = cmd.trim().replace(/^\/btw/, "").trim();
+    const question = cmd
+      .trim()
+      .replace(/^\/btw/, "")
+      .trim();
     if (question === "") return { message: tr.text("btw.usage") };
     if (this.#btwActive) {
       return { message: tr.text("btw.already_running"), error: true };
@@ -491,7 +498,7 @@ export class TuiSessionCommands {
 
 /** Reads a PNG from the system clipboard; null when none is present. */
 export async function readClipboardImage(): Promise<Uint8Array | null> {
-  const os = Deno.build.os;
+  const os = runtime.build.os;
   if (os === "darwin") {
     return await runCapture("pngpaste", ["-"]);
   }
@@ -499,7 +506,7 @@ export async function readClipboardImage(): Promise<Uint8Array | null> {
     return await readWindowsClipboardPNG();
   }
   // Linux: prefer Wayland, then X11.
-  if ((Deno.env.get("WAYLAND_DISPLAY") ?? "") !== "") {
+  if ((runtime.env.get("WAYLAND_DISPLAY") ?? "") !== "") {
     const viaWl = await runCapture("wl-paste", ["--type", "image/png"]);
     if (viaWl !== null) return viaWl;
   }
@@ -517,9 +524,9 @@ async function runCapture(
   program: string,
   args: string[],
 ): Promise<Uint8Array | null> {
-  let output: Deno.CommandOutput;
+  let output: CommandOutput;
   try {
-    output = await new Deno.Command(program, {
+    output = await new runtime.Command(program, {
       args,
       stdout: "piped",
       stderr: "null",
@@ -543,9 +550,9 @@ async function readWindowsClipboardPNG(): Promise<Uint8Array | null> {
     "$image.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)",
     "[Convert]::ToBase64String($stream.ToArray())",
   ].join("; ");
-  let output: Deno.CommandOutput;
+  let output: CommandOutput;
   try {
-    output = await new Deno.Command("powershell.exe", {
+    output = await new runtime.Command("powershell.exe", {
       args: ["-NoProfile", "-NonInteractive", "-Command", script],
       stdout: "piped",
       stderr: "null",

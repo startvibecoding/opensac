@@ -42,9 +42,7 @@ function parseIntPrefix(v: string): { num: string; rest: string } | undefined {
   return { num: v.slice(0, i), rest: v.slice(i) };
 }
 
-function parsePrerelease(
-  v: string,
-): { pre: string; rest: string } | undefined {
+function parsePrerelease(v: string): { pre: string; rest: string } | undefined {
   if (v === "" || v.charCodeAt(0) !== 0x2d /* - */) {
     return undefined;
   }

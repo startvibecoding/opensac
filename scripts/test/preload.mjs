@@ -1,10 +1,9 @@
 // Preload hook for the Node test runner (`node --test`) and the CLI entry.
 //
 // Two things must happen before any application module loads:
-//   1. The `Deno.*` global vocabulary is installed by
-//      `src/platform/node_compat.ts`. Application entry points import it
-//      explicitly; a test file must not, because a top-level statement could
-//      touch the filesystem before the side-effect import is evaluated.
+//   1. The Node runtime modules are loaded by `src/platform/runtime.ts`, which
+//      also installs the Web `Worker` and fetch globals. Importing it here keeps
+//      every child process the test runner spawns consistent.
 //   2. JSX-bearing `.tsx` sources (the Ink TUI) are transpiled, since Node has
 //      no built-in JSX support. Plain `.ts` needs no hook: Node strips erasable
 //      types itself.
@@ -20,4 +19,4 @@ register(
   fileURLToPath(new URL("../../", import.meta.url)),
 );
 
-await import(new URL("../../src/platform/node_compat.ts", import.meta.url));
+await import(new URL("../../src/platform/runtime.ts", import.meta.url));

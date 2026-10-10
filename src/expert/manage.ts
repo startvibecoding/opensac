@@ -1,3 +1,5 @@
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry, FileInfo } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { type Manifest, sourceGlobal, sourceProject } from "./expert.ts";
 import { agentsDirName, loadBundle, manifestFileName } from "./bundle.ts";
@@ -49,7 +51,7 @@ export class Manager {
   listScope(scope: Scope): Summary[] {
     const dir = this.scopeDir(scope);
     return listOSLayer(dir, scope).sort((a, b) =>
-      a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
     );
   }
 
@@ -85,11 +87,11 @@ export class Manager {
   update(scope: Scope, draft: ManagedBundle): ManagedBundle {
     const { name, dir } = this.validateDraftScope(scope, draft);
     const target = path.join(dir, name);
-    let info: Deno.FileInfo | null = null;
+    let info: FileInfo | null = null;
     try {
-      info = Deno.statSync(target);
+      info = runtime.statSync(target);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
+      if (err instanceof runtime.errors.NotFound) {
         throw new Error(`${scope} expert ${quote(name)} not found`);
       }
       throw new Error(`inspect expert ${quote(name)}: ${err}`);
@@ -106,11 +108,11 @@ export class Manager {
     validateBundleNameOrThrow(name);
     const dir = this.scopeDir(scope);
     const target = path.join(dir, name);
-    let info: Deno.FileInfo | null = null;
+    let info: FileInfo | null = null;
     try {
-      info = Deno.statSync(target);
+      info = runtime.statSync(target);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
+      if (err instanceof runtime.errors.NotFound) {
         throw new Error(`${scope} expert ${quote(name)} not found`);
       }
       throw new Error(`inspect expert ${quote(name)}: ${err}`);
@@ -118,7 +120,7 @@ export class Manager {
     if (!info.isDirectory) {
       throw new Error(`${scope} expert ${quote(name)} is not a directory`);
     }
-    Deno.removeSync(target, { recursive: true });
+    runtime.removeSync(target, { recursive: true });
   }
 
   scopeDir(scope: Scope): string {
@@ -139,9 +141,9 @@ export class Manager {
       }
       default:
         throw new Error(
-          `expert scope ${
-            quote(scope)
-          } is not writable; builtin experts are read-only`,
+          `expert scope ${quote(
+            scope,
+          )} is not writable; builtin experts are read-only`,
         );
     }
   }
@@ -151,12 +153,14 @@ export class Manager {
     draft: ManagedBundle,
   ): { name: string; dir: string } {
     if (
-      draft.scope !== "" && draft.scope !== undefined && draft.scope !== scope
+      draft.scope !== "" &&
+      draft.scope !== undefined &&
+      draft.scope !== scope
     ) {
       throw new Error(
-        `bundle scope ${quote(draft.scope)} does not match requested scope ${
-          quote(scope)
-        }`,
+        `bundle scope ${quote(draft.scope)} does not match requested scope ${quote(
+          scope,
+        )}`,
       );
     }
     const name = draft.manifest.name.trim();
@@ -171,8 +175,8 @@ export class Manager {
     draft: ManagedBundle,
     replace: boolean,
   ): void {
-    Deno.mkdirSync(parent, { recursive: true });
-    const tmpRoot = Deno.makeTempDirSync({
+    runtime.mkdirSync(parent, { recursive: true });
+    const tmpRoot = runtime.makeTempDirSync({
       dir: parent,
       prefix: ".expert-write-",
     });
@@ -185,16 +189,16 @@ export class Manager {
       }
       const target = path.join(parent, name);
       if (!replace) {
-        Deno.renameSync(staged, target);
+        runtime.renameSync(staged, target);
         return;
       }
       const backup = path.join(tmpRoot, ".previous");
-      Deno.renameSync(target, backup);
+      runtime.renameSync(target, backup);
       try {
-        Deno.renameSync(staged, target);
+        runtime.renameSync(staged, target);
       } catch (err) {
         try {
-          Deno.renameSync(backup, target);
+          runtime.renameSync(backup, target);
         } catch {
           // best-effort restore
         }
@@ -202,7 +206,7 @@ export class Manager {
       }
     } finally {
       try {
-        Deno.removeSync(tmpRoot, { recursive: true });
+        runtime.removeSync(tmpRoot, { recursive: true });
       } catch {
         // best-effort cleanup
       }
@@ -211,9 +215,9 @@ export class Manager {
 }
 
 function readAgentSources(bundleDir: string): Record<string, string> {
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
-    entries = [...Deno.readDirSync(path.join(bundleDir, agentsDirName))];
+    entries = [...runtime.readDirSync(path.join(bundleDir, agentsDirName))];
   } catch (err) {
     throw new Error(`read agents directory: ${err}`);
   }
@@ -223,7 +227,7 @@ function readAgentSources(bundleDir: string): Record<string, string> {
     const id = entry.name.slice(0, -3);
     validateAgentIDOrThrow(id);
     try {
-      agents[id] = Deno.readTextFileSync(
+      agents[id] = runtime.readTextFileSync(
         path.join(bundleDir, agentsDirName, entry.name),
       );
     } catch (err) {
@@ -241,8 +245,12 @@ function validateAgentIDOrThrow(id: string): void {
 /** Rejects empty ids and path traversal in an agents/<id>.md file name. */
 export function validateAgentID(id: string): string | null {
   if (
-    id.trim() === "" || id !== path.basename(id) || id.includes("/") ||
-    id.includes("\\") || id === "." || id === ".."
+    id.trim() === "" ||
+    id !== path.basename(id) ||
+    id.includes("/") ||
+    id.includes("\\") ||
+    id === "." ||
+    id === ".."
   ) {
     return `invalid agent id ${quote(id)}`;
   }
@@ -250,12 +258,12 @@ export function validateAgentID(id: string): string | null {
 }
 
 function writeManagedBundle(dir: string, draft: ManagedBundle): void {
-  Deno.mkdirSync(path.join(dir, agentsDirName), { recursive: true });
+  runtime.mkdirSync(path.join(dir, agentsDirName), { recursive: true });
   const data = JSON.stringify(draft.manifest, null, 2);
-  Deno.writeTextFileSync(path.join(dir, manifestFileName), data + "\n");
+  runtime.writeTextFileSync(path.join(dir, manifestFileName), data + "\n");
   for (const [id, source] of Object.entries(draft.agents)) {
     validateAgentIDOrThrow(id);
-    Deno.writeTextFileSync(
+    runtime.writeTextFileSync(
       path.join(dir, agentsDirName, id + ".md"),
       source,
     );
@@ -264,7 +272,7 @@ function writeManagedBundle(dir: string, draft: ManagedBundle): void {
 
 function existsSync(p: string): boolean {
   try {
-    Deno.statSync(p);
+    runtime.statSync(p);
     return true;
   } catch {
     return false;
@@ -273,7 +281,7 @@ function existsSync(p: string): boolean {
 
 function isFile(p: string): boolean {
   try {
-    return !Deno.statSync(p).isDirectory;
+    return !runtime.statSync(p).isDirectory;
   } catch {
     return false;
   }

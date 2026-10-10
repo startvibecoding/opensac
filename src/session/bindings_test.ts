@@ -3,6 +3,7 @@
 // persistence so the portable binding surface is exercised without the
 // not-yet-ported session Manager.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
@@ -19,7 +20,7 @@ import { openRootDB } from "./root_db.ts";
 import { test } from "#testing";
 
 test("channel tools persist for a session", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const sessionId = "session-channel-tools";
     const db = openRootDB(sessionDir);
@@ -65,7 +66,7 @@ test("channel binding validation", () => {
 });
 
 test("find binding returns null for missing identity", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     // Ensure the schema exists before querying.
     openRootDB(sessionDir);

@@ -1,6 +1,5 @@
-// Project-owned replacement for the JSR `@std/encoding/base64` and
-// `@std/encoding/base64url` modules, backed by `node:buffer`. See `./path.ts`
-// for the rationale.
+// Project-owned replacement for the standard base64 and base64url helpers,
+// backed by `node:buffer`. See `./path.ts` for the rationale.
 
 import { Buffer } from "node:buffer";
 

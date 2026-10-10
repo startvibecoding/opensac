@@ -32,11 +32,7 @@ import { type Event } from "./events.ts";
 import { runUserEntryID } from "../session/run_user_message.ts";
 import { test } from "#testing";
 
-function model(
-  input: string[],
-  contextWindow = 0,
-  maxTokens = 0,
-): Model {
+function model(input: string[], contextWindow = 0, maxTokens = 0): Model {
   return {
     id: "m1",
     name: "m1",
@@ -94,10 +90,10 @@ test("loadHistoryMessages retains messages and context", () => {
 
 test("loadHistoryState keeps entry IDs aligned", () => {
   const a = createAgent({}, undefined);
-  a.loadHistoryState([createUserMessage("a"), createUserMessage("b")], [
-    "e1",
-    "e2",
-  ]);
+  a.loadHistoryState(
+    [createUserMessage("a"), createUserMessage("b")],
+    ["e1", "e2"],
+  );
   const [msgs, ids] = a.getHistoryState();
   assertEquals(msgs.length, 2);
   assertEquals(ids, ["e1", "e2"]);

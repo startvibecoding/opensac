@@ -2,6 +2,7 @@
 // (`acquirePromptAdmission`). Fixtures construct an `AcpServer`, bind an
 // in-memory sink, and call the handlers directly.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assertEquals, assertRejects } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -112,9 +113,11 @@ test("session/cancel aborts the session's cancel handle", () => {
 });
 
 test("acquirePromptAdmission fences concurrent local runs", async () => {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-admission-" });
+  const root = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-acp-admission-",
+  });
   const sessionDir = path.join(root, "sessions");
-  Deno.mkdirSync(sessionDir, { recursive: true });
+  nodeRuntime.mkdirSync(sessionDir, { recursive: true });
   createSession({ workDir: root, sessionDir, id: "session-1" });
   const server = new AcpServer();
   server.settings = { sessionDir } as unknown as Settings;
@@ -131,14 +134,11 @@ test("acquirePromptAdmission fences concurrent local runs", async () => {
   rt.cancel = null;
   const releaseAgain = await server.acquirePromptAdmission(rt);
   releaseAgain();
-  Deno.removeSync(root, { recursive: true });
+  nodeRuntime.removeSync(root, { recursive: true });
 });
 
 test("acquirePromptAdmission rejects an unbound runtime", async () => {
   const server = new AcpServer();
   const rt = new ACPSessionRuntime();
-  await assertRejects(
-    () => server.acquirePromptAdmission(rt),
-    Error,
-  );
+  await assertRejects(() => server.acquirePromptAdmission(rt), Error);
 });

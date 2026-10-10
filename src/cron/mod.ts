@@ -5,7 +5,7 @@
 // the shared `Scheduler` are ported. The `Scheduler` binds to the durable
 // Runtime (`ExecutionRuntime`/`RunStore`, `AcquireExecutionAdmission`, and the
 // Runtime-owned maintenance executor). See
-// docs/proposal/go-to-deno-migration.md backlog #25.
+// docs/proposal/go-to-typescript-migration.md backlog #25.
 
 export * from "./cron.ts";
 export * from "./schedule.ts";

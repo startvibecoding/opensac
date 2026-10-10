@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { KnowledgeBaseDAO } from "../dao/mod.ts";
@@ -25,8 +26,10 @@ import { writeRootDatabase } from "./database.ts";
 import { test } from "#testing";
 
 test("knowledge base uses dedicated SQLite database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
+  const rootDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Dedicated",
@@ -39,7 +42,7 @@ test("knowledge base uses dedicated SQLite database", () => {
       enabled: true,
     });
     const dbPath = knowledgeBaseDatabasePath(sessionDir, base.id);
-    assert(Deno.statSync(dbPath).isFile);
+    assert(nodeRuntime.statSync(dbPath).isFile);
     assertNoKnowledgeTablesInSessionDatabase(sessionDir);
 
     const now = new Date();
@@ -55,42 +58,50 @@ test("knowledge base uses dedicated SQLite database", () => {
         edgeCount: 0,
         startedAt: now,
       },
-      files: [{
-        id: "file",
-        snapshotId: "snapshot",
-        relativePath: "architecture.md",
-        contentSha256: "hash",
-        byteSize: 12,
-        mediaType: "",
-        status: "indexed",
-      }],
-      chunks: [{
-        id: "chunk",
-        snapshotId: "snapshot",
-        fileId: "file",
-        ordinal: 0,
-        text: "Alpha owns the runtime.",
-        startLine: 1,
-        endLine: 1,
-        contentSha256: "hash",
-      }],
-      nodes: [{
-        id: "node",
-        snapshotId: "snapshot",
-        kind: "section",
-        label: "Alpha",
-        normalizedLabel: "alpha",
-      }],
+      files: [
+        {
+          id: "file",
+          snapshotId: "snapshot",
+          relativePath: "architecture.md",
+          contentSha256: "hash",
+          byteSize: 12,
+          mediaType: "",
+          status: "indexed",
+        },
+      ],
+      chunks: [
+        {
+          id: "chunk",
+          snapshotId: "snapshot",
+          fileId: "file",
+          ordinal: 0,
+          text: "Alpha owns the runtime.",
+          startLine: 1,
+          endLine: 1,
+          contentSha256: "hash",
+        },
+      ],
+      nodes: [
+        {
+          id: "node",
+          snapshotId: "snapshot",
+          kind: "section",
+          label: "Alpha",
+          normalizedLabel: "alpha",
+        },
+      ],
       edges: [],
-      evidence: [{
-        id: "evidence",
-        snapshotId: "snapshot",
-        nodeId: "node",
-        chunkId: "chunk",
-        startLine: 1,
-        endLine: 1,
-        confidence: 1,
-      }],
+      evidence: [
+        {
+          id: "evidence",
+          snapshotId: "snapshot",
+          nodeId: "node",
+          chunkId: "chunk",
+          startLine: 1,
+          endLine: 1,
+          confidence: 1,
+        },
+      ],
     };
     storeKnowledgeGraphSnapshot(sessionDir, graph);
     const query = queryKnowledgeGraph(sessionDir, base.id, "Alpha", 4);
@@ -101,22 +112,24 @@ test("knowledge base uses dedicated SQLite database", () => {
     deleteKnowledgeBase(sessionDir, base.id);
     let exists = true;
     try {
-      Deno.statSync(dbPath);
+      nodeRuntime.statSync(dbPath);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) exists = false;
+      if (err instanceof nodeRuntime.errors.NotFound) exists = false;
       else throw err;
     }
     assertEquals(exists, false);
   } finally {
     closeAll();
-    Deno.removeSync(sessionDir, { recursive: true });
-    Deno.removeSync(rootDir, { recursive: true });
+    nodeRuntime.removeSync(sessionDir, { recursive: true });
+    nodeRuntime.removeSync(rootDir, { recursive: true });
   }
 });
 
 test("knowledge snapshot retention keeps only active graph", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
+  const rootDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Retention",
@@ -152,14 +165,16 @@ test("knowledge snapshot retention keeps only active graph", () => {
     assertKnowledgeGraphRowCounts(sessionDir, base.id, 1, 1, 1, 1);
   } finally {
     closeAll();
-    Deno.removeSync(sessionDir, { recursive: true });
-    Deno.removeSync(rootDir, { recursive: true });
+    nodeRuntime.removeSync(sessionDir, { recursive: true });
+    nodeRuntime.removeSync(rootDir, { recursive: true });
   }
 });
 
 test("knowledge base update invalidates and prunes graph", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
+  const rootDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Reconfigure",
@@ -200,14 +215,16 @@ test("knowledge base update invalidates and prunes graph", () => {
     assertKnowledgeGraphRowCounts(sessionDir, base.id, 0, 0, 0, 0);
   } finally {
     closeAll();
-    Deno.removeSync(sessionDir, { recursive: true });
-    Deno.removeSync(rootDir, { recursive: true });
+    nodeRuntime.removeSync(sessionDir, { recursive: true });
+    nodeRuntime.removeSync(rootDir, { recursive: true });
   }
 });
 
 test("knowledge base migrates legacy session store into dedicated database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
+  const rootDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const baseID = "legacybase";
     const baseRecord = {
@@ -260,46 +277,54 @@ test("knowledge base migrates legacy session store into dedicated database", () 
         errorSummary: "",
       };
       store.insertSnapshot(tx, snapshot);
-      store.insertFiles(tx, [{
-        id: "legacy-file",
-        snapshotId: snapshot.id,
-        relativePath: "legacy.md",
-        contentSha256: "hash",
-        byteSize: 10,
-        mediaType: "",
-        title: "",
-        status: "indexed",
-      }]);
-      store.insertChunks(tx, [{
-        id: "legacy-chunk",
-        snapshotId: snapshot.id,
-        fileId: "legacy-file",
-        relativePath: "",
-        ordinal: 0,
-        text: "Legacy Alpha evidence.",
-        startLine: 1,
-        endLine: 1,
-        contentSha256: "hash",
-      }]);
-      store.insertNodes(tx, [{
-        id: "legacy-node",
-        snapshotId: snapshot.id,
-        kind: "section",
-        label: "Alpha",
-        normalizedLabel: "alpha",
-        summary: "",
-        attributes: "{}",
-      }]);
-      store.insertEvidence(tx, [{
-        id: "legacy-evidence",
-        snapshotId: snapshot.id,
-        nodeId: "legacy-node",
-        edgeId: "",
-        chunkId: "legacy-chunk",
-        startLine: 1,
-        endLine: 1,
-        confidence: 1,
-      }]);
+      store.insertFiles(tx, [
+        {
+          id: "legacy-file",
+          snapshotId: snapshot.id,
+          relativePath: "legacy.md",
+          contentSha256: "hash",
+          byteSize: 10,
+          mediaType: "",
+          title: "",
+          status: "indexed",
+        },
+      ]);
+      store.insertChunks(tx, [
+        {
+          id: "legacy-chunk",
+          snapshotId: snapshot.id,
+          fileId: "legacy-file",
+          relativePath: "",
+          ordinal: 0,
+          text: "Legacy Alpha evidence.",
+          startLine: 1,
+          endLine: 1,
+          contentSha256: "hash",
+        },
+      ]);
+      store.insertNodes(tx, [
+        {
+          id: "legacy-node",
+          snapshotId: snapshot.id,
+          kind: "section",
+          label: "Alpha",
+          normalizedLabel: "alpha",
+          summary: "",
+          attributes: "{}",
+        },
+      ]);
+      store.insertEvidence(tx, [
+        {
+          id: "legacy-evidence",
+          snapshotId: snapshot.id,
+          nodeId: "legacy-node",
+          edgeId: "",
+          chunkId: "legacy-chunk",
+          startLine: 1,
+          endLine: 1,
+          confidence: 1,
+        },
+      ]);
     });
 
     const bases = listKnowledgeBases(sessionDir);
@@ -316,21 +341,26 @@ test("knowledge base migrates legacy session store into dedicated database", () 
     }
     assertEquals(unindexed, true);
     assertKnowledgeGraphRowCounts(sessionDir, baseID, 1, 1, 1, 1);
-    assert(Deno.statSync(knowledgeBaseDatabasePath(sessionDir, baseID)).isFile);
+    assert(
+      nodeRuntime.statSync(knowledgeBaseDatabasePath(sessionDir, baseID))
+        .isFile,
+    );
     const remaining = root.db!.get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM knowledge_bases`,
     )!;
     assertEquals(remaining.n, 0);
   } finally {
     closeAll();
-    Deno.removeSync(sessionDir, { recursive: true });
-    Deno.removeSync(rootDir, { recursive: true });
+    nodeRuntime.removeSync(sessionDir, { recursive: true });
+    nodeRuntime.removeSync(rootDir, { recursive: true });
   }
 });
 
 test("knowledge graph reuse plan clones only unchanged file subgraph", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
+  const rootDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const base = createKnowledgeBase(sessionDir, {
       name: "Incremental",
@@ -419,14 +449,16 @@ test("knowledge graph reuse plan clones only unchanged file subgraph", () => {
           normalizedLabel: "changed.md",
         },
       ],
-      edges: [{
-        id: "stable-edge",
-        snapshotId: "source",
-        fromNodeId: "stable-file-node",
-        toNodeId: "stable-section",
-        relationType: "contains",
-        confidence: 1,
-      }],
+      edges: [
+        {
+          id: "stable-edge",
+          snapshotId: "source",
+          fromNodeId: "stable-file-node",
+          toNodeId: "stable-section",
+          relationType: "contains",
+          confidence: 1,
+        },
+      ],
       evidence: [
         {
           id: "stable-file-evidence",
@@ -525,8 +557,8 @@ test("knowledge graph reuse plan clones only unchanged file subgraph", () => {
     assertEquals(target.evidence[0].snapshotId, "target");
   } finally {
     closeAll();
-    Deno.removeSync(sessionDir, { recursive: true });
-    Deno.removeSync(rootDir, { recursive: true });
+    nodeRuntime.removeSync(sessionDir, { recursive: true });
+    nodeRuntime.removeSync(rootDir, { recursive: true });
   }
 });
 
@@ -551,42 +583,50 @@ function knowledgeGraphForRetention(
       edgeCount: 0,
       startedAt: now,
     },
-    files: [{
-      id: fileID,
-      snapshotId: snapshotID,
-      relativePath: `${snapshotID}.md`,
-      contentSha256: `hash-${snapshotID}`,
-      byteSize: text.length,
-      mediaType: "",
-      status: "indexed",
-    }],
-    chunks: [{
-      id: chunkID,
-      snapshotId: snapshotID,
-      fileId: fileID,
-      ordinal: 0,
-      text,
-      startLine: 1,
-      endLine: 1,
-      contentSha256: `chunk-hash-${snapshotID}`,
-    }],
-    nodes: [{
-      id: nodeID,
-      snapshotId: snapshotID,
-      kind: "section",
-      label: snapshotID,
-      normalizedLabel: snapshotID,
-    }],
+    files: [
+      {
+        id: fileID,
+        snapshotId: snapshotID,
+        relativePath: `${snapshotID}.md`,
+        contentSha256: `hash-${snapshotID}`,
+        byteSize: text.length,
+        mediaType: "",
+        status: "indexed",
+      },
+    ],
+    chunks: [
+      {
+        id: chunkID,
+        snapshotId: snapshotID,
+        fileId: fileID,
+        ordinal: 0,
+        text,
+        startLine: 1,
+        endLine: 1,
+        contentSha256: `chunk-hash-${snapshotID}`,
+      },
+    ],
+    nodes: [
+      {
+        id: nodeID,
+        snapshotId: snapshotID,
+        kind: "section",
+        label: snapshotID,
+        normalizedLabel: snapshotID,
+      },
+    ],
     edges: [],
-    evidence: [{
-      id: `evidence-${snapshotID}`,
-      snapshotId: snapshotID,
-      nodeId: nodeID,
-      chunkId: chunkID,
-      startLine: 1,
-      endLine: 1,
-      confidence: 1,
-    }],
+    evidence: [
+      {
+        id: `evidence-${snapshotID}`,
+        snapshotId: snapshotID,
+        nodeId: nodeID,
+        chunkId: chunkID,
+        startLine: 1,
+        endLine: 1,
+        confidence: 1,
+      },
+    ],
   };
 }
 

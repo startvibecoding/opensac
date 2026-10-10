@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { type Settings } from "../config/settings.ts";
 
 /** User-configurable settings for the shared Core process. */
@@ -63,9 +64,8 @@ export function resolveCoreConfig(settings: Settings): ResolvedCoreConfig {
     throw new Error("core.auth must be a boolean");
   }
 
-  const passwords = core?.passwords === undefined
-    ? defaults.passwords
-    : core.passwords;
+  const passwords =
+    core?.passwords === undefined ? defaults.passwords : core.passwords;
   if (!Array.isArray(passwords)) {
     throw new Error("core.passwords must be an array of strings");
   }
@@ -104,7 +104,7 @@ export function validateCorePassword(password: string): void {
   }
 }
 
-/** Rejects invalid listener host values before they reach Deno.serve. */
+/** Rejects invalid listener host values before they reach runtime.serve. */
 export function validateCoreHost(host: string): void {
   const normalized = host.trim();
   if (
@@ -124,7 +124,9 @@ export function assertResolvedCoreConfig(config: ResolvedCoreConfig): void {
   }
   validateCoreHost(config.host);
   if (
-    !Number.isInteger(config.port) || config.port < 0 || config.port > 65535
+    !Number.isInteger(config.port) ||
+    config.port < 0 ||
+    config.port > 65535
   ) {
     throw new Error("core.port must be an integer from 0 to 65535");
   }
@@ -141,7 +143,8 @@ export function assertResolvedCoreConfig(config: ResolvedCoreConfig): void {
     validateCorePassword(password);
   }
   if (
-    config.auth && !config.passwords.some((password) => password.length > 0)
+    config.auth &&
+    !config.passwords.some((password) => password.length > 0)
   ) {
     throw new Error("core.auth=true requires at least one non-empty password");
   }

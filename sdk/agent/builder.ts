@@ -42,10 +42,10 @@ export class Builder {
   private delegateMode = false;
   private approvalHandler:
     | ((
-      toolCallId: string,
-      toolName: string,
-      args: Record<string, unknown>,
-    ) => boolean)
+        toolCallId: string,
+        toolName: string,
+        args: Record<string, unknown>,
+      ) => boolean)
     | undefined;
   private externalTools: ExternalTool[] = [];
   private disableBuiltinTools = false;
@@ -201,7 +201,7 @@ export class Builder {
     }
     if (this.workDir === "") {
       try {
-        this.workDir = Deno.cwd();
+        this.workDir = process.cwd();
       } catch (e) {
         throw new Error(`agent: get working directory: ${errorMessage(e)}`);
       }
@@ -329,10 +329,10 @@ export interface BuilderConfig {
   delegateMode: boolean;
   approvalHandler:
     | ((
-      toolCallId: string,
-      toolName: string,
-      args: Record<string, unknown>,
-    ) => boolean)
+        toolCallId: string,
+        toolName: string,
+        args: Record<string, unknown>,
+      ) => boolean)
     | undefined;
   externalTools: ExternalTool[];
   disableBuiltinTools: boolean;
@@ -353,11 +353,11 @@ let resolveProviderFunc:
 export function setResolveProviderFunc(
   fn:
     | ((
-      vendor: string,
-      baseURL: string,
-      api: string,
-      apiKey: string,
-    ) => Provider)
+        vendor: string,
+        baseURL: string,
+        api: string,
+        apiKey: string,
+      ) => Provider)
     | undefined,
 ): void {
   resolveProviderFunc = fn;

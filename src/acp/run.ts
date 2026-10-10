@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { join } from "../compat/path.ts";
 import { CoreClient } from "../core/client.ts";
 import { resolveCoreConfig } from "../core/config.ts";
@@ -54,14 +55,14 @@ export interface RunTransport {
 
 class StdoutSink implements AcpServerSink {
   write(data: string): void {
-    Deno.stdout.writeSync(new TextEncoder().encode(data));
+    runtime.stdout.writeSync(new TextEncoder().encode(data));
   }
 }
 
 /** Default newline-delimited ACP transport. */
 export function stdioTransport(): RunTransport {
   return {
-    reader: new ACPLineReader(Deno.stdin.readable),
+    reader: new ACPLineReader(runtime.stdin.readable),
     sink: new StdoutSink(),
   };
 }
@@ -87,9 +88,10 @@ async function createDefaultACPCoreClient(): Promise<BridgeCoreClient> {
   const discovery = await core.ensureStarted();
   if (discovery.status !== "ready") {
     await core.close();
-    const hint = discovery.status === "incompatible"
-      ? '; run "opensac core stop" to replace it'
-      : "";
+    const hint =
+      discovery.status === "incompatible"
+        ? '; run "opensac core stop" to replace it'
+        : "";
     throw new Error(`Core is not ready: ${discovery.status}${hint}`);
   }
   return new ACPBridgeClient({ core });
@@ -123,7 +125,7 @@ export function standaloneACPCoreDependencies(
       const outcome = await handle.close();
       if (!outcome.exited) {
         // stderr only: stdout is the ACP NDJSON wire.
-        Deno.stderr.writeSync(
+        runtime.stderr.writeSync(
           new TextEncoder().encode(
             "opensac acp: private Core did not exit in time; its state directory was kept\n",
           ),
@@ -146,9 +148,10 @@ function withACPCoreDefaults(
   opts: RunOptions,
 ): ACPRPCRequest {
   if (request.method !== "session/new") return request;
-  const params = request.params !== null && typeof request.params === "object"
-    ? request.params as Record<string, unknown>
-    : {};
+  const params =
+    request.params !== null && typeof request.params === "object"
+      ? (request.params as Record<string, unknown>)
+      : {};
   const defaults: Record<string, unknown> = {};
   if (opts.provider !== undefined && params.provider === undefined) {
     defaults.provider = opts.provider;
@@ -177,7 +180,7 @@ export async function runACPCore(
   const client = await deps.createClient();
   const bridge = new ACPBridge({
     client,
-    context: { source: "acp", workDir: Deno.cwd() },
+    context: { source: "acp", workDir: runtime.cwd() },
     write: (line) => transport.sink.write(line),
   });
   try {
@@ -203,13 +206,11 @@ async function dispatchCoreLoop(
     } catch (error) {
       if (error instanceof EmptyMessageError) continue;
       transport.sink.write(
-        `${
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: null,
-            error: { code: -32700, message: "parse error" },
-          })
-        }\n`,
+        `${JSON.stringify({
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32700, message: "parse error" },
+        })}\n`,
       );
       continue;
     }
@@ -217,13 +218,11 @@ async function dispatchCoreLoop(
     if (request.jsonrpc !== "2.0" || !validRPCID(request.idRaw)) {
       if ((request.idRaw ?? "") !== "" || request.jsonrpc !== "2.0") {
         transport.sink.write(
-          `${
-            JSON.stringify({
-              jsonrpc: "2.0",
-              id: request.idRaw === null ? null : request.idRaw,
-              error: { code: -32600, message: "invalid request" },
-            })
-          }\n`,
+          `${JSON.stringify({
+            jsonrpc: "2.0",
+            id: request.idRaw === null ? null : request.idRaw,
+            error: { code: -32600, message: "invalid request" },
+          })}\n`,
         );
       }
       continue;

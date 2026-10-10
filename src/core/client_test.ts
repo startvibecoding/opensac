@@ -1,3 +1,5 @@
+import { runtime } from "../platform/runtime.ts";
+import type { Conn, NetAddr } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
@@ -27,18 +29,13 @@ import {
 import { defaultLauncherArgs } from "./client.ts";
 import { test } from "#testing";
 
-test("Core launcher resolves Deno and Node entrypoints", () => {
-  const coreEntrypoint = new URL("./main.ts", import.meta.url).pathname;
-  const nodeEntrypoint = new URL("../main.ts", import.meta.url).pathname;
-  assertEquals(defaultLauncherArgs("/usr/local/bin/deno")[0], "--allow-read");
-  assertEquals(defaultLauncherArgs("/usr/local/bin/deno").slice(-2), [
-    coreEntrypoint,
-    "core",
-  ]);
+test("Core launcher resolves the Node entrypoint", () => {
+  const nodeEntrypoint = new URL("./main.ts", import.meta.url).pathname;
   assertEquals(defaultLauncherArgs("/usr/local/bin/node"), [
     nodeEntrypoint,
     "core",
   ]);
+  assertEquals(defaultLauncherArgs("/usr/local/bin/opensac"), ["core"]);
 });
 
 const TEST_VERSION = "0.1.0-client-test";
@@ -91,7 +88,7 @@ function registration(
     id: "core-test",
     version: TEST_VERSION,
     protocolVersion: TEST_PROTOCOL_VERSION,
-    pid: Deno.pid,
+    pid: runtime.pid,
     host: "127.0.0.1",
     port,
     startedAt: 1_700_000_000_000,
@@ -102,11 +99,13 @@ function registration(
 async function withStateDir(
   test: (stateDir: string, paths: CorePaths) => Promise<void>,
 ): Promise<void> {
-  const stateDir = await Deno.makeTempDir({ prefix: "opensac-core-client-" });
+  const stateDir = await runtime.makeTempDir({
+    prefix: "opensac-core-client-",
+  });
   try {
     await test(stateDir, CorePaths.fromStateDir(stateDir));
   } finally {
-    await Deno.remove(stateDir, { recursive: true });
+    await runtime.remove(stateDir, { recursive: true });
   }
 }
 
@@ -132,15 +131,15 @@ async function writeRegistration(
 async function startProbe(
   handler: (request: Request) => Response | Promise<Response>,
 ): Promise<CoreServerHandle> {
-  let resolveAddress!: (address: Deno.NetAddr) => void;
-  const addressReady = new Promise<Deno.NetAddr>((resolve) => {
+  let resolveAddress!: (address: NetAddr) => void;
+  const addressReady = new Promise<NetAddr>((resolve) => {
     resolveAddress = resolve;
   });
-  const server = Deno.serve(
+  const server = runtime.serve(
     {
       hostname: "127.0.0.1",
       port: 0,
-      onListen: (address) => resolveAddress(address as Deno.NetAddr),
+      onListen: (address) => resolveAddress(address as NetAddr),
     },
     handler,
   );
@@ -247,7 +246,7 @@ test("CoreClient validates the endpoint even when a registration PID was reused"
         paths,
         registration(stateDir, handle.address.port, {
           id: "old-registration-with-reused-pid",
-          pid: Deno.pid,
+          pid: runtime.pid,
         }),
       );
       const client = new CoreClient(clientOptions(stateDir));
@@ -272,7 +271,7 @@ test("CoreClient selects one configured password and never retries a call", asyn
     const requests: Array<{ method: string; authorization: string | null }> =
       [];
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -292,11 +291,13 @@ test("CoreClient selects one configured password and never retries a call", asyn
         authorization === "Bearer server-second"
       ) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            healthy: true,
-            version: TEST_VERSION,
-            protocolVersion: TEST_PROTOCOL_VERSION,
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
@@ -345,7 +346,7 @@ test("CoreClient uses a deterministic default password until explicitly changed"
   await withStateDir(async (stateDir, paths) => {
     const requests: string[] = [];
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -360,15 +361,17 @@ test("CoreClient uses a deterministic default password until explicitly changed"
           },
         );
       }
-      const result = body.method === CORE_METHODS.info ? EXPECTED_INFO : {
-        healthy: true,
-        version: TEST_VERSION,
-        protocolVersion: TEST_PROTOCOL_VERSION,
-      };
-      return new Response(
-        JSON.stringify(coreResult(body.id, result)),
-        { headers: { "content-type": "application/json" } },
-      );
+      const result =
+        body.method === CORE_METHODS.info
+          ? EXPECTED_INFO
+          : {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            };
+      return new Response(JSON.stringify(coreResult(body.id, result)), {
+        headers: { "content-type": "application/json" },
+      });
     });
     try {
       await writeRegistration(
@@ -394,11 +397,10 @@ test("CoreClient uses a deterministic default password until explicitly changed"
 
 test("CoreClient reports an unauthenticated registration without leaking passwords", async () => {
   await withStateDir(async (stateDir, paths) => {
-    const handle = await startServer(
-      TEST_VERSION,
-      TEST_PROTOCOL_VERSION,
-      { auth: true, passwords: ["server-secret"] },
-    );
+    const handle = await startServer(TEST_VERSION, TEST_PROTOCOL_VERSION, {
+      auth: true,
+      passwords: ["server-secret"],
+    });
     try {
       await writeRegistration(
         paths,
@@ -411,10 +413,7 @@ test("CoreClient reports an unauthenticated registration without leaking passwor
       );
       const discovered = await client.discover();
       assertEquals(discovered.status, "unauthenticated");
-      assertEquals(
-        JSON.stringify(discovered).includes("wrong-secret"),
-        false,
-      );
+      assertEquals(JSON.stringify(discovered).includes("wrong-secret"), false);
     } finally {
       await handle.stop();
     }
@@ -423,8 +422,8 @@ test("CoreClient reports an unauthenticated registration without leaking passwor
 
 test("CoreClient reports malformed registration as stale", async () => {
   await withStateDir(async (stateDir, paths) => {
-    await Deno.mkdir(stateDir, { recursive: true });
-    await Deno.writeTextFile(paths.registrationFile, "{not-json");
+    await runtime.mkdir(stateDir, { recursive: true });
+    await runtime.writeTextFile(paths.registrationFile, "{not-json");
     const client = new CoreClient(clientOptions(stateDir));
     const discovered = await client.discover();
     assertEquals(discovered.status, "stale");
@@ -433,11 +432,10 @@ test("CoreClient reports malformed registration as stale", async () => {
 
 test("CoreClient uses the configured Bearer header for authenticated discovery", async () => {
   await withStateDir(async (stateDir, paths) => {
-    const handle = await startServer(
-      TEST_VERSION,
-      TEST_PROTOCOL_VERSION,
-      { auth: true, passwords: ["client-secret"] },
-    );
+    const handle = await startServer(TEST_VERSION, TEST_PROTOCOL_VERSION, {
+      auth: true,
+      passwords: ["client-secret"],
+    });
     try {
       await writeRegistration(
         paths,
@@ -499,11 +497,7 @@ test("CoreClient rejects a response whose JSON-RPC ID does not match", async () 
         registration(stateDir, handle.address.port),
       );
       const client = new CoreClient(clientOptions(stateDir));
-      await assertRejects(
-        () => client.call("test.method"),
-        Error,
-        "ID",
-      );
+      await assertRejects(() => client.call("test.method"), Error, "ID");
     } finally {
       await handle.stop();
     }
@@ -514,7 +508,7 @@ test("CoreClient allows a null auth ID but rejects a non-null mismatch", async (
   await withStateDir(async (stateDir, paths) => {
     let authId: string | null = null;
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -526,11 +520,13 @@ test("CoreClient allows a null auth ID but rejects a non-null mismatch", async (
       }
       if (body.method === CORE_METHODS.health) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            healthy: true,
-            version: TEST_VERSION,
-            protocolVersion: TEST_PROTOCOL_VERSION,
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
@@ -551,10 +547,7 @@ test("CoreClient allows a null auth ID but rejects a non-null mismatch", async (
       assertEquals((await client.discover()).status, "ready");
 
       authId = null;
-      await assertRejects(
-        () => client.call("test.method"),
-        CoreClientRpcError,
-      );
+      await assertRejects(() => client.call("test.method"), CoreClientRpcError);
       authId = "wrong-id";
       await assertRejects(
         () => client.call("test.method"),
@@ -571,7 +564,7 @@ test("CoreClient sends one non-batched JSON-RPC request", async () => {
   await withStateDir(async (stateDir, paths) => {
     const bodies: unknown[] = [];
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -580,15 +573,16 @@ test("CoreClient sends one non-batched JSON-RPC request", async () => {
         JSON.stringify({
           jsonrpc: "2.0",
           id: body.id,
-          result: body.method === CORE_METHODS.info
-            ? EXPECTED_INFO
-            : body.method === CORE_METHODS.health
-            ? {
-              healthy: true,
-              version: TEST_VERSION,
-              protocolVersion: TEST_PROTOCOL_VERSION,
-            }
-            : { accepted: true },
+          result:
+            body.method === CORE_METHODS.info
+              ? EXPECTED_INFO
+              : body.method === CORE_METHODS.health
+                ? {
+                    healthy: true,
+                    version: TEST_VERSION,
+                    protocolVersion: TEST_PROTOCOL_VERSION,
+                  }
+                : { accepted: true },
         }),
         { headers: { "content-type": "application/json" } },
       );
@@ -601,10 +595,9 @@ test("CoreClient sends one non-batched JSON-RPC request", async () => {
       const client = new CoreClient(clientOptions(stateDir));
       assertEquals((await client.discover()).status, "ready");
       bodies.length = 0;
-      assertEquals(
-        await client.call("test.method", { value: 3 }),
-        { accepted: true },
-      );
+      assertEquals(await client.call("test.method", { value: 3 }), {
+        accepted: true,
+      });
       assertEquals(bodies.length, 1);
       assert(Array.isArray(bodies[0]) === false);
       assertEquals((bodies[0] as { method: string }).method, "test.method");
@@ -617,7 +610,7 @@ test("CoreClient sends one non-batched JSON-RPC request", async () => {
 test("CoreClient reports malformed core.info without inventing actual values", async () => {
   await withStateDir(async (stateDir, paths) => {
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -652,7 +645,7 @@ test("CoreClient rechecks registration currency before caching discovery", async
   await withStateDir(async (stateDir, paths) => {
     let requests = 0;
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -668,11 +661,13 @@ test("CoreClient rechecks registration currency before caching discovery", async
         );
       }
       return new Response(
-        JSON.stringify(coreResult(body.id, {
-          healthy: true,
-          version: TEST_VERSION,
-          protocolVersion: TEST_PROTOCOL_VERSION,
-        })),
+        JSON.stringify(
+          coreResult(body.id, {
+            healthy: true,
+            version: TEST_VERSION,
+            protocolVersion: TEST_PROTOCOL_VERSION,
+          }),
+        ),
         { headers: { "content-type": "application/json" } },
       );
     });
@@ -750,11 +745,13 @@ test("CoreClient bounds a response body that never completes", async () => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(
-          new TextEncoder().encode(JSON.stringify({
-            jsonrpc: "2.0",
-            id: "ignored",
-            result: EXPECTED_INFO,
-          })),
+          new TextEncoder().encode(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: "ignored",
+              result: EXPECTED_INFO,
+            }),
+          ),
         );
         setTimeout(() => {
           try {
@@ -765,10 +762,11 @@ test("CoreClient bounds a response body that never completes", async () => {
         }, 250);
       },
     });
-    const handle = await startProbe(() =>
-      new Response(body, {
-        headers: { "content-type": "application/json" },
-      })
+    const handle = await startProbe(
+      () =>
+        new Response(body, {
+          headers: { "content-type": "application/json" },
+        }),
     );
     try {
       await writeRegistration(
@@ -997,7 +995,7 @@ test("CoreClient shutdown surfaces a method-not-found RPC error", async () => {
 test("CoreClient shutdown rejects an invalid acknowledgement shape", async () => {
   await withStateDir(async (stateDir, paths) => {
     const probe = await startProbe(async (request) => {
-      const body = await request.json() as { id?: unknown };
+      const body = (await request.json()) as { id?: unknown };
       return new Response(
         JSON.stringify(
           coreResult((body.id ?? null) as string | number | null, {
@@ -1052,7 +1050,7 @@ test("CoreEventConnection correlates WebSocket requests with their responses", a
     const portReady = new Promise<number>((resolve) => {
       resolvePort = resolve;
     });
-    const server = Deno.serve(
+    const server = runtime.serve(
       {
         hostname: "127.0.0.1",
         port: 0,
@@ -1061,33 +1059,38 @@ test("CoreEventConnection correlates WebSocket requests with their responses", a
       async (request) => {
         const pathname = new URL(request.url).pathname;
         if (pathname === "/rpc") {
-          const body = await request.json() as {
+          const body = (await request.json()) as {
             id?: unknown;
             method?: unknown;
           };
-          const result = body.method === CORE_METHODS.info ? EXPECTED_INFO : {
-            healthy: true,
-            version: TEST_VERSION,
-            protocolVersion: TEST_PROTOCOL_VERSION,
-          };
+          const result =
+            body.method === CORE_METHODS.info
+              ? EXPECTED_INFO
+              : {
+                  healthy: true,
+                  version: TEST_VERSION,
+                  protocolVersion: TEST_PROTOCOL_VERSION,
+                };
           return new Response(
             JSON.stringify(coreResult(body.id ?? null, result)),
             { headers: { "content-type": "application/json" } },
           );
         }
         if (pathname === "/events") {
-          const { socket, response } = Deno.upgradeWebSocket(request);
+          const { socket, response } = runtime.upgradeWebSocket(request);
           socket.onmessage = (message) => {
             const body = JSON.parse(String(message.data)) as {
               id?: unknown;
               method?: unknown;
             };
             if (typeof body.method === "string") seen.push(body.method);
-            socket.send(JSON.stringify({
-              jsonrpc: "2.0",
-              id: body.id ?? null,
-              result: { ok: true },
-            }));
+            socket.send(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: body.id ?? null,
+                result: { ok: true },
+              }),
+            );
           };
           return response;
         }
@@ -1107,7 +1110,7 @@ test("CoreEventConnection correlates WebSocket requests with their responses", a
               setTimeout(
                 () => reject(new Error("event request timed out")),
                 2_000,
-              )
+              ),
             ),
           ]);
         await bounded(events.subscribe("session-1", "run-1", 0));
@@ -1128,9 +1131,10 @@ test("CoreEventConnection correlates WebSocket requests with their responses", a
 // ── startup and connection continuity across a Core restart ─────────────────
 
 /** A free local port with nothing listening on it. */
-function closedEphemeralPort(): number {
-  const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
-  const port = (listener.addr as Deno.NetAddr).port;
+async function closedEphemeralPort(): Promise<number> {
+  const listener = runtime.listen({ hostname: "127.0.0.1", port: 0 });
+  await listener.ready;
+  const port = (listener.addr as NetAddr).port;
   listener.close();
   return port;
 }
@@ -1139,7 +1143,7 @@ const requestEncoder = new TextEncoder();
 const requestDecoder = new TextDecoder();
 
 /** Reads one HTTP/1.1 request, headers and declared body, off a raw socket. */
-async function readHttpRequest(conn: Deno.Conn): Promise<string> {
+async function readHttpRequest(conn: Conn): Promise<string> {
   const buffer = new Uint8Array(8192);
   let text = "";
   let headerEnd = -1;
@@ -1163,18 +1167,19 @@ async function readHttpRequest(conn: Deno.Conn): Promise<string> {
 /**
  * A Core endpoint that answers discovery and then vanishes mid-request.
  *
- * Deno reports the second shape as `client error (SendRequest): connection
+ * Node reports the second shape as `client error (SendRequest): connection
  * closed before message completed`, so the socket has to be closed without an
  * answer rather than refused at connect time.
  */
-function startVanishingCore(): {
-  address: Deno.NetAddr;
+async function startVanishingCore(): Promise<{
+  address: NetAddr;
   dropped: () => number;
   stop(): Promise<void>;
-} {
+}> {
   let dropped = 0;
-  const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
-  const address = listener.addr as Deno.NetAddr;
+  const listener = runtime.listen({ hostname: "127.0.0.1", port: 0 });
+  await listener.ready;
+  const address = listener.addr as NetAddr;
   const accepting = (async () => {
     while (true) {
       const conn = await listener.accept().catch(() => undefined);
@@ -1184,21 +1189,24 @@ function startVanishingCore(): {
           const text = await readHttpRequest(conn);
           const method = /"method":"([^"]*)"/.exec(text)?.[1] ?? "";
           const id = /"id":("[^"]*"|\d+)/.exec(text)?.[1] ?? "1";
-          if (
-            method === CORE_METHODS.info || method === CORE_METHODS.health
-          ) {
-            const result = method === CORE_METHODS.info ? EXPECTED_INFO : {
-              healthy: true,
-              version: TEST_VERSION,
-              protocolVersion: TEST_PROTOCOL_VERSION,
-            };
+          if (method === CORE_METHODS.info || method === CORE_METHODS.health) {
+            const result =
+              method === CORE_METHODS.info
+                ? EXPECTED_INFO
+                : {
+                    healthy: true,
+                    version: TEST_VERSION,
+                    protocolVersion: TEST_PROTOCOL_VERSION,
+                  };
             const body = JSON.stringify(coreResult(JSON.parse(id), result));
-            await conn.write(requestEncoder.encode(
-              `HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n` +
-                `content-length: ${
-                  requestEncoder.encode(body).length
-                }\r\nconnection: close\r\n\r\n${body}`,
-            ));
+            await conn.write(
+              requestEncoder.encode(
+                `HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n` +
+                  `content-length: ${
+                    requestEncoder.encode(body).length
+                  }\r\nconnection: close\r\n\r\n${body}`,
+              ),
+            );
           } else {
             // The Core is gone: the request arrived, the answer never does.
             dropped++;
@@ -1223,43 +1231,47 @@ function startVanishingCore(): {
 
 /** Core-shaped probe: `/rpc` answers info/health, `/events` upgrades to WS. */
 async function startCoreProbe(): Promise<CoreServerHandle> {
-  let resolveAddress!: (address: Deno.NetAddr) => void;
-  const addressReady = new Promise<Deno.NetAddr>((resolve) => {
+  let resolveAddress!: (address: NetAddr) => void;
+  const addressReady = new Promise<NetAddr>((resolve) => {
     resolveAddress = resolve;
   });
-  const server = Deno.serve(
+  const server = runtime.serve(
     {
       hostname: "127.0.0.1",
       port: 0,
-      onListen: (address) => resolveAddress(address as Deno.NetAddr),
+      onListen: (address) => resolveAddress(address as NetAddr),
     },
     async (request) => {
       const pathname = new URL(request.url).pathname;
       if (pathname === "/events") {
-        const { socket, response } = Deno.upgradeWebSocket(request);
+        const { socket, response } = runtime.upgradeWebSocket(request);
         socket.onmessage = (message) => {
           const body = JSON.parse(String(message.data)) as { id?: unknown };
-          socket.send(JSON.stringify({
-            jsonrpc: "2.0",
-            id: body.id ?? null,
-            result: { ok: true },
-          }));
+          socket.send(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id ?? null,
+              result: { ok: true },
+            }),
+          );
         };
         return response;
       }
       if (pathname !== "/rpc") {
         return new Response("not found", { status: 404 });
       }
-      const body = await request.json() as { id?: unknown; method?: unknown };
-      const result = body.method === CORE_METHODS.info ? EXPECTED_INFO : {
-        healthy: true,
-        version: TEST_VERSION,
-        protocolVersion: TEST_PROTOCOL_VERSION,
-      };
-      return new Response(
-        JSON.stringify(coreResult(body.id ?? null, result)),
-        { headers: { "content-type": "application/json" } },
-      );
+      const body = (await request.json()) as { id?: unknown; method?: unknown };
+      const result =
+        body.method === CORE_METHODS.info
+          ? EXPECTED_INFO
+          : {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            };
+      return new Response(JSON.stringify(coreResult(body.id ?? null, result)), {
+        headers: { "content-type": "application/json" },
+      });
     },
   );
   const address = await addressReady;
@@ -1318,7 +1330,7 @@ test("CoreClient reports a launcher failure once the adoption window closes", as
         new CoreLauncherError("Core child exited during startup (code 1)"),
       );
     const client = new CoreClient(
-      clientOptions(stateDir, { launcher, startTimeoutMs: 60 }),
+      clientOptions(stateDir, { launcher, startTimeoutMs: 1500 }),
     );
 
     const error = await assertRejects(
@@ -1340,7 +1352,7 @@ test("CoreClient reports a launcher failure that is not an Error", async () => {
     // hides why startup stopped.
     const launcher: CoreLauncher = () => Promise.reject(undefined);
     const client = new CoreClient(
-      clientOptions(stateDir, { launcher, startTimeoutMs: 60 }),
+      clientOptions(stateDir, { launcher, startTimeoutMs: 1500 }),
     );
 
     const error = await assertRejects(
@@ -1368,7 +1380,7 @@ test("late launch cleanup keeps a registration whose process is still alive", as
     // row is not demonstrably ours to delete.
     await writeRegistration(
       paths,
-      registration(stateDir, closedEphemeralPort(), { id: "peer" }),
+      registration(stateDir, await closedEphemeralPort(), { id: "peer" }),
     );
     releaseLauncher();
     await client.close();
@@ -1386,7 +1398,7 @@ test("CoreClient reports a real cancellation ahead of a launcher failure", async
     // lock does, while the caller gives up inside the adoption window.
     const launcher: CoreLauncher = () => {
       queueMicrotask(() =>
-        controller.abort(new DOMException("caller gave up", "AbortError"))
+        controller.abort(new DOMException("caller gave up", "AbortError")),
       );
       return Promise.reject(
         new CoreLauncherError("Core child exited during startup (code 0)"),
@@ -1452,7 +1464,7 @@ test("CoreClient does not replay a request the Core may have received", async ()
   await withStateDir(async (stateDir, paths) => {
     let handled = 0;
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -1464,11 +1476,13 @@ test("CoreClient does not replay a request the Core may have received", async ()
       }
       if (body.method === CORE_METHODS.health) {
         return new Response(
-          JSON.stringify(coreResult(body.id, {
-            healthy: true,
-            version: TEST_VERSION,
-            protocolVersion: TEST_PROTOCOL_VERSION,
-          })),
+          JSON.stringify(
+            coreResult(body.id, {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
@@ -1501,7 +1515,7 @@ test("CoreClient does not replay a request the Core may have received", async ()
 
 test("CoreClient drops the cached endpoint when a Core vanishes mid-request", async () => {
   await withStateDir(async (stateDir, paths) => {
-    const vanishing = startVanishingCore();
+    const vanishing = await startVanishingCore();
     const replacement = await startCoreProbe();
     try {
       await writeRegistration(
@@ -1555,18 +1569,18 @@ test("CoreClient drops the cached endpoint when a Core vanishes mid-request", as
 async function startRestartingCoreProbe(
   resident: Set<string> | "session.open never restores",
 ): Promise<CoreServerHandle> {
-  let resolveAddress!: (address: Deno.NetAddr) => void;
-  const addressReady = new Promise<Deno.NetAddr>((resolve) => {
+  let resolveAddress!: (address: NetAddr) => void;
+  const addressReady = new Promise<NetAddr>((resolve) => {
     resolveAddress = resolve;
   });
-  const server = Deno.serve(
+  const server = runtime.serve(
     {
       hostname: "127.0.0.1",
       port: 0,
-      onListen: (address) => resolveAddress(address as Deno.NetAddr),
+      onListen: (address) => resolveAddress(address as NetAddr),
     },
     async (request) => {
-      const message = await request.json() as {
+      const message = (await request.json()) as {
         id?: unknown;
         method?: unknown;
         params?: { sessionId?: unknown };
@@ -1574,18 +1588,19 @@ async function startRestartingCoreProbe(
       const id = message.id ?? null;
       const sessionId = message.params?.sessionId;
       if (message.method === CORE_METHODS.info) {
-        return new Response(
-          JSON.stringify(coreResult(id, EXPECTED_INFO)),
-          { headers: { "content-type": "application/json" } },
-        );
+        return new Response(JSON.stringify(coreResult(id, EXPECTED_INFO)), {
+          headers: { "content-type": "application/json" },
+        });
       }
       if (message.method === CORE_METHODS.health) {
         return new Response(
-          JSON.stringify(coreResult(id, {
-            healthy: true,
-            version: TEST_VERSION,
-            protocolVersion: TEST_PROTOCOL_VERSION,
-          })),
+          JSON.stringify(
+            coreResult(id, {
+              healthy: true,
+              version: TEST_VERSION,
+              protocolVersion: TEST_PROTOCOL_VERSION,
+            }),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
@@ -1597,29 +1612,29 @@ async function startRestartingCoreProbe(
         ) {
           resident.add(sessionId);
         }
-        return new Response(
-          JSON.stringify(coreResult(id, { sessionId })),
-          { headers: { "content-type": "application/json" } },
-        );
+        return new Response(JSON.stringify(coreResult(id, { sessionId })), {
+          headers: { "content-type": "application/json" },
+        });
       }
       if (
         typeof sessionId === "string" &&
         (resident === "session.open never restores" || !resident.has(sessionId))
       ) {
         return new Response(
-          JSON.stringify(coreError(
-            id,
-            CORE_ERROR_SESSION_NOT_RESIDENT,
-            `session not found: ${sessionId}`,
-            { sessionId },
-          )),
+          JSON.stringify(
+            coreError(
+              id,
+              CORE_ERROR_SESSION_NOT_RESIDENT,
+              `session not found: ${sessionId}`,
+              { sessionId },
+            ),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
-      return new Response(
-        JSON.stringify(coreResult(id, { ok: true })),
-        { headers: { "content-type": "application/json" } },
-      );
+      return new Response(JSON.stringify(coreResult(id, { ok: true })), {
+        headers: { "content-type": "application/json" },
+      });
     },
   );
   const address = await addressReady;
@@ -1702,7 +1717,7 @@ test("CoreClient does not replay a request that failed for another reason", asyn
   await withStateDir(async (stateDir, paths) => {
     let handled = 0;
     const handle = await startProbe(async (request) => {
-      const body = await request.json() as {
+      const body = (await request.json()) as {
         id: string | number | null;
         method: string;
       };
@@ -1712,24 +1727,24 @@ test("CoreClient does not replay a request that failed for another reason", asyn
       ) {
         handled++;
         return new Response(
-          JSON.stringify(coreResult(
-            body.id,
-            body.method === CORE_METHODS.info ? EXPECTED_INFO : {
-              healthy: true,
-              version: TEST_VERSION,
-              protocolVersion: TEST_PROTOCOL_VERSION,
-            },
-          )),
+          JSON.stringify(
+            coreResult(
+              body.id,
+              body.method === CORE_METHODS.info
+                ? EXPECTED_INFO
+                : {
+                    healthy: true,
+                    version: TEST_VERSION,
+                    protocolVersion: TEST_PROTOCOL_VERSION,
+                  },
+            ),
+          ),
           { headers: { "content-type": "application/json" } },
         );
       }
       handled++;
       return new Response(
-        JSON.stringify(coreError(
-          body.id,
-          -32603,
-          "session run is busy",
-        )),
+        JSON.stringify(coreError(body.id, -32603, "session run is busy")),
         { headers: { "content-type": "application/json" } },
       );
     });
@@ -1769,11 +1784,9 @@ test("CoreClient lists live event connections through core.clients.list", async 
       const client = new CoreClient(clientOptions(stateDir));
       try {
         const events = await client.connectEvents();
-        const clients = await client.call<
-          { clients: Array<{ clientId: string }> }
-        >(
-          CORE_METHODS.clientsList,
-        );
+        const clients = await client.call<{
+          clients: Array<{ clientId: string }>;
+        }>(CORE_METHODS.clientsList);
         assert(
           clients.clients.some((client) => client.clientId.length > 0),
           JSON.stringify(clients),

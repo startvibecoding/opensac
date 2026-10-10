@@ -3,6 +3,8 @@
 // its place. The previous database and its sidecars are renamed (never deleted)
 // next to the new file, so the old sessions remain recoverable.
 
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { closeAll } from "../db/mod.ts";
 import { sessionDir as platformSessionDir } from "../platform/platform.ts";
@@ -48,9 +50,10 @@ export interface LeftBehindEntry {
  * being written there, and this process cannot detect that.
  */
 export function resetDatabase(sessionDir?: string): ResetReport {
-  const dir = sessionDir === undefined || sessionDir === ""
-    ? platformSessionDir()
-    : sessionDir;
+  const dir =
+    sessionDir === undefined || sessionDir === ""
+      ? platformSessionDir()
+      : sessionDir;
   const report: ResetReport = {
     databaseBackup: "",
     archived: [],
@@ -120,7 +123,7 @@ export function moveDatabaseFiles(
   for (const source of sources) {
     const destination = backupPath + source.slice(dbPath.length);
     try {
-      Deno.renameSync(source, destination);
+      runtime.renameSync(source, destination);
     } catch (err) {
       rollbackDatabaseMove(
         dbPath,
@@ -162,7 +165,7 @@ function rollbackDatabaseMove(
     const source = sources[index];
     const archived = moved[index].to;
     try {
-      Deno.renameSync(archived, source);
+      runtime.renameSync(archived, source);
       restored.push({ from: archived, to: source });
     } catch (err) {
       errs.push(new Error(`restore ${source}: ${err}`));
@@ -190,9 +193,9 @@ function leftBehindEntries(
 ): LeftBehindEntry[] {
   const prefix = path.basename(dbPath);
   const leftBehind: LeftBehindEntry[] = [];
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
-    entries = [...Deno.readDirSync(sessionDir)];
+    entries = [...runtime.readDirSync(sessionDir)];
   } catch (err) {
     throw new Error(`inspect session directory: ${err}`);
   }
@@ -212,19 +215,19 @@ function leftBehindEntries(
  * Measures one entry without following symbolic links, so reporting what a
  * reset left behind can never be turned into an unbounded walk.
  */
-function entryBytes(fullPath: string, entry: Deno.DirEntry): number {
+function entryBytes(fullPath: string, entry: DirEntry): number {
   if (!entry.isDirectory) {
     try {
-      return Deno.statSync(fullPath).size;
+      return runtime.statSync(fullPath).size;
     } catch (err) {
       throw new Error(`inspect ${fullPath}: ${err}`);
     }
   }
   let total = 0;
   const walk = (dir: string) => {
-    let children: Deno.DirEntry[];
+    let children: DirEntry[];
     try {
-      children = [...Deno.readDirSync(dir)];
+      children = [...runtime.readDirSync(dir)];
     } catch (err) {
       throw new Error(`measure ${dir}: ${err}`);
     }
@@ -235,7 +238,7 @@ function entryBytes(fullPath: string, entry: Deno.DirEntry): number {
         continue;
       }
       try {
-        total += Deno.statSync(childPath).size;
+        total += runtime.statSync(childPath).size;
       } catch (err) {
         throw new Error(`measure ${childPath}: ${err}`);
       }
@@ -252,10 +255,11 @@ function entryBytes(fullPath: string, entry: Deno.DirEntry): number {
  */
 export function resetBackupPath(dbPath: string): string {
   const stamp = utcStamp();
-  for (let attempt = 0;; attempt++) {
-    const candidate = attempt === 0
-      ? `${dbPath}.pure-${stamp}.bak`
-      : `${dbPath}.pure-${stamp}-${attempt}.bak`;
+  for (let attempt = 0; ; attempt++) {
+    const candidate =
+      attempt === 0
+        ? `${dbPath}.pure-${stamp}.bak`
+        : `${dbPath}.pure-${stamp}-${attempt}.bak`;
     if (backupPathAvailable(candidate)) return candidate;
     if (attempt >= 1000) {
       throw new Error(`no free backup path for ${dbPath}`);
@@ -279,29 +283,29 @@ export function backupPathAvailable(candidate: string): boolean {
 function utcStamp(): string {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, "0");
-  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${
-    pad(now.getUTCDate())
-  }T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${
-    pad(now.getUTCSeconds())
-  }Z`;
+  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(
+    now.getUTCDate(),
+  )}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(
+    now.getUTCSeconds(),
+  )}Z`;
 }
 
 function fileExists(p: string): boolean {
   try {
-    const stat = Deno.statSync(p);
+    const stat = runtime.statSync(p);
     return stat.isFile || stat.isSymlink;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
+    if (err instanceof runtime.errors.NotFound) return false;
     throw new Error(`inspect ${p}: ${err}`);
   }
 }
 
 function pathExists(p: string): boolean {
   try {
-    Deno.lstatSync(p);
+    runtime.lstatSync(p);
     return true;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
+    if (err instanceof runtime.errors.NotFound) return false;
     throw new Error(`check ${p}: ${err}`);
   }
 }

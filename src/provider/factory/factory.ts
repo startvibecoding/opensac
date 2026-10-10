@@ -213,14 +213,17 @@ export function providerSortPriority(id: string): number {
   if (name.includes("deepseek")) return 20;
   if (name.includes("xiaomi") || name.includes("mimo")) return 30;
   if (
-    name.includes("doubao") || name.includes("volc") || name.includes("ark")
+    name.includes("doubao") ||
+    name.includes("volc") ||
+    name.includes("ark")
   ) {
     return 40;
   }
   if (name.includes("openai")) return 50;
   if (name.includes("anthropic") || name.includes("claude")) return 60;
   if (
-    name.includes("google") || name.includes("gemini") ||
+    name.includes("google") ||
+    name.includes("gemini") ||
     name.includes("vertex")
   ) {
     return 70;
@@ -412,9 +415,8 @@ export function convertCompat(
     supportsParallelToolCalls: cloneBool(c.supportsParallelToolCalls),
     supportsToolChoice: cloneBool(c.supportsToolChoice),
     supportsHostedTools: cloneBoolMap(c.supportsHostedTools),
-    supportedInclude: c.supportedInclude === undefined
-      ? undefined
-      : [...c.supportedInclude],
+    supportedInclude:
+      c.supportedInclude === undefined ? undefined : [...c.supportedInclude],
     supportsReasoningEffort: cloneBool(c.supportsReasoningEffort),
     supportsStrictMode: cloneBool(c.supportsStrictMode),
     maxTokensField: c.maxTokensField,

@@ -69,7 +69,11 @@ test("deepSeekTokenCount memoizes without changing counts", () => {
   assertEquals(cold[4], 0, "empty text counts zero");
 
   // Warm passes (cache hits) must agree with the cold computation.
-  assertEquals(samples.map((s) => deepSeekTokenCount(s)), cold, "warm pass");
+  assertEquals(
+    samples.map((s) => deepSeekTokenCount(s)),
+    cold,
+    "warm pass",
+  );
   // Distinct string instances with equal content share the memoized value.
   const rebuilt = samples.map((s) => s.slice(0));
   assertEquals(

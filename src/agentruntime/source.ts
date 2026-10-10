@@ -272,36 +272,41 @@ export function resolveSource(input: SourceResolutionInput): SourceResolution {
   }
 
   if (
-    binding !== SOURCE_UNKNOWN && header !== SOURCE_UNKNOWN &&
+    binding !== SOURCE_UNKNOWN &&
+    header !== SOURCE_UNKNOWN &&
     binding !== header
   ) {
     result.conflicted = true;
     result.diagnostics.push(
-      `binding source ${
-        JSON.stringify(binding)
-      } conflicts with session header source ${JSON.stringify(header)}`,
+      `binding source ${JSON.stringify(
+        binding,
+      )} conflicts with session header source ${JSON.stringify(header)}`,
     );
   }
   if (
-    binding !== SOURCE_UNKNOWN && input.current !== undefined &&
-    input.current !== SOURCE_UNKNOWN && binding !== input.current
+    binding !== SOURCE_UNKNOWN &&
+    input.current !== undefined &&
+    input.current !== SOURCE_UNKNOWN &&
+    binding !== input.current
   ) {
     result.conflicted = true;
     result.diagnostics.push(
-      `binding source ${
-        JSON.stringify(binding)
-      } conflicts with current runtime source ${JSON.stringify(input.current)}`,
+      `binding source ${JSON.stringify(
+        binding,
+      )} conflicts with current runtime source ${JSON.stringify(input.current)}`,
     );
   }
   if (
-    header !== SOURCE_UNKNOWN && input.current !== undefined &&
-    input.current !== SOURCE_UNKNOWN && header !== input.current
+    header !== SOURCE_UNKNOWN &&
+    input.current !== undefined &&
+    input.current !== SOURCE_UNKNOWN &&
+    header !== input.current
   ) {
     result.conflicted = true;
     result.diagnostics.push(
-      `session header source ${
-        JSON.stringify(header)
-      } conflicts with current runtime source ${JSON.stringify(input.current)}`,
+      `session header source ${JSON.stringify(
+        header,
+      )} conflicts with current runtime source ${JSON.stringify(input.current)}`,
     );
   }
   return result;
@@ -452,7 +457,8 @@ export function validateSourceCandidates(input: SourceResolutionInput): void {
   ];
   for (const [name, source] of candidates) {
     if (
-      source !== undefined && source !== SOURCE_UNKNOWN &&
+      source !== undefined &&
+      source !== SOURCE_UNKNOWN &&
       !isKnownRequestedSource(source)
     ) {
       throw new Error(`unknown ${name} source ${JSON.stringify(source)}`);

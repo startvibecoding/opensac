@@ -95,11 +95,7 @@ export class Buffer {
       parts[parts.length - 1] + after,
     ];
 
-    this.#lines.splice(
-      this.#cursorLine,
-      1,
-      ...newLines,
-    );
+    this.#lines.splice(this.#cursorLine, 1, ...newLines);
 
     this.#cursorLine += newLines.length - 1;
     this.#cursorCol = Array.from(parts[parts.length - 1]).length;

@@ -82,9 +82,8 @@ export class ImageGenerationTool implements Tool {
     ) {
       throw new Error("image_generation is disabled");
     }
-    const prompt = typeof params["prompt"] === "string"
-      ? params["prompt"] as string
-      : "";
+    const prompt =
+      typeof params["prompt"] === "string" ? (params["prompt"] as string) : "";
     if (prompt.trim() === "") {
       throw new Error("image_generation requires a non-empty prompt");
     }
@@ -125,9 +124,9 @@ export class ImageGenerationTool implements Tool {
     if (typeof quality === "string" && quality.trim() !== "") {
       body["quality"] = quality;
     }
-    const response = await this.#postJSON<
-      { data?: Array<{ b64_json?: string; url?: string }> }
-    >(ctx, cfg, "/images/generations", body);
+    const response = await this.#postJSON<{
+      data?: Array<{ b64_json?: string; url?: string }>;
+    }>(ctx, cfg, "/images/generations", body);
     const items: ImageGenerationResult[] = [];
     for (const item of response.data ?? []) {
       items.push({ b64JSON: item.b64_json ?? "", url: item.url ?? "" });
@@ -146,9 +145,9 @@ export class ImageGenerationTool implements Tool {
       input: prompt,
       tools: [{ type: "image_generation" }],
     };
-    const response = await this.#postJSON<
-      { output?: Array<{ type?: string; result?: string }> }
-    >(ctx, cfg, "/responses", body);
+    const response = await this.#postJSON<{
+      output?: Array<{ type?: string; result?: string }>;
+    }>(ctx, cfg, "/responses", body);
     const items: ImageGenerationResult[] = [];
     for (const item of response.output ?? []) {
       if (item.type === "image_generation_call" && item.result) {
@@ -189,7 +188,7 @@ export class ImageGenerationTool implements Tool {
       );
     }
     try {
-      return await response.json() as T;
+      return (await response.json()) as T;
     } catch (err) {
       throw new Error(`decode image_generation response: ${messageOf(err)}`);
     }
@@ -201,9 +200,7 @@ export class ImageGenerationTool implements Tool {
     items: ImageGenerationResult[],
   ): Promise<ToolResult> {
     if (items.length === 0) {
-      throw new Error(
-        "image_generation response contained no generated image",
-      );
+      throw new Error("image_generation response contained no generated image");
     }
     const contents: ContentBlock[] = [];
     for (const item of items) {
@@ -217,9 +214,7 @@ export class ImageGenerationTool implements Tool {
       contents.push({ type: "image", image: { data, mimeType: mime } });
     }
     if (contents.length === 0) {
-      throw new Error(
-        "image_generation response contained no image data",
-      );
+      throw new Error("image_generation response contained no image data");
     }
     return {
       text: `Generated ${contents.length} image(s).`,

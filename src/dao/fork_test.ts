@@ -112,7 +112,10 @@ test("fork DAO entry insertion, ordering, and current id", () => {
     assert(seqB > seqA, "the autoincrement sequence must increase");
 
     const entries = dao.listEntries(db, SOURCE);
-    assertEquals(entries.map((e) => e.id), ["entry-a", "entry-b"]);
+    assertEquals(
+      entries.map((e) => e.id),
+      ["entry-a", "entry-b"],
+    );
     assertEquals(entries[0].seq, seqA);
     assertEquals(entries[1].parentId, "entry-a");
 

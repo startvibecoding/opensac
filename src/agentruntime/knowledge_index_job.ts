@@ -52,10 +52,7 @@ export class KnowledgeIndexJob {
   private finishedFlag: boolean;
   private readonly waiters: Array<() => void> = [];
 
-  constructor(
-    snapshot: KnowledgeSnapshot,
-    progress: KnowledgeIndexProgress,
-  ) {
+  constructor(snapshot: KnowledgeSnapshot, progress: KnowledgeIndexProgress) {
     this.snapshot = snapshot;
     this.err = null;
     this.finishedFlag = false;

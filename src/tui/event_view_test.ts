@@ -3,6 +3,7 @@
 // view replays the rows the simple view withheld — each row released to
 // terminal scrollback exactly once through Ink's append-only <Static>.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { render } from "ink";
 import { App } from "./app.tsx";
@@ -69,7 +70,7 @@ function session(tuilang: string): TUISession {
       model: "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
       tuilang,
     },

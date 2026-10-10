@@ -57,7 +57,8 @@ export async function attachSessionResources(
   const manager = resources.manager;
   const registry = resources.registry;
   if (
-    (resources.workDir ?? "") === "" || manager === undefined ||
+    (resources.workDir ?? "") === "" ||
+    manager === undefined ||
     registry === undefined
   ) {
     throw new Error(

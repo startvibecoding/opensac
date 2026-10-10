@@ -163,10 +163,11 @@ test("modal cache bounds its retained text and re-wraps on demand", () => {
 
 test("wrapBlockLines wraps per input line and keeps blank lines", () => {
   const width = 10;
-  assertEquals(
-    wrapBlockLines("one two three four five", width),
-    ["one two", "three four", "five"],
-  );
+  assertEquals(wrapBlockLines("one two three four five", width), [
+    "one two",
+    "three four",
+    "five",
+  ]);
   assertEquals(wrapBlockLines("a\n\nb", width), ["a", "", "b"]);
   assertEquals(wrapBlockLines("", width), [""]);
   // ANSI styling survives the wrap.

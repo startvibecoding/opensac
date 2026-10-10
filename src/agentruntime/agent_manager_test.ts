@@ -41,32 +41,28 @@ test("agentManagerRequiresSharedDependencies", () => {
   );
   assertThrows(
     () =>
-      createAgentManager(
-        { runtime: stubRuntime() } as unknown as AgentManagerOptions,
-      ),
+      createAgentManager({
+        runtime: stubRuntime(),
+      } as unknown as AgentManagerOptions),
     Error,
     "agent runtime settings are required",
   );
   assertThrows(
     () =>
-      createAgentManager(
-        {
-          runtime: stubRuntime(),
-          settings: defaultSettings(),
-        } as unknown as AgentManagerOptions,
-      ),
+      createAgentManager({
+        runtime: stubRuntime(),
+        settings: defaultSettings(),
+      } as unknown as AgentManagerOptions),
     Error,
     "agent provider is required",
   );
   assertThrows(
     () =>
-      createAgentManager(
-        {
-          runtime: stubRuntime(),
-          settings: defaultSettings(),
-          provider: {} as Provider,
-        } as unknown as AgentManagerOptions,
-      ),
+      createAgentManager({
+        runtime: stubRuntime(),
+        settings: defaultSettings(),
+        provider: {} as Provider,
+      } as unknown as AgentManagerOptions),
     Error,
     "agent model is required",
   );

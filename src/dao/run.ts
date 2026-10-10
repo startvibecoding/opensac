@@ -67,7 +67,7 @@ const intentColumns = `id, session_id AS sessionId, source, model, mode,
   created_at AS createdAt`;
 
 export class RunDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -179,9 +179,7 @@ export class RunDAO {
    * Returns the most recent run row for each of the given sessions keyed by
    * session ID. Ties are broken by the greatest rowid for determinism.
    */
-  latestRunBySessions(
-    sessionIds: string[],
-  ): Map<string, SessionRunRecord> {
+  latestRunBySessions(sessionIds: string[]): Map<string, SessionRunRecord> {
     const result = new Map<string, SessionRunRecord>();
     if (sessionIds.length === 0) return result;
     const { sql, params } = inList(sessionIds);
@@ -250,12 +248,14 @@ export class RunDAO {
   }
 
   nextAttempt(sessionId: string, intentId: string): number {
-    return queryOptional<{ attempt: number }>(
-      this.requireDb(),
-      `SELECT COALESCE(MAX(attempt), 0) + 1 AS attempt FROM session_runs
+    return (
+      queryOptional<{ attempt: number }>(
+        this.requireDb(),
+        `SELECT COALESCE(MAX(attempt), 0) + 1 AS attempt FROM session_runs
        WHERE session_id = ? AND intent_id = ?`,
-      [sessionId, intentId],
-    )?.attempt ?? 1;
+        [sessionId, intentId],
+      )?.attempt ?? 1
+    );
   }
 
   latestForIntent(
@@ -288,16 +288,9 @@ export class RunDAO {
     message: string,
     predecessors: string[],
   ): number {
-    let sql =
-      `UPDATE session_runs SET status = ?, updated_at = ?, finished_at = ?, error = ?
+    let sql = `UPDATE session_runs SET status = ?, updated_at = ?, finished_at = ?, error = ?
        WHERE id = ?`;
-    const params: Param[] = [
-      status,
-      updatedAt,
-      finishedAt,
-      message,
-      runId,
-    ];
+    const params: Param[] = [status, updatedAt, finishedAt, message, runId];
     if (predecessors.length > 0) {
       const { sql: inSql, params: inParams } = inList(predecessors);
       sql += ` AND status IN (${inSql})`;

@@ -22,7 +22,7 @@ export interface ChannelToolGenerationRecord {
 
 /** Owns session/channel binding and channel-tool persistence. */
 export class BindingDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -52,9 +52,7 @@ export class BindingDAO {
       execChanges(
         tx,
         `DELETE FROM session_channel_tools WHERE session_id = ?`,
-        [
-          sessionId,
-        ],
+        [sessionId],
       );
       for (const tool of tools) {
         execChanges(
@@ -191,7 +189,8 @@ export class BindingDAO {
         throw new Error(`source session "${fromSessionId}" not found`);
       }
       if (
-        source.channelType !== channelType || source.channelId !== channelId
+        source.channelType !== channelType ||
+        source.channelId !== channelId
       ) {
         throw new Error(
           `source session is not bound to ${channelType}/${channelId}`,
@@ -247,7 +246,8 @@ export class BindingDAO {
         throw new Error(`session "${oldSessionId}" not found`);
       }
       if (
-        current.channelType !== channelType || current.channelId !== channelId
+        current.channelType !== channelType ||
+        current.channelId !== channelId
       ) {
         throw new Error(
           `session is no longer bound to ${channelType}/${channelId}`,

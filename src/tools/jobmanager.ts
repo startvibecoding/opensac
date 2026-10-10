@@ -16,12 +16,7 @@ export class BackgroundJob {
   stderr: Uint8Array = new Uint8Array(0);
   err: Error | null = null;
 
-  constructor(
-    id: number,
-    command: string,
-    pid: number,
-    kill: () => void,
-  ) {
+  constructor(id: number, command: string, pid: number, kill: () => void) {
     this.id = id;
     this.command = command;
     this.pid = pid;
@@ -105,8 +100,7 @@ export class JobManager {
     if (Date.now() - this.#lastGC < gcInterval) return;
     this.#lastGC = Date.now();
     for (const [id, job] of this.#jobs) {
-      const stale = job.done &&
-        Date.now() - job.startTime > staleJobTTL;
+      const stale = job.done && Date.now() - job.startTime > staleJobTTL;
       if (stale) this.#jobs.delete(id);
     }
   }

@@ -83,12 +83,9 @@ export class CoreRuntimeDispatcher {
         // A not-resident session is an expected, replayable condition rather
         // than a server fault, so it keeps its own code and names the session
         // the client must re-open.
-        return coreError(
-          id,
-          CORE_ERROR_SESSION_NOT_RESIDENT,
-          error.message,
-          { sessionId: error.sessionId },
-        );
+        return coreError(id, CORE_ERROR_SESSION_NOT_RESIDENT, error.message, {
+          sessionId: error.sessionId,
+        });
       }
       return coreError(
         id,
@@ -162,9 +159,10 @@ export class CoreRuntimeDispatcher {
         const input = parseSessionIdParams(params);
         if (input === undefined) throw invalidParams();
         const sessions = await this.#host.listSessions();
-        return sessions.find((session) =>
-          session.sessionId === input.sessionId
-        ) ?? null;
+        return (
+          sessions.find((session) => session.sessionId === input.sessionId) ??
+          null
+        );
       }
       case CORE_RUNTIME_METHODS.sessionConfigSet: {
         const input = parseConfigParams(params);
@@ -184,12 +182,12 @@ export class CoreRuntimeDispatcher {
       case CORE_RUNTIME_METHODS.sessionSkillSet: {
         const input = parseSkillParams(params);
         if (input === undefined) throw invalidParams();
-        return await this.#host.setSessionSkill?.(input) ?? null;
+        return (await this.#host.setSessionSkill?.(input)) ?? null;
       }
       case CORE_RUNTIME_METHODS.sessionSkillState: {
         const input = parseSessionIdParams(params);
         if (input === undefined) throw invalidParams();
-        return await this.#host.getSessionSkillState?.(input) ?? null;
+        return (await this.#host.getSessionSkillState?.(input)) ?? null;
       }
       case CORE_RUNTIME_METHODS.sessionCapabilities: {
         const input = parseSessionIdParams(params);
@@ -383,7 +381,7 @@ export class CoreRuntimeDispatcher {
 }
 
 class CoreDispatchError extends Error {
-    readonly code: number;
+  readonly code: number;
   readonly data?: unknown;
 
   constructor(code: number, message: string, data?: unknown) {
@@ -395,12 +393,14 @@ class CoreDispatchError extends Error {
 }
 
 function isExtensionMethod(method: string): boolean {
-  return method === "doctor" ||
+  return (
+    method === "doctor" ||
     method.startsWith("approval.") ||
     method.startsWith("question.") ||
     method.startsWith("attachment.") ||
     method.startsWith("project.") ||
-    method.startsWith("manage.");
+    method.startsWith("manage.")
+  );
 }
 
 function invalidParams(): CoreDispatchError {

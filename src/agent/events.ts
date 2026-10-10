@@ -6,7 +6,11 @@
 import { type Attachment, type Usage } from "../provider/types.ts";
 import { type ContextUsage } from "../context/mod.ts";
 import { type FileDiff, type TaskPlan } from "../tools/mod.ts";
-import { type HostedItem, type Message, type ToolCallBlock } from "../provider/types.ts";
+import {
+  type HostedItem,
+  type Message,
+  type ToolCallBlock,
+} from "../provider/types.ts";
 import { type AgentID } from "../../sdk/agent/types.ts";
 
 /** EventType identifies the type of agent event. */

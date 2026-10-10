@@ -12,7 +12,7 @@
 // fence, and `createAgentManager`), and the `SessionRuntime`/`Builder` resource
 // assembly (context/skills/sandbox/tools/MCP, the Runtime-owned input path,
 // expert orchestration, the artifact collector, and coordinated shutdown).
-// See docs/proposal/go-to-deno-migration.md backlog #26.
+// See docs/proposal/go-to-typescript-migration.md backlog #26.
 
 export * from "./source.ts";
 export * from "./run_handle.ts";

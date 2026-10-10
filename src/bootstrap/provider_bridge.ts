@@ -58,7 +58,7 @@ import {
  * interface.
  */
 export class ProviderAdapter implements PublicProvider {
-    private readonly inner: InternalProvider;
+  private readonly inner: InternalProvider;
 
   constructor(inner: InternalProvider) {
     this.inner = inner;
@@ -351,19 +351,17 @@ function encodeArguments(value: unknown): Uint8Array | undefined {
  * user code.
  */
 export function registerProviderBridge(): void {
-  setResolveProviderFunc(
-    (vendor, baseURL, api, apiKey) => {
-      const cfg: ProviderConfig = {
-        vendor,
-        baseUrl: baseURL,
-        api,
-        apiKey,
-        models: [],
-      };
-      const provider = resolveProvider(cfg);
-      return new ProviderAdapter(provider);
-    },
-  );
+  setResolveProviderFunc((vendor, baseURL, api, apiKey) => {
+    const cfg: ProviderConfig = {
+      vendor,
+      baseUrl: baseURL,
+      api,
+      apiKey,
+      models: [],
+    };
+    const provider = resolveProvider(cfg);
+    return new ProviderAdapter(provider);
+  });
 }
 
 // Mirror the Go init() in provider_bridge.go.

@@ -1,5 +1,11 @@
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
-import { type InstalledState, type Market, type SkillSummary } from "./types.ts";
+import {
+  type InstalledState,
+  type Market,
+  type SkillSummary,
+} from "./types.ts";
 
 /** Name of the per-skill install metadata file. */
 export const metadataFileName = ".opensac-skillhub.json";
@@ -32,11 +38,11 @@ export class LocalIndex {
 
   private scan(root: string, scope: string): void {
     if (root === "") return;
-    let dirEntries: Deno.DirEntry[];
+    let dirEntries: DirEntry[];
     try {
-      dirEntries = [...Deno.readDirSync(root)];
+      dirEntries = [...runtime.readDirSync(root)];
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return;
+      if (error instanceof runtime.errors.NotFound) return;
       throw error;
     }
     for (const entry of dirEntries) {
@@ -87,8 +93,8 @@ export class LocalIndex {
       let state = this.state(item.market, item.id);
       if (!state) state = this.localState(item);
       if (state) {
-        state.updateAvailable = !state.local &&
-          versionsDiffer(state.version ?? "", item.version);
+        state.updateAvailable =
+          !state.local && versionsDiffer(state.version ?? "", item.version);
       }
       item.installed = state ?? null;
     }
@@ -98,7 +104,8 @@ export class LocalIndex {
     for (const state of this.entries.values()) {
       if (
         state.local &&
-        (state.name === item.slug || state.name === item.name ||
+        (state.name === item.slug ||
+          state.name === item.name ||
           state.name === item.displayName)
       ) {
         return { ...state };
@@ -135,9 +142,9 @@ export function readMetadata(dir: string): InstallMetadata {
   const file = path.join(dir, metadataFileName);
   let raw: string;
   try {
-    raw = Deno.readTextFileSync(file);
+    raw = runtime.readTextFileSync(file);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
+    if (error instanceof runtime.errors.NotFound) {
       throw new MetadataError(`metadata not found: ${file}`);
     }
     throw error;
@@ -156,11 +163,12 @@ export function readMetadata(dir: string): InstallMetadata {
     slug: typeof obj.slug === "string" ? obj.slug : "",
     version: typeof obj.version === "string" ? obj.version : "",
     installedAt: typeof obj.installedAt === "string" ? obj.installedAt : "",
-    sourceUrl: typeof obj.sourceURL === "string"
-      ? obj.sourceURL
-      : typeof obj.sourceUrl === "string"
-      ? obj.sourceUrl
-      : "",
+    sourceUrl:
+      typeof obj.sourceURL === "string"
+        ? obj.sourceURL
+        : typeof obj.sourceUrl === "string"
+          ? obj.sourceUrl
+          : "",
   };
   if (marketRaw.trim() === "" || metadata.id.trim() === "") {
     throw new MetadataError(`invalid metadata: ${file}`);
@@ -176,7 +184,7 @@ export function hasSkillFile(dir: string): boolean {
 
 function exists(file: string): boolean {
   try {
-    Deno.statSync(file);
+    runtime.statSync(file);
     return true;
   } catch {
     return false;

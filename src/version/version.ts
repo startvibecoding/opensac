@@ -5,6 +5,7 @@
 // value.
 
 /** Replaced in release builds. Empty is intentional. */
+import { runtime } from "../platform/runtime.ts";
 export let version = "";
 
 /** Sets the build version (mirrors assigning the Go package var in tests). */
@@ -16,11 +17,11 @@ export function current(): string {
   const value = version.trim();
   if (value !== "") return value;
 
-  const buildVersion = Deno.env.get("OPENSAC_BUILD_VERSION")?.trim() ?? "";
+  const buildVersion = runtime.env.get("OPENSAC_BUILD_VERSION")?.trim() ?? "";
   if (buildVersion !== "" && buildVersion !== "(devel)") return buildVersion;
 
-  const revision = Deno.env.get("OPENSAC_VCS_REVISION")?.trim() ?? "";
-  const modified = Deno.env.get("OPENSAC_VCS_MODIFIED")?.trim() ?? "";
+  const revision = runtime.env.get("OPENSAC_VCS_REVISION")?.trim() ?? "";
+  const modified = runtime.env.get("OPENSAC_VCS_MODIFIED")?.trim() ?? "";
   if (revision !== "") {
     return modified === "true" ? `${revision}-dirty` : revision;
   }

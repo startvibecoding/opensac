@@ -1,12 +1,13 @@
 // (the Go package ships no Windows test,
 // so these cover the ported behaviour directly).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { createWinSandbox, Level } from "./mod.ts";
 import { test } from "#testing";
 
 test("win sandbox reports unavailable", () => {
-  const sb = createWinSandbox(Deno.cwd(), Level.Standard);
+  const sb = createWinSandbox(runtime.cwd(), Level.Standard);
   assertEquals(sb.name(), "windows-sandbox");
   assertEquals(sb.level(), Level.Standard);
   assert(!sb.isAvailable());
@@ -14,7 +15,7 @@ test("win sandbox reports unavailable", () => {
 });
 
 test("win sandbox wrapCommand shell selection", () => {
-  const sb = createWinSandbox(Deno.cwd(), Level.Standard);
+  const sb = createWinSandbox(runtime.cwd(), Level.Standard);
 
   const cmd = sb.wrapCommand(undefined, "", "echo hello", {});
   assertEquals(cmd.program, "cmd.exe");
@@ -25,8 +26,8 @@ test("win sandbox wrapCommand shell selection", () => {
 });
 
 test("win sandbox buildEnv filters and overlays", () => {
-  const sb = createWinSandbox(Deno.cwd(), Level.Standard);
-  Deno.env.set("OPENSAC_SANDBOX_LEAK", "1");
+  const sb = createWinSandbox(runtime.cwd(), Level.Standard);
+  runtime.env.set("OPENSAC_SANDBOX_LEAK", "1");
   try {
     const env = sb.buildEnv({});
     // Non-allow-listed parent variables are dropped.
@@ -36,6 +37,6 @@ test("win sandbox buildEnv filters and overlays", () => {
     const withOpts = sb.buildEnv({ envVars: { FOO: "bar" } });
     assert(withOpts.includes("FOO=bar"));
   } finally {
-    Deno.env.delete("OPENSAC_SANDBOX_LEAK");
+    runtime.env.delete("OPENSAC_SANDBOX_LEAK");
   }
 });

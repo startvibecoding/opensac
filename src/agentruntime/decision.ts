@@ -1,7 +1,7 @@
 //
 // `DecisionService` owns pending decision identity and first-response-wins
 // semantics for Approval/Question. Protocol-specific payloads and rendering
-// remain in adapters. Go's `sync.Mutex` is dropped (Deno is single-threaded);
+// remain in adapters. Go's `sync.Mutex` is dropped (Node is single-threaded);
 // the `(DecisionRequest, error)` multiple return maps to a returned request
 // that throws on failure.
 
@@ -85,7 +85,8 @@ export class DecisionService {
       throw new Error("decision ID and run ID are required");
     }
     if (
-      request.kind !== DECISION_APPROVAL && request.kind !== DECISION_QUESTION
+      request.kind !== DECISION_APPROVAL &&
+      request.kind !== DECISION_QUESTION
     ) {
       throw new Error(`unsupported decision kind: ${request.kind}`);
     }
@@ -142,7 +143,8 @@ export class DecisionService {
       const prior = this.#resolved.get(resolution.id);
       if (prior !== undefined) {
         if (
-          (resolution.kind === undefined || resolution.kind === "" ||
+          (resolution.kind === undefined ||
+            resolution.kind === "" ||
             resolution.kind === prior.kind) &&
           resolution.status === prior.status &&
           (resolution.value ?? "") === (prior.value ?? "")
@@ -156,7 +158,8 @@ export class DecisionService {
       throw new Error(`decision is no longer pending: ${resolution.id}`);
     }
     if (
-      resolution.kind !== undefined && resolution.kind !== "" &&
+      resolution.kind !== undefined &&
+      resolution.kind !== "" &&
       resolution.kind !== request.kind
     ) {
       throw new Error(`decision kind mismatch: ${resolution.id}`);

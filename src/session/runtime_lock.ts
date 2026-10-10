@@ -12,6 +12,7 @@
 //   `setInterval` scheduler per session directory, unref'd so it never keeps
 //   the process alive on its own.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
 import { BUSY_TIMEOUT_MS } from "../db/mod.ts";
@@ -75,12 +76,7 @@ export class RuntimeLeasePurposeError extends Error {
 
 /** Describes why a process owns the Session-wide lease. */
 export type RuntimeLeasePurpose =
-  | "run"
-  | "admission"
-  | "execution"
-  | "recovery"
-  | "mutation"
-  | "fork";
+  "run" | "admission" | "execution" | "recovery" | "mutation" | "fork";
 
 const runtimeLeasePurposeLegacyRun = "run";
 const runtimeLeasePurposeAdmission = "admission";
@@ -262,7 +258,9 @@ function acquireRuntimeLeaseWithOptions(
 
     const current: RuntimeLeaseRecord | null = dao.find(tx, sessionId) ?? null;
     if (
-      current !== null && current.state === "active" && current.expiresAt > now
+      current !== null &&
+      current.state === "active" &&
+      current.expiresAt > now
     ) {
       throw new RuntimeLeaseBusyError(sessionId);
     }
@@ -303,7 +301,7 @@ function acquireRuntimeLeaseWithOptions(
       dao.insert(tx, {
         sessionId,
         ownerId: ownerID,
-        ownerPid: Deno.pid,
+        ownerPid: nodeRuntime.pid,
         ownerKind: "process",
         tokenHash,
         epoch,
@@ -323,7 +321,7 @@ function acquireRuntimeLeaseWithOptions(
         {
           sessionId,
           ownerId: ownerID,
-          ownerPid: Deno.pid,
+          ownerPid: nodeRuntime.pid,
           ownerKind: "process",
           tokenHash,
           epoch,
@@ -393,11 +391,13 @@ export class LeaseHeartbeatScheduler {
       this.#renewing = true;
       // A rejected batch must not become an unhandled rejection (the process
       // would exit) nor leave the overlap guard latched; the next tick retries.
-      void this.renew(leases).catch(() => {}).finally(() => {
-        this.#renewing = false;
-      });
+      void this.renew(leases)
+        .catch(() => {})
+        .finally(() => {
+          this.#renewing = false;
+        });
     }, runtimeHeartbeatTiming.everyMs);
-    Deno.unrefTimer(this.#timer);
+    nodeRuntime.unrefTimer(this.#timer);
   }
 
   /**
@@ -953,7 +953,8 @@ export function acquireMutations(
   const ordered: string[] = [];
   for (const id of ids) {
     if (
-      id === "" || (ordered.length > 0 && ordered[ordered.length - 1] === id)
+      id === "" ||
+      (ordered.length > 0 && ordered[ordered.length - 1] === id)
     ) {
       continue;
     }
@@ -1074,7 +1075,8 @@ export function tryLockRuntimes(
   const ordered: string[] = [];
   for (const id of ids) {
     if (
-      id === "" || (ordered.length > 0 && ordered[ordered.length - 1] === id)
+      id === "" ||
+      (ordered.length > 0 && ordered[ordered.length - 1] === id)
     ) {
       continue;
     }

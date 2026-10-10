@@ -1,7 +1,7 @@
 // internal/workflow/js.go (resolveJSValue, lookupResult, resultsText, logs).
 //
 // `context.Context` maps to `AbortSignal`; Go goroutines/channels map to
-// async/Promise with a small async semaphore; `sync.RWMutex` is dropped (Deno
+// async/Promise with a small async semaphore; `sync.RWMutex` is dropped (Node
 // is single-threaded). `errors.Join` maps to an AggregateError whose message
 // concatenates the joined errors.
 
@@ -107,20 +107,25 @@ export class Runner {
       throw new Error("workflow host is required");
     }
     const cancelController = new AbortController();
-    const combined = signal !== undefined
-      ? AbortSignal.any([signal, cancelController.signal])
-      : cancelController.signal;
+    const combined =
+      signal !== undefined
+        ? AbortSignal.any([signal, cancelController.signal])
+        : cancelController.signal;
     const now = this.now();
-    const rt = new WorkflowRuntime(this, {
-      id: "",
-      name: "",
-      status: statusRunning,
-      startedAt: now,
-      updatedAt: now,
-      phases: [],
-      results: {},
-      logs: [],
-    }, () => cancelController.abort());
+    const rt = new WorkflowRuntime(
+      this,
+      {
+        id: "",
+        name: "",
+        status: statusRunning,
+        startedAt: now,
+        updatedAt: now,
+        phases: [],
+        results: {},
+        logs: [],
+      },
+      () => cancelController.abort(),
+    );
     if (this.concurrency > 0) rt.concurrency = this.concurrency;
     if (rt.concurrency <= 0) rt.concurrency = 5;
 
@@ -143,8 +148,8 @@ export class Runner {
       rt.markError(err);
       await safeSave(rt);
       if (err instanceof Error) {
-        (err as Error & { workflowState?: RunState }).workflowState = rt
-          .snapshot();
+        (err as Error & { workflowState?: RunState }).workflowState =
+          rt.snapshot();
       }
       throw err;
     } finally {
@@ -378,24 +383,22 @@ export class WorkflowRuntime {
         }
         case "parallel": {
           const ac = new AbortController();
-          const pSignal = signal !== undefined
-            ? AbortSignal.any([signal, ac.signal])
-            : ac.signal;
+          const pSignal =
+            signal !== undefined
+              ? AbortSignal.any([signal, ac.signal])
+              : ac.signal;
           const errs: unknown[] = [];
-          await Promise.all(node.children.map(async (child) => {
-            if (child === null || child === undefined) return;
-            try {
-              await this.executeJSNodes(
-                pSignal,
-                [child],
-                phase,
-                phaseIndex,
-              );
-            } catch (err) {
-              errs.push(err);
-              ac.abort();
-            }
-          }));
+          await Promise.all(
+            node.children.map(async (child) => {
+              if (child === null || child === undefined) return;
+              try {
+                await this.executeJSNodes(pSignal, [child], phase, phaseIndex);
+              } catch (err) {
+                errs.push(err);
+                ac.abort();
+              }
+            }),
+          );
           if (errs.length > 1) {
             const nonCanceled = errs.filter((e) => !isCanceled(e));
             if (nonCanceled.length > 0) {
@@ -439,8 +442,9 @@ export class WorkflowRuntime {
     if (instanceKey !== "") {
       return this.resultByStorageKey(resultStorageKey(baseKey, instanceKey));
     }
-    return this.resultByStorageKey(baseKey) ??
-      this.latestResultForBase(baseKey);
+    return (
+      this.resultByStorageKey(baseKey) ?? this.latestResultForBase(baseKey)
+    );
   }
 
   resultByStorageKey(key: string): AgentResult | undefined {
@@ -464,8 +468,8 @@ export class WorkflowRuntime {
   }
 
   resultsText(query: string): string {
-    const results = Object.values(this.state.results ?? {}).filter((res) =>
-      resultMatchesBase(res, query) || res.phase === query
+    const results = Object.values(this.state.results ?? {}).filter(
+      (res) => resultMatchesBase(res, query) || res.phase === query,
     );
     results.sort((a, b) => {
       if (a.startedAt.getTime() === b.startedAt.getTime()) {
@@ -546,9 +550,9 @@ async function resolveExpr(
       const r = rt.lookupResult(s, k);
       if (r === undefined) {
         throw new Error(
-          `workflow result ${JSON.stringify(s)} with key ${
-            JSON.stringify(k)
-          } not found`,
+          `workflow result ${JSON.stringify(s)} with key ${JSON.stringify(
+            k,
+          )} not found`,
         );
       }
       return r.result ?? "";

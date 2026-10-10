@@ -77,14 +77,11 @@ test("assistant markdown rows stay within the TUI width", async () => {
   controller.handleAgentEvent({ type: EVENT_TURN_END } as never);
 
   const stdout = new FakeStdout();
-  const inst = render(
-    App({ controller, width: 20 }) as ReactElement,
-    {
-      stdout: stdout as unknown as NodeJS.WriteStream,
-      exitOnCtrlC: false,
-      patchConsole: false,
-    },
-  );
+  const inst = render(App({ controller, width: 20 }) as ReactElement, {
+    stdout: stdout as unknown as NodeJS.WriteStream,
+    exitOnCtrlC: false,
+    patchConsole: false,
+  });
   await new Promise((resolve) => setTimeout(resolve, 30));
   inst.unmount();
 
@@ -94,9 +91,9 @@ test("assistant markdown rows stay within the TUI width", async () => {
     assertEquals(
       displayWidth(line) <= 20 && markdownVisualWidth(line) <= 20,
       true,
-      `line too wide (${displayWidth(line)}/${markdownVisualWidth(line)}): ${
-        JSON.stringify(line)
-      }\n${rendered}`,
+      `line too wide (${displayWidth(line)}/${markdownVisualWidth(line)}): ${JSON.stringify(
+        line,
+      )}\n${rendered}`,
     );
   }
   assertEquals(/(^|\n)#[^\n]*标题/m.test(rendered), false, rendered);

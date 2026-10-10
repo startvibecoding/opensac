@@ -64,7 +64,7 @@ const entryColumns = `session_id AS sessionId, seq, id, type,
   parent_id AS parentId, timestamp, data`;
 
 export class ForkDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -91,27 +91,27 @@ export class ForkDAO {
     );
   }
 
-  activeRunCount(
-    executor: DB,
-    sessionId: string,
-    statuses: string[],
-  ): number {
+  activeRunCount(executor: DB, sessionId: string, statuses: string[]): number {
     const { sql, params } = inList(statuses);
-    return queryOptional<{ n: number }>(
-      executor,
-      `SELECT COUNT(*) AS n FROM session_runs
+    return (
+      queryOptional<{ n: number }>(
+        executor,
+        `SELECT COUNT(*) AS n FROM session_runs
        WHERE session_id = ? AND status IN (${sql})`,
-      [sessionId, ...params],
-    )?.n ?? 0;
+        [sessionId, ...params],
+      )?.n ?? 0
+    );
   }
 
   openTurnCount(executor: DB, sessionId: string): number {
-    return queryOptional<{ n: number }>(
-      executor,
-      `SELECT COUNT(*) AS n FROM conversation_turns
+    return (
+      queryOptional<{ n: number }>(
+        executor,
+        `SELECT COUNT(*) AS n FROM conversation_turns
        WHERE session_id = ? AND status = ?`,
-      [sessionId, "open"],
-    )?.n ?? 0;
+        [sessionId, "open"],
+      )?.n ?? 0
+    );
   }
 
   listEntries(executor: DB, sessionId: string): ForkEntryRecord[] {
@@ -140,30 +140,34 @@ export class ForkDAO {
     sessionId: string,
     statuses: string[],
   ): ForkFingerprintRecord {
-    const maxSeq = queryOptional<{ v: number }>(
-      executor,
-      `SELECT COALESCE(MAX(seq), 0) AS v FROM entries WHERE session_id = ?`,
-      [sessionId],
-    )?.v ?? 0;
-    const leaf = queryOptional<{ v: string }>(
-      executor,
-      `SELECT COALESCE((SELECT id FROM entries WHERE session_id = ?
+    const maxSeq =
+      queryOptional<{ v: number }>(
+        executor,
+        `SELECT COALESCE(MAX(seq), 0) AS v FROM entries WHERE session_id = ?`,
+        [sessionId],
+      )?.v ?? 0;
+    const leaf =
+      queryOptional<{ v: string }>(
+        executor,
+        `SELECT COALESCE((SELECT id FROM entries WHERE session_id = ?
         ORDER BY seq DESC LIMIT 1), '') AS v`,
-      [sessionId],
-    )?.v ?? "";
-    const openTurns = queryOptional<{ n: number }>(
-      executor,
-      `SELECT COUNT(*) AS n FROM conversation_turns
+        [sessionId],
+      )?.v ?? "";
+    const openTurns =
+      queryOptional<{ n: number }>(
+        executor,
+        `SELECT COUNT(*) AS n FROM conversation_turns
        WHERE session_id = ? AND status = ?`,
-      [sessionId, "open"],
-    )?.n ?? 0;
+        [sessionId, "open"],
+      )?.n ?? 0;
     const { sql, params } = inList(statuses);
-    const activeRuns = queryOptional<{ n: number }>(
-      executor,
-      `SELECT COUNT(*) AS n FROM session_runs
+    const activeRuns =
+      queryOptional<{ n: number }>(
+        executor,
+        `SELECT COUNT(*) AS n FROM session_runs
        WHERE session_id = ? AND status IN (${sql})`,
-      [sessionId, ...params],
-    )?.n ?? 0;
+        [sessionId, ...params],
+      )?.n ?? 0;
     return { maxSeq: maxSeq, leaf, openTurns, activeRuns };
   }
 

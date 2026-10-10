@@ -57,8 +57,7 @@ export interface SystemPromptOptions {
   shellPath?: string;
 }
 
-const authoredSystemPrompt =
-  `When creating a git commit, include this trailer exactly:
+const authoredSystemPrompt = `When creating a git commit, include this trailer exactly:
 Co-Authored-By: OpenSAC <harness@opensac.net>`;
 
 /** Constructs the system prompt and includes the resolved tool execution policy. */
@@ -76,7 +75,8 @@ export function buildSystemPromptWithOptions(
   options: SystemPromptOptions,
 ): string {
   let out = "";
-  let toolExecutionMode = (options.toolExecutionMode ?? "").trim()
+  let toolExecutionMode = (options.toolExecutionMode ?? "")
+    .trim()
     .toLowerCase();
   if (toolExecutionMode !== "sequential") toolExecutionMode = "parallel";
   let maxToolConcurrency = options.maxToolConcurrency ?? 0;
@@ -90,8 +90,7 @@ export function buildSystemPromptWithOptions(
   const shell = resolveBashShell(options.shellPath ?? "");
 
   // Core identity and environment
-  out +=
-    `You are OpenSAC, an AI coding assistant operating in a terminal environment.
+  out += `You are OpenSAC, an AI coding assistant operating in a terminal environment.
 
 ## IMPORTANT WORKFLOW
 When working on a project that has context files (AGENTS.md, CLAUDE.md, .cursorrules, etc.),
@@ -108,25 +107,20 @@ that should guide your approach.
 
   // Platform-specific notes
   if (isWindows()) {
-    out +=
-      `Note: You are running on Windows. The shell advertised above is the one commands actually run in.
+    out += `Note: You are running on Windows. The shell advertised above is the one commands actually run in.
 Prefer POSIX shell syntax and $VAR environment variables. Path separators work with either slash or backslash.
 `;
   } else if (isMacOS()) {
-    out +=
-      `Note: You are running on macOS. Some commands may differ from Linux (e.g., sed, grep flags).
+    out += `Note: You are running on macOS. Some commands may differ from Linux (e.g., sed, grep flags).
 `;
   } else if (isBSD()) {
-    out +=
-      `Note: You are running on a BSD system. Some commands may differ from Linux (e.g., sed, grep flags, pkg instead of apt/yum).
+    out += `Note: You are running on a BSD system. Some commands may differ from Linux (e.g., sed, grep flags, pkg instead of apt/yum).
 `;
   } else if (isSolaris()) {
-    out +=
-      `Note: You are running on Solaris/illumos. Some commands may differ from Linux (e.g., grep, find, pkg).
+    out += `Note: You are running on Solaris/illumos. Some commands may differ from Linux (e.g., grep, find, pkg).
 `;
   } else if (isPlan9()) {
-    out +=
-      `Note: You are running on Plan 9. Commands and paths differ significantly from Unix; use rc shell syntax.
+    out += `Note: You are running on Plan 9. Commands and paths differ significantly from Unix; use rc shell syntax.
 `;
   }
   out += "\n";

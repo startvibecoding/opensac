@@ -5,12 +5,16 @@
 // `setBuilderFunc`. Go's `init()` builder registration maps to a module-level
 // call at the bottom of this file, mirroring `bootstrap`'s blank import.
 //
-// Deviations: `os.Getwd` maps to `Deno.cwd`; Go's `*bool` optional fields map
-// to plain optional booleans; `context.CancelFunc`/`chan` are dropped (Deno is
+// Deviations: `os.Getwd` maps to `nodeRuntime.cwd`; Go's `*bool` optional fields map
+// to plain optional booleans; `context.CancelFunc`/`chan` are dropped (Node is
 // single-threaded); `provider.ThinkingLevel(...)` maps to the `thinkingMedium`
 // constant.
 
-import { type Agent as PublicAgent, type AgentID } from "../../sdk/agent/types.ts";
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import {
+  type Agent as PublicAgent,
+  type AgentID,
+} from "../../sdk/agent/types.ts";
 import {
   type Builder,
   type BuilderConfig,
@@ -239,10 +243,10 @@ export function createAgentFactory(
   compactionSettings: CompactionSettings,
   approvalHandler:
     | ((
-      toolCallId: string,
-      toolName: string,
-      args: Record<string, unknown>,
-    ) => boolean)
+        toolCallId: string,
+        toolName: string,
+        args: Record<string, unknown>,
+      ) => boolean)
     | undefined,
   opts: AgentFactoryOptions = {
     multiAgentEnabled: true,
@@ -284,7 +288,7 @@ function createAgentFromFactory(
   let workDir = opts.workDir ?? "";
   if (workDir === "") {
     try {
-      workDir = Deno.cwd();
+      workDir = nodeRuntime.cwd();
     } catch {
       workDir = "";
     }
@@ -315,9 +319,7 @@ function createAgentFromFactory(
     model = f.model;
     if (sess !== undefined) {
       const entry = sess.getLatestModelChange();
-      if (
-        entry !== null && entry.modelId !== "" && f.provider !== undefined
-      ) {
+      if (entry !== null && entry.modelId !== "" && f.provider !== undefined) {
         const persisted = f.provider.getModel(entry.modelId);
         if (persisted !== undefined) model = persisted;
       }
@@ -333,9 +335,7 @@ function createAgentFromFactory(
     if (f.toolExecutionMode !== "") {
       toolExecMode = f.toolExecutionMode;
     } else if (f.settings !== undefined) {
-      toolExecMode = toolExecutionEffectiveMode(
-        f.settings.toolExecution ?? {},
-      );
+      toolExecMode = toolExecutionEffectiveMode(f.settings.toolExecution ?? {});
     }
   }
   let maxToolConcurrency = opts.maxToolConcurrency ?? 0;
@@ -393,9 +393,7 @@ function createAgentFromFactory(
   // Manager-created top-level agents normally have an isolated Registry. If the
   // shared Runtime resolved team capability for this run, reattach the canonical
   // manager-owned sub-agent tools here.
-  if (
-    (opts.parentId ?? "") === "" && multiAgent && f.manager !== undefined
-  ) {
+  if ((opts.parentId ?? "") === "" && multiAgent && f.manager !== undefined) {
     registerSubAgentTools(registry, f.manager);
   }
 
@@ -457,7 +455,8 @@ function createAgentFromFactory(
   };
   // The session mailbox belongs to the conversational lead.
   if (
-    (opts.parentId ?? "") === "" && opts.auxiliaryRole !== true &&
+    (opts.parentId ?? "") === "" &&
+    opts.auxiliaryRole !== true &&
     f.memberMailbox !== undefined &&
     (opts.isSubAgent !== true || opts.ownsSessionMailbox === true)
   ) {
@@ -489,8 +488,11 @@ export function withParentRuntimeConfig(
   clone.allow = cfg.allow;
   clone.extraContext = cfg.extraContext ?? "";
   clone.ruleContent = cfg.ruleContent ?? "";
-  clone.compactionSettings = cfg.compactionSettings ??
-    { enabled: false, reserveTokens: 0, keepRecentTokens: 0 };
+  clone.compactionSettings = cfg.compactionSettings ?? {
+    enabled: false,
+    reserveTokens: 0,
+    keepRecentTokens: 0,
+  };
   clone.approvalHandler = cfg.approvalHandler;
   clone.beforeToolCall = cfg.beforeToolCall;
   clone.beforeToolExecute = cfg.beforeToolExecute;

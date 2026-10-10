@@ -34,7 +34,7 @@ export class MarkdownBlock {
   #text = "";
   #done = false;
 
-    readonly width: number;
+  readonly width: number;
   readonly theme?: Theme;
 
   constructor(width: number, theme?: Theme) {

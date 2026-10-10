@@ -9,7 +9,8 @@ import {
   type ContentBlock,
   type ImageContent,
   type Message,
-  type Model} from "../provider/types.ts";
+  type Model,
+} from "../provider/types.ts";
 import { deepSeekTokenCount } from "./deepseek_tokenizer.ts";
 import { type CompactionSettings } from "./compaction.ts";
 
@@ -68,9 +69,8 @@ export class ModelAwareTokenEstimator implements TokenEstimator {
   }
 
   estimateTokens(msg: Message): number {
-    return estimateMessageTokens(
-      msg,
-      (image) => estimateImageTokensForModelOrGeneric(image, this.model),
+    return estimateMessageTokens(msg, (image) =>
+      estimateImageTokensForModelOrGeneric(image, this.model),
     );
   }
 
@@ -115,7 +115,9 @@ function estimateMessageTokens(
 
 function estimateImageTokens(image: ImageContent | undefined): number {
   if (
-    image !== undefined && (image.width ?? 0) > 0 && (image.height ?? 0) > 0
+    image !== undefined &&
+    (image.width ?? 0) > 0 &&
+    (image.height ?? 0) > 0
   ) {
     return estimateGenericImageTokens(image.width!, image.height!);
   }
@@ -217,7 +219,9 @@ function estimateMessageCharsWithImageEstimator(
 
 function estimateImageChars(image: ImageContent | undefined): number {
   if (
-    image !== undefined && (image.width ?? 0) > 0 && (image.height ?? 0) > 0
+    image !== undefined &&
+    (image.width ?? 0) > 0 &&
+    (image.height ?? 0) > 0
   ) {
     const tokens = estimateGenericImageTokens(image.width!, image.height!);
     return tokens * 4;
@@ -241,7 +245,8 @@ function estimateImageTokensForModel(
   model: Model | null,
 ): number {
   if (
-    image === undefined || (image.width ?? 0) <= 0 ||
+    image === undefined ||
+    (image.width ?? 0) <= 0 ||
     (image.height ?? 0) <= 0 ||
     model === null
   ) {

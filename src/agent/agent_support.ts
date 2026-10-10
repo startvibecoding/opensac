@@ -15,7 +15,8 @@ import {
   type Message,
   type ToolCallBlock,
   type ToolDefinition,
-  type Usage} from "../provider/types.ts";
+  type Usage,
+} from "../provider/types.ts";
 import { type Provider } from "../provider/provider.ts";
 import {
   defaultProviderConfig,
@@ -125,7 +126,9 @@ export function normalizeToolCallArguments(
   tc: ToolCallBlock | null | undefined,
 ): Record<string, unknown> | null {
   if (
-    tc === null || tc === undefined || tc.arguments === null ||
+    tc === null ||
+    tc === undefined ||
+    tc.arguments === null ||
     tc.arguments === undefined
   ) {
     return null;
@@ -145,7 +148,9 @@ export function normalizeToolCallArguments(
       throw err instanceof Error ? err : new Error(String(err));
     }
     if (
-      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
     ) {
       return parsed as Record<string, unknown>;
     }
@@ -190,8 +195,8 @@ export function normalizeMessage(msg: Message): [Message, string[]] {
     const cloned = cloneContentBlock(block);
     if (cloned.toolCall !== undefined && cloned.toolCall !== null) {
       const call = { ...cloned.toolCall };
-      const emptyBefore = typeof call.arguments === "string" &&
-        call.arguments.length === 0;
+      const emptyBefore =
+        typeof call.arguments === "string" && call.arguments.length === 0;
       let argErr: Error | null = null;
       try {
         normalizeToolCallArguments(call);
@@ -200,9 +205,8 @@ export function normalizeMessage(msg: Message): [Message, string[]] {
       }
       if (emptyBefore || argErr !== null) {
         let notice = `tool ${JSON.stringify(call.name)}`;
-        notice += argErr !== null
-          ? ": invalid JSON arguments"
-          : ": empty arguments";
+        notice +=
+          argErr !== null ? ": invalid JSON arguments" : ": empty arguments";
         notices.push(notice);
       }
       cloned.toolCall = call;
@@ -237,12 +241,16 @@ const outputRecoveryTailCharacters = 1200;
 /** Builds the output-limit recovery continuation message. */
 export function buildOutputRecoveryMessage(partial: string): string {
   const runes = Array.from(partial);
-  const tail = runes.length > outputRecoveryTailCharacters
-    ? runes.slice(runes.length - outputRecoveryTailCharacters).join("")
-    : partial;
-  return "Output token limit hit. Resume directly — no apology, no recap of what you were doing. Pick up mid-thought if that is where the cut happened. Break remaining work into smaller pieces.\n\n" +
+  const tail =
+    runes.length > outputRecoveryTailCharacters
+      ? runes.slice(runes.length - outputRecoveryTailCharacters).join("")
+      : partial;
+  return (
+    "Output token limit hit. Resume directly — no apology, no recap of what you were doing. Pick up mid-thought if that is where the cut happened. Break remaining work into smaller pieces.\n\n" +
     "The previous assistant response ended with this exact suffix. Do not repeat any line, table row, code line, or prose that already appears in it; output only text that comes after this suffix:\n\n<previous_response_suffix>\n" +
-    tail + "\n</previous_response_suffix>";
+    tail +
+    "\n</previous_response_suffix>"
+  );
 }
 
 /**
@@ -253,15 +261,19 @@ export function buildStreamRecoveryMessage(partial: string): string {
   const base =
     "The connection was interrupted while you were responding. Resume directly from the exact point where your previous response stopped — no apology, no recap of what you were doing. Pick up mid-thought or mid-word if that is where the cut happened.";
   const runes = Array.from(partial);
-  const tail = runes.length > outputRecoveryTailCharacters
-    ? runes.slice(runes.length - outputRecoveryTailCharacters).join("")
-    : partial;
+  const tail =
+    runes.length > outputRecoveryTailCharacters
+      ? runes.slice(runes.length - outputRecoveryTailCharacters).join("")
+      : partial;
   if (tail === "") {
     return base;
   }
-  return base +
+  return (
+    base +
     "\n\nThe interrupted response ended with this exact suffix. Do not repeat any line, table row, code line, or prose that already appears in it; output only text that comes after this suffix:\n\n<previous_response_suffix>\n" +
-    tail + "\n</previous_response_suffix>";
+    tail +
+    "\n</previous_response_suffix>"
+  );
 }
 
 /** Reports whether a provider stop reason indicates output truncation. */
@@ -298,9 +310,10 @@ export function replayTextContent(message: Message): string | undefined {
 }
 
 /** Resolves the provider name used for usage statistics. */
-export function usageStatsProviderName(
-  cfg: { vendor?: string; provider?: Provider | null },
-): string {
+export function usageStatsProviderName(cfg: {
+  vendor?: string;
+  provider?: Provider | null;
+}): string {
   if ((cfg.vendor ?? "") !== "") {
     return cfg.vendor as string;
   }
@@ -344,9 +357,10 @@ export function toolExecutionResultSummary(
  * Parses a persisted tool execution result summary, returning a conservative
  * fallback when the summary is missing or empty.
  */
-export function parseToolExecutionResultSummary(
-  raw: unknown,
-): { content: string; isError: boolean } {
+export function parseToolExecutionResultSummary(raw: unknown): {
+  content: string;
+  isError: boolean;
+} {
   const fallback =
     "A prior tool execution completed; its result is available in the session transcript.";
   if (raw === null || raw === undefined || typeof raw !== "object") {

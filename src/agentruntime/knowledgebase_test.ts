@@ -3,6 +3,7 @@
 // `SessionRuntime` resource assembly is ported: the verified co-mention edge
 // projection and the dedicated durable Librarian session.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -53,7 +54,7 @@ import {
 import { test } from "#testing";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
+  return nodeRuntime.makeTempDirSync({ dir: nodeRuntime.env.get("TMPDIR") });
 }
 
 function testModel(id: string, name: string): Model {
@@ -71,8 +72,8 @@ function testModel(id: string, name: string): Model {
 
 function writeFile(root: string, relative: string, body: string): void {
   const full = path.join(root, relative);
-  Deno.mkdirSync(path.dirname(full), { recursive: true });
-  Deno.writeTextFileSync(full, body);
+  nodeRuntime.mkdirSync(path.dirname(full), { recursive: true });
+  nodeRuntime.writeTextFileSync(full, body);
 }
 
 test("knowledge base indexer stores queryable graph snapshot", async () => {
@@ -122,7 +123,7 @@ test("knowledge base indexer stores queryable graph snapshot", async () => {
     missingErr = err;
   }
   assertInstanceOf(missingErr, KnowledgeBaseNotFoundError);
-  assert(Deno.statSync(path.join(source, "docs", "auth.md")).isFile);
+  assert(nodeRuntime.statSync(path.join(source, "docs", "auth.md")).isFile);
 });
 
 test("prepare knowledge context builds bounded cited reference", async () => {
@@ -152,9 +153,7 @@ test("prepare knowledge context builds bounded cited reference", async () => {
   const capsules = prepareKnowledgeContext(
     sessionDir,
     "durable graph evidence",
-    [
-      { knowledgeBaseId: base.id, required: true },
-    ],
+    [{ knowledgeBaseId: base.id, required: true }],
   );
   assertEquals(capsules.length, 1);
   assert(capsules[0].snapshotId !== "");
@@ -174,10 +173,10 @@ test("knowledge base indexer ignores symlink and build output", async () => {
   const root = tempDir();
   const source = tempDir();
   const outside = path.join(tempDir(), "secret.md");
-  Deno.writeTextFileSync(outside, "# Secret\nnot indexable");
+  nodeRuntime.writeTextFileSync(outside, "# Secret\nnot indexable");
   writeFile(source, "dist/generated.md", "# Generated\nignore me");
   writeFile(source, "notes.md", "# Included\nkeep me");
-  Deno.symlinkSync(outside, path.join(source, "linked.md"));
+  nodeRuntime.symlinkSync(outside, path.join(source, "linked.md"));
 
   const base = createKnowledgeBase(root, {
     name: "Notes",
@@ -214,16 +213,18 @@ test("knowledge indexer rejects unsupported model links", () => {
       errorSummary: "",
     },
     files: [],
-    chunks: [{
-      id: "chunk",
-      snapshotId: "snapshot",
-      fileId: "",
-      ordinal: 0,
-      text: "Alpha is documented here.",
-      startLine: 4,
-      endLine: 5,
-      contentSha256: "",
-    }],
+    chunks: [
+      {
+        id: "chunk",
+        snapshotId: "snapshot",
+        fileId: "",
+        ordinal: 0,
+        text: "Alpha is documented here.",
+        startLine: 4,
+        endLine: 5,
+        contentSha256: "",
+      },
+    ],
     nodes: [
       {
         id: "alpha",
@@ -352,9 +353,7 @@ test("knowledge base service set settings refreshes indexer factory", () => {
   const source = tempDir();
   writeFile(source, "notes.md", "# Notes\n\nAlpha is documented here.\n");
   const seen: string[] = [];
-  const factory: KnowledgeBaseProviderFactory = (
-    settings: Settings,
-  ) => {
+  const factory: KnowledgeBaseProviderFactory = (settings: Settings) => {
     seen.push(settings.defaultModel ?? "");
     return {
       provider: {} as unknown as Provider,
@@ -377,25 +376,27 @@ test("knowledge base service set settings refreshes indexer factory", () => {
     schedule: "manual",
     enabled: true,
   });
-  const first: KnowledgeIndexerBinding | null = service.resolveKnowledgeIndexer(
-    base,
-  );
+  const first: KnowledgeIndexerBinding | null =
+    service.resolveKnowledgeIndexer(base);
   assert(first !== null);
   service.setSettings({ sessionDir, defaultModel: "second" } as Settings);
-  const second: KnowledgeIndexerBinding | null = service
-    .resolveKnowledgeIndexer(base);
+  const second: KnowledgeIndexerBinding | null =
+    service.resolveKnowledgeIndexer(base);
   assert(second !== null);
   assertEquals(seen, ["first", "second"]);
 });
 
 test("make knowledge capsule enforces a zero budget", () => {
-  const capsule = makeKnowledgeCapsule({
-    knowledgeBase: {} as never,
-    snapshot: {} as never,
-    chunks: [],
-    nodes: [],
-    edges: [],
-  }, 0);
+  const capsule = makeKnowledgeCapsule(
+    {
+      knowledgeBase: {} as never,
+      snapshot: {} as never,
+      chunks: [],
+      nodes: [],
+      edges: [],
+    },
+    0,
+  );
   assertEquals(capsule.text, "");
   assertEquals(capsule.citations.length, 0);
 });
@@ -458,13 +459,15 @@ class KnowledgeIndexerTestProvider implements Provider {
     if (nodes.length >= 2 && chunks.length > 0) {
       const chunk = chunks[0];
       response = JSON.stringify({
-        links: [{
-          fromNodeId: nodes[0].id,
-          toNodeId: nodes[1].id,
-          chunkId: chunk.id,
-          startLine: chunk.startLine,
-          endLine: chunk.endLine,
-        }],
+        links: [
+          {
+            fromNodeId: nodes[0].id,
+            toNodeId: nodes[1].id,
+            chunkId: chunk.id,
+            startLine: chunk.startLine,
+            endLine: chunk.endLine,
+          },
+        ],
       });
     }
     yield { type: streamStart };
@@ -473,107 +476,105 @@ class KnowledgeIndexerTestProvider implements Provider {
   }
 }
 
-test(
-  "knowledge indexer adds only evidence-verified co-mention edges",
-  async () => {
-    const sessionDir = tempDir();
-    const source = tempDir();
-    const content =
-      "# Alpha\n\nAlpha and Beta are both discussed in this architecture note.\n\n## Beta\n\nBeta is documented alongside Alpha.\n";
-    writeFile(source, "architecture.md", content);
-    const model = testModel("indexer-model", "Indexer model");
-    const indexer = new KnowledgeIndexerTestProvider(model);
-    const base = createKnowledgeBase(sessionDir, {
-      name: "Architecture",
-      rootDir: source,
-      preprocessProfile: "documents",
-      provider: "indexer",
-      model: model.id,
-      mode: MODE_YOLO,
-      schedule: "manual",
-      enabled: true,
-    });
-    const settings = defaultSettings();
-    settings.sessionDir = sessionDir;
-    const service = createKnowledgeBaseService(
-      sessionDir,
-      defaultKnowledgeBaseIndexPolicy(),
-      settings,
-      () => ({ provider: indexer, model }),
+test("knowledge indexer adds only evidence-verified co-mention edges", async () => {
+  const sessionDir = tempDir();
+  const source = tempDir();
+  const content =
+    "# Alpha\n\nAlpha and Beta are both discussed in this architecture note.\n\n## Beta\n\nBeta is documented alongside Alpha.\n";
+  writeFile(source, "architecture.md", content);
+  const model = testModel("indexer-model", "Indexer model");
+  const indexer = new KnowledgeIndexerTestProvider(model);
+  const base = createKnowledgeBase(sessionDir, {
+    name: "Architecture",
+    rootDir: source,
+    preprocessProfile: "documents",
+    provider: "indexer",
+    model: model.id,
+    mode: MODE_YOLO,
+    schedule: "manual",
+    enabled: true,
+  });
+  const settings = defaultSettings();
+  settings.sessionDir = sessionDir;
+  const service = createKnowledgeBaseService(
+    sessionDir,
+    defaultKnowledgeBaseIndexPolicy(),
+    settings,
+    () => ({ provider: indexer, model }),
+  );
+  try {
+    const snapshot = await service.index(undefined, base.id);
+    assertEquals(indexer.calls, 1);
+    assert(
+      snapshot.edgeCount >= 3,
+      `edge count ${snapshot.edgeCount} is below 3`,
     );
-    try {
-      const snapshot = await service.index(undefined, base.id);
-      assertEquals(indexer.calls, 1);
+    for (const name of indexer.toolNames) {
       assert(
-        snapshot.edgeCount >= 3,
-        `edge count ${snapshot.edgeCount} is below 3`,
+        ["read", "ls", "grep", "find"].includes(name),
+        `indexer received non-read-only tool ${name}`,
       );
-      for (const name of indexer.toolNames) {
-        assert(
-          ["read", "ls", "grep", "find"].includes(name),
-          `indexer received non-read-only tool ${name}`,
-        );
-      }
-      const graph = service.query(undefined, base.id, "Alpha Beta", 8);
-      let found = false;
-      for (const edge of graph.edges) {
-        if (edge.relationType === "co_mentions") {
-          found = true;
-          assertEquals(edge.confidence, 1);
-        }
-      }
-      assert(found, "want a verified co_mentions edge");
-
-      const run = getSessionRun(sessionDir, snapshot.runId ?? "");
-      assert(run !== null, "index Run missing");
-      assertEquals(run!.model, model.id);
-      assertEquals(run!.status, RUN_STATE_COMPLETED);
-
-      const reused = await service.index(undefined, base.id);
-      assertEquals(reused.id, snapshot.id);
-      assertEquals(indexer.calls, 1, "reuse must not call the model again");
-
-      const events = listSessionRunEvents(
-        sessionDir,
-        knowledgeLibrarianSessionIDForBase(base),
-      );
-      let reusedEvent = false;
-      for (const event of events) {
-        if (
-          event.eventType === "knowledge_snapshot_reused" &&
-          event.runId !== snapshot.runId
-        ) {
-          reusedEvent = true;
-        }
-      }
-      assert(reusedEvent, "reuse event missing");
-
-      writeFile(
-        source,
-        "architecture.md",
-        content + "\n## Gamma\n\nGamma is a new indexed section.\n",
-      );
-      const changed = await service.index(undefined, base.id);
-      assert(changed.id !== snapshot.id, "changed scan must create a snapshot");
-      assertEquals(indexer.calls, 2);
-    } finally {
-      closeDatabases();
     }
-  },
-);
+    const graph = service.query(undefined, base.id, "Alpha Beta", 8);
+    let found = false;
+    for (const edge of graph.edges) {
+      if (edge.relationType === "co_mentions") {
+        found = true;
+        assertEquals(edge.confidence, 1);
+      }
+    }
+    assert(found, "want a verified co_mentions edge");
 
-test(
-  "knowledge librarian uses dedicated agent session and durable run",
-  async () => {
-    const sessionDir = tempDir();
-    const source = tempDir();
+    const run = getSessionRun(sessionDir, snapshot.runId ?? "");
+    assert(run !== null, "index Run missing");
+    assertEquals(run!.model, model.id);
+    assertEquals(run!.status, RUN_STATE_COMPLETED);
+
+    const reused = await service.index(undefined, base.id);
+    assertEquals(reused.id, snapshot.id);
+    assertEquals(indexer.calls, 1, "reuse must not call the model again");
+
+    const events = listSessionRunEvents(
+      sessionDir,
+      knowledgeLibrarianSessionIDForBase(base),
+    );
+    let reusedEvent = false;
+    for (const event of events) {
+      if (
+        event.eventType === "knowledge_snapshot_reused" &&
+        event.runId !== snapshot.runId
+      ) {
+        reusedEvent = true;
+      }
+    }
+    assert(reusedEvent, "reuse event missing");
+
     writeFile(
       source,
-      "runtime.md",
-      "# Runtime\n\nThe runtime owns durable Runs and controls graph evidence.\n",
+      "architecture.md",
+      content + "\n## Gamma\n\nGamma is a new indexed section.\n",
     );
-    const model = testModel("librarian-model", "Librarian model");
-    const mock = createMockProvider("librarian", [model], [
+    const changed = await service.index(undefined, base.id);
+    assert(changed.id !== snapshot.id, "changed scan must create a snapshot");
+    assertEquals(indexer.calls, 2);
+  } finally {
+    closeDatabases();
+  }
+});
+
+test("knowledge librarian uses dedicated agent session and durable run", async () => {
+  const sessionDir = tempDir();
+  const source = tempDir();
+  writeFile(
+    source,
+    "runtime.md",
+    "# Runtime\n\nThe runtime owns durable Runs and controls graph evidence.\n",
+  );
+  const model = testModel("librarian-model", "Librarian model");
+  const mock = createMockProvider(
+    "librarian",
+    [model],
+    [
       { type: streamStart },
       {
         type: streamTextDelta,
@@ -581,73 +582,73 @@ test(
           "The shared runtime owns durable Runs. See runtime.md lines 1-3.",
       },
       { type: streamDone, stopReason: "stop" },
-    ]);
-    const base = createKnowledgeBase(sessionDir, {
-      name: "Runtime docs",
-      rootDir: source,
-      preprocessProfile: "documents",
-      provider: "librarian",
-      model: model.id,
-      mode: MODE_YOLO,
-      schedule: "manual",
-      enabled: true,
-    });
-    const service = createKnowledgeBaseService(
-      sessionDir,
-      defaultKnowledgeBaseIndexPolicy(),
+    ],
+  );
+  const base = createKnowledgeBase(sessionDir, {
+    name: "Runtime docs",
+    rootDir: source,
+    preprocessProfile: "documents",
+    provider: "librarian",
+    model: model.id,
+    mode: MODE_YOLO,
+    schedule: "manual",
+    enabled: true,
+  });
+  const service = createKnowledgeBaseService(
+    sessionDir,
+    defaultKnowledgeBaseIndexPolicy(),
+  );
+  await service.index(undefined, base.id);
+  const graph = service.query(undefined, base.id, "who owns durable run", 6);
+
+  const callerWorkDir = tempDir();
+  const callerManager = createManager(callerWorkDir, sessionDir);
+  callerManager.init();
+  const caller = await attachSessionResources({
+    id: callerManager.getHeader()!.id,
+    source: SOURCE_ACP,
+    entrySource: SOURCE_ACP,
+    workDir: callerWorkDir,
+    manager: callerManager,
+    registry: createRegistry(callerWorkDir, undefined),
+    providers: { librarian: mock },
+    settings: { ...defaultSettings(), sessionDir },
+  });
+  try {
+    caller.configureSession(mock, "librarian", model, MODE_YOLO, "");
+    const capsule = await service.librarianCapsule(
+      undefined,
+      caller,
+      getKnowledgeBase(sessionDir, base.id),
+      graph,
+      "who owns durable run",
+      maxKnowledgeCapsuleChars,
     );
-    await service.index(undefined, base.id);
-    const graph = service.query(undefined, base.id, "who owns durable run", 6);
+    assert(
+      capsule.text.includes("owns durable Runs"),
+      `librarian capsule = ${JSON.stringify(capsule)}`,
+    );
+    assert(capsule.citations.length > 0, "capsule has no citations");
+    assertEquals(mock.getCallCount(), 1);
 
-    const callerWorkDir = tempDir();
-    const callerManager = createManager(callerWorkDir, sessionDir);
-    callerManager.init();
-    const caller = await attachSessionResources({
-      id: callerManager.getHeader()!.id,
-      source: SOURCE_ACP,
-      entrySource: SOURCE_ACP,
-      workDir: callerWorkDir,
-      manager: callerManager,
-      registry: createRegistry(callerWorkDir, undefined),
-      providers: { librarian: mock },
-      settings: { ...defaultSettings(), sessionDir },
-    });
-    try {
-      caller.configureSession(mock, "librarian", model, MODE_YOLO, "");
-      const capsule = await service.librarianCapsule(
-        undefined,
-        caller,
-        getKnowledgeBase(sessionDir, base.id),
-        graph,
-        "who owns durable run",
-        maxKnowledgeCapsuleChars,
-      );
+    const librarianSessionID = knowledgeLibrarianSessionIDForBase(base);
+    const runs = listSessionRuns(sessionDir, librarianSessionID, 10);
+    let librarianRunFound = false;
+    for (const run of runs) {
       assert(
-        capsule.text.includes("owns durable Runs"),
-        `librarian capsule = ${JSON.stringify(capsule)}`,
+        run.id !== "" && run.sessionId !== callerManager.getHeader()!.id,
+        "librarian Run incorrectly used caller session or has no identity",
       );
-      assert(capsule.citations.length > 0, "capsule has no citations");
-      assertEquals(mock.getCallCount(), 1);
-
-      const librarianSessionID = knowledgeLibrarianSessionIDForBase(base);
-      const runs = listSessionRuns(sessionDir, librarianSessionID, 10);
-      let librarianRunFound = false;
-      for (const run of runs) {
-        assert(
-          run.id !== "" && run.sessionId !== callerManager.getHeader()!.id,
-          "librarian Run incorrectly used caller session or has no identity",
-        );
-        if (run.model === model.id) {
-          librarianRunFound = run.status === RUN_STATE_COMPLETED;
-        }
+      if (run.model === model.id) {
+        librarianRunFound = run.status === RUN_STATE_COMPLETED;
       }
-      assert(
-        librarianRunFound,
-        `librarian durable Run missing from ${JSON.stringify(runs)}`,
-      );
-    } finally {
-      caller.close();
-      closeDatabases();
     }
-  },
-);
+    assert(
+      librarianRunFound,
+      `librarian durable Run missing from ${JSON.stringify(runs)}`,
+    );
+  } finally {
+    caller.close();
+    closeDatabases();
+  }
+});

@@ -4,6 +4,7 @@
 // Manager is replaced with direct function calls against a temp session
 // database.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -15,7 +16,7 @@ import {
 import { test } from "#testing";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  return runtime.makeTempDirSync({ prefix: "opensac-session-" });
 }
 
 test("startConversationTurn opens a durable boundary row", () => {

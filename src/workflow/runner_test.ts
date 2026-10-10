@@ -1,5 +1,6 @@
 // internal/workflow/semantics_test.go (results/log ordering).
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -30,10 +31,14 @@ function fixedClock(): () => Date {
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
-      clearTimeout(timer);
-      reject(abortError());
-    }, { once: true });
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(abortError());
+      },
+      { once: true },
+    );
   });
 }
 
@@ -101,22 +106,20 @@ test("runner executes JavaScript workflow", async () => {
 
 test("runner rejects invalid JavaScript agent option", async () => {
   const r = new Runner({ host: new FakeHost(), now: fixedClock() });
-  const err = await assertRejects(
-    () =>
-      r.run(
-        `workflow("bad",{phases:[phase("scan",agent("worker",{prompt:"bad",unknown:true}))]});`,
-      ),
+  const err = await assertRejects(() =>
+    r.run(
+      `workflow("bad",{phases:[phase("scan",agent("worker",{prompt:"bad",unknown:true}))]});`,
+    ),
   );
   assertStringIncludes((err as Error).message, "unknown agent option");
 });
 
 test("runner reports missing result", async () => {
   const r = new Runner({ host: new FakeHost(), now: fixedClock() });
-  await assertRejects(
-    () =>
-      r.run(
-        `workflow("bad",{phases:[phase("verify",agent("cross-check",{prompt:result("scan.missing")}))]});`,
-      ),
+  await assertRejects(() =>
+    r.run(
+      `workflow("bad",{phases:[phase("verify",agent("cross-check",{prompt:result("scan.missing")}))]});`,
+    ),
   );
 });
 
@@ -185,7 +188,7 @@ test("parallel aggregates failures and cancels siblings", async () => {
 });
 
 test("file store persists loads and lists workflow state", async () => {
-  const dir = await Deno.makeTempDir();
+  const dir = await runtime.makeTempDir();
   try {
     const store = createFileStore(dir);
     const started = new Date(Date.UTC(2026, 7, 7, 12, 0, 0, 0));
@@ -218,11 +221,11 @@ test("file store persists loads and lists workflow state", async () => {
         status: statusDone,
         startedAt: started,
         updatedAt: started,
-      })
+      }),
     );
     await assertRejects(() => store.load("../escape"));
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await runtime.remove(dir, { recursive: true });
   }
 });
 

@@ -8,6 +8,7 @@
 // streaming row rebuilds one block, a spinner tick touches only live rows, and
 // the cached window equals a body rebuilt from scratch.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   EVENT_STATUS,
@@ -26,7 +27,7 @@ function makeSession(): { session: TUISession; service: FakeTUIService } {
       model: "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
     },
     service,
@@ -220,7 +221,10 @@ test("tool modal keeps tab bodies cached separately", () => {
   } as never);
   session.openToolModal();
   const modal = session.toolModalForTest();
-  assertEquals(modal.targets.map((t) => t.id), ["main", "agent:worker-1"]);
+  assertEquals(
+    modal.targets.map((t) => t.id),
+    ["main", "agent:worker-1"],
+  );
 
   // Warm the main tab, then leave it and come back.
   session.toolModalView();

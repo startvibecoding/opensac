@@ -8,9 +8,9 @@
 // several files), so this module owns the whole class. The standalone helpers
 // with no receiver live in expert.ts, registry.ts, and artifact.ts.
 //
-// Deviations: `sync.RWMutex` is dropped (Deno is single-threaded); `time.Time`
+// Deviations: `sync.RWMutex` is dropped (Node is single-threaded); `time.Time`
 // maps to `Date`; `context.Context` maps to an optional `AbortSignal`; the
-// resource-assembly loaders are async because Deno's filesystem APIs are async;
+// resource-assembly loaders are async because Node's filesystem APIs are async;
 // and Go's `(value, error)` returns throw typed errors.
 
 import {
@@ -267,9 +267,10 @@ export class SessionRuntime {
     this.artifactEnabled = init.artifactEnabled ?? false;
     this.expert = null;
     this.mailbox = null;
-    this.expertCenter = init.workDir !== undefined && init.workDir !== ""
-      ? new Center(init.workDir)
-      : null;
+    this.expertCenter =
+      init.workDir !== undefined && init.workDir !== ""
+        ? new Center(init.workDir)
+        : null;
     this.resourceSettings = init.resourceSettings ?? null;
     this.resourceWorkflows = init.resourceWorkflows ?? false;
     this.resourceBrowser = init.resourceBrowser ?? false;
@@ -465,9 +466,9 @@ export class SessionRuntime {
     }
     if (p.getModel(model.id) === undefined) {
       throw new Error(
-        `model ${JSON.stringify(model.id)} is not available for provider ${
-          JSON.stringify(providerName)
-        }`,
+        `model ${JSON.stringify(model.id)} is not available for provider ${JSON.stringify(
+          providerName,
+        )}`,
       );
     }
     if (mode.trim() === "") {
@@ -637,10 +638,9 @@ export class SessionRuntime {
     this.synchronizeCoreToolsLocked(browserEnabled);
     this.lastUsed = new Date();
     if (manager !== undefined) {
-      const persisted = loadSessionCapabilities(
-        manager.getSessionDir(),
-        this.id,
-      ) ?? emptyCapabilities(this.id);
+      const persisted =
+        loadSessionCapabilities(manager.getSessionDir(), this.id) ??
+        emptyCapabilities(this.id);
       persisted.sessionId = this.id;
       persisted.browser = browserEnabled;
       persisted.webSearch = webSearchEnabled;
@@ -660,7 +660,8 @@ export class SessionRuntime {
     const manager = this.manager;
     const previous = [...this.additionalDirectories];
     if (
-      manager !== undefined && (normalized.length > 0 || previous.length > 0)
+      manager !== undefined &&
+      (normalized.length > 0 || previous.length > 0)
     ) {
       manager.reload();
       manager.appendAdditionalDirectories(normalized);
@@ -722,8 +723,13 @@ export class SessionRuntime {
   reloadPersistedConfig(manager: SessionManager | undefined): void {
     if (manager === undefined) return;
     this.reloadAdditionalDirectories(manager);
-    let { provider: p, providerName, model, mode, thinkingLevel: thinking } =
-      this.configSnapshot();
+    let {
+      provider: p,
+      providerName,
+      model,
+      mode,
+      thinkingLevel: thinking,
+    } = this.configSnapshot();
     if (p === null) {
       throw new Error("session provider is unavailable");
     }
@@ -743,9 +749,7 @@ export class SessionRuntime {
       mode = this.resolvePolicy("", modeChange.mode, MODE_YOLO).mode;
     }
     const thinkingChange = manager.getLatestThinkingLevelChange();
-    if (
-      thinkingChange !== null && thinkingChange.thinkingLevel.trim() !== ""
-    ) {
+    if (thinkingChange !== null && thinkingChange.thinkingLevel.trim() !== "") {
       thinking = validateThinkingLevel(thinkingChange.thinkingLevel);
     }
     this.provider = p;
@@ -857,16 +861,14 @@ export class SessionRuntime {
       case CONFIG_OPTION_THINKING_LEVEL: {
         if (currentModel === null || !currentModel.reasoning) {
           throw new Error(
-            `config option ${
-              JSON.stringify(CONFIG_OPTION_THINKING_LEVEL)
-            } is unavailable for model ${
-              JSON.stringify(
-                qualifiedModel(
-                  providerName,
-                  currentModel ?? ({ id: "" } as Model),
-                ),
-              )
-            }`,
+            `config option ${JSON.stringify(
+              CONFIG_OPTION_THINKING_LEVEL,
+            )} is unavailable for model ${JSON.stringify(
+              qualifiedModel(
+                providerName,
+                currentModel ?? ({ id: "" } as Model),
+              ),
+            )}`,
           );
         }
         const thinking = validateThinkingLevel(value);
@@ -967,9 +969,9 @@ export class SessionRuntime {
     const bundle = center.get(expertID);
     if (bundle.invalid) {
       throw new Error(
-        `expert bundle ${
-          JSON.stringify(expertID)
-        } is invalid: ${bundle.invalidReason}`,
+        `expert bundle ${JSON.stringify(
+          expertID,
+        )} is invalid: ${bundle.invalidReason}`,
       );
     }
     this.expert = createExpertBinding(bundle);
@@ -989,9 +991,9 @@ export class SessionRuntime {
     const currentID = manager.getExpertId().trim();
     if (currentID !== "" && nextID !== "" && currentID !== nextID) {
       throw new ExpertSwitchRequiresForkError(
-        `${expertSwitchRequiresForkMessage}: ${JSON.stringify(currentID)} -> ${
-          JSON.stringify(nextID)
-        }`,
+        `${expertSwitchRequiresForkMessage}: ${JSON.stringify(currentID)} -> ${JSON.stringify(
+          nextID,
+        )}`,
       );
     }
     const prepared = await this.prepareExpertResources(nextID);
@@ -1013,9 +1015,9 @@ export class SessionRuntime {
       bundle = center.get(expertID);
       if (bundle.invalid) {
         throw new Error(
-          `expert bundle ${
-            JSON.stringify(expertID)
-          } is invalid: ${bundle.invalidReason}`,
+          `expert bundle ${JSON.stringify(
+            expertID,
+          )} is invalid: ${bundle.invalidReason}`,
         );
       }
     }
@@ -1070,9 +1072,7 @@ export class SessionRuntime {
   }
 
   /** Installs a successful preflight result (async wrapper). */
-  publishPreparedExpertResources(
-    prepared: PreparedExpertResources,
-  ): void {
+  publishPreparedExpertResources(prepared: PreparedExpertResources): void {
     this.ensureOpen();
     this.publishPreparedExpertResourcesLocked(prepared);
   }
@@ -1131,9 +1131,8 @@ export class SessionRuntime {
     const skillsMgr = resources.skillsMgr;
     const extraContext = resources.extraContext;
     const activeContext = activeSkillsContext(skillsMgr, opts.activeSkills);
-    const binding = expertBundle !== null
-      ? createExpertBinding(expertBundle)
-      : null;
+    const binding =
+      expertBundle !== null ? createExpertBinding(expertBundle) : null;
     if (this.closed) {
       throw new Error("agent runtime is closed");
     }
@@ -1384,19 +1383,20 @@ export class SessionRuntime {
     validateAttachmentReferenceForResolver(ref);
     const kind = attachment.kind as AttachmentKind;
     if (
-      kind !== ATTACHMENT_IMAGE && kind !== ATTACHMENT_FILE &&
-      kind !== ATTACHMENT_AUDIO && kind !== ATTACHMENT_VIDEO
+      kind !== ATTACHMENT_IMAGE &&
+      kind !== ATTACHMENT_FILE &&
+      kind !== ATTACHMENT_AUDIO &&
+      kind !== ATTACHMENT_VIDEO
     ) {
       throw new Error(
-        `provider attachment kind ${
-          JSON.stringify(attachment.kind)
-        } is not deliverable`,
+        `provider attachment kind ${JSON.stringify(
+          attachment.kind,
+        )} is not deliverable`,
       );
     }
     let content: { data: Uint8Array; mediaType: string; filename: string };
-    const metadataResolver = p as unknown as Partial<
-      AttachmentMetadataResolver
-    >;
+    const metadataResolver =
+      p as unknown as Partial<AttachmentMetadataResolver>;
     const refResolver = p as unknown as Partial<AttachmentResolver>;
     if (typeof metadataResolver.resolveAttachmentWithMetadata === "function") {
       content = await metadataResolver.resolveAttachmentWithMetadata(
@@ -1464,7 +1464,9 @@ export class SessionRuntime {
     const service = this.attachments;
     const registry = this.registry;
     if (
-      service === null || registry === null || this.id === "" ||
+      service === null ||
+      registry === null ||
+      this.id === "" ||
       this.workDir === ""
     ) {
       throw new Error(
@@ -1491,7 +1493,7 @@ export class SessionRuntime {
       throw new Error("runtime registry is required");
     }
     const servers = policy.servers.filter((server) =>
-      isMCPServerEnabled(server)
+      isMCPServerEnabled(server),
     );
     if (servers.length === 0) {
       return;
@@ -1565,10 +1567,7 @@ export class SessionRuntime {
    * Constructs a non-persisted agent over an adapter-provided registry.
    * Intended for temporary side queries such as TUI /btw.
    */
-  buildTransientAgent(
-    registry: Registry,
-    opts: AgentBuildOptions,
-  ): Agent {
+  buildTransientAgent(registry: Registry, opts: AgentBuildOptions): Agent {
     this.ensureOpen();
     if (registry === null || registry === undefined) {
       throw new Error("transient agent registry is required");
@@ -1589,7 +1588,8 @@ export class SessionRuntime {
       throw new Error("agent provider and model are required");
     }
     if (
-      opts.conversationTurn === true && opts.runtimeOwnsTurnEnd === true &&
+      opts.conversationTurn === true &&
+      opts.runtimeOwnsTurnEnd === true &&
       (opts.runId ?? "") !== ""
     ) {
       opts.runtimeOwnsUserEntry = true;
@@ -1621,10 +1621,7 @@ export class SessionRuntime {
       const composed = composeSteering(mailbox, opts.getSteeringMessages);
       steeringMessages = composed ?? undefined;
       if (teamBound || sourceWaitsForMembers(runtimeSource)) {
-        const fu = composeFollowUps(
-          mailbox,
-          opts.getSteeringMessages,
-        );
+        const fu = composeFollowUps(mailbox, opts.getSteeringMessages);
         if (fu !== undefined) {
           followUpMessages = (ctx: RunContext) => fu(ctx.signal);
         }
@@ -1657,8 +1654,7 @@ export class SessionRuntime {
     const policy = this.resolvedExecutionPolicy(MODE_YOLO);
     mode = policy.resolveMode("", mode);
     const beforeToolCall =
-      beforeToolCallForPolicy(policy, opts.beforeToolCall) ??
-        undefined;
+      beforeToolCallForPolicy(policy, opts.beforeToolCall) ?? undefined;
     let beforeToolExecute:
       | ((ctx: BeforeToolExecuteContext) => ToolCallBlockResult | undefined)
       | undefined = beforeToolExecuteForRuntime(this);
@@ -1674,7 +1670,8 @@ export class SessionRuntime {
     }
     let budgetPolicy = emptyIterationBudgetPolicy();
     if (
-      enableIterationBudget && opts.auxiliaryRole !== true &&
+      enableIterationBudget &&
+      opts.auxiliaryRole !== true &&
       (opts.parentId ?? "") === ""
     ) {
       budgetPolicy = resolveIterationBudget(
@@ -1704,8 +1701,11 @@ export class SessionRuntime {
       expertIdentity,
       expertRoster,
       compactionSettings: compactionSettingsFromConfig(
-        settings.compaction ??
-          { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+        settings.compaction ?? {
+          enabled: false,
+          reserveTokens: 0,
+          keepRecentTokens: 0,
+        },
       ),
       approvalHandler: opts.approvalHandler,
       approvalDecisionLookup: opts.approvalDecisionLookup,
@@ -2026,7 +2026,8 @@ export async function loadContextResourcesWithExpert(
   }
   let projectDirs = projectSkillDirs(workDir);
   if (
-    expertBundle !== null && expertBundle.skillsDir !== "" &&
+    expertBundle !== null &&
+    expertBundle.skillsDir !== "" &&
     expertBundle.skillsFS === null
   ) {
     projectDirs = [expertBundle.skillsDir, ...projectDirs];
@@ -2037,14 +2038,11 @@ export async function loadContextResourcesWithExpert(
   );
   skillsMgr.load();
   if (
-    expertBundle !== null && expertBundle.skillsDir !== "" &&
+    expertBundle !== null &&
+    expertBundle.skillsDir !== "" &&
     expertBundle.skillsFS !== null
   ) {
-    skillsMgr.loadFS(
-      expertBundle.skillsFS,
-      expertBundle.skillsDir,
-      "expert",
-    );
+    skillsMgr.loadFS(expertBundle.skillsFS, expertBundle.skillsDir, "expert");
   }
   let extraContext = "";
   if (settings.contextFiles?.enabled) {
@@ -2075,15 +2073,20 @@ export function activeSkillsContext(
   active: Record<string, boolean>,
 ): string {
   if (
-    active === null || active === undefined || Object.keys(active).length === 0
+    active === null ||
+    active === undefined ||
+    Object.keys(active).length === 0
   ) {
     return "";
   }
-  const names = Object.keys(active).filter((name) => active[name]).sort();
+  const names = Object.keys(active)
+    .filter((name) => active[name])
+    .sort();
   let context = "";
   for (const name of names) {
     if (
-      manager === undefined || manager === null ||
+      manager === undefined ||
+      manager === null ||
       manager.get(name) === undefined
     ) {
       throw new Error(`skill not found: ${name}`);
@@ -2098,8 +2101,10 @@ export function subAgentToolsEnabled(
   runtime: SessionRuntime | null | undefined,
   requested: boolean,
 ): boolean {
-  return requested ||
-    (runtime !== null && runtime !== undefined && runtime.teamExpertActive());
+  return (
+    requested ||
+    (runtime !== null && runtime !== undefined && runtime.teamExpertActive())
+  );
 }
 
 // --- Internal helpers -------------------------------------------------------
@@ -2135,8 +2140,14 @@ function cloneProviderCatalog(src: ProviderCatalog): ProviderCatalog | null {
 }
 
 function isZeroIterationBudget(p: IterationBudgetPolicy): boolean {
-  return p.soft === 0 && p.hard === 0 && p.renewFactor === 0 &&
-    p.maxRenewals === 0 && p.minInterval === 0 && p.maxWallClock === 0;
+  return (
+    p.soft === 0 &&
+    p.hard === 0 &&
+    p.renewFactor === 0 &&
+    p.maxRenewals === 0 &&
+    p.minInterval === 0 &&
+    p.maxWallClock === 0
+  );
 }
 
 function emptySubmission(text: string): InputSubmission {

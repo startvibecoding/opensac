@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -64,8 +65,8 @@ function writeBundle(
   const dir = path.join(root, name);
   for (const [rel, content] of Object.entries(files)) {
     const p = path.join(dir, rel);
-    Deno.mkdirSync(path.dirname(p), { recursive: true });
-    Deno.writeTextFileSync(p, content);
+    runtime.mkdirSync(path.dirname(p), { recursive: true });
+    runtime.writeTextFileSync(p, content);
   }
   return dir;
 }
@@ -75,11 +76,11 @@ function defIDs(b: Bundle): string[] {
 }
 
 function withTempDir(fn: (dir: string) => void): void {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   try {
     fn(dir);
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 }
 

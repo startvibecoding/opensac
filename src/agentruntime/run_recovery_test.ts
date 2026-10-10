@@ -6,6 +6,7 @@
 // deferred to the execution-snapshot slice, and `context.DeadlineExceeded`
 // maps to a `TimeoutError` reason.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { closeDatabases } from "../session/root_db.ts";
 import { createManager } from "../session/manager.ts";
@@ -61,7 +62,7 @@ function durableRun(overrides: Partial<DurableRun>): DurableRun {
 }
 
 function initRecoveryTestSession(sessionDir: string, id: string): void {
-  const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+  const manager = createManager(runtime.makeTempDirSync(), sessionDir);
   manager.initWithID(id);
 }
 
@@ -70,35 +71,46 @@ function delay(ms: number): Promise<void> {
 }
 
 test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     const now = new Date();
     initRecoveryTestSession(sessionDir, "session-1");
     initRecoveryTestSession(sessionDir, "session-2");
-    store.create(durableRun({
-      id: "local",
-      sessionId: "session-1",
-      source: "acp",
-      startedAt: now,
-    }));
-    store.create(durableRun({
-      id: "remote",
-      sessionId: "session-2",
-      source: "responses_background",
-      startedAt: now,
-    }));
+    store.create(
+      durableRun({
+        id: "local",
+        sessionId: "session-1",
+        source: "acp",
+        startedAt: now,
+      }),
+    );
+    store.create(
+      durableRun({
+        id: "remote",
+        sessionId: "session-2",
+        source: "responses_background",
+        startedAt: now,
+      }),
+    );
 
     const cleaned: string[] = [];
     const result = await recoverOrphanedRuns(
       sessionDir,
-      (run) => run.id === "remote" ? RECOVERY_KEEP_REMOTE : RECOVERY_FAIL_LOCAL,
+      (run) =>
+        run.id === "remote" ? RECOVERY_KEEP_REMOTE : RECOVERY_FAIL_LOCAL,
       (run) => {
         cleaned.push(run.id);
       },
     );
-    assertEquals(result.failed.map((r) => r.id), ["local"]);
-    assertEquals(result.kept.map((r) => r.id), ["remote"]);
+    assertEquals(
+      result.failed.map((r) => r.id),
+      ["local"],
+    );
+    assertEquals(
+      result.kept.map((r) => r.id),
+      ["remote"],
+    );
     assertEquals(cleaned, ["local"]);
     assertEquals(getSessionRun(sessionDir, "local")!.status, "failed");
     assertEquals(getSessionRun(sessionDir, "remote")!.status, "running");
@@ -108,17 +120,19 @@ test("RecoverOrphanedRunsFailsLocalAndKeepsRemote", async () => {
 });
 
 test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     for (let i = 0; i < 10; i++) {
       const id = `parallel-${String(i).padStart(2, "0")}`;
       initRecoveryTestSession(sessionDir, id);
-      store.create(durableRun({
-        id: `run-${id}`,
-        sessionId: id,
-        startedAt: new Date((100 + i) * 1000),
-      }));
+      store.create(
+        durableRun({
+          id: `run-${id}`,
+          sessionId: id,
+          startedAt: new Date((100 + i) * 1000),
+        }),
+      );
     }
     let active = 0;
     let maxActive = 0;
@@ -149,29 +163,30 @@ test("RecoverOrphanedRunsParallelizesAndPreservesScanOrder", async () => {
 });
 
 test("RecoverOrphanedRunsSlowAttemptDoesNotBlockOtherSessions", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     initRecoveryTestSession(sessionDir, "slow-session");
     initRecoveryTestSession(sessionDir, "fast-session");
-    store.create(durableRun({
-      id: "slow-run",
-      sessionId: "slow-session",
-      source: "tui",
-    }));
-    store.create(durableRun({
-      id: "fast-run",
-      sessionId: "fast-session",
-      source: "tui",
-    }));
+    store.create(
+      durableRun({
+        id: "slow-run",
+        sessionId: "slow-session",
+        source: "tui",
+      }),
+    );
+    store.create(
+      durableRun({
+        id: "fast-run",
+        sessionId: "fast-session",
+        source: "tui",
+      }),
+    );
 
     let fastAttemptStarted = false;
-    const resultCh = recoverOrphanedRunsWithSlowPolicy(
-      sessionDir,
-      () => {
-        fastAttemptStarted = true;
-      },
-    );
+    const resultCh = recoverOrphanedRunsWithSlowPolicy(sessionDir, () => {
+      fastAttemptStarted = true;
+    });
     const deadline = Date.now() + 3_000;
     while (Date.now() < deadline && !fastAttemptStarted) {
       await delay(10);
@@ -223,21 +238,25 @@ async function recoverOrphanedRunsWithSlowPolicy(
 }
 
 test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     const store = new RunStore(sessionDir);
     initRecoveryTestSession(sessionDir, "session-local");
     initRecoveryTestSession(sessionDir, "session-remote");
-    store.create(durableRun({
-      id: "stale-local",
-      sessionId: "session-local",
-      source: "wechat",
-    }));
-    store.create(durableRun({
-      id: "remote",
-      sessionId: "session-remote",
-      source: "responses_background",
-    }));
+    store.create(
+      durableRun({
+        id: "stale-local",
+        sessionId: "session-local",
+        source: "wechat",
+      }),
+    );
+    store.create(
+      durableRun({
+        id: "remote",
+        sessionId: "session-remote",
+        source: "responses_background",
+      }),
+    );
 
     const local = await recoverOrphanedSessionRun(
       sessionDir,
@@ -245,7 +264,10 @@ test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
       null,
       null,
     );
-    assertEquals(local.failed.map((r) => r.id), ["stale-local"]);
+    assertEquals(
+      local.failed.map((r) => r.id),
+      ["stale-local"],
+    );
     assertEquals(local.kept.length, 0);
     assertEquals(getSessionRun(sessionDir, "stale-local")!.status, "failed");
 
@@ -255,7 +277,10 @@ test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
       () => RECOVERY_KEEP_REMOTE,
       null,
     );
-    assertEquals(remote.kept.map((r) => r.id), ["remote"]);
+    assertEquals(
+      remote.kept.map((r) => r.id),
+      ["remote"],
+    );
     assertEquals(remote.failed.length, 0);
     assertEquals(getSessionRun(sessionDir, "remote")!.status, "running");
   } finally {
@@ -264,24 +289,32 @@ test("RecoverOrphanedSessionRunForAdmissionFailsOnlyLocalRun", async () => {
 });
 
 test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-owned");
     const guard = acquireExecutionAdmission(sessionDir, "session-owned");
     const store = new RunStore(sessionDir);
     try {
-      store.create(durableRun({
-        id: "owned",
-        sessionId: "session-owned",
-        source: "acp",
-      }));
+      store.create(
+        durableRun({
+          id: "owned",
+          sessionId: "session-owned",
+          source: "acp",
+        }),
+      );
       let result = await recoverOrphanedRuns(sessionDir, null, null);
-      assertEquals(result.skipped.map((r) => r.id), ["owned"]);
+      assertEquals(
+        result.skipped.map((r) => r.id),
+        ["owned"],
+      );
       assertEquals(result.failed.length, 0);
       assertEquals(getSessionRun(sessionDir, "owned")!.status, "running");
       guard.release();
       result = await recoverOrphanedRuns(sessionDir, null, null);
-      assertEquals(result.failed.map((r) => r.id), ["owned"]);
+      assertEquals(
+        result.failed.map((r) => r.id),
+        ["owned"],
+      );
     } finally {
       guard.release();
     }
@@ -292,24 +325,24 @@ test("RecoverOrphanedRunsSkipsValidExecutionLease", async () => {
 
 test("DefaultRunRecoveryPolicyDoesNotTrustSourceAlone", () => {
   assertEquals(
-    defaultRunRecoveryPolicy(
-      { source: "responses_background" } as SessionRun,
-    ),
+    defaultRunRecoveryPolicy({ source: "responses_background" } as SessionRun),
     RECOVERY_FAIL_LOCAL,
   );
 });
 
 test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-remote-record");
     const now = new Date();
-    new RunStore(sessionDir).create(durableRun({
-      id: "remote-parent",
-      sessionId: "session-remote-record",
-      source: "responses_background",
-      startedAt: now,
-    }));
+    new RunStore(sessionDir).create(
+      durableRun({
+        id: "remote-parent",
+        sessionId: "session-remote-record",
+        source: "responses_background",
+        startedAt: now,
+      }),
+    );
     saveResponseRun(sessionDir, {
       id: 0,
       sessionId: "session-remote-record",
@@ -327,7 +360,10 @@ test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
       updatedAt: now,
     });
     const result = await recoverOrphanedRuns(sessionDir, null, null);
-    assertEquals(result.kept.map((r) => r.id), ["remote-parent"]);
+    assertEquals(
+      result.kept.map((r) => r.id),
+      ["remote-parent"],
+    );
     assertEquals(result.failed.length, 0);
     const recovery = getSessionRunRecovery(sessionDir, "remote-parent");
     assertEquals(recovery!.state, "detached_remote");
@@ -337,14 +373,16 @@ test("RecoverOrphanedRunsKeepsVerifiedRemoteRecord", async () => {
 });
 
 test("RecoveryFailureIsDurableAndRetryable", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     initRecoveryTestSession(sessionDir, "session-retry");
-    new RunStore(sessionDir).create(durableRun({
-      id: "retry",
-      sessionId: "session-retry",
-      source: "tui",
-    }));
+    new RunStore(sessionDir).create(
+      durableRun({
+        id: "retry",
+        sessionId: "session-retry",
+        source: "tui",
+      }),
+    );
     const wantErr = new Error("decision cleanup unavailable");
     await assertRejects(
       () =>

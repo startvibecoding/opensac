@@ -1,6 +1,6 @@
 //
 // Go embeds the builtin expert bundles (software-company, frontend-developer)
-// with go:embed. Deno has no equivalent embed API, so the bundle files are
+// with go:embed. Node has no equivalent embed API, so the bundle files are
 // inlined into `builtin_content.ts` (generated from src/expert/builtin) and
 // served through an in-memory ExpertFS. Regenerate it whenever the builtin
 // bundles change.

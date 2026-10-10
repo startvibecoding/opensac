@@ -7,9 +7,7 @@ const close = "\u003c/think\u003e";
 
 test("ThinkSplitterSingleChunk", () => {
   const s = new ThinkSplitter();
-  const { text, think } = s.push(
-    `${open}reasoning here${close}visible answer`,
-  );
+  const { text, think } = s.push(`${open}reasoning here${close}visible answer`);
   assertEquals(think, "reasoning here");
   assertEquals(text, "visible answer");
   const f = s.flush();
@@ -28,15 +26,13 @@ test("ThinkSplitterTagSplitAcrossChunks", () => {
   const s = new ThinkSplitter();
   let text = "";
   let think = "";
-  for (
-    const c of [
-      "\u003cthi",
-      "nk\u003ethink",
-      "ing\u003c/th",
-      "ink\u003eans",
-      "wer",
-    ]
-  ) {
+  for (const c of [
+    "\u003cthi",
+    "nk\u003ethink",
+    "ing\u003c/th",
+    "ink\u003eans",
+    "wer",
+  ]) {
     const r = s.push(c);
     text += r.text;
     think += r.think;

@@ -1,3 +1,5 @@
+import { runtime } from "../platform/runtime.ts";
+import type { NetAddr } from "../platform/runtime.ts";
 import { assertEquals, assertRejects } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreAuth } from "./auth.ts";
@@ -47,9 +49,9 @@ test("CoreServer exposes unauthenticated health on an ephemeral port", async () 
     assertEquals(response.status, 200);
     assertEquals(await response.json(), { healthy: true });
     assertEquals(handle.address.transport, "tcp");
-    assertEquals((handle.address as Deno.NetAddr).port > 0, true);
+    assertEquals((handle.address as NetAddr).port > 0, true);
     assertEquals(
-      handle.url.includes(String((handle.address as Deno.NetAddr).port)),
+      handle.url.includes(String((handle.address as NetAddr).port)),
       true,
     );
   } finally {
@@ -134,15 +136,13 @@ test("CoreServer serves core.health and core.info without private configuration"
       },
     });
     const text = JSON.stringify(infoBody);
-    for (
-      const secret of [
-        "rpc-secret",
-        "127.0.0.1",
-        "pid",
-        "passwords",
-        "provider",
-      ]
-    ) {
+    for (const secret of [
+      "rpc-secret",
+      "127.0.0.1",
+      "pid",
+      "passwords",
+      "provider",
+    ]) {
       assertEquals(text.includes(secret), false, secret);
     }
   } finally {
@@ -438,7 +438,7 @@ test("CoreServer rejects core.shutdown when no shutdown hook is wired", async ()
         method: CORE_METHODS.shutdown,
       }),
     });
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       error?: { code?: number; message?: string };
     };
     assertEquals(body.error?.code, -32601);

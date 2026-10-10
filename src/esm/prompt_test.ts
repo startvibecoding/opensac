@@ -49,13 +49,11 @@ test("UpdateTool requires reason", () => {
   );
 
   const guidelines = tool.promptGuidelines().join("\n");
-  for (
-    const want of [
-      "complete_candidate",
-      "Do not mark complete for a demo",
-      "three consecutive ESM agent runs",
-    ]
-  ) {
+  for (const want of [
+    "complete_candidate",
+    "Do not mark complete for a demo",
+    "three consecutive ESM agent runs",
+  ]) {
     assert(
       guidelines.includes(want),
       `update_esm guidelines missing ${JSON.stringify(want)}`,
@@ -74,15 +72,13 @@ test("Worker and audit prompts use isolated roles", () => {
   });
 
   const worker = workerTaskPrompt(obj);
-  for (
-    const want of [
-      "ESM worker sub-agent",
-      "Work toward the full objective, not a demo",
-      "complete_candidate",
-      "Do not call get_esm or update_esm",
-      "Previous failed completion audit",
-    ]
-  ) {
+  for (const want of [
+    "ESM worker sub-agent",
+    "Work toward the full objective, not a demo",
+    "complete_candidate",
+    "Do not call get_esm or update_esm",
+    "Previous failed completion audit",
+  ]) {
     assert(
       worker.includes(want),
       `WorkerTaskPrompt missing ${JSON.stringify(want)}`,
@@ -90,16 +86,14 @@ test("Worker and audit prompts use isolated roles", () => {
   }
 
   const audit = auditTaskPrompt(obj);
-  for (
-    const want of [
-      "ESM audit sub-agent",
-      "must be skeptical",
-      "Completion candidate evidence",
-      "Pass only when your own tool-backed evidence proves the full objective is complete",
-      "You must use tools to inspect the current repository state",
-      '"verdict":"pass|fail"',
-    ]
-  ) {
+  for (const want of [
+    "ESM audit sub-agent",
+    "must be skeptical",
+    "Completion candidate evidence",
+    "Pass only when your own tool-backed evidence proves the full objective is complete",
+    "You must use tools to inspect the current repository state",
+    '"verdict":"pass|fail"',
+  ]) {
     assert(
       audit.includes(want),
       `AuditTaskPrompt missing ${JSON.stringify(want)}`,
@@ -107,16 +101,14 @@ test("Worker and audit prompts use isolated roles", () => {
   }
 
   const critic = criticTaskPrompt(obj);
-  for (
-    const want of [
-      "ESM critic sub-agent",
-      "challenge the worker's completion claim",
-      "Look for demos",
-      "Pass only when your own tool-backed inspection finds no hard blocker",
-      "You must use tools to inspect the current repository state",
-      '"verdict":"pass|fail"',
-    ]
-  ) {
+  for (const want of [
+    "ESM critic sub-agent",
+    "challenge the worker's completion claim",
+    "Look for demos",
+    "Pass only when your own tool-backed inspection finds no hard blocker",
+    "You must use tools to inspect the current repository state",
+    '"verdict":"pass|fail"',
+  ]) {
     assert(
       critic.includes(want),
       `CriticTaskPrompt missing ${JSON.stringify(want)}`,

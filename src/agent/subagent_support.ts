@@ -72,8 +72,9 @@ export function modeWithinCapability(candidate: string, cap: string): boolean {
     case "agent":
       return candidate === "agent" || candidate === "plan";
     case "yolo":
-      return candidate === "yolo" || candidate === "agent" ||
-        candidate === "plan";
+      return (
+        candidate === "yolo" || candidate === "agent" || candidate === "plan"
+      );
     case "os":
       return candidate === "os" || candidate === "plan";
     default:
@@ -174,8 +175,12 @@ export function validateSubAgentPolicy(
 
 /** Reports whether a managed-agent state is terminal. */
 export function isTerminalManagedState(state: string): boolean {
-  return state === "done" || state === "incomplete" || state === "error" ||
-    state === "canceled";
+  return (
+    state === "done" ||
+    state === "incomplete" ||
+    state === "error" ||
+    state === "canceled"
+  );
 }
 
 /**

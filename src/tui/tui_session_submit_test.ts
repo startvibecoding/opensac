@@ -4,6 +4,7 @@
 // unwind the busy state and surface one error row instead of wedging the
 // session.
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -23,28 +24,26 @@ import { test } from "#testing";
  * tests never touch the developer's real state.
  */
 function isolateConfigDir(): { restore: () => void } {
-  const dir = Deno.makeTempDirSync();
-  const previous = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", dir);
+  const dir = runtime.makeTempDirSync();
+  const previous = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", dir);
   return {
     restore: () => {
-      if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
-      else Deno.env.set("OPENSAC_DIR", previous);
-      Deno.removeSync(dir, { recursive: true });
+      if (previous === undefined) runtime.env.delete("OPENSAC_DIR");
+      else runtime.env.set("OPENSAC_DIR", previous);
+      runtime.removeSync(dir, { recursive: true });
     },
   };
 }
 
-function session(
-  service: FakeTUIService = createFakeTUIService(),
-): TUISession {
+function session(service: FakeTUIService = createFakeTUIService()): TUISession {
   return new TUISession(
     {
       provider: "openai",
       model: "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
     },
     service,
@@ -138,7 +137,7 @@ test("answering an unknown decision still clears the panel quietly", async () =>
     await tick();
     assertEquals(s.controller.shownApproval, undefined);
     const errors = s.controller.store.messages.filter((m) =>
-      m.startsWith("Error:")
+      m.startsWith("Error:"),
     );
     assertEquals(errors, []);
   } finally {
@@ -156,7 +155,7 @@ test("an early submit failure unwinds busy and surfaces the error", async () => 
     assertEquals(s.busy, false);
     assertEquals(s.controller.isThinking, false);
     const errors = s.controller.store.messages.filter((m) =>
-      m.startsWith("Error:")
+      m.startsWith("Error:"),
     );
     assert(errors.length >= 1, "expected a visible error row");
     assertStringIncludes(errors[0], "Error:");

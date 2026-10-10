@@ -4,7 +4,7 @@ import { test } from "#testing";
 
 test("TruncateStringKeepsValidUTF8", () => {
   const got = truncateString("你好世界", 5);
-  // Deno strings are always valid UTF-16; assert it decodes to the first rune.
+  // Node strings are always valid UTF-16; assert it decodes to the first rune.
   assertEquals(got, "你");
 });
 

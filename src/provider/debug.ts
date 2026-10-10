@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { type ToolCallBlock, type Usage } from "./types.ts";
 
 /**
@@ -30,19 +31,22 @@ export interface DebugResponse {
  * debugLogOnlyEnv is set.
  */
 export function debugJSON(label: string, body: string | Uint8Array): void {
-  if ((Deno.env.get(debugEnv) ?? "") === "") return;
+  if ((runtime.env.get(debugEnv) ?? "") === "") return;
 
   const text = typeof body === "string" ? body : new TextDecoder().decode(body);
   const line = `[DEBUG] ${label}: ${text}\n`;
 
   try {
-    Deno.writeTextFileSync("debug.log", line, { append: true, create: true });
+    runtime.writeTextFileSync("debug.log", line, {
+      append: true,
+      create: true,
+    });
   } catch {
     // best-effort logging; a missing/permission-denied file must not throw
   }
-  if ((Deno.env.get(debugLogOnlyEnv) ?? "") === "") {
+  if ((runtime.env.get(debugLogOnlyEnv) ?? "") === "") {
     try {
-      Deno.stderr.writeSync(new TextEncoder().encode(line));
+      runtime.stderr.writeSync(new TextEncoder().encode(line));
     } catch {
       // ignore
     }
@@ -54,7 +58,7 @@ export function debugJSON(label: string, body: string | Uint8Array): void {
  * not include credentials or other secrets in the formatted values.
  */
 export function debugLogf(format: string, ...args: unknown[]): void {
-  if ((Deno.env.get(debugEnv) ?? "") === "") return;
+  if ((runtime.env.get(debugEnv) ?? "") === "") return;
   debugJSON("diagnostic", goSprintf(format, args));
 }
 
@@ -158,17 +162,19 @@ export function goSprintf(format: string, args: unknown[]): string {
     const value = args[argIndex++];
     switch (verb) {
       case "q":
-        out += typeof value === "string"
-          ? JSON.stringify(value)
-          : fmtQ(String(value));
+        out +=
+          typeof value === "string"
+            ? JSON.stringify(value)
+            : fmtQ(String(value));
         break;
       case "s":
       case "v":
-        out += value === undefined || value === null
-          ? "null"
-          : typeof value === "string"
-          ? value
-          : fmtV(value);
+        out +=
+          value === undefined || value === null
+            ? "null"
+            : typeof value === "string"
+              ? value
+              : fmtV(value);
         break;
       case "d":
       case "i":

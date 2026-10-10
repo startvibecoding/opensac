@@ -48,8 +48,8 @@ export interface UserRegExpMatcherOptions {
   signal?: AbortSignal;
 }
 
-const workerUrl = "data:application/javascript," +
-  encodeURIComponent(workerSource);
+const workerUrl =
+  "data:application/javascript," + encodeURIComponent(workerSource);
 
 interface PendingRequest {
   id: number;

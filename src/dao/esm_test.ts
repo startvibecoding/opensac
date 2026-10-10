@@ -102,10 +102,7 @@ test("ESM DAO round-trips an objective and preserves creation time", () => {
     );
 
     assertEquals(
-      dao.update(
-        db,
-        objective({ sessionId: "missing" }),
-      ),
+      dao.update(db, objective({ sessionId: "missing" })),
       false,
       "updating an absent session reports no change",
     );
@@ -197,23 +194,27 @@ test("ESM guidance DAO lists by status and consumes pending rows", () => {
       dao.list("session-esm", "pending", 10).map((row) => row.id),
       ["guide-1", "guide-2"],
     );
-    assertEquals(dao.list("session-esm", "", 1).map((row) => row.id), [
-      "guide-4",
-    ]);
+    assertEquals(
+      dao.list("session-esm", "", 1).map((row) => row.id),
+      ["guide-4"],
+    );
     assertEquals(dao.list("missing-session", "", 10), []);
 
     dao.consume(db, "session-esm", "guide-1", "2026-01-01T00:10:00Z");
     const consumed = dao.list("session-esm", "consumed", 10);
-    assertEquals(consumed.map((row) => row.id), ["guide-4", "guide-1"]);
+    assertEquals(
+      consumed.map((row) => row.id),
+      ["guide-4", "guide-1"],
+    );
     assertEquals(consumed[1].consumedAt, "2026-01-01T00:10:00Z");
 
     // Consuming twice, or from another session, must not rewrite the row.
     dao.consume(db, "session-esm", "guide-1", "2026-01-01T00:20:00Z");
     dao.consume(db, "session-other", "guide-2", "2026-01-01T00:30:00Z");
     assertEquals(
-      dao.list("session-esm", "consumed", 10).find((row) =>
-        row.id === "guide-1"
-      )?.consumedAt,
+      dao
+        .list("session-esm", "consumed", 10)
+        .find((row) => row.id === "guide-1")?.consumedAt,
       "2026-01-01T00:10:00Z",
     );
     assertEquals(

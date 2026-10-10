@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 
 /**
@@ -13,11 +14,11 @@ export async function resolvePathWithExistingSymlinks(
   let current = abs;
   for (;;) {
     try {
-      await Deno.lstat(current);
-      const resolved = await Deno.realPath(current);
+      await runtime.lstat(current);
+      const resolved = await runtime.realPath(current);
       return path.join(resolved, ...missing);
     } catch (err) {
-      if (!(err instanceof Deno.errors.NotFound)) {
+      if (!(err instanceof runtime.errors.NotFound)) {
         throw err;
       }
     }

@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { wrapError } from "../provider/errors.ts";
 import {
@@ -52,8 +53,10 @@ test("Supervisor worker continue stops at active", async () => {
   try {
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter({ [roleWorker]: continueResponse });
-    const { objective: obj, error } = await new Supervisor({ store, adapter })
-      .run(sessionID, "run-1", Deno.makeTempDirSync(), "agent");
+    const { objective: obj, error } = await new Supervisor({
+      store,
+      adapter,
+    }).run(sessionID, "run-1", nodeRuntime.makeTempDirSync(), "agent");
     assertEquals(error, null);
     assertEquals(obj!.status, statusActive);
     assertEquals(adapter.roles, [roleWorker]);
@@ -74,7 +77,7 @@ test("Supervisor completion uses critic then audit", async () => {
     const { objective: obj } = await new Supervisor({ store, adapter }).run(
       sessionID,
       "run-1",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "agent",
     );
     assertEquals(obj!.status, statusComplete);
@@ -93,7 +96,7 @@ test("Supervisor publishes lifecycle events", async () => {
     await new Supervisor({ store, adapter, events }).run(
       sessionID,
       "run-events",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "agent",
     );
     assertEquals(events.events.length, 2);
@@ -115,8 +118,10 @@ test("Supervisor repeated recovery stays active and uses observer", async () => 
     }
     const adapter = new RuntimeTestAdapter();
     adapter.roleErr = new EsmDeadlineExceededError();
-    const { objective: obj, error } = await new Supervisor({ store, adapter })
-      .run(sessionID, "run-limit", Deno.makeTempDirSync(), "agent");
+    const { objective: obj, error } = await new Supervisor({
+      store,
+      adapter,
+    }).run(sessionID, "run-limit", nodeRuntime.makeTempDirSync(), "agent");
     assertEquals(error, null);
     assertEquals(obj!.status, statusActive);
     assertEquals(obj!.recoveryCount, 6);
@@ -132,8 +137,10 @@ test("Supervisor incomplete role recovers and keeps objective active", async () 
     store.create(sessionID, "finish the objective");
     const adapter = new RuntimeTestAdapter();
     adapter.roleErr = createRoleIncompleteError(roleWorker, "max_iterations");
-    const { objective: obj, error } = await new Supervisor({ store, adapter })
-      .run(sessionID, "run-incomplete", Deno.makeTempDirSync(), "yolo");
+    const { objective: obj, error } = await new Supervisor({
+      store,
+      adapter,
+    }).run(sessionID, "run-incomplete", nodeRuntime.makeTempDirSync(), "yolo");
     assertEquals(error, null);
     assertEquals(obj!.status, statusActive);
     assertEquals(obj!.recoveryCount, 1);
@@ -163,8 +170,10 @@ test("Supervisor keeps the objective active for every provider transport prefix"
       store.create(sessionID, `finish: ${label}`);
       const adapter = new RuntimeTestAdapter();
       adapter.roleErr = transportErr;
-      const { objective: obj, error } = await new Supervisor({ store, adapter })
-        .run(sessionID, "run-transport", Deno.makeTempDirSync(), "yolo");
+      const { objective: obj, error } = await new Supervisor({
+        store,
+        adapter,
+      }).run(sessionID, "run-transport", nodeRuntime.makeTempDirSync(), "yolo");
       assertEquals(error, null, `${label}: transport fault must be recovered`);
       assertEquals(obj!.status, statusActive, label);
       assertEquals(obj!.recoveryCount, 1, label);
@@ -194,8 +203,10 @@ test("Supervisor does not retry an explicit cancellation hidden under fetch fail
     );
     const adapter = new RuntimeTestAdapter();
     adapter.roleErr = cancelErr;
-    const { objective: obj, error } = await new Supervisor({ store, adapter })
-      .run(sessionID, "run-cancel", Deno.makeTempDirSync(), "yolo");
+    const { objective: obj, error } = await new Supervisor({
+      store,
+      adapter,
+    }).run(sessionID, "run-cancel", nodeRuntime.makeTempDirSync(), "yolo");
     assertEquals(error, cancelErr);
     assertEquals(obj!.status, statusPaused, "a cancel is a stop, not a retry");
     assert(!canAutoRun(obj!));
@@ -216,7 +227,7 @@ test("Supervisor roles use unbounded long-task iterations", async () => {
     await new Supervisor({ store, adapter }).run(
       sessionID,
       "run-unbounded",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "yolo",
     );
     for (const role of [roleWorker, roleCritic, roleAudit]) {
@@ -237,8 +248,10 @@ test("Supervisor non-retryable failure pauses until explicit resume", async () =
     const wantErr = new Error("provider rejected the request");
     const adapter = new RuntimeTestAdapter();
     adapter.roleErr = wantErr;
-    const { objective: obj, error } = await new Supervisor({ store, adapter })
-      .run(sessionID, "run-failed", Deno.makeTempDirSync(), "yolo");
+    const { objective: obj, error } = await new Supervisor({
+      store,
+      adapter,
+    }).run(sessionID, "run-failed", nodeRuntime.makeTempDirSync(), "yolo");
     assert(error === wantErr, "Run error should be the original failure");
     assertEquals(obj!.status, statusPaused);
     assert(!canAutoRun(obj!));
@@ -257,13 +270,13 @@ test("Supervisor shared store persists across runtime instances", async () => {
     await new Supervisor({ store, adapter: first }).run(
       sessionID,
       "tui-run",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "agent",
     );
     await new Supervisor({ store, adapter: second }).run(
       sessionID,
       "acp-run",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "agent",
     );
     const obj = store.get(sessionID);
@@ -285,8 +298,10 @@ test("Supervisor rejected completions continue across continuations", async () =
         '{"verdict":"fail","review":"missing regression tests","requirements_checked":["objective -> gap"],"missing_work":["add regression tests"],"evidence":["read source"]}',
     });
     for (let i = 1; i <= 4; i++) {
-      const { objective: obj, error } = await new Supervisor({ store, adapter })
-        .run(sessionID, `run-${i}`, Deno.makeTempDirSync(), "yolo");
+      const { objective: obj, error } = await new Supervisor({
+        store,
+        adapter,
+      }).run(sessionID, `run-${i}`, nodeRuntime.makeTempDirSync(), "yolo");
       assertEquals(error, null);
       assertEquals(obj!.status, statusActive);
       assertEquals(obj!.rejectionCount, i);
@@ -313,7 +328,7 @@ test("Supervisor blocked audit accumulates across continuations", async () => {
     let res = await new Supervisor({ store, adapter: blocked }).run(
       sessionID,
       "run-1",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "yolo",
     );
     assertEquals(res.objective!.status, statusActive);
@@ -323,7 +338,7 @@ test("Supervisor blocked audit accumulates across continuations", async () => {
     res = await new Supervisor({ store, adapter: continuing }).run(
       sessionID,
       "run-2",
-      Deno.makeTempDirSync(),
+      nodeRuntime.makeTempDirSync(),
       "yolo",
     );
     assertEquals(res.objective!.blockedCount, 0);
@@ -333,7 +348,7 @@ test("Supervisor blocked audit accumulates across continuations", async () => {
       const r = await new Supervisor({ store, adapter: blocked }).run(
         sessionID,
         `run-${i}`,
-        Deno.makeTempDirSync(),
+        nodeRuntime.makeTempDirSync(),
         "yolo",
       );
       obj = r.objective!;

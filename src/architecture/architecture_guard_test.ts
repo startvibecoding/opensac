@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { fromFileUrl, join } from "../compat/path.ts";
 import {
@@ -29,18 +30,18 @@ test("production architecture guard", () => {
 });
 
 test("Core boundary allowlist is narrow and preserves Agent construction guards", () => {
-  const root = Deno.makeTempDirSync();
+  const root = nodeRuntime.makeTempDirSync();
   try {
     const coreDir = join(root, "src/core");
-    Deno.mkdirSync(coreDir, { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(coreDir, { recursive: true });
+    nodeRuntime.writeTextFileSync(
       join(coreDir, "server.ts"),
       [
         'import { Agent } from "../agent/agent.ts";',
         'export function build() { return new Agent("id", "", {}, {}); }',
       ].join("\n"),
     );
-    Deno.writeTextFileSync(
+    nodeRuntime.writeTextFileSync(
       join(coreDir, "client.ts"),
       [
         'export * from "../agent/agent.ts";',
@@ -53,7 +54,7 @@ test("Core boundary allowlist is narrow and preserves Agent construction guards"
         'const concatenated = await import("../agent/" + dynamicName + ".ts");',
       ].join("\n"),
     );
-    Deno.writeTextFileSync(
+    nodeRuntime.writeTextFileSync(
       join(coreDir, "unreviewed.ts"),
       "export const value = true;\n",
     );
@@ -67,18 +68,18 @@ test("Core boundary allowlist is narrow and preserves Agent construction guards"
       clientViolations.some((violation) =>
         violation.message.includes(
           "Core foundation imports runtime implementation module",
-        )
+        ),
       ),
     );
     assert(
       clientViolations.some((violation) =>
-        violation.message.includes("non-literal dynamic import")
+        violation.message.includes("non-literal dynamic import"),
       ),
     );
     for (const specifier of ["../esm/", "../context/", "../ai/"]) {
       assert(
         clientViolations.some((violation) =>
-          violation.message.includes(specifier)
+          violation.message.includes(specifier),
         ),
         `expected omitted Core dependency ${specifier}`,
       );
@@ -86,21 +87,21 @@ test("Core boundary allowlist is narrow and preserves Agent construction guards"
     assert(joined.includes("direct new Agent"));
     assert(joined.includes("explicitly classified"));
     assert(
-      Object.keys(coreBoundaryAllowlist).every((path) =>
-        path.startsWith("src/core/") && path.endsWith(".ts")
+      Object.keys(coreBoundaryAllowlist).every(
+        (path) => path.startsWith("src/core/") && path.endsWith(".ts"),
       ),
     );
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    nodeRuntime.removeSync(root, { recursive: true });
   }
 });
 
 test("Core boundary rejects a concatenated dynamic import independently", () => {
-  const root = Deno.makeTempDirSync();
+  const root = nodeRuntime.makeTempDirSync();
   try {
     const coreDir = join(root, "src/core");
-    Deno.mkdirSync(coreDir, { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(coreDir, { recursive: true });
+    nodeRuntime.writeTextFileSync(
       join(coreDir, "client.ts"),
       [
         'const name = "agent";',
@@ -113,21 +114,21 @@ test("Core boundary rejects a concatenated dynamic import independently", () => 
     );
     assertEquals(
       violations.filter((violation) =>
-        violation.message.includes("non-literal dynamic import")
+        violation.message.includes("non-literal dynamic import"),
       ).length,
       1,
     );
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    nodeRuntime.removeSync(root, { recursive: true });
   }
 });
 
 test("Core Runtime Host is the narrow runtime import exception", () => {
-  const root = Deno.makeTempDirSync();
+  const root = nodeRuntime.makeTempDirSync();
   try {
     const coreDir = join(root, "src/core");
-    Deno.mkdirSync(coreDir, { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(coreDir, { recursive: true });
+    nodeRuntime.writeTextFileSync(
       join(coreDir, "runtime_host.ts"),
       [
         'import { type RuntimeSource } from "../agentruntime/source.ts";',
@@ -140,7 +141,7 @@ test("Core Runtime Host is the narrow runtime import exception", () => {
     );
     assertEquals(violations, []);
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    nodeRuntime.removeSync(root, { recursive: true });
   }
 });
 test("string literals ignore comments and template bodies", () => {
@@ -242,8 +243,7 @@ const bypassCases: Case[] = [
   {
     name: "direct agent construction",
     path: "src/acp/new_adapter.ts",
-    src:
-      'export function build(reg: any) { return new Agent("id", "", {}, reg); }\n',
+    src: 'export function build(reg: any) { return new Agent("id", "", {}, reg); }\n',
     want: "direct new Agent",
   },
   {
@@ -279,8 +279,7 @@ const bypassCases: Case[] = [
   {
     name: "runtime store wiring is allowed",
     path: "src/acp/adapter.ts",
-    src:
-      "export function wire(execution: any, runStore: any) { execution.setRunStore(runStore); }\n",
+    src: "export function wire(execution: any, runStore: any) { execution.setRunStore(runStore); }\n",
     want: "",
   },
 ];
@@ -288,11 +287,11 @@ const bypassCases: Case[] = [
 test("production architecture guard detects canonical run bypasses", async (t) => {
   for (const tc of bypassCases) {
     await t.step(tc.name, () => {
-      const root = Deno.makeTempDirSync();
+      const root = nodeRuntime.makeTempDirSync();
       try {
         const target = join(root, tc.path);
-        Deno.mkdirSync(join(root, tc.path, ".."), { recursive: true });
-        Deno.writeTextFileSync(target, tc.src);
+        nodeRuntime.mkdirSync(join(root, tc.path, ".."), { recursive: true });
+        nodeRuntime.writeTextFileSync(target, tc.src);
         const violations = productionViolations(root);
         const joined = formatViolations(violations);
         if (tc.want === "") {
@@ -301,12 +300,12 @@ test("production architecture guard detects canonical run bypasses", async (t) =
         }
         assert(
           joined.includes(tc.want),
-          `violations ${JSON.stringify(joined)} do not contain ${
-            JSON.stringify(tc.want)
-          }`,
+          `violations ${JSON.stringify(joined)} do not contain ${JSON.stringify(
+            tc.want,
+          )}`,
         );
       } finally {
-        Deno.removeSync(root, { recursive: true });
+        nodeRuntime.removeSync(root, { recursive: true });
       }
     });
   }

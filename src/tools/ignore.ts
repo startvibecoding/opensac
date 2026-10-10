@@ -3,9 +3,10 @@
 // `.gitignore`, `.ignore`, and `.rgignore` files (plus the global gitignore)
 // and hidden-file rules. Deviations: Go's `regexp`-based globs map to the
 // `globset.ts` `GlobSet`; the optional `git config --global core.excludesfile`
-// probe runs through `Deno.Command` and silently falls back to the well-known
+// probe runs through `runtime.Command` and silently falls back to the well-known
 // paths when git is unavailable.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { GlobSet } from "./globset.ts";
 
@@ -55,7 +56,7 @@ export class IgnoreStack {
       const parent = path.dirname(curr);
       if (parent === curr) break;
       try {
-        Deno.statSync(path.join(curr, ".git"));
+        runtime.statSync(path.join(curr, ".git"));
         break; // hit a .git boundary
       } catch {
         // keep climbing
@@ -122,7 +123,9 @@ export class IgnoreStack {
     const filename = path.basename(p);
 
     if (
-      !this.hidden && filename.startsWith(".") && filename !== "." &&
+      !this.hidden &&
+      filename.startsWith(".") &&
+      filename !== "." &&
       filename !== ".."
     ) {
       return true;
@@ -161,7 +164,7 @@ export class IgnoreStack {
 
 function getGlobalGitIgnorePath(): string {
   try {
-    const out = new Deno.Command("git", {
+    const out = new runtime.Command("git", {
       args: ["config", "--global", "core.excludesfile"],
       stdout: "piped",
       stderr: "null",
@@ -191,7 +194,7 @@ function getGlobalGitIgnorePath(): string {
 
 function homeDirSafe(): string {
   try {
-    const home = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
+    const home = runtime.env.get("HOME") ?? runtime.env.get("USERPROFILE");
     return home ?? "";
   } catch {
     return "";
@@ -200,7 +203,7 @@ function homeDirSafe(): string {
 
 function exists(p: string): boolean {
   try {
-    Deno.statSync(p);
+    runtime.statSync(p);
     return true;
   } catch {
     return false;
@@ -211,7 +214,7 @@ function exists(p: string): boolean {
 export function parseIgnoreFile(p: string): string[] | null {
   let text: string;
   try {
-    text = Deno.readTextFileSync(p);
+    text = runtime.readTextFileSync(p);
   } catch {
     return null;
   }

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { optStringMap, parseJsonRecord } from "../util/json.ts";
 import { configDir } from "./settings.ts";
@@ -16,7 +17,7 @@ export function globalEnvPath(): string {
 export function loadEnv(): EnvConfig {
   const c: EnvConfig = { vars: {} };
   try {
-    const data = Deno.readTextFileSync(globalEnvPath());
+    const data = runtime.readTextFileSync(globalEnvPath());
     const vars = optStringMap(parseJsonRecord(data), "vars");
     if (vars !== undefined) c.vars = vars;
   } catch {
@@ -37,8 +38,11 @@ export function envList(c: EnvConfig): Record<string, string> {
  */
 export function validateEnvName(name: string): void {
   const trimmed = name.trim();
-  const hasBadChar = name.includes("=") || name.includes("\u0000") ||
-    name.includes("\r") || name.includes("\n");
+  const hasBadChar =
+    name.includes("=") ||
+    name.includes("\u0000") ||
+    name.includes("\r") ||
+    name.includes("\n");
   if (trimmed === "" || hasBadChar) {
     throw new Error("invalid environment variable name");
   }
@@ -71,9 +75,9 @@ export function applyEnvPatch(
     validateEnvName(name);
     if (seen.has(name)) {
       throw new Error(
-        `environment variable ${
-          JSON.stringify(name)
-        } cannot be both set and unset`,
+        `environment variable ${JSON.stringify(
+          name,
+        )} cannot be both set and unset`,
       );
     }
     seen.add(name);
@@ -110,12 +114,12 @@ export function clearEnv(c: EnvConfig): void {
 
 /** Persists env.json with sorted keys and private permissions. */
 export function saveEnv(c: EnvConfig): void {
-  Deno.mkdirSync(configDir(), { recursive: true, mode: 0o700 });
+  runtime.mkdirSync(configDir(), { recursive: true, mode: 0o700 });
   const keys = Object.keys(c.vars).sort();
   const ordered: Record<string, string> = {};
   for (const k of keys) ordered[k] = c.vars[k];
   const data = JSON.stringify({ vars: ordered }, null, 2) + "\n";
   const tmp = globalEnvPath() + ".tmp";
-  Deno.writeTextFileSync(tmp, data, { mode: 0o600 });
-  Deno.renameSync(tmp, globalEnvPath());
+  runtime.writeTextFileSync(tmp, data, { mode: 0o600 });
+  runtime.renameSync(tmp, globalEnvPath());
 }

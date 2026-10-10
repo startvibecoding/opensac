@@ -13,7 +13,7 @@
 
 - 状态: 主体完成（P0–P4 + P1-3 + §3.4-1/§3.4-2 + comma-ok/value+error 扫尾 + P2-1 ACP teardown + P3 治理余项 + provider SSE 解码 guard 已落地，2026-09-24 收尾轮）；唯一接受残差见 §4 末「余项汇总（2026-09-24）」：自有持久化 JSON 列（自写自读）
 - 范围: `src/`、`sdk/`（不含 `desktop/`、生成物）
-- 前置文档: `docs/proposal/go-to-deno-migration.md`（迁移台账）、`AGENTS.md`（架构不变量）
+- 前置文档: `docs/proposal/go-to-typescript-migration.md`（迁移台账）、`AGENTS.md`（架构不变量）
 
 > 范围变更记录（2026-09-22）: serve/API、WebUI、WeChat/Feishu channel、A2A
 > 入口已从产品中移除（`src/serve/`、`src/messaging/`、`src/a2a/`、
@@ -320,7 +320,7 @@ ms 与 ns 之间来回换算（`elapsedMs * 1_000_000`）。
 
 **建议**: 迁移收尾后做一次"注释去 Go 化"清理: 每文件保留**为什么**（语义决策、
 兼容约束、偏差原因），删掉**从哪来**（Go 文件路径、Go API 名对照）。Go→TS 对照
-知识集中保留在 `docs/proposal/go-to-deno-migration.md` 一处。判据: 注释解释
+知识集中保留在 `docs/proposal/go-to-typescript-migration.md` 一处。判据: 注释解释
 当前代码的意图 → 保留；注释解释两个代码库的差异 → 收编或删除。
 
 ### 3.12 文件命名 snake_case（Go 风格）——低优先级
@@ -504,7 +504,7 @@ P1-3 完成记录（2026-09-23）:
    `listenAddrForTest` → `resetDebugServer`/`debugListenAddr`；
    `CurrentVersion`/`currentVersion` 同概念重复已合并（store 拥有）；
    文件命名决定: **保留 snake_case**（churn > 收益，§3.12 定案）；
-3. ✅ 迁移文档 `go-to-deno-migration.md` 保留为历史台账；Go 源树不再是
+3. ✅ 迁移文档 `go-to-typescript-migration.md` 保留为历史台账；Go 源树不再是
    source of truth（溯源注释已移除即为宣告）。
 
 ### 风险与缓解

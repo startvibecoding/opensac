@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { isGitDeniedPath } from "./git.ts";
 import { type Options } from "./sandbox.ts";
@@ -6,10 +7,7 @@ import { type Options } from "./sandbox.ts";
  * Resolves sandbox path rules against `projectDir` and rejects ambiguous
  * allow/deny overlaps before a backend constructs any mounts.
  */
-export function normalizeOptions(
-  projectDir: string,
-  opts: Options,
-): Options {
+export function normalizeOptions(projectDir: string, opts: Options): Options {
   const base = canonicalSandboxPath(projectDir);
   if (base === "") {
     throw new Error("sandbox project directory is required");
@@ -43,7 +41,7 @@ export function normalizeOptions(
   result.deniedPaths = normalize(opts.deniedPaths, "deniedPaths");
   result.tmpSize = normalizeTmpSize(opts.tmpSize);
 
-  if (Deno.build.os === "linux") {
+  if (runtime.build.os === "linux") {
     const filtered: string[] = [];
     for (const deny of result.deniedPaths) {
       // Git metadata is part of the project and must remain visible.
@@ -58,17 +56,17 @@ export function normalizeOptions(
   for (const deny of result.deniedPaths) {
     if (pathContains(deny, base)) {
       throw new Error(
-        `sandbox denied path ${
-          JSON.stringify(deny)
-        } contains project directory ${JSON.stringify(base)}`,
+        `sandbox denied path ${JSON.stringify(
+          deny,
+        )} contains project directory ${JSON.stringify(base)}`,
       );
     }
     for (const allow of [...result.allowedRead, ...result.allowedWrite]) {
       if (pathsOverlap(deny, allow)) {
         throw new Error(
-          `sandbox denied path ${JSON.stringify(deny)} overlaps allowed path ${
-            JSON.stringify(allow)
-          }`,
+          `sandbox denied path ${JSON.stringify(deny)} overlaps allowed path ${JSON.stringify(
+            allow,
+          )}`,
         );
       }
     }
@@ -81,9 +79,9 @@ export function normalizeTmpSize(value: string | undefined): string {
   const bytes = parseTmpSize(value);
   if (bytes === 0) {
     throw new Error(
-      `invalid sandbox tmpSize ${
-        JSON.stringify(value)
-      }: size must be greater than zero`,
+      `invalid sandbox tmpSize ${JSON.stringify(
+        value,
+      )}: size must be greater than zero`,
     );
   }
   return bytes.toString();
@@ -122,9 +120,9 @@ export function parseTmpSize(value: string): number {
 export function canonicalSandboxPath(p: string): string {
   if (p === "") return "";
   try {
-    return Deno.realPathSync(path.resolve(path.normalize(p)));
+    return runtime.realPathSync(path.resolve(path.normalize(p)));
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err;
+    if (!(err instanceof runtime.errors.NotFound)) throw err;
   }
   // Canonicalize the longest existing parent, then append the missing suffix.
   const abs = path.resolve(path.normalize(p));
@@ -132,13 +130,13 @@ export function canonicalSandboxPath(p: string): string {
   let parent = abs;
   for (;;) {
     try {
-      let resolved = Deno.realPathSync(parent);
+      let resolved = runtime.realPathSync(parent);
       for (let i = suffix.length - 1; i >= 0; i--) {
         resolved = path.join(resolved, suffix[i]);
       }
       return resolved;
     } catch (err) {
-      if (!(err instanceof Deno.errors.NotFound)) throw err;
+      if (!(err instanceof runtime.errors.NotFound)) throw err;
     }
     const next = path.dirname(parent);
     if (next === parent) throw new Error("no existing parent");

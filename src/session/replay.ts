@@ -50,8 +50,9 @@ interface UnknownEntry {
 
 function entryTypeOf(entry: unknown): string {
   const candidate = entry as UnknownEntry | null;
-  return candidate !== null && typeof candidate === "object" &&
-      typeof candidate.type === "string"
+  return candidate !== null &&
+    typeof candidate === "object" &&
+    typeof candidate.type === "string"
     ? candidate.type
     : "";
 }
@@ -64,17 +65,17 @@ function entryTypeOf(entry: unknown): string {
 export function getEntryMetadata(entry: unknown): EntryMetadata {
   const candidate = entry as UnknownEntry | null;
   if (
-    candidate === null || typeof candidate !== "object" ||
-    typeof candidate.id !== "string" || typeof candidate.type !== "string"
+    candidate === null ||
+    typeof candidate !== "object" ||
+    typeof candidate.id !== "string" ||
+    typeof candidate.type !== "string"
   ) {
     return { id: "", type: "", parentID: null, timestamp: new Date() };
   }
-  const parentID = typeof candidate.parentId === "string"
-    ? candidate.parentId
-    : null;
-  const timestamp = candidate.timestamp instanceof Date
-    ? candidate.timestamp
-    : new Date();
+  const parentID =
+    typeof candidate.parentId === "string" ? candidate.parentId : null;
+  const timestamp =
+    candidate.timestamp instanceof Date ? candidate.timestamp : new Date();
   return { id: candidate.id, type: candidate.type, parentID, timestamp };
 }
 
@@ -183,9 +184,9 @@ export function applyCompactionEntry(
   }
   if (firstKept < 0) {
     console.warn(
-      `[session] warning: compaction ${entry.id} skipped, first kept entry ${
-        JSON.stringify(entry.firstKeptEntryId)
-      } not found in replay state`,
+      `[session] warning: compaction ${entry.id} skipped, first kept entry ${JSON.stringify(
+        entry.firstKeptEntryId,
+      )} not found in replay state`,
     );
     return;
   }
@@ -243,9 +244,9 @@ export function applySequencedCompactionEntry(
   }
   if (firstKept < 0) {
     console.warn(
-      `[session] warning: sequenced compaction ${entry.id} skipped at seq ${seq}, first kept entry ${
-        JSON.stringify(entry.firstKeptEntryId)
-      } not found in replay state`,
+      `[session] warning: sequenced compaction ${entry.id} skipped at seq ${seq}, first kept entry ${JSON.stringify(
+        entry.firstKeptEntryId,
+      )} not found in replay state`,
     );
     return;
   }
@@ -256,11 +257,13 @@ export function applySequencedCompactionEntry(
     return;
   }
 
-  const nextMessages: SequencedMessage[] = [{
-    seq,
-    entryID: entry.id,
-    message: summary,
-  }];
+  const nextMessages: SequencedMessage[] = [
+    {
+      seq,
+      entryID: entry.id,
+      message: summary,
+    },
+  ];
   for (const item of state.messages.slice(firstKept)) {
     const cloned = cloneMessage(item.message);
     cloned.usage = undefined;

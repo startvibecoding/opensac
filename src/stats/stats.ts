@@ -2,6 +2,7 @@
 // Package stats provides usage-statistics queries over the request_stats table
 // and an HTTP dashboard that renders them.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import type { DB as RawDB } from "../db/mod.ts";
 import {
@@ -92,7 +93,7 @@ export class DB {
   static open(dbPath: string): DB {
     let exists = true;
     try {
-      Deno.statSync(dbPath);
+      runtime.statSync(dbPath);
     } catch {
       exists = false;
     }

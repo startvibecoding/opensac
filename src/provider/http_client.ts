@@ -1,10 +1,11 @@
 //
 // Deviation: Go returns *http.Client whose Transport exposes Proxy/HTTP2 knobs;
-// Deno has no pluggable Transport. We expose a small HttpClient wrapper over
-// `fetch` that applies Deno.createHttpClient proxy / HTTP-version options and an
+// Node has no pluggable Transport. We expose a small HttpClient wrapper over
+// `fetch` that applies runtime.createHttpClient proxy / HTTP-version options and an
 // optional request timeout via AbortSignal.
 
 /** HTTPClientOptions controls provider HTTP transport behavior. */
+import { runtime } from "../platform/runtime.ts";
 export interface HTTPClientOptions {
   proxyUrl?: string;
   forceHTTP11?: boolean;
@@ -51,7 +52,7 @@ function normalizeProxyUrl(proxyUrl: string | undefined): string | undefined {
 function build(opts: HTTPClientOptions, timeoutMs: number): HttpClient {
   const proxy = normalizeProxyUrl(opts.proxyUrl);
   const forceHTTP11 = opts.forceHTTP11 === true;
-  const client = Deno.createHttpClient({
+  const client = runtime.createHttpClient({
     ...(proxy !== undefined ? { proxy: { url: proxy } } : {}),
     ...(forceHTTP11 ? { http2: false } : {}),
   });

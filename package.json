@@ -21,14 +21,14 @@
     "publish:node": "node scripts/npm_publish_if_needed.ts --tag latest dist/node",
     "install:cli": "npm link",
     "test": "node --import ./scripts/test/preload.mjs --test",
-    "test:architecture": "node --import ./scripts/test/preload.mjs --test src/architecture/",
+    "test:architecture": "node --import ./scripts/test/preload.mjs --test src/architecture/*_test.ts",
     "check": "tsc -p tsconfig.json",
     "typecheck": "npm run check",
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "fuzz": "node --import ./scripts/test/preload.mjs --test --test-name-pattern=fuzz src/esm src/mcp src/util"
+    "fuzz": "node --import ./scripts/test/preload.mjs --test --test-name-pattern=fuzz src/esm/*_test.ts src/mcp/*_test.ts src/util/*_test.ts"
   },
   "dependencies": {
     "@jsquash/webp": "^1.5.0",
@@ -39,11 +39,14 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "esbuild": "^0.25.0",
     "eslint": "^9.18.0",
+    "globals": "^15.14.0",
     "prettier": "^3.4.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
   }
 }

@@ -23,9 +23,9 @@ export function atomicStdout<
         return (chunk: unknown, ...args: unknown[]): unknown =>
           typeof chunk === "string"
             ? Reflect.apply(target.write, target, [
-              SYNC_BEGIN + chunk + SYNC_END,
-              ...args,
-            ])
+                SYNC_BEGIN + chunk + SYNC_END,
+                ...args,
+              ])
             : Reflect.apply(target.write, target, [chunk, ...args]);
       }
       const value = Reflect.get(target, prop);

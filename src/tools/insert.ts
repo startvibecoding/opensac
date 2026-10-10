@@ -1,10 +1,13 @@
 //
 // Inserts content at one structural position in a text file. The in-memory path
 // mirrors Go byte-for-byte; files larger than `insertInMemoryLimit` use the
-// streaming path (`Deno.FsFile` seek/read plus a temp-file rename). Go's
+// streaming path (`FsFile` seek/read plus a temp-file rename). Go's
 // `utf8.Valid` maps to `TextDecoder({fatal:true})` and `io` copy loops map to
 // `readSync`/`writeSync`.
 
+import { runtime } from "../platform/runtime.ts";
+import { SeekMode } from "../platform/runtime.ts";
+import type { FileInfo, FsFile } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   buildFileDiff,
@@ -121,7 +124,9 @@ export class InsertTool implements Tool {
     const createIfMissing = boolParam(params, "create_if_missing", false);
     const ensureNewline = boolParam(params, "ensure_newline", true);
     if (
-      createIfMissing && position.type !== "head" && position.type !== "tail"
+      createIfMissing &&
+      position.type !== "head" &&
+      position.type !== "tail"
     ) {
       throw new Error("create_if_missing only supports head or tail");
     }
@@ -144,14 +149,15 @@ export class InsertTool implements Tool {
 
     const release = await this.#registry.acquireFileLock(ctx, p, this.name());
     try {
-      let infoBefore: Deno.FileInfo | null = null;
+      let infoBefore: FileInfo | null = null;
       try {
-        infoBefore = Deno.statSync(p);
+        infoBefore = runtime.statSync(p);
       } catch {
         infoBefore = null;
       }
       if (
-        infoBefore !== null && infoBefore.isFile &&
+        infoBefore !== null &&
+        infoBefore.isFile &&
         infoBefore.size > insertInMemoryLimit
       ) {
         return this.#executeLargeInsert(
@@ -168,10 +174,10 @@ export class InsertTool implements Tool {
       }
 
       let data: Uint8Array | null = null;
-      let info: Deno.FileInfo | null = null;
+      let info: FileInfo | null = null;
       try {
-        data = Deno.readFileSync(p);
-        info = Deno.statSync(p);
+        data = runtime.readFileSync(p);
+        info = runtime.statSync(p);
         if (!info.isFile) {
           throw new Error(`path is not a regular file: ${p}`);
         }
@@ -230,11 +236,7 @@ export class InsertTool implements Tool {
       newData.set(inserted, offset);
       newData.set(existing.subarray(offset), offset + inserted.length);
 
-      const diff = buildFileDiff(
-        p,
-        decode(existing),
-        decode(newData),
-      );
+      const diff = buildFileDiff(p, decode(existing), decode(newData));
       const result: InsertResult = {
         path: p,
         changed: true,
@@ -247,9 +249,9 @@ export class InsertTool implements Tool {
       };
       if (dryRun) {
         return createInsertToolResult(
-          `Would insert ${inserted.length} bytes into ${p}\n${
-            formatFileDiffSummary(diff)
-          }`,
+          `Would insert ${inserted.length} bytes into ${p}\n${formatFileDiffSummary(
+            diff,
+          )}`,
           diff,
           result,
         );
@@ -257,8 +259,8 @@ export class InsertTool implements Tool {
 
       let mode = 0o644;
       if (info !== null) {
-        const currentInfo = Deno.statSync(p);
-        const currentData = Deno.readFileSync(p);
+        const currentInfo = runtime.statSync(p);
+        const currentData = runtime.readFileSync(p);
         if (
           !bytesEqual(currentData, existing) ||
           (currentInfo.mode ?? 0) !== (info.mode ?? 0)
@@ -273,9 +275,9 @@ export class InsertTool implements Tool {
         throw new Error(`atomic write failed: ${messageOf(err)}`);
       }
       return createInsertToolResult(
-        `Inserted ${inserted.length} bytes into ${p}\n${
-          formatFileDiffSummary(diff)
-        }`,
+        `Inserted ${inserted.length} bytes into ${p}\n${formatFileDiffSummary(
+          diff,
+        )}`,
         diff,
         result,
       );
@@ -293,7 +295,7 @@ export class InsertTool implements Tool {
     ensure: boolean,
     d: InsertDedupe,
     dry: boolean,
-    info: Deno.FileInfo,
+    info: FileInfo,
   ): ToolResult {
     if (create) {
       throw new Error("large-file create_if_missing is not supported");
@@ -307,13 +309,13 @@ export class InsertTool implements Tool {
       throw new Error("operation aborted");
     }
 
-    const file = Deno.openSync(p, { read: true });
+    const file = runtime.openSync(p, { read: true });
     try {
       validateLargeText(file, info.size);
       const off = scanLargeInsertOffset(file, position, info.size);
       let before = 0;
       if (off > 0) {
-        file.seekSync(off - 1, Deno.SeekMode.Start);
+        file.seekSync(off - 1, SeekMode.Start);
         const buf = new Uint8Array(1);
         file.readSync(buf);
         before = buf[0];
@@ -418,9 +420,11 @@ function parseInsertPosition(raw: unknown): InsertPosition {
       throw new Error(`unsupported position field: ${key}`);
     }
   }
-  const typ = typeof m["type"] === "string" ? m["type"] as string : "";
+  const typ = typeof m["type"] === "string" ? (m["type"] as string) : "";
   if (
-    typ !== "head" && typ !== "tail" && typ !== "before_line" &&
+    typ !== "head" &&
+    typ !== "tail" &&
+    typ !== "before_line" &&
     typ !== "after_line"
   ) {
     throw new Error(`invalid position type: ${typ}`);
@@ -469,7 +473,7 @@ function parseInsertDedupe(raw: unknown): InsertDedupe {
     }
     enabled = m["enabled"];
   }
-  let mode = typeof m["mode"] === "string" ? m["mode"] as string : "";
+  let mode = typeof m["mode"] === "string" ? (m["mode"] as string) : "";
   if (mode === "") mode = "exact";
   if (mode !== "exact" && mode !== "trimmed" && mode !== "line") {
     throw new Error(`invalid dedupe mode: ${mode}`);
@@ -589,8 +593,8 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
   return out;
 }
 
-function validateLargeText(file: Deno.FsFile, size: number): void {
-  file.seekSync(0, Deno.SeekMode.Start);
+function validateLargeText(file: FsFile, size: number): void {
+  file.seekSync(0, SeekMode.Start);
   const chunk = new Uint8Array(128 * 1024);
   let read = 0;
   const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -616,14 +620,14 @@ function validateLargeText(file: Deno.FsFile, size: number): void {
 }
 
 function scanLargeInsertOffset(
-  file: Deno.FsFile,
+  file: FsFile,
   p: InsertPosition,
   size: number,
 ): number {
   if (p.type === "head") return 0;
   if (p.type === "tail") return size;
 
-  file.seekSync(0, Deno.SeekMode.Start);
+  file.seekSync(0, SeekMode.Start);
   const chunk = new Uint8Array(128 * 1024);
   let off = 0;
   let line = 1;
@@ -676,27 +680,31 @@ function normalizeLargeInsertContent(
 
 function streamAtomicInsert(
   p: string,
-  src: Deno.FsFile,
+  src: FsFile,
   off: number,
   inserted: Uint8Array,
   mode: number,
 ): void {
   const dir = path.dirname(p);
-  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".opensac-insert-" });
-  let tmp: Deno.FsFile | null = null;
+  const tmpPath = runtime.makeTempFileSync({ dir, prefix: ".opensac-insert-" });
+  let tmp: FsFile | null = null;
   try {
-    tmp = Deno.openSync(tmpPath, { write: true, create: true, truncate: true });
-    Deno.chmodSync(tmpPath, mode & 0o777);
+    tmp = runtime.openSync(tmpPath, {
+      write: true,
+      create: true,
+      truncate: true,
+    });
+    runtime.chmodSync(tmpPath, mode & 0o777);
 
-    src.seekSync(0, Deno.SeekMode.Start);
+    src.seekSync(0, SeekMode.Start);
     copyN(src, tmp, off);
     tmp.writeSync(inserted);
-    src.seekSync(off, Deno.SeekMode.Start);
+    src.seekSync(off, SeekMode.Start);
     copyAll(src, tmp);
     tmp.syncSync();
     tmp.close();
     tmp = null;
-    Deno.renameSync(tmpPath, p);
+    runtime.renameSync(tmpPath, p);
   } catch (err) {
     if (tmp !== null) {
       try {
@@ -706,7 +714,7 @@ function streamAtomicInsert(
       }
     }
     try {
-      Deno.removeSync(tmpPath);
+      runtime.removeSync(tmpPath);
     } catch {
       // ignore
     }
@@ -714,7 +722,7 @@ function streamAtomicInsert(
   }
 }
 
-function copyN(src: Deno.FsFile, dst: Deno.FsFile, count: number): void {
+function copyN(src: FsFile, dst: FsFile, count: number): void {
   let remaining = count;
   const buf = new Uint8Array(128 * 1024);
   while (remaining > 0) {
@@ -726,7 +734,7 @@ function copyN(src: Deno.FsFile, dst: Deno.FsFile, count: number): void {
   }
 }
 
-function copyAll(src: Deno.FsFile, dst: Deno.FsFile): void {
+function copyAll(src: FsFile, dst: FsFile): void {
   const buf = new Uint8Array(128 * 1024);
   for (;;) {
     const n = src.readSync(buf);
@@ -736,7 +744,7 @@ function copyAll(src: Deno.FsFile, dst: Deno.FsFile): void {
 }
 
 function isNotFound(err: unknown): boolean {
-  return err instanceof Deno.errors.NotFound;
+  return err instanceof runtime.errors.NotFound;
 }
 
 function messageOf(err: unknown): string {

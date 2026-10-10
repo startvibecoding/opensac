@@ -171,12 +171,13 @@ export class CronTool implements Tool {
       if (!j.enabled) status = "⏸ disabled";
       if (j.lastStatus === "failed") status = "❌ failed";
       if (j.lastStatus === "running") status = "🔄 running";
-      out +=
-        `- [${j.id}] ${j.name}\n  Status: ${status} | Mode: ${j.mode} | Schedule: ${
-          scheduleStr(j.schedule ?? "", j.oneShot ?? false)
-        } | Runs: ${j.runCount ?? 0}\n  Prompt: ${
-          truncateStr(j.prompt ?? "", 80)
-        }\n`;
+      out += `- [${j.id}] ${j.name}\n  Status: ${status} | Mode: ${j.mode} | Schedule: ${scheduleStr(
+        j.schedule ?? "",
+        j.oneShot ?? false,
+      )} | Runs: ${j.runCount ?? 0}\n  Prompt: ${truncateStr(
+        j.prompt ?? "",
+        80,
+      )}\n`;
       if (j.lastRun) {
         out += `  Last run: ${j.lastRun.toISOString()}\n`;
       }
@@ -233,11 +234,13 @@ export class CronTool implements Tool {
     const kind = isOneShot ? "one-shot" : "periodic";
     const nextInfo = nextRun ? `\n  Next run: ${nextRun.toISOString()}` : "";
     return createTextToolResult(
-      `✅ Cron job created (${kind}):\n  ID: ${job.id}\n  Name: ${job.name}\n  Schedule: ${
-        scheduleStr(job.schedule ?? "", isOneShot)
-      }\n  Mode: ${job.mode}${nextInfo}\n  Prompt: ${
-        truncateStr(job.prompt ?? "", 100)
-      }`,
+      `✅ Cron job created (${kind}):\n  ID: ${job.id}\n  Name: ${job.name}\n  Schedule: ${scheduleStr(
+        job.schedule ?? "",
+        isOneShot,
+      )}\n  Mode: ${job.mode}${nextInfo}\n  Prompt: ${truncateStr(
+        job.prompt ?? "",
+        100,
+      )}`,
     );
   }
 
@@ -314,9 +317,7 @@ export class CronTool implements Tool {
       throw new Error(`cron job named "${trimmedName}" not found`);
     }
     if (matches.length > 1) {
-      throw new Error(
-        `cron job name "${trimmedName}" is ambiguous; use id`,
-      );
+      throw new Error(`cron job name "${trimmedName}" is ambiguous; use id`);
     }
     return matches[0];
   }

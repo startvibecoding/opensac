@@ -1,6 +1,3 @@
-# Deno
-.deno/
-deno.lock.bak
 coverage/
 
 # Leftover rule file from the Go source project this was ported from; it is

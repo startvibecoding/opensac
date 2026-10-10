@@ -107,9 +107,7 @@ function resolveSessionDir(sessionDir: string): string {
   return sessionDir === "" ? platformSessionDir() : sessionDir;
 }
 
-function openExisting(
-  sessionDir: string,
-): Database | null {
+function openExisting(sessionDir: string): Database | null {
   const db = openExistingSessionDB(sessionDir);
   return db;
 }
@@ -151,10 +149,10 @@ export function saveSessionCapabilities(
     throw new Error("session capability session ID is empty");
   }
   const dir = resolveSessionDir(sessionDir);
-  const updatedAt = caps.updatedAt instanceof Date &&
-      !isNaN(caps.updatedAt.getTime())
-    ? caps.updatedAt
-    : new Date();
+  const updatedAt =
+    caps.updatedAt instanceof Date && !isNaN(caps.updatedAt.getTime())
+      ? caps.updatedAt
+      : new Date();
   writeRootDatabase(dir, (tx) => {
     validateRuntimeLeaseTx(tx, dir, caps.sessionId);
     new SessionDAO(null).upsertCapability(tx, {
@@ -189,10 +187,10 @@ export function saveSessionRunEvent(
     throw new Error("session run event type is empty");
   }
   const id = ev.id === "" ? generateID() : ev.id;
-  const timestamp = ev.timestamp instanceof Date &&
-      !isNaN(ev.timestamp.getTime())
-    ? ev.timestamp
-    : new Date();
+  const timestamp =
+    ev.timestamp instanceof Date && !isNaN(ev.timestamp.getTime())
+      ? ev.timestamp
+      : new Date();
   const dir = resolveSessionDir(sessionDir);
   const data = normalizeEventData(ev.data);
   writeRootDatabase(dir, (tx) => {
@@ -265,10 +263,10 @@ export function saveSessionCapabilityEvent(
     throw new Error("session capability event capability is empty");
   }
   const id = ev.id === "" ? generateID() : ev.id;
-  const timestamp = ev.timestamp instanceof Date &&
-      !isNaN(ev.timestamp.getTime())
-    ? ev.timestamp
-    : new Date();
+  const timestamp =
+    ev.timestamp instanceof Date && !isNaN(ev.timestamp.getTime())
+      ? ev.timestamp
+      : new Date();
   const dir = resolveSessionDir(sessionDir);
   const data = normalizeEventData(ev.data);
   writeRootDatabase(dir, (tx) => {
@@ -299,21 +297,21 @@ export function listSessionCapabilityEvents(
   if (sessionId === "") return [];
   const db = openExisting(sessionDir);
   if (db === null) return [];
-  return new SessionDAO(db.db).listCapabilityEvents(sessionId).map((
-    record,
-  ) => ({
-    id: record.id,
-    sessionId: record.sessionId,
-    runId: record.runId,
-    eventType: record.eventType,
-    source: record.source,
-    actor: record.actor,
-    capability: record.capability,
-    oldValue: record.oldValue,
-    newValue: record.newValue,
-    timestamp: parseSessionTimestamp(record.timestamp),
-    data: decodeData(record.data),
-  }));
+  return new SessionDAO(db.db)
+    .listCapabilityEvents(sessionId)
+    .map((record) => ({
+      id: record.id,
+      sessionId: record.sessionId,
+      runId: record.runId,
+      eventType: record.eventType,
+      source: record.source,
+      actor: record.actor,
+      capability: record.capability,
+      oldValue: record.oldValue,
+      newValue: record.newValue,
+      timestamp: parseSessionTimestamp(record.timestamp),
+      data: decodeData(record.data),
+    }));
 }
 
 /**
@@ -379,9 +377,10 @@ export function listSessionMessagesWithSeq(
   return state.messages;
 }
 
-function decodeMessage(
-  record: { seq: number; data: string },
-): SequencedMessage {
+function decodeMessage(record: {
+  seq: number;
+  data: string;
+}): SequencedMessage {
   const entry = JSON.parse(record.data) as MessageEntry;
   return {
     seq: record.seq,
@@ -402,13 +401,11 @@ export function listSessionMessagesAfter(
   const db = openExisting(sessionDir);
   if (db === null) return [];
   const messages: SequencedMessage[] = [];
-  for (
-    const record of new SessionDAO(db.db).messagesAfter(
-      sessionId,
-      afterSeq,
-      capped,
-    )
-  ) {
+  for (const record of new SessionDAO(db.db).messagesAfter(
+    sessionId,
+    afterSeq,
+    capped,
+  )) {
     if (record.data === "") continue;
     try {
       messages.push(decodeMessage(record));
@@ -430,9 +427,10 @@ export function listSessionMessagesLatest(
   const db = openExisting(sessionDir);
   if (db === null) return [];
   const messages: SequencedMessage[] = [];
-  for (
-    const record of new SessionDAO(db.db).messagesLatest(sessionId, capped)
-  ) {
+  for (const record of new SessionDAO(db.db).messagesLatest(
+    sessionId,
+    capped,
+  )) {
     if (record.data === "") continue;
     try {
       messages.push(decodeMessage(record));
@@ -456,13 +454,11 @@ export function listSessionMessagesBefore(
   const db = openExisting(sessionDir);
   if (db === null) return [];
   const messages: SequencedMessage[] = [];
-  for (
-    const record of new SessionDAO(db.db).messagesBefore(
-      sessionId,
-      beforeSeq,
-      capped,
-    )
-  ) {
+  for (const record of new SessionDAO(db.db).messagesBefore(
+    sessionId,
+    beforeSeq,
+    capped,
+  )) {
     if (record.data === "") continue;
     try {
       messages.push(decodeMessage(record));
@@ -493,8 +489,9 @@ export function listSessionRunEventsAfter(
   const capped = limit > 500 ? 500 : limit;
   const db = openExisting(sessionDir);
   if (db === null) return [];
-  return new SessionDAO(db.db).runEventsAfter(sessionId, afterSeq, capped).map(
-    (record) => ({
+  return new SessionDAO(db.db)
+    .runEventsAfter(sessionId, afterSeq, capped)
+    .map((record) => ({
       seq: record.seq,
       event: {
         id: record.id,
@@ -508,8 +505,7 @@ export function listSessionRunEventsAfter(
         timestamp: parseSessionTimestamp(record.timestamp),
         data: decodeData(record.data),
       },
-    }),
-  );
+    }));
 }
 
 /** Returns capability events with their seq cursor. */
@@ -531,24 +527,22 @@ export function listSessionCapabilityEventsAfter(
   const capped = limit > 500 ? 500 : limit;
   const db = openExisting(sessionDir);
   if (db === null) return [];
-  return new SessionDAO(db.db).capabilityEventsAfter(
-    sessionId,
-    afterSeq,
-    capped,
-  ).map((record) => ({
-    seq: record.seq,
-    event: {
-      id: record.id,
-      sessionId: record.sessionId,
-      runId: record.runId,
-      eventType: record.eventType,
-      source: record.source,
-      actor: record.actor,
-      capability: record.capability,
-      oldValue: record.oldValue,
-      newValue: record.newValue,
-      timestamp: parseSessionTimestamp(record.timestamp),
-      data: decodeData(record.data),
-    },
-  }));
+  return new SessionDAO(db.db)
+    .capabilityEventsAfter(sessionId, afterSeq, capped)
+    .map((record) => ({
+      seq: record.seq,
+      event: {
+        id: record.id,
+        sessionId: record.sessionId,
+        runId: record.runId,
+        eventType: record.eventType,
+        source: record.source,
+        actor: record.actor,
+        capability: record.capability,
+        oldValue: record.oldValue,
+        newValue: record.newValue,
+        timestamp: parseSessionTimestamp(record.timestamp),
+        data: decodeData(record.data),
+      },
+    }));
 }

@@ -6,6 +6,7 @@
 // (imagescript rather than `x/image/draw` CatmullRom), so encoded bytes are not
 // bit-identical (the Go tests only assert geometry/limits/MIME).
 
+import { runtime } from "../platform/runtime.ts";
 import { Image } from "imagescript";
 import { decode as decodeWebp } from "@jsquash/webp";
 import { type Family, type Hint } from "./policy.ts";
@@ -124,7 +125,7 @@ export async function prepareFile(
   path: string,
   policy: Policy,
 ): Promise<Result> {
-  const data = Deno.readFileSync(path);
+  const data = runtime.readFileSync(path);
   return await prepareBytes(data, policy);
 }
 
@@ -208,10 +209,10 @@ export async function prepareBytes(
   const targetH = scaled.height;
   const scale = scaled.scale;
   const needsResize = targetW !== sourceW || targetH !== sourceH;
-  const needsTranscode = sourceMime !== "image/png" &&
-    sourceMime !== "image/jpeg";
-  const tooLarge = policy.maxOutputBytes > 0 &&
-    data.length > policy.maxOutputBytes;
+  const needsTranscode =
+    sourceMime !== "image/png" && sourceMime !== "image/jpeg";
+  const tooLarge =
+    policy.maxOutputBytes > 0 && data.length > policy.maxOutputBytes;
   if (!needsCrop && !needsResize && !needsTranscode && !tooLarge) {
     return { data, mimeType: sourceMime, meta };
   }
@@ -234,7 +235,8 @@ export async function prepareBytes(
     if (sourceW > 0) meta.scale = encoded.width / sourceW;
   }
   meta.bytes = encoded.data.length;
-  meta.transcoded = encoded.mimeType !== sourceMime ||
+  meta.transcoded =
+    encoded.mimeType !== sourceMime ||
     sourceFormat !== formatFromMime(encoded.mimeType);
   return { data: encoded.data, mimeType: encoded.mimeType, meta };
 }
@@ -244,25 +246,40 @@ export async function prepareBytes(
 /** Detects the image container format from magic bytes. */
 export function sniffFormat(data: Uint8Array): string {
   if (
-    data.length >= 8 && data[0] === 0x89 && data[1] === 0x50 &&
-    data[2] === 0x4e && data[3] === 0x47
+    data.length >= 8 &&
+    data[0] === 0x89 &&
+    data[1] === 0x50 &&
+    data[2] === 0x4e &&
+    data[3] === 0x47
   ) {
     return "png";
   }
   if (
-    data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff
+    data.length >= 3 &&
+    data[0] === 0xff &&
+    data[1] === 0xd8 &&
+    data[2] === 0xff
   ) {
     return "jpeg";
   }
   if (
-    data.length >= 6 && data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46
+    data.length >= 6 &&
+    data[0] === 0x47 &&
+    data[1] === 0x49 &&
+    data[2] === 0x46
   ) {
     return "gif";
   }
   if (
-    data.length >= 12 && data[0] === 0x52 && data[1] === 0x49 &&
-    data[2] === 0x46 && data[3] === 0x46 && data[8] === 0x57 &&
-    data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50
+    data.length >= 12 &&
+    data[0] === 0x52 &&
+    data[1] === 0x49 &&
+    data[2] === 0x46 &&
+    data[3] === 0x46 &&
+    data[8] === 0x57 &&
+    data[9] === 0x45 &&
+    data[10] === 0x42 &&
+    data[11] === 0x50
   ) {
     return "webp";
   }
@@ -318,15 +335,15 @@ function normalizedCrop(
   if (crop.x < 0 || crop.y < 0) {
     throw new Error("invalid crop: x and y must be non-negative");
   }
-  if (
-    crop.x + crop.width > width || crop.y + crop.height > height
-  ) {
+  if (crop.x + crop.width > width || crop.y + crop.height > height) {
     throw new Error(
       `invalid crop: rectangle ${crop.width}x${crop.height}+${crop.x}+${crop.y} exceeds image bounds ${width}x${height}`,
     );
   }
   if (
-    crop.x === 0 && crop.y === 0 && crop.width === width &&
+    crop.x === 0 &&
+    crop.y === 0 &&
+    crop.width === width &&
     crop.height === height
   ) {
     return { rect: crop, needsCrop: false };
@@ -422,7 +439,9 @@ async function encodeForPolicyOnce(
       quality as Parameters<Image["encodeJPEG"]>[0],
     );
     if (
-      maxOutputBytes <= 0 || data.length <= maxOutputBytes || quality === 70
+      maxOutputBytes <= 0 ||
+      data.length <= maxOutputBytes ||
+      quality === 70
     ) {
       return { data, mimeType: "image/jpeg" };
     }
@@ -496,7 +515,8 @@ function capOutputLimit(policy: Policy, max: number): void {
 
 function raiseDetailLongEdge(policy: Policy, min: number): void {
   if (
-    policy.mode === "detail" && (policy.maxLongEdge ?? 0) > 0 &&
+    policy.mode === "detail" &&
+    (policy.maxLongEdge ?? 0) > 0 &&
     (policy.maxLongEdge ?? 0) < min
   ) {
     policy.maxLongEdge = min;
@@ -543,12 +563,16 @@ export function policyForHint(h: Hint, mode: Mode): Policy {
     h.providerName ?? "",
     h.vendor ?? "",
     h.baseURL ?? "",
-  ].map((s) =>
-    s.trim().toLowerCase().replaceAll("_", "-").replaceAll(" ", "-").replaceAll(
-      ":",
-      "-",
+  ]
+    .map((s) =>
+      s
+        .trim()
+        .toLowerCase()
+        .replaceAll("_", "-")
+        .replaceAll(" ", "-")
+        .replaceAll(":", "-"),
     )
-  ).join(" ");
+    .join(" ");
   if (providerText.includes("groq") || providerText.includes("api.groq.com")) {
     capOutputLimit(policy, 3 << 20);
   }

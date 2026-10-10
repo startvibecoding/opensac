@@ -4,6 +4,7 @@
 // fenced recovery lease with `AcquireRecovery`. The `context.Context`
 // cancellation fixture is dropped because the DAO layer is synchronous.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { SessionDAO } from "../dao/mod.ts";
@@ -79,7 +80,7 @@ function baseRun(overrides: Partial<SessionRun>): SessionRun {
 }
 
 test("session run recovery requires a fenced recovery lease", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     makeSession(sessionDir, "recovery-record");
     const now = new Date();
@@ -166,7 +167,7 @@ test("session run recovery requires a fenced recovery lease", () => {
 });
 
 test("converge session run recovery atomically closes run, turn, decisions, and recovery", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-recovery-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-recovery-" });
   try {
     makeSession(sessionDir, "recovery-converge");
     const guard = acquireExecutionAdmission(sessionDir, "recovery-converge");
@@ -239,11 +240,7 @@ test("converge session run recovery atomically closes run, turn, decisions, and 
     }
     assert(runStored && decisionStored);
 
-    const recoveryGuard = acquireRecovery(
-      sessionDir,
-      run.sessionId,
-      run.id,
-    );
+    const recoveryGuard = acquireRecovery(sessionDir, run.sessionId, run.id);
     try {
       beginSessionRunRecovery(
         sessionDir,

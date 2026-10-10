@@ -83,10 +83,12 @@ test({
     await tick();
     // A later render adds a second completed block; the first must not be
     // re-emitted (Static writes it to scrollback only once).
-    inst.rerender(view([
-      { id: "1", text: "# hello", done: true },
-      { id: "2", text: "- item", done: true },
-    ]));
+    inst.rerender(
+      view([
+        { id: "1", text: "# hello", done: true },
+        { id: "2", text: "- item", done: true },
+      ]),
+    );
     await tick();
     inst.unmount();
 
@@ -115,14 +117,11 @@ test({
     assert(stdout.output.includes("Hello world"));
     // Once completed, the block moves into Static/scrollback.
     const stdout2 = new FakeStdout();
-    const inst2 = render(
-      view([{ id: "1", text: "Hello world", done: true }]),
-      {
-        stdout: stdout2 as unknown as NodeJS.WriteStream,
-        exitOnCtrlC: false,
-        patchConsole: false,
-      },
-    );
+    const inst2 = render(view([{ id: "1", text: "Hello world", done: true }]), {
+      stdout: stdout2 as unknown as NodeJS.WriteStream,
+      exitOnCtrlC: false,
+      patchConsole: false,
+    });
     await tick();
     inst2.unmount();
     assertEquals(stdout2.output.split("Hello world").length - 1, 1);

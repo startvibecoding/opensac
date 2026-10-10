@@ -4,6 +4,7 @@
 // exact-ID open, workdir-scoped open, and lease-guarded deletion contracts that
 // the Go callers rely on.
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   createSession,
@@ -16,7 +17,7 @@ import { acquireSessionMutation } from "./execution_admission.ts";
 import { test } from "#testing";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
+  return runtime.makeTempDirSync({ dir: runtime.env.get("TMPDIR") });
 }
 
 test("createSession requires a work directory", () => {
@@ -77,11 +78,7 @@ test("openSessionForWorkDir is workdir-scoped", () => {
   const workDir = tempDir();
   const sessionDir = tempDir();
   createSession({ workDir, sessionDir, id: "scoped-session" });
-  const reopened = openSessionForWorkDir(
-    workDir,
-    sessionDir,
-    "scoped-session",
-  );
+  const reopened = openSessionForWorkDir(workDir, sessionDir, "scoped-session");
   assertEquals(reopened.getHeader()!.cwd, workDir);
   assertThrows(
     () => openSessionForWorkDir("", sessionDir, "scoped-session"),

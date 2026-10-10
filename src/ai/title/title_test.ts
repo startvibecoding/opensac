@@ -56,8 +56,7 @@ test("GeneratorUsesCommonProviderInterfaceAndNormalizes", async () => {
   const name = await new Generator({
     provider: p,
     model: { id: "model" } as Model,
-  })
-    .generate([createUserMessage("请修复登录")]);
+  }).generate([createUserMessage("请修复登录")]);
   assertEquals(name, "修复登录问题 并补充测试");
   assertEquals(p.params?.modelId, "model");
   assertEquals(p.params?.messages.length, 2);
@@ -70,8 +69,7 @@ test("GeneratorFallsBackWhenProviderFails", async () => {
   const name = await new Generator({
     provider: p,
     model: { id: "model" } as Model,
-  })
-    .generate([createUserMessage("hi")]);
+  }).generate([createUserMessage("hi")]);
   assertEquals(name, "hi");
 });
 

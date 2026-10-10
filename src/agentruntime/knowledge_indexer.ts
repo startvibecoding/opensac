@@ -13,7 +13,8 @@
 import {
   type KnowledgeChunk,
   type KnowledgeGraphSnapshot,
-  type KnowledgeNode} from "../session/mod.ts";
+  type KnowledgeNode,
+} from "../session/mod.ts";
 import { generateID } from "../session/entry.ts";
 import { truncateKnowledgeText } from "./knowledge_context.ts";
 
@@ -29,12 +30,10 @@ export const maxKnowledgeIndexerNodes = 64;
 export const maxKnowledgeIndexerLinks = 24;
 export const maxKnowledgeIndexerOutput = 24_000;
 
-export function indexerRoleInstructions(
-  baseName: string,
-): string {
-  return `You are the Indexer Agent for the knowledge base ${
-    JSON.stringify(baseName)
-  }.
+export function indexerRoleInstructions(baseName: string): string {
+  return `You are the Indexer Agent for the knowledge base ${JSON.stringify(
+    baseName,
+  )}.
 You receive existing graph nodes and untrusted source excerpts. Return only the requested JSON object.
 
 Rules:
@@ -87,11 +86,13 @@ export function indexerPrompt(graph: KnowledgeGraphSnapshot | null): string {
     });
   }
   const payload = JSON.stringify({ nodes, chunks });
-  return "Return exactly one JSON object with no Markdown:\n" +
+  return (
+    "Return exactly one JSON object with no Markdown:\n" +
     '{"links":[{"fromNodeId":"existing node id","toNodeId":"existing node id","chunkId":"existing chunk id","startLine":1,"endLine":1}]}' +
     "\nOnly select co-mentions supported by one chunk.\n<untrusted-index-input>\n" +
     payload +
-    "\n</untrusted-index-input>";
+    "\n</untrusted-index-input>"
+  );
 }
 
 export interface IndexerLink {
@@ -212,14 +213,18 @@ export function appendVerifiedCoMentionEdges(
     const to = nodes.get(link.toNodeId.trim());
     const chunk = chunks.get(link.chunkId.trim());
     if (
-      from === undefined || to === undefined || chunk === undefined ||
-      from.id === to.id || !knowledgeIndexerNodeAllowed(from) ||
+      from === undefined ||
+      to === undefined ||
+      chunk === undefined ||
+      from.id === to.id ||
+      !knowledgeIndexerNodeAllowed(from) ||
       !knowledgeIndexerNodeAllowed(to)
     ) {
       continue;
     }
     if (
-      link.startLine < chunk.startLine || link.endLine < link.startLine ||
+      link.startLine < chunk.startLine ||
+      link.endLine < link.startLine ||
       link.endLine > chunk.endLine
     ) {
       continue;
@@ -255,8 +260,10 @@ export function appendVerifiedCoMentionEdges(
 }
 
 export function knowledgeIndexerNodeAllowed(node: KnowledgeNode): boolean {
-  return (node.kind === "section" || node.kind === "symbol") &&
-    node.label.trim().length >= 2;
+  return (
+    (node.kind === "section" || node.kind === "symbol") &&
+    node.label.trim().length >= 2
+  );
 }
 
 export function knowledgeLabelInChunk(label: string, text: string): boolean {

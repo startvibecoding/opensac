@@ -5,6 +5,7 @@
 // test belongs to the CLI slice. Fixtures bind a mock provider catalog so a
 // session runtime is fully configured and call the handlers directly.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertStrictEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -88,11 +89,11 @@ interface Fixture {
 }
 
 function createFixture(): Fixture {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-prompt-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-acp-prompt-" });
   const sessionDir = path.join(root, "sessions");
-  Deno.mkdirSync(sessionDir, { recursive: true });
+  nodeRuntime.mkdirSync(sessionDir, { recursive: true });
   const workDir = path.join(root, "work");
-  Deno.mkdirSync(workDir, { recursive: true });
+  nodeRuntime.mkdirSync(workDir, { recursive: true });
   const server = new AcpServer();
   server.settings = { sessionDir } as unknown as Settings;
   const sink = new SyncBuffer();
@@ -191,7 +192,7 @@ async function promptAdmissionReleased(
 }
 
 test("esm steering injects a changed objective exactly once", () => {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-esm-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-acp-esm-" });
   const settings = { sessionDir: root } as unknown as Settings;
   const store = new ESMStore(root);
   store.create("sess-esm", "finish the ACP objective");
@@ -209,7 +210,7 @@ test("esm steering injects a changed objective exactly once", () => {
 
 test("esm steering absent without settings or session id", () => {
   assertStrictEquals(esmSteeringMessages(null, "sess"), undefined);
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-esm-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-acp-esm-" });
   assertStrictEquals(
     esmSteeringMessages({ sessionDir: root } as unknown as Settings, ""),
     undefined,
@@ -472,167 +473,155 @@ test("handlePrompt projects a missing-terminal stream as failed", async () => {
   assertEquals(error.code, -32000);
 });
 
-test(
-  "handlePrompt teardown orders the terminal projection after the response and releases admission",
-  async () => {
-    const { server, sink, workDir, sessionDir } = createFixture();
-    bindMockProvider(server, [
-      { type: streamStart },
-      { type: streamTextDelta, textDelta: "hello world" },
-      { type: streamDone, stopReason: "stop" },
-    ]);
-    const sessionId = await openSession(server, sink, workDir);
-    sink.reset();
-    await server.handlePrompt(
-      rpc(2, "session/prompt", {
-        sessionId,
-        prompt: [{ type: "text", text: "hi" }],
-      }),
-    );
-    const response = await waitForResponse(sink);
-    assertEquals(response.result, { stopReason: "end_turn" });
+test("handlePrompt teardown orders the terminal projection after the response and releases admission", async () => {
+  const { server, sink, workDir, sessionDir } = createFixture();
+  bindMockProvider(server, [
+    { type: streamStart },
+    { type: streamTextDelta, textDelta: "hello world" },
+    { type: streamDone, stopReason: "stop" },
+  ]);
+  const sessionId = await openSession(server, sink, workDir);
+  sink.reset();
+  await server.handlePrompt(
+    rpc(2, "session/prompt", {
+      sessionId,
+      prompt: [{ type: "text", text: "hi" }],
+    }),
+  );
+  const response = await waitForResponse(sink);
+  assertEquals(response.result, { stopReason: "end_turn" });
 
-    // Teardown runs after the response: the admission projection precedes it,
-    // the terminal projection follows it.
-    await waitUntil(
-      () =>
-        runStatusParams(sink.toString()).some((p) => p.status === "completed"),
-      "terminal run_status projection",
-    );
-    assertEquals(
-      runStatusParams(sink.toString()).map((p) => String(p.status)),
-      ["running", "completed"],
-    );
-    const raw = sink.toString();
-    const runningAt = raw.indexOf('"event":"run_status"');
-    const responseAt = raw.indexOf('"id":2,"result"');
-    const terminalAt = raw.lastIndexOf('"event":"run_status"');
-    assert(
-      runningAt !== -1 && responseAt !== -1 && terminalAt !== -1,
-      "expected admission response and terminal projection markers",
-    );
-    assert(runningAt < responseAt, "running projection precedes the response");
-    assert(
-      responseAt < terminalAt,
-      "terminal projection follows the response",
-    );
+  // Teardown runs after the response: the admission projection precedes it,
+  // the terminal projection follows it.
+  await waitUntil(
+    () =>
+      runStatusParams(sink.toString()).some((p) => p.status === "completed"),
+    "terminal run_status projection",
+  );
+  assertEquals(
+    runStatusParams(sink.toString()).map((p) => String(p.status)),
+    ["running", "completed"],
+  );
+  const raw = sink.toString();
+  const runningAt = raw.indexOf('"event":"run_status"');
+  const responseAt = raw.indexOf('"id":2,"result"');
+  const terminalAt = raw.lastIndexOf('"event":"run_status"');
+  assert(
+    runningAt !== -1 && responseAt !== -1 && terminalAt !== -1,
+    "expected admission response and terminal projection markers",
+  );
+  assert(runningAt < responseAt, "running projection precedes the response");
+  assert(responseAt < terminalAt, "terminal projection follows the response");
 
-    // The durable Run is terminal once the projection was written, and the
-    // admission lease was released so the next prompt can be admitted.
-    assertEquals(
-      getActiveDurableRun(sessionDir, sessionId),
-      null,
-      "durable run terminal after the projection",
-    );
-    await waitUntil(
-      () => promptAdmissionReleased(server, sessionId),
-      "prompt admission release",
-    );
-    const rt = server.sessionRuntime(sessionId)!;
-    assertEquals(rt.promptID, "");
-    assertEquals(rt.runID, "");
-    assertStrictEquals(rt.cancel, null);
-  },
-);
+  // The durable Run is terminal once the projection was written, and the
+  // admission lease was released so the next prompt can be admitted.
+  assertEquals(
+    getActiveDurableRun(sessionDir, sessionId),
+    null,
+    "durable run terminal after the projection",
+  );
+  await waitUntil(
+    () => promptAdmissionReleased(server, sessionId),
+    "prompt admission release",
+  );
+  const rt = server.sessionRuntime(sessionId)!;
+  assertEquals(rt.promptID, "");
+  assertEquals(rt.runID, "");
+  assertStrictEquals(rt.cancel, null);
+});
 
-test(
-  "handlePrompt failed-run teardown terminalizes the run and releases admission",
-  async () => {
-    const { server, sink, workDir, sessionDir } = createFixture();
-    // A provider that closes its stream without any terminal event.
-    bindMockProvider(server, [{ type: streamStart }]);
-    const sessionId = await openSession(server, sink, workDir);
-    sink.reset();
-    await server.handlePrompt(
-      rpc(2, "session/prompt", {
-        sessionId,
-        prompt: [{ type: "text", text: "hi" }],
-      }),
-    );
-    const response = await waitForResponse(sink);
-    const error = response.error as Record<string, unknown>;
-    assert(error !== undefined, "expected a failure response");
+test("handlePrompt failed-run teardown terminalizes the run and releases admission", async () => {
+  const { server, sink, workDir, sessionDir } = createFixture();
+  // A provider that closes its stream without any terminal event.
+  bindMockProvider(server, [{ type: streamStart }]);
+  const sessionId = await openSession(server, sink, workDir);
+  sink.reset();
+  await server.handlePrompt(
+    rpc(2, "session/prompt", {
+      sessionId,
+      prompt: [{ type: "text", text: "hi" }],
+    }),
+  );
+  const response = await waitForResponse(sink);
+  const error = response.error as Record<string, unknown>;
+  assert(error !== undefined, "expected a failure response");
 
-    await waitUntil(
-      () => runStatusParams(sink.toString()).some((p) => p.status === "failed"),
-      "terminal failed projection",
-    );
-    assertEquals(
-      runStatusParams(sink.toString()).map((p) => String(p.status)),
-      ["running", "failed"],
-    );
-    const raw = sink.toString();
-    const responseAt = raw.indexOf('"id":2,"error"');
-    const terminalAt = raw.lastIndexOf('"event":"run_status"');
-    assert(
-      responseAt !== -1 && terminalAt !== -1,
-      "expected error response and terminal projection markers",
-    );
-    assert(
-      responseAt < terminalAt,
-      "terminal projection follows the error response",
-    );
-    assertEquals(
-      getActiveDurableRun(sessionDir, sessionId),
-      null,
-      "durable run terminal after the failed run",
-    );
-    await waitUntil(
-      () => promptAdmissionReleased(server, sessionId),
-      "prompt admission release after the failed run",
-    );
-    const rt = server.sessionRuntime(sessionId)!;
-    assertEquals(rt.promptID, "");
-    assertStrictEquals(rt.cancel, null);
-  },
-);
+  await waitUntil(
+    () => runStatusParams(sink.toString()).some((p) => p.status === "failed"),
+    "terminal failed projection",
+  );
+  assertEquals(
+    runStatusParams(sink.toString()).map((p) => String(p.status)),
+    ["running", "failed"],
+  );
+  const raw = sink.toString();
+  const responseAt = raw.indexOf('"id":2,"error"');
+  const terminalAt = raw.lastIndexOf('"event":"run_status"');
+  assert(
+    responseAt !== -1 && terminalAt !== -1,
+    "expected error response and terminal projection markers",
+  );
+  assert(
+    responseAt < terminalAt,
+    "terminal projection follows the error response",
+  );
+  assertEquals(
+    getActiveDurableRun(sessionDir, sessionId),
+    null,
+    "durable run terminal after the failed run",
+  );
+  await waitUntil(
+    () => promptAdmissionReleased(server, sessionId),
+    "prompt admission release after the failed run",
+  );
+  const rt = server.sessionRuntime(sessionId)!;
+  assertEquals(rt.promptID, "");
+  assertStrictEquals(rt.cancel, null);
+});
 
-test(
-  "handlePrompt teardown finalizes the run when the cancellation hook throws",
-  async () => {
-    const { server, sink, workDir, sessionDir } = createFixture();
-    bindMockProvider(server, [
-      { type: streamStart },
-      { type: streamTextDelta, textDelta: "hello world" },
-      { type: streamDone, stopReason: "stop" },
-    ]);
-    const sessionId = await openSession(server, sink, workDir);
-    // handlePrompt reuses a pre-attached execution, so its cancel hook can be
-    // poisoned before the run: the teardown must not skip any later step.
-    const execution = server.createSessionExecution();
-    let cancelCalls = 0;
-    execution.cancel = (): boolean => {
-      cancelCalls += 1;
-      throw new Error("injected cancel failure");
-    };
-    const rt = server.sessionRuntime(sessionId)!;
-    rt.execution = execution;
-    sink.reset();
-    await server.handlePrompt(
-      rpc(2, "session/prompt", {
-        sessionId,
-        prompt: [{ type: "text", text: "hi" }],
-      }),
-    );
-    const response = await waitForResponse(sink);
-    assertEquals(response.result, { stopReason: "end_turn" });
+test("handlePrompt teardown finalizes the run when the cancellation hook throws", async () => {
+  const { server, sink, workDir, sessionDir } = createFixture();
+  bindMockProvider(server, [
+    { type: streamStart },
+    { type: streamTextDelta, textDelta: "hello world" },
+    { type: streamDone, stopReason: "stop" },
+  ]);
+  const sessionId = await openSession(server, sink, workDir);
+  // handlePrompt reuses a pre-attached execution, so its cancel hook can be
+  // poisoned before the run: the teardown must not skip any later step.
+  const execution = server.createSessionExecution();
+  let cancelCalls = 0;
+  execution.cancel = (): boolean => {
+    cancelCalls += 1;
+    throw new Error("injected cancel failure");
+  };
+  const rt = server.sessionRuntime(sessionId)!;
+  rt.execution = execution;
+  sink.reset();
+  await server.handlePrompt(
+    rpc(2, "session/prompt", {
+      sessionId,
+      prompt: [{ type: "text", text: "hi" }],
+    }),
+  );
+  const response = await waitForResponse(sink);
+  assertEquals(response.result, { stopReason: "end_turn" });
 
-    await waitUntil(
-      () => getActiveDurableRun(sessionDir, sessionId) === null,
-      "durable run terminal despite the cancel failure",
-    );
-    await waitUntil(
-      () =>
-        runStatusParams(sink.toString()).some((p) => p.status === "completed"),
-      "terminal projection despite the cancel failure",
-    );
-    await waitUntil(
-      () => promptAdmissionReleased(server, sessionId),
-      "prompt admission release despite the cancel failure",
-    );
-    assertEquals(cancelCalls, 1, "the cancel hook ran exactly once");
-  },
-);
+  await waitUntil(
+    () => getActiveDurableRun(sessionDir, sessionId) === null,
+    "durable run terminal despite the cancel failure",
+  );
+  await waitUntil(
+    () =>
+      runStatusParams(sink.toString()).some((p) => p.status === "completed"),
+    "terminal projection despite the cancel failure",
+  );
+  await waitUntil(
+    () => promptAdmissionReleased(server, sessionId),
+    "prompt admission release despite the cancel failure",
+  );
+  assertEquals(cancelCalls, 1, "the cancel hook ran exactly once");
+});
 
 /** A sink that rejects the terminal `run_status` projection write. */
 class TerminalRunStatusFailingSink extends SyncBuffer {
@@ -647,45 +636,42 @@ class TerminalRunStatusFailingSink extends SyncBuffer {
   }
 }
 
-test(
-  "handlePrompt teardown releases admission when the terminal projection write fails",
-  async () => {
-    const { server, workDir, sessionDir } = createFixture();
-    const sink = new TerminalRunStatusFailingSink();
-    server.sink = sink;
-    bindMockProvider(server, [
-      { type: streamStart },
-      { type: streamTextDelta, textDelta: "hello world" },
-      { type: streamDone, stopReason: "stop" },
-    ]);
-    const sessionId = await openSession(server, sink, workDir);
-    sink.reset();
-    await server.handlePrompt(
-      rpc(2, "session/prompt", {
-        sessionId,
-        prompt: [{ type: "text", text: "hi" }],
-      }),
-    );
-    const response = await waitForResponse(sink);
-    assertEquals(response.result, { stopReason: "end_turn" });
+test("handlePrompt teardown releases admission when the terminal projection write fails", async () => {
+  const { server, workDir, sessionDir } = createFixture();
+  const sink = new TerminalRunStatusFailingSink();
+  server.sink = sink;
+  bindMockProvider(server, [
+    { type: streamStart },
+    { type: streamTextDelta, textDelta: "hello world" },
+    { type: streamDone, stopReason: "stop" },
+  ]);
+  const sessionId = await openSession(server, sink, workDir);
+  sink.reset();
+  await server.handlePrompt(
+    rpc(2, "session/prompt", {
+      sessionId,
+      prompt: [{ type: "text", text: "hi" }],
+    }),
+  );
+  const response = await waitForResponse(sink);
+  assertEquals(response.result, { stopReason: "end_turn" });
 
-    // The durable finish precedes the projection...
-    await waitUntil(
-      () => getActiveDurableRun(sessionDir, sessionId) === null,
-      "durable run terminal despite the projection failure",
-    );
-    // ...and a rejected projection write must not skip the admission release.
-    await waitUntil(
-      () => promptAdmissionReleased(server, sessionId),
-      "prompt admission release despite the projection failure",
-    );
-    const rt = server.sessionRuntime(sessionId)!;
-    assertEquals(rt.promptID, "");
-    assertStrictEquals(rt.cancel, null);
-    assertEquals(
-      runStatusParams(sink.toString()).map((p) => String(p.status)),
-      ["running"],
-      "the terminal projection write never landed",
-    );
-  },
-);
+  // The durable finish precedes the projection...
+  await waitUntil(
+    () => getActiveDurableRun(sessionDir, sessionId) === null,
+    "durable run terminal despite the projection failure",
+  );
+  // ...and a rejected projection write must not skip the admission release.
+  await waitUntil(
+    () => promptAdmissionReleased(server, sessionId),
+    "prompt admission release despite the projection failure",
+  );
+  const rt = server.sessionRuntime(sessionId)!;
+  assertEquals(rt.promptID, "");
+  assertStrictEquals(rt.cancel, null);
+  assertEquals(
+    runStatusParams(sink.toString()).map((p) => String(p.status)),
+    ["running"],
+    "the terminal projection write never landed",
+  );
+});

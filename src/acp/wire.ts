@@ -1,7 +1,7 @@
 // (the ACP stdio JSON-RPC transport).
 //
 // Go reads newline-delimited JSON with a `bufio.Reader` and writes JSON lines
-// to a `io.Writer` it optionally flushes. The Deno projection keeps the same
+// to a `io.Writer` it optionally flushes. The Node projection keeps the same
 // wire contract (one JSON document per line, JSON-RPC ids echoed verbatim) but
 // exposes the reader/writer as small classes so the server can bind them to
 // stdin/stdout or an in-memory fixture.
@@ -111,7 +111,9 @@ export async function readRequest(
     );
   }
   if (
-    decoded === null || typeof decoded !== "object" || Array.isArray(decoded)
+    decoded === null ||
+    typeof decoded !== "object" ||
+    Array.isArray(decoded)
   ) {
     throw new Error("parse ACP request: not a JSON-RPC object");
   }
@@ -167,9 +169,10 @@ export async function writeACPResponse(
   errResp: RPCError | null,
 ): Promise<void> {
   if (idRaw === null || idRaw.trim() === "") return;
-  const body = errResp !== null
-    ? `"error":${JSON.stringify(acpErrorEnvelope(errResp))}`
-    : `"result":${JSON.stringify(result ?? null)}`;
+  const body =
+    errResp !== null
+      ? `"error":${JSON.stringify(acpErrorEnvelope(errResp))}`
+      : `"result":${JSON.stringify(result ?? null)}`;
   await sink.write(`{"jsonrpc":"2.0","id":${idRaw.trim()},${body}}\n`);
 }
 
@@ -251,9 +254,13 @@ export function topLevelRawField(
   const n = line.length;
   const skipWhitespace = () => {
     while (
-      i < n && (line[i] === " " || line[i] === "\t" || line[i] === "\r" ||
+      i < n &&
+      (line[i] === " " ||
+        line[i] === "\t" ||
+        line[i] === "\r" ||
         line[i] === "\n")
-    ) i++;
+    )
+      i++;
   };
   skipWhitespace();
   if (line[i] !== "{") return undefined;
@@ -330,8 +337,6 @@ function skipRawValue(value: string, start: number): number {
     return -1;
   }
   let i = start;
-  while (
-    i < value.length && ",}] \t\r\n".indexOf(value[i]) < 0
-  ) i++;
+  while (i < value.length && ",}] \t\r\n".indexOf(value[i]) < 0) i++;
   return i;
 }

@@ -48,7 +48,8 @@ export function saveExecutionIntent(
     throw new Error("execution intent ID and session ID are required");
   }
   if (
-    !(intent.createdAt instanceof Date) || isNaN(intent.createdAt.getTime())
+    !(intent.createdAt instanceof Date) ||
+    isNaN(intent.createdAt.getTime())
   ) {
     intent.createdAt = new Date();
   }
@@ -137,7 +138,8 @@ function createExecutionIntentAndSessionRunEventInternal(
     throw new Error("session run intent ID does not match execution intent");
   }
   if (
-    !(intent.createdAt instanceof Date) || isNaN(intent.createdAt.getTime())
+    !(intent.createdAt instanceof Date) ||
+    isNaN(intent.createdAt.getTime())
   ) {
     intent.createdAt = new Date();
   }
@@ -151,10 +153,12 @@ function createExecutionIntentAndSessionRunEventInternal(
 
   const request = normalizedRunJSON(intent.request);
   const policy = normalizedRunJSON(intent.policy);
-  const finishedAt = run.finishedAt !== null && run.finishedAt !== undefined &&
-      !isNaN(run.finishedAt.getTime())
-    ? run.finishedAt.toISOString()
-    : null;
+  const finishedAt =
+    run.finishedAt !== null &&
+    run.finishedAt !== undefined &&
+    !isNaN(run.finishedAt.getTime())
+      ? run.finishedAt.toISOString()
+      : null;
 
   let boundLease = null;
   openRootDB(sessionDir).runInTx((tx) => {
@@ -178,7 +182,8 @@ function createExecutionIntentAndSessionRunEventInternal(
       if (event.sessionId === "") event.sessionId = run.sessionId;
       if (event.runId === "") event.runId = run.id;
       if (
-        !(event.timestamp instanceof Date) || isNaN(event.timestamp.getTime())
+        !(event.timestamp instanceof Date) ||
+        isNaN(event.timestamp.getTime())
       ) {
         event.timestamp = run.startedAt;
       }

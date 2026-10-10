@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { createKnowledgeBase } from "../session/mod.ts";
 import {
@@ -9,15 +10,17 @@ import { SOURCE_ACP } from "./source.ts";
 import { test } from "#testing";
 
 test("knowledge base start index runs in background with progress", async () => {
-  const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
-  const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
+  const sessionDir = runtime.makeTempDirSync({
+    dir: runtime.env.get("TMPDIR"),
+  });
+  const source = runtime.makeTempDirSync({ dir: runtime.env.get("TMPDIR") });
   const files: Record<string, string> = {
     "notes.md": "# Notes\n\nBackground indexing keeps transports responsive.",
     "guide.md": "# Guide\n\nProgress is polled periodically by hosts.",
     "extra.md": "# Extra\n\nConcurrent starts share a single job.",
   };
   for (const [name, body] of Object.entries(files)) {
-    Deno.writeTextFileSync(`${source}/${name}`, body);
+    runtime.writeTextFileSync(`${source}/${name}`, body);
   }
   const base = createKnowledgeBase(sessionDir, {
     name: "Async notes",
@@ -60,8 +63,10 @@ test("knowledge base start index runs in background with progress", async () => 
 });
 
 test("knowledge base start index rejects disabled base synchronously", () => {
-  const sessionDir = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
-  const source = Deno.makeTempDirSync({ dir: Deno.env.get("TMPDIR") });
+  const sessionDir = runtime.makeTempDirSync({
+    dir: runtime.env.get("TMPDIR"),
+  });
+  const source = runtime.makeTempDirSync({ dir: runtime.env.get("TMPDIR") });
   const base = createKnowledgeBase(sessionDir, {
     name: "Disabled",
     rootDir: source,

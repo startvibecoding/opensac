@@ -2,7 +2,12 @@
 // provider: provider listing, default-model persistence, TUI language, cron
 // gating, and the clipboard reader's fallback behavior.
 
-import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
 import { Translator } from "./i18n.ts";
 import { createFakeTUIService } from "./service.ts";
@@ -24,7 +29,7 @@ function stub(multiAgent = false): Stub {
   const session = {
     translator: new Translator("en"),
     settings,
-    workDir: Deno.cwd(),
+    workDir: nodeRuntime.cwd(),
     mode: "yolo",
     busy: false,
     multiAgent,
@@ -85,14 +90,14 @@ test("cron rejects an unknown subcommand", () => {
  * settings.json (OPENSAC_DIR is the primary config-dir override).
  */
 function isolateConfigDir(): { restore: () => void } {
-  const dir = Deno.makeTempDirSync();
-  const previous = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", dir);
+  const dir = nodeRuntime.makeTempDirSync();
+  const previous = nodeRuntime.env.get("OPENSAC_DIR");
+  nodeRuntime.env.set("OPENSAC_DIR", dir);
   return {
     restore: () => {
-      if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
-      else Deno.env.set("OPENSAC_DIR", previous);
-      Deno.removeSync(dir, { recursive: true });
+      if (previous === undefined) nodeRuntime.env.delete("OPENSAC_DIR");
+      else nodeRuntime.env.set("OPENSAC_DIR", previous);
+      nodeRuntime.removeSync(dir, { recursive: true });
     },
   };
 }
@@ -121,12 +126,12 @@ test("previewPastedImage reports when nothing was pasted", () => {
 test("handleBTW asks the Core-owned transient query", async () => {
   const settings = defaultSettings();
   const service = createFakeTUIService();
-  await service.createSession({ workDir: Deno.cwd(), sessionId: "s1" });
+  await service.createSession({ workDir: nodeRuntime.cwd(), sessionId: "s1" });
   service.transientAnswer = "stub side answer";
   const session = {
     translator: new Translator("en"),
     settings,
-    workDir: Deno.cwd(),
+    workDir: nodeRuntime.cwd(),
     mode: "yolo",
     busy: false,
     multiAgent: false,
@@ -152,7 +157,7 @@ test("systemInit refuses to run while the agent is busy", async () => {
   const session = {
     translator: new Translator("en"),
     settings,
-    workDir: Deno.cwd(),
+    workDir: nodeRuntime.cwd(),
     mode: "yolo",
     busy: true,
     multiAgent: false,

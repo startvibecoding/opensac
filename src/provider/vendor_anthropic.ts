@@ -12,12 +12,6 @@ export function registerVendorAnthropic(): void {
     ),
   );
   registerVendorAdapter(
-    new SimpleVendorAdapter(
-      "claude",
-      [],
-      "",
-      undefined,
-      "anthropic-messages",
-    ),
+    new SimpleVendorAdapter("claude", [], "", undefined, "anthropic-messages"),
   );
 }

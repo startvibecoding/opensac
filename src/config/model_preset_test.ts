@@ -15,8 +15,8 @@ test("preset model config prefers the current provider catalog", () => {
 
 test("preset model config returns a copy the caller may mutate", () => {
   const catalog = defaultProviderConfigsAll();
-  const builtin = catalog["anthropic"].models.find((m) =>
-    m.id === "claude-3-5-haiku-20241022"
+  const builtin = catalog["anthropic"].models.find(
+    (m) => m.id === "claude-3-5-haiku-20241022",
   );
   assert(builtin);
 
@@ -33,7 +33,7 @@ test("preset model config falls back to any other built-in provider", () => {
   const providerIDs = Object.keys(catalog).filter((pid) => pid !== "anthropic");
   assert(providerIDs.length > 0);
   const donor = providerIDs.find((pid) =>
-    catalog[pid].models.some((m) => m.id === "gpt-4")
+    catalog[pid].models.some((m) => m.id === "gpt-4"),
   );
   assert(donor !== undefined, "expected gpt-4 in a non-anthropic provider");
 

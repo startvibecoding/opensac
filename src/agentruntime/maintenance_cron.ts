@@ -111,9 +111,7 @@ export async function runMaintenanceCronJob(
     return { handled: false, response: "" };
   }
   if (sessionDir.trim() === "") {
-    throw new Error(
-      `maintenance job ${trimmed} requires a session directory`,
-    );
+    throw new Error(`maintenance job ${trimmed} requires a session directory`);
   }
   if (trimmed !== maintenanceStorageReconcileJobID()) {
     throw new Error(`unknown maintenance job "${trimmed}"`);
@@ -135,7 +133,6 @@ export async function runMaintenanceCronJob(
   );
   return {
     handled: true,
-    response:
-      `reclaimed ${reconciliation.removed} unreferenced attachment directories (${reconciliation.freed} bytes) older than ${reconciliation.ageFloor.toISOString()}; kept ${reconciliation.skippedYoung} too recent, ${reconciliation.skippedReferenced} referenced, ${reconciliation.skippedUnrecognized} unrecognized`,
+    response: `reclaimed ${reconciliation.removed} unreferenced attachment directories (${reconciliation.freed} bytes) older than ${reconciliation.ageFloor.toISOString()}; kept ${reconciliation.skippedYoung} too recent, ${reconciliation.skippedReferenced} referenced, ${reconciliation.skippedUnrecognized} unrecognized`,
   };
 }

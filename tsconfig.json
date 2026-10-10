@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "allowImportingTsExtensions": true,
@@ -18,16 +18,18 @@
     "jsx": "react",
     "types": ["node"],
     "paths": {
-      "@opensac/path": ["./src/compat/path.ts"],
-      "@opensac/path/posix": ["./src/compat/path_posix.ts"],
-      "@opensac/assert": ["./src/compat/assert.ts"],
-      "@opensac/encoding/base64": ["./src/compat/encoding.ts"],
-      "@opensac/encoding/base64url": ["./src/compat/encoding.ts"],
       "#testing": ["./src/testing/mod.ts"],
       "#testing/*": ["./src/testing/*.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "sdk/**/*.ts", "examples/**/*.ts", "scripts/**/*.ts", "bootstrap.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "sdk/**/*.ts",
+    "examples/**/*.ts",
+    "scripts/**/*.ts",
+    "bootstrap.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",

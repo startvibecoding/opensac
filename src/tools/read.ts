@@ -1,7 +1,9 @@
 //
 // Faithful port except that `imageproc.prepareFile` is async, so `execute`
-// awaits it. Go's `encoding/base64` maps to `@std/encoding`.
+// awaits it. Go's `encoding/base64` maps to `src/compat/encoding.ts`.
 
+import { runtime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import { encodeBase64 } from "../compat/encoding.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -119,9 +121,9 @@ export class ReadTool implements Tool {
     const mimeType = imageMimeType[ext];
     if (mimeType !== undefined) {
       const policy = this.#imageReadPolicy(params);
-      let info: Deno.FileInfo;
+      let info: FileInfo;
       try {
-        info = Deno.statSync(p);
+        info = runtime.statSync(p);
       } catch (err) {
         throw new Error(`cannot stat image file: ${messageOf(err)}`);
       }
@@ -163,7 +165,7 @@ export class ReadTool implements Tool {
 
     let data: Uint8Array;
     try {
-      data = await Deno.readFile(p);
+      data = await runtime.readFile(p);
     } catch (err) {
       throw new Error(`cannot read file: ${messageOf(err)}`);
     }
@@ -202,7 +204,8 @@ export class ReadTool implements Tool {
     }
 
     if (new TextEncoder().encode(sb).length > maxBytes) {
-      sb = truncateString(sb, maxBytes) +
+      sb =
+        truncateString(sb, maxBytes) +
         `\n... (truncated, total ${lines.length} lines)`;
     }
 
@@ -234,19 +237,20 @@ function imageDescription(
   result: Result,
 ): string {
   const meta = result.meta;
-  const original = `${meta.originalWidth}x${meta.originalHeight} ${
-    formatBytes(meta.originalBytes)
-  } ${sourceMime}`;
-  const sent = `${meta.width}x${meta.height} ${
-    formatBytes(meta.bytes)
-  } ${result.mimeType}`;
+  const original = `${meta.originalWidth}x${meta.originalHeight} ${formatBytes(
+    meta.originalBytes,
+  )} ${sourceMime}`;
+  const sent = `${meta.width}x${meta.height} ${formatBytes(
+    meta.bytes,
+  )} ${result.mimeType}`;
   let crop = "";
   if (meta.cropped) {
-    crop =
-      `, crop: ${meta.cropWidth}x${meta.cropHeight}+${meta.cropX}+${meta.cropY}`;
+    crop = `, crop: ${meta.cropWidth}x${meta.cropHeight}+${meta.cropX}+${meta.cropY}`;
   }
   if (
-    meta.resized || meta.transcoded || meta.originalBytes !== meta.bytes ||
+    meta.resized ||
+    meta.transcoded ||
+    meta.originalBytes !== meta.bytes ||
     sourceMime !== result.mimeType
   ) {
     return `[Image file: ${p}, original: ${original}${crop}, sent: ${sent}, mode: ${meta.detail}]`;

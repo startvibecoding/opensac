@@ -23,9 +23,9 @@ function isIPv6Wildcard(host: string): boolean {
 /** True for a local-only address or hostname. */
 export function isLoopbackCoreHost(value: string): boolean {
   const host = normalizeCoreHost(value);
-  return isLocalhost(host) ||
-    host === "::1" ||
-    /^127(?:\.\d{1,3}){3}$/.test(host);
+  return (
+    isLocalhost(host) || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host)
+  );
 }
 
 function isLocalhost(value: string): boolean {
@@ -66,7 +66,8 @@ export function connectHostForRegistration(
   const bind = normalizeCoreHost(registration.host);
   const configured = normalizeCoreHost(config.host);
   const advertised = registration.connectHost?.trim();
-  const hasAdvertisedHost = advertised !== undefined &&
+  const hasAdvertisedHost =
+    advertised !== undefined &&
     advertised !== "" &&
     !isWildcardCoreHost(advertised);
 
@@ -122,9 +123,7 @@ export function registrationUrl(
   if (host === "" || /[/?#@\s]/.test(host) || host.includes("://")) {
     throw new TypeError("registered Core host is invalid");
   }
-  const url = new URL(
-    `http://${formatCoreHostForUrl(host)}:${port}/`,
-  );
+  const url = new URL(`http://${formatCoreHostForUrl(host)}:${port}/`);
   if (url.username !== "" || url.password !== "" || url.pathname !== "/") {
     throw new TypeError("registered Core endpoint is invalid");
   }
@@ -162,8 +161,10 @@ export function registrationMatchesConfiguredEndpoint(
   }
 
   if (isLoopbackCoreHost(bind) && isLoopbackCoreHost(configured)) {
-    return (isIPv6Host(bind) && isIPv6Host(configured)) ||
-      (!isIPv6Host(bind) && !isIPv6Host(configured));
+    return (
+      (isIPv6Host(bind) && isIPv6Host(configured)) ||
+      (!isIPv6Host(bind) && !isIPv6Host(configured))
+    );
   }
   return false;
 }

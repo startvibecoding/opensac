@@ -50,10 +50,7 @@ export class JobsTool implements Tool {
     };
   }
 
-  execute(
-    _ctx: ToolContext,
-    params: Record<string, unknown>,
-  ): ToolResult {
+  execute(_ctx: ToolContext, params: Record<string, unknown>): ToolResult {
     const jm = this.#bashTool.getJobManager();
 
     if (params["cleanup"] === true) {
@@ -121,7 +118,7 @@ function formatJobDetail(job: BackgroundJob): string {
 function formatDate(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
-    pad(d.getHours())
-  }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }

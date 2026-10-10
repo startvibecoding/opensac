@@ -3,6 +3,7 @@
 // This port injects a fake `HttpClient` and builds plain Response-like objects
 // (the provider only reads `status`, `body`, and `text()`).
 
+import { runtime } from "../../platform/runtime.ts";
 import { assert, assertEquals } from "../../compat/assert.ts";
 import { type HttpClient } from "../http_client.ts";
 import {
@@ -106,9 +107,10 @@ function mockClient(
 ): HttpClient {
   return {
     fetch(input, init) {
-      const headers = init?.headers instanceof Headers
-        ? init.headers
-        : new Headers(init?.headers);
+      const headers =
+        init?.headers instanceof Headers
+          ? init.headers
+          : new Headers(init?.headers);
       const captured: CapturedRequest = {
         url: new URL(input.toString()),
         headers,
@@ -225,13 +227,15 @@ test("GoogleDoesNotRetryStreamReadErrorAfterVisibleOutput", async () => {
   p.client = {
     fetch() {
       attempts++;
-      return Promise.resolve(fakeResponse(
-        200,
-        sseBody(
-          'data: {"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}\n',
-          streamErr,
+      return Promise.resolve(
+        fakeResponse(
+          200,
+          sseBody(
+            'data: {"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}\n',
+            streamErr,
+          ),
         ),
-      ));
+      );
     },
     close() {},
   };
@@ -272,23 +276,23 @@ test("GoogleProviderHTTPProxy", () => {
 });
 
 test("ResolveAPIKeyShellCommandRequiresOptIn", () => {
-  const prev = Deno.env.get("VIBECODING_ALLOW_SHELL_CONFIG");
+  const prev = runtime.env.get("VIBECODING_ALLOW_SHELL_CONFIG");
   try {
-    Deno.env.set("VIBECODING_ALLOW_SHELL_CONFIG", "");
+    runtime.env.set("VIBECODING_ALLOW_SHELL_CONFIG", "");
     assertEquals(
       resolveAPIKey({ models: [], apiKey: "!printf secret" }),
       "!printf secret",
     );
-    Deno.env.set("VIBECODING_ALLOW_SHELL_CONFIG", "1");
+    runtime.env.set("VIBECODING_ALLOW_SHELL_CONFIG", "1");
     assertEquals(
       resolveAPIKey({ models: [], apiKey: "!printf secret" }),
       "secret",
     );
   } finally {
     if (prev === undefined) {
-      Deno.env.delete("VIBECODING_ALLOW_SHELL_CONFIG");
+      runtime.env.delete("VIBECODING_ALLOW_SHELL_CONFIG");
     } else {
-      Deno.env.set("VIBECODING_ALLOW_SHELL_CONFIG", prev);
+      runtime.env.set("VIBECODING_ALLOW_SHELL_CONFIG", prev);
     }
   }
 });
@@ -310,17 +314,21 @@ function bareProvider(): Provider {
 test("ConvertMessagesToolResultUsesTextContents", () => {
   const p = bareProvider();
   const contents = p.convertMessages({
-    messages: [{
-      role: "toolResult",
-      toolCallId: "call_1",
-      toolName: "bash",
-      contents: [{
-        type: "text",
-        text: "bash output from content block",
-        cache_control: { type: "ephemeral" },
-      }],
-      timestamp: new Date(),
-    }],
+    messages: [
+      {
+        role: "toolResult",
+        toolCallId: "call_1",
+        toolName: "bash",
+        contents: [
+          {
+            type: "text",
+            text: "bash output from content block",
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        timestamp: new Date(),
+      },
+    ],
   } as ChatParams);
   assertEquals(contents.length, 1);
   assertEquals(contents[0].parts.length, 1);
@@ -389,10 +397,12 @@ test("ConvertMessagesPreservesGoogleFunctionCallIDs", () => {
 
   const fallback = p.convertMessages({
     messages: [
-      createAssistantMessage([{
-        type: "toolCall",
-        toolCall: { id: "google_toolcall_9", name: "lookup", arguments: {} },
-      }]),
+      createAssistantMessage([
+        {
+          type: "toolCall",
+          toolCall: { id: "google_toolcall_9", name: "lookup", arguments: {} },
+        },
+      ]),
       createToolResultMessage("google_toolcall_9", "lookup", "value", false),
     ],
   } as ChatParams);
@@ -432,39 +442,36 @@ test("GoogleAssistantToolCallIncludesThoughtSignature", () => {
 // ─── streaming ───────────────────────────────────────────────────────────────
 
 test("GoogleStreamMultipleFunctionCallsPreservesIDs", async () => {
-  const sse = 'data: {"candidates":[{"content":{"parts":[' +
+  const sse =
+    'data: {"candidates":[{"content":{"parts":[' +
     '{"functionCall":{"id":"call-1","name":"lookup","args":{"key":"a"}}},' +
     '{"functionCall":{"id":"call-2","name":"lookup","args":{"key":"b"}}}]},' +
     '"finishReason":"STOP"}]}\n';
-  for (
-    const tc of [
-      {
-        name: "gemini",
-        p: createGeminiProvider(
-          "fake-key",
-          "https://generativelanguage.googleapis.com/v1beta/models",
-          [m("mock")],
-        ),
-      },
-      {
-        name: "vertex",
-        p: createVertexProvider(
-          "fake-key",
-          "https://aiplatform.googleapis.com/v1/publishers/google/models",
-          [m("mock")],
-        ),
-      },
-    ]
-  ) {
+  for (const tc of [
+    {
+      name: "gemini",
+      p: createGeminiProvider(
+        "fake-key",
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        [m("mock")],
+      ),
+    },
+    {
+      name: "vertex",
+      p: createVertexProvider(
+        "fake-key",
+        "https://aiplatform.googleapis.com/v1/publishers/google/models",
+        [m("mock")],
+      ),
+    },
+  ]) {
     const p = createMockGoogleProvider(tc.p, sse);
     const calls: ToolCallBlock[] = [];
-    for (
-      const event of await chatAndCollect(p, {
-        ...abortParams(),
-        modelId: "mock",
-        messages: [createUserMessage("hi")],
-      })
-    ) {
+    for (const event of await chatAndCollect(p, {
+      ...abortParams(),
+      modelId: "mock",
+      messages: [createUserMessage("hi")],
+    })) {
       if (event.type === streamToolCall && event.toolCall !== undefined) {
         calls.push(event.toolCall);
       }
@@ -495,13 +502,11 @@ test("GoogleStreamTextThinkToolCallAndUsage", async () => {
   let tool: ToolCallBlock | undefined;
   let usage: Usage | undefined;
   let done = false;
-  for (
-    const ev of await chatAndCollect(p, {
-      ...abortParams(),
-      modelId: "gemini-test",
-      messages: [createUserMessage("hi")],
-    })
-  ) {
+  for (const ev of await chatAndCollect(p, {
+    ...abortParams(),
+    modelId: "gemini-test",
+    messages: [createUserMessage("hi")],
+  })) {
     switch (ev.type) {
       case streamTextDelta:
         text += ev.textDelta ?? "";
@@ -573,10 +578,12 @@ test("GoogleGeminiRequest", async () => {
     createGeminiProvider(
       "fake-key",
       "https://generativelanguage.googleapis.com/v1beta/models",
-      [m("gemini-test", {
-        reasoning: true,
-        compat: { disableSamplingParams: false },
-      })],
+      [
+        m("gemini-test", {
+          reasoning: true,
+          compat: { disableSamplingParams: false },
+        }),
+      ],
     ),
     okSSE,
     bodies,
@@ -589,20 +596,26 @@ test("GoogleGeminiRequest", async () => {
       assertEquals(req.headers.get("x-goog-api-key"), "fake-key");
     },
   );
-  const req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "gemini-test",
-    systemPrompt: "system",
-    messages: [createUserMessage("hi")],
-    tools: [{
-      name: "read",
-      description: "Read file",
-      parameters: { type: "object" },
-    }],
-    thinkingLevel: thinkingHigh,
-    maxTokens: 123,
-    temperature: 0.2,
-  }, bodies);
+  const req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "gemini-test",
+      systemPrompt: "system",
+      messages: [createUserMessage("hi")],
+      tools: [
+        {
+          name: "read",
+          description: "Read file",
+          parameters: { type: "object" },
+        },
+      ],
+      thinkingLevel: thinkingHigh,
+      maxTokens: 123,
+      temperature: 0.2,
+    },
+    bodies,
+  );
 
   const si = req.systemInstruction as Record<string, unknown>;
   const siParts = si.parts as Array<Record<string, unknown>>;
@@ -644,11 +657,15 @@ test("GoogleGeminiOmitsMaxOutputTokensByDefault", async () => {
     okSSE,
     bodies,
   );
-  const req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "gemini-test",
-    messages: [createUserMessage("hi")],
-  }, bodies);
+  const req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "gemini-test",
+      messages: [createUserMessage("hi")],
+    },
+    bodies,
+  );
   const gc = req.generationConfig as Record<string, unknown>;
   assert(gc !== undefined && typeof gc === "object");
   assert(!("maxOutputTokens" in gc));
@@ -672,19 +689,27 @@ test("GoogleImageMediaResolution", async () => {
       okSSE,
       bodies,
     );
-    const contents: ContentBlock[] = [{
-      type: "image",
-      image: { data: "aW1hZ2U=", mimeType: "image/png", detail: tt.detail },
-    }];
-    const req = await captureBody(p, {
-      ...abortParams(),
-      modelId: "gemini-test",
-      messages: [{
-        role: "user",
-        contents,
-        timestamp: new Date(),
-      }],
-    }, bodies);
+    const contents: ContentBlock[] = [
+      {
+        type: "image",
+        image: { data: "aW1hZ2U=", mimeType: "image/png", detail: tt.detail },
+      },
+    ];
+    const req = await captureBody(
+      p,
+      {
+        ...abortParams(),
+        modelId: "gemini-test",
+        messages: [
+          {
+            role: "user",
+            contents,
+            timestamp: new Date(),
+          },
+        ],
+      },
+      bodies,
+    );
     const gc = req.generationConfig as Record<string, unknown>;
     assert(gc !== undefined);
     const got = (gc.mediaResolution as string | undefined) ?? "";
@@ -701,11 +726,15 @@ test("GoogleRequestCachedContent", async () => {
   );
   p.setCachedContent("cachedContents/test-cache");
   createMockGoogleProvider(p, "data: {}\n", bodies);
-  const req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "gemini-test",
-    messages: [createUserMessage("hi")],
-  }, bodies);
+  const req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "gemini-test",
+      messages: [createUserMessage("hi")],
+    },
+    bodies,
+  );
   assertEquals(req.cachedContent, "cachedContents/test-cache");
 });
 
@@ -750,10 +779,7 @@ test("GoogleVertexOAuthAuthorizationHeader", async () => {
         req.url.pathname,
         "/v1/projects/test/locations/global/publishers/google/models/gemini-test:streamGenerateContent",
       );
-      assertEquals(
-        req.headers.get("Authorization"),
-        "Bearer ya29.fake-token",
-      );
+      assertEquals(req.headers.get("Authorization"), "Bearer ya29.fake-token");
     },
   );
   await chatAndCollect(p, {
@@ -775,13 +801,17 @@ test("GoogleDisableSamplingParamsCompat", async () => {
     okSSE,
     bodies,
   );
-  const req = await captureBody(p, {
-    ...abortParams(),
-    modelId: "gemini-test",
-    messages: [createUserMessage("hi")],
-    temperature: 0.2,
-    topP: 0.9,
-  }, bodies);
+  const req = await captureBody(
+    p,
+    {
+      ...abortParams(),
+      modelId: "gemini-test",
+      messages: [createUserMessage("hi")],
+      temperature: 0.2,
+      topP: 0.9,
+    },
+    bodies,
+  );
   const gc = req.generationConfig as Record<string, unknown>;
   assert(gc !== undefined);
   assertEquals(gc.temperature, undefined);

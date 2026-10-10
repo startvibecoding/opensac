@@ -7,9 +7,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function trackPeak<T>(
-  fn: (item: T) => Promise<void>,
-): { peak: () => number; fn: (item: T) => Promise<void> } {
+function trackPeak<T>(fn: (item: T) => Promise<void>): {
+  peak: () => number;
+  fn: (item: T) => Promise<void>;
+} {
   let active = 0;
   let peak = 0;
   return {
@@ -29,7 +30,7 @@ function trackPeak<T>(
 test("boundedParallel preserves order and concurrency limit", async () => {
   const items = Array.from({ length: 32 }, (_v, i) => i);
   const tracker = trackPeak<number>(async (item) => {
-    await sleep((items.length - item) % 4 + 1);
+    await sleep(((items.length - item) % 4) + 1);
   });
 
   const results = await boundedParallel(3, items, async (item) => {
@@ -54,10 +55,7 @@ test("boundedParallel default and serial limits", async () => {
     await sleep(1);
   });
   await boundedParallel(0, items, (item) => tracker.fn(item));
-  assertEquals(
-    tracker.peak() <= defaultToolExecutionMaxConcurrency,
-    true,
-  );
+  assertEquals(tracker.peak() <= defaultToolExecutionMaxConcurrency, true);
 
   const serial = trackPeak<number>(async () => {
     await sleep(1);

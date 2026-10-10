@@ -88,9 +88,9 @@ function cloneBool(v: boolean | undefined): boolean | undefined {
 }
 
 /** Builds an Anthropic provider from a provider config. */
-function anthropicProviderFromConfig(cfg: ProviderConfig): ReturnType<
-  typeof createAnthropicProvider
-> {
+function anthropicProviderFromConfig(
+  cfg: ProviderConfig,
+): ReturnType<typeof createAnthropicProvider> {
   return createAnthropicProvider(
     cfg.apiKey ?? "",
     cfg.baseUrl ?? "",
@@ -102,17 +102,13 @@ function anthropicProviderFromConfig(cfg: ProviderConfig): ReturnType<
 // Mirrors the Go init(): register the generic Anthropic-compatible provider
 // factory so builder/model resolution through the global registry can construct
 // Anthropic-style providers.
-register(
-  "anthropic",
-  (cfg) =>
-    cfg == null
-      ? createAnthropicProvider("", "")
-      : anthropicProviderFromConfig(cfg),
+register("anthropic", (cfg) =>
+  cfg == null
+    ? createAnthropicProvider("", "")
+    : anthropicProviderFromConfig(cfg),
 );
-register(
-  "anthropic-messages",
-  (cfg) =>
-    cfg == null
-      ? createAnthropicProvider("", "")
-      : anthropicProviderFromConfig(cfg),
+register("anthropic-messages", (cfg) =>
+  cfg == null
+    ? createAnthropicProvider("", "")
+    : anthropicProviderFromConfig(cfg),
 );

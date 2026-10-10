@@ -99,12 +99,7 @@ export interface WaitOptions {
 
 /** BrowserType identifies a Chromium-family browser to launch. */
 export type BrowserType =
-  | "chrome"
-  | "chromium"
-  | "brave"
-  | "edge"
-  | "chrome-canary"
-  | "";
+  "chrome" | "chromium" | "brave" | "edge" | "chrome-canary" | "";
 
 export const BROWSER_CHROME: BrowserType = "chrome";
 export const BROWSER_CHROMIUM: BrowserType = "chromium";

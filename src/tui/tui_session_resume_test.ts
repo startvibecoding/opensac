@@ -6,6 +6,7 @@
 // user can see the history being continued, so the reprint is asserted here as
 // part of the same contract, not as an optional extra.
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -22,14 +23,14 @@ import { test } from "#testing";
 
 /** Redirects the config dir so no test touches real user state. */
 function isolateConfigDir(): { restore: () => void } {
-  const dir = Deno.makeTempDirSync();
-  const previous = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", dir);
+  const dir = runtime.makeTempDirSync();
+  const previous = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", dir);
   return {
     restore: () => {
-      if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
-      else Deno.env.set("OPENSAC_DIR", previous);
-      Deno.removeSync(dir, { recursive: true });
+      if (previous === undefined) runtime.env.delete("OPENSAC_DIR");
+      else runtime.env.set("OPENSAC_DIR", previous);
+      runtime.removeSync(dir, { recursive: true });
     },
   };
 }
@@ -73,9 +74,7 @@ test("continueLast resumes the newest persisted session and reprints it", async 
     const older = newSession(service);
     await older.start();
     const olderId = older.currentSessionID();
-    service.seedTranscript(olderId, [
-      { role: "user", text: "the older turn" },
-    ]);
+    service.seedTranscript(olderId, [{ role: "user", text: "the older turn" }]);
     await older.close();
 
     // A newer conversation: `-c` must continue this one.
@@ -158,11 +157,7 @@ test("resumeSession wins over continueLast and reprints in order", async () => {
     );
     assertEquals(
       rendered.slice(0, 3),
-      [
-        "> first turn",
-        "first reply",
-        "> second turn",
-      ],
+      ["> first turn", "first reply", "> second turn"],
       "history reprints in its original order, assistant rows carrying raw " +
         "Markdown through the assistant projection",
     );
@@ -334,9 +329,9 @@ test("a resume scopes its open to the directory the target came from", async () 
     assertEquals(resumed.currentSessionID(), id, "-c still resumes");
     assert(
       calls.some((c) => c.workDir === "/project"),
-      `the resume open must carry its work directory, got ${
-        JSON.stringify(calls)
-      }`,
+      `the resume open must carry its work directory, got ${JSON.stringify(
+        calls,
+      )}`,
     );
     service.openSession = original;
     await resumed.close();
@@ -424,9 +419,9 @@ test("a not-resident Core answer is retried, not reported as a bad id", async ()
       );
       assertEquals(session.currentSessionID(), id);
       assert(
-        !rows(session).some((row) =>
-          row.includes("resume_failed") ||
-          row.includes("Cannot resume")
+        !rows(session).some(
+          (row) =>
+            row.includes("resume_failed") || row.includes("Cannot resume"),
         ),
         "a Core restart must not be reported as an unresumable session",
       );
@@ -501,8 +496,8 @@ test("a resumed assistant turn reprints as an assistant row", async () => {
     await resumed.start();
     try {
       const store = resumed.controller.store;
-      const rowIndex = store.messages.findIndex((row) =>
-        row === "a **rendered** reply"
+      const rowIndex = store.messages.findIndex(
+        (row) => row === "a **rendered** reply",
       );
       assert(rowIndex >= 0, "the raw Markdown reprint is stored");
       assertEquals(
@@ -548,8 +543,8 @@ test("a /sessions switch reprints the durable conversation", async () => {
         !rendered.includes(ownId),
         "only the switched-to session's conversation prints",
       );
-      const rowIndex = live.controller.store.messages.findIndex((row) =>
-        row === "earlier **answer**"
+      const rowIndex = live.controller.store.messages.findIndex(
+        (row) => row === "earlier **answer**",
       );
       assertEquals(
         live.controller.store.messageKinds.get(rowIndex),

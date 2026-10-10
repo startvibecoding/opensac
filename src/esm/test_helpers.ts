@@ -1,5 +1,6 @@
 // Shared test fixtures for the src/esm suite. Not production code.
 
+import { runtime } from "../platform/runtime.ts";
 import { closeAll } from "../db/mod.ts";
 import { type Objective, phaseWorker, statusActive } from "./state.ts";
 import { Store } from "./store.ts";
@@ -9,7 +10,8 @@ import {
   type RoleRequest,
   type RuntimeAdapter,
   type RuntimeEvent,
-  type RuntimeEventSink} from "./runtime_core.ts";
+  type RuntimeEventSink,
+} from "./runtime_core.ts";
 
 /** Builds an Objective with sensible defaults for tests. */
 export function makeObjective(overrides: Partial<Objective> = {}): Objective {
@@ -45,7 +47,7 @@ export function makeStore(prefix = "opensac-esm-"): {
   sessionID: string;
   sessionDir: string;
 } {
-  const sessionDir = Deno.makeTempDirSync({ prefix });
+  const sessionDir = runtime.makeTempDirSync({ prefix });
   return { store: new Store(sessionDir), sessionID: "esm-session", sessionDir };
 }
 
@@ -64,9 +66,8 @@ export class RuntimeTestAdapter implements RuntimeAdapter {
   roleErr: unknown = null;
 
   constructor(responses: Map<Role, string> | Record<string, string> = {}) {
-    this.responses = responses instanceof Map
-      ? responses
-      : new Map(Object.entries(responses));
+    this.responses =
+      responses instanceof Map ? responses : new Map(Object.entries(responses));
   }
 
   runRole(

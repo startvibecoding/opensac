@@ -16,7 +16,7 @@ export interface SessionMetadataRecord {
 }
 
 export class ProjectDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -74,13 +74,15 @@ export class ProjectDAO {
   }
 
   metadata(sessionId: string): SessionMetadataRecord | null {
-    return queryOptional<SessionMetadataRecord>(
-      this.requireDb(),
-      `SELECT session_id AS sessionId, project_id AS projectId, pinned,
+    return (
+      queryOptional<SessionMetadataRecord>(
+        this.requireDb(),
+        `SELECT session_id AS sessionId, project_id AS projectId, pinned,
               updated_at AS updatedAt
        FROM session_metadata WHERE session_id = ? LIMIT 1`,
-      [sessionId],
-    ) ?? null;
+        [sessionId],
+      ) ?? null
+    );
   }
 
   /**

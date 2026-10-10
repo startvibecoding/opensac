@@ -8,6 +8,8 @@
 // skipped instead of being buffered whole into memory. This is registered as
 // a deliberate deviation from the external SDK dependency.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { compileUserRegExp } from "../util/regex.ts";
 import {
@@ -92,9 +94,10 @@ export class GrepTool implements Tool {
     _ctx: ToolContext,
     params: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const pattern = typeof params["pattern"] === "string"
-      ? params["pattern"] as string
-      : "";
+    const pattern =
+      typeof params["pattern"] === "string"
+        ? (params["pattern"] as string)
+        : "";
     if (pattern === "") {
       throw new Error("pattern is required");
     }
@@ -109,14 +112,15 @@ export class GrepTool implements Tool {
       }
     }
     try {
-      Deno.statSync(searchPath);
+      nodeRuntime.statSync(searchPath);
     } catch (err) {
       throw new Error(`invalid path: ${messageOf(err)}`);
     }
 
-    const include = typeof params["include"] === "string"
-      ? params["include"] as string
-      : "";
+    const include =
+      typeof params["include"] === "string"
+        ? (params["include"] as string)
+        : "";
     let maxResults = 100;
     const rv = params["maxResults"];
     if (typeof rv === "number" && rv > 0) maxResults = Math.trunc(rv);
@@ -188,11 +192,12 @@ export class GrepTool implements Tool {
       matcher.close();
     }
 
-    const skippedNote = scan.skipped > 0
-      ? `\n... (skipped ${scan.skipped} files over ${
-        Math.floor(maxGrepFileBytes / (1024 * 1024))
-      }MB)`
-      : "";
+    const skippedNote =
+      scan.skipped > 0
+        ? `\n... (skipped ${scan.skipped} files over ${Math.floor(
+            maxGrepFileBytes / (1024 * 1024),
+          )}MB)`
+        : "";
     if (scan.lines.length === 0) {
       const empty = "(no matches found)" + skippedNote;
       return createTextToolResult(
@@ -237,7 +242,7 @@ async function scanGrepFiles(
   for (const file of files) {
     let size: number;
     try {
-      size = (await Deno.stat(file.path)).size;
+      size = (await nodeRuntime.stat(file.path)).size;
     } catch {
       continue;
     }
@@ -247,7 +252,7 @@ async function scanGrepFiles(
     }
     let data: Uint8Array;
     try {
-      data = await Deno.readFile(file.path);
+      data = await nodeRuntime.readFile(file.path);
     } catch {
       continue;
     }
@@ -284,7 +289,7 @@ function collectGrepFiles(
   includeGlob: GlobSet | null,
 ): Promise<GrepFile[]> {
   return (async () => {
-    const info = Deno.lstatSync(root);
+    const info = nodeRuntime.lstatSync(root);
     if (!info.isDirectory) {
       if (shouldIncludeGrepPath(root, path.basename(root), includeGlob)) {
         return [{ path: root, rel: path.basename(root) }];
@@ -309,8 +314,8 @@ async function walkGrepDir(
 ): Promise<void> {
   stack.push(dir);
   try {
-    const entries: Deno.DirEntry[] = [];
-    for await (const entry of Deno.readDir(dir)) {
+    const entries: DirEntry[] = [];
+    for await (const entry of nodeRuntime.readDir(dir)) {
       entries.push(entry);
     }
     entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

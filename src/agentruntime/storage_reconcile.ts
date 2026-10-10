@@ -4,12 +4,14 @@
 // It fails closed against an unreadable or missing sessions database.
 //
 // Deviations: `context.Context` maps to an optional `AbortSignal`; `time.Time`
-// maps to `Date`; `sync/atomic` maps to plain module state (Deno is
-// single-threaded); `os.ReadDir`/`Lstat`/`RemoveAll` map to Deno APIs. The
+// maps to `Date`; `sync/atomic` maps to plain module state (Node is
+// single-threaded); `os.ReadDir`/`Lstat`/`RemoveAll` map to Node APIs. The
 // `(s *AttachmentService) ReconcileStorage` method maps to the standalone
 // `reconcileAttachmentStorage` function because TS classes cannot be split
 // across modules.
 
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry, FileInfo } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { AttachmentDAO } from "../dao/mod.ts";
 import { queryRootDatabase, rootDatabasePath } from "../session/database.ts";
@@ -96,9 +98,7 @@ export function artifactReclaimFloor(
   now: Date,
 ): Date {
   if (policy.retention <= 0) return new Date(now.getTime());
-  return new Date(
-    now.getTime() - (policy.retention + RECONCILE_GRACE_MS),
-  );
+  return new Date(now.getTime() - (policy.retention + RECONCILE_GRACE_MS));
 }
 
 /**
@@ -125,11 +125,11 @@ export async function reconcileArtifactStorage(
   report.ageFloor = artifactReclaimFloor(policy, now);
 
   const root = path.join(sessionDir, artifactDirectoryName);
-  let rootInfo: Deno.FileInfo | null;
+  let rootInfo: FileInfo | null;
   try {
-    rootInfo = await Deno.lstat(root);
+    rootInfo = await runtime.lstat(root);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return report;
+    if (err instanceof runtime.errors.NotFound) return report;
     throw new Error(`inspect attachment storage: ${err}`);
   }
   if (!rootInfo.isDirectory) {
@@ -137,10 +137,10 @@ export async function reconcileArtifactStorage(
   }
 
   const referenced = await referencedArtifactDirectories(sessionDir);
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
     entries = [];
-    for await (const entry of Deno.readDir(root)) entries.push(entry);
+    for await (const entry of runtime.readDir(root)) entries.push(entry);
   } catch (err) {
     throw new Error(`read attachment storage: ${err}`);
   }
@@ -151,7 +151,8 @@ export async function reconcileArtifactStorage(
     report.scanned++;
     const entryPath = path.join(root, entry.name);
     if (
-      !entry.isDirectory || entry.isSymlink ||
+      !entry.isDirectory ||
+      entry.isSymlink ||
       !isAttachmentDirectoryID(entry.name)
     ) {
       report.skippedUnrecognized++;
@@ -173,7 +174,7 @@ export async function reconcileArtifactStorage(
       continue;
     }
     try {
-      await Deno.remove(entryPath, { recursive: true });
+      await runtime.remove(entryPath, { recursive: true });
     } catch (err) {
       throw new Error(
         `reclaim unreferenced attachment storage ${entryPath}: ${err}`,
@@ -194,9 +195,9 @@ async function referencedArtifactDirectories(
 ): Promise<Set<string>> {
   const dbPath = rootDatabasePath(sessionDir);
   try {
-    await Deno.stat(dbPath);
+    await runtime.stat(dbPath);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) {
+    if (err instanceof runtime.errors.NotFound) {
       throw new Error(
         `sessions database ${dbPath} does not exist; refusing to reconcile attachment storage against an unknown reference set`,
       );
@@ -227,23 +228,25 @@ async function referencedArtifactDirectories(
 async function artifactDirectoryContents(
   dir: string,
 ): Promise<{ newest: Date; size: number } | null> {
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
     entries = [];
-    for await (const entry of Deno.readDir(dir)) entries.push(entry);
+    for await (const entry of runtime.readDir(dir)) entries.push(entry);
   } catch {
     return null;
   }
   let newest = 0;
   let size = 0;
   for (const entry of entries) {
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = await Deno.lstat(path.join(dir, entry.name));
+      info = await runtime.lstat(path.join(dir, entry.name));
     } catch {
       return null;
     }
-    const acceptable = !entry.isDirectory && !info.isSymlink &&
+    const acceptable =
+      !entry.isDirectory &&
+      !info.isSymlink &&
       (entry.name === "content" || entry.name.startsWith(".incoming-"));
     if (!acceptable) return null;
     const mtime = info.mtime?.getTime() ?? 0;
@@ -254,7 +257,7 @@ async function artifactDirectoryContents(
     // An empty directory is a leftover of a failed intake, and its age is the
     // directory's own modification time.
     try {
-      const info = await Deno.stat(dir);
+      const info = await runtime.stat(dir);
       newest = info.mtime?.getTime() ?? 0;
     } catch {
       return null;

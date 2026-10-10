@@ -41,9 +41,8 @@ export function saveESMGuidance(
       guidance: value,
       status,
       createdAt: createdAt.toISOString(),
-      consumedAt: guidance.consumedAt == null
-        ? null
-        : guidance.consumedAt.toISOString(),
+      consumedAt:
+        guidance.consumedAt == null ? null : guidance.consumedAt.toISOString(),
     });
   });
 }
@@ -95,6 +94,9 @@ function esmGuidanceFromRecord(record: ESMGuidanceRecord): ESMGuidance {
 }
 
 function isZeroDate(value: Date | undefined): boolean {
-  return value === undefined || Number.isNaN(value.getTime()) ||
-    value.getTime() === 0;
+  return (
+    value === undefined ||
+    Number.isNaN(value.getTime()) ||
+    value.getTime() === 0
+  );
 }

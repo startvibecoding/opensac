@@ -1,6 +1,6 @@
 // Regression tests for provider transport-failure classification.
 //
-// The bug: Deno reports every fetch-level network fault as `TypeError: "fetch
+// The bug: Node reports every fetch-level network fault as `TypeError: "fetch
 // failed"` and puts the real reason only on `cause`, while each provider's
 // private `wrapError` flattened the error and dropped the chain. The agent then
 // saw only "send request: fetch failed", which no rule matched, so a plain
@@ -12,15 +12,15 @@ import { errorChainText, wrapError } from "./errors.ts";
 import { isRetryable, retryErrorDetail } from "./retry.ts";
 import { test } from "#testing";
 
-/** Builds one error in the exact shape Deno's `fetch` produces. */
-function denoFetchFailure(causeMessage: string): Error {
+/** Builds one error in the exact shape Node's `fetch` produces. */
+function fetchFailure(causeMessage: string): Error {
   const cause = new Error(causeMessage);
   const failure = new TypeError("fetch failed", { cause });
   return failure;
 }
 
 test("wrapError keeps the cause chain and names the real reason", () => {
-  const raw = denoFetchFailure(
+  const raw = fetchFailure(
     "error sending request for url (http://127.0.0.1:45999/v1): client error (Connect): tcp connect error: Connection refused (os error 111)",
   );
   const wrapped = wrapError("send request", raw);
@@ -41,7 +41,7 @@ test("wrapError keeps the cause chain and names the real reason", () => {
 test("a fetch failure the provider wrapped is retryable and reported", () => {
   const wrapped = wrapError(
     "send request",
-    denoFetchFailure(
+    fetchFailure(
       "error sending request for url (https://api.example.invalid/v1): client error (Connect): tcp connect error: Connection refused (os error 111)",
     ),
   );
@@ -61,7 +61,7 @@ test("the legacy flattened message still classifies as retryable", () => {
 test("a DNS failure through the wrapper is retryable", () => {
   const wrapped = wrapError(
     "send request",
-    denoFetchFailure(
+    fetchFailure(
       "error sending request for url (https://api.example.invalid/v1): client error (Connect): dns error: failed to lookup address information: Name or service not known",
     ),
   );
@@ -82,10 +82,9 @@ test("a fetch failure that may never succeed is still retried but named", () => 
   assert(isRetryable(wrapError("send request", badURL), 0));
   assertEquals(retryErrorDetail(badURL), "invalid request URL");
 
-  const tls = new Error(
-    "fetch failed",
-    { cause: new Error("certificate has expired") },
-  );
+  const tls = new Error("fetch failed", {
+    cause: new Error("certificate has expired"),
+  });
   assert(isRetryable(wrapError("send request", tls), 0));
   assertEquals(retryErrorDetail(tls), "TLS certificate verification failed");
 });
@@ -119,8 +118,8 @@ test("a cancellation wrapped as a fetch failure is never retried", () => {
   assertEquals(isRetryable(wrapError("send request", canceled), 0), false);
 });
 
-test("every Deno abort shape is never retried, bare or wrapped", () => {
-  // The shapes Deno actually produces for a cancelled fetch. Each one names the
+test("every Node abort shape is never retried, bare or wrapped", () => {
+  // The shapes Node actually produces for a cancelled fetch. Each one names the
   // cancellation without using the "The operation was aborted." wording, so a
   // check that reads only the top message or one exact phrase lets a user abort
   // be replayed as a transport blip.
@@ -215,7 +214,7 @@ test("a genuine timeout stays retryable after the permanence check", () => {
     true,
   );
   // And both spellings report the same bounded reason, because `isTimeoutLike`
-  // matches the two-word form that Deno actually emits.
+  // matches the two-word form that Node actually emits.
   assertEquals(
     retryErrorDetail(new Error("read timed out")),
     "request timed out",

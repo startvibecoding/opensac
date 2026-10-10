@@ -7,7 +7,11 @@
 // tests for the newly ported request-assembly helpers.
 
 import { assert, assertEquals } from "../compat/assert.ts";
-import { type ContentBlock, type Message, type Model } from "../provider/types.ts";
+import {
+  type ContentBlock,
+  type Message,
+  type Model,
+} from "../provider/types.ts";
 import {
   createAssistantMessage,
   createSystemInjectedUserMessage,
@@ -19,11 +23,7 @@ import { createAgent } from "./agent.ts";
 import { isContextGuardToolResult } from "./agent_context.ts";
 import { test } from "#testing";
 
-function model(
-  input: string[],
-  contextWindow = 0,
-  maxTokens = 0,
-): Model {
+function model(input: string[], contextWindow = 0, maxTokens = 0): Model {
   return {
     id: "m1",
     name: "m1",
@@ -184,9 +184,7 @@ test("replaceLargestToolResultForContext replaces the largest result", () => {
   );
   a.loadHistoryMessages([
     createUserMessage("run tools"),
-    createAssistantMessage([
-      { type: "text", text: "calling" },
-    ]),
+    createAssistantMessage([{ type: "text", text: "calling" }]),
     createToolResultMessage("t1", "small_tool", "short", false),
     createToolResultMessage("t2", "big_tool", "y".repeat(4000), false),
   ]);

@@ -69,11 +69,9 @@ export class ResponsesRunManager {
       const models = this.provider.models();
       if (models.length === 0) {
         throw new Error(
-          `no models available from provider ${
-            JSON.stringify(
-              this.provider.name(),
-            )
-          }`,
+          `no models available from provider ${JSON.stringify(
+            this.provider.name(),
+          )}`,
         );
       }
       modelId = models[0].id;
@@ -168,9 +166,7 @@ export class ResponsesRunManager {
     try {
       saveResponseRun(this.sessionDir, run);
     } catch (err) {
-      throw new Error(
-        `persist background response: ${(err as Error).message}`,
-      );
+      throw new Error(`persist background response: ${(err as Error).message}`);
     }
     return run;
   }
@@ -189,7 +185,8 @@ export class ResponsesRunManager {
     signal?: AbortSignal,
   ): Promise<ResponseRun> {
     if (
-      previous === undefined || previous === null ||
+      previous === undefined ||
+      previous === null ||
       (previous.responseId ?? "").trim() === ""
     ) {
       throw new Error("previous Responses response ID is required");
@@ -290,7 +287,8 @@ export class ResponsesRunManager {
     const runs = listResponseRuns(this.sessionDir, sessionId, 500);
     for (let i = 0; i < runs.length; i++) {
       if (
-        isResponsesTerminalStatus(runs[i].state) || runs[i].responseId === ""
+        isResponsesTerminalStatus(runs[i].state) ||
+        runs[i].responseId === ""
       ) {
         continue;
       }
@@ -354,9 +352,7 @@ export class ResponsesRunManager {
           await waitForBackgroundRetry(signal, attempt, baseDelayMs);
           continue;
         }
-        throw new Error(
-          `read background response: ${(err as Error).message}`,
-        );
+        throw new Error(`read background response: ${(err as Error).message}`);
       }
       if (resp.status < 200 || resp.status >= 300) {
         if (
@@ -439,8 +435,10 @@ function archiveBackgroundResponseWithPolicy(
   policies: Record<string, ResponsesHostedPolicy> | undefined,
 ): void {
   if (
-    response === undefined || response === null ||
-    run.sessionId === "" || run.localTurnId === ""
+    response === undefined ||
+    response === null ||
+    run.sessionId === "" ||
+    run.localTurnId === ""
   ) {
     return;
   }
@@ -470,29 +468,26 @@ function archiveBackgroundResponseWithPolicy(
     usage: convertResponsesUsage(response.usage),
     attachments: normalizer.attachments(),
   };
-  saveResponseTurn(
-    sessionDir,
-    {
-      id: 0,
-      sessionId: run.sessionId,
-      localTurnId: run.localTurnId,
-      messageId: null,
-      requestId: "",
-      responseId: response.id ?? "",
-      previousResponseId: response.previous_response_id ?? "",
-      conversationId: responsesConversationID(response),
-      provider: run.provider,
-      api: run.api,
-      model: "background",
-      stateMode: "replay",
-      status,
-      incompleteReason,
-      requestSummary: undefined,
-      responseSummary: summary,
-      createdAt: run.createdAt,
-      completedAt: now,
-    } satisfies ResponseTurn,
-  );
+  saveResponseTurn(sessionDir, {
+    id: 0,
+    sessionId: run.sessionId,
+    localTurnId: run.localTurnId,
+    messageId: null,
+    requestId: "",
+    responseId: response.id ?? "",
+    previousResponseId: response.previous_response_id ?? "",
+    conversationId: responsesConversationID(response),
+    provider: run.provider,
+    api: run.api,
+    model: "background",
+    stateMode: "replay",
+    status,
+    incompleteReason,
+    requestSummary: undefined,
+    responseSummary: summary,
+    createdAt: run.createdAt,
+    completedAt: now,
+  } satisfies ResponseTurn);
   for (let index = 0; index < output.length; index++) {
     const item = decodeResponsesOutputItem(output[index], index);
     if (item === undefined || item.type === "") continue;

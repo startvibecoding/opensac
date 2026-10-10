@@ -103,12 +103,14 @@ test("subagent_wait nil mailbox", async () => {
 
 test("subagent_wait pending summary excludes payload", async () => {
   const mbox: MemberMailbox = createMemberMailbox();
-  mbox.enqueue(completion({
-    memberId: "engineer",
-    displayName: "工程师",
-    status: MEMBER_STATUS_DONE,
-    payload: "SECRET-PAYLOAD-CONTENT",
-  }));
+  mbox.enqueue(
+    completion({
+      memberId: "engineer",
+      displayName: "工程师",
+      status: MEMBER_STATUS_DONE,
+      payload: "SECRET-PAYLOAD-CONTENT",
+    }),
+  );
 
   const tool = createSubAgentWaitTool({ mailbox: mbox });
   const start = Date.now();
@@ -133,11 +135,13 @@ test("subagent_wait pending summary excludes payload", async () => {
 test("subagent_wait returns on activity", async () => {
   const mbox = createMemberMailbox();
   setTimeout(() => {
-    mbox.enqueue(completion({
-      memberId: "qa",
-      status: MEMBER_STATUS_DONE,
-      payload: "passed",
-    }));
+    mbox.enqueue(
+      completion({
+        memberId: "qa",
+        status: MEMBER_STATUS_DONE,
+        payload: "passed",
+      }),
+    );
   }, 30);
 
   const tool = createSubAgentWaitTool({ mailbox: mbox });

@@ -104,7 +104,8 @@ export class AgentHost implements Host {
     try {
       for await (const ev of a.run(buildTaskPrompt(task), run.signal)) {
         if (
-          ev.type === eventToolApprovalRequest && this.parentSink !== undefined
+          ev.type === eventToolApprovalRequest &&
+          this.parentSink !== undefined
         ) {
           sendParentEvent(this.parentSink, {
             type: EVENT_TOOL_APPROVAL_REQUEST,
@@ -120,8 +121,7 @@ export class AgentHost implements Host {
             completed = true;
             switch (ev.status) {
               case taskFailed:
-                runErr = ev.error ??
-                  new Error("workflow worker failed");
+                runErr = ev.error ?? new Error("workflow worker failed");
                 manager.markError(a.id(), runErr);
                 break;
               case taskIncomplete:
@@ -131,8 +131,7 @@ export class AgentHost implements Host {
                 break;
               case taskCanceled:
                 resultStatus = statusCanceled;
-                runErr = ev.error ??
-                  new Error("workflow worker canceled");
+                runErr = ev.error ?? new Error("workflow worker canceled");
                 manager.markCanceled(a.id(), runErr);
                 break;
               default:
@@ -183,7 +182,8 @@ export class AgentHost implements Host {
       if (resultStatus === statusDone) result.status = statusError;
       result.error = runErr.message;
       if (
-        resultStatus === statusIncomplete || resultStatus === statusCanceled
+        resultStatus === statusIncomplete ||
+        resultStatus === statusCanceled
       ) {
         return result;
       }
@@ -200,10 +200,7 @@ function abortErrorFrom(signal: AbortSignal): Error {
 }
 
 /** Builds the stable agent ID for one workflow task. */
-export function workflowAgentID(
-  name: string,
-  instanceKey: string,
-): AgentID {
+export function workflowAgentID(name: string, instanceKey: string): AgentID {
   name = name.trim();
   if (name === "") return "";
   let key = name;

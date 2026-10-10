@@ -4,6 +4,7 @@
 // It is computed once per process. Keeping it in its own module avoids a
 // runtime_lock import cycle.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 let processID: string | null = null;
 
 /** Returns this process's stable runtime owner identity. */
@@ -12,9 +13,9 @@ export function runtimeOwnerID(): string {
   try {
     const nonce = new Uint8Array(16);
     crypto.getRandomValues(nonce);
-    processID = `pid-${Deno.pid}-${toHex(nonce)}`;
+    processID = `pid-${nodeRuntime.pid}-${toHex(nonce)}`;
   } catch {
-    processID = `pid-${Deno.pid}-${Date.now()}`;
+    processID = `pid-${nodeRuntime.pid}-${Date.now()}`;
   }
   return processID;
 }

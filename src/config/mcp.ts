@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   asJsonRecord,
@@ -117,7 +118,7 @@ export function mcpConfigFromJSON(value: unknown): MCPConfig {
 
 /** Reads and parses mcp.json from `p`. */
 export function loadMCPConfig(p: string): MCPConfig {
-  const data = Deno.readTextFileSync(p);
+  const data = runtime.readTextFileSync(p);
   try {
     return mcpConfigFromJSON(JSON.parse(data));
   } catch (err) {
@@ -129,21 +130,21 @@ export function loadMCPConfig(p: string): MCPConfig {
 export function saveMCPConfig(p: string, cfg: MCPConfig | undefined): void {
   const effective = cfg ?? {};
   const dir = path.dirname(p);
-  Deno.mkdirSync(dir, { recursive: true });
+  runtime.mkdirSync(dir, { recursive: true });
   const data = JSON.stringify(configToJSON(effective), null, 2) + "\n";
 
-  const tmpPath = Deno.makeTempFileSync({
+  const tmpPath = runtime.makeTempFileSync({
     dir,
     prefix: ".mcp-",
     suffix: ".tmp",
   });
   try {
-    Deno.writeTextFileSync(tmpPath, data);
-    Deno.chmodSync(tmpPath, 0o600);
-    Deno.renameSync(tmpPath, p);
+    runtime.writeTextFileSync(tmpPath, data);
+    runtime.chmodSync(tmpPath, 0o600);
+    runtime.renameSync(tmpPath, p);
   } catch (err) {
     try {
-      Deno.removeSync(tmpPath);
+      runtime.removeSync(tmpPath);
     } catch {
       // already gone
     }

@@ -2,8 +2,9 @@
 //
 // Deviations: the async resource loaders are awaited; mock/`SessionRuntime`
 // construction uses the ported camelCase API; `t.TempDir()` maps to
-// `Deno.makeTempDirSync`.
+// `nodeRuntime.makeTempDirSync`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -66,8 +67,8 @@ function inputTestSession(): {
   workDir: string;
   manager: ReturnType<typeof createManager>;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-rt-root-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "opensac-rt-work-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-rt-root-" });
+  const workDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-rt-work-" });
   const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, manager };
@@ -91,26 +92,22 @@ function writeExpertFixtures(workDir: string): void {
     members: string[] = [],
   ): void => {
     const dir = `${workDir}/.opensac/experts/${name}`;
-    Deno.mkdirSync(`${dir}/agents`, { recursive: true, mode: 0o700 });
+    nodeRuntime.mkdirSync(`${dir}/agents`, { recursive: true, mode: 0o700 });
     let team = "";
     if (members.length > 0) {
       const quoted = members.map((m) => `"${m}"`).join(",");
-      team =
-        `,"teamInfo":{"leadAgent":"${persona}","memberAgents":[${quoted}]},"members":[{"id":"${persona}","name":{"zh":"总监","en":"Boss"},"role":"lead"}`;
+      team = `,"teamInfo":{"leadAgent":"${persona}","memberAgents":[${quoted}]},"members":[{"id":"${persona}","name":{"zh":"总监","en":"Boss"},"role":"lead"}`;
       for (const m of members) {
-        team +=
-          `,{"id":"${m}","name":{"zh":"成员-${m}","en":"Member"},"role":"member"}`;
+        team += `,{"id":"${m}","name":{"zh":"成员-${m}","en":"Member"},"role":"member"}`;
       }
       team += "]";
     }
     const agentName = expertType === "agent" ? `,"agentName":"${persona}"` : "";
-    const manifest =
-      `{"schemaVersion":1,"name":"${name}","expertType":"${expertType}"${agentName},"displayName":{"zh":"${name}","en":"${name}"}${team}}`;
-    Deno.writeTextFileSync(`${dir}/expert.json`, manifest);
+    const manifest = `{"schemaVersion":1,"name":"${name}","expertType":"${expertType}"${agentName},"displayName":{"zh":"${name}","en":"${name}"}${team}}`;
+    nodeRuntime.writeTextFileSync(`${dir}/expert.json`, manifest);
     const writePersona = (id: string, role: string, body: string): void => {
-      const content =
-        `---\nname: ${id}\nrole: ${role}\ndescription: persona ${id}\n---\n${body}\n`;
-      Deno.writeTextFileSync(`${dir}/agents/${id}.md`, content);
+      const content = `---\nname: ${id}\nrole: ${role}\ndescription: persona ${id}\n---\n${body}\n`;
+      nodeRuntime.writeTextFileSync(`${dir}/agents/${id}.md`, content);
     };
     writePersona(persona, "lead", `LEAD-BODY-${name}`);
     for (const m of members) writePersona(m, "member", `MEMBER-BODY-${m}`);
@@ -120,7 +117,7 @@ function writeExpertFixtures(workDir: string): void {
 }
 
 test("beginArtifactCollectionDisabledByDefault", () => {
-  const registry = createRegistry(Deno.makeTempDirSync(), undefined);
+  const registry = createRegistry(nodeRuntime.makeTempDirSync(), undefined);
   const runtime = new SessionRuntime({ registry });
   const collector = runtime.beginArtifactCollection("run-disabled");
   assertEquals(collector, null);
@@ -157,7 +154,10 @@ test("artifactCollectorObserverReceivesPersistedRecord", async () => {
     try {
       const observed: SessionAttachment[] = [];
       collector.setObserver((record) => observed.push(record));
-      Deno.writeTextFileSync(`${workDir}/report.txt`, "observer content");
+      nodeRuntime.writeTextFileSync(
+        `${workDir}/report.txt`,
+        "observer content",
+      );
       const tool = runtime.registry!.get("publish_artifact");
       assert(tool !== undefined, "publish_artifact was not registered");
       await tool.execute({}, { path: "report.txt" });
@@ -195,12 +195,12 @@ test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () => {
       collector.setObserver(() => {
         throw new Error("observer projection failed");
       });
-      Deno.writeTextFileSync(`${workDir}/panic.txt`, "panic safe");
+      nodeRuntime.writeTextFileSync(`${workDir}/panic.txt`, "panic safe");
       const record = await collector.register("panic.txt", "", "auto");
       assertEquals(record.status, "generated");
       assert(record.id !== "");
       collector.setObserver(null);
-      Deno.writeTextFileSync(`${workDir}/second.txt`, "second");
+      nodeRuntime.writeTextFileSync(`${workDir}/second.txt`, "second");
       await collector.register("second.txt", "", "auto");
       assertEquals(collector.artifacts().length, 2);
       const stored = service.get(manager.getHeader()!.id, record.id);
@@ -214,8 +214,8 @@ test("artifactCollectorObserverPanicDoesNotAffectRegistration", async () => {
 });
 
 test("attachSessionResourcesUsesManagerIdentity", async () => {
-  const workDir = Deno.makeTempDirSync();
-  const manager = createManager(workDir, Deno.makeTempDirSync());
+  const workDir = nodeRuntime.makeTempDirSync();
+  const manager = createManager(workDir, nodeRuntime.makeTempDirSync());
   manager.init();
   try {
     const registry = createRegistry(workDir, createNoneSandbox());
@@ -235,13 +235,13 @@ test("attachSessionResourcesUsesManagerIdentity", async () => {
 
 test("attachSessionResourcesRejectsIncompleteOwnership", async () => {
   await assertRejects(() =>
-    attachSessionResources({ workDir: Deno.makeTempDirSync() })
+    attachSessionResources({ workDir: nodeRuntime.makeTempDirSync() }),
   );
 });
 
 test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
-  const workDir = Deno.makeTempDirSync();
-  const manager = createManager(workDir, Deno.makeTempDirSync());
+  const workDir = nodeRuntime.makeTempDirSync();
+  const manager = createManager(workDir, nodeRuntime.makeTempDirSync());
   manager.init();
   try {
     const runtime = new SessionRuntime({ source: SOURCE_TUI, workDir });
@@ -256,8 +256,8 @@ test("sessionRuntimeBindSessionUpdatesLazyIdentity", async () => {
 });
 
 test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
-  const workDir = Deno.makeTempDirSync();
-  const sessionDir = Deno.makeTempDirSync();
+  const workDir = nodeRuntime.makeTempDirSync();
+  const sessionDir = nodeRuntime.makeTempDirSync();
   const first = createManager(workDir, sessionDir);
   first.init();
   try {
@@ -275,7 +275,10 @@ test("bindSessionKeepsPreviousIdentityWhenPreparationFails", async () => {
 });
 
 test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
-  const manager = createManager(Deno.makeTempDirSync(), Deno.makeTempDirSync());
+  const manager = createManager(
+    nodeRuntime.makeTempDirSync(),
+    nodeRuntime.makeTempDirSync(),
+  );
   manager.init();
   try {
     const runtime = new SessionRuntime({ source: SOURCE_TUI });
@@ -287,7 +290,7 @@ test("sessionRuntimeBindSessionRejectsClosedRuntime", async () => {
 });
 
 test("buildRegistryAppliesAdapterPolicy", () => {
-  const workDir = Deno.makeTempDirSync();
+  const workDir = nodeRuntime.makeTempDirSync();
   const registry = buildRegistry(workDir, undefined, undefined, {
     registerDefaults: true,
     enablePlanTool: false,
@@ -299,9 +302,11 @@ test("buildRegistryAppliesAdapterPolicy", () => {
   buildRegistry(workDir, undefined, undefined, {
     registerDefaults: false,
     browser: false,
-    mutators: [() => {
-      mutated = true;
-    }],
+    mutators: [
+      () => {
+        mutated = true;
+      },
+    ],
   });
   assert(mutated, "mutator did not run");
   let threw = false;
@@ -317,9 +322,9 @@ test("buildRegistryAppliesAdapterPolicy", () => {
 });
 
 test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () => {
-  const workDir = Deno.makeTempDirSync();
+  const workDir = nodeRuntime.makeTempDirSync();
   writeExpertFixtures(workDir);
-  const manager = createManager(workDir, Deno.makeTempDirSync());
+  const manager = createManager(workDir, nodeRuntime.makeTempDirSync());
   manager.init();
   try {
     const model = makeModel();
@@ -338,9 +343,9 @@ test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () => {
       MODE_YOLO,
       thinkingMedium,
     );
-    const expertOption = runtime.configOptions().find((o) =>
-      o.id === CONFIG_OPTION_EXPERT
-    )!;
+    const expertOption = runtime
+      .configOptions()
+      .find((o) => o.id === CONFIG_OPTION_EXPERT)!;
     assert(expertOption.id !== "");
     assertEquals(expertOption.currentValue, "");
     assert(expertOption.options!.length >= 3);
@@ -365,8 +370,8 @@ test("sessionRuntimeExpertConfigOptionUsesRuntimeBindingRules", async () => {
 });
 
 test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
-  const workDir = Deno.makeTempDirSync();
-  const manager = createManager(workDir, Deno.makeTempDirSync());
+  const workDir = nodeRuntime.makeTempDirSync();
+  const manager = createManager(workDir, nodeRuntime.makeTempDirSync());
   manager.init();
   try {
     const modelOne = makeModel({
@@ -405,10 +410,7 @@ test("sessionRuntimeConfigOptionsPersistModelModeThinking", async () => {
       "test-provider/model-two",
     );
     await runtime.setConfigOption("mode", MODE_PLAN);
-    await runtime.setConfigOption(
-      CONFIG_OPTION_THINKING_LEVEL,
-      thinkingHigh,
-    );
+    await runtime.setConfigOption(CONFIG_OPTION_THINKING_LEVEL, thinkingHigh);
     assertEquals(
       optionCurrentValue(runtime.configOptions(), CONFIG_OPTION_MODEL),
       "test-provider/model-two",
@@ -486,7 +488,7 @@ test("sessionRuntimeAttachPreparedInputRejectsUnavailable", async () => {
     assertEquals(attached.resources.length, 1);
     runtime.discardInput(attached);
     assertThrows(() =>
-      runtime.attachPreparedInput(undefined, "hi", [prepared])
+      runtime.attachPreparedInput(undefined, "hi", [prepared]),
     );
   } finally {
     closeDatabases();

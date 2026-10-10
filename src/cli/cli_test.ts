@@ -1,8 +1,9 @@
 // Focused tests for the ported cmd/mothx surface: ACP timeout resolution,
 // flag→RunOptions mapping, doctor projection, and the command tree
 // dispatch. Subprocess/stdio behavior is covered by the ACP process test
-// (run_process_test.ts) which spawns `deno run src/main.ts acp`.
+// (run_process_test.ts) which spawns `node src/main.ts acp`.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   defaultCLIOptions,
@@ -93,16 +94,17 @@ test("acpRunOptions maps CLI flags and resolved timeouts", () => {
   assertEquals(opts.version, "9.9.9");
   assertEquals(opts.permissionTimeoutMs, 420_000);
   // Question timeout reads env when the flag is empty.
-  const previous = Deno.env.get("OPENSAC_ACP_QUESTION_TIMEOUT");
-  Deno.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", "3m");
+  const previous = runtime.env.get("OPENSAC_ACP_QUESTION_TIMEOUT");
+  runtime.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", "3m");
   try {
     assertEquals(
       acpRunOptions(defaultCLIOptions(), "").questionTimeoutMs,
       180_000,
     );
   } finally {
-    if (previous === undefined) Deno.env.delete("OPENSAC_ACP_QUESTION_TIMEOUT");
-    else Deno.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", previous);
+    if (previous === undefined)
+      runtime.env.delete("OPENSAC_ACP_QUESTION_TIMEOUT");
+    else runtime.env.set("OPENSAC_ACP_QUESTION_TIMEOUT", previous);
   }
 });
 
@@ -139,9 +141,9 @@ test("core dispatches bare start and the stop subcommand to their own runners", 
 });
 
 test("doctor command projects JSON and human output", () => {
-  const configDir = Deno.makeTempDirSync();
-  const previous = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", configDir);
+  const configDir = runtime.makeTempDirSync();
+  const previous = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", configDir);
   try {
     const lines: string[] = [];
     const result = executeDoctorCommand({
@@ -163,21 +165,15 @@ test("doctor command projects JSON and human output", () => {
     assert(human.includes("  OpenSAC Doctor"));
     assert(human.some((line: string) => line.includes("Result:")));
   } finally {
-    if (previous === undefined) Deno.env.delete("OPENSAC_DIR");
-    else Deno.env.set("OPENSAC_DIR", previous);
+    if (previous === undefined) runtime.env.delete("OPENSAC_DIR");
+    else runtime.env.set("OPENSAC_DIR", previous);
   }
 });
 
 test("root command registers acp doctor and knowledge-mcp", async () => {
   const root = createRootCommand("test-version");
   const help = await root.getHelp();
-  const names: string[] = [
-    "acp",
-    "core",
-    "doctor",
-    "knowledge-mcp",
-    "stats",
-  ];
+  const names: string[] = ["acp", "core", "doctor", "knowledge-mcp", "stats"];
   for (const name of names) {
     assert(help.includes(name), `help must list ${name}`);
   }
@@ -186,16 +182,14 @@ test("root command registers acp doctor and knowledge-mcp", async () => {
 test("every supported subcommand is wired (no pending placeholders)", async () => {
   const root = createRootCommand("test-version");
   const help = await root.getHelp();
-  for (
-    const name of [
-      "acp",
-      "core",
-      "doctor",
-      "knowledge-mcp",
-      "stats",
-      "speedtest",
-    ]
-  ) {
+  for (const name of [
+    "acp",
+    "core",
+    "doctor",
+    "knowledge-mcp",
+    "stats",
+    "speedtest",
+  ]) {
     assert(help.includes(name), `help must list ${name}`);
   }
   // The removed serve/A2A modes must not come back as subcommands. Read the
@@ -221,10 +215,7 @@ test("knowledge-mcp serve requires at least one knowledge base", async () => {
   } catch (error) {
     threw = true;
     const message = (error as Error).message;
-    assert(
-      message.includes("at least one --knowledge-base"),
-      message,
-    );
+    assert(message.includes("at least one --knowledge-base"), message);
   }
   assert(threw);
 });
@@ -307,11 +298,13 @@ test("core dispatches status, start, restart, pair, and list to their own runner
       return Promise.resolve({
         url: "http://127.0.0.1:1",
         pid: 7,
-        clients: [{
-          clientId: "client-1",
-          connectedAt: 1_700_000_000_000,
-          subscriptions: [{ sessionId: "s1", runId: "r1" }],
-        }],
+        clients: [
+          {
+            clientId: "client-1",
+            connectedAt: 1_700_000_000_000,
+            subscriptions: [{ sessionId: "s1", runId: "r1" }],
+          },
+        ],
       });
     },
   };
@@ -405,12 +398,14 @@ test("core lifecycle formatters project human and JSON output", () => {
   const listOutcome = {
     url: "http://127.0.0.1:1",
     pid: 7,
-    clients: [{
-      clientId: "client-1",
-      remoteAddress: "127.0.0.1",
-      connectedAt: 1_700_000_000_000,
-      subscriptions: [{ sessionId: "s1", runId: "r1" }],
-    }],
+    clients: [
+      {
+        clientId: "client-1",
+        remoteAddress: "127.0.0.1",
+        connectedAt: 1_700_000_000_000,
+        subscriptions: [{ sessionId: "s1", runId: "r1" }],
+      },
+    ],
   };
   assertEquals(formatCoreList(listOutcome, true), JSON.stringify(listOutcome));
   const listed = formatCoreList(listOutcome, false);
@@ -440,7 +435,9 @@ test("core lifecycle formatters project human and JSON output", () => {
   );
   assert(paired.includes("unauthenticated local clients"), paired);
   assert(
-    formatCorePair({ ...pairOutcome, auth: true, verified: true }, false)
-      .includes("candidate password accepted"),
+    formatCorePair(
+      { ...pairOutcome, auth: true, verified: true },
+      false,
+    ).includes("candidate password accepted"),
   );
 });

@@ -3,6 +3,7 @@
 // names. `Chat(ctx, params) <-chan StreamEvent` maps to
 // `chat(params): AsyncIterable<StreamEvent>` and `context.Context`/the abort
 // channel map to `params.abort` (AbortSignal).
+import { runtime } from "../../platform/runtime.ts";
 import { wrapError } from "../errors.ts";
 import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
@@ -201,9 +202,7 @@ export function decodeGoogleStreamChunk(
   return chunk;
 }
 
-function decodeGoogleCandidate(
-  rec: Record<string, unknown>,
-): GoogleCandidate {
+function decodeGoogleCandidate(rec: Record<string, unknown>): GoogleCandidate {
   const content = optRecord(rec, "content") ?? {};
   const parts: GooglePart[] = [];
   const partsRaw = content["parts"];
@@ -293,11 +292,11 @@ export class Provider extends BaseProvider implements ProviderInterface {
     if (baseURL === "") baseURL = defaultBaseURL;
     if (apiKey === "") {
       if (kind === apiKindGemini) {
-        apiKey = Deno.env.get("GOOGLE_API_KEY") ?? "";
+        apiKey = runtime.env.get("GOOGLE_API_KEY") ?? "";
       } else if (kind === apiKindVertex) {
-        apiKey = Deno.env.get("GOOGLE_CLOUD_API_KEY") ?? "";
+        apiKey = runtime.env.get("GOOGLE_CLOUD_API_KEY") ?? "";
         if (apiKey === "") {
-          apiKey = Deno.env.get("GOOGLE_VERTEX_ACCESS_TOKEN") ?? "";
+          apiKey = runtime.env.get("GOOGLE_VERTEX_ACCESS_TOKEN") ?? "";
         }
       }
     }
@@ -434,7 +433,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
         if (attempt < maxRetries && isRetryable(err, 0)) {
           const plan = retryPlan(attempt, err);
           yield plan.event;
-          if (!await waitOrAbort(plan.delay)) {
+          if (!(await waitOrAbort(plan.delay))) {
             yield {
               type: streamError,
               error: new Error("aborted"),
@@ -455,7 +454,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
         if (attempt < maxRetries && isRetryable(err, resp.status)) {
           const plan = retryPlan(attempt, err);
           yield plan.event;
-          if (!await waitOrAbort(plan.delay)) {
+          if (!(await waitOrAbort(plan.delay))) {
             yield {
               type: streamError,
               error: new Error("aborted"),
@@ -489,12 +488,13 @@ export class Provider extends BaseProvider implements ProviderInterface {
         return;
       }
       if (
-        attempt < maxRetries && !state.visibleOutput &&
+        attempt < maxRetries &&
+        !state.visibleOutput &&
         isRetryable(streamErr, 0)
       ) {
         const plan = retryPlan(attempt, streamErr);
         yield plan.event;
-        if (!await waitOrAbort(plan.delay)) {
+        if (!(await waitOrAbort(plan.delay))) {
           yield {
             type: streamError,
             error: new Error("aborted"),
@@ -589,7 +589,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
       }
       for (const candidate of chunk.candidates ?? []) {
         if (
-          candidate.finishReason !== undefined && candidate.finishReason !== ""
+          candidate.finishReason !== undefined &&
+          candidate.finishReason !== ""
         ) {
           stopReason = candidate.finishReason.toLowerCase();
         }
@@ -760,7 +761,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
             break;
           case "thinking":
             if (
-              (block.thinking ?? "") !== "" || (block.signature ?? "") !== ""
+              (block.thinking ?? "") !== "" ||
+              (block.signature ?? "") !== ""
             ) {
               content.parts.push({
                 text: block.thinking ?? "",
@@ -958,7 +960,8 @@ export function googleRole(role: string): string {
 
 function googleToolResultText(msg: Message): string {
   if (
-    (msg.content ?? "") !== "" || msg.contents === undefined ||
+    (msg.content ?? "") !== "" ||
+    msg.contents === undefined ||
     msg.contents.length === 0
   ) {
     return msg.content ?? "";

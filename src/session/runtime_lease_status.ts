@@ -24,16 +24,15 @@ export interface ActiveRuntimeLease {
 
 /** Renders the holder in one line for an operator-facing refusal. */
 export function describeActiveRuntimeLease(lease: ActiveRuntimeLease): string {
-  let description =
-    `session ${lease.sessionId} holds an active ${lease.purpose} lease owned by ${lease.ownerKind} (pid ${lease.ownerPid})`;
+  let description = `session ${lease.sessionId} holds an active ${lease.purpose} lease owned by ${lease.ownerKind} (pid ${lease.ownerPid})`;
   if (lease.runId !== "") {
     description += `, run ${lease.runId}`;
   }
   const remaining = lease.expiresAt.getTime() - Date.now();
   if (remaining > 0) {
-    description += `, still renewing (expires in ${
-      formatDurationSeconds(remaining / 1000)
-    })`;
+    description += `, still renewing (expires in ${formatDurationSeconds(
+      remaining / 1000,
+    )})`;
   }
   return description;
 }
@@ -58,9 +57,7 @@ function formatDurationSeconds(seconds: number): string {
  * admitted or executing a run, so an idle TUI or ACP process holding
  * the same directory open is not reported here.
  */
-export function activeRuntimeLeases(
-  sessionDir: string,
-): ActiveRuntimeLease[] {
+export function activeRuntimeLeases(sessionDir: string): ActiveRuntimeLease[] {
   const db = openExistingSessionDBReadOnly(sessionDir);
   if (db === null) return [];
   try {

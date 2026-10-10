@@ -1,13 +1,18 @@
-import { assertEquals, assertRejects, assertThrows } from "../src/compat/assert.ts";
+import { runtime } from "../src/platform/runtime.ts";
+import {
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "../src/compat/assert.ts";
 import { join } from "../src/compat/path.ts";
 import {
-import { test } from "#testing";
   authHeader,
   isPublished,
   packumentUrl,
   parseArgs,
   readPackageJson,
 } from "./npm_publish_if_needed.ts";
+import { test } from "#testing";
 
 /** Builds a fetch stub returning one status and a fixed body. */
 function stubFetch(status: number, body: unknown = {}): typeof fetch {
@@ -25,9 +30,7 @@ function recordingFetch(
 ): typeof fetch {
   return ((input: string | URL | Request) => {
     seen.url = String(input);
-    return Promise.resolve(
-      new Response(JSON.stringify(body), { status }),
-    );
+    return Promise.resolve(new Response(JSON.stringify(body), { status }));
   }) as unknown as typeof fetch;
 }
 
@@ -81,9 +84,9 @@ test("AuthHeaderUsesTheWorkflowTokenWhenPresent", () => {
 });
 
 test("ReadPackageJsonRequiresNameAndVersion", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "opensac-publish-test-" });
+  const dir = await runtime.makeTempDir({ prefix: "opensac-publish-test-" });
   try {
-    await Deno.writeTextFile(
+    await runtime.writeTextFile(
       join(dir, "package.json"),
       JSON.stringify({ name: "opensac", version: "1.0.0" }),
     );
@@ -92,7 +95,7 @@ test("ReadPackageJsonRequiresNameAndVersion", async () => {
       version: "1.0.0",
     });
 
-    await Deno.writeTextFile(
+    await runtime.writeTextFile(
       join(dir, "package.json"),
       JSON.stringify({ name: "opensac" }),
     );
@@ -102,7 +105,7 @@ test("ReadPackageJsonRequiresNameAndVersion", async () => {
       "name and a version",
     );
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await runtime.remove(dir, { recursive: true });
   }
 });
 
@@ -110,22 +113,12 @@ test("IsPublishedReadsTheVersionOutOfThePackument", async () => {
   const registry = "https://registry.npmjs.org";
   const packument = { versions: { "1.0.0": {}, "2.0.0": {} } };
   assertEquals(
-    await isPublished(
-      registry,
-      "opensac",
-      "1.0.0",
-      stubFetch(200, packument),
-    ),
+    await isPublished(registry, "opensac", "1.0.0", stubFetch(200, packument)),
     true,
   );
   // The packument existing does not mean this version does.
   assertEquals(
-    await isPublished(
-      registry,
-      "opensac",
-      "3.0.0",
-      stubFetch(200, packument),
-    ),
+    await isPublished(registry, "opensac", "3.0.0", stubFetch(200, packument)),
     false,
   );
   assertEquals(
@@ -216,11 +209,7 @@ test("ParseArgsForwardsEverythingAfterTheSeparator", () => {
 test("ParseArgsRejectsAMissingFlagValue", () => {
   const defaults = { registry: "https://registry.npmjs.org", tag: "latest" };
   // parseArgs throws synchronously, so assertThrows is the matching assertion.
-  assertThrows(
-    () => parseArgs(["--tag"], defaults),
-    Error,
-    "requires a value",
-  );
+  assertThrows(() => parseArgs(["--tag"], defaults), Error, "requires a value");
   assertThrows(
     () => parseArgs(["--registry"], defaults),
     Error,

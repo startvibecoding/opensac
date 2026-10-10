@@ -111,8 +111,7 @@ const fileColumns = `id, snapshot_id AS snapshotId,
   relative_path AS relativePath, content_sha256 AS contentSha256,
   byte_size AS byteSize, media_type AS mediaType, title, status`;
 
-const chunkColumns =
-  `c.id AS id, c.snapshot_id AS snapshotId, c.file_id AS fileId,
+const chunkColumns = `c.id AS id, c.snapshot_id AS snapshotId, c.file_id AS fileId,
   kf.relative_path AS relativePath, c.ordinal AS ordinal, c.text AS text,
   c.start_line AS startLine, c.end_line AS endLine,
   c.content_sha256 AS contentSha256`;
@@ -129,7 +128,7 @@ const evidenceColumns = `id, snapshot_id AS snapshotId, node_id AS nodeId,
 
 /** The only owner of SQL for the knowledge-base configuration/hraph store. */
 export class KnowledgeBaseDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -153,11 +152,13 @@ export class KnowledgeBaseDAO {
 
   /** Reports whether this database still contains the former shared tables. */
   hasStorage(): boolean {
-    return queryOptional<{ n: number }>(
-      this.requireDb(),
-      `SELECT COUNT(*) AS n FROM sqlite_master
+    return (
+      queryOptional<{ n: number }>(
+        this.requireDb(),
+        `SELECT COUNT(*) AS n FROM sqlite_master
        WHERE type = 'table' AND name = 'knowledge_bases'`,
-    )?.n !== 0;
+      )?.n !== 0
+    );
   }
 
   insertBase(executor: DB, record: KnowledgeBaseRecord): void {
@@ -218,11 +219,9 @@ export class KnowledgeBaseDAO {
          SELECT id FROM knowledge_index_snapshots WHERE knowledge_base_id = ?)`,
       [id],
     );
-    return execChanges(
-      executor,
-      `DELETE FROM knowledge_bases WHERE id = ?`,
-      [id],
-    );
+    return execChanges(executor, `DELETE FROM knowledge_bases WHERE id = ?`, [
+      id,
+    ]);
   }
 
   insertSnapshot(executor: DB, record: KnowledgeSnapshotRecord): void {
@@ -647,10 +646,16 @@ function splitFTSQueryTerms(value: string): string[] {
 
 function isFTSQueryChar(ch: string): boolean {
   const code = ch.codePointAt(0)!;
-  return ch === "_" || ch === "-" || ch === "." || ch === "/" ||
+  return (
+    ch === "_" ||
+    ch === "-" ||
+    ch === "." ||
+    ch === "/" ||
     (code >= 0x30 && code <= 0x39) ||
     (code >= 0x61 && code <= 0x7a) ||
-    (code >= 0x41 && code <= 0x5a) || knowledgeIsFTSCJK(code);
+    (code >= 0x41 && code <= 0x5a) ||
+    knowledgeIsFTSCJK(code)
+  );
 }
 
 /** Reports whether a code point is in the CJK range preserved by the FTS path. */
@@ -663,8 +668,10 @@ export function knowledgeFTSHasTokenRune(term: string): boolean {
   for (const ch of Array.from(term)) {
     const code = ch.codePointAt(0)!;
     if (
-      ch === "_" || (code >= 0x30 && code <= 0x39) ||
-      (code >= 0x61 && code <= 0x7a) || (code >= 0x41 && code <= 0x5a) ||
+      ch === "_" ||
+      (code >= 0x30 && code <= 0x39) ||
+      (code >= 0x61 && code <= 0x7a) ||
+      (code >= 0x41 && code <= 0x5a) ||
       knowledgeIsFTSCJK(code)
     ) {
       return true;

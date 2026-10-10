@@ -327,9 +327,9 @@ export function serializeConversation(messages: Message[]): string {
             case "toolCall":
               if (block.toolCall !== undefined) {
                 parts.push(
-                  `[tool_call: ${block.toolCall.name}(${
-                    stringifyArguments(block.toolCall)
-                  })]`,
+                  `[tool_call: ${block.toolCall.name}(${stringifyArguments(
+                    block.toolCall,
+                  )})]`,
                 );
               }
               break;
@@ -344,9 +344,10 @@ export function serializeConversation(messages: Message[]): string {
           content = serializeContentBlocks(msg.contents ?? []);
         }
         parts.push(
-          `Tool Result [${msg.toolName ?? ""}]: ${
-            truncateString(content, 500)
-          }\n\n`,
+          `Tool Result [${msg.toolName ?? ""}]: ${truncateString(
+            content,
+            500,
+          )}\n\n`,
         );
         break;
       }
@@ -388,9 +389,9 @@ function serializeContentBlocks(blocks: ContentBlock[]): string {
       case "toolCall":
         if (block.toolCall !== undefined) {
           parts.push(
-            `[tool_call: ${block.toolCall.name}(${
-              stringifyArguments(block.toolCall)
-            })]`,
+            `[tool_call: ${block.toolCall.name}(${stringifyArguments(
+              block.toolCall,
+            )})]`,
           );
         }
         break;
@@ -428,8 +429,7 @@ export interface CompressionTemplate {
 // defaultCompressionInstruction is injected into the conversation for
 // Insert-then-Compress. This implements Rule R4.2: the compression instruction
 // is a system_injected message.
-const defaultCompressionInstruction =
-  `Please create a structured context checkpoint summary of our conversation so far.
+const defaultCompressionInstruction = `Please create a structured context checkpoint summary of our conversation so far.
 
 Use this EXACT format:
 
@@ -464,8 +464,7 @@ Keep each section concise. Preserve exact file paths, function names, and error 
 
 // defaultUpdateCompressionInstruction is used when there's an existing summary
 // to update.
-const defaultUpdateCompressionInstruction =
-  `Please update the existing summary with new information from our conversation.
+const defaultUpdateCompressionInstruction = `Please update the existing summary with new information from our conversation.
 
 <existing-summary>
 %s
@@ -481,8 +480,7 @@ RULES:
 
 Use the same EXACT format as the existing summary.`;
 
-const codeCompressionInstruction =
-  `Please create a structured coding checkpoint summary of our work so far.
+const codeCompressionInstruction = `Please create a structured coding checkpoint summary of our work so far.
 
 Use this EXACT format:
 
@@ -519,8 +517,7 @@ Use this EXACT format:
 
 Keep each section concise. Preserve exact file paths, function names, commands, and error messages.`;
 
-const codeUpdateCompressionInstruction =
-  `Please update the existing coding checkpoint summary with new information from our conversation.
+const codeUpdateCompressionInstruction = `Please update the existing coding checkpoint summary with new information from our conversation.
 
 <existing-summary>
 %s
@@ -533,8 +530,7 @@ RULES:
 - REMOVE stale next steps only when they are clearly completed or no longer relevant
 - Keep the same EXACT format as the existing summary.`;
 
-const conversationCompressionInstruction =
-  `Please create a concise conversation checkpoint summary of our conversation so far.
+const conversationCompressionInstruction = `Please create a concise conversation checkpoint summary of our conversation so far.
 
 Use this EXACT format:
 
@@ -560,8 +556,7 @@ Use this EXACT format:
 
 Keep it concise and preserve exact identifiers, paths, commands, and error messages.`;
 
-const conversationUpdateCompressionInstruction =
-  `Please update the existing conversation checkpoint summary with new information.
+const conversationUpdateCompressionInstruction = `Please update the existing conversation checkpoint summary with new information.
 
 <existing-summary>
 %s
@@ -673,9 +668,10 @@ async function generateSummaryInsertThenCompressWithOptions(
   }
 
   // Build compression instruction
-  const instruction = previousSummary !== ""
-    ? applyUpdateInstruction(tpl.updateInstruction, previousSummary)
-    : tpl.instruction;
+  const instruction =
+    previousSummary !== ""
+      ? applyUpdateInstruction(tpl.updateInstruction, previousSummary)
+      : tpl.instruction;
 
   // Create the compression instruction message (system_injected)
   const compressionMsg = createSystemInjectedUserMessage(instruction);
@@ -770,8 +766,7 @@ export function generateSummary(
   );
 }
 
-const largeToolResultCompressionInstruction =
-  `Summarize the following tool result for a later conversation checkpoint.
+const largeToolResultCompressionInstruction = `Summarize the following tool result for a later conversation checkpoint.
 
 Preserve exact file paths, identifiers, commands, error messages, decisions, and other facts needed to continue the task. Remove repetition and incidental detail. Return only the concise factual summary; do not call tools.
 
@@ -842,10 +837,9 @@ async function compressLargeToolResultsWithOptions(
           options,
         );
       } catch (err) {
-        throw new Error(
-          `compress tool result ${index}: ${errorMessage(err)}`,
-          { cause: err },
-        );
+        throw new Error(`compress tool result ${index}: ${errorMessage(err)}`, {
+          cause: err,
+        });
       }
     },
   );
@@ -930,7 +924,7 @@ async function summarizeToolResultWithOptions(
   }
 
   const maxRateLimitRetries = 2;
-  for (let attempt = 0;; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     try {
       return await summarizeToolResultOnceWithOptions(
         signal,
@@ -1033,9 +1027,9 @@ function toolResultSummaryPrompt(msg: Message): string {
     "%s",
     () => toolName,
   );
-  return `${instruction}\n\n<tool_result name=${
-    goQuote(toolName)
-  }>\n${toolOutput}\n</tool_result>`;
+  return `${instruction}\n\n<tool_result name=${goQuote(
+    toolName,
+  )}>\n${toolOutput}\n</tool_result>`;
 }
 
 function isRateLimitError(err: unknown): boolean {
@@ -1043,10 +1037,12 @@ function isRateLimitError(err: unknown): boolean {
     return false;
   }
   const message = errorMessage(err).toLowerCase();
-  return message.includes("429") ||
+  return (
+    message.includes("429") ||
     message.includes("rate limit") ||
     message.includes("rate_limit") ||
-    message.includes("too many requests");
+    message.includes("too many requests")
+  );
 }
 
 /**
@@ -1211,7 +1207,8 @@ function stripLeadingPreviousSummary(
   }
   const first = messages[0];
   if (
-    first.systemInjected === true && first.role === "user" &&
+    first.systemInjected === true &&
+    first.role === "user" &&
     first.content === previousSummary
   ) {
     return messages.slice(1);
@@ -1246,9 +1243,11 @@ function isCancelOrDeadline(
   if (err instanceof Error) {
     if (err.name === "AbortError" || err.name === "TimeoutError") return true;
     const message = err.message.toLowerCase();
-    return message.includes("operation was aborted") ||
+    return (
+      message.includes("operation was aborted") ||
       message.includes("context canceled") ||
-      message.includes("deadline exceeded");
+      message.includes("deadline exceeded")
+    );
   }
   return false;
 }

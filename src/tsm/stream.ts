@@ -44,11 +44,7 @@ export function createStream(width: number, theme?: Theme): Stream {
 }
 
 /** Convenience function for one-shot Markdown rendering. */
-export function render(
-  src: string,
-  width: number,
-  theme?: Theme,
-): string {
+export function render(src: string, width: number, theme?: Theme): string {
   return renderMarkdown(src, width, theme);
 }
 

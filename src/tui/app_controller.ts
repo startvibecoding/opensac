@@ -105,17 +105,15 @@ function hostedItemVisibleInCompact(status: string): boolean {
  */
 function isImportantEventStatus(message: string): boolean {
   const lower = message.trim().toLowerCase();
-  for (
-    const marker of [
-      "warning",
-      "error",
-      "failed",
-      "denied",
-      "canceled",
-      "cancelled",
-      "permission",
-    ]
-  ) {
+  for (const marker of [
+    "warning",
+    "error",
+    "failed",
+    "denied",
+    "canceled",
+    "cancelled",
+    "permission",
+  ]) {
     if (lower.includes(marker)) return true;
   }
   return false;
@@ -251,10 +249,7 @@ export class AppController {
    * deliberately does not touch the transcript: the condition is about the
    * transport, and it clears itself once the connection settles.
    */
-  setCoreConnection(
-    state: TUICoreConnectionState,
-    notice: string,
-  ): void {
+  setCoreConnection(state: TUICoreConnectionState, notice: string): void {
     this.coreConnection = state;
     this.coreConnectionNotice = notice;
     this.#cb.scheduleRender();

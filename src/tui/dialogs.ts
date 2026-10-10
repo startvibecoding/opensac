@@ -21,7 +21,8 @@ import {
   type TUIProviderCatalogEntry,
   type TUISessionListEntry,
   type TUISettingsReadScope,
-  type TUISettingsWriteScope} from "./service.ts";
+  type TUISettingsWriteScope,
+} from "./service.ts";
 
 /** The session surface a dialog may read and mutate. */
 export interface DialogHost {
@@ -93,15 +94,12 @@ export class ModelDialog implements DialogController {
 
   select(value: string): void {
     const tr = this.#host.translator;
-    const model = this.#host.listModels(this.#host.providerName)
+    const model = this.#host
+      .listModels(this.#host.providerName)
       .find((entry) => entry.id === value);
     this.#host.applyModel(this.#host.providerName, value);
     this.#dialog.close(
-      tr.text(
-        "commands.model.switched",
-        model?.name ?? value,
-        value,
-      ),
+      tr.text("commands.model.switched", model?.name ?? value, value),
     );
   }
 
@@ -166,11 +164,12 @@ export class DefaultModelDialog implements DialogController {
     }
     const models =
       this.#catalog.find((entry) => entry.id === this.#providerID)?.models ??
-        [];
+      [];
     return {
-      title: `${
-        tr.text("dialog.default_model.title", this.#scope)
-      } · ${this.#providerID}`,
+      title: `${tr.text(
+        "dialog.default_model.title",
+        this.#scope,
+      )} · ${this.#providerID}`,
       search: true,
       items: models.map(({ id }) => ({
         label: id,
@@ -267,11 +266,7 @@ export class EnvDialog implements DialogController {
   #addIndex = 0;
   #doneIndex = 0;
 
-  constructor(
-    host: DialogHost,
-    dialog: Dialog,
-    vars: Record<string, string>,
-  ) {
+  constructor(host: DialogHost, dialog: Dialog, vars: Record<string, string>) {
     this.#host = host;
     this.#dialog = dialog;
     this.#vars = { ...vars };
@@ -294,16 +289,17 @@ export class EnvDialog implements DialogController {
     items.push({ label: tr.text("dialog.env.done"), value: "done" });
     const input = this.#dialog.inputActive
       ? {
-        prompt: this.#editKind === "key"
-          ? tr.text("dialog.env.prompt_key")
-          : tr.text("dialog.env.prompt_value", this.#editing),
-        value: this.#dialog.inputValue,
-        placeholder: tr.text(
-          this.#editKind === "key"
-            ? "dialog.env.placeholder_key"
-            : "dialog.env.placeholder_value",
-        ),
-      }
+          prompt:
+            this.#editKind === "key"
+              ? tr.text("dialog.env.prompt_key")
+              : tr.text("dialog.env.prompt_value", this.#editing),
+          value: this.#dialog.inputValue,
+          placeholder: tr.text(
+            this.#editKind === "key"
+              ? "dialog.env.placeholder_key"
+              : "dialog.env.placeholder_value",
+          ),
+        }
       : undefined;
     return {
       title: tr.text("dialog.env.title"),
@@ -394,11 +390,7 @@ export class SessionsDialog implements DialogController {
   #error = "";
   #message = "";
 
-  constructor(
-    host: DialogHost,
-    dialog: Dialog,
-    items: TUISessionListEntry[],
-  ) {
+  constructor(host: DialogHost, dialog: Dialog, items: TUISessionListEntry[]) {
     this.#host = host;
     this.#dialog = dialog;
     this.#items = items;
@@ -411,9 +403,11 @@ export class SessionsDialog implements DialogController {
     const items: DialogItem[] = this.#items.map((detail) => {
       const preview = detail.preview.trim().replace(/\s+/g, " ");
       return {
-        label: `${detail.sessionId}  ${detail.messageCount} msgs  ${
-          formatAge(detail.modTime, now, tr)
-        }${preview === "" ? "" : `  ${preview}`}`,
+        label: `${detail.sessionId}  ${detail.messageCount} msgs  ${formatAge(
+          detail.modTime,
+          now,
+          tr,
+        )}${preview === "" ? "" : `  ${preview}`}`,
         value: `session:${detail.sessionId}`,
         current: detail.sessionId === currentID,
       };
@@ -624,9 +618,9 @@ export class SettingsDialog implements DialogController {
           items: [
             {
               label: tr.text("settings.field.default_model"),
-              description: `${this.#value(s.defaultProvider)} / ${
-                this.#value(s.defaultModel)
-              }`,
+              description: `${this.#value(s.defaultProvider)} / ${this.#value(
+                s.defaultModel,
+              )}`,
               value: "defaults.modelPicker",
             },
             this.#item(
@@ -1231,11 +1225,7 @@ export class SettingsDialog implements DialogController {
     return { label, description, value: field };
   }
 
-  #inputItem(
-    field: string,
-    label: string,
-    description: string,
-  ): DialogItem {
+  #inputItem(field: string, label: string, description: string): DialogItem {
     return { label, description, value: `input:${field}` };
   }
 
@@ -1380,8 +1370,11 @@ export class SettingsDialog implements DialogController {
       case "compaction.enabled":
         this.#save({
           compaction: {
-            ...(this.#settings.compaction ??
-              { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
+            ...(this.#settings.compaction ?? {
+              enabled: false,
+              reserveTokens: 0,
+              keepRecentTokens: 0,
+            }),
             enabled: this.#settings.compaction?.enabled !== true,
           },
         });
@@ -1389,8 +1382,11 @@ export class SettingsDialog implements DialogController {
       case "sandbox.enabled":
         this.#save({
           sandbox: {
-            ...(this.#settings.sandbox ??
-              { enabled: false, level: "none", allowNetwork: false }),
+            ...(this.#settings.sandbox ?? {
+              enabled: false,
+              level: "none",
+              allowNetwork: false,
+            }),
             enabled: this.#settings.sandbox?.enabled !== true,
           },
         });
@@ -1398,8 +1394,11 @@ export class SettingsDialog implements DialogController {
       case "retry.enabled":
         this.#save({
           retry: {
-            ...(this.#settings.retry ??
-              { enabled: false, maxRetries: 0, baseDelayMs: 0 }),
+            ...(this.#settings.retry ?? {
+              enabled: false,
+              maxRetries: 0,
+              baseDelayMs: 0,
+            }),
             enabled: this.#settings.retry?.enabled !== true,
           },
         });
@@ -1534,19 +1533,20 @@ export class SettingsDialog implements DialogController {
       );
       return;
     }
-    void this.#host.saveSettings(this.#tuiScope, { tuilang: value }).then(
-      () => {
+    void this.#host
+      .saveSettings(this.#tuiScope, { tuilang: value })
+      .then(() => {
         this.#settings.tuilang = value;
         this.#host.reloadSettings();
         this.#host.requestRender();
-      },
-    ).catch((err) => {
-      this.#error = this.#host.translator.text(
-        "settings.language.save_failed",
-        (err as Error).message,
-      );
-      this.#host.requestRender();
-    });
+      })
+      .catch((err) => {
+        this.#error = this.#host.translator.text(
+          "settings.language.save_failed",
+          (err as Error).message,
+        );
+        this.#host.requestRender();
+      });
   }
 
   #normalizeStatusLine(next: Record<string, unknown>): void {
@@ -1739,16 +1739,22 @@ export class SettingsDialog implements DialogController {
       case "compaction.reserveTokens":
         return {
           compaction: {
-            ...(s.compaction ??
-              { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
+            ...(s.compaction ?? {
+              enabled: false,
+              reserveTokens: 0,
+              keepRecentTokens: 0,
+            }),
             reserveTokens: this.#int(input, tr),
           },
         };
       case "compaction.keepRecentTokens":
         return {
           compaction: {
-            ...(s.compaction ??
-              { enabled: false, reserveTokens: 0, keepRecentTokens: 0 }),
+            ...(s.compaction ?? {
+              enabled: false,
+              reserveTokens: 0,
+              keepRecentTokens: 0,
+            }),
             keepRecentTokens: this.#int(input, tr),
           },
         };
@@ -1842,17 +1848,20 @@ export class SettingsDialog implements DialogController {
 
   /** Persists a patch to global settings and refreshes the live session. */
   #save(patch: Record<string, unknown>): void {
-    void this.#host.saveSettings("global", patch).then((fresh) => {
-      this.#settings = fresh;
-      this.#host.reloadSettings();
-      this.#host.requestRender();
-    }).catch((err) => {
-      this.#error = this.#host.translator.text(
-        "settings.save_failed",
-        (err as Error).message,
-      );
-      this.#host.requestRender();
-    });
+    void this.#host
+      .saveSettings("global", patch)
+      .then((fresh) => {
+        this.#settings = fresh;
+        this.#host.reloadSettings();
+        this.#host.requestRender();
+      })
+      .catch((err) => {
+        this.#error = this.#host.translator.text(
+          "settings.save_failed",
+          (err as Error).message,
+        );
+        this.#host.requestRender();
+      });
   }
 
   key(): void {}
@@ -1941,15 +1950,18 @@ export class TuiLangDialog implements DialogController {
 
   #save(value: string): void {
     const tr = this.#host.translator;
-    void this.#host.saveSettings(this.#scope, { tuilang: value }).then(() => {
-      this.#settings.tuilang = value;
-      this.#host.reloadSettings();
-      this.#dialog.close(tr.text("tuilang.saved", this.#scope, value, value));
-      this.#host.requestRender();
-    }).catch((err) => {
-      this.#error = tr.text("tuilang.save_failed", (err as Error).message);
-      this.#host.requestRender();
-    });
+    void this.#host
+      .saveSettings(this.#scope, { tuilang: value })
+      .then(() => {
+        this.#settings.tuilang = value;
+        this.#host.reloadSettings();
+        this.#dialog.close(tr.text("tuilang.saved", this.#scope, value, value));
+        this.#host.requestRender();
+      })
+      .catch((err) => {
+        this.#error = tr.text("tuilang.save_failed", (err as Error).message);
+        this.#host.requestRender();
+      });
   }
 
   submit(): void {}

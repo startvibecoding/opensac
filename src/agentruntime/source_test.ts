@@ -33,7 +33,8 @@ import {
   SOURCE_WE_CHAT,
   SourceConflictError,
   sourceFromSessionHeader,
-  sourceWaitsForMembers} from "./source.ts";
+  sourceWaitsForMembers,
+} from "./source.ts";
 import { test } from "#testing";
 
 test("ResolveSource prefers persisted binding and reports conflicts", () => {
@@ -138,12 +139,10 @@ test("ResolvePolicy unbound CLI uses requested mode", () => {
 });
 
 test("ResolvePolicy rejects unknown source candidates", () => {
-  for (
-    const input of [
-      { requested: "adapter-without-policy" as RuntimeSource },
-      { current: "stale-runtime" as RuntimeSource },
-    ]
-  ) {
+  for (const input of [
+    { requested: "adapter-without-policy" as RuntimeSource },
+    { current: "stale-runtime" as RuntimeSource },
+  ]) {
     const { error } = resolvePolicy(input, "", "", MODE_AGENT);
     assert(error !== null, `expected error for ${JSON.stringify(input)}`);
   }

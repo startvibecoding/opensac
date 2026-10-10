@@ -39,9 +39,10 @@ export function buildRegistry(
   if ((workDir ?? "").trim() === "") {
     throw new Error("registry work directory is required");
   }
-  const active = sandboxMgr === null || sandboxMgr === undefined
-    ? undefined
-    : sandboxMgr.getActive();
+  const active =
+    sandboxMgr === null || sandboxMgr === undefined
+      ? undefined
+      : sandboxMgr.getActive();
   const registry = createRegistry(workDir, active);
   if (policy.registerDefaults) {
     if (policy.enablePlanTool === undefined) {

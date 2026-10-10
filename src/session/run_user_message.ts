@@ -81,7 +81,8 @@ export function appendRunUserMessageTx(tx: Tx, run: SessionRun): void {
     throw new Error("runtime-admitted entry must have user role");
   }
   if (
-    !(message.timestamp instanceof Date) || isNaN(message.timestamp.getTime())
+    !(message.timestamp instanceof Date) ||
+    isNaN(message.timestamp.getTime())
   ) {
     message.timestamp = run.startedAt;
     if (
@@ -127,15 +128,18 @@ export function appendRunAssistantMessageTx(tx: Tx, run: SessionRun): void {
     throw new Error("runtime assistant entry must have assistant role");
   }
   if (
-    !(message.timestamp instanceof Date) || isNaN(message.timestamp.getTime())
+    !(message.timestamp instanceof Date) ||
+    isNaN(message.timestamp.getTime())
   ) {
     if (
-      run.finishedAt !== null && run.finishedAt !== undefined &&
+      run.finishedAt !== null &&
+      run.finishedAt !== undefined &&
       !isNaN(run.finishedAt.getTime())
     ) {
       message.timestamp = run.finishedAt;
     } else if (
-      run.startedAt instanceof Date && !isNaN(run.startedAt.getTime())
+      run.startedAt instanceof Date &&
+      !isNaN(run.startedAt.getTime())
     ) {
       message.timestamp = run.startedAt;
     } else {
@@ -167,7 +171,7 @@ export function appendRunAssistantMessageTx(tx: Tx, run: SessionRun): void {
     }
     if (
       runAssistantMessageFingerprint(run.id, existing.message) !==
-        runAssistantMessageFingerprint(run.id, message)
+      runAssistantMessageFingerprint(run.id, message)
     ) {
       throw new Error(
         `assistant entry ${entryId} conflicts with the terminal message`,

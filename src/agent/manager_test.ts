@@ -1,5 +1,5 @@
 // (AgentManager lifecycle and
-// AgentFactory wiring cases). The concurrency case is omitted: Deno is
+// AgentFactory wiring cases). The concurrency case is omitted: Node is
 // single-threaded, so the manager's map updates are already atomic.
 //
 // The tests isolated under a temp OPENSAC_DIR so default-session creation never
@@ -129,31 +129,28 @@ test("AgentManagerDestroyNotFound", () => {
   assertThrows(() => m.destroy("nonexistent"));
 });
 
-test(
-  "AgentManagerFinishCancelsChildrenAndRetainsStatus",
-  () => {
-    const m = createTestManager();
-    const parent = m.create({ id: "main" });
-    m.create({ id: "sub-1", parentId: "main" });
-    m.markRunning("sub-1");
+test("AgentManagerFinishCancelsChildrenAndRetainsStatus", () => {
+  const m = createTestManager();
+  const parent = m.create({ id: "main" });
+  m.create({ id: "sub-1", parentId: "main" });
+  m.markRunning("sub-1");
 
-    let cancelled = false;
-    m.setCancel("sub-1", () => {
-      cancelled = true;
-    });
-    m.finish("main", new Error("network error"));
+  let cancelled = false;
+  m.setCancel("sub-1", () => {
+    cancelled = true;
+  });
+  m.finish("main", new Error("network error"));
 
-    assert(cancelled);
-    assertEquals(m.count(), 0);
-    assertEquals(m.status("main"), undefined);
-    const st = m.status("sub-1");
-    assert(st !== undefined);
-    assertEquals(st.state, "error");
-    assertEquals(st.error, "network error");
-    assert(parent instanceof AgentAdapter);
-    assertFalse((parent as AgentAdapter).inner.aborted());
-  },
-);
+  assert(cancelled);
+  assertEquals(m.count(), 0);
+  assertEquals(m.status("main"), undefined);
+  const st = m.status("sub-1");
+  assert(st !== undefined);
+  assertEquals(st.state, "error");
+  assertEquals(st.error, "network error");
+  assert(parent instanceof AgentAdapter);
+  assertFalse((parent as AgentAdapter).inner.aborted());
+});
 
 test("AgentManagerFinishSuccessKeepsAsyncChildren", () => {
   const m = createTestManager();
@@ -212,56 +209,19 @@ test("AgentManagerStatusListenerTerminalTransitions", () => {
   assertEquals(seen, ["sub-1:done"]);
 });
 
-test(
-  "AgentManagerUpdateRuntimeConfigAffectsFutureAgents",
-  () => {
-    const oldModel = model("old-model", "Old", "old-provider");
-    const oldProvider = createMockProvider("old-provider", [oldModel], []);
-    const newModel = model("new-model", "New", "new-provider");
-    const newProvider = createMockProvider("new-provider", [newModel], []);
-    const settings: Settings = defaultSettings();
-    settings.defaultProvider = "new-provider";
-    settings.defaultModel = "new-model";
+test("AgentManagerUpdateRuntimeConfigAffectsFutureAgents", () => {
+  const oldModel = model("old-model", "Old", "old-provider");
+  const oldProvider = createMockProvider("old-provider", [oldModel], []);
+  const newModel = model("new-model", "New", "new-provider");
+  const newProvider = createMockProvider("new-provider", [newModel], []);
+  const settings: Settings = defaultSettings();
+  settings.defaultProvider = "new-provider";
+  settings.defaultModel = "new-model";
 
-    const m = createAgentManager(
-      createAgentFactory(
-        oldProvider,
-        oldModel,
-        defaultSettings(),
-        undefined,
-        "",
-        "",
-        undefined,
-        emptyCompaction(),
-        undefined,
-      ),
-    );
-    m.updateRuntimeConfig(
-      newProvider,
-      "new-provider",
-      newModel,
-      settings,
-      undefined,
-    );
-
-    const a = m.create({ id: "future" }) as AgentAdapter;
-    const cfg = runtimeConfigOfManagedAgent(a);
-    assert(cfg !== undefined);
-    assertEquals(cfg.provider, newProvider as MockProvider);
-    assertEquals(cfg.model?.id, "new-model");
-    assertEquals(cfg.settings?.defaultProvider, "new-provider");
-    assertEquals(cfg.settings?.defaultModel, "new-model");
-  },
-);
-
-test(
-  "ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering",
-  () => {
-    const m1 = model("m1", "M1", "");
-    const p = createMockProvider("mock", [m1], []);
-    const factory = createAgentFactory(
-      p,
-      m1,
+  const m = createAgentManager(
+    createAgentFactory(
+      oldProvider,
+      oldModel,
       defaultSettings(),
       undefined,
       "",
@@ -269,50 +229,79 @@ test(
       undefined,
       emptyCompaction(),
       undefined,
-      {
-        multiAgentEnabled: true,
-        delegateEnabled: false,
-        workflowsEnabled: false,
-      },
-    );
-    const manager = createAgentManager(factory);
-    const mailbox = createMemberMailbox();
-    manager.setMemberContext(
-      createMemberDefRegistry([member("engineer")]),
-      mailbox,
-      "team",
-    );
+    ),
+  );
+  m.updateRuntimeConfig(
+    newProvider,
+    "new-provider",
+    newModel,
+    settings,
+    undefined,
+  );
 
-    const created = manager.create({
-      id: "esm-worker",
-      multiAgent: true,
-    }) as AgentAdapter;
-    assert(created.inner.registry()?.get("subagent_spawn") !== undefined);
-    assert(created.inner.config.getSteeringMessages !== undefined);
+  const a = m.create({ id: "future" }) as AgentAdapter;
+  const cfg = runtimeConfigOfManagedAgent(a);
+  assert(cfg !== undefined);
+  assertEquals(cfg.provider, newProvider as MockProvider);
+  assertEquals(cfg.model?.id, "new-model");
+  assertEquals(cfg.settings?.defaultProvider, "new-provider");
+  assertEquals(cfg.settings?.defaultModel, "new-model");
+});
 
-    mailbox.enqueue(
-      {
-        kind: "",
-        memberId: "engineer",
-        displayName: "",
-        status: "done",
-        payload: "completed work",
-        questionId: "",
-        options: [],
-      } as import("./mailbox.ts").MemberCompletion,
-    );
-    const messages = created.inner.config.getSteeringMessages?.() ?? [];
-    assertEquals(messages.length, 1);
-    assertEquals(messages[0].systemInjected, true);
+test("ManagerCreatedLeadReceivesTeamToolsAndMailboxSteering", () => {
+  const m1 = model("m1", "M1", "");
+  const p = createMockProvider("mock", [m1], []);
+  const factory = createAgentFactory(
+    p,
+    m1,
+    defaultSettings(),
+    undefined,
+    "",
+    "",
+    undefined,
+    emptyCompaction(),
+    undefined,
+    {
+      multiAgentEnabled: true,
+      delegateEnabled: false,
+      workflowsEnabled: false,
+    },
+  );
+  const manager = createAgentManager(factory);
+  const mailbox = createMemberMailbox();
+  manager.setMemberContext(
+    createMemberDefRegistry([member("engineer")]),
+    mailbox,
+    "team",
+  );
 
-    const critic = manager.create({
-      id: "esm-critic",
-      multiAgent: false,
-      tools: ["read"],
-    }) as AgentAdapter;
-    assert(critic.inner.registry()?.get("subagent_spawn") === undefined);
-  },
-);
+  const created = manager.create({
+    id: "esm-worker",
+    multiAgent: true,
+  }) as AgentAdapter;
+  assert(created.inner.registry()?.get("subagent_spawn") !== undefined);
+  assert(created.inner.config.getSteeringMessages !== undefined);
+
+  mailbox.enqueue({
+    kind: "",
+    memberId: "engineer",
+    displayName: "",
+    status: "done",
+    payload: "completed work",
+    questionId: "",
+    options: [],
+  } as import("./mailbox.ts").MemberCompletion);
+  const messages = created.inner.config.getSteeringMessages?.() ?? [];
+  assertEquals(messages.length, 1);
+  assertEquals(messages[0].systemInjected, true);
+
+  const critic = manager.create({
+    id: "esm-critic",
+    multiAgent: false,
+    tools: ["read"],
+  }) as AgentAdapter;
+  assert(critic.inner.registry()?.get("subagent_spawn") === undefined);
+});
 
 // Keep the exported helpers referenced for lint parity.
 void MemberDefRegistry;

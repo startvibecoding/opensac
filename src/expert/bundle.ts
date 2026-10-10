@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   type AgentDef,
@@ -57,7 +58,7 @@ export interface BundleSource {
 }
 
 class OsSource implements BundleSource {
-    private readonly root: string;
+  private readonly root: string;
 
   constructor(root: string) {
     this.root = root;
@@ -65,27 +66,27 @@ class OsSource implements BundleSource {
 
   readFile(name: string): string | null {
     try {
-      return Deno.readTextFileSync(path.join(this.root, name));
+      return runtime.readTextFileSync(path.join(this.root, name));
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) return null;
+      if (err instanceof runtime.errors.NotFound) return null;
       throw err;
     }
   }
 
   listDir(name: string): string[] | null {
     try {
-      return [...Deno.readDirSync(path.join(this.root, name))]
+      return [...runtime.readDirSync(path.join(this.root, name))]
         .map((entry) => entry.name)
         .sort();
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) return null;
+      if (err instanceof runtime.errors.NotFound) return null;
       throw err;
     }
   }
 
   statDir(name: string): boolean {
     try {
-      return Deno.statSync(path.join(this.root, name)).isDirectory;
+      return runtime.statSync(path.join(this.root, name)).isDirectory;
     } catch {
       return false;
     }
@@ -101,7 +102,7 @@ class OsSource implements BundleSource {
 }
 
 class FsSource implements BundleSource {
-    private readonly fsys: ExpertFS;
+  private readonly fsys: ExpertFS;
   private readonly root: string;
 
   constructor(fsys: ExpertFS, root: string) {
@@ -364,24 +365,23 @@ export function loadAgentDef(
   if (fm.name !== id) {
     return {
       def: null,
-      reason: `agents/${fileName}: frontmatter name ${
-        quote(fm.name)
-      } 与文件名不一致`,
+      reason: `agents/${fileName}: frontmatter name ${quote(
+        fm.name,
+      )} 与文件名不一致`,
     };
   }
   if (!validModes.has(fm.mode)) {
     return {
       def: null,
-      reason: `agents/${fileName}: mode ${
-        quote(fm.mode)
-      } 非法（允许：空、plan、agent、yolo、os）`,
+      reason: `agents/${fileName}: mode ${quote(
+        fm.mode,
+      )} 非法（允许：空、plan、agent、yolo、os）`,
     };
   }
   if (fm.maxIterations < 0) {
     return {
       def: null,
-      reason:
-        `agents/${fileName}: max_iterations 不能为负数（${fm.maxIterations}）`,
+      reason: `agents/${fileName}: max_iterations 不能为负数（${fm.maxIterations}）`,
     };
   }
   const def: AgentDef = {
@@ -400,10 +400,7 @@ export function loadAgentDef(
  * Resolves def.role: manifest decision first (team leadAgent / memberAgents,
  * agent agentName), frontmatter role only as fallback.
  */
-export function assignRoles(
-  m: Manifest,
-  defs: Map<string, AgentDef>,
-): void {
+export function assignRoles(m: Manifest, defs: Map<string, AgentDef>): void {
   switch (m.expertType) {
     case typeTeam: {
       if (m.teamInfo !== undefined) {

@@ -4,6 +4,7 @@
 // fallback path is exercised here with a BigInt argument (which JSON.stringify
 // cannot serialize), preserving the same fallback contract.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert } from "../compat/assert.ts";
 import {
   debugCompleteResponse,
@@ -14,23 +15,23 @@ import {
 import { test } from "#testing";
 
 async function inTempDir(fn: () => void | Promise<void>): Promise<void> {
-  const workDir = await Deno.makeTempDir();
-  const old = Deno.cwd();
-  Deno.chdir(workDir);
+  const workDir = await runtime.makeTempDir();
+  const old = runtime.cwd();
+  runtime.chdir(workDir);
   try {
     await fn();
   } finally {
-    Deno.chdir(old);
+    runtime.chdir(old);
   }
 }
 
 async function readLog(workDir: string): Promise<string> {
-  return await Deno.readTextFile(`${workDir}/debug.log`);
+  return await runtime.readTextFile(`${workDir}/debug.log`);
 }
 
 test("DebugJSONWritesRequestAndCompleteResponse", async () => {
-  Deno.env.set("VIBECODING_DEBUG", "1");
-  Deno.env.set(debugLogOnlyEnv, "1");
+  runtime.env.set("VIBECODING_DEBUG", "1");
+  runtime.env.set(debugLogOnlyEnv, "1");
   try {
     await inTempDir(async () => {
       debugJSON("OpenAI request JSON", `{"model":"test","stream":true}`);
@@ -40,7 +41,7 @@ test("DebugJSONWritesRequestAndCompleteResponse", async () => {
         content: "complete response",
       });
 
-      const log = await readLog(Deno.cwd());
+      const log = await readLog(runtime.cwd());
       assert(
         log.includes(`OpenAI request JSON: {"model":"test","stream":true}`),
         `debug log missing request JSON: ${log}`,
@@ -57,59 +58,61 @@ test("DebugJSONWritesRequestAndCompleteResponse", async () => {
       );
     });
   } finally {
-    Deno.env.delete("VIBECODING_DEBUG");
-    Deno.env.delete(debugLogOnlyEnv);
+    runtime.env.delete("VIBECODING_DEBUG");
+    runtime.env.delete(debugLogOnlyEnv);
   }
 });
 
 test("DebugLogfWritesOnlyWhenDebugEnabled", async () => {
   await inTempDir(async () => {
-    Deno.env.set(debugLogOnlyEnv, "1");
-    Deno.env.delete("VIBECODING_DEBUG");
+    runtime.env.set(debugLogOnlyEnv, "1");
+    runtime.env.delete("VIBECODING_DEBUG");
     try {
       debugLogf("not written");
       let exists = true;
       try {
-        await Deno.stat(`${Deno.cwd()}/debug.log`);
+        await runtime.stat(`${runtime.cwd()}/debug.log`);
       } catch {
         exists = false;
       }
       assert(!exists, "debug log exists without debug mode");
 
-      Deno.env.set("VIBECODING_DEBUG", "1");
+      runtime.env.set("VIBECODING_DEBUG", "1");
       debugLogf(
         "session %q sync failed: %v",
         "s1",
         new Error("file does not exist"),
       );
-      const data = await readLog(Deno.cwd());
+      const data = await readLog(runtime.cwd());
       assert(
         data.includes(`diagnostic: session "s1" sync failed`),
         `debug log missing diagnostic: ${data}`,
       );
     } finally {
-      Deno.env.delete("VIBECODING_DEBUG");
-      Deno.env.delete(debugLogOnlyEnv);
+      runtime.env.delete("VIBECODING_DEBUG");
+      runtime.env.delete(debugLogOnlyEnv);
     }
   });
 });
 
 test("DebugCompleteResponseLogsResponseWhenJSONMarshalFails", async () => {
-  Deno.env.set("VIBECODING_DEBUG", "1");
-  Deno.env.set(debugLogOnlyEnv, "1");
+  runtime.env.set("VIBECODING_DEBUG", "1");
+  runtime.env.set(debugLogOnlyEnv, "1");
   try {
     await inTempDir(async () => {
       debugCompleteResponse({
         provider: "openai",
         api: "chat-completions",
-        toolCalls: [{
-          id: "call_1",
-          name: "read_file",
-          arguments: 123n as unknown,
-        }],
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "read_file",
+            arguments: 123n as unknown,
+          },
+        ],
       });
 
-      const log = await readLog(Deno.cwd());
+      const log = await readLog(runtime.cwd());
       assert(
         log.includes("Response JSON marshal error"),
         `missing marshal error: ${log}`,
@@ -121,7 +124,7 @@ test("DebugCompleteResponseLogsResponseWhenJSONMarshalFails", async () => {
       assert(log.includes("123"), `missing argument dump: ${log}`);
     });
   } finally {
-    Deno.env.delete("VIBECODING_DEBUG");
-    Deno.env.delete(debugLogOnlyEnv);
+    runtime.env.delete("VIBECODING_DEBUG");
+    runtime.env.delete(debugLogOnlyEnv);
   }
 });

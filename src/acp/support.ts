@@ -10,6 +10,7 @@
 // Deviations: `json.RawMessage` maps to a decoded `unknown`; `time.Time` maps to
 // `Date`; Go's `(value, error)` returns throw typed errors.
 
+import { runtime } from "../platform/runtime.ts";
 import { createHash } from "node:crypto";
 import { decodeBase64Url, encodeBase64Url } from "../compat/encoding.ts";
 import {
@@ -95,8 +96,9 @@ export function doctorStartupMessage(detail: string): string {
 /** Classifies an arbitrary startup failure without exposing its cause. */
 export function classifyACPStartupError(error: unknown): ACPStartupError {
   if (error instanceof ACPStartupError) return error;
-  const message = (error instanceof Error ? error.message : String(error))
-    .toLowerCase();
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
   let code = "config_invalid";
   let publicMessage = "ACP configuration is invalid";
   let fix = "Check settings.json and ACP options";
@@ -137,9 +139,8 @@ export function writeACPStartupError(
   error: unknown,
   write?: (line: string) => void,
 ): void {
-  const startup = error instanceof ACPStartupError
-    ? error
-    : classifyACPStartupError(error);
+  const startup =
+    error instanceof ACPStartupError ? error : classifyACPStartupError(error);
   const payload: Record<string, string> = {
     code: startup.code,
     message: startup.message,
@@ -150,7 +151,7 @@ export function writeACPStartupError(
     write(line);
     return;
   }
-  Deno.stderr.writeSync(new TextEncoder().encode(line));
+  runtime.stderr.writeSync(new TextEncoder().encode(line));
 }
 
 // ---------------------------------------------------------------------------
@@ -171,9 +172,7 @@ export interface TranscriptPageResult {
 
 /** Encodes a transcript offset as an opaque cursor. */
 export function encodeTranscriptCursor(before: number): string {
-  return encodeBase64Url(
-    new TextEncoder().encode(`acp-history-v1:${before}`),
-  );
+  return encodeBase64Url(new TextEncoder().encode(`acp-history-v1:${before}`));
 }
 
 /** Decodes a transcript cursor, throwing on an invalid value. */
@@ -278,7 +277,8 @@ export function messageUpdates(
           content: { type: "text", text: content.text ?? "" },
         });
       } else if (
-        content.type === "toolCall" && content.toolCall !== undefined
+        content.type === "toolCall" &&
+        content.toolCall !== undefined
       ) {
         const rawInput = parseToolArguments(content.toolCall.arguments);
         const title = registry.rememberToolTitle(
@@ -546,7 +546,8 @@ export function questionAnswer(
       return { answer, status: "resolved" };
     }
     if (
-      record !== undefined && typeof record.answer === "string" &&
+      record !== undefined &&
+      typeof record.answer === "string" &&
       record.answer !== ""
     ) {
       return { answer: record.answer, status: "resolved" };
@@ -560,7 +561,8 @@ export function questionAnswer(
   }
   let answer = typeof record.answer === "string" ? record.answer.trim() : "";
   if (
-    answer === "" && Array.isArray(record.answers) &&
+    answer === "" &&
+    Array.isArray(record.answers) &&
     record.answers.length > 0 &&
     typeof record.answers[0] === "string"
   ) {

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { basename, join } from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
@@ -14,19 +15,19 @@ const TEST_PROTOCOL_VERSION = 3;
 async function withParentDir(
   test: (parentDir: string) => Promise<void>,
 ): Promise<void> {
-  const parentDir = await Deno.makeTempDir({
+  const parentDir = await runtime.makeTempDir({
     prefix: "opensac-private-core-",
   });
   try {
     await test(parentDir);
   } finally {
-    await Deno.remove(parentDir, { recursive: true });
+    await runtime.remove(parentDir, { recursive: true });
   }
 }
 
 async function directoryEntries(directory: string): Promise<string[]> {
   const entries: string[] = [];
-  for await (const entry of Deno.readDir(directory)) {
+  for await (const entry of runtime.readDir(directory)) {
     entries.push(entry.name);
   }
   return entries;
@@ -37,7 +38,7 @@ function stubRegistration(port: number): CoreRegistration {
     id: "stub-private-core",
     version: TEST_VERSION,
     protocolVersion: TEST_PROTOCOL_VERSION,
-    pid: Deno.pid,
+    pid: runtime.pid,
     host: "127.0.0.1",
     port,
     startedAt: Date.now(),
@@ -53,14 +54,14 @@ async function startStubCore(): Promise<{
   const portReady = new Promise<number>((resolve) => {
     resolvePort = resolve;
   });
-  const server = Deno.serve(
+  const server = runtime.serve(
     {
       hostname: "127.0.0.1",
       port: 0,
       onListen: (address) => resolvePort(address.port),
     },
     async (request) => {
-      const body = await request.json() as CoreRpcRequest;
+      const body = (await request.json()) as CoreRpcRequest;
       switch (body.method) {
         case "core.info":
           return Response.json(
@@ -130,7 +131,7 @@ test("startPrivateCore owns an isolated Core that close() shuts down and cleans 
 
       // The private Core registers only inside its own state directory.
       const paths = CorePaths.fromStateDir(handle.stateDir);
-      assert(await new CoreRegistry(paths).read() !== undefined);
+      assert((await new CoreRegistry(paths).read()) !== undefined);
       assertEquals(await directoryEntries(parentDir), [
         basename(handle.stateDir),
       ]);
@@ -145,7 +146,7 @@ test("startPrivateCore owns an isolated Core that close() shuts down and cleans 
       // the lifecycle exited cleanly.
       assertEquals(await core.done, 0);
       assertEquals(await new CoreRegistry(paths).read(), undefined);
-      await assertRejects(() => Deno.stat(handle.stateDir));
+      await assertRejects(() => runtime.stat(handle.stateDir));
 
       // close() is idempotent and reports the same outcome.
       assertEquals(await handle.close(), { exited: true, cleaned: true });
@@ -192,11 +193,9 @@ test("startPrivateCore keeps the private state directory when the Core exit cann
         stopTimeoutMs: 0,
         createStateDir: async (parent) => {
           const stateDir = join(parent, "stub-private-core");
-          await Deno.mkdir(stateDir, { recursive: true });
+          await runtime.mkdir(stateDir, { recursive: true });
           const paths = CorePaths.fromStateDir(stateDir);
-          await new CoreRegistry(paths).write(
-            stubRegistration(stub.port),
-          );
+          await new CoreRegistry(paths).write(stubRegistration(stub.port));
           return stateDir;
         },
       });
@@ -207,7 +206,7 @@ test("startPrivateCore keeps the private state directory when the Core exit cann
         assertEquals(outcome, { exited: false, cleaned: false });
         assert((await directoryEntries(parentDir)).length === 1);
       } finally {
-        await Deno.remove(handle.stateDir, { recursive: true });
+        await runtime.remove(handle.stateDir, { recursive: true });
       }
     } finally {
       await stub.stop();

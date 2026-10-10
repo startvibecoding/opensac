@@ -1,26 +1,19 @@
-// The single owner of the `Deno.*` API vocabulary for this repository.
+// Node-backed implementations of the process/net APIs the sources use.
 //
-// There is no Deno runtime or registry dependency here: `src/platform/deno_shim.ts`
-// provides the file/env/process namespace backed by Node built-ins, and this
-// module adds the richer APIs the product uses — `Deno.Command`, `Deno.execPath`,
-// `Deno.args`, `Deno.exit`, `Deno.serve`, `Deno.upgradeWebSocket`, `Deno.connect`,
-// `Deno.createHttpClient`, `Deno.SeekMode`, `Deno.unrefTimer`, `Deno.resolveDns`,
-// and the Web `Worker` global — then installs the result as a process global
-// before any application module loads.
+// This module adds the richer process/network APIs on top of
+// `./runtime_core.ts`: process spawning (`Command`), the HTTP server
+// (`serve`/`upgradeWebSocket`), raw sockets (`listen`/`connect`), the
+// fetch HTTP client, DNS, and the Web `Worker`/`fetch` globals. `./runtime.ts`
+// merges the two into the single `runtime` module the rest of the tree imports.
 //
-// Every entry point must import it first: the whole source tree reads `Deno.*`
-// as a global, and under Node only this module makes that true.
-//
-// Known deviations from Deno under Node:
-//   * A `Deno.serve` bind failure (e.g. port in use) surfaces asynchronously
-//     through `finished`/`onError`, because `node:http` has no synchronous
-//     listen.
-//   * `Deno.createHttpClient` proxy support needs the optional `undici`
-//     dependency; without it the client connects directly.
+// Known deviations from a runtime with a synchronous HTTP listen:
+//   * An HTTP bind failure (e.g. port in use) surfaces asynchronously through
+//     `finished`/`onError`, because `node:http` has no synchronous listen.
+//   * HTTP proxy support needs the optional `undici` dependency.
 //   * Module-URL web workers are unsupported (throw), which degrades the stats
 //     offload to its in-process fallback. `data:`-URL workers work.
 
-// deno-lint-ignore-file no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Buffer } from "node:buffer";
 import { spawn as spawnChild, spawnSync } from "node:child_process";
@@ -33,18 +26,17 @@ import {
   resolveTxt,
 } from "node:dns/promises";
 import { constants as fsConstants, openSync as openFileSync } from "node:fs";
-import { mkdir, open } from "node:fs/promises";
+import { mkdir, open, readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
-import { connect as netConnect } from "node:net";
+import {
+  connect as netConnect,
+  createServer as netCreateServer,
+} from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
-// The Deno namespace the sources read at runtime. esbuild leaves `Deno` as a
-// global reference; this module installs the shim object globally and extends it.
-import { denoNamespace } from "./deno_shim.ts";
-
-type AnyDeno = Record<string, any> & { serve?: unknown };
 
 const require = createRequire(import.meta.url);
 
@@ -53,28 +45,10 @@ const upgradeContext = Symbol("opensacNodeUpgrade");
 /** Symbol marking a client produced by the `createHttpClient` shim. */
 const httpClientMarker = Symbol("opensacHttpClient");
 
-
-/**
- * Overwrites a member on the shim's `Deno` object. The shim defines most
- * members as getter-only, so plain assignment throws; `defineProperty` works
- * because those descriptors are configurable.
- */
-function override(target: AnyDeno, key: string, value: unknown): void {
-  Object.defineProperty(target, key, {
-    value,
-    configurable: true,
-    writable: true,
-    enumerable: true,
-  });
-}
-
-// ─── Deno.Command ──────────────────────────────────────────────────────────
+// ─── Command ──────────────────────────────────────────────────────────────
 
 function currentArgs(): string[] {
-  const scriptIndex = process.argv.findIndex((arg, index) =>
-    index > 1 && (arg.endsWith(".js") || arg.endsWith(".mjs"))
-  );
-  return scriptIndex >= 0 ? process.argv.slice(scriptIndex + 1) : [];
+  return process.argv.slice(2);
 }
 
 function normalizeMode(mode: unknown): string | undefined {
@@ -95,7 +69,7 @@ function nodeStdio(
 }
 
 function toWebReadable(stream: any): ReadableStream<Uint8Array> | null {
-  return stream ? Readable.toWeb(stream) : null;
+  return stream ? (Readable.toWeb(stream) as ReadableStream<Uint8Array>) : null;
 }
 
 function toWebWritable(stream: any): WritableStream<Uint8Array> | null {
@@ -144,12 +118,30 @@ class NodeChildProcess {
     this.#proc.kill((signal ?? "SIGTERM") as any);
   }
 
+  async output(): Promise<any> {
+    if (this.#proc.stdin !== null && !this.#proc.stdin.destroyed) {
+      this.#proc.stdin.end();
+    }
+    const [stdout, stderr, status] = await Promise.all([
+      readAll(this.stdout),
+      readAll(this.stderr),
+      this.status,
+    ]);
+    return { ...status, stdout, stderr };
+  }
+
   ref(): void {
     this.#proc.ref();
   }
 
   unref(): void {
     this.#proc.unref();
+    // The stdio pipes are separate handles: without unref'ing them a parent
+    // that spawned a long-lived child (the shared Core) would keep its event
+    // loop alive after it has nothing left to do.
+    this.#proc.stdout?.unref?.();
+    this.#proc.stderr?.unref?.();
+    this.#proc.stdin?.unref?.();
   }
 }
 
@@ -234,7 +226,7 @@ class NodeCommand {
   }
 }
 
-// ─── Deno.serve / upgradeWebSocket ─────────────────────────────────────────
+// ─── HTTP server ───────────────────────────────────────────────────────────
 
 function requestFromNode(req: any): Request {
   const host = req.headers.host ?? "localhost";
@@ -254,6 +246,11 @@ function requestFromNode(req: any): Request {
 
 async function respondToNode(res: any, response: Response): Promise<void> {
   res.statusCode = response.status;
+  // Do not keep the connection alive. A client that holds a pooled socket to a
+  // Core that has just stopped would otherwise see "other side closed" instead
+  // of a clean connection refusal, which the Core client uses to detect that
+  // the endpoint moved.
+  res.shouldKeepAlive = false;
   for (const [k, v] of response.headers) res.setHeader(k, v);
   if (response.body !== null) {
     const reader = response.body.getReader();
@@ -300,7 +297,7 @@ function statusText(status: number): string {
 }
 
 function serve(target: any, maybeHandler?: any): any {
-  const options = typeof target === "function" ? {} : target ?? {};
+  const options = typeof target === "function" ? {} : (target ?? {});
   const handler = typeof target === "function" ? target : maybeHandler;
   const server = createServer();
   const { WebSocketServer } = require("ws");
@@ -329,13 +326,19 @@ function serve(target: any, maybeHandler?: any): any {
 
   server.on("upgrade", (req, socket, head) => {
     const request = requestFromNode(req);
-    (request as any)[upgradeContext] = { req, socket, head, wss };
+    const ctx = { req, socket, head, wss, upgraded: false };
+    (request as any)[upgradeContext] = ctx;
     Promise.resolve(handler(request)).then(
       (response) => {
-        if (response !== undefined && response.status !== 101) {
+        // `upgradeWebSocket` performs the handshake itself and marks the
+        // context; anything else is a plain response on the raw socket.
+        if (ctx.upgraded) return;
+        if (response !== undefined) {
           void respondToUpgradedSocket(socket, response).catch(() =>
-            socket.destroy()
+            socket.destroy(),
           );
+        } else {
+          socket.destroy();
         }
       },
       () => socket.destroy(),
@@ -348,20 +351,23 @@ function serve(target: any, maybeHandler?: any): any {
   });
   server.on("close", () => resolveFinished());
 
-  server.listen({
-    host: options.hostname ?? undefined,
-    port: options.port ?? 0,
-  }, () => {
-    const address = server.address();
-    if (address !== null && typeof address === "object") {
-      addr = {
-        transport: "tcp",
-        hostname: address.address,
-        port: address.port,
-      };
-      if (typeof options.onListen === "function") options.onListen(addr);
-    }
-  });
+  server.listen(
+    {
+      host: options.hostname ?? undefined,
+      port: options.port ?? 0,
+    },
+    () => {
+      const address = server.address();
+      if (address !== null && typeof address === "object") {
+        addr = {
+          transport: "tcp",
+          hostname: address.address,
+          port: address.port,
+        };
+        if (typeof options.onListen === "function") options.onListen(addr);
+      }
+    },
+  );
 
   if (options.signal !== undefined) {
     options.signal.addEventListener(
@@ -377,8 +383,19 @@ function serve(target: any, maybeHandler?: any): any {
       return;
     }
     shuttingDown = true;
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    resolveFinished();
+    // Upgraded WebSocket sockets are detached from the HTTP server, so
+    // `server.close()` alone would wait for them forever. Terminate them, then
+    // force any remaining keep-alive connections closed.
+    for (const client of wss.clients) {
+      try {
+        client.terminate();
+      } catch {
+        // already gone
+      }
+    }
+    wss.close();
+    server.close(() => resolveFinished());
+    server.closeAllConnections?.();
   }
 
   return {
@@ -399,9 +416,10 @@ function serve(target: any, maybeHandler?: any): any {
   };
 }
 
-function upgradeWebSocket(
-  request: Request,
-): { socket: any; response: Response } {
+function upgradeWebSocket(request: Request): {
+  socket: any;
+  response: Response;
+} {
   const ctx = (request as any)[upgradeContext];
   if (ctx === undefined) {
     throw new Error("upgradeWebSocket expects an upgrade request");
@@ -411,19 +429,147 @@ function upgradeWebSocket(
     socket = ws;
   });
   if (socket === undefined) throw new Error("websocket upgrade failed");
-  return { socket, response: new Response(null, { status: 101 }) };
+  // Node's `Response` rejects a 101 status (only 200–599 are allowed), so the
+  // handshake is signalled to `serve` through the context instead. The returned
+  // response is a placeholder the caller may return as-is.
+  ctx.upgraded = true;
+  return { socket, response: new Response(null, { status: 200 }) };
 }
 
-// ─── Deno.connect / createHttpClient ───────────────────────────────────────
+// ─── connect / createHttpClient ─────────────────────────────────────────────
+
+function wrapNetSocket(socket: any): any {
+  let buffer: Buffer = Buffer.alloc(0);
+  let waiter: ((n: number | null) => void) | null = null;
+  let ended = false;
+  socket.on("data", (chunk: Buffer) => {
+    buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);
+    if (waiter) {
+      const w = waiter;
+      waiter = null;
+      w(buffer.length);
+    }
+  });
+  socket.on("end", () => {
+    ended = true;
+    if (waiter) {
+      const w = waiter;
+      waiter = null;
+      w(null);
+    }
+  });
+  socket.on("error", () => {
+    ended = true;
+    if (waiter) {
+      const w = waiter;
+      waiter = null;
+      w(null);
+    }
+  });
+  return {
+    rid: -1,
+    readable: Readable.toWeb(socket),
+    writable: Writable.toWeb(socket),
+    async read(p: Uint8Array): Promise<number | null> {
+      if (buffer.length === 0) {
+        if (ended) return null;
+        await new Promise<void>((resolve) => {
+          waiter = () => resolve();
+        });
+      }
+      const n = Math.min(p.length, buffer.length);
+      buffer.copy(p, 0, 0, n);
+      buffer = buffer.subarray(n);
+      return n === 0 ? null : n;
+    },
+    async write(p: Uint8Array): Promise<number> {
+      await new Promise<void>((resolve) =>
+        socket.write(Buffer.from(p), resolve),
+      );
+      return p.length;
+    },
+    async closeWrite(): Promise<void> {
+      socket.end();
+    },
+    close(): void {
+      socket.destroy();
+    },
+  };
+}
+
+function listen(options: any): any {
+  const server = netCreateServer();
+  let addr = {
+    transport: "tcp",
+    hostname: options?.hostname ?? "0.0.0.0",
+    port: options?.port ?? 0,
+  };
+  let resolveReady: () => void = () => {};
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve;
+  });
+  const pending: any[] = [];
+  const waiters: Array<(conn: any) => void> = [];
+  let closed = false;
+  server.on("connection", (socket: any) => {
+    const conn = wrapNetSocket(socket);
+    const waiter = waiters.shift();
+    if (waiter) waiter(conn);
+    else pending.push(conn);
+  });
+  server.on("error", () => resolveReady());
+  server.on("close", () => {
+    closed = true;
+    while (waiters.length) waiters.shift()!(undefined);
+  });
+  server.listen(
+    { host: options?.hostname ?? undefined, port: options?.port ?? 0 },
+    () => {
+      const a = server.address();
+      if (a !== null && typeof a === "object") {
+        addr = { transport: "tcp", hostname: a.address, port: a.port };
+      }
+      resolveReady();
+    },
+  );
+  if (options?.signal !== undefined) {
+    options.signal.addEventListener("abort", () => server.close(), {
+      once: true,
+    });
+  }
+  return {
+    get addr() {
+      return addr;
+    },
+    rid: -1,
+    ready,
+    accept(): Promise<any> {
+      const conn = pending.shift();
+      if (conn !== undefined) return Promise.resolve(conn);
+      if (closed) return Promise.resolve(undefined);
+      return new Promise((resolve) => waiters.push(resolve));
+    },
+    close(): void {
+      server.close();
+    },
+    ref(): void {
+      server.ref();
+    },
+    unref(): void {
+      server.unref();
+    },
+  };
+}
 
 function connect(options: any): Promise<any> {
   return new Promise((resolve, reject) => {
-    const socket = options.transport === "unix"
-      ? netConnect({ path: options.path })
-      : netConnect({
-        host: options.hostname ?? "127.0.0.1",
-        port: options.port,
-      });
+    const socket =
+      options.transport === "unix"
+        ? netConnect({ path: options.path })
+        : netConnect({
+            host: options.hostname ?? "127.0.0.1",
+            port: options.port,
+          });
     socket.once("connect", () => {
       resolve({
         readable: Readable.toWeb(socket),
@@ -449,11 +595,13 @@ function createHttpClient(options: any = {}): any {
     },
   };
   if (proxyUrl !== undefined) {
-    void import("undici").then((undici: any) => {
-      const agent = new undici.ProxyAgent(proxyUrl);
-      client.dispatcher = agent;
-      client._dispose = () => agent.close();
-    }).catch(() => {});
+    void import("undici")
+      .then((undici: any) => {
+        const agent = new undici.ProxyAgent(proxyUrl);
+        client.dispatcher = agent;
+        client._dispose = () => agent.close();
+      })
+      .catch(() => {});
   }
   return client;
 }
@@ -472,21 +620,44 @@ function installFetchBridge(): void {
       if (client.dispatcher !== undefined) next.dispatcher = client.dispatcher;
       return original(input, next);
     }
+    // Node's fetch does not implement `file:` URLs, but bundled WASM loaders
+    // (e.g. `@jsquash/webp`) fetch their assets by file URL. Read them here.
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : typeof input?.url === "string"
+            ? input.url
+            : "";
+    if (url.startsWith("file:")) {
+      return readFile(fileURLToPath(url)).then(
+        (bytes) =>
+          new Response(
+            bytes,
+            url.endsWith(".wasm")
+              ? { headers: { "content-type": "application/wasm" } }
+              : undefined,
+          ),
+      );
+    }
     return original(input, init);
   };
   (patched as any).__opensacBridged = true;
   (globalThis as any).fetch = patched;
 }
 
-// ─── Deno.makeTemp{File,Dir} (shim ignores dir/suffix) ─────────────────────
+// ─── makeTemp{File,Dir} (ignores dir/suffix placeholders in the name) ───────
 
 function tempName(prefix: string, suffix: string): string {
   return `${prefix}${randomBytes(8).toString("hex")}${suffix}`;
 }
 
-async function makeTempDir(
-  { dir = tmpdir(), prefix = "", suffix = "" }: any = {},
-): Promise<string> {
+async function makeTempDir({
+  dir = tmpdir(),
+  prefix = "",
+  suffix = "",
+}: any = {}): Promise<string> {
   for (;;) {
     const candidate = join(dir, tempName(prefix, suffix));
     try {
@@ -498,9 +669,11 @@ async function makeTempDir(
   }
 }
 
-function makeTempDirSync(
-  { dir = tmpdir(), prefix = "", suffix = "" }: any = {},
-): string {
+function makeTempDirSync({
+  dir = tmpdir(),
+  prefix = "",
+  suffix = "",
+}: any = {}): string {
   const { mkdirSync } = require("node:fs");
   for (;;) {
     const candidate = join(dir, tempName(prefix, suffix));
@@ -513,9 +686,11 @@ function makeTempDirSync(
   }
 }
 
-async function makeTempFile(
-  { dir = tmpdir(), prefix = "", suffix = "" }: any = {},
-): Promise<string> {
+async function makeTempFile({
+  dir = tmpdir(),
+  prefix = "",
+  suffix = "",
+}: any = {}): Promise<string> {
   for (;;) {
     const candidate = join(dir, tempName(prefix, suffix));
     try {
@@ -532,9 +707,11 @@ async function makeTempFile(
   }
 }
 
-function makeTempFileSync(
-  { dir = tmpdir(), prefix = "", suffix = "" }: any = {},
-): string {
+function makeTempFileSync({
+  dir = tmpdir(),
+  prefix = "",
+  suffix = "",
+}: any = {}): string {
   for (;;) {
     const candidate = join(dir, tempName(prefix, suffix));
     try {
@@ -605,42 +782,43 @@ function decodeDataURL(url: string): string {
     : decodeURIComponent(payload);
 }
 
-// ─── Install ───────────────────────────────────────────────────────────────
+// ─── Public surface ─────────────────────────────────────────────────────────
 
-/** Installs the Deno namespace (shim + extensions) as a process global. */
-export function installNodeDenoCompat(): void {
-  const deno = denoNamespace as AnyDeno;
-
-  // Expose it globally, for code that reaches `Deno.*` as a global reference.
-  (globalThis as any).Deno = deno;
-
-  override(deno, "Command", NodeCommand);
-  override(deno, "execPath", () => process.execPath);
-  override(deno, "args", currentArgs());
-  override(deno, "exit", (code?: number | string) => {
+/**
+ * The richer process/net members, merged over `runtime_core` by `runtime.ts`.
+ * These win over the base definitions (e.g. makeTemp* and exit).
+ */
+export const runtimeNet: Record<string, unknown> = {
+  Command: NodeCommand,
+  execPath: () => process.execPath,
+  args: currentArgs(),
+  exit: (code?: number | string) => {
     if (typeof code === "string") {
       console.error(code);
       process.exit(1);
     }
     process.exit(code ?? 0);
-  });
-  override(deno, "makeTempFile", makeTempFile);
-  override(deno, "makeTempFileSync", makeTempFileSync);
-  override(deno, "makeTempDir", makeTempDir);
-  override(deno, "makeTempDirSync", makeTempDirSync);
-  override(deno, "serve", serve);
-  override(deno, "upgradeWebSocket", upgradeWebSocket);
-  override(deno, "connect", connect);
-  override(deno, "createHttpClient", createHttpClient);
-  override(deno, "SeekMode", { Start: 0, Current: 1, End: 2 });
-  override(deno, "unrefTimer", (id: any) => {
+  },
+  makeTempFile,
+  makeTempFileSync,
+  makeTempDir,
+  makeTempDirSync,
+  serve,
+  listen,
+  upgradeWebSocket,
+  connect,
+  createHttpClient,
+  SeekMode: { Start: 0, Current: 1, End: 2 },
+  unrefTimer: (id: any) => {
     if (
-      id !== null && typeof id === "object" && typeof id.unref === "function"
+      id !== null &&
+      typeof id === "object" &&
+      typeof id.unref === "function"
     ) {
       id.unref();
     }
-  });
-  override(deno, "resolveDns", async (hostname: string, recordType = "A") => {
+  },
+  resolveDns: async (hostname: string, recordType = "A") => {
     switch (recordType) {
       case "A":
         return await resolve4(hostname);
@@ -649,20 +827,28 @@ export function installNodeDenoCompat(): void {
       case "CNAME":
         return await resolveCname(hostname);
       case "MX":
-        return (await resolveMx(hostname)).map((r) =>
-          `${r.priority} ${r.exchange}`
+        return (await resolveMx(hostname)).map(
+          (r) => `${r.priority} ${r.exchange}`,
         );
       case "TXT":
         return (await resolveTxt(hostname)).map((parts) => parts.join(""));
       default:
         throw new Error(`resolveDns: unsupported record type ${recordType}`);
     }
-  });
+  },
+};
 
+let workerInstalled = false;
+
+/**
+ * Installs the Web `Worker` global (over `node:worker_threads`) and bridges the
+ * fetch HTTP-client option. Idempotent; `runtime.ts` calls it once at load.
+ */
+export function installWorkerGlobal(): void {
+  if (workerInstalled) return;
+  workerInstalled = true;
   if ((globalThis as any).Worker === undefined) {
     (globalThis as any).Worker = NodeWebWorker;
   }
   installFetchBridge();
 }
-
-installNodeDenoCompat();

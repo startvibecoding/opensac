@@ -42,7 +42,7 @@ const columns = `session_id AS sessionId, esm_id AS esmId, objective, status,
 
 /** SQL-backed access to session_esm_objectives. */
 export class ESMDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;

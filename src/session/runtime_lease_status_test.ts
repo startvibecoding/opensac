@@ -2,6 +2,7 @@
 // The Manager-based holder setup is replaced with a direct lease row so the
 // preflight itself is exercised without the not-yet-ported session Manager.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import { RuntimeLeaseDAO, type RuntimeLeaseRecord } from "../dao/mod.ts";
@@ -13,12 +14,14 @@ import {
 import { test } from "#testing";
 
 test("active runtime leases reports held holders", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     // No database yet: nothing is held, and a read-only preflight must not
     // initialize the file it is only inspecting.
     assertEquals(activeRuntimeLeases(sessionDir), []);
-    assertThrows(() => Deno.statSync(rootDBPath(sessionDir)));
+    assertThrows(() => nodeRuntime.statSync(rootDBPath(sessionDir)));
 
     const db = openRootDB(sessionDir);
     const executor = db.db!;
@@ -26,7 +29,7 @@ test("active runtime leases reports held holders", () => {
     const record: RuntimeLeaseRecord = {
       sessionId: "lease-holder",
       ownerId: "owner-live",
-      ownerPid: Deno.pid,
+      ownerPid: nodeRuntime.pid,
       ownerKind: "process",
       tokenHash: "token-live",
       epoch: 1,
@@ -57,7 +60,7 @@ test("active runtime leases reports held holders", () => {
     assertEquals(leases.length, 2);
     const holder = leases.find((lease) => lease.sessionId === "lease-holder");
     assert(holder !== undefined);
-    assertEquals(holder.ownerPid, Deno.pid);
+    assertEquals(holder.ownerPid, nodeRuntime.pid);
     assertEquals(holder.purpose, "run");
     const description = describeActiveRuntimeLease(holder);
     assert(description.includes("lease-holder"));
@@ -68,7 +71,9 @@ test("active runtime leases reports held holders", () => {
 });
 
 test("active runtime leases never migrates the preflight database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const pathValue = rootDBPath(sessionDir);
     const standalone = openStandalone(pathValue, (db) => {
@@ -89,11 +94,11 @@ test("active runtime leases never migrates the preflight database", () => {
       )`);
     });
     standalone.close();
-    const before = Deno.readFileSync(pathValue);
+    const before = nodeRuntime.readFileSync(pathValue);
 
     assertEquals(activeRuntimeLeases(sessionDir), []);
 
-    const after = Deno.readFileSync(pathValue);
+    const after = nodeRuntime.readFileSync(pathValue);
     assertEquals(
       before.length,
       after.length,

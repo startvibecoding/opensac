@@ -17,8 +17,8 @@ test("public SDK must not import src", () => {
   assertEquals(
     violations,
     [],
-    `public SDK boundary violations (move wiring to src/bootstrap/):\n- ${
-      violations.join("\n- ")
-    }`,
+    `public SDK boundary violations (move wiring to src/bootstrap/):\n- ${violations.join(
+      "\n- ",
+    )}`,
   );
 });

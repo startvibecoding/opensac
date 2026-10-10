@@ -5,6 +5,7 @@
 // loss), and a fenced epoch bump blocks. Raw SQL lease fixtures are allowed in
 // tests (the DAO/DB rule governs production code).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert } from "../compat/assert.ts";
 import { type BeforeToolExecuteContext } from "../agent/mod.ts";
 import { type ToolCallBlock } from "../provider/types.ts";
@@ -70,10 +71,10 @@ function hookInput(runId: string): BeforeToolExecuteContext {
 }
 
 test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fence-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-fence-" });
   try {
     const manager = createManager(
-      Deno.makeTempDirSync({ prefix: "opensac-fence-work-" }),
+      runtime.makeTempDirSync({ prefix: "opensac-fence-work-" }),
       sessionDir,
     );
     manager.initWithID("fence-session");
@@ -133,9 +134,9 @@ test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
       const decision = hook(hookInput("fence-run"));
       if (decision === undefined || !decision.block) {
         throw new Error(
-          `displaced lease decision = ${
-            JSON.stringify(decision)
-          }, want blocked`,
+          `displaced lease decision = ${JSON.stringify(
+            decision,
+          )}, want blocked`,
         );
       }
 
@@ -169,9 +170,9 @@ test("beforeToolExecuteFenceFollowsFencedOwnership", () => {
 });
 
 test("beforeToolExecuteFenceAllowsNonSideEffectingAndUnboundRuns", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-fence-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-fence-" });
   try {
-    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(runtime.makeTempDirSync(), sessionDir);
     manager.initWithID("fence-idle");
     const hook = beforeToolExecuteForRuntime({
       id: "fence-idle",

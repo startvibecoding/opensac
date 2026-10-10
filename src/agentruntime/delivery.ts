@@ -105,8 +105,7 @@ export function deliveryOperationText(
   operationKind: string,
 ): string {
   const payload = decodeObject(raw) as
-    | { caption?: string; fallback?: string }
-    | undefined;
+    { caption?: string; fallback?: string } | undefined;
   if (payload === undefined) return "";
   if (operationKind === "send_fallback_text") {
     return (payload.fallback ?? "").trim();
@@ -119,9 +118,7 @@ export function deliveryOperationText(
  * performs no persistence and no network I/O. Ordinary transport fallback is
  * returned as `fallbackText`; the plan is empty when nothing is deliverable.
  */
-export function planDelivery(
-  request: DeliveryPlanRequest,
-): PlanDeliveryResult {
+export function planDelivery(request: DeliveryPlanRequest): PlanDeliveryResult {
   const sessionId = request.sessionId.trim();
   const runId = request.runId.trim();
   const platform = request.platform.trim();
@@ -220,15 +217,16 @@ export function planDelivery(
       let name = (attachment.filename ?? "").trim();
       if (name === "") name = kind;
       fallback.push(
-        `Generated ${kind} ${
-          JSON.stringify(name)
-        } is available in the OpenSAC session; this transport cannot send media attachments.`,
+        `Generated ${kind} ${JSON.stringify(
+          name,
+        )} is available in the OpenSAC session; this transport cannot send media attachments.`,
       );
       return;
     }
-    const keyPrefix = `artifact-${
-      String(index + 1).padStart(3, "0")
-    }-${attachment.id}`;
+    const keyPrefix = `artifact-${String(index + 1).padStart(
+      3,
+      "0",
+    )}-${attachment.id}`;
     const uploadId = appendOperation(
       keyPrefix + "-upload",
       attachment.id,
@@ -245,9 +243,7 @@ export function planDelivery(
       sequence,
       dependsOn: uploadId,
       idempotencyKey: sendId,
-      payloadDigest: stableDeliveryDigest(
-        attachment.sha256 + "\x00" + kind,
-      ),
+      payloadDigest: stableDeliveryDigest(attachment.sha256 + "\x00" + kind),
       status: "pending",
       createdAt,
     });
@@ -302,7 +298,9 @@ function decodeObject(raw: unknown): Record<string, unknown> | undefined {
     try {
       const parsed = JSON.parse(raw);
       if (
-        parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        parsed !== null &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed)
       ) {
         return parsed as Record<string, unknown>;
       }

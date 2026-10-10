@@ -1,6 +1,7 @@
 // (AgentFactory runtime-config inheritance, provider-name propagation, and the
 // compile-time AgentAdapter interface assertion).
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import { type Agent as PublicAgent } from "../../sdk/agent/types.ts";
@@ -26,128 +27,132 @@ function contains(haystack: string, needle: string): boolean {
   return haystack.includes(needle);
 }
 
-test(
-  "AgentManagerChildInheritsParentBeforeToolCallPolicy",
-  () => {
-    const mockProvider = createMockProvider(
-      "mock",
-      [testModel("model1", "Model 1")],
-      [],
-    );
-    const settings: Settings = defaultSettings();
-    settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
-    const factory = createAgentFactory(
-      mockProvider,
-      mockProvider.models()[0],
-      settings,
-      undefined,
-      "",
-      "",
-      undefined,
-      emptyCompaction(),
-      undefined,
-      {
-        multiAgentEnabled: true,
-        delegateEnabled: false,
-        workflowsEnabled: false,
-      },
-    );
-    const manager = createAgentManager(factory);
+test("AgentManagerChildInheritsParentBeforeToolCallPolicy", () => {
+  const mockProvider = createMockProvider(
+    "mock",
+    [testModel("model1", "Model 1")],
+    [],
+  );
+  const settings: Settings = defaultSettings();
+  settings.sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-sessions-",
+  });
+  const factory = createAgentFactory(
+    mockProvider,
+    mockProvider.models()[0],
+    settings,
+    undefined,
+    "",
+    "",
+    undefined,
+    emptyCompaction(),
+    undefined,
+    {
+      multiAgentEnabled: true,
+      delegateEnabled: false,
+      workflowsEnabled: false,
+    },
+  );
+  const manager = createAgentManager(factory);
 
-    const parentRegistry = createRegistry(
-      Deno.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
-      createNoneSandbox(),
-    );
-    const parent = createAgentWithLoopConfig({
+  const parentRegistry = createRegistry(
+    nodeRuntime.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
+    createNoneSandbox(),
+  );
+  const parent = createAgentWithLoopConfig(
+    {
       id: "parent",
       mode: "yolo",
       forcedMode: "yolo",
       beforeToolCall: () => ({ block: true, reason: "inherited policy" }),
-    }, parentRegistry);
-    manager.register(createAgentAdapter(parent));
+    },
+    parentRegistry,
+  );
+  manager.register(createAgentAdapter(parent));
 
-    const child = manager.create({
-      parentId: parent.id(),
-      mode: "plan",
-      workDir: Deno.makeTempDirSync({ prefix: "opensac-child-" }),
-    }) as AgentAdapter;
-    const childConfig = runtimeConfigOfManagedAgent(child);
-    assert(childConfig !== undefined);
-    assert(childConfig.beforeToolCall !== undefined);
-    assertEquals(childConfig.mode, "yolo");
-    assertEquals(childConfig.forcedMode, "yolo");
-    const decision = childConfig.beforeToolCall?.({
-      assistantMessage: { role: "assistant", timestamp: new Date() },
-      toolCall: { id: "t", name: "bash", kind: "function" },
-      args: {},
-      context: null,
-    });
-    assert(decision !== undefined && decision.block);
-    assertEquals(decision.reason, "inherited policy");
-  },
-);
+  const child = manager.create({
+    parentId: parent.id(),
+    mode: "plan",
+    workDir: nodeRuntime.makeTempDirSync({ prefix: "opensac-child-" }),
+  }) as AgentAdapter;
+  const childConfig = runtimeConfigOfManagedAgent(child);
+  assert(childConfig !== undefined);
+  assert(childConfig.beforeToolCall !== undefined);
+  assertEquals(childConfig.mode, "yolo");
+  assertEquals(childConfig.forcedMode, "yolo");
+  const decision = childConfig.beforeToolCall?.({
+    assistantMessage: { role: "assistant", timestamp: new Date() },
+    toolCall: { id: "t", name: "bash", kind: "function" },
+    args: {},
+    context: null,
+  });
+  assert(decision !== undefined && decision.block);
+  assertEquals(decision.reason, "inherited policy");
+});
 
-test(
-  "AgentManagerChildInheritsParentBeforeToolExecuteFence",
-  () => {
-    const mockProvider = createMockProvider(
-      "mock",
-      [testModel("model1", "Model 1")],
-      [],
-    );
-    const settings: Settings = defaultSettings();
-    settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
-    const factory = createAgentFactory(
-      mockProvider,
-      mockProvider.models()[0],
-      settings,
-      undefined,
-      "",
-      "",
-      undefined,
-      emptyCompaction(),
-      undefined,
-      {
-        multiAgentEnabled: true,
-        delegateEnabled: false,
-        workflowsEnabled: false,
-      },
-    );
-    const manager = createAgentManager(factory);
+test("AgentManagerChildInheritsParentBeforeToolExecuteFence", () => {
+  const mockProvider = createMockProvider(
+    "mock",
+    [testModel("model1", "Model 1")],
+    [],
+  );
+  const settings: Settings = defaultSettings();
+  settings.sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-sessions-",
+  });
+  const factory = createAgentFactory(
+    mockProvider,
+    mockProvider.models()[0],
+    settings,
+    undefined,
+    "",
+    "",
+    undefined,
+    emptyCompaction(),
+    undefined,
+    {
+      multiAgentEnabled: true,
+      delegateEnabled: false,
+      workflowsEnabled: false,
+    },
+  );
+  const manager = createAgentManager(factory);
 
-    const parentRegistry = createRegistry(
-      Deno.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
-      createNoneSandbox(),
-    );
-    const parent = createAgentWithLoopConfig({
+  const parentRegistry = createRegistry(
+    nodeRuntime.makeTempDirSync({ prefix: "opensac-parent-reg-" }),
+    createNoneSandbox(),
+  );
+  const parent = createAgentWithLoopConfig(
+    {
       id: "parent-fence",
       mode: "yolo",
       forcedMode: "yolo",
       beforeToolExecute: () => ({ block: true, reason: "inherited fence" }),
-    }, parentRegistry);
-    manager.register(createAgentAdapter(parent));
+    },
+    parentRegistry,
+  );
+  manager.register(createAgentAdapter(parent));
 
-    const child = manager.create({
-      parentId: parent.id(),
-      mode: "plan",
-      workDir: Deno.makeTempDirSync({ prefix: "opensac-child-" }),
-    }) as AgentAdapter;
-    const childConfig = runtimeConfigOfManagedAgent(child);
-    assert(childConfig !== undefined);
-    assert(childConfig.beforeToolExecute !== undefined);
-    const decision = childConfig.beforeToolExecute?.({
-      toolCall: { id: "t", name: "bash", kind: "function" },
-      args: {},
-      context: null,
-      executionContext: {},
-      runId: "",
-      executionKey: "",
-      sideEffecting: false,
-    });
-    assert(decision !== undefined && decision.block);
-    assertEquals(decision.reason, "inherited fence");
-  },
-);
+  const child = manager.create({
+    parentId: parent.id(),
+    mode: "plan",
+    workDir: nodeRuntime.makeTempDirSync({ prefix: "opensac-child-" }),
+  }) as AgentAdapter;
+  const childConfig = runtimeConfigOfManagedAgent(child);
+  assert(childConfig !== undefined);
+  assert(childConfig.beforeToolExecute !== undefined);
+  const decision = childConfig.beforeToolExecute?.({
+    toolCall: { id: "t", name: "bash", kind: "function" },
+    args: {},
+    context: null,
+    executionContext: {},
+    runId: "",
+    executionKey: "",
+    sideEffecting: false,
+  });
+  assert(decision !== undefined && decision.block);
+  assertEquals(decision.reason, "inherited fence");
+});
 
 test("AgentFactoryWorkflowPromptNotInheritedByChild", () => {
   const mockProvider = createMockProvider(
@@ -156,11 +161,13 @@ test("AgentFactoryWorkflowPromptNotInheritedByChild", () => {
     [],
   );
   const sandboxMgr: SandboxManager = createManager(
-    Deno.makeTempDirSync({ prefix: "opensac-sandbox-" }),
+    nodeRuntime.makeTempDirSync({ prefix: "opensac-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
+  settings.sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-sessions-",
+  });
   const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],
@@ -193,11 +200,13 @@ test("AgentFactoryPropagatesProviderNameToChildren", () => {
     [],
   );
   const sandboxMgr: SandboxManager = createManager(
-    Deno.makeTempDirSync({ prefix: "opensac-sandbox-" }),
+    nodeRuntime.makeTempDirSync({ prefix: "opensac-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({ prefix: "opensac-sessions-" });
+  settings.sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-sessions-",
+  });
   const factory = createAgentFactory(
     mockProvider,
     mockProvider.models()[0],

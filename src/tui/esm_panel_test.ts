@@ -266,11 +266,17 @@ test("esmPanelLines appends live activity for the active agent", () => {
   const obj = makeObjective();
   // No active agent: no live details section
   const plain = esmPanelLines(obj, 76, tr);
-  assertEquals(plain.some((l) => l.includes("Live details:")), false);
+  assertEquals(
+    plain.some((l) => l.includes("Live details:")),
+    false,
+  );
 
   // Active agent without a snapshot yet
   const starting = esmPanelLines(obj, 76, tr, { activeAgentId: "a1" });
-  assertEquals(starting.some((l) => l.includes("a1")), true);
+  assertEquals(
+    starting.some((l) => l.includes("a1")),
+    true,
+  );
 
   // Active agent with a snapshot
   const act: AgentActivity = {
@@ -317,21 +323,30 @@ test("activeESMPanelActivity falls back through result/text/think", () => {
     76,
     tr,
   );
-  assertEquals(result.some((l) => l.includes("the result")), true);
+  assertEquals(
+    result.some((l) => l.includes("the result")),
+    true,
+  );
 
   const text = activeESMPanelActivity(
     { activeAgentId: "a1", activity: { ...base, lastText: "the text" } },
     76,
     tr,
   );
-  assertEquals(text.some((l) => l.includes("the text")), true);
+  assertEquals(
+    text.some((l) => l.includes("the text")),
+    true,
+  );
 
   const think = activeESMPanelActivity(
     { activeAgentId: "a1", activity: { ...base, lastThink: "deep thought" } },
     76,
     tr,
   );
-  assertEquals(think.some((l) => l.includes("deep thought")), true);
+  assertEquals(
+    think.some((l) => l.includes("deep thought")),
+    true,
+  );
 
   // Empty id yields no lines
   assertEquals(activeESMPanelActivity({ activeAgentId: "" }, 76, tr), []);

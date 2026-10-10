@@ -3,10 +3,11 @@
 // ported vibe-browser SDK. Registration helpers mirror the Go package.
 //
 // Deviations from Go: `context.Context` maps to the `ToolContext` `AbortSignal`;
-// `sync.Mutex` is dropped (Deno is single-threaded); `panic`-based `requireString`
-// throws instead; `os.WriteFile`/`os.MkdirAll` map to `Deno.mkdirSync`/
-// `Deno.writeFileSync`; `encoding/json` maps to `JSON`.
+// `sync.Mutex` is dropped (Node is single-threaded); `panic`-based `requireString`
+// throws instead; `os.WriteFile`/`os.MkdirAll` map to `runtime.mkdirSync`/
+// `runtime.writeFileSync`; `encoding/json` maps to `JSON`.
 
+import { runtime } from "../platform/runtime.ts";
 import {
   defaultPolicy,
   type Mode,
@@ -25,7 +26,11 @@ import {
   type ToolResult,
 } from "../tools/tool.ts";
 import { Client, type Options } from "./client.ts";
-import { type Cookie, type HTMLOptions, type ScreenshotOptions } from "./protocol.ts";
+import {
+  type Cookie,
+  type HTMLOptions,
+  type ScreenshotOptions,
+} from "./protocol.ts";
 
 /** The tool name registered with the shared registry. */
 export const TOOL_NAME = "browser";
@@ -85,9 +90,10 @@ export class BrowserTool implements Tool {
     return JSON.parse(PARAMETERS_JSON);
   }
 
-  executionTimeout(
-    _params: Record<string, unknown>,
-  ): { durationMs: number; provided: boolean } {
+  executionTimeout(_params: Record<string, unknown>): {
+    durationMs: number;
+    provided: boolean;
+  } {
     return { durationMs: 2 * 60 * 1000, provided: true };
   }
 
@@ -113,11 +119,7 @@ export class BrowserTool implements Tool {
         const url = stringParam(params, "url");
         if (url !== "") {
           const waitUntil = stringParam(params, "waitUntil");
-          await c.navigate(
-            url,
-            waitUntil ? { waitUntil } : undefined,
-            signal,
-          );
+          await c.navigate(url, waitUntil ? { waitUntil } : undefined, signal);
         }
         return await pageSummary(c, "browser opened", signal);
       }
@@ -137,13 +139,16 @@ export class BrowserTool implements Tool {
         await c.reload(signal);
         return createTextToolResult("reloaded");
       case "snapshot": {
-        const s = await c.snapshot({
-          selector: stringParam(params, "selector"),
-          interactive: boolParam(params, "interactive"),
-          compact: boolParam(params, "compact"),
-          depth: intParam(params, "depth"),
-          urls: boolParam(params, "urls"),
-        }, signal);
+        const s = await c.snapshot(
+          {
+            selector: stringParam(params, "selector"),
+            interactive: boolParam(params, "interactive"),
+            compact: boolParam(params, "compact"),
+            depth: intParam(params, "depth"),
+            urls: boolParam(params, "urls"),
+          },
+          signal,
+        );
         return createTextToolResult(s);
       }
       case "click":
@@ -339,7 +344,7 @@ export class BrowserTool implements Tool {
     params: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<Client> {
-    if (this.#client && await this.#client.isConnected()) return this.#client;
+    if (this.#client && (await this.#client.isConnected())) return this.#client;
     const opts = clientOptions(params);
     const c = boolParam(params, "daemon")
       ? await Client.connect(opts)
@@ -369,8 +374,8 @@ export class BrowserTool implements Tool {
     if (outputPath !== "") {
       const resolved = this.#resolvePath(outputPath);
       const dir = resolved.slice(0, resolved.lastIndexOf("/"));
-      if (dir) Deno.mkdirSync(dir, { recursive: true });
-      Deno.writeFileSync(resolved, data);
+      if (dir) runtime.mkdirSync(dir, { recursive: true });
+      runtime.writeFileSync(resolved, data);
       return createTextToolResult(`screenshot saved: ${resolved}`);
     }
     return await this.#screenshotToolResult(data, params);
@@ -412,10 +417,7 @@ export class BrowserTool implements Tool {
       detail: result.meta.detail,
       scale: result.meta.scale,
     };
-    return createImageToolResult(
-      browserScreenshotDescription(result),
-      image,
-    );
+    return createImageToolResult(browserScreenshotDescription(result), image);
   }
 
   #screenshotImagePolicy(params: Record<string, unknown>): Policy {
@@ -437,12 +439,12 @@ export function createTool(registry: Registry | undefined): BrowserTool {
 
 function browserScreenshotDescription(result: ImageResult): string {
   const m = result.meta;
-  const original = `${m.originalWidth}x${m.originalHeight} ${
-    formatBytes(m.originalBytes)
-  }`;
-  const sent = `${m.width}x${m.height} ${
-    formatBytes(m.bytes)
-  } ${result.mimeType}`;
+  const original = `${m.originalWidth}x${m.originalHeight} ${formatBytes(
+    m.originalBytes,
+  )}`;
+  const sent = `${m.width}x${m.height} ${formatBytes(
+    m.bytes,
+  )} ${result.mimeType}`;
   if (m.resized || m.transcoded || m.originalBytes !== m.bytes) {
     return `[Browser screenshot, original: ${original}, sent: ${sent}, mode: ${m.detail}]`;
   }
@@ -593,22 +595,22 @@ export function cookieFromParams(params: Record<string, unknown>): Cookie {
 export function clientOptions(params: Record<string, unknown>): Options {
   const browserName = firstNonEmpty(
     stringParam(params, "browser"),
-    Deno.env.get("VIBE_BROWSER_BROWSER") ?? "",
+    runtime.env.get("VIBE_BROWSER_BROWSER") ?? "",
   );
   const opts: Options = {
     cdpUrl: firstNonEmpty(
       stringParam(params, "cdpUrl"),
-      Deno.env.get("VIBE_BROWSER_CDP_URL") ?? "",
+      runtime.env.get("VIBE_BROWSER_CDP_URL") ?? "",
     ),
     session: firstNonEmpty(
       stringParam(params, "session"),
-      Deno.env.get("VIBE_BROWSER_SESSION") ?? "",
+      runtime.env.get("VIBE_BROWSER_SESSION") ?? "",
     ),
     executablePath: firstNonEmpty(
       stringParam(params, "executablePath"),
-      Deno.env.get("CHROME_PATH") ?? "",
+      runtime.env.get("CHROME_PATH") ?? "",
     ),
-    daemonSocketDir: Deno.env.get("VIBE_BROWSER_SOCKET_DIR") ?? "",
+    daemonSocketDir: runtime.env.get("VIBE_BROWSER_SOCKET_DIR") ?? "",
     launch: {
       headless: true,
       viewportWidth: intParamDefault(

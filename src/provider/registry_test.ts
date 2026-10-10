@@ -20,10 +20,8 @@ function cfg(partial: Partial<ProviderConfig>): ProviderConfig {
 
 test("ProviderRegistryRegisterAndCreate", () => {
   const r = new ProviderRegistry();
-  r.register(
-    "test",
-    (_cfg) =>
-      createMockProvider("test", [{ id: "m1", name: "Model 1" } as never], []),
+  r.register("test", (_cfg) =>
+    createMockProvider("test", [{ id: "m1", name: "Model 1" } as never], []),
   );
   assert(r.has("test"));
   assert(!r.has("nonexistent"));
@@ -119,9 +117,8 @@ test("ResolveProviderAutoDetect", () => {
   const r = new ProviderRegistry();
   r.register("deepseek", () => createMockProvider("deepseek", [], []));
   r.register("openai-chat", () => createMockProvider("openai-chat", [], []));
-  r.register(
-    "anthropic-messages",
-    () => createMockProvider("anthropic-messages", [], []),
+  r.register("anthropic-messages", () =>
+    createMockProvider("anthropic-messages", [], []),
   );
   withRegistry(r, () => {
     const p = resolveProvider(
@@ -133,15 +130,13 @@ test("ResolveProviderAutoDetect", () => {
 
 test("ResolveProviderFallback", () => {
   const r = new ProviderRegistry();
-  for (
-    const name of [
-      "openai-chat",
-      "openai-responses",
-      "anthropic-messages",
-      "google-gemini",
-      "google-vertex",
-    ]
-  ) {
+  for (const name of [
+    "openai-chat",
+    "openai-responses",
+    "anthropic-messages",
+    "google-gemini",
+    "google-vertex",
+  ]) {
     r.register(name, () => createMockProvider(name, [], []));
   }
   withRegistry(r, () => {
@@ -175,7 +170,7 @@ test("ResolveProviderFallback", () => {
 test("ResolveProviderUnknownAPI", () => {
   withRegistry(new ProviderRegistry(), () => {
     const err = assertThrows(() =>
-      resolveProvider(cfg({ api: "unknown-api" }))
+      resolveProvider(cfg({ api: "unknown-api" })),
     ) as Error;
     assert(err.message.includes("unsupported API type"));
   });
@@ -183,15 +178,13 @@ test("ResolveProviderUnknownAPI", () => {
 
 test("ResolveProviderUnregisteredVendorUsesAPI", () => {
   const r = new ProviderRegistry();
-  for (
-    const name of [
-      "openai-chat",
-      "openai-responses",
-      "anthropic-messages",
-      "google-gemini",
-      "google-vertex",
-    ]
-  ) {
+  for (const name of [
+    "openai-chat",
+    "openai-responses",
+    "anthropic-messages",
+    "google-gemini",
+    "google-vertex",
+  ]) {
     r.register(name, () => createMockProvider(name, [], []));
   }
   withRegistry(r, () => {
@@ -212,9 +205,8 @@ test("ResolveProviderUnregisteredVendorUsesAPI", () => {
 test("ResolveProviderVendorPriorityOverAPIFallback", () => {
   const r = new ProviderRegistry();
   r.register("openai", () => createMockProvider("openai", [], []));
-  r.register(
-    "openai-responses",
-    () => createMockProvider("openai-responses", [], []),
+  r.register("openai-responses", () =>
+    createMockProvider("openai-responses", [], []),
   );
   withRegistry(r, () => {
     const p = resolveProvider(
@@ -226,13 +218,11 @@ test("ResolveProviderVendorPriorityOverAPIFallback", () => {
 
 test("ResolveProviderGoogleFallback", () => {
   const r = new ProviderRegistry();
-  r.register(
-    "google-gemini",
-    () => createMockProvider("google-gemini", [], []),
+  r.register("google-gemini", () =>
+    createMockProvider("google-gemini", [], []),
   );
-  r.register(
-    "google-vertex",
-    () => createMockProvider("google-vertex", [], []),
+  r.register("google-vertex", () =>
+    createMockProvider("google-vertex", [], []),
   );
   withRegistry(r, () => {
     assertEquals(

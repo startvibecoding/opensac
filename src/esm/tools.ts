@@ -36,7 +36,7 @@ export function createUpdateTool(
 }
 
 class GetTool implements Tool {
-    private readonly store: Store | null;
+  private readonly store: Store | null;
   private readonly sessionID: SessionIDFunc;
 
   constructor(store: Store | null, sessionID: SessionIDFunc) {
@@ -88,11 +88,15 @@ class GetTool implements Tool {
 }
 
 class UpdateTool implements Tool {
-    private readonly store: Store | null;
+  private readonly store: Store | null;
   private readonly sessionID: SessionIDFunc;
   private readonly runID: RunIDFunc | null;
 
-  constructor(store: Store | null, sessionID: SessionIDFunc, runID: RunIDFunc | null) {
+  constructor(
+    store: Store | null,
+    sessionID: SessionIDFunc,
+    runID: RunIDFunc | null,
+  ) {
     this.store = store;
     this.sessionID = sessionID;
     this.runID = runID;
@@ -208,9 +212,9 @@ export function formatObjective(obj: Objective | null): string {
   }
   if (obj.remainingWork.length > 0) {
     b.push(
-      `Remaining work (${obj.remainingWork.length}): ${
-        obj.remainingWork.join("; ")
-      }\n`,
+      `Remaining work (${obj.remainingWork.length}): ${obj.remainingWork.join(
+        "; ",
+      )}\n`,
     );
   }
   if (obj.rejectionCount > 0) {

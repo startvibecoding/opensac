@@ -54,7 +54,7 @@ export interface StatsRecord {
 
 /** SQL-backed access to request_stats. */
 export class StatsDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -87,15 +87,17 @@ export class StatsDAO {
 
   summary(filter: StatsFilter): StatsSummaryRecord {
     const { where, params } = statsWhere(filter);
-    return queryOptional<StatsSummaryRecord>(
-      this.requireDb(),
-      `SELECT COUNT(*) AS totalRequests,
+    return (
+      queryOptional<StatsSummaryRecord>(
+        this.requireDb(),
+        `SELECT COUNT(*) AS totalRequests,
               CAST(COALESCE(SUM(input_tokens), 0) AS INTEGER) AS inputTokens,
               CAST(COALESCE(SUM(output_tokens), 0) AS INTEGER) AS outputTokens,
               CAST(COALESCE(SUM(total_tokens), 0) AS INTEGER) AS totalTokens
        FROM request_stats${where}`,
-      params,
-    ) ?? { totalRequests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+        params,
+      ) ?? { totalRequests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+    );
   }
 
   timeSeries(filter: StatsFilter, groupBy: string): StatsAggregateRecord[] {
@@ -152,11 +154,12 @@ export class StatsDAO {
   ): { records: StatsRecord[]; total: number } {
     const db = this.requireDb();
     const { where, params } = statsWhere(filter);
-    const total = queryOptional<{ n: number }>(
-      db,
-      `SELECT COUNT(*) AS n FROM request_stats${where}`,
-      params,
-    )?.n ?? 0;
+    const total =
+      queryOptional<{ n: number }>(
+        db,
+        `SELECT COUNT(*) AS n FROM request_stats${where}`,
+        params,
+      )?.n ?? 0;
     const records = queryAll<StatsRecord>(
       db,
       `SELECT id, timestamp, session_id AS sessionId, provider, protocol, model,

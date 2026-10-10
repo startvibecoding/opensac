@@ -146,7 +146,9 @@ export function decodeDecisionEvent(
   if (envelope === undefined) return null;
   const decision = envelope.decision;
   if (
-    decision === null || typeof decision !== "object" || Array.isArray(decision)
+    decision === null ||
+    typeof decision !== "object" ||
+    Array.isArray(decision)
   ) {
     return null;
   }

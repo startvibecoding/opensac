@@ -1,8 +1,9 @@
 // Shared-API implementations behind the TUI {@link CommandHost}. Each method is
-// a thin translation of the Go handler to the Deno port's shared modules
+// a thin translation of the Go handler to the Node port's shared modules
 // (config, session, skills, expert, workflow, skillhub, esm, stats). It never
 // constructs an Agent, opens a database directly, or builds SQL.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import {
   addEditPath,
   type AllowConfig,
@@ -37,7 +38,8 @@ import {
   type TUIEsmObjectiveView,
   type TUIExpertBundleView,
   type TUISessionListEntry,
-  type TUISessionView} from "./service.ts";
+  type TUISessionView,
+} from "./service.ts";
 import { type CoreRuntimeEvent } from "../core/runtime.ts";
 import { CONFIG_OPTION_BROWSER } from "../agentruntime/session_options.ts";
 import { Service as SkillHubService } from "../skillhub/service.ts";
@@ -142,9 +144,9 @@ export class TuiCommands {
                 sessionId,
                 name: skill.name,
                 active: false,
-              })
+              }),
             ),
-        )
+        ),
       )
       .catch((error) => {
         this.#host.controller.addMessage(
@@ -200,7 +202,7 @@ export class TuiCommands {
     const target = scope === "global" ? globalMCPPath() : projectMCPPath();
     if (!force) {
       try {
-        Deno.statSync(target);
+        nodeRuntime.statSync(target);
         return { message: tr.text("init_mcp.exists", scope) };
       } catch {
         // Not present: write it.
@@ -231,8 +233,7 @@ export class TuiCommands {
     for (const e of experts) {
       const marker = e.name === boundID ? "*" : " ";
       const name = tr.language === "zh" ? e.displayName.zh : e.displayName.en;
-      let line =
-        `  [${marker}] ${e.name}  ${name} (${e.expertType}, ${e.source})`;
+      let line = `  [${marker}] ${e.name}  ${name} (${e.expertType}, ${e.source})`;
       if (e.invalid) line += `: invalid — ${e.invalidReason ?? ""}`;
       lines.push(line);
     }
@@ -252,19 +253,15 @@ export class TuiCommands {
       });
       return this.#formatExpertBundle(bundle);
     } catch (err) {
-      return this.#tr().text(
-        "expert.show_failed",
-        (err as Error).message,
-      );
+      return this.#tr().text("expert.show_failed", (err as Error).message);
     }
   }
 
   #formatExpertBundle(bundle: TUIExpertBundleView): string {
     const tr = this.#tr();
     const lines = [`Expert: ${bundle.name}`];
-    const displayName = tr.language === "zh"
-      ? bundle.displayName.zh
-      : bundle.displayName.en;
+    const displayName =
+      tr.language === "zh" ? bundle.displayName.zh : bundle.displayName.en;
     lines.push(`Name: ${displayName}`);
     lines.push(`Type: ${bundle.expertType}`);
     if (bundle.invalid) {
@@ -280,9 +277,8 @@ export class TuiCommands {
         if (name !== "" && name !== member.id) {
           line += ` (${name})`;
         }
-        const profession = tr.language === "zh"
-          ? member.profession.zh
-          : member.profession.en;
+        const profession =
+          tr.language === "zh" ? member.profession.zh : member.profession.en;
         if (profession !== "") {
           line += `: ${profession}`;
         }
@@ -308,9 +304,8 @@ export class TuiCommands {
       return { message: (err as Error).message, error: true };
     }
     return {
-      message: id === ""
-        ? tr.text("expert.unbound")
-        : tr.text("expert.bound", id),
+      message:
+        id === "" ? tr.text("expert.unbound") : tr.text("expert.bound", id),
     };
   }
 
@@ -371,9 +366,11 @@ export class TuiCommands {
       this.#host.adoptSession(child);
       this.#host.controller.store.resetTranscriptState();
       this.#host.controller.resetContextUsage();
-      const detail = (await this.#host.service.listPersistedSessions({
-        workDir: this.#host.workDir,
-      })).find((entry) => entry.sessionId === child.sessionId);
+      const detail = (
+        await this.#host.service.listPersistedSessions({
+          workDir: this.#host.workDir,
+        })
+      ).find((entry) => entry.sessionId === child.sessionId);
       return {
         message: tr.text(
           "sessions.switched",
@@ -555,7 +552,10 @@ export class TuiCommands {
     const sessionID = this.#host.currentSessionID();
     if (sessionID === "") return { message: tr.text("esm.panel.no_objective") };
     const service = this.#host.service;
-    const raw = cmd.trim().replace(/^\/esm/, "").trim();
+    const raw = cmd
+      .trim()
+      .replace(/^\/esm/, "")
+      .trim();
     const [sub, ...restArr] = raw === "" ? ["status"] : raw.split(/\s+/);
     const rest = restArr.join(" ");
     // Go: pause/resume/clear cannot mutate an active run; only objective
@@ -704,9 +704,9 @@ export class TuiCommands {
     }
     if (obj.remainingWork.length > 0) {
       lines.push(
-        `Remaining work (${obj.remainingWork.length}): ${
-          obj.remainingWork.join("; ")
-        }`,
+        `Remaining work (${obj.remainingWork.length}): ${obj.remainingWork.join(
+          "; ",
+        )}`,
       );
     }
     return lines.join("\n");
@@ -783,8 +783,10 @@ export class TuiCommands {
         };
       }
       return {
-        message: [tr.text("alloweditpath.title"), ...paths.map((p) => `  ${p}`)]
-          .join("\n"),
+        message: [
+          tr.text("alloweditpath.title"),
+          ...paths.map((p) => `  ${p}`),
+        ].join("\n"),
       };
     }
     switch (parts[1]) {
@@ -850,10 +852,7 @@ export class TuiCommands {
     if (parts.length < 2) {
       return {
         message: [
-          tr.text(
-            "allowautoedit.status",
-            getAutoEdit(allow) ? "ON" : "OFF",
-          ),
+          tr.text("allowautoedit.status", getAutoEdit(allow) ? "ON" : "OFF"),
           tr.text("commands.usage", "/allowautoedit [on|off] [global]"),
         ].join("\n"),
       };
@@ -1041,11 +1040,11 @@ export class TuiCommands {
       enabled,
       ...(enabled && !current.command
         ? {
-          command: "ccstatusline",
-          type: "command",
-          timeoutMs: 800,
-          fallback: "builtin",
-        }
+            command: "ccstatusline",
+            type: "command",
+            timeoutMs: 800,
+            fallback: "builtin",
+          }
         : {}),
     };
     try {
@@ -1160,9 +1159,10 @@ export class TuiCommands {
       };
     }
     return {
-      message: refresh === 0
-        ? `Status line refresh updated (${scope} settings): event-driven`
-        : `Status line refresh updated (${scope} settings): ${refresh}s`,
+      message:
+        refresh === 0
+          ? `Status line refresh updated (${scope} settings): event-driven`
+          : `Status line refresh updated (${scope} settings): ${refresh}s`,
     };
   }
 
@@ -1173,8 +1173,8 @@ export class TuiCommands {
     if (this.#host.controller.isThinking) {
       return { message: tr.text("rule.running"), error: true };
     }
-    const overwrite = parts.length > 1 &&
-      (parts[1] === "force" || parts[1] === "--force");
+    const overwrite =
+      parts.length > 1 && (parts[1] === "force" || parts[1] === "--force");
     if (parts.length > 2 || (parts.length === 2 && !overwrite)) {
       return {
         message: tr.text("commands.usage", "/rule [force|--force]"),
@@ -1182,10 +1182,11 @@ export class TuiCommands {
       };
     }
     try {
-      const { path: filePath, content, written } = ensureRuleFile(
-        this.#host.workDir,
-        overwrite,
-      );
+      const {
+        path: filePath,
+        content,
+        written,
+      } = ensureRuleFile(this.#host.workDir, overwrite);
       // The rule text is Core-owned session context: update it through the
       // service so Core-run prompts see it immediately.
       await this.#host.service.setSessionContext({
@@ -1283,11 +1284,7 @@ export class TuiCommands {
             };
           }
           const { market, id } = TuiCommands.#parseSkillHubID(parts[2]);
-          const detail = await service.detail(
-            undefined,
-            market as Market,
-            id,
-          );
+          const detail = await service.detail(undefined, market as Market, id);
           const lines = [
             `${detail.name} (${detail.id})`,
             detail.description ?? "",
@@ -1391,9 +1388,7 @@ export class TuiCommands {
           }
           const lines = ["Installed marketplace skills:"];
           for (const state of states) {
-            lines.push(
-              `  ${state.dir} (${state.scope}, ${state.version})`,
-            );
+            lines.push(`  ${state.dir} (${state.scope}, ${state.version})`);
           }
           return { message: lines.join("\n") };
         }
@@ -1463,7 +1458,7 @@ export class TuiCommands {
       if (byModel.length > 0) {
         lines.push("", tr.text("stats.by_model"));
         for (const row of byModel.slice(0, 5)) {
-          const label = row.model !== "" ? row.model : (row.label || "-");
+          const label = row.model !== "" ? row.model : row.label || "-";
           lines.push(
             `  ${label}  req:${row.requests}  in:${row.inputTokens}  out:${row.outputTokens}  total:${row.totalTokens}`,
           );
@@ -1474,14 +1469,13 @@ export class TuiCommands {
         lines.push("", tr.text("stats.recent"));
         for (const item of recent.items) {
           const t =
-            item.timestamp?.toISOString().slice(0, 16).replace("T", " ") ??
-              "-";
+            item.timestamp?.toISOString().slice(0, 16).replace("T", " ") ?? "-";
           lines.push(
             `  ${t}  ${item.vendor || "-"}  ${
               item.model || "-"
-            }  in:${item.inputTokens} out:${item.outputTokens}  ${
-              formatStatsDuration(item.durationMs)
-            }`,
+            }  in:${item.inputTokens} out:${item.outputTokens}  ${formatStatsDuration(
+              item.durationMs,
+            )}`,
           );
         }
       }
@@ -1492,7 +1486,7 @@ export class TuiCommands {
   }
 
   /** Starts the in-process usage dashboard (Go startStatsServer). */
-  #startStatsServer(): CommandResult {
+  async #startStatsServer(): Promise<CommandResult> {
     const tr = this.#tr();
     if (this.#statsServer !== undefined) {
       return {
@@ -1502,7 +1496,7 @@ export class TuiCommands {
     try {
       const db = StatsDB.openDefault();
       const server = new StatsServer(db, DEFAULT_STATS_ADDR);
-      server.start();
+      await server.start();
       this.#statsServer = server;
       this.#statsServerURL = `http://${server.boundAddr()}`;
       return {
@@ -1624,9 +1618,10 @@ export class TuiCommands {
       if (status === "failed") {
         const error = payload.error;
         return {
-          message: typeof error === "string" && error !== ""
-            ? error
-            : tr.text("compact.done"),
+          message:
+            typeof error === "string" && error !== ""
+              ? error
+              : tr.text("compact.done"),
           error: true,
         };
       }

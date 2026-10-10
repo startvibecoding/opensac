@@ -371,7 +371,7 @@ test("execution runtime durable begin compensates create failure", () => {
         model: "",
         mode: "",
       },
-    )
+    ),
   );
   assert(!runtime.active().active);
   assertEquals(runtime.stateValue(), RUN_STATE_FAILED);
@@ -400,7 +400,7 @@ test("a one-active-run conflict surfaces as a busy session, not raw SQL", () => 
         model: "",
         mode: "",
       },
-    )
+    ),
   );
   assertStringIncludes(err.message, "session session-busy");
   assertStringIncludes(err.message, "already has an active run");
@@ -506,8 +506,7 @@ test("execution runtime observe agent event persists retry and safe terminal err
     retryMaxAttempts: 3,
     retryAfterMs: 1200,
     retryReason: "provider timeout",
-    statusMessage:
-      `"auto" tool choice requires --enable-auto-tool-choice (api_key=sk-secret-123)`,
+    statusMessage: `"auto" tool choice requires --enable-auto-tool-choice (api_key=sk-secret-123)`,
   } as AgentEvent);
   assert(observed.retry !== undefined);
   assertEquals(observed.retry!.attempt, 2);

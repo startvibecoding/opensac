@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -23,13 +24,13 @@ export function describeMigrationRecovery(r: MigrationRecovery): string {
     return `another OpenSAC process rebuilt the database at ${r.path} after a failed migration`;
   }
   if (r.backupPath === "") {
-    return `database migration failed for ${r.path} (${
-      message(r.err)
-    }); started a new empty database`;
+    return `database migration failed for ${r.path} (${message(
+      r.err,
+    )}); started a new empty database`;
   }
-  return `database migration failed for ${r.path} (${
-    message(r.err)
-  }); backed up the previous database to ${r.backupPath} and started a new empty database`;
+  return `database migration failed for ${r.path} (${message(
+    r.err,
+  )}); backed up the previous database to ${r.backupPath} and started a new empty database`;
 }
 
 function message(err: unknown): string {
@@ -132,7 +133,7 @@ function snapshotUnrebuildableDatabase(
   cause: unknown,
 ): MigrationRecovery {
   try {
-    Deno.statSync(pathValue);
+    runtime.statSync(pathValue);
   } catch (err) {
     throw new Error(`inspect database before rebuild: ${message(err)}`);
   }
@@ -149,19 +150,20 @@ function snapshotUnrebuildableDatabase(
 
 /** Returns an unused backup file name next to the database. */
 function backupPathFor(pathValue: string): string {
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(
-    /\.\d+Z$/,
-    "Z",
-  );
-  for (let attempt = 0;; attempt++) {
-    const candidate = attempt > 0
-      ? `${pathValue}.migration-failed-${stamp}-${attempt}.bak`
-      : `${pathValue}.migration-failed-${stamp}.bak`;
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "Z");
+  for (let attempt = 0; ; attempt++) {
+    const candidate =
+      attempt > 0
+        ? `${pathValue}.migration-failed-${stamp}-${attempt}.bak`
+        : `${pathValue}.migration-failed-${stamp}.bak`;
     let exists = true;
     try {
-      Deno.statSync(candidate);
+      runtime.statSync(candidate);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
+      if (err instanceof runtime.errors.NotFound) {
         exists = false;
       } else {
         throw new Error(`check backup path ${candidate}: ${message(err)}`);
@@ -226,9 +228,9 @@ export function removeDatabaseFiles(pathValue: string): void {
   const errs: unknown[] = [];
   for (const target of targets) {
     try {
-      Deno.removeSync(target);
+      runtime.removeSync(target);
     } catch (err) {
-      if (!(err instanceof Deno.errors.NotFound)) {
+      if (!(err instanceof runtime.errors.NotFound)) {
         errs.push(new Error(`remove ${target}: ${message(err)}`));
       }
     }
@@ -242,9 +244,9 @@ function databaseFileSuffixes(): string[] {
 
 function copyFileIfExists(source: string, destination: string): void {
   try {
-    Deno.statSync(source);
+    runtime.statSync(source);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return;
+    if (err instanceof runtime.errors.NotFound) return;
     throw new Error(`inspect ${source}: ${message(err)}`);
   }
   copyFile(source, destination);
@@ -252,7 +254,7 @@ function copyFileIfExists(source: string, destination: string): void {
 
 function copyFile(source: string, destination: string): void {
   try {
-    Deno.copyFileSync(source, destination);
+    runtime.copyFileSync(source, destination);
   } catch (err) {
     throw new Error(`copy ${source} to ${destination}: ${message(err)}`);
   }

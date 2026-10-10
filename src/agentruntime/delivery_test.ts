@@ -14,9 +14,7 @@ import {
 } from "./delivery.ts";
 import { test } from "#testing";
 
-function attachment(
-  overrides: Partial<SessionAttachment>,
-): SessionAttachment {
+function attachment(overrides: Partial<SessionAttachment>): SessionAttachment {
   return {
     id: "",
     sessionId: "session",
@@ -92,9 +90,7 @@ test("PlanDeliveryRejectsForeignAttachment", () => {
       sendFile: false,
       sendVideo: false,
     },
-    attachments: [
-      attachment({ id: "a", sessionId: "other", runId: "run" }),
-    ],
+    attachments: [attachment({ id: "a", sessionId: "other", runId: "run" })],
   };
   let threw = false;
   try {
@@ -127,10 +123,7 @@ test("PlanDeliveryIsDeterministic", () => {
   const second = planDelivery(make());
   assertEquals(first.plan.intent.id, second.plan.intent.id);
   assertEquals(first.plan.operations.length, 1);
-  assertEquals(
-    first.plan.operations[0].id,
-    second.plan.operations[0].id,
-  );
+  assertEquals(first.plan.operations[0].id, second.plan.operations[0].id);
   assertEquals(first.plan.intent.status, "pending");
 });
 

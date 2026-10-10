@@ -1,6 +1,6 @@
 //
 // Deviation: Go asserts on *http.Transport internals (Proxy function,
-// ForceAttemptHTTP2). Deno has no pluggable transport, so the port exposes the
+// ForceAttemptHTTP2). Node has no pluggable transport, so the port exposes the
 // normalized proxy URL and HTTP/1.1 flag on the client and asserts on those.
 
 import { assert, assertEquals } from "../compat/assert.ts";

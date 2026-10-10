@@ -15,9 +15,10 @@ export type Language = "zh" | "en";
 export type MessageID = string;
 
 /** Parses a settings value; unknown values fall back to auto (valid=false). */
-export function parseConfigured(
-  value: string,
-): { configured: ConfiguredLanguage; valid: boolean } {
+export function parseConfigured(value: string): {
+  configured: ConfiguredLanguage;
+  valid: boolean;
+} {
   const normalized = value.trim().toLowerCase();
   if (normalized === "" || normalized === "auto") {
     return { configured: "auto", valid: true };
@@ -50,9 +51,9 @@ export function utcOffset(now: Date, timeZone: string | null): string {
     timeZone,
     timeZoneName: "longOffset",
   });
-  const part = formatter.formatToParts(now).find(
-    (p) => p.type === "timeZoneName",
-  )?.value ?? "";
+  const part =
+    formatter.formatToParts(now).find((p) => p.type === "timeZoneName")
+      ?.value ?? "";
   const m = /^GMT([+-])(\d{2}):(\d{2})$/.exec(part);
   if (m === null) return "unknown";
   return `UTC${m[1]}${m[2]}:${m[3]}`;
@@ -75,9 +76,9 @@ function utcOffsetHours(now: Date, timeZone: string): number {
     timeZone,
     timeZoneName: "longOffset",
   });
-  const part = formatter.formatToParts(now).find(
-    (p) => p.type === "timeZoneName",
-  )?.value ?? "";
+  const part =
+    formatter.formatToParts(now).find((p) => p.type === "timeZoneName")
+      ?.value ?? "";
   const m = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(part);
   if (m === null) return 0;
   const sign = m[1] === "-" ? -1 : 1;

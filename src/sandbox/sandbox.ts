@@ -1,10 +1,9 @@
 //
-// The Go original wraps commands as `*exec.Cmd`; Deno has no such type, so a
+// The Go original wraps commands as `*exec.Cmd`; Node has no such type, so a
 // `CommandSpec` descriptor is returned instead and the caller spawns it.
 
 /** Defines the sandbox restriction level. */
 export const Level = {
-
   /** Required sandbox: read-only project. */
   Strict: 0,
   /** Best-effort sandbox: read-write project. */
@@ -213,10 +212,7 @@ export class Manager {
 }
 
 /** Creates a manager (default sandbox policy unless `opts` is given). */
-export function createManager(
-  projectDir: string,
-  opts: Options = {},
-): Manager {
+export function createManager(projectDir: string, opts: Options = {}): Manager {
   return new Manager(projectDir, opts);
 }
 

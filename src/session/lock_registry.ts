@@ -4,7 +4,7 @@
 // accumulate one mutex per historical session or identity key forever.
 //
 // Deviation: Go's `sync.Mutex` is a blocking OS-level primitive; here
-// `CountedMutex` is an async queue-based mutex so a single-threaded Deno
+// `CountedMutex` is an async queue-based mutex so a single-threaded Node
 // process can still hold a key across `await` points. Mutual exclusion across
 // an eviction boundary still holds because a key's entry is only removed after
 // every holder unlocked it and dropped its reference.

@@ -304,7 +304,8 @@ function localExecutionForStop(
   if (
     facts.activeRuns.length !== 1 ||
     facts.activeRuns[0].id !== expected.activeRun.id ||
-    lease === null || !lease.valid ||
+    lease === null ||
+    !lease.valid ||
     lease.purpose !== "execution" ||
     lease.runId !== expected.activeRun.id ||
     lease.epoch !== expected.leaseEpoch ||
@@ -327,9 +328,9 @@ async function requestDetachedRemoteStop(
   expected: SessionExecutionSnapshot,
   cancel:
     | ((
-      ctx: AbortSignal | undefined,
-      request: RemoteStopRequest,
-    ) => Promise<void>)
+        ctx: AbortSignal | undefined,
+        request: RemoteStopRequest,
+      ) => Promise<void>)
     | undefined,
 ): Promise<SessionStopResult> {
   if (expected.activeRun === undefined || expected.remoteRunId === "") {
@@ -369,7 +370,8 @@ async function requestDetachedRemoteStop(
     if (
       facts.activeRuns.length !== 1 ||
       facts.activeRuns[0].id !== expected.activeRun.id ||
-      lease === null || !lease.valid ||
+      lease === null ||
+      !lease.valid ||
       lease.purpose !== "recovery" ||
       lease.runId !== expected.activeRun.id ||
       lease.ownerInstanceId !== binding.ownerInstanceId ||

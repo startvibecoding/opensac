@@ -6,6 +6,7 @@
 // Builders, SessionRuntimes, or ExecutionRuntimes: session identity, the
 // durable run, and the print/unattended run policy are Core-owned.
 
+import { runtime } from "../platform/runtime.ts";
 import { configDir, type Settings } from "../config/mod.ts";
 import { CoreClient } from "../core/client.ts";
 import { resolveCoreConfig } from "../core/config.ts";
@@ -18,7 +19,8 @@ import { isSessionNotFound } from "../tui/service.ts";
 import {
   type TUIDecisionRequest,
   type TUIService,
-  type TUISessionView} from "../tui/service.ts";
+  type TUISessionView,
+} from "../tui/service.ts";
 import { coreEventToAgentEvent } from "../tui/run_event_projection.ts";
 import {
   EVENT_ERROR,
@@ -104,9 +106,10 @@ async function openPrintService(
   const discovery = await core.ensureStarted();
   if (discovery.status !== "ready") {
     await core.close();
-    const hint = discovery.status === "incompatible"
-      ? '; run "opensac core stop" to replace it'
-      : "";
+    const hint =
+      discovery.status === "incompatible"
+        ? '; run "opensac core stop" to replace it'
+        : "";
     throw new Error(`Core is not ready: ${discovery.status}${hint}`);
   }
   return {
@@ -156,17 +159,18 @@ async function openPrintSession(
   // `-r`/`--session` names either a directory (whose newest session is chosen)
   // or an id scoped to this working directory; `-c` always means "the newest of
   // this directory".
-  const dirTarget = target.resumeSession !== "" &&
-      isDirectoryTarget(target.resumeSession)
-    ? target.resumeSession
-    : "";
+  const dirTarget =
+    target.resumeSession !== "" && isDirectoryTarget(target.resumeSession)
+      ? target.resumeSession
+      : "";
   const workDir = dirTarget !== "" ? dirTarget : resolved.workDir;
   let picked;
   try {
     const entries = await service.listPersistedSessions({ workDir });
-    picked = dirTarget !== "" || target.continueLast
-      ? newestFirst(entries)
-      : entries.find((entry) => entry.sessionId === target.resumeSession);
+    picked =
+      dirTarget !== "" || target.continueLast
+        ? newestFirst(entries)
+        : entries.find((entry) => entry.sessionId === target.resumeSession);
     if (picked === undefined) return await create();
     return await service.openSession({
       sessionId: picked.sessionId,
@@ -236,21 +240,20 @@ export async function runPrintAction(
   deps: PrintDeps,
 ): Promise<PrintRunResult> {
   const settings = deps.settings;
-  const writeError = options.writeError ??
-    ((line: string) => console.error(line));
+  const writeError =
+    options.writeError ?? ((line: string) => console.error(line));
   const write = options.writeOut ?? ((line: string) => console.log(line));
   const mdWidth = options.mdWidth ?? 80;
-  const workDir = options.workDir !== "" ? options.workDir : Deno.cwd();
+  const workDir = options.workDir !== "" ? options.workDir : runtime.cwd();
 
-  const providerName = options.provider !== ""
-    ? options.provider
-    : (settings.defaultProvider ?? "");
-  const modelID = options.model !== ""
-    ? options.model
-    : (settings.defaultModel ?? "");
+  const providerName =
+    options.provider !== ""
+      ? options.provider
+      : (settings.defaultProvider ?? "");
+  const modelID =
+    options.model !== "" ? options.model : (settings.defaultModel ?? "");
   const mode = options.mode || settings.defaultMode || "yolo";
-  const thinkingLevel = options.thinking || settings.defaultThinkingLevel ||
-    "";
+  const thinkingLevel = options.thinking || settings.defaultThinkingLevel || "";
 
   if (options.json) {
     emitJSON(write, {
@@ -313,9 +316,10 @@ export async function runPrintAction(
         thinkingLevel,
       });
       runId = accepted.runId;
-      for await (
-        const event of service.subscribeRunEvents(sessionId, accepted.runId)
-      ) {
+      for await (const event of service.subscribeRunEvents(
+        sessionId,
+        accepted.runId,
+      )) {
         const agentEvent = coreEventToAgentEvent(event);
         if (agentEvent === undefined) continue;
         switch (agentEvent.type) {
@@ -512,9 +516,6 @@ interface PrintJSONEvent {
   message?: string;
 }
 
-function emitJSON(
-  write: (line: string) => void,
-  event: PrintJSONEvent,
-): void {
+function emitJSON(write: (line: string) => void, event: PrintJSONEvent): void {
   write(JSON.stringify(event));
 }

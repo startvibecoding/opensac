@@ -160,9 +160,15 @@ export function splitInputChunk(chunk: string): KeyEvent[] {
     while (j < n) {
       const c = chunk[j];
       if (
-        c === "\u001b" || c === "\r" || c === "\n" || c === "\t" ||
-        c === "\u007f" || c === "\b" || c.charCodeAt(0) < 0x20
-      ) break;
+        c === "\u001b" ||
+        c === "\r" ||
+        c === "\n" ||
+        c === "\t" ||
+        c === "\u007f" ||
+        c === "\b" ||
+        c.charCodeAt(0) < 0x20
+      )
+        break;
       j++;
     }
     const text = chunk.slice(i, j);
@@ -216,7 +222,7 @@ function parseEscape(
   const next = k + 1;
   const modifier = params.includes(";") ? Number(params.split(";")[1]) : 1;
   const ctrl = (modifier - 1) % 8 >= 4;
-  const alt = ((modifier - 1) % 8 & 2) !== 0;
+  const alt = (((modifier - 1) % 8) & 2) !== 0;
 
   switch (final) {
     case "A":

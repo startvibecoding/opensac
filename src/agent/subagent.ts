@@ -22,7 +22,12 @@ import {
   taskIncomplete,
   type TaskStatus,
 } from "../../sdk/agent/mod.ts";
-import { Registry, type Tool, type ToolContext, type ToolResult } from "../tools/tool.ts";
+import {
+  Registry,
+  type Tool,
+  type ToolContext,
+  type ToolResult,
+} from "../tools/tool.ts";
 import { createTextToolResult } from "../tools/tool.ts";
 import type { AgentAdapter } from "./bridge.ts";
 import {
@@ -317,10 +322,7 @@ function parentContextFor(ctx: ToolContext): RunContext | undefined {
 }
 
 /** Reads the requested string parameter, or "". */
-function stringParam(
-  params: Record<string, unknown>,
-  key: string,
-): string {
+function stringParam(params: Record<string, unknown>, key: string): string {
   const v = params[key];
   return typeof v === "string" ? v : "";
 }
@@ -429,9 +431,9 @@ export class SubAgentSpawnTool implements Tool {
       const def = this.manager.members.get(memberID);
       if (def === undefined) {
         throw new Error(
-          `unknown member ${JSON.stringify(memberID)}; known members: [${
-            this.manager.members.ids().join(" ")
-          }]`,
+          `unknown member ${JSON.stringify(memberID)}; known members: [${this.manager.members
+            .ids()
+            .join(" ")}]`,
         );
       }
       memberDef = def;
@@ -450,9 +452,9 @@ export class SubAgentSpawnTool implements Tool {
     if (memberDef !== undefined && memberDef.workDir !== "") {
       if (workDir !== "" && workDir !== memberDef.workDir) {
         throw new Error(
-          `member ${JSON.stringify(memberID)} work_dir is fixed to ${
-            JSON.stringify(memberDef.workDir)
-          }`,
+          `member ${JSON.stringify(memberID)} work_dir is fixed to ${JSON.stringify(
+            memberDef.workDir,
+          )}`,
         );
       }
       workDir = memberDef.workDir;
@@ -475,9 +477,8 @@ export class SubAgentSpawnTool implements Tool {
 
     let extra = stringParam(params, "system_prompt_extra");
     if (memberDef !== undefined && memberDef.prompt !== "") {
-      extra = extra !== ""
-        ? memberDef.prompt + "\n\n" + extra
-        : memberDef.prompt;
+      extra =
+        extra !== "" ? memberDef.prompt + "\n\n" + extra : memberDef.prompt;
     }
 
     let toolFilter = stringArrayParam(params, "tools");
@@ -609,11 +610,13 @@ export class SubAgentSpawnTool implements Tool {
       }
     })();
 
-    return createTextToolResult(JSON.stringify({
-      handle: a.id(),
-      status: "running",
-      timeout: goDurationString(policy.timeoutPerAgentMs),
-    }));
+    return createTextToolResult(
+      JSON.stringify({
+        handle: a.id(),
+        status: "running",
+        timeout: goDurationString(policy.timeoutPerAgentMs),
+      }),
+    );
   }
 
   private applyTerminal(
@@ -1178,7 +1181,9 @@ export class SubAgentAnswerTool implements Tool {
     const questionID = stringParam(params, "question_id");
     const answer = stringParam(params, "answer");
     if (
-      handle.trim() === "" || questionID.trim() === "" || answer.trim() === ""
+      handle.trim() === "" ||
+      questionID.trim() === "" ||
+      answer.trim() === ""
     ) {
       throw new Error("handle, question_id and answer are required");
     }

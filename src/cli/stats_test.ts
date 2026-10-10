@@ -2,6 +2,7 @@
 // projection (tabwriter alignment), formatter helpers, and the web-server
 // path with an injected serve function (no real browser or listener).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -9,7 +10,11 @@ import {
   executeStatsCommand,
   printStatsCLI,
 } from "./stats.ts";
-import { type Aggregate, type RecentPage, type Summary } from "../stats/stats.ts";
+import {
+  type Aggregate,
+  type RecentPage,
+  type Summary,
+} from "../stats/stats.ts";
 import { closeDatabases, openBunDatabase } from "../session/mod.ts";
 import { test } from "#testing";
 
@@ -129,7 +134,7 @@ test("default stats options match Go defaults", () => {
 });
 
 test("executeStatsCommand --cli reads a real sessions.db via --db", () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   const dbPath = path.join(dir, "sessions.db");
   openBunDatabase(dbPath); // creates the shared schema
   const lines: string[] = [];
@@ -145,7 +150,7 @@ test("executeStatsCommand --cli reads a real sessions.db via --db", () => {
 });
 
 test("executeStatsCommand web path invokes the injected serve hook", async () => {
-  const dir = Deno.makeTempDirSync();
+  const dir = runtime.makeTempDirSync();
   // Use the not-found path to validate option plumbing without a real database.
   let captured: unknown = null;
   const opts = defaultStatsOptions();

@@ -107,7 +107,8 @@ export function commandArgumentSuggestionItems(value: string): SuggestItem[] {
         return argumentItems(cmd, ["on", "off"]);
       }
       if (
-        argIndex === 2 && fields.length >= 2 &&
+        argIndex === 2 &&
+        fields.length >= 2 &&
         (fields[1] === "on" || fields[1] === "off")
       ) {
         return argumentItems(`${cmd} ${fields[1]}`, ["global"]);
@@ -124,7 +125,8 @@ export function commandArgumentSuggestionItems(value: string): SuggestItem[] {
         ]);
       }
       if (
-        argIndex === 2 && fields.length >= 2 &&
+        argIndex === 2 &&
+        fields.length >= 2 &&
         (fields[1] === "on" || fields[1] === "off")
       ) {
         return argumentItems(`${cmd} ${fields[1]}`, ["project", "global"]);
@@ -135,7 +137,8 @@ export function commandArgumentSuggestionItems(value: string): SuggestItem[] {
         return argumentItems(cmd, ["global", "project", "auto", "zh", "en"]);
       }
       if (
-        argIndex === 2 && fields.length >= 2 &&
+        argIndex === 2 &&
+        fields.length >= 2 &&
         (fields[1] === "global" || fields[1] === "project")
       ) {
         return argumentItems(`${cmd} ${fields[1]}`, ["auto", "zh", "en"]);

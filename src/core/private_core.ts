@@ -7,6 +7,7 @@
 // as the Core's OPENSAC_DIR, so its registration, lock, sessions, and database
 // stay isolated from the shared Core's state.
 
+import { runtime } from "../platform/runtime.ts";
 import { join } from "../compat/path.ts";
 import {
   CoreClient,
@@ -92,7 +93,7 @@ export async function startPrivateCore(
   // The private directory is the child Core's OPENSAC_DIR: give it a settings
   // file that binds an OS-assigned loopback port so it can never collide with
   // the shared Core's fixed configured endpoint.
-  await Deno.writeTextFile(
+  await runtime.writeTextFile(
     join(stateDir, "settings.json"),
     `${JSON.stringify({ core: config }, null, 2)}\n`,
   );
@@ -167,14 +168,12 @@ async function closePrivateCore(
     // successful shutdown request; `exited` below reports the truth either
     // way, and close() stays total so exit-time cleanup cannot throw.
   }
-  const exited = registration === undefined || await waitForRegistrationExit(
-    registry,
-    registration,
-    {
+  const exited =
+    registration === undefined ||
+    (await waitForRegistrationExit(registry, registration, {
       timeoutMs: options.stopTimeoutMs ?? DEFAULT_STOP_TIMEOUT_MS,
       sleep: options.sleep,
-    },
-  );
+    }));
   await client.close();
 
   let cleaned = false;
@@ -192,7 +191,7 @@ async function closePrivateCore(
 
 async function createUniqueStateDir(parentDir: string): Promise<string> {
   const stateDir = join(parentDir, uniqueStateDirName());
-  await Deno.mkdir(stateDir, { recursive: true });
+  await runtime.mkdir(stateDir, { recursive: true });
   return stateDir;
 }
 
@@ -201,13 +200,13 @@ function uniqueStateDirName(): string {
   try {
     random = crypto.randomUUID();
   } catch {
-    random = `${Date.now().toString(36)}-${
-      Math.random().toString(36).slice(2)
-    }`;
+    random = `${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2)}`;
   }
   return `${Date.now().toString(36)}-${random}`;
 }
 
 function removeStateDir(stateDir: string): Promise<void> {
-  return Deno.remove(stateDir, { recursive: true });
+  return runtime.remove(stateDir, { recursive: true });
 }

@@ -38,8 +38,7 @@ export function knowledgeLibrarianSessionID(
   rootDir: string,
 ): string {
   const sum = createHash("sha256").update(`${baseID}\x00${rootDir}`).digest();
-  return knowledgeLibrarianSessionPrefix +
-    sum.subarray(0, 12).toString("hex");
+  return knowledgeLibrarianSessionPrefix + sum.subarray(0, 12).toString("hex");
 }
 
 /** Derives the dedicated-session identity from a knowledge-base handle. */
@@ -83,9 +82,9 @@ export function openKnowledgeLibrarianSession(
 }
 
 export function librarianRoleInstructions(base: KnowledgeBase): string {
-  return `You are the Librarian Agent for the knowledge base ${
-    JSON.stringify(base.name)
-  }.
+  return `You are the Librarian Agent for the knowledge base ${JSON.stringify(
+    base.name,
+  )}.
 Your working directory is the knowledge source. Answer the caller's question with a compact factual briefing.
 
 Rules:
@@ -111,9 +110,9 @@ export function librarianPrompt(
   );
   for (const chunk of graph.chunks) {
     builder.push(
-      `\n<evidence file=${
-        JSON.stringify(chunk.relativePath ?? "")
-      } lines=${chunk.startLine}-${chunk.endLine}>\n${chunk.text}\n</evidence>`,
+      `\n<evidence file=${JSON.stringify(
+        chunk.relativePath ?? "",
+      )} lines=${chunk.startLine}-${chunk.endLine}>\n${chunk.text}\n</evidence>`,
     );
   }
   return builder.join("\n");

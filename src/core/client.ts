@@ -1,3 +1,5 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { ChildProcess } from "../platform/runtime.ts";
 import { basename, fileURLToPath, fromFileUrl } from "../compat/path.ts";
 import { CORE_AUTH_HEADER, CORE_CLIENT_ID_HEADER } from "./auth.ts";
 import {
@@ -330,9 +332,11 @@ export class CoreLauncherError extends CoreClientError {
   ) {
     super(
       message,
-      details.cause === undefined ? undefined : {
-        cause: details.cause,
-      },
+      details.cause === undefined
+        ? undefined
+        : {
+            cause: details.cause,
+          },
     );
     this.exitCode = details.exitCode;
     this.signal = details.signal;
@@ -432,9 +436,7 @@ export class CoreClient {
       !Number.isInteger(options.protocolVersion) ||
       options.protocolVersion < 0
     ) {
-      throw new TypeError(
-        "CoreClient protocolVersion must be an integer >= 0",
-      );
+      throw new TypeError("CoreClient protocolVersion must be an integer >= 0");
     }
     this.#protocolVersion = options.protocolVersion;
     this.#config = copyConfig(options.config);
@@ -445,11 +447,13 @@ export class CoreClient {
     this.#ignoreProcessLiveness = options.ignoreProcessLiveness === true;
 
     if (
-      options.launcher !== undefined && typeof options.launcher !== "function"
+      options.launcher !== undefined &&
+      typeof options.launcher !== "function"
     ) {
       throw new TypeError("CoreClient launcher must be a function");
     }
-    this.#launcher = options.launcher ??
+    this.#launcher =
+      options.launcher ??
       createDefaultCoreLauncher(
         this.#paths.stateDir,
         this.#config.passwords,
@@ -472,7 +476,7 @@ export class CoreClient {
         this.#discover({
           requestTimeoutMs: REQUEST_TIMEOUT_MS,
           signal: combineAbortSignals(this.#signal, signal),
-        })
+        }),
       );
     }
 
@@ -581,11 +585,12 @@ export class CoreClient {
       // that process's clean stop path, but it is only safe once the
       // registration is still the one discovery inspected: a replacement that
       // appeared in between must never be signalled by mistake.
-      const replaceable = isMethodNotFoundError(error) &&
-        await isCurrentRegistration(registry, registration);
+      const replaceable =
+        isMethodNotFoundError(error) &&
+        (await isCurrentRegistration(registry, registration));
       if (!replaceable) return false;
       try {
-        Deno.kill(registration.pid, "SIGTERM");
+        nodeRuntime.kill(registration.pid, "SIGTERM");
         signalled = true;
       } catch {
         return false;
@@ -688,11 +693,7 @@ export class CoreClient {
     sessionId: string,
     signal?: AbortSignal,
   ): Promise<void> {
-    await this.call(
-      CORE_RUNTIME_METHODS.sessionOpen,
-      { sessionId },
-      signal,
-    );
+    await this.call(CORE_RUNTIME_METHODS.sessionOpen, { sessionId }, signal);
   }
 
   async connectEvents(signal?: AbortSignal): Promise<CoreEventConnection> {
@@ -735,10 +736,13 @@ export class CoreClient {
       socket = await openSocket(url);
     }
 
-    const pending = new Map<string, {
-      resolve(result: unknown): void;
-      reject(error: unknown): void;
-    }>();
+    const pending = new Map<
+      string,
+      {
+        resolve(result: unknown): void;
+        reject(error: unknown): void;
+      }
+    >();
     const notifications = new Set<
       (notification: CoreRpcNotification) => void
     >();
@@ -746,11 +750,14 @@ export class CoreClient {
     const drops = new Set<() => void>();
     // Subscriptions this connection owns, so a reconnect onto a replacement
     // Core re-establishes them before anyone has to notice they are gone.
-    const subscriptions = new Map<string, {
-      sessionId: string;
-      runId: string;
-      cursor: number;
-    }>();
+    const subscriptions = new Map<
+      string,
+      {
+        sessionId: string;
+        runId: string;
+        cursor: number;
+      }
+    >();
     let closed = false;
     let nextId = 1;
 
@@ -979,9 +986,10 @@ export class CoreClient {
    * restores the deterministic first configured password.
    */
   setPassword(password: string | undefined): void {
-    this.#selectedPassword = password === undefined
-      ? deterministicPassword(this.#config)
-      : validateSelectedPassword(password);
+    this.#selectedPassword =
+      password === undefined
+        ? deterministicPassword(this.#config)
+        : validateSelectedPassword(password);
   }
 
   /** Alias for callers that describe the operation as credential selection. */
@@ -1083,7 +1091,7 @@ export class CoreClient {
 
       const baseline = await this.#readLaunchBaseline();
       const launchPromise = Promise.resolve().then(() =>
-        this.#launcher(controller.signal)
+        this.#launcher(controller.signal),
       );
       // A launcher may represent a long-lived child rather than a one-shot
       // spawn operation, so its completion is never awaited here. A rejection
@@ -1314,10 +1322,12 @@ export class CoreClient {
     launchPromise: Promise<void>,
     baseline: CoreRegistration | undefined,
   ): void {
-    const cleanup = launchPromise.then(
-      () => this.#cleanupLateRegistration(baseline),
-      () => undefined,
-    ).catch(() => undefined);
+    const cleanup = launchPromise
+      .then(
+        () => this.#cleanupLateRegistration(baseline),
+        () => undefined,
+      )
+      .catch(() => undefined);
     // A broken launcher may ignore cancellation forever. Do not make close()
     // wait on that abandoned promise; the completion branch still performs
     // best-effort identity cleanup if the launcher eventually returns.
@@ -1341,7 +1351,8 @@ export class CoreClient {
       return;
     }
     if (
-      current === undefined || sameRegistrationForCleanup(current, baseline)
+      current === undefined ||
+      sameRegistrationForCleanup(current, baseline)
     ) {
       return;
     }
@@ -1416,10 +1427,11 @@ export class CoreClient {
     } catch (error) {
       if (options.signal?.aborted) throw abortReason(options.signal);
       this.#connection = undefined;
-      const reason = error instanceof TypeError &&
-          error.message.includes("configured fixed port")
-        ? error.message
-        : "Core registration has an invalid endpoint";
+      const reason =
+        error instanceof TypeError &&
+        error.message.includes("configured fixed port")
+          ? error.message
+          : "Core registration has an invalid endpoint";
       return staleResult(
         registration,
         reason,
@@ -1723,12 +1735,15 @@ export class CoreClient {
       if (signal.aborted) onAbort();
     }
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort(
-        new DOMException("Core request timed out", "TimeoutError"),
-      );
-    }, Math.max(1, timeoutMs));
+    const timer = setTimeout(
+      () => {
+        timedOut = true;
+        controller.abort(
+          new DOMException("Core request timed out", "TimeoutError"),
+        );
+      },
+      Math.max(1, timeoutMs),
+    );
     try {
       let response: Response;
       try {
@@ -1804,8 +1819,8 @@ export class CoreClient {
       );
     }
 
-    const authenticationStatus = response.status === 401 ||
-      response.status === 403;
+    const authenticationStatus =
+      response.status === 401 || response.status === 403;
     if (
       message.id !== requestId &&
       !(authenticationStatus && message.id === null)
@@ -1878,13 +1893,16 @@ export class CoreClient {
   }
 
   #matchesInfo(info: CoreInfo): boolean {
-    return this.#matchesVersion(info.version, info.protocolVersion) &&
-      info.coreProtocolVersion === CORE_PROTOCOL_VERSION;
+    return (
+      this.#matchesVersion(info.version, info.protocolVersion) &&
+      info.coreProtocolVersion === CORE_PROTOCOL_VERSION
+    );
   }
 
   #matchesVersion(version: string, protocolVersion: number): boolean {
-    return version === this.#version &&
-      protocolVersion === this.#protocolVersion;
+    return (
+      version === this.#version && protocolVersion === this.#protocolVersion
+    );
   }
 
   #incompatibleError(
@@ -2046,14 +2064,12 @@ function isLocalCoreHost(value: string): boolean {
 }
 
 /** Reports whether a PID is alive, dead, or indeterminate on this host. */
-export function processLiveness(
-  pid: number,
-): "alive" | "dead" | "unknown" {
+export function processLiveness(pid: number): "alive" | "dead" | "unknown" {
   try {
-    Deno.kill(pid, 0);
+    nodeRuntime.kill(pid, 0);
     return "alive";
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return "dead";
+    if (error instanceof nodeRuntime.errors.NotFound) return "dead";
     return "unknown";
   }
 }
@@ -2127,10 +2143,7 @@ export async function waitForRegistrationExit(
   }
 }
 
-async function defaultSleep(
-  ms: number,
-  signal?: AbortSignal,
-): Promise<void> {
+async function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) throw abortReason(signal);
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -2179,11 +2192,11 @@ function incompatibleResult(
     result.actualVersion = info?.version ?? error.actualVersion;
   }
   if (info !== undefined || error.actualProtocolVersion !== undefined) {
-    result.actualProtocolVersion = info?.protocolVersion ??
-      error.actualProtocolVersion;
+    result.actualProtocolVersion =
+      info?.protocolVersion ?? error.actualProtocolVersion;
   }
-  const actualCoreProtocolVersion = error.actualCoreProtocolVersion ??
-    info?.coreProtocolVersion;
+  const actualCoreProtocolVersion =
+    error.actualCoreProtocolVersion ?? info?.coreProtocolVersion;
   if (actualCoreProtocolVersion !== undefined) {
     result.actualCoreProtocolVersion = actualCoreProtocolVersion;
   }
@@ -2221,17 +2234,17 @@ function launcherStartupError(
 ): CoreStartupError {
   return error instanceof CoreLauncherError
     ? new CoreStartupError(
-      `Core launcher failed: ${error.message}`,
-      discovery,
-      timeoutMs,
-      { cause: error },
-    )
+        `Core launcher failed: ${error.message}`,
+        discovery,
+        timeoutMs,
+        { cause: error },
+      )
     : new CoreStartupError(
-      "Core launcher failed",
-      discovery,
-      timeoutMs,
-      error === undefined ? {} : { cause: error },
-    );
+        "Core launcher failed",
+        discovery,
+        timeoutMs,
+        error === undefined ? {} : { cause: error },
+      );
 }
 
 /**
@@ -2243,8 +2256,10 @@ function launcherStartupError(
  * the dedicated protocol code, never the error message.
  */
 function reopensResidentSession(error: unknown): boolean {
-  return error instanceof CoreClientRpcError &&
-    error.code === CORE_ERROR_SESSION_NOT_RESIDENT;
+  return (
+    error instanceof CoreClientRpcError &&
+    error.code === CORE_ERROR_SESSION_NOT_RESIDENT
+  );
 }
 
 /** The session the Core named in a not-resident error, if it named one. */
@@ -2258,9 +2273,9 @@ function residentSessionId(error: unknown): string {
 
 /** WebSocket endpoint of the Core event stream for an HTTP base URL. */
 function eventsUrl(baseUrl: string): string {
-  return `${
-    baseUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:")
-  }/events`;
+  return `${baseUrl
+    .replace(/^http:/, "ws:")
+    .replace(/^https:/, "wss:")}/events`;
 }
 
 /** Signals that mean a connection was never established with a Core. */
@@ -2297,7 +2312,7 @@ const ENDPOINT_GONE_PATTERNS = [
   /os error 32/i,
   /socket hang up/i,
   /other side closed/i,
-  // Deno's `fetch` reports a Core that disappears while a request is in
+  // Node's `fetch` reports a Core that disappears while a request is in
   // flight as a *send* failure, not a connection error: the request may
   // already have reached the peer, so the outcome is uncertain and must only
   // invalidate the cached endpoint, never be replayed.
@@ -2308,7 +2323,7 @@ const ENDPOINT_GONE_PATTERNS = [
 /**
  * Collects the messages and structured codes of an error cause chain.
  *
- * Deno's `fetch` reports a refused connection as `TypeError: fetch failed`
+ * Node's `fetch` reports a refused connection as `TypeError: fetch failed`
  * wrapping a transport error string without a `code`, so classification has
  * to look at the whole chain rather than the top-level error alone.
  */
@@ -2321,7 +2336,9 @@ function transportDiagnostics(error: unknown): {
   const seen = new Set<unknown>();
   let current: unknown = error;
   while (
-    current !== null && typeof current === "object" && !seen.has(current)
+    current !== null &&
+    typeof current === "object" &&
+    !seen.has(current)
   ) {
     seen.add(current);
     const value = current as {
@@ -2385,8 +2402,10 @@ function discoveryMessage(result: CoreDiscoveryResult): string {
 }
 
 function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError" ||
-    error instanceof Error && error.name === "AbortError";
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
 }
 
 function asClientError(error: unknown, fallback: string): CoreClientError {
@@ -2399,8 +2418,9 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 function abortReason(signal: AbortSignal): unknown {
-  return signal.reason ??
-    new DOMException("Core operation aborted", "AbortError");
+  return (
+    signal.reason ?? new DOMException("Core operation aborted", "AbortError")
+  );
 }
 
 function combineAbortSignals(
@@ -2410,9 +2430,11 @@ function combineAbortSignals(
     (signal): signal is AbortSignal => signal !== undefined,
   );
   if (active.length === 0) return undefined;
-  const any = (AbortSignal as unknown as {
-    any?: (signals: AbortSignal[]) => AbortSignal;
-  }).any;
+  const any = (
+    AbortSignal as unknown as {
+      any?: (signals: AbortSignal[]) => AbortSignal;
+    }
+  ).any;
   if (typeof any === "function") return any.call(AbortSignal, active);
   const controller = new AbortController();
   for (const signal of active) {
@@ -2431,7 +2453,8 @@ function sameRegistrationForCleanup(
   left: CoreRegistration,
   right: CoreRegistration | undefined,
 ): boolean {
-  return right !== undefined &&
+  return (
+    right !== undefined &&
     left.id === right.id &&
     left.version === right.version &&
     left.protocolVersion === right.protocolVersion &&
@@ -2439,7 +2462,8 @@ function sameRegistrationForCleanup(
     left.host === right.host &&
     left.connectHost === right.connectHost &&
     left.port === right.port &&
-    left.startedAt === right.startedAt;
+    left.startedAt === right.startedAt
+  );
 }
 
 async function awaitWithDeadline<T>(
@@ -2453,13 +2477,14 @@ async function awaitWithDeadline<T>(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let onAbort: (() => void) | undefined;
   try {
-    const abort = signal === undefined
-      ? new Promise<T>(() => undefined)
-      : new Promise<T>((_resolve, reject) => {
-        onAbort = () => reject(abortReason(signal!));
-        signal!.addEventListener("abort", onAbort, { once: true });
-        if (signal!.aborted) onAbort();
-      });
+    const abort =
+      signal === undefined
+        ? new Promise<T>(() => undefined)
+        : new Promise<T>((_resolve, reject) => {
+            onAbort = () => reject(abortReason(signal!));
+            signal!.addEventListener("abort", onAbort, { once: true });
+            if (signal!.aborted) onAbort();
+          });
     return await Promise.race([
       operation,
       new Promise<T>((_resolve, reject) => {
@@ -2510,21 +2535,8 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-// Permissions granted to a Core child launched from source. The child is the
-// real runtime host: it runs tools, MCP servers, git, and sandbox binaries, so
-// it needs run access to the same programs the parent would run. Omitting
-// `--allow-run` here made every source-installed CLI fail inside the child with
-// `Requires run access to "/bin/bash", run again with the --allow-run flag`,
-// even though the parent shim was installed with full access.
-const DENO_SOURCE_PERMISSION_ARGS = [
-  "--allow-read",
-  "--allow-write",
-  "--allow-net",
-  "--allow-env",
-  "--allow-run",
-  "--allow-ffi",
-  "--allow-sys",
-];
+// Permissions/entrypoint for a Core child launched from source. The child is
+// the real runtime host: it runs tools, MCP servers, git, and sandbox binaries.
 
 function createDefaultCoreLauncher(
   stateDir: string,
@@ -2538,14 +2550,14 @@ function createDefaultCoreLauncher(
         new DOMException("Core launch aborted", "AbortError"),
       );
     }
-    const executable = Deno.execPath();
+    const executable = nodeRuntime.execPath();
     const args = defaultLauncherArgs(executable);
-    let child: Deno.ChildProcess;
+    let child: ChildProcess;
     try {
-      child = new Deno.Command(executable, {
+      child = new nodeRuntime.Command(executable, {
         args,
         env: {
-          ...Deno.env.toObject(),
+          ...nodeRuntime.env.toObject(),
           OPENSAC_DIR: stateDir,
           ...(version === "" ? {} : { OPENSAC_CORE_VERSION: version }),
           ...(protocolVersion === 0
@@ -2599,13 +2611,13 @@ function createDefaultCoreLauncher(
             `${stderr}\n${stdout}`,
             secrets,
           );
-          const code = typeof status.code === "number"
-            ? status.code
-            : undefined;
+          const code =
+            typeof status.code === "number" ? status.code : undefined;
           const signalName = status.signal ?? undefined;
-          const suffix = code === undefined
-            ? `signal ${signalName ?? "unknown"}`
-            : `code ${code}`;
+          const suffix =
+            code === undefined
+              ? `signal ${signalName ?? "unknown"}`
+              : `code ${code}`;
           finish(() =>
             reject(
               new CoreLauncherError(
@@ -2618,7 +2630,7 @@ function createDefaultCoreLauncher(
                   detail: detail === "" ? undefined : detail,
                 },
               ),
-            )
+            ),
           );
         },
         (error) => {
@@ -2627,7 +2639,7 @@ function createDefaultCoreLauncher(
               new CoreLauncherError("Core child status could not be read", {
                 cause: error,
               }),
-            )
+            ),
           );
         },
       );
@@ -2647,16 +2659,15 @@ async function readChildOutput(
 }
 
 function stripLauncherControlCharacters(value: string): string {
-  return [...value].map((character) => {
-    const code = character.charCodeAt(0);
-    return code < 0x20 || code === 0x7f ? " " : character;
-  }).join("");
+  return [...value]
+    .map((character) => {
+      const code = character.charCodeAt(0);
+      return code < 0x20 || code === 0x7f ? " " : character;
+    })
+    .join("");
 }
 
-function sanitizeLauncherOutput(
-  value: string,
-  secrets: string[] = [],
-): string {
+function sanitizeLauncherOutput(value: string, secrets: string[] = []): string {
   let sanitized = stripLauncherControlCharacters(value)
     .replace(/Bearer\s+[^\s]+/gi, "Bearer [redacted]")
     .replace(
@@ -2674,17 +2685,8 @@ function sanitizeLauncherOutput(
 
 export function defaultLauncherArgs(executable: string): string[] {
   const executableName = basename(executable).toLowerCase();
-  const isDeno = executableName === "deno" ||
-    executableName.startsWith("deno.");
-  if (isDeno) {
-    return [
-      ...DENO_SOURCE_PERMISSION_ARGS,
-      fromFileUrl(new URL("./main.ts", import.meta.url)),
-      "core",
-    ];
-  }
   if (executableName === "node" || executableName.startsWith("node.")) {
-    return [fileURLToPath(new URL("../main.ts", import.meta.url)), "core"];
+    return [fileURLToPath(new URL("./main.ts", import.meta.url)), "core"];
   }
   return ["core"];
 }

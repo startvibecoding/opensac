@@ -2,6 +2,7 @@
 // agent with the full activity snapshot (latest tool, thinking, response,
 // result, event timeline), mirroring the Go renderAgentActivity.
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assertEquals,
   assertStringIncludes,
@@ -31,7 +32,7 @@ function makeSession(controller: AppController): TUISession {
       model: settings.defaultModel ?? "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
     },
     createFakeTUIService(),
@@ -77,7 +78,10 @@ test("tool modal lists sub-agent targets with detailed progress", () => {
 
   // Targets: main + one sub-agent.
   const modal = session.toolModalForTest();
-  assertEquals(modal.targets.map((t) => t.id), ["main", "agent:worker-1"]);
+  assertEquals(
+    modal.targets.map((t) => t.id),
+    ["main", "agent:worker-1"],
+  );
 
   // Switch to the sub-agent target and render it.
   session.switchToolModalTarget(1);
@@ -100,47 +104,47 @@ test("tool modal refuses to open when there is nothing to show", () => {
   assertThrows(() => session.toolModalForTest());
 });
 
-test(
-  "main tab expands tool calls without one tab per tool",
-  () => {
-    const tr = new Translator("en");
-    const controller = new AppController(tr, {
-      onMessage: () => {},
-      scheduleRender: () => {},
-    });
-    controller.addMessage("plain preamble");
-    const ev = (extra: Record<string, unknown>) =>
-      extra as unknown as Parameters<AppController["handleAgentEvent"]>[0];
-    controller.handleAgentEvent(
-      ev({
-        type: EVENT_TOOL_EXECUTION_START,
-        toolCallId: "tc-9",
-        toolName: "bash",
-        toolArgs: { command: "npm test" },
-      }),
-    );
-    controller.handleAgentEvent(
-      ev({
-        type: EVENT_TOOL_EXECUTION_END,
-        toolCallId: "tc-9",
-        toolName: "bash",
-        toolArgs: { command: "npm test" },
-        toolResult: "all 10 tests passed",
-      }),
-    );
+test("main tab expands tool calls without one tab per tool", () => {
+  const tr = new Translator("en");
+  const controller = new AppController(tr, {
+    onMessage: () => {},
+    scheduleRender: () => {},
+  });
+  controller.addMessage("plain preamble");
+  const ev = (extra: Record<string, unknown>) =>
+    extra as unknown as Parameters<AppController["handleAgentEvent"]>[0];
+  controller.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_START,
+      toolCallId: "tc-9",
+      toolName: "bash",
+      toolArgs: { command: "npm test" },
+    }),
+  );
+  controller.handleAgentEvent(
+    ev({
+      type: EVENT_TOOL_EXECUTION_END,
+      toolCallId: "tc-9",
+      toolName: "bash",
+      toolArgs: { command: "npm test" },
+      toolResult: "all 10 tests passed",
+    }),
+  );
 
-    const session = makeSession(controller);
-    session.openToolModal();
-    // Tabs: main + agents only — never one tab per tool call.
-    const modal = session.toolModalForTest();
-    assertEquals(modal.targets.map((t) => t.id), ["main"]);
+  const session = makeSession(controller);
+  session.openToolModal();
+  // Tabs: main + agents only — never one tab per tool call.
+  const modal = session.toolModalForTest();
+  assertEquals(
+    modal.targets.map((t) => t.id),
+    ["main"],
+  );
 
-    // Main renders the expanded transcript: tool header with the command,
-    // then `---` plus the full output.
-    const view = session.toolModalView();
-    assertStringIncludes(view, "[bash]");
-    assertStringIncludes(view, "npm test");
-    assertStringIncludes(view, "all 10 tests passed");
-    assertStringIncludes(view, "plain preamble");
-  },
-);
+  // Main renders the expanded transcript: tool header with the command,
+  // then `---` plus the full output.
+  const view = session.toolModalView();
+  assertStringIncludes(view, "[bash]");
+  assertStringIncludes(view, "npm test");
+  assertStringIncludes(view, "all 10 tests passed");
+  assertStringIncludes(view, "plain preamble");
+});

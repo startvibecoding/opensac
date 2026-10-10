@@ -8,7 +8,8 @@ import {
   type Message,
   type ToolCallBlock,
   type ToolDefinition,
-  type Usage} from "./types.ts";
+  type Usage,
+} from "./types.ts";
 
 /**
  * Provider is the interface that all LLM provider implementations must

@@ -112,9 +112,7 @@ export function createAgentManager(opts: AgentManagerOptions): AgentManager {
   // settings pointer redirect sub-agents to the platform-default session DB:
   // that would split child execution and durable state from the parent run.
   const effectiveSettings: Settings = { ...opts.settings };
-  if (
-    runtimeManager !== undefined && runtimeManager.getSessionDir() !== ""
-  ) {
+  if (runtimeManager !== undefined && runtimeManager.getSessionDir() !== "") {
     effectiveSettings.sessionDir = runtimeManager.getSessionDir();
   }
   // A team expert binding forces multi-agent capability for the session at the
@@ -122,7 +120,8 @@ export function createAgentManager(opts: AgentManagerOptions): AgentManager {
   const expertState = runtime.expertState();
   const expertBinding = expertState.binding;
   const mailbox = expertState.mailbox;
-  const multiAgentEnabled = (opts.multiAgentEnabled ?? false) ||
+  const multiAgentEnabled =
+    (opts.multiAgentEnabled ?? false) ||
     (expertBinding !== null && expertBinding.team);
   let expertIdentity = "";
   let expertRoster = "";
@@ -139,8 +138,11 @@ export function createAgentManager(opts: AgentManagerOptions): AgentManager {
     return SOURCE_UNKNOWN;
   };
   const compaction = compactionSettingsFromConfig(
-    effectiveSettings.compaction ??
-      { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
+    effectiveSettings.compaction ?? {
+      enabled: false,
+      reserveTokens: 0,
+      keepRecentTokens: 0,
+    },
   );
   const factoryOptions: AgentFactoryOptions = {
     multiAgentEnabled,
@@ -179,10 +181,12 @@ export function createAgentManager(opts: AgentManagerOptions): AgentManager {
       };
       try {
         const resolved = resolveManagerSource(manager, input);
-        return beforeToolCallForPolicy(
-          policyForSource(resolved.source, MODE_YOLO),
-          undefined,
-        ) ?? undefined;
+        return (
+          beforeToolCallForPolicy(
+            policyForSource(resolved.source, MODE_YOLO),
+            undefined,
+          ) ?? undefined
+        );
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         return () => ({ block: true, reason });

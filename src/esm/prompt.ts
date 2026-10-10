@@ -46,9 +46,9 @@ export function steeringPrompt(obj: Objective | null): string {
   }
   if (obj.remainingWork.length > 0) {
     b.push(
-      `- remaining work (${obj.remainingWork.length}): ${
-        obj.remainingWork.join("; ")
-      }\n`,
+      `- remaining work (${obj.remainingWork.length}): ${obj.remainingWork.join(
+        "; ",
+      )}\n`,
     );
   }
   if (obj.rejectionCount > 0) {
@@ -171,9 +171,9 @@ export function workerTaskPrompt(obj: Objective | null): string {
   }
   if (obj.remainingWork.length > 0) {
     b.push(
-      `\nPersisted remaining work (${obj.remainingWork.length}):\n- ${
-        obj.remainingWork.join("\n- ")
-      }\n`,
+      `\nPersisted remaining work (${obj.remainingWork.length}):\n- ${obj.remainingWork.join(
+        "\n- ",
+      )}\n`,
     );
   }
   if (obj.rejectionCount > 0) {

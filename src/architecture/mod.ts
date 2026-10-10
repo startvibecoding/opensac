@@ -4,7 +4,7 @@
 // construction path, one execution/lifecycle path, one DB→DAO direction, one
 // decision-envelope owner, one input/content path, and a public SDK that never
 // imports `src/`, plus the narrow reviewed `src/core` foundation boundary.
-// Run with `deno task test:architecture`.
+// Run with `npm run test:architecture`.
 
 export {
   coreBoundaryAllowlist,

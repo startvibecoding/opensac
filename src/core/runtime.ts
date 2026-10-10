@@ -1,5 +1,9 @@
 import { type Settings } from "../config/settings.ts";
-import { type CoreRpcId, type CoreRpcParams, type CoreRpcResponse } from "./protocol.ts";
+import {
+  type CoreRpcId,
+  type CoreRpcParams,
+  type CoreRpcResponse,
+} from "./protocol.ts";
 
 /** A front-end-neutral runtime source identifier. */
 export type CoreRuntimeSource = string;
@@ -456,19 +460,18 @@ export interface CoreRuntimeHost {
    * Unlike `history` (the live event log of the current process), this reads
    * the persisted branch, so it is non-empty after a Core restart.
    */
-  transcript(input: {
-    sessionId: string;
-  }): Promise<CoreTranscriptMessage[]>;
+  transcript(input: { sessionId: string }): Promise<CoreTranscriptMessage[]>;
   prompt(input: CorePromptInput): Promise<CorePromptAccepted>;
   cancelRun(input: { sessionId: string; runId: string }): Promise<CoreRunView>;
-  getRun(
-    input: { sessionId: string; runId: string },
-  ): Promise<CoreRunView | undefined>;
+  getRun(input: {
+    sessionId: string;
+    runId: string;
+  }): Promise<CoreRunView | undefined>;
   listSessions(): Promise<CoreSessionView[]>;
   /** Lists the persisted sessions of one working directory. */
-  listPersistedSessions(
-    input: { workDir?: string },
-  ): Promise<CoreSessionListEntry[]>;
+  listPersistedSessions(input: {
+    workDir?: string;
+  }): Promise<CoreSessionListEntry[]>;
   setSessionConfig(input: {
     sessionId: string;
     mode?: string;
@@ -486,17 +489,15 @@ export interface CoreRuntimeHost {
     sessionId: string;
   }): Promise<Record<string, unknown>>;
   /** Projects the discovered skill index of one session. */
-  listSessionSkills(
-    input: { sessionId: string },
-  ): Promise<CoreSkillView[]>;
+  listSessionSkills(input: { sessionId: string }): Promise<CoreSkillView[]>;
   /** Materializes one input resource for a session before a run exists. */
   prepareInput(
     input: CorePrepareInput & { sessionId: string },
   ): Promise<CorePreparedInput>;
   /** Projects capability discovery metadata for one session. */
-  sessionCapabilities(
-    input: { sessionId: string },
-  ): Promise<CoreCapabilityView>;
+  sessionCapabilities(input: {
+    sessionId: string;
+  }): Promise<CoreCapabilityView>;
   /**
    * Reads one settings document. `"effective"` merges global and project
    * settings for the work directory; `"global"` returns only the fields
@@ -516,9 +517,9 @@ export interface CoreRuntimeHost {
     workDir?: string;
   }): Promise<Settings>;
   /** Projects the built-in-plus-configured provider catalog. */
-  providerCatalog(
-    input: { workDir?: string },
-  ): Promise<CoreProviderCatalogView[]>;
+  providerCatalog(input: {
+    workDir?: string;
+  }): Promise<CoreProviderCatalogView[]>;
   /** Validates one provider/model pair; rejects with the raw cause. */
   validateProviderModel(input: {
     providerID: string;
@@ -532,29 +533,27 @@ export interface CoreRuntimeHost {
     vars: Record<string, string>;
   }): Promise<Record<string, string>>;
   /** Projects one session's rule/extra system-prompt context. */
-  sessionContext(
-    input: { sessionId: string },
-  ): Promise<CoreSessionContextView>;
+  sessionContext(input: { sessionId: string }): Promise<CoreSessionContextView>;
   /** Updates one session's rule/extra system-prompt context. */
-  setSessionContext(
-    input: {
-      sessionId: string;
-      ruleContent?: string;
-      extraContext?: string;
-    },
-  ): Promise<CoreSessionContextView>;
+  setSessionContext(input: {
+    sessionId: string;
+    ruleContent?: string;
+    extraContext?: string;
+  }): Promise<CoreSessionContextView>;
   /** Projects the discoverable expert bundles of one session. */
   listExperts(input: { sessionId: string }): Promise<CoreExpertSummaryView[]>;
   /** Resolves one expert bundle for display. */
-  inspectExpert(
-    input: { sessionId: string; expertId: string },
-  ): Promise<CoreExpertBundleView>;
+  inspectExpert(input: {
+    sessionId: string;
+    expertId: string;
+  }): Promise<CoreExpertBundleView>;
   /** Projects one session's resolved expert binding. */
   expertState(input: { sessionId: string }): Promise<CoreExpertStateView>;
   /** Binds or unbinds one session's expert (empty id unbinds). */
-  setExpert(
-    input: { sessionId: string; expertId: string },
-  ): Promise<CoreExpertStateView>;
+  setExpert(input: {
+    sessionId: string;
+    expertId: string;
+  }): Promise<CoreExpertStateView>;
   /**
    * Forks one session's history into a child branch. A non-null `expertId`
    * applies the expert binding only to the child (empty string unbinds it).
@@ -567,10 +566,7 @@ export interface CoreRuntimeHost {
   /** Projects the managed agent registry of one session. */
   listAgents(input: { sessionId: string }): Promise<CoreAgentView[]>;
   /** Destroys one managed agent and its children. */
-  destroyAgent(input: {
-    sessionId: string;
-    agentId: string;
-  }): Promise<void>;
+  destroyAgent(input: { sessionId: string; agentId: string }): Promise<void>;
   /** Enables/disables the blocking delegate tool of one session. */
   setDelegate(input: {
     sessionId: string;

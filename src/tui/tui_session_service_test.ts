@@ -4,6 +4,7 @@
 // the cancel/replay paths, correlate decision answers to the originating Core
 // request, and close the service session exactly once.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { testWithIsolatedConfig as test } from "../test_helpers.ts";
 import {
@@ -88,7 +89,7 @@ function makeSession(
       model: "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
       ...options,
     },
@@ -125,10 +126,16 @@ test("submitting text calls service.prompt and projects run events", async () =>
       textDelta: "Hello from the Core",
     },
   });
-  fake.emit(sessionId, "run-live", "run_finished", {
-    status: "completed",
-    agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
-  }, true);
+  fake.emit(
+    sessionId,
+    "run-live",
+    "run_finished",
+    {
+      status: "completed",
+      agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+    },
+    true,
+  );
   await pending;
 
   assertEquals(rec.prompts, [{ sessionId, text: "hello" }]);
@@ -199,13 +206,23 @@ test("decision answers correlate to the originating Core request", async () => {
   assertEquals(session.controller.shownApproval, undefined);
   // First response wins: the pending decision is consumed on the service side.
   await assertRejects(() =>
-    fake.answerDecision({ requestId: "ap-1", kind: "approval", approved: true })
+    fake.answerDecision({
+      requestId: "ap-1",
+      kind: "approval",
+      approved: true,
+    }),
   );
 
-  fake.emit(sessionId, "run-live", "run_finished", {
-    status: "completed",
-    agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
-  }, true);
+  fake.emit(
+    sessionId,
+    "run-live",
+    "run_finished",
+    {
+      status: "completed",
+      agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+    },
+    true,
+  );
   await pending;
 });
 
@@ -219,7 +236,7 @@ test("an early submit failure unwinds busy without a bound session", async () =>
   assertEquals(session.busy, false);
   assertEquals(session.controller.isThinking, false);
   const errors = session.controller.store.messages.filter((message) =>
-    message.startsWith("Error:")
+    message.startsWith("Error:"),
   );
   assert(errors.length >= 1, "expected a visible error row");
 });
@@ -309,9 +326,7 @@ test("a replaced incompatible Core is reported locally and clears itself", async
   // The notice is localized: both dictionaries carry the key, and the session
   // uses the translator rather than an English literal.
   assert(session.translator.text("core.replaced").length > 0);
-  assert(
-    !session.translator.text("core.replaced").includes("undefined"),
-  );
+  assert(!session.translator.text("core.replaced").includes("undefined"));
 
   // It clears itself, and a later connection replay stays silent because a
   // healthy front end did not actually lose its connection.

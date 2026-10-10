@@ -1,5 +1,6 @@
 // (bwrap cases live in bwrap_test.ts).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   createManager,
@@ -56,7 +57,7 @@ test("noneSandbox wrapCommand uses platform shell args", () => {
 });
 
 test("createManager and default active level", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = runtime.makeTempDirSync({ prefix: "sbx-" });
   const m = createManager(project);
   // Default active sandbox is direct execution.
   assertEquals(m.getActive().level(), Level.None);
@@ -65,14 +66,14 @@ test("createManager and default active level", () => {
 });
 
 test("manager getForLevel", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = runtime.makeTempDirSync({ prefix: "sbx-" });
   const m = createManager(project);
   assertEquals(m.getForLevel(Level.None).level(), Level.None);
   assertThrows(() => m.getForLevel(99 as Level));
 });
 
 test("manager standard falls back on invalid policy", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = runtime.makeTempDirSync({ prefix: "sbx-" });
   // A denied path that contains the project makes the policy invalid.
   const m = new Manager(project, { deniedPaths: [project] });
   m.setLevel(Level.Standard);
@@ -81,13 +82,13 @@ test("manager standard falls back on invalid policy", () => {
 });
 
 test("manager strict does not fall back on invalid policy", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = runtime.makeTempDirSync({ prefix: "sbx-" });
   const m = new Manager(project, { deniedPaths: [project] });
   assertThrows(() => m.setLevel(Level.Strict));
 });
 
 test("manager with invalid policy still allows none", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = runtime.makeTempDirSync({ prefix: "sbx-" });
   const m = new Manager(project, { deniedPaths: [project] });
   m.setLevel(Level.None);
   assertEquals(m.getActive().level(), Level.None);

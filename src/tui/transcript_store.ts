@@ -21,11 +21,7 @@ export type ToolResultStatus = "running" | "completed" | "interrupted";
  * "assistant" row carries raw Markdown source and renders through the same
  * Markdown projection as a live assistant turn. */
 export type MessageKind =
-  | "status"
-  | "error"
-  | "warning"
-  | "plain"
-  | "assistant";
+  "status" | "error" | "warning" | "plain" | "assistant";
 
 export interface ToolResultEntry {
   toolCallID: string;
@@ -67,11 +63,7 @@ export interface ToolResultEvent {
 export interface TranscriptStoreOptions {
   translator: Translator;
   /** Summarizer override (tests); defaults to summarizeToolResult. */
-  summarize?: (
-    toolName: string,
-    result: string,
-    diff?: FileDiff,
-  ) => string;
+  summarize?: (toolName: string, result: string, diff?: FileDiff) => string;
 }
 
 /**
@@ -135,7 +127,8 @@ export class TranscriptStore {
 
   constructor(options: TranscriptStoreOptions) {
     this.#translator = options.translator;
-    this.#summarize = options.summarize ??
+    this.#summarize =
+      options.summarize ??
       ((toolName, result, diff) =>
         summarizeToolResult(toolName, result, diff, this.#translator));
   }
@@ -194,7 +187,8 @@ export class TranscriptStore {
    */
   appendThinkDelta(delta: string): void {
     if (
-      this.currentThinkIdx >= 0 && this.currentThinkIdx < this.messages.length
+      this.currentThinkIdx >= 0 &&
+      this.currentThinkIdx < this.messages.length
     ) {
       this.#appendThinkDelta(this.currentThinkIdx, delta);
       return;
@@ -224,8 +218,8 @@ export class TranscriptStore {
 
   /** Commits active streaming rows and clears the active indices. */
   commitActiveStream(): void {
-    const hadActive = this.currentThinkIdx >= 0 ||
-      this.currentAssistantIdx >= 0;
+    const hadActive =
+      this.currentThinkIdx >= 0 || this.currentAssistantIdx >= 0;
     if (this.currentThinkIdx >= 0) {
       // finalizeThinkStream: builder content already mirrors thinkRaw here.
       this.currentThinkIdx = -1;
@@ -355,8 +349,9 @@ export class TranscriptStore {
     if (groupID <= 0) return false;
     // A group can only render as a tree when it holds enough parallel calls,
     // so the count check never allocates a member list.
-    return (this.#groupTables().get(groupID)?.length ?? 0) >=
-      MIN_TOOL_GROUP_SIZE;
+    return (
+      (this.#groupTables().get(groupID)?.length ?? 0) >= MIN_TOOL_GROUP_SIZE
+    );
   }
 
   /**
@@ -384,9 +379,10 @@ export class TranscriptStore {
       }
       row.toolName = matchedName;
       row.toolArgs = matchedArgs;
-      row.status = event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED
-        ? "interrupted"
-        : "completed";
+      row.status =
+        event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED
+          ? "interrupted"
+          : "completed";
       row.fullContent = event.toolResult ?? "";
       row.diff = event.toolDiff;
       row.plan = event.plan;
@@ -410,9 +406,10 @@ export class TranscriptStore {
       toolCallID: event.toolCallID,
       toolName: matchedName,
       toolArgs: matchedArgs,
-      status: event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED
-        ? "interrupted"
-        : "completed",
+      status:
+        event.toolExecutionState === TOOL_EXECUTION_INTERRUPTED
+          ? "interrupted"
+          : "completed",
       msgIndex: msgIdx,
       fullContent: event.toolResult ?? "",
       diff: event.toolDiff,
@@ -521,9 +518,9 @@ function truncatePlain50(s: string): string {
 export function summarizeFileDiff(diff: FileDiff | undefined): string {
   if (!diff) return "";
   const suffix = diff.truncated ? " large" : "";
-  return `+${diff.added} -${diff.deleted}${suffix} (-${
-    formatLineRangesForDisplay(diff.deletedLines)
-  } +${formatLineRangesForDisplay(diff.addedLines)})`;
+  return `+${diff.added} -${diff.deleted}${suffix} (-${formatLineRangesForDisplay(
+    diff.deletedLines,
+  )} +${formatLineRangesForDisplay(diff.addedLines)})`;
 }
 
 /** Compresses line lists into compact ranges (Go formatLineRangesForDisplay). */

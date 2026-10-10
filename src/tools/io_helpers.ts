@@ -1,32 +1,33 @@
 // (the file-diff and atomic-write helpers).
 //
 // These helpers are shared by the write/edit/insert tools. Go's `os.FileMode`
-// maps to Deno's Unix `mode`; the atomic writes use a temp file in the target
+// maps to Node's Unix `mode`; the atomic writes use a temp file in the target
 // directory plus a rename, preserving the existing permissions.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 
 /** Writes data to `p` atomically using a temp file and rename. */
 export function writeFileAtomic(p: string, data: Uint8Array): void {
   let perm = 0o644;
   try {
-    const info = Deno.statSync(p);
+    const info = runtime.statSync(p);
     if (info.mode !== null) perm = info.mode & 0o777;
   } catch {
     // new file
   }
 
   const dir = path.dirname(p);
-  Deno.mkdirSync(dir, { recursive: true });
+  runtime.mkdirSync(dir, { recursive: true });
 
-  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".tmp-" });
+  const tmpPath = runtime.makeTempFileSync({ dir, prefix: ".tmp-" });
   try {
-    Deno.writeFileSync(tmpPath, data, { mode: perm });
-    Deno.chmodSync(tmpPath, perm);
-    Deno.renameSync(tmpPath, p);
+    runtime.writeFileSync(tmpPath, data, { mode: perm });
+    runtime.chmodSync(tmpPath, perm);
+    runtime.renameSync(tmpPath, p);
   } catch (err) {
     try {
-      Deno.removeSync(tmpPath);
+      runtime.removeSync(tmpPath);
     } catch {
       // ignore
     }
@@ -41,15 +42,15 @@ export function writeFileAtomicWithMode(
   mode: number,
 ): void {
   const dir = path.dirname(p);
-  Deno.mkdirSync(dir, { recursive: true });
-  const tmpPath = Deno.makeTempFileSync({ dir, prefix: ".opensac-insert-" });
+  runtime.mkdirSync(dir, { recursive: true });
+  const tmpPath = runtime.makeTempFileSync({ dir, prefix: ".opensac-insert-" });
   try {
-    Deno.chmodSync(tmpPath, mode & 0o777);
-    Deno.writeFileSync(tmpPath, data);
-    Deno.renameSync(tmpPath, p);
+    runtime.chmodSync(tmpPath, mode & 0o777);
+    runtime.writeFileSync(tmpPath, data);
+    runtime.renameSync(tmpPath, p);
   } catch (err) {
     try {
-      Deno.removeSync(tmpPath);
+      runtime.removeSync(tmpPath);
     } catch {
       // ignore
     }
@@ -111,9 +112,9 @@ export function formatFileDiffSummary(
     return "Diff: +0 -0\n- lines: none\n+ lines: none";
   }
   const suffix = diff.truncated ? " (large file; line ranges approximate)" : "";
-  return `Diff: +${diff.added} -${diff.deleted}${suffix}\n- lines: ${
-    formatLineRanges(diff.deletedLines)
-  }\n+ lines: ${formatLineRanges(diff.addedLines)}`;
+  return `Diff: +${diff.added} -${diff.deleted}${suffix}\n- lines: ${formatLineRanges(
+    diff.deletedLines,
+  )}\n+ lines: ${formatLineRanges(diff.addedLines)}`;
 }
 
 export function formatWriteDiffSummary(

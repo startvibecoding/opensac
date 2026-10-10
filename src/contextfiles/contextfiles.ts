@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { projectDirName, projectPathFor } from "../config/mod.ts";
 
@@ -142,7 +143,7 @@ export function loadContextFiles(
 
 function readFileOrNull(p: string): string | null {
   try {
-    return Deno.readTextFileSync(p);
+    return runtime.readTextFileSync(p);
   } catch {
     return null;
   }
@@ -164,9 +165,7 @@ export function safeContextFilePath(
   } catch {
     return { ok: false, path: "" };
   }
-  if (
-    rel === ".." || rel.startsWith(".." + path.SEPARATOR)
-  ) {
+  if (rel === ".." || rel.startsWith(".." + path.SEPARATOR)) {
     return { ok: false, path: "" };
   }
   return { ok: true, path: resolved };
@@ -205,7 +204,7 @@ export const defaultRuleContent = `# Project Rules
 export function loadRuleFile(cwd: string): string {
   const p = ruleFilePath(cwd);
   try {
-    return Deno.readTextFileSync(p);
+    return runtime.readTextFileSync(p);
   } catch {
     return "";
   }
@@ -227,17 +226,17 @@ export function ensureRuleFile(
   const p = ruleFilePath(cwd);
   if (!overwrite) {
     try {
-      const existing = Deno.readTextFileSync(p);
+      const existing = runtime.readTextFileSync(p);
       return { path: p, content: existing, written: false };
     } catch (err) {
-      if (!(err instanceof Deno.errors.NotFound)) {
+      if (!(err instanceof runtime.errors.NotFound)) {
         throw err;
       }
     }
   }
 
-  Deno.mkdirSync(path.dirname(p), { recursive: true });
-  Deno.writeTextFileSync(p, defaultRuleContent);
+  runtime.mkdirSync(path.dirname(p), { recursive: true });
+  runtime.writeTextFileSync(p, defaultRuleContent);
   return { path: p, content: defaultRuleContent, written: true };
 }
 
@@ -248,7 +247,8 @@ export function ensureRuleFile(
  */
 export function buildContextString(result: LoadResult): string {
   if (
-    result.globalFiles.length === 0 && result.parentFiles.length === 0 &&
+    result.globalFiles.length === 0 &&
+    result.parentFiles.length === 0 &&
     result.projectFiles.length === 0
   ) {
     return "";

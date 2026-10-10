@@ -4,6 +4,7 @@
 // covered by session_runtime_test.ts; the manifest assertion here exercises
 // the materializer's own deterministic `buildManifest` instead.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { decodeBase64 } from "../compat/encoding.ts";
 import * as path from "../compat/path.ts";
@@ -27,8 +28,8 @@ function inputTestSession(): {
   workDir: string;
   sessionId: string;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-inputmat-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "opensac-work-" });
+  const root = runtime.makeTempDirSync({ prefix: "opensac-inputmat-" });
+  const workDir = runtime.makeTempDirSync({ prefix: "opensac-work-" });
   const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
@@ -82,7 +83,7 @@ test("InputMaterializerWritesProjectResourceAndManifest", async () => {
     assert(record.relativePath.startsWith(".opensac/tmp/inputs/"));
     assert(!path.isAbsolute(record.relativePath));
     const contentPath = path.join(workDir, ...record.relativePath.split("/"));
-    assertEquals(await Deno.readTextFile(contentPath), "hello input");
+    assertEquals(await runtime.readTextFile(contentPath), "hello input");
 
     const conn = openRootDB(root).db!;
     const stored = new InputResourceDAO(null).find(conn, sessionId, record.id);
@@ -92,44 +93,38 @@ test("InputMaterializerWritesProjectResourceAndManifest", async () => {
     const manifest = materializer.buildManifest([record]);
     assert(manifest.includes(record.relativePath));
     assert(manifest.includes("Use read"));
-    assertEquals(
-      sanitizeAttachmentFilename(record.filename),
-      "notes.txt",
-    );
+    assertEquals(sanitizeAttachmentFilename(record.filename), "notes.txt");
   } finally {
     closeDatabases();
   }
 });
 
-test(
-  "InputMaterializerCanonicalizesImageWithoutDirectProviderContent",
-  async () => {
-    const { root, workDir, sessionId } = inputTestSession();
-    try {
-      const materializer = new InputMaterializer(
-        root,
-        workDir,
-        defaultInputPolicy(),
-      );
-      const record = await materializer.Prepare(
-        sessionId,
-        "run-image",
-        bytesIngress({
-          kind: "image",
-          content: onePixelPNG(),
-          filenameHint: "screen.bin",
-          mediaTypeHint: "application/octet-stream",
-        }),
-      );
-      assertEquals(record.mediaType, "image/png");
-      assertEquals(path.extname(record.filename), ".png");
-      const manifest = materializer.buildManifest([record]);
-      assert(manifest.includes(record.relativePath));
-    } finally {
-      closeDatabases();
-    }
-  },
-);
+test("InputMaterializerCanonicalizesImageWithoutDirectProviderContent", async () => {
+  const { root, workDir, sessionId } = inputTestSession();
+  try {
+    const materializer = new InputMaterializer(
+      root,
+      workDir,
+      defaultInputPolicy(),
+    );
+    const record = await materializer.Prepare(
+      sessionId,
+      "run-image",
+      bytesIngress({
+        kind: "image",
+        content: onePixelPNG(),
+        filenameHint: "screen.bin",
+        mediaTypeHint: "application/octet-stream",
+      }),
+    );
+    assertEquals(record.mediaType, "image/png");
+    assertEquals(path.extname(record.filename), ".png");
+    const manifest = materializer.buildManifest([record]);
+    assert(manifest.includes(record.relativePath));
+  } finally {
+    closeDatabases();
+  }
+});
 
 test("InputMaterializerDetectsExtensionlessWebP", async () => {
   const { root, workDir, sessionId } = inputTestSession();
@@ -244,12 +239,12 @@ test("InputResourceLifecycleEventsAndDraftCleanup", async () => {
     assertEquals(events[0].eventType, "input_resource_prepared");
 
     const contentPath = path.join(workDir, ...record.relativePath.split("/"));
-    Deno.statSync(contentPath);
+    runtime.statSync(contentPath);
 
     materializer.Discard(sessionId, record.id);
     let exists = true;
     try {
-      Deno.statSync(contentPath);
+      runtime.statSync(contentPath);
     } catch {
       exists = false;
     }
@@ -281,7 +276,7 @@ test("InputResourceLifecycleEventsAndDraftCleanup", async () => {
     assertEquals(removed, 1);
     let oldExists = true;
     try {
-      Deno.statSync(path.join(workDir, ...old.relativePath.split("/")));
+      runtime.statSync(path.join(workDir, ...old.relativePath.split("/")));
     } catch {
       oldExists = false;
     }
@@ -308,7 +303,7 @@ test("InputMaterializerRejectsOversizedAndInvalidImage", async () => {
           content: encoder.encode("12345"),
           filenameHint: "large.bin",
         }),
-      )
+      ),
     );
     assert(String(oversized).includes("exceeds 4 bytes"));
 
@@ -321,7 +316,7 @@ test("InputMaterializerRejectsOversizedAndInvalidImage", async () => {
           content: encoder.encode("not an image"),
           filenameHint: "broken.png",
         }),
-      )
+      ),
     );
     assert(String(invalid).includes("detected media type"));
 

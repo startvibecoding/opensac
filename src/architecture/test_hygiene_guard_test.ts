@@ -18,10 +18,14 @@ test("adapter tests use canonical run boundaries", () => {
   assertEquals(
     violations,
     [],
-    `adapter tests must use the canonical runtime boundaries (migrate, or add a documented legacyTestAllowlist entry):\n- ${
-      violations.map((v) => `${v.file}: ${v.message}`).join("\n- ")
-    }\n\nallowlist (${Object.keys(legacyTestAllowlist).length} entries):\n\t${
-      Object.keys(legacyTestAllowlist).sort().join("\n\t")
-    }`,
+    `adapter tests must use the canonical runtime boundaries (migrate, or add a documented legacyTestAllowlist entry):\n- ${violations
+      .map((v) => `${v.file}: ${v.message}`)
+      .join(
+        "\n- ",
+      )}\n\nallowlist (${Object.keys(legacyTestAllowlist).length} entries):\n\t${Object.keys(
+      legacyTestAllowlist,
+    )
+      .sort()
+      .join("\n\t")}`,
   );
 });

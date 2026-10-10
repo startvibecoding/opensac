@@ -41,7 +41,7 @@ test("ResolveAttachmentWithMetadataUsesCodeInterpreterContainer", async () => {
   p.client = mockClient((req) => {
     if (
       req.url !==
-        "https://api.test/v1/containers/container_123/files/file_123/content"
+      "https://api.test/v1/containers/container_123/files/file_123/content"
     ) {
       throw new Error(`request path = ${req.url}`);
     }

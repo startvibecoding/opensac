@@ -2,6 +2,7 @@
 // Raw INSERTs in the Go tests map to StatsDAO.insert over the shared
 // connection; the test never constructs SQL itself.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { StatsDAO, type StatsRecord } from "../dao/mod.ts";
@@ -30,9 +31,9 @@ function insert(db: DB, record: Partial<StatsRecord>): void {
 }
 
 function createTestDB(): DB {
-  const tmpDir = Deno.makeTempDirSync();
+  const tmpDir = runtime.makeTempDirSync();
   const dbPath = path.join(tmpDir, "sessions.db");
-  const f = Deno.openSync(dbPath, { create: true, write: true });
+  const f = runtime.openSync(dbPath, { create: true, write: true });
   f.close();
   return DB.open(dbPath);
 }
@@ -44,18 +45,16 @@ test("DashboardUsesOpenSACSmallFavicon", () => {
 
 test("DashboardShareActivityUsesSevenDayFlameHeatmap", () => {
   const html = dashboardHTML();
-  for (
-    const expected of [
-      "Last 7 days by 2-hour intensity",
-      "groupBy: '1h'",
-      "shareStartDate.setDate(shareStartDate.getDate() - 6)",
-      "from: localDate(shareStartDate)",
-      "const days = []",
-      "const hourMap = {}",
-      "const slotH = (chartH - slotGap * 11) / 12",
-      "function flameColor(value)",
-    ]
-  ) {
+  for (const expected of [
+    "Last 7 days by 2-hour intensity",
+    "groupBy: '1h'",
+    "shareStartDate.setDate(shareStartDate.getDate() - 6)",
+    "from: localDate(shareStartDate)",
+    "const days = []",
+    "const hourMap = {}",
+    "const slotH = (chartH - slotGap * 11) / 12",
+    "function flameColor(value)",
+  ]) {
     assert(
       html.includes(expected),
       `dashboard share activity is missing ${expected}`,
@@ -269,9 +268,9 @@ test("RecentFiltered", () => {
 });
 
 test("CurrentSchemaInitializationIsIdempotent", () => {
-  const tmpDir = Deno.makeTempDirSync();
+  const tmpDir = runtime.makeTempDirSync();
   const dbPath = path.join(tmpDir, "sessions.db");
-  const f = Deno.openSync(dbPath, { create: true, write: true });
+  const f = runtime.openSync(dbPath, { create: true, write: true });
   f.close();
 
   const db1 = DB.open(dbPath);
@@ -287,7 +286,7 @@ test("CurrentSchemaInitializationIsIdempotent", () => {
 });
 
 test("OpenUsesSharedSessionConnection", () => {
-  const dbPath = path.join(Deno.makeTempDirSync(), "sessions.db");
+  const dbPath = path.join(runtime.makeTempDirSync(), "sessions.db");
   const shared = openBunDatabase(dbPath);
 
   const statsDB = DB.open(dbPath);
@@ -317,6 +316,7 @@ function isoUTC(
   minute = 0,
   second = 0,
 ): string {
-  return new Date(Date.UTC(year, month - 1, day, hour, minute, second))
-    .toISOString();
+  return new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second),
+  ).toISOString();
 }

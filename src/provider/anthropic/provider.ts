@@ -7,6 +7,7 @@
 // Deviation: `Chat(ctx, params) <-chan StreamEvent` maps to
 // `chat(params): AsyncIterable<StreamEvent>`; the abort channel maps to
 // `params.abort` (an AbortSignal) and is threaded into `fetch`.
+import { runtime as nodeRuntime } from "../../platform/runtime.ts";
 import { wrapError } from "../errors.ts";
 import { BaseProvider } from "../base.ts";
 import { debugCompleteResponse, debugJSON } from "../debug.ts";
@@ -308,7 +309,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
   ) {
     super("anthropic", models);
     if (baseURL === "") baseURL = "https://api.anthropic.com";
-    if (apiKey === "") apiKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+    if (apiKey === "") apiKey = nodeRuntime.env.get("ANTHROPIC_API_KEY") ?? "";
     this.apiKey = apiKey;
     this.baseURL = baseURL.replace(/\/+$/, "");
     this.client = client;
@@ -404,11 +405,13 @@ export class Provider extends BaseProvider implements ProviderInterface {
       if (this.isCacheControlEnabled()) {
         // Send system prompt as content block array with cache_control for
         // prompt caching.
-        reqBody.system = [{
-          type: "text",
-          text: params.systemPrompt,
-          cache_control: { type: "ephemeral" },
-        }];
+        reqBody.system = [
+          {
+            type: "text",
+            text: params.systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+        ];
       } else {
         // Send system prompt as simple string (for proxies that don't support
         // array format).
@@ -417,7 +420,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
     }
 
     if (
-      params.thinkingLevel !== thinkingOff && model !== undefined &&
+      params.thinkingLevel !== thinkingOff &&
+      model !== undefined &&
       model.reasoning
     ) {
       // Determine thinking format: explicit config > URL auto-detect > default.
@@ -541,7 +545,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
         if (attempt < maxRetries && isRetryable(err, 0)) {
           const plan = retryPlan(attempt, err);
           yield plan.event;
-          if (!await waitOrAbort(plan.delay)) {
+          if (!(await waitOrAbort(plan.delay))) {
             yield {
               type: streamError,
               error: new Error("aborted"),
@@ -562,7 +566,7 @@ export class Provider extends BaseProvider implements ProviderInterface {
         if (attempt < maxRetries && isRetryable(err, resp.status)) {
           const plan = retryPlan(attempt, err);
           yield plan.event;
-          if (!await waitOrAbort(plan.delay)) {
+          if (!(await waitOrAbort(plan.delay))) {
             yield {
               type: streamError,
               error: new Error("aborted"),
@@ -596,12 +600,13 @@ export class Provider extends BaseProvider implements ProviderInterface {
         return;
       }
       if (
-        attempt < maxRetries && !state.visibleOutput &&
+        attempt < maxRetries &&
+        !state.visibleOutput &&
         isRetryable(streamErr, 0)
       ) {
         const plan = retryPlan(attempt, streamErr);
         yield plan.event;
-        if (!await waitOrAbort(plan.delay)) {
+        if (!(await waitOrAbort(plan.delay))) {
           yield {
             type: streamError,
             error: new Error("aborted"),
@@ -734,7 +739,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
             thinkSignature = "";
           }
           if (
-            currentBlockType === "tool_use" && toolCallIndex >= 0 &&
+            currentBlockType === "tool_use" &&
+            toolCallIndex >= 0 &&
             toolCallIndex < toolCalls.length
           ) {
             const raw = mergeToolCallInput(
@@ -788,7 +794,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
               acc.usage.input = u.input_tokens ?? 0;
             }
             if (
-              (u.cache_read_input_tokens ?? 0) > 0 && acc.usage.cacheRead === 0
+              (u.cache_read_input_tokens ?? 0) > 0 &&
+              acc.usage.cacheRead === 0
             ) {
               acc.usage.cacheRead = u.cache_read_input_tokens ?? 0;
             }
@@ -867,8 +874,11 @@ export class Provider extends BaseProvider implements ProviderInterface {
 
       if (acc.usage !== undefined) {
         const finalUsage = acc.usage;
-        finalUsage.totalTokens = finalUsage.input + finalUsage.cacheRead +
-          finalUsage.cacheWrite + finalUsage.output;
+        finalUsage.totalTokens =
+          finalUsage.input +
+          finalUsage.cacheRead +
+          finalUsage.cacheWrite +
+          finalUsage.output;
         state.visibleOutput = true;
         yield { type: streamUsage, usage: finalUsage };
       }
@@ -932,8 +942,10 @@ export class Provider extends BaseProvider implements ProviderInterface {
                 let input: Record<string, unknown> = {};
                 const args = c.toolCall.arguments;
                 if (
-                  args !== undefined && args !== null &&
-                  typeof args === "object" && !Array.isArray(args)
+                  args !== undefined &&
+                  args !== null &&
+                  typeof args === "object" &&
+                  !Array.isArray(args)
                 ) {
                   input = args as Record<string, unknown>;
                 }
@@ -957,7 +969,8 @@ export class Provider extends BaseProvider implements ProviderInterface {
           blocks.push(block);
         }
         if (
-          blocks.length === 1 && blocks[0].type === "text" &&
+          blocks.length === 1 &&
+          blocks[0].type === "text" &&
           blocks[0].cache_control === undefined
         ) {
           am.content = blocks[0].text ?? "";
@@ -1101,9 +1114,7 @@ function tryParseObject(raw: string): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
-  if (
-    parsed === null || typeof parsed !== "object" || Array.isArray(parsed)
-  ) {
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return undefined;
   }
   return parsed as Record<string, unknown>;
@@ -1147,9 +1158,10 @@ export function mergeToolCallInput(initial: string, streamed: string): string {
 }
 
 /** Decodes merged tool-call arguments into the provider-neutral block shape. */
-export function decodeToolArguments(
-  raw: string,
-): { arguments?: unknown; invalidArguments?: string } {
+export function decodeToolArguments(raw: string): {
+  arguments?: unknown;
+  invalidArguments?: string;
+} {
   if (raw === "") return { arguments: {} };
   try {
     return { arguments: JSON.parse(raw) };
@@ -1202,9 +1214,11 @@ function deepseekReasoningEffort(level: ThinkingLevel): string {
 }
 
 function isAnthropicAdaptiveModel(modelID: string): boolean {
-  return modelID.startsWith("claude-opus-4-7") ||
+  return (
+    modelID.startsWith("claude-opus-4-7") ||
     modelID.startsWith("claude-opus-4-6") ||
-    modelID.startsWith("claude-sonnet-4-6");
+    modelID.startsWith("claude-sonnet-4-6")
+  );
 }
 
 export function useAdaptiveThinking(model: Model, modelID: string): boolean {

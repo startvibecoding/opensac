@@ -3,6 +3,7 @@
 // `resolveManagerPolicy`). Go exercises these only through the agent-manager
 // integration cases; these cover the precedence and conflict rules directly.
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { createManager } from "../session/manager.ts";
 import { closeDatabases } from "../session/root_db.ts";
@@ -14,9 +15,9 @@ import { SOURCE_TUI, SOURCE_WE_CHAT, SourceConflictError } from "./source.ts";
 import { test } from "#testing";
 
 test("resolveManagerSourcePrefersPersistedBindingOverRequest", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-source-" });
   try {
-    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(runtime.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     const resolved = resolveManagerSource(manager, { requested: SOURCE_TUI });
     assertEquals(resolved.source, SOURCE_WE_CHAT);
@@ -33,9 +34,9 @@ test("resolveManagerSourceFallsBackToRequestWithoutManager", () => {
 });
 
 test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-source-" });
   try {
-    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(runtime.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     assertThrows(
       () => resolveManagerSource(manager, { current: SOURCE_TUI }),
@@ -47,9 +48,9 @@ test("resolveManagerSourceThrowsOnConflictingCurrent", () => {
 });
 
 test("resolveManagerPolicyAppliesForcedChannelMode", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-source-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-source-" });
   try {
-    const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+    const manager = createManager(runtime.makeTempDirSync(), sessionDir);
     manager.initWithBinding("wechat", "source-user");
     const result = resolveManagerPolicy(
       manager,

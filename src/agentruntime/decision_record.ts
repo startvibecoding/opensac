@@ -9,7 +9,8 @@
 import {
   type DecisionKind,
   type DecisionRequest,
-  type DecisionResolution} from "./decision.ts";
+  type DecisionResolution,
+} from "./decision.ts";
 
 export interface DecisionRecord {
   id: string;
@@ -60,7 +61,7 @@ export function createDecisionResolutionRecord(
 /**
  * Revives the `createdAt`/`expiresAt` string fields produced by JSON parsing
  * back into `Date` values. Go's `encoding/json` unmarshals time.Time directly;
- * the Deno port revives explicitly because session event data is pre-decoded.
+ * the Node port revives explicitly because session event data is pre-decoded.
  */
 export function reviveDecisionRecordDates(
   raw: Record<string, unknown>,

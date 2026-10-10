@@ -4,6 +4,7 @@
 // enforcement is off and a session with no lease row skips lease validation, so
 // these tests use a literal session ID and reproduce the run lifecycle directly.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { createAssistantMessage } from "../provider/types.ts";
@@ -69,7 +70,9 @@ function statusOf(sessionDir: string, sql: string, params: string[]): string {
 }
 
 test("create session run rejects duplicate and status rollback", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const started = new Date();
     const run = baseRun({
@@ -104,7 +107,9 @@ test("create session run rejects duplicate and status rollback", () => {
 });
 
 test("update session run status allows waiting resume and cancellation", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     createSessionRun(
       sessionDir,
@@ -114,23 +119,19 @@ test("update session run status allows waiting resume and cancellation", () => {
         status: "queued",
       }),
     );
-    for (
-      const status of [
-        "running",
-        "waiting_for_approval",
-        "running",
-        "cancelling",
-        "cancelled",
-      ]
-    ) {
+    for (const status of [
+      "running",
+      "waiting_for_approval",
+      "running",
+      "cancelling",
+      "cancelled",
+    ]) {
       updateSessionRunStatus(sessionDir, "run-1", status, "", null);
     }
     assertEquals(
-      statusOf(
-        sessionDir,
-        "SELECT status FROM session_runs WHERE id = ?",
-        ["run-1"],
-      ),
+      statusOf(sessionDir, "SELECT status FROM session_runs WHERE id = ?", [
+        "run-1",
+      ]),
       "cancelled",
     );
   } finally {
@@ -139,34 +140,34 @@ test("update session run status allows waiting resume and cancellation", () => {
 });
 
 test("next session run attempt uses highest existing attempt", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const started = new Date();
-    for (
-      const run of [
-        baseRun({
-          id: "run-a",
-          sessionId: "session-run-attempts",
-          intentId: "intent-a",
-          attempt: 1,
-          status: "failed",
-          startedAt: started,
-          updatedAt: started,
-          finishedAt: started,
-        }),
-        baseRun({
-          id: "run-b",
-          sessionId: "session-run-attempts",
-          intentId: "intent-a",
-          retryOf: "run-a",
-          attempt: 2,
-          status: "failed",
-          startedAt: started,
-          updatedAt: started,
-          finishedAt: started,
-        }),
-      ]
-    ) {
+    for (const run of [
+      baseRun({
+        id: "run-a",
+        sessionId: "session-run-attempts",
+        intentId: "intent-a",
+        attempt: 1,
+        status: "failed",
+        startedAt: started,
+        updatedAt: started,
+        finishedAt: started,
+      }),
+      baseRun({
+        id: "run-b",
+        sessionId: "session-run-attempts",
+        intentId: "intent-a",
+        retryOf: "run-a",
+        attempt: 2,
+        status: "failed",
+        startedAt: started,
+        updatedAt: started,
+        finishedAt: started,
+      }),
+    ]) {
       createSessionRun(sessionDir, run);
     }
     assertEquals(
@@ -179,7 +180,9 @@ test("next session run attempt uses highest existing attempt", () => {
 });
 
 test("finish session run and conversation turn commits assistant idempotently", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const started = new Date();
     createSessionRunAndEvent(
@@ -216,10 +219,12 @@ test("finish session run and conversation turn commits assistant idempotently", 
         endedAt: null,
       },
     );
-    const assistant = createAssistantMessage([{
-      type: "text",
-      text: "answer",
-    }]);
+    const assistant = createAssistantMessage([
+      {
+        type: "text",
+        text: "answer",
+      },
+    ]);
     const planTime = new Date(started.getTime() + 1500);
     const plan: DeliveryPlan = {
       intent: {
@@ -234,29 +239,31 @@ test("finish session run and conversation turn commits assistant idempotently", 
         createdAt: planTime,
         updatedAt: planTime,
       },
-      operations: [{
-        id: "op-delivery-assistant",
-        intentId: "",
-        operationKey: "caption",
-        artifactId: "",
-        operationKind: "send_text",
-        sequence: 1,
-        dependsOn: "",
-        idempotencyKey: "op-delivery-assistant",
-        payloadDigest: "sha256:caption",
-        status: "pending",
-        providerAssetId: "",
-        providerMessageId: "",
-        providerState: undefined,
-        attemptCount: 0,
-        nextAttemptAt: null,
-        failureCode: "",
-        retryWindowStartedAt: null,
-        leaseOwner: "",
-        leaseEpoch: 0,
-        createdAt: planTime,
-        updatedAt: planTime,
-      }],
+      operations: [
+        {
+          id: "op-delivery-assistant",
+          intentId: "",
+          operationKey: "caption",
+          artifactId: "",
+          operationKind: "send_text",
+          sequence: 1,
+          dependsOn: "",
+          idempotencyKey: "op-delivery-assistant",
+          payloadDigest: "sha256:caption",
+          status: "pending",
+          providerAssetId: "",
+          providerMessageId: "",
+          providerState: undefined,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          failureCode: "",
+          retryWindowStartedAt: null,
+          leaseOwner: "",
+          leaseEpoch: 0,
+          createdAt: planTime,
+          updatedAt: planTime,
+        },
+      ],
     };
     const finished = new Date(started.getTime() + 2000);
     const terminalRun = baseRun({
@@ -342,7 +349,9 @@ test("finish session run and conversation turn commits assistant idempotently", 
 });
 
 test("finish session run commits when turn already closed", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const started = new Date();
     createSessionRunAndEvent(
@@ -423,11 +432,9 @@ test("finish session run commits when turn already closed", () => {
       "completed",
     );
     assertEquals(
-      count(
-        sessionDir,
-        `SELECT COUNT(*) AS n FROM entries WHERE id = ?`,
-        [runAssistantEntryID("run-closed-turn")],
-      ),
+      count(sessionDir, `SELECT COUNT(*) AS n FROM entries WHERE id = ?`, [
+        runAssistantEntryID("run-closed-turn"),
+      ]),
       1,
     );
     assertEquals(
@@ -444,7 +451,9 @@ test("finish session run commits when turn already closed", () => {
 });
 
 test("finish session run rolls back invalid delivery plan", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const started = new Date();
     createSessionRunAndEvent(
@@ -497,29 +506,31 @@ test("finish session run rolls back invalid delivery plan", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      operations: [{
-        id: "op-rollback",
-        intentId: "",
-        operationKey: "caption",
-        artifactId: "missing-artifact",
-        operationKind: "send_text",
-        sequence: 1,
-        dependsOn: "",
-        idempotencyKey: "op-rollback",
-        payloadDigest: "sha256:rollback",
-        status: "pending",
-        providerAssetId: "",
-        providerMessageId: "",
-        providerState: undefined,
-        attemptCount: 0,
-        nextAttemptAt: null,
-        failureCode: "",
-        retryWindowStartedAt: null,
-        leaseOwner: "",
-        leaseEpoch: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }],
+      operations: [
+        {
+          id: "op-rollback",
+          intentId: "",
+          operationKey: "caption",
+          artifactId: "missing-artifact",
+          operationKind: "send_text",
+          sequence: 1,
+          dependsOn: "",
+          idempotencyKey: "op-rollback",
+          payloadDigest: "sha256:rollback",
+          status: "pending",
+          providerAssetId: "",
+          providerMessageId: "",
+          providerState: undefined,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          failureCode: "",
+          retryWindowStartedAt: null,
+          leaseOwner: "",
+          leaseEpoch: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
     };
     let threw = false;
     try {
@@ -562,9 +573,7 @@ test("finish session run rolls back invalid delivery plan", () => {
       statusOf(
         sessionDir,
         "SELECT status FROM conversation_turns WHERE id = ?",
-        [
-          "turn-rollback",
-        ],
+        ["turn-rollback"],
       ),
       "open",
     );
@@ -586,9 +595,7 @@ test("finish session run rolls back invalid delivery plan", () => {
       count(
         sessionDir,
         `SELECT COUNT(*) AS n FROM delivery_intents WHERE id = ?`,
-        [
-          "intent-rollback-delivery",
-        ],
+        ["intent-rollback-delivery"],
       ),
       0,
     );
@@ -598,7 +605,9 @@ test("finish session run rolls back invalid delivery plan", () => {
 });
 
 test("list session runs does not deadlock pool", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const sessionId = "session-list-runs-pool";
     createSessionRun(
@@ -627,7 +636,9 @@ test("list session runs does not deadlock pool", () => {
 });
 
 test("annotate session run error only fills empty error", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
     const now = new Date();
     createSessionRun(

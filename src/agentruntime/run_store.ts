@@ -39,7 +39,8 @@ import {
 import {
   type DeliveryIntent as SessionDeliveryIntent,
   type DeliveryOperation as SessionDeliveryOperation,
-  type DeliveryPlan as SessionDeliveryPlan} from "../session/delivery_store.ts";
+  type DeliveryPlan as SessionDeliveryPlan,
+} from "../session/delivery_store.ts";
 import { type DeliveryPlan } from "./delivery.ts";
 import { type ErrorInfo, type RetryInfo } from "./error_info.ts";
 import { type RunEvent } from "./run_event.ts";
@@ -410,7 +411,8 @@ export class RunStore {
     message: string,
   ): void {
     if (
-      !run.conversationTurn || run.conversationTurnId === "" ||
+      !run.conversationTurn ||
+      run.conversationTurnId === "" ||
       run.sessionId === ""
     ) {
       return;

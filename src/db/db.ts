@@ -5,6 +5,7 @@
 // DAO. Only this package may open, configure, cache, or close the underlying
 // SQLite connection; table operations belong to src/dao.
 
+import { runtime } from "../platform/runtime.ts";
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue } from "node:sqlite";
 import * as path from "../compat/path.ts";
@@ -50,7 +51,7 @@ export const BUSY_TIMEOUT_MS = 10_000;
 
 /** SQLite `synchronous` mode for new connections. */
 function synchronousMode(): string {
-  const env = (Deno.env.get("OPENSAC_SQLITE_SYNCHRONOUS") ?? "").trim();
+  const env = (runtime.env.get("OPENSAC_SQLITE_SYNCHRONOUS") ?? "").trim();
   return env.toUpperCase() === "FULL" ? "FULL" : "NORMAL";
 }
 
@@ -157,10 +158,7 @@ export function openWithOptions(
  * Opens an uncached connection for callers that explicitly own its lifecycle,
  * such as offline integrity checks. Foreign key enforcement stays disabled.
  */
-export function openStandalone(
-  pathValue: string,
-  migrate?: Migrator,
-): DB {
+export function openStandalone(pathValue: string, migrate?: Migrator): DB {
   const canonical = canonicalPath(pathValue);
   return openRecovering(canonical, migrate, {});
 }
@@ -194,7 +192,7 @@ export function query<T>(
 /**
  * Runs a write operation in one transaction.
  *
- * The Go original took a `context.Context`; Deno is single-threaded, so the
+ * The Go original took a `context.Context`; Node is single-threaded, so the
  * callback runs synchronously and the transaction is committed on success.
  */
 export function write<T>(
@@ -329,9 +327,9 @@ function openRecovering(
     if (reason !== "") {
       failed.db.close();
       throw new Error(
-        `${
-          describe(failed.cause)
-        } (${reason}; the database was left untouched)`,
+        `${describe(
+          failed.cause,
+        )} (${reason}; the database was left untouched)`,
       );
     }
     let recovery: MigrationRecovery;
@@ -401,7 +399,7 @@ function openOnce(
   migrate: Migrator | undefined,
   opts: Options,
 ): DB {
-  Deno.mkdirSync(path.dirname(pathValue), { recursive: true, mode: 0o700 });
+  runtime.mkdirSync(path.dirname(pathValue), { recursive: true, mode: 0o700 });
   const raw = new DatabaseSync(pathValue);
   const connection = new DB(pathValue, raw);
   try {
@@ -461,22 +459,22 @@ function checkIntegrity(connection: DB, pathValue: string): void {
   } catch (err) {
     if (isSQLiteBusy(err)) {
       throw new Error(
-        `sqlite reported a stale index (${cause}) but the writer lock was unavailable for ${indexRepairBudget}ms, so it was not repaired: another process still holds the SQLite writer lock on ${pathValue}; stop it and retry: ${
-          describe(err)
-        }`,
+        `sqlite reported a stale index (${cause}) but the writer lock was unavailable for ${indexRepairBudget}ms, so it was not repaired: another process still holds the SQLite writer lock on ${pathValue}; stop it and retry: ${describe(
+          err,
+        )}`,
       );
     }
     if (isSQLiteReadOnly(err)) {
       throw new Error(
-        `sqlite reported a stale index (${cause}) but ${pathValue} is read-only, so it could not be repaired: ${
-          describe(err)
-        }`,
+        `sqlite reported a stale index (${cause}) but ${pathValue} is read-only, so it could not be repaired: ${describe(
+          err,
+        )}`,
       );
     }
     throw new Error(
-      `repair SQLite indexes after integrity check ${JSON.stringify(cause)}: ${
-        describe(err)
-      }`,
+      `repair SQLite indexes after integrity check ${JSON.stringify(cause)}: ${describe(
+        err,
+      )}`,
     );
   }
   const after = quickCheck(connection);

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertNotEquals } from "../compat/assert.ts";
 import {
   cachePath,
@@ -31,11 +32,11 @@ test("CompareVersions", () => {
 
 test("IsCheckable", () => {
   const cases: Record<string, boolean> = {
-    "dev": false,
+    dev: false,
     "": false,
     "v1.1.50": true,
     "1.1.50": true,
-    "unknown": false,
+    unknown: false,
   };
   for (const [v, want] of Object.entries(cases)) {
     assertEquals(isCheckable(v), want, `isCheckable(${v})`);
@@ -47,11 +48,11 @@ test("Normalize", () => {
 });
 
 test("CheckInBackgroundRespectsDisableFlag", () => {
-  const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("OPENSAC_DIR");
-  const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
-  Deno.env.set("OPENSAC_DIR", dir);
-  Deno.env.set("VIBECODING_NO_UPDATE_CHECK", "1");
+  const dir = runtime.makeTempDirSync();
+  const oldDir = runtime.env.get("OPENSAC_DIR");
+  const oldDisable = runtime.env.get("VIBECODING_NO_UPDATE_CHECK");
+  runtime.env.set("OPENSAC_DIR", dir);
+  runtime.env.set("VIBECODING_NO_UPDATE_CHECK", "1");
   try {
     let called = false;
     setFetchLatestVersion(() => {
@@ -67,11 +68,11 @@ test("CheckInBackgroundRespectsDisableFlag", () => {
 });
 
 test("CheckInBackgroundRecordsFailureCooldown", async () => {
-  const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("OPENSAC_DIR");
-  const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
-  Deno.env.set("OPENSAC_DIR", dir);
-  Deno.env.set("VIBECODING_NO_UPDATE_CHECK", "");
+  const dir = runtime.makeTempDirSync();
+  const oldDir = runtime.env.get("OPENSAC_DIR");
+  const oldDisable = runtime.env.get("VIBECODING_NO_UPDATE_CHECK");
+  runtime.env.set("OPENSAC_DIR", dir);
+  runtime.env.set("VIBECODING_NO_UPDATE_CHECK", "");
   try {
     const nowValue = new Date(1000 * 1000);
     setNow(() => nowValue);
@@ -93,11 +94,11 @@ test("CheckInBackgroundRecordsFailureCooldown", async () => {
 });
 
 test("RefreshCacheNotifiesForNewerSemver", async () => {
-  const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("OPENSAC_DIR");
-  const oldDisable = Deno.env.get("VIBECODING_NO_UPDATE_CHECK");
-  Deno.env.set("OPENSAC_DIR", dir);
-  Deno.env.set("VIBECODING_NO_UPDATE_CHECK", "");
+  const dir = runtime.makeTempDirSync();
+  const oldDir = runtime.env.get("OPENSAC_DIR");
+  const oldDisable = runtime.env.get("VIBECODING_NO_UPDATE_CHECK");
+  runtime.env.set("OPENSAC_DIR", dir);
+  runtime.env.set("VIBECODING_NO_UPDATE_CHECK", "");
   try {
     const nowValue = new Date(2000 * 1000);
     setNow(() => nowValue);
@@ -121,9 +122,9 @@ test("RefreshCacheNotifiesForNewerSemver", async () => {
 });
 
 test("RefreshCacheSkipsNotifyForCurrentOrOlderVersion", async () => {
-  const dir = Deno.makeTempDirSync();
-  const oldDir = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", dir);
+  const dir = runtime.makeTempDirSync();
+  const oldDir = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", dir);
   try {
     setFetchLatestVersion(() => Promise.resolve("v1.2.3"));
     let called = false;
@@ -143,6 +144,6 @@ test("RefreshCacheSkipsNotifyForCurrentOrOlderVersion", async () => {
 });
 
 function restoreEnv(key: string, value: string | undefined): void {
-  if (value === undefined) Deno.env.delete(key);
-  else Deno.env.set(key, value);
+  if (value === undefined) runtime.env.delete(key);
+  else runtime.env.set(key, value);
 }

@@ -1,5 +1,6 @@
 // (bwrap cases).
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   bwrapCapabilitiesComplete,
@@ -71,7 +72,7 @@ test("probeBwrapCapabilities real binary", () => {
 });
 
 test("bwrap args use complete isolation profile", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = nodeRuntime.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Standard, {
     tmpSize: "4096",
   });
@@ -82,22 +83,20 @@ test("bwrap args use complete isolation profile", () => {
     "hostname && ps",
   );
 
-  for (
-    const flag of [
-      "--unshare-user",
-      "--unshare-pid",
-      "--unshare-ipc",
-      "--unshare-uts",
-      "--new-session",
-      "--die-with-parent",
-      "--proc",
-      "--dev",
-      "--size",
-      "--tmpfs",
-      "--hostname",
-      "--chdir",
-    ]
-  ) {
+  for (const flag of [
+    "--unshare-user",
+    "--unshare-pid",
+    "--unshare-ipc",
+    "--unshare-uts",
+    "--new-session",
+    "--die-with-parent",
+    "--proc",
+    "--dev",
+    "--size",
+    "--tmpfs",
+    "--hostname",
+    "--chdir",
+  ]) {
     assert(indexArgs(args, flag) >= 0, `missing ${flag} in bwrap profile`);
   }
   assert(indexArgs(args, "--size", "4096", "--tmpfs", "/tmp") >= 0);
@@ -106,7 +105,7 @@ test("bwrap args use complete isolation profile", () => {
 });
 
 test("bwrap args do not rebind dev devices", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = nodeRuntime.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Standard, {
     allowedRead: ["/dev/null", "/dev/urandom", "/etc/ssl"],
   });
@@ -125,7 +124,7 @@ test("bwrap args do not rebind dev devices", () => {
 });
 
 test("bwrap normalizes human readable tmpSize", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = nodeRuntime.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Standard, {
     tmpSize: "100m",
   });
@@ -140,7 +139,7 @@ test("bwrap normalizes human readable tmpSize", () => {
 });
 
 test("bwrap args preserve host network", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = nodeRuntime.makeTempDirSync({ prefix: "sbx-" });
   const forOpts = (networkAccess: boolean) =>
     createBwrapSandbox(project, Level.Standard).buildBwrapArgs(
       {},
@@ -165,7 +164,7 @@ test("bwrap wrapCommand returns a command spec", () => {
 });
 
 test("bwrap strict level binds project read-only", () => {
-  const project = Deno.makeTempDirSync({ prefix: "sbx-" });
+  const project = nodeRuntime.makeTempDirSync({ prefix: "sbx-" });
   const sb = createBwrapSandbox(project, Level.Strict);
   const args = sb.buildBwrapArgs(
     sb.options,

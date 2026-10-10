@@ -14,10 +14,7 @@ export const errBodyBytes = 64 << 10;
 export const defaultMaxJSONBytes = 16 << 20;
 
 /** A minimal injectable HTTP client: a fetch function. */
-export type HttpClient = (
-  url: string,
-  init?: RequestInit,
-) => Promise<Response>;
+export type HttpClient = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** Builds a default fetch-based client when none is supplied. */
 export function createHTTPClient(client?: HttpClient): HttpClient {
@@ -85,9 +82,7 @@ export async function getWithStatus(
     return {
       status: response.status,
       body,
-      error: new Error(
-        `GET ${endpoint}: ${statusText(response)}: ${text}`,
-      ),
+      error: new Error(`GET ${endpoint}: ${statusText(response)}: ${text}`),
     };
   }
   const body = await readBodyLimited(response, maxBytes);

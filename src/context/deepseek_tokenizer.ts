@@ -5,6 +5,7 @@
 // runtime. The JSON is vendored under `src/context/tokenizerdata` and copied
 // beside the published bundle by `scripts/build_node.ts`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { resourceUrl } from "../platform/resources.ts";
 
 /** DeepSeek V3 applies regex splitting before byte-level BPE. */
@@ -76,7 +77,7 @@ function loadDeepSeekTokenizer(): DeepSeekTokenizer | null {
   if (deepSeekTok !== undefined) return deepSeekTok;
   let file: DeepSeekTokenizerFile;
   try {
-    const data = Deno.readTextFileSync(tokenizerDataURL());
+    const data = nodeRuntime.readTextFileSync(tokenizerDataURL());
     file = JSON.parse(data) as DeepSeekTokenizerFile;
   } catch {
     deepSeekTok = null;
@@ -318,17 +319,19 @@ function deepSeekBPEMerge(tok: DeepSeekTokenizer, symbols: string[]): string[] {
 function deepSeekByteToRune(b: number): number {
   // bytes that already have a printable representation
   if (
-    (b >= 0x21 && b <= 0x7e) || (b >= 0xa1 && b <= 0xac) ||
+    (b >= 0x21 && b <= 0x7e) ||
+    (b >= 0xa1 && b <= 0xac) ||
     (b >= 0xae && b <= 0xff)
   ) {
     return b;
   }
   let n = 0;
   for (let i = 0; i < b; i++) {
-    if (
-      !((i >= 0x21 && i <= 0x7e) || (i >= 0xa1 && i <= 0xac) ||
-        (i >= 0xae && i <= 0xff))
-    ) {
+    if (!(
+      (i >= 0x21 && i <= 0x7e) ||
+      (i >= 0xa1 && i <= 0xac) ||
+      (i >= 0xae && i <= 0xff)
+    )) {
       n++;
     }
   }

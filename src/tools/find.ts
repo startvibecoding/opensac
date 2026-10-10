@@ -6,6 +6,8 @@
 // lexicographically. This is registered as a deliberate deviation from the
 // external SDK dependency.
 
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { compileGeneratedRegExp } from "../util/regex.ts";
 import { globToRegex } from "./globset.ts";
@@ -72,9 +74,10 @@ export class FindTool implements Tool {
     _ctx: ToolContext,
     params: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const pattern = typeof params["pattern"] === "string"
-      ? params["pattern"] as string
-      : "";
+    const pattern =
+      typeof params["pattern"] === "string"
+        ? (params["pattern"] as string)
+        : "";
     if (pattern === "") {
       throw new Error("pattern is required");
     }
@@ -89,7 +92,7 @@ export class FindTool implements Tool {
       }
     }
     try {
-      Deno.statSync(searchPath);
+      runtime.statSync(searchPath);
     } catch (err) {
       throw new Error(`invalid path: ${messageOf(err)}`);
     }
@@ -152,9 +155,9 @@ async function walk(
   }
   stack.push(dir);
 
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
-    entries = [...Deno.readDirSync(dir)];
+    entries = [...runtime.readDirSync(dir)];
   } catch {
     return;
   }

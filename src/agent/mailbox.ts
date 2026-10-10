@@ -87,7 +87,7 @@ export class MemberMailbox {
     this.activityPending = false;
     if (pending.length === 0) return null;
     return pending.map((c) =>
-      createSystemInjectedUserMessage(formatMemberItem(c))
+      createSystemInjectedUserMessage(formatMemberItem(c)),
     );
   }
 
@@ -173,11 +173,11 @@ function formatMemberQuestion(c: MemberCompletion): string {
   if (c.options.length > 0) {
     b += `options: ${c.options.join(" | ")}\n`;
   }
-  b += `下一步：用 subagent_answer(handle:${
-    JSON.stringify(c.memberId)
-  }, question_id:${
-    JSON.stringify(c.questionId)
-  }, answer:"…") 回答；成员会继续执行。`;
+  b += `下一步：用 subagent_answer(handle:${JSON.stringify(
+    c.memberId,
+  )}, question_id:${JSON.stringify(
+    c.questionId,
+  )}, answer:"…") 回答；成员会继续执行。`;
   return b;
 }
 
@@ -194,9 +194,9 @@ function formatMemberCompletion(c: MemberCompletion): string {
   if (c.status === MEMBER_STATUS_ERROR) {
     b += truncateMemberPayload(c.payload, memberErrorPayloadRunes);
     b += "\n";
-    b += `下一步：如仍需该成员，用 subagent_spawn(member:${
-      JSON.stringify(c.memberId)
-    }, task:…) 重新派发任务。`;
+    b += `下一步：如仍需该成员，用 subagent_spawn(member:${JSON.stringify(
+      c.memberId,
+    )}, task:…) 重新派发任务。`;
   } else {
     b += truncateMemberPayload(c.payload, memberPayloadRunes);
   }

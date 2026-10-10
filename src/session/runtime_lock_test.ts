@@ -3,6 +3,7 @@
 // Manager is replaced with direct DAO session/Run persistence so the portable
 // lease surface can be exercised on its own.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { closeAll } from "../db/mod.ts";
@@ -84,7 +85,7 @@ function makeRun(
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 test("released lease leaves a fencing tombstone", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-tombstone");
     const releaseOld = tryLockRuntime(sessionDir, "lease-tombstone");
@@ -106,7 +107,7 @@ test("released lease leaves a fencing tombstone", () => {
 });
 
 test("admission requires an existing idle session", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "admission-idle");
     const guard = acquireExecutionAdmission(sessionDir, "admission-idle");
@@ -127,7 +128,7 @@ test("admission requires an existing idle session", () => {
 });
 
 test("admission requires recovery for an active run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "admission-active");
     makeRun(sessionDir, "admission-active", "run-active", "running");
@@ -150,7 +151,7 @@ test("admission requires recovery for an active run", () => {
 });
 
 test("recovery binds the expected active run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "recovery-bind");
     makeRun(sessionDir, "recovery-bind", "run-recovery", "running");
@@ -174,7 +175,7 @@ test("recovery binds the expected active run", () => {
 });
 
 test("recovery requires an active run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "recovery-idle");
     assertThrows(
@@ -187,7 +188,7 @@ test("recovery requires an active run", () => {
 });
 
 test("multi-mutation releases earlier sessions on conflict", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "mutation-a");
     makeSession(sessionDir, "mutation-b");
@@ -207,7 +208,7 @@ test("multi-mutation releases earlier sessions on conflict", () => {
 });
 
 test("an unexpired lease blocks a competing process", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-busy");
     const db = openRootDB(sessionDir);
@@ -235,7 +236,7 @@ test("an unexpired lease blocks a competing process", () => {
 });
 
 test("an expired lease is reclaimed with a fencing epoch bump", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "lease-expired");
     const db = openRootDB(sessionDir);
@@ -274,7 +275,7 @@ test("an expired lease is reclaimed with a fencing epoch bump", () => {
 });
 
 test("heartbeat batch renews survivors and marks displaced leases lost", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "hb-batch-1");
     makeSession(sessionDir, "hb-batch-2");
@@ -288,8 +289,8 @@ test("heartbeat batch renews survivors and marks displaced leases lost", async (
       scheduler!.stop();
 
       const db = openRootDB(sessionDir);
-      const beforeA = new RuntimeLeaseDAO(db.db).find(db.db!, "hb-batch-1")
-        ?.heartbeatAt ?? 0;
+      const beforeA =
+        new RuntimeLeaseDAO(db.db).find(db.db!, "hb-batch-1")?.heartbeatAt ?? 0;
       // Bump B's epoch to simulate another process taking over.
       db.db!.run(
         "UPDATE session_runtime_leases SET epoch = epoch + 1 WHERE session_id = ?",
@@ -299,8 +300,8 @@ test("heartbeat batch renews survivors and marks displaced leases lost", async (
       await scheduler!.renew(snapshotRuntimeLeasesForDir(dirKey));
 
       assert(guardB.lost()?.aborted, "displaced lease B must be marked lost");
-      const afterA = new RuntimeLeaseDAO(db.db).find(db.db!, "hb-batch-1")
-        ?.heartbeatAt ?? 0;
+      const afterA =
+        new RuntimeLeaseDAO(db.db).find(db.db!, "hb-batch-1")?.heartbeatAt ?? 0;
       assert(afterA >= beforeA, "surviving lease A must stay renewable");
     } finally {
       guardA.release();
@@ -312,7 +313,7 @@ test("heartbeat batch renews survivors and marks displaced leases lost", async (
 });
 
 test("retire keeps a live lease and stops only for an empty directory", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   try {
     makeSession(sessionDir, "retire-race");
     const dirKey = leaseDirKey(sessionDir);
@@ -341,7 +342,7 @@ test("retire keeps a live lease and stops only for an empty directory", () => {
 });
 
 test("a transient renewal error never marks the lease lost", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   const originalBudget = runtimeHeartbeatTiming.retryBudgetMs;
   try {
     makeSession(sessionDir, "renew-stall");
@@ -358,7 +359,7 @@ test("a transient renewal error never marks the lease lost", async () => {
         "renew-stall",
       );
       const blocked = path.join(sessionDir, "blocked-dir");
-      Deno.writeTextFileSync(blocked, "not a directory");
+      nodeRuntime.writeTextFileSync(blocked, "not a directory");
       runtimeHeartbeatTiming.retryBudgetMs = 600;
 
       const scheduler = new LeaseHeartbeatScheduler(blocked);
@@ -377,7 +378,7 @@ test("a transient renewal error never marks the lease lost", async () => {
 });
 
 test("renewal recovers after repeated timeout ticks", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   const originalBudget = runtimeHeartbeatTiming.retryBudgetMs;
   try {
     makeSession(sessionDir, "renew-recover");
@@ -391,7 +392,7 @@ test("renewal recovers after repeated timeout ticks", async () => {
         "renew-recover",
       );
       const blocked = path.join(sessionDir, "blocked-dir");
-      Deno.writeTextFileSync(blocked, "not a directory");
+      nodeRuntime.writeTextFileSync(blocked, "not a directory");
       runtimeHeartbeatTiming.retryBudgetMs = 400;
 
       const timedOut = new LeaseHeartbeatScheduler(blocked);
@@ -420,7 +421,7 @@ test("renewal recovers after repeated timeout ticks", async () => {
 });
 
 test("a slow renew batch never overlaps the next tick", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-lease-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-lease-" });
   const originalEvery = runtimeHeartbeatTiming.everyMs;
   try {
     makeSession(sessionDir, "hb-overlap");
@@ -444,7 +445,7 @@ test("a slow renew batch never overlaps the next tick", async () => {
           setTimeout(() => {
             inFlight--;
             resolve();
-          }, 60)
+          }, 60),
         );
       };
       runtimeHeartbeatTiming.everyMs = 10;
@@ -471,26 +472,19 @@ test("a slow renew batch never overlaps the next tick", async () => {
   }
 });
 
-test(
-  "runtime lease guard releases the process-local lock when the durable release throws",
-  () => {
-    let unlocked = false;
-    const lease = {
-      release(): void {
-        throw new Error("durable lease release failed");
-      },
-    } as unknown as ConstructorParameters<typeof RuntimeLeaseGuard>[0];
-    const guard = new RuntimeLeaseGuard(lease, () => {
-      unlocked = true;
-    });
-    assertThrows(
-      () => guard.release(),
-      Error,
-      "durable lease release failed",
-    );
-    assert(
-      unlocked,
-      "the process-local lock must be freed even when the durable release fails",
-    );
-  },
-);
+test("runtime lease guard releases the process-local lock when the durable release throws", () => {
+  let unlocked = false;
+  const lease = {
+    release(): void {
+      throw new Error("durable lease release failed");
+    },
+  } as unknown as ConstructorParameters<typeof RuntimeLeaseGuard>[0];
+  const guard = new RuntimeLeaseGuard(lease, () => {
+    unlocked = true;
+  });
+  assertThrows(() => guard.release(), Error, "durable lease release failed");
+  assert(
+    unlocked,
+    "the process-local lock must be freed even when the durable release fails",
+  );
+});

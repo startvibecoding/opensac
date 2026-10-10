@@ -2,7 +2,7 @@
 // AgentManager owns the lifecycle of every agent instance: registration,
 // creation (with parent validation and sub-agent policy enforcement), status
 // tracking, child bookkeeping, cancellation, and destruction. Go's
-// `sync.RWMutex` is dropped (Deno is single-threaded), `context.CancelFunc`
+// `sync.RWMutex` is dropped (Node is single-threaded), `context.CancelFunc`
 // maps to a `() => void`, and `time.Time` maps to `Date`.
 //
 // The manager is a plain class whose public fields (`members`, `mailbox`,
@@ -50,7 +50,7 @@ export interface ManagedAgentStatus {
 
 /**
  * Observes lifecycle transitions of managed agents. It is invoked after the
- * manager lock is released (a no-op here, since Deno is single-threaded), so
+ * manager lock is released (a no-op here, since Node is single-threaded), so
  * listeners may call back into the manager safely.
  */
 export type AgentStatusListener = (status: ManagedAgentStatus) => void;
@@ -265,10 +265,10 @@ export class AgentManager {
     this.agents.set(id, a);
     if ((opts.parentId ?? "") !== "") {
       this.parentOf.set(id, opts.parentId!);
-      this.children.set(
-        opts.parentId!,
-        [...(this.children.get(opts.parentId!) ?? []), id],
-      );
+      this.children.set(opts.parentId!, [
+        ...(this.children.get(opts.parentId!) ?? []),
+        id,
+      ]);
     }
     const now = new Date();
     this.statuses.set(id, {

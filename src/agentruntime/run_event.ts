@@ -54,10 +54,7 @@ export interface RunEventProjector {
  * Ensures a terminal event payload carries the assistant transcript entry ID
  * under the canonical key without clobbering an existing adapter value.
  */
-export function withAssistantEntryData(
-  raw: unknown,
-  entryId: string,
-): unknown {
+export function withAssistantEntryData(raw: unknown, entryId: string): unknown {
   if (entryId === "") return raw;
   const data = asObject(raw);
   if (data === undefined) return raw;
@@ -78,25 +75,20 @@ export class SessionRunEventSink implements RunEventSink {
 
   record(ev: RunEvent): string {
     if (ev.sessionId === "" || ev.runId === "" || ev.eventType === "") {
-      throw new Error(
-        "run event requires session ID, run ID, and event type",
-      );
+      throw new Error("run event requires session ID, run ID, and event type");
     }
-    return saveSessionRunEvent(
-      this.sessionDir,
-      {
-        id: ev.id ?? "",
-        sessionId: ev.sessionId,
-        runId: ev.runId,
-        eventType: ev.eventType,
-        source: ev.source,
-        status: ev.status,
-        model: ev.model,
-        mode: ev.mode,
-        timestamp: ev.timestamp ?? new Date(),
-        data: ev.data,
-      } satisfies SessionRunEvent,
-    );
+    return saveSessionRunEvent(this.sessionDir, {
+      id: ev.id ?? "",
+      sessionId: ev.sessionId,
+      runId: ev.runId,
+      eventType: ev.eventType,
+      source: ev.source,
+      status: ev.status,
+      model: ev.model,
+      mode: ev.mode,
+      timestamp: ev.timestamp ?? new Date(),
+      data: ev.data,
+    } satisfies SessionRunEvent);
   }
 
   recordJSON(
@@ -155,10 +147,7 @@ export function withRunAttemptData(
  * `ErrorInfo` persisted on the Run row. Malformed adapter data is discarded
  * instead of retaining a possible raw provider diagnostic.
  */
-export function withTerminalErrorInfo(
-  raw: unknown,
-  info: ErrorInfo,
-): unknown {
+export function withTerminalErrorInfo(raw: unknown, info: ErrorInfo): unknown {
   const data = asObject(raw) ?? {};
   data.error = info;
   data.errorInfo = info;
@@ -175,7 +164,9 @@ function asObject(raw: unknown): Record<string, unknown> | undefined {
     try {
       const parsed = JSON.parse(raw);
       if (
-        parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        parsed !== null &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed)
       ) {
         return parsed as Record<string, unknown>;
       }

@@ -3,7 +3,8 @@
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   type ExternalTool,
-  type ExternalToolPromptInfo} from "../../sdk/agent/external_tool.ts";
+  type ExternalToolPromptInfo,
+} from "../../sdk/agent/external_tool.ts";
 import { createExternalToolAdapter } from "./external_tool_adapter.ts";
 import { test } from "#testing";
 

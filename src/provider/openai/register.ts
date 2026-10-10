@@ -1,6 +1,7 @@
 import {
   type ModelCompat as ConfigModelCompat,
-  type ProviderConfig} from "../../config/mod.ts";
+  type ProviderConfig,
+} from "../../config/mod.ts";
 import { modelMaxTokensWasSet } from "../../config/mod.ts";
 import { register } from "../registry.ts";
 import { type Model, type ModelCompat, type ModelPricing } from "../types.ts";
@@ -74,9 +75,8 @@ export function convertCompat(
     supportsParallelToolCalls: cloneBool(c.supportsParallelToolCalls),
     supportsToolChoice: cloneBool(c.supportsToolChoice),
     supportsHostedTools: cloneBoolMap(c.supportsHostedTools),
-    supportedInclude: c.supportedInclude === undefined
-      ? undefined
-      : [...c.supportedInclude],
+    supportedInclude:
+      c.supportedInclude === undefined ? undefined : [...c.supportedInclude],
     supportsReasoningEffort: cloneBool(c.supportsReasoningEffort),
     supportsStrictMode: cloneBool(c.supportsStrictMode),
     maxTokensField: c.maxTokensField,

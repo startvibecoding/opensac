@@ -1,5 +1,6 @@
 // Tests for the bounded user-pattern matching worker (regex_match.ts).
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -78,10 +79,7 @@ test("UserRegExpMatcher times out a catastrophic pattern instead of hanging", as
   const lines = ["a".repeat(40) + "!"];
   try {
     const started = performance.now();
-    await assertRejects(
-      () => matcher.match(lines),
-      RegExpMatchTimeoutError,
-    );
+    await assertRejects(() => matcher.match(lines), RegExpMatchTimeoutError);
     const elapsed = performance.now() - started;
     assert(elapsed < 3000, `timeout must fire quickly, took ${elapsed}ms`);
   } finally {
@@ -119,11 +117,7 @@ test("UserRegExpMatcher aborts an in-flight match via the signal", async () => {
 test("UserRegExpMatcher reports invalid patterns like compileUserRegExp", async () => {
   const matcher = createUserRegExpMatcher("(unclosed", "");
   try {
-    await assertRejects(
-      () => matcher.match(["abc"]),
-      Error,
-      "invalid regex",
-    );
+    await assertRejects(() => matcher.match(["abc"]), Error, "invalid regex");
   } finally {
     matcher.close();
   }
@@ -142,7 +136,7 @@ test("UserRegExpMatcher default budget constant stays positive", () => {
 });
 
 test("inlined regex worker source stays in sync with regex_worker.js", async () => {
-  const onDisk = await Deno.readTextFile(
+  const onDisk = await runtime.readTextFile(
     new URL("./regex_worker.js", import.meta.url),
   );
   assertEquals(regexWorkerSource, onDisk);

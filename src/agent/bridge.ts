@@ -349,9 +349,8 @@ export function eventToPublic(e: Event): PublicEvent {
     textDelta: e.textDelta,
     thinkDelta: e.thinkDelta,
     hostedItem: hostedItemToPublic(e.hostedItem),
-    toolCall: e.toolCall === undefined
-      ? undefined
-      : toolCallBlockToPublic(e.toolCall),
+    toolCall:
+      e.toolCall === undefined ? undefined : toolCallBlockToPublic(e.toolCall),
     toolCallId: e.toolCallId,
     toolName: e.toolName,
     toolArgs: e.toolArgs,
@@ -706,7 +705,7 @@ function modelCompatToPublic(c: InternalModelCompat): PublicModelCompat {
  * implementation through the shared runtime.
  */
 export class PublicProviderAdapter implements PublicProvider {
-    private readonly inner: InternalProvider;
+  private readonly inner: InternalProvider;
 
   constructor(inner: InternalProvider) {
     this.inner = inner;
@@ -813,7 +812,10 @@ export class ProviderAdapter extends BaseProvider implements InternalProvider {
   private readonly pub: PublicProvider;
 
   constructor(pub: PublicProvider) {
-    super(pub.name(), pub.models().map((m) => modelInfoToInternal(m)));
+    super(
+      pub.name(),
+      pub.models().map((m) => modelInfoToInternal(m)),
+    );
     this.pub = pub;
   }
 

@@ -1,3 +1,5 @@
+import { runtime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { projectSkillDirs } from "../skills/skills.ts";
 import { createMemoryCache, MemoryCache } from "./cache.ts";
@@ -21,7 +23,8 @@ import {
   type SkillDetail,
   type SkillId,
   type SkillSummary,
-  type UserSkillsQuery} from "./types.ts";
+  type UserSkillsQuery,
+} from "./types.ts";
 
 /** Re-exported installer request/result types. */
 export type { InstallRequest, InstallResult };
@@ -39,10 +42,13 @@ export class Service {
     officialHandles: string[],
     ...clients: MarketClient[]
   ) {
-    const resolved = clients.length > 0 ? clients : [
-      createSkillHubClient("", undefined),
-      createClawHubClient("", undefined),
-    ];
+    const resolved =
+      clients.length > 0
+        ? clients
+        : [
+            createSkillHubClient("", undefined),
+            createClawHubClient("", undefined),
+          ];
     for (const client of resolved) {
       if (client) this.clients.set(client.market().id, client);
     }
@@ -156,7 +162,7 @@ export class Service {
     const allItems: SkillSummary[] = [];
     const seen = new Set<string>();
     for (const handle of this.officialHandles) {
-      for (let remotePage = 1;; remotePage++) {
+      for (let remotePage = 1; ; remotePage++) {
         const page = await client.userSkills(signal, handle, {
           query: query.query,
           limit: 100,
@@ -209,9 +215,9 @@ export class Service {
       }
       if (target !== path.resolve(path.normalize(this.globalDir))) {
         throw new Error(
-          `global scope requires target directory ${
-            JSON.stringify(this.globalDir)
-          }`,
+          `global scope requires target directory ${JSON.stringify(
+            this.globalDir,
+          )}`,
         );
       }
       return;
@@ -220,9 +226,9 @@ export class Service {
       if (target === path.resolve(path.normalize(root))) return;
     }
     throw new Error(
-      `target directory ${
-        JSON.stringify(targetDir)
-      } is not a configured project skills directory`,
+      `target directory ${JSON.stringify(
+        targetDir,
+      )} is not a configured project skills directory`,
     );
   }
 
@@ -251,16 +257,16 @@ export class Service {
       );
     }
     this.validateSkillDir(state.dir);
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = Deno.lstatSync(state.dir);
+      info = runtime.lstatSync(state.dir);
     } catch (error) {
       throw error;
     }
     if (info.isSymlink) {
       throw new Error("refusing to uninstall a symbolic link");
     }
-    Deno.removeSync(state.dir, { recursive: true });
+    runtime.removeSync(state.dir, { recursive: true });
     this.cache.clear();
   }
 
@@ -271,16 +277,18 @@ export class Service {
     for (const root of roots) {
       const rel = path.relative(path.resolve(path.normalize(root)), target);
       if (
-        rel !== "" && rel !== "." && rel !== ".." &&
+        rel !== "" &&
+        rel !== "." &&
+        rel !== ".." &&
         !rel.startsWith(".." + path.SEPARATOR)
       ) {
         return;
       }
     }
     throw new Error(
-      `skill directory ${
-        JSON.stringify(dir)
-      } is outside configured skills directories`,
+      `skill directory ${JSON.stringify(
+        dir,
+      )} is outside configured skills directories`,
     );
   }
 

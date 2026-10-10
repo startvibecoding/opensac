@@ -1,5 +1,5 @@
 //
-// Go embeds builtin/* with go:embed. Deno has no equivalent embed API, so the
+// Go embeds builtin/* with go:embed. Node has no equivalent embed API, so the
 // built-in SKILL.md files are inlined into `builtin_content.ts` (generated from
 // src/skills/builtin) and served through an in-memory SkillFS. The content
 // mirrors that directory; regenerate it whenever the builtin skills change.

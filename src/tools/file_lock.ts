@@ -1,7 +1,7 @@
 //
 // Coordinates in-process writes to individual files. It deliberately supports
 // acquiring only one file at a time. Go's `context.Context` maps to an
-// `AbortSignal`; the `sync.Mutex` is dropped (Deno is single-threaded) and
+// `AbortSignal`; the `sync.Mutex` is dropped (Node is single-threaded) and
 // replaced with a promise-based per-path waiter queue.
 
 interface HeldLock {
@@ -47,9 +47,9 @@ export class FileLockManager {
       } catch (err) {
         if (err instanceof AbortError) {
           throw new Error(
-            `wait for file lock ${p} held by ${currentOwner} since ${
-              new Date(acquiredAt).toISOString()
-            }: ${err.message}`,
+            `wait for file lock ${p} held by ${currentOwner} since ${new Date(
+              acquiredAt,
+            ).toISOString()}: ${err.message}`,
           );
         }
         throw err;

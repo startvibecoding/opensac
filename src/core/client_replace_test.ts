@@ -4,6 +4,7 @@
 // fixtures, and the behavior they cover (stopping a Core the client cannot
 // talk to) is a distinct policy from ordinary startup.
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertRejects } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CorePaths } from "./paths.ts";
@@ -52,7 +53,7 @@ function registration(
     id: "core-foreign",
     version: FOREIGN_VERSION,
     protocolVersion: TEST_PROTOCOL_VERSION,
-    pid: Deno.pid,
+    pid: runtime.pid,
     host: "127.0.0.1",
     port,
     startedAt: 1_700_000_000_000,
@@ -63,11 +64,13 @@ function registration(
 async function withStateDir(
   test: (stateDir: string, paths: CorePaths) => Promise<void>,
 ): Promise<void> {
-  const stateDir = await Deno.makeTempDir({ prefix: "opensac-core-replace-" });
+  const stateDir = await runtime.makeTempDir({
+    prefix: "opensac-core-replace-",
+  });
   try {
     await test(stateDir, CorePaths.fromStateDir(stateDir));
   } finally {
-    await Deno.remove(stateDir, { recursive: true });
+    await runtime.remove(stateDir, { recursive: true });
   }
 }
 
@@ -151,9 +154,7 @@ test("ensureStarted replaces an incompatible Core when asked", async () => {
         assertEquals(shutdownCalls, 1);
         assertEquals(
           started.status === "ready" &&
-            started.url.includes(
-              String(replacement?.address.port),
-            ),
+            started.url.includes(String(replacement?.address.port)),
           true,
           "the client must not report the replaced endpoint as ready",
         );

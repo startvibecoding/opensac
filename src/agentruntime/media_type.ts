@@ -7,6 +7,7 @@
 // Deviation: `[]byte` maps to `Uint8Array`; the signature table is expressed as
 // plain objects instead of Go's `sniffSig` interface.
 
+import { runtime } from "../platform/runtime.ts";
 const sniffLen = 512;
 
 /** Whether a byte is a whitespace byte (0xWS) per the MIME sniffing spec. */
@@ -271,7 +272,9 @@ function matchSignature(
       for (let i = firstNonWS; i < data.length; i++) {
         const b = data[i];
         if (
-          b <= 0x08 || b === 0x0b || (0x0e <= b && b <= 0x1a) ||
+          b <= 0x08 ||
+          b === 0x0b ||
+          (0x0e <= b && b <= 0x1a) ||
           (0x1c <= b && b <= 0x1f)
         ) {
           return "";
@@ -287,7 +290,7 @@ function matchSignature(
  * `detectAttachmentMediaType`.
  */
 export async function detectAttachmentMediaType(path: string): Promise<string> {
-  const file = await Deno.open(path, { read: true });
+  const file = await runtime.open(path, { read: true });
   try {
     const buf = new Uint8Array(512);
     const n = await file.read(buf);

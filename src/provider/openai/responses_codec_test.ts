@@ -1,3 +1,4 @@
+import { runtime } from "../../platform/runtime.ts";
 import { assert, assertEquals } from "../../compat/assert.ts";
 import {
   createResponsesNormalizer,
@@ -11,13 +12,14 @@ import { type ResponsesSSEEvent } from "./responses.ts";
 import { test } from "#testing";
 
 function readResponsesFixture(name: string): string {
-  return Deno.readTextFileSync(
+  return runtime.readTextFileSync(
     new URL(`./testdata/responses/${name}`, import.meta.url),
   );
 }
 
 test("DecodeResponsesSSESupportsFieldsMultilineDataAndDone", async () => {
-  const input = "event: response.output_text.delta\r\n" +
+  const input =
+    "event: response.output_text.delta\r\n" +
     "id: evt_1\r\n" +
     'data: {"type":"response.output_text.delta",\r\n' +
     'data: "delta":"hello"}\r\n' +
@@ -44,7 +46,8 @@ test("DecodeResponsesSSESupportsFieldsMultilineDataAndDone", async () => {
 });
 
 test("DecodeResponsesSSEAcceptsLineDelimitedGatewayEvents", async () => {
-  const input = 'data: {"type":"response.created"}\n' +
+  const input =
+    'data: {"type":"response.created"}\n' +
     'data: {"type":"response.completed","response":{"status":"completed"}}\n' +
     "data: [DONE]\n";
   const types: string[] = [];
@@ -96,8 +99,7 @@ test("ResponsesProtocolFixtures", async (t) => {
   });
 
   await t.step("annotation without URL retains provenance", () => {
-    const raw =
-      `{"id":"msg_1","type":"message","status":"completed","content":[{"type":"output_text","text":"see source","annotations":[{"type":"url_citation","title":"Source","start_index":4,"end_index":10}]}]}`;
+    const raw = `{"id":"msg_1","type":"message","status":"completed","content":[{"type":"output_text","text":"see source","annotations":[{"type":"url_citation","title":"Source","start_index":4,"end_index":10}]}]}`;
     const item = decodeResponsesOutputItem(raw, 0);
     assert(item !== undefined);
     const n = createResponsesNormalizer();
@@ -210,10 +212,7 @@ test("ResponsesNormalizerInterleavesFunctionArgumentsByItemIdentity", () => {
     },
   ];
   for (const event of events) {
-    assertEquals(
-      n.apply(event, `{"type":"${event.type}"}`),
-      undefined,
-    );
+    assertEquals(n.apply(event, `{"type":"${event.type}"}`), undefined);
   }
   const calls = n.toolCalls();
   assertEquals(calls.length, 2);
@@ -299,8 +298,7 @@ test("ResponsesNormalizerPreservesUnknownItemWithSanitizedCanonicalJSON", () => 
     output_index: 3,
     item: { id: "future_1", type: "future_item", status: "completed" },
   };
-  const raw =
-    `{"type":"response.output_item.done","output_index":3,"item":{"id":"future_1","type":"future_item","secret":"do-not-store"}}`;
+  const raw = `{"type":"response.output_item.done","output_index":3,"item":{"id":"future_1","type":"future_item","secret":"do-not-store"}}`;
   assertEquals(n.apply(event, raw), undefined);
   assertEquals(n.response.unknownItems, 1);
   assertEquals(n.response.items.length, 1);
@@ -338,8 +336,7 @@ test("ResponsesNormalizerRejectsComputerUseItem", () => {
     output_index: 0,
     item: { id: "computer_1", type: "computer_call", status: "completed" },
   };
-  const raw =
-    `{"type":"response.output_item.done","item":{"id":"computer_1","type":"computer_call","action":{"type":"screenshot","secret":"redact-me"}}}`;
+  const raw = `{"type":"response.output_item.done","item":{"id":"computer_1","type":"computer_call","action":{"type":"screenshot","secret":"redact-me"}}}`;
   assertEquals(n.apply(event, raw), undefined);
   const err = n.unsupportedError();
   assert(err !== undefined);
@@ -359,8 +356,7 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
         output_index: 0,
         item: { id: "msg_1", type: "message", status: "completed" },
       },
-      raw:
-        `{"type":"response.output_item.done","output_index":0,"item":{"id":"msg_1","type":"message","status":"completed","content":[{"type":"output_text","annotations":[{"type":"url_citation","title":"OpenAI","url":"https://openai.com","start_index":2,"end_index":8}]}]}}`,
+      raw: `{"type":"response.output_item.done","output_index":0,"item":{"id":"msg_1","type":"message","status":"completed","content":[{"type":"output_text","annotations":[{"type":"url_citation","title":"OpenAI","url":"https://openai.com","start_index":2,"end_index":8}]}]}}`,
     },
     {
       event: {
@@ -372,8 +368,7 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
           status: "completed",
         },
       },
-      raw:
-        `{"type":"response.output_item.done","output_index":1,"item":{"id":"file_1","type":"code_interpreter_call","status":"completed","container_id":"container_123","result":{"type":"container_file_citation","file_id":"file_123","filename":"report.csv"}}}`,
+      raw: `{"type":"response.output_item.done","output_index":1,"item":{"id":"file_1","type":"code_interpreter_call","status":"completed","container_id":"container_123","result":{"type":"container_file_citation","file_id":"file_123","filename":"report.csv"}}}`,
     },
     {
       event: {
@@ -381,8 +376,7 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
         output_index: 2,
         item: { id: "mcp_1", type: "mcp_call" },
       },
-      raw:
-        `{"type":"response.output_item.done","output_index":2,"item":{"id":"mcp_1","type":"mcp_call","server_url":"https://private.example/mcp","result":{"type":"image","url":"https://untrusted.example/payload.png"}}}`,
+      raw: `{"type":"response.output_item.done","output_index":2,"item":{"id":"mcp_1","type":"mcp_call","server_url":"https://private.example/mcp","result":{"type":"image","url":"https://untrusted.example/payload.png"}}}`,
     },
     {
       event: {
@@ -390,8 +384,7 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
         output_index: 3,
         item: { id: "image_1", type: "image_generation_call" },
       },
-      raw:
-        `{"type":"response.output_item.done","output_index":3,"item":{"id":"image_1","type":"image_generation_call","result":"aW1n"}}`,
+      raw: `{"type":"response.output_item.done","output_index":3,"item":{"id":"image_1","type":"image_generation_call","result":"aW1n"}}`,
     },
     {
       event: {
@@ -399,8 +392,7 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
         output_index: 4,
         item: { id: "search_1", type: "file_search_call", status: "completed" },
       },
-      raw:
-        `{"type":"response.output_item.done","output_index":4,"item":{"id":"search_1","type":"file_search_call","status":"completed","results":[{"file_id":"file_search_1","filename":"guide.md","score":0.92,"text":"matching content"}]}}`,
+      raw: `{"type":"response.output_item.done","output_index":4,"item":{"id":"search_1","type":"file_search_call","status":"completed","results":[{"file_id":"file_search_1","filename":"guide.md","score":0.92,"text":"matching content"}]}}`,
     },
     {
       event: {
@@ -408,8 +400,7 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
         output_index: 5,
         item: { id: "unsafe_1", type: "message", status: "completed" },
       },
-      raw:
-        `{"type":"response.output_item.done","output_index":5,"item":{"id":"unsafe_1","type":"message","status":"completed","content":[{"type":"output_text","annotations":[{"type":"url_citation","title":"unsafe","url":"javascript:alert(1)"}]}]}}`,
+      raw: `{"type":"response.output_item.done","output_index":5,"item":{"id":"unsafe_1","type":"message","status":"completed","content":[{"type":"output_text","annotations":[{"type":"url_citation","title":"unsafe","url":"javascript:alert(1)"}]}]}}`,
     },
   ];
   for (const entry of events) {
@@ -445,16 +436,14 @@ test("ResponsesNormalizerExtractsSafeHostedToolAttachments", () => {
 });
 
 test("SafeResponsesAttachmentURLRejectsPrivateTargets", () => {
-  for (
-    const raw of [
-      "https://localhost/file",
-      "https://api.localhost/file",
-      "https://127.0.0.1/file",
-      "https://10.0.0.1/file",
-      "https://[::1]/file",
-      "https://[fe80::1]/file",
-    ]
-  ) {
+  for (const raw of [
+    "https://localhost/file",
+    "https://api.localhost/file",
+    "https://127.0.0.1/file",
+    "https://10.0.0.1/file",
+    "https://[::1]/file",
+    "https://[fe80::1]/file",
+  ]) {
     assertEquals(safeResponsesAttachmentURL(raw), "");
   }
   assertEquals(

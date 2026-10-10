@@ -78,9 +78,7 @@ test("ParseScheduleFiveFields", () => {
 });
 
 test("ParseScheduleRejectsInvalidCronFields", () => {
-  for (
-    const expr of ["0 99 * * *", "0 9 32 * *", "0 9 * 13 *", "0 9 * * 8"]
-  ) {
+  for (const expr of ["0 99 * * *", "0 9 32 * *", "0 9 * 13 *", "0 9 * * 8"]) {
     assertThrows(
       () => parseSchedule(expr, new Date()),
       Error,

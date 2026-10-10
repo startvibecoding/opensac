@@ -35,16 +35,18 @@ class ModelCaptureInternalProvider implements InternalProvider {
   }
 
   models(): InternalModel[] {
-    return [{
-      id: "fallback",
-      name: "fallback",
-      provider: "capture",
-      reasoning: false,
-      input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 0,
-      maxTokens: 0,
-    }];
+    return [
+      {
+        id: "fallback",
+        name: "fallback",
+        provider: "capture",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 0,
+        maxTokens: 0,
+      },
+    ];
   }
 
   getModel(id: string): InternalModel | undefined {
@@ -107,10 +109,7 @@ test("ProviderBridgeMapsToolCallEvent", () => {
     streamEventTypeToPublic(internalStreamToolCall),
     publicStreamToolCall,
   );
-  assertEquals(
-    streamEventTypeToPublic(internalStreamUsage),
-    publicStreamUsage,
-  );
+  assertEquals(streamEventTypeToPublic(internalStreamUsage), publicStreamUsage);
   assertEquals(
     streamEventTypeToPublic(internalStreamHostedItem),
     publicStreamHostedItem,

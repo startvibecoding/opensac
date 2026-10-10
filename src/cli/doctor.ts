@@ -16,11 +16,10 @@ export interface DoctorCommandOptions {
 }
 
 /** Runs the doctor diagnostics and projects the chosen output format. */
-export function executeDoctorCommand(
-  opts: DoctorCommandOptions,
-): { exitCode: number } {
-  const write = opts.write ??
-    ((line: string) => console.log(line));
+export function executeDoctorCommand(opts: DoctorCommandOptions): {
+  exitCode: number;
+} {
+  const write = opts.write ?? ((line: string) => console.log(line));
   const result = runDoctor("", opts.version);
   if (opts.json) {
     write(JSON.stringify(result));

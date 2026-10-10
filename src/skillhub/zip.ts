@@ -1,6 +1,6 @@
 // Minimal ZIP reader/writer used by the skillhub installer.
 //
-// Go's archive/zip is not available in Deno; this module implements only the
+// Go's archive/zip is not available in Node; this module implements only the
 // subset needed for safe extraction (central-directory parsing, stored and
 // deflate entries via DecompressionStream) plus a small writer so tests can
 // build real archives without a dependency.
@@ -84,10 +84,7 @@ function localDataOffset(
   return localOffset + 30 + nameLen + extraLen;
 }
 
-function decompress(
-  method: number,
-  slice: Uint8Array,
-): Promise<Uint8Array> {
+function decompress(method: number, slice: Uint8Array): Promise<Uint8Array> {
   if (method === 0) return Promise.resolve(slice.slice());
   if (method === 8) {
     return transform(slice, new DecompressionStream("deflate-raw"));
@@ -147,13 +144,13 @@ export async function createZip(
     const raw = entry.dir
       ? new Uint8Array(0)
       : typeof entry.content === "string"
-      ? encoder.encode(entry.content)
-      : entry.content;
+        ? encoder.encode(entry.content)
+        : entry.content;
     const compressed = entry.dir
       ? new Uint8Array(0)
       : method === 8
-      ? await deflateRaw(raw)
-      : raw;
+        ? await deflateRaw(raw)
+        : raw;
     const crc = crc32(raw);
     const local = new Uint8Array(30 + nameBytes.length);
     const lv = new DataView(local.buffer);

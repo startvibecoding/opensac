@@ -48,10 +48,7 @@ export class SkillRefTool implements Tool {
     };
   }
 
-  execute(
-    _ctx: ToolContext,
-    params: Record<string, unknown>,
-  ): ToolResult {
+  execute(_ctx: ToolContext, params: Record<string, unknown>): ToolResult {
     const skillName = params["skill"];
     if (typeof skillName !== "string" || skillName === "") {
       throw new Error("missing required parameter: skill");

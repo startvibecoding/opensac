@@ -45,7 +45,9 @@ export function fromAgentEvent(event: Event): SessionExecutorEvent {
   return {
     type: event.type,
     payload,
-    terminal: event.type === EVENT_RUN_FINISHED || event.type === EVENT_DONE ||
+    terminal:
+      event.type === EVENT_RUN_FINISHED ||
+      event.type === EVENT_DONE ||
       event.type === EVENT_ERROR,
     agentEvent: event,
   };
@@ -63,24 +65,23 @@ export function serializeAgentEvent(event: Event): Record<string, unknown> {
     JSON.stringify(event, (_key, value) =>
       value instanceof Error
         ? {
-          [ERROR_VALUE_KEY]: { name: value.name, message: value.message },
-        }
-        : value),
+            [ERROR_VALUE_KEY]: { name: value.name, message: value.message },
+          }
+        : value,
+    ),
   ) as Record<string, unknown>;
 }
 
 /** Rebuilds one Agent event from its serialized projection. */
-export function deserializeAgentEvent(
-  record: Record<string, unknown>,
-): Event {
+export function deserializeAgentEvent(record: Record<string, unknown>): Event {
   return JSON.parse(JSON.stringify(record), (_key, value) => {
     if (
-      value !== null && typeof value === "object" &&
+      value !== null &&
+      typeof value === "object" &&
       ERROR_VALUE_KEY in (value as Record<string, unknown>)
     ) {
       const raw = (value as Record<string, unknown>)[ERROR_VALUE_KEY] as
-        | { name?: unknown; message?: unknown }
-        | undefined;
+        { name?: unknown; message?: unknown } | undefined;
       const error = new Error(
         typeof raw?.message === "string" ? raw.message : "",
       );
@@ -96,10 +97,7 @@ export function deserializeAgentEvent(
 /** Runtime operations required by the shared prompt executor. */
 export interface SessionExecutionDriver {
   admit(): Promise<() => void>;
-  createRun(input: {
-    runId: string;
-    text: string;
-  }): Promise<{
+  createRun(input: { runId: string; text: string }): Promise<{
     runId: string;
     events: AsyncIterable<SessionExecutorEvent>;
     cancel: () => void;
@@ -185,16 +183,18 @@ export class SessionExecutor {
         await this.#publish(event);
         if (!event.terminal) continue;
         terminal = true;
-        const status = typeof event.payload.status === "string"
-          ? event.payload.status
-          : "completed";
-        const state = status === "cancelled" || status === "canceled"
-          ? "cancelled"
-          : status === "failed" || status === "error"
-          ? "failed"
-          : status === "timed_out"
-          ? "timed_out"
-          : "completed";
+        const status =
+          typeof event.payload.status === "string"
+            ? event.payload.status
+            : "completed";
+        const state =
+          status === "cancelled" || status === "canceled"
+            ? "cancelled"
+            : status === "failed" || status === "error"
+              ? "failed"
+              : status === "timed_out"
+                ? "timed_out"
+                : "completed";
         await this.#driver.finish(runId, state);
       }
       if (!terminal) {

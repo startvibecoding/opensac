@@ -10,7 +10,8 @@
 
 import {
   type BeforeToolExecuteContext,
-  type ToolCallBlockResult} from "../agent/mod.ts";
+  type ToolCallBlockResult,
+} from "../agent/mod.ts";
 import type { Manager } from "../session/manager.ts";
 import { validateRuntimeLease } from "../session/mod.ts";
 
@@ -19,8 +20,7 @@ export interface ToolFenceRuntime {
   readonly id: string;
   readonly manager: Manager | undefined;
   readonly execution:
-    | { active(): { runId: string; active: boolean } }
-    | undefined;
+    { active(): { runId: string; active: boolean } } | undefined;
 }
 
 /**
@@ -42,7 +42,8 @@ export function beforeToolExecuteForRuntime(
     // Compatibility: a manager-less or run-less execution (transient/derived
     // agents) has no durable lease to revalidate and is left unfenced.
     if (
-      execution === undefined || manager === undefined ||
+      execution === undefined ||
+      manager === undefined ||
       (toolCtx.runId ?? "").trim() === ""
     ) {
       return undefined;

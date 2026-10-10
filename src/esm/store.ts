@@ -393,9 +393,9 @@ export class Store {
         break;
       default:
         throw new Error(
-          `model may only set esm status to ${
-            JSON.stringify(statusComplete)
-          } or ${JSON.stringify(statusBlocked)}`,
+          `model may only set esm status to ${JSON.stringify(
+            statusComplete,
+          )} or ${JSON.stringify(statusBlocked)}`,
         );
     }
 
@@ -621,7 +621,8 @@ export class Store {
     let nextBlockedReason = current.blockedReason;
     let nextBlockedRunID = current.blockedRunId;
     if (
-      current.blockedCount > 0 && current.blockedRunId !== "" &&
+      current.blockedCount > 0 &&
+      current.blockedRunId !== "" &&
       current.blockedRunId !== runID
     ) {
       nextBlockedCount = 0;
@@ -631,7 +632,8 @@ export class Store {
     let nextRejectionCount = current.rejectionCount;
     let nextRejectionRunID = current.rejectionRunId;
     if (
-      current.rejectionCount > 0 && current.rejectionRunId !== "" &&
+      current.rejectionCount > 0 &&
+      current.rejectionRunId !== "" &&
       current.rejectionRunId !== runID
     ) {
       nextRejectionCount = 0;

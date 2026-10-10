@@ -1,7 +1,8 @@
 //
 // Go's io/fs + go:embed is replaced by a small `SkillFS` interface (used for
-// embedded built-in skills) plus direct Deno FS access for project/global dirs.
+// embedded built-in skills) plus direct Node FS access for project/global dirs.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import * as posix from "../compat/path_posix.ts";
 import { loadGlobalSettingsSparse, skillsDisabled } from "../config/mod.ts";
@@ -68,9 +69,9 @@ export const expertCreaterSkillName = "expert-creater";
 
 function readFileOS(p: string): string | undefined {
   try {
-    return Deno.readTextFileSync(p);
+    return runtime.readTextFileSync(p);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return undefined;
+    if (err instanceof runtime.errors.NotFound) return undefined;
     return undefined;
   }
 }
@@ -78,7 +79,7 @@ function readFileOS(p: string): string | undefined {
 function readDirOS(dir: string): SkillFSEntry[] | undefined {
   try {
     const out: SkillFSEntry[] = [];
-    for (const entry of Deno.readDirSync(dir)) {
+    for (const entry of runtime.readDirSync(dir)) {
       out.push({ name: entry.name, isDir: entry.isDirectory });
     }
     return out;
@@ -89,7 +90,7 @@ function readDirOS(dir: string): SkillFSEntry[] | undefined {
 
 function isDirOS(p: string): boolean {
   try {
-    return Deno.statSync(p).isDirectory;
+    return runtime.statSync(p).isDirectory;
   } catch {
     return false;
   }
@@ -518,5 +519,5 @@ export function extractDescription(content: string): string {
 
 /** Creates the .skills directory in the project root. */
 export function createProjectSkillsDir(projectDir: string): void {
-  Deno.mkdirSync(path.join(projectDir, ".skills"), { recursive: true });
+  runtime.mkdirSync(path.join(projectDir, ".skills"), { recursive: true });
 }

@@ -1,6 +1,7 @@
 // (project and session
 // metadata sections; Manager-based setup replaced with a bare schema).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -16,7 +17,7 @@ import {
 import { test } from "#testing";
 
 test("list session metadata batch and project counts", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const project = createProject(sessionDir, "Phase1");
     assert(project.id !== "");
@@ -55,7 +56,7 @@ test("list session metadata batch and project counts", () => {
 });
 
 test("delete project clears session assignments but keeps the pin", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     const project = createProject(sessionDir, "Temporary");
     setSessionMetadata(sessionDir, "session-project-delete", {
@@ -76,7 +77,7 @@ test("delete project clears session assignments but keeps the pin", () => {
 });
 
 test("list projects degrades on a missing database", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
   try {
     assertEquals(listProjects(sessionDir), []);
   } finally {

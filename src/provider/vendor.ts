@@ -21,13 +21,19 @@ export interface VendorAdapter {
 
 /** A data-driven vendor adapter keyed by base-URL substrings. */
 export class SimpleVendorAdapter implements VendorAdapter {
-    private readonly adapterName: string;
+  private readonly adapterName: string;
   private readonly domains: string[];
   private readonly thinkingFormatValue: string = "";
   private readonly cacheControlValue: boolean | undefined = undefined;
   private readonly defaultApi: string = "";
 
-  constructor(adapterName: string, domains: string[], thinkingFormatValue: string = "", cacheControlValue: boolean | undefined = undefined, defaultApi: string = "") {
+  constructor(
+    adapterName: string,
+    domains: string[],
+    thinkingFormatValue: string = "",
+    cacheControlValue: boolean | undefined = undefined,
+    defaultApi: string = "",
+  ) {
     this.adapterName = adapterName;
     this.domains = domains;
     this.thinkingFormatValue = thinkingFormatValue;
@@ -50,7 +56,8 @@ export class SimpleVendorAdapter implements VendorAdapter {
       cfg.thinkingFormat = this.thinkingFormatValue;
     }
     if (
-      cfg.cacheControl === undefined && this.cacheControlValue !== undefined
+      cfg.cacheControl === undefined &&
+      this.cacheControlValue !== undefined
     ) {
       cfg.cacheControl = this.cacheControlValue;
     }
@@ -69,9 +76,7 @@ export function registerVendorAdapter(adapter: VendorAdapter | null): void {
 }
 
 /** Returns a registered vendor adapter by name. */
-export function getVendorAdapter(
-  name: string,
-): VendorAdapter | undefined {
+export function getVendorAdapter(name: string): VendorAdapter | undefined {
   return vendorAdapters.get(normalizeVendorName(name));
 }
 

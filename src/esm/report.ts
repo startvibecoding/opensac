@@ -140,7 +140,8 @@ export function parseRecoveryReport(text: string): RecoveryReport {
     throw new Error("recovery summary is empty");
   }
   if (
-    report.decision === recoveryDecisionBlocked && report.blockers.length === 0
+    report.decision === recoveryDecisionBlocked &&
+    report.blockers.length === 0
   ) {
     throw new Error("blocked recovery report has no concrete blocker");
   }

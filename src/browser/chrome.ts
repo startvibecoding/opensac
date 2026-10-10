@@ -3,11 +3,13 @@
 // Handles launching and managing Chrome/Chromium-based browsers plus CDP URL
 // discovery. Supports Chrome, Chromium, Brave, Edge, and variants.
 //
-// Deviations from Go: `os/exec` maps to `Deno.Command`; `net/http` maps to
+// Deviations from Go: `os/exec` maps to `runtime.Command`; `net/http` maps to
 // `fetch`; `context.Context` maps to `AbortSignal`; `log/slog` logging is
 // dropped (callers can observe errors); process-group handling is omitted
-// because `Deno.Command` children are detached enough for our use.
+// because `runtime.Command` children are detached enough for our use.
 
+import { runtime } from "../platform/runtime.ts";
+import type { ChildProcess } from "../platform/runtime.ts";
 import { type BrowserType, type LaunchOptions } from "./protocol.ts";
 
 /** DEFAULT_CDP_PORT is the default Chrome DevTools Protocol port. */
@@ -21,7 +23,7 @@ export const DEFAULT_VIEWPORT_HEIGHT = 1080;
 
 /** A running browser process. */
 export class Process {
-  #child: Deno.ChildProcess;
+  #child: ChildProcess;
   browser: BrowserType;
   executable: string;
   userDataDir: string;
@@ -31,7 +33,7 @@ export class Process {
   #killed = false;
 
   constructor(init: {
-    child: Deno.ChildProcess;
+    child: ChildProcess;
     browser: BrowserType;
     executable: string;
     userDataDir: string;
@@ -64,7 +66,7 @@ export class Process {
     }
     if (this.userDataDir && this.userDataDir.includes("vibe-browser-")) {
       try {
-        Deno.removeSync(this.userDataDir, { recursive: true });
+        runtime.removeSync(this.userDataDir, { recursive: true });
       } catch {
         // ignore
       }
@@ -74,7 +76,7 @@ export class Process {
 
 function getBrowserCandidates(browserType: BrowserType): string[] {
   const t = browserType || "chrome";
-  switch (Deno.build.os) {
+  switch (runtime.build.os) {
     case "darwin":
       return darwinCandidates(t);
     case "linux":
@@ -98,10 +100,7 @@ function darwinCandidates(t: string): string[] {
         "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
       ];
     case "chromium":
-      return [
-        "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        "chromium",
-      ];
+      return ["/Applications/Chromium.app/Contents/MacOS/Chromium", "chromium"];
     case "brave":
       return [
         "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
@@ -150,9 +149,9 @@ function linuxCandidates(t: string): string[] {
 }
 
 function windowsCandidates(t: string): string[] {
-  const local = Deno.env.get("LOCALAPPDATA") ?? "";
-  const progFiles = Deno.env.get("PROGRAMFILES") ?? "";
-  const progFilesX86 = Deno.env.get("PROGRAMFILES(X86)") ?? "";
+  const local = runtime.env.get("LOCALAPPDATA") ?? "";
+  const progFiles = runtime.env.get("PROGRAMFILES") ?? "";
+  const progFilesX86 = runtime.env.get("PROGRAMFILES(X86)") ?? "";
   switch (t) {
     case "chrome": {
       const candidates = [
@@ -175,10 +174,7 @@ function windowsCandidates(t: string): string[] {
       const candidates: string[] = [];
       if (local) {
         candidates.push(
-          join(
-            local,
-            "BraveSoftware/Brave-Browser/Application/brave.exe",
-          ),
+          join(local, "BraveSoftware/Brave-Browser/Application/brave.exe"),
         );
       }
       return candidates;
@@ -203,17 +199,17 @@ function join(...parts: string[]): string {
 function isExecutable(p: string): boolean {
   if (p.includes("/") || p.includes("\\")) {
     try {
-      return Deno.statSync(p).isFile;
+      return runtime.statSync(p).isFile;
     } catch {
       return false;
     }
   }
-  const pathEnv = Deno.env.get("PATH") ?? "";
-  const sep = Deno.build.os === "windows" ? ";" : ":";
+  const pathEnv = runtime.env.get("PATH") ?? "";
+  const sep = runtime.build.os === "windows" ? ";" : ":";
   for (const dir of pathEnv.split(sep)) {
     if (!dir) continue;
     try {
-      if (Deno.statSync(`${dir}/${p}`).isFile) return true;
+      if (runtime.statSync(`${dir}/${p}`).isFile) return true;
     } catch {
       // continue
     }
@@ -283,7 +279,7 @@ export async function discoverCdpUrl(
   const port = portIn || DEFAULT_CDP_PORT;
 
   try {
-    const info = await fetchJson(`http://${host}:${port}/json/version`) as {
+    const info = (await fetchJson(`http://${host}:${port}/json/version`)) as {
       webSocketDebuggerUrl?: string;
     };
     if (info.webSocketDebuggerUrl) {
@@ -294,9 +290,9 @@ export async function discoverCdpUrl(
   }
 
   try {
-    const targets = await fetchJson(
+    const targets = (await fetchJson(
       `http://${host}:${port}/json/list`,
-    ) as Array<{
+    )) as Array<{
       type?: string;
       webSocketDebuggerUrl?: string;
     }>;
@@ -377,7 +373,7 @@ export async function launch(
 
   let userDataDir = opts.userDataDir ?? "";
   if (!userDataDir) {
-    userDataDir = Deno.makeTempDirSync({ prefix: "vibe-browser-" });
+    userDataDir = runtime.makeTempDirSync({ prefix: "vibe-browser-" });
   }
 
   const args = [
@@ -401,12 +397,14 @@ export async function launch(
   if (opts.headless !== false) args.push("--headless=new");
   if (opts.proxy) args.push(`--proxy-server=${opts.proxy}`);
 
-  const viewportWidth = opts.viewportWidth && opts.viewportWidth > 0
-    ? opts.viewportWidth
-    : DEFAULT_VIEWPORT_WIDTH;
-  const viewportHeight = opts.viewportHeight && opts.viewportHeight > 0
-    ? opts.viewportHeight
-    : DEFAULT_VIEWPORT_HEIGHT;
+  const viewportWidth =
+    opts.viewportWidth && opts.viewportWidth > 0
+      ? opts.viewportWidth
+      : DEFAULT_VIEWPORT_WIDTH;
+  const viewportHeight =
+    opts.viewportHeight && opts.viewportHeight > 0
+      ? opts.viewportHeight
+      : DEFAULT_VIEWPORT_HEIGHT;
   args.push(`--window-size=${viewportWidth},${viewportHeight}`);
 
   if (opts.extensions && opts.extensions.length > 0) {
@@ -419,7 +417,7 @@ export async function launch(
   if (opts.profile) args.push(`--profile-directory=${opts.profile}`);
   if (opts.args) args.push(...opts.args);
 
-  const command = new Deno.Command(execPath, {
+  const command = new runtime.Command(execPath, {
     args,
     stdout: "null",
     stderr: "null",
@@ -464,7 +462,7 @@ export async function listTargets(
   }>
 > {
   const host = hostIn || "127.0.0.1";
-  return await fetchJson(`http://${host}:${port}/json/list`) as Array<{
+  return (await fetchJson(`http://${host}:${port}/json/list`)) as Array<{
     id: string;
     type: string;
     title?: string;
@@ -479,7 +477,7 @@ export async function getBrowserVersion(
   port: number,
 ): Promise<Record<string, unknown>> {
   const host = hostIn || "127.0.0.1";
-  return await fetchJson(`http://${host}:${port}/json/version`) as Record<
+  return (await fetchJson(`http://${host}:${port}/json/version`)) as Record<
     string,
     unknown
   >;

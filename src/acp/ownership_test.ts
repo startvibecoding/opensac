@@ -1,12 +1,13 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { fromFileUrl, join } from "../compat/path.ts";
 import { productionViolations, type Violation } from "../architecture/guard.ts";
 import { test } from "#testing";
 
 function formatViolations(violations: Violation[]): string {
-  return violations.map((violation) =>
-    `${violation.file}: ${violation.message}`
-  ).join("\n- ");
+  return violations
+    .map((violation) => `${violation.file}: ${violation.message}`)
+    .join("\n- ");
 }
 
 const projectRoot = fromFileUrl(new URL("../../", import.meta.url));
@@ -19,7 +20,9 @@ test("production ACP entry cannot import runtime implementation modules", () => 
 });
 
 test("ACP public surface does not export the legacy management router", () => {
-  const source = Deno.readTextFileSync(join(projectRoot, "src/acp/mod.ts"));
+  const source = nodeRuntime.readTextFileSync(
+    join(projectRoot, "src/acp/mod.ts"),
+  );
   assertEquals(source.includes('export * from "./manage.ts";'), false);
   assertEquals(source.includes('export * from "./manage_skillhub.ts";'), false);
   assertEquals(
@@ -29,11 +32,11 @@ test("ACP public surface does not export the legacy management router", () => {
 });
 
 test("ACP bridge files cannot import runtime implementation modules", () => {
-  const root = Deno.makeTempDirSync();
+  const root = nodeRuntime.makeTempDirSync();
   try {
     const acpDir = join(root, "src/acp");
-    Deno.mkdirSync(acpDir, { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(acpDir, { recursive: true });
+    nodeRuntime.writeTextFileSync(
       join(acpDir, "bridge.ts"),
       [
         'import { SessionRuntime } from "../agentruntime/session_runtime.ts";',
@@ -50,23 +53,23 @@ test("ACP bridge files cannot import runtime implementation modules", () => {
       violations.some((violation) =>
         violation.message.includes(
           "ACP bridge imports runtime implementation module",
-        )
+        ),
       ),
-      `expected ACP bridge import violation:\n- ${
-        formatViolations(violations)
-      }`,
+      `expected ACP bridge import violation:\n- ${formatViolations(
+        violations,
+      )}`,
     );
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    nodeRuntime.removeSync(root, { recursive: true });
   }
 });
 
 test("ACP bridge files cannot directly construct runtime owners", () => {
-  const root = Deno.makeTempDirSync();
+  const root = nodeRuntime.makeTempDirSync();
   try {
     const acpDir = join(root, "src/acp");
-    Deno.mkdirSync(acpDir, { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(acpDir, { recursive: true });
+    nodeRuntime.writeTextFileSync(
       join(acpDir, "bridge_extensions.ts"),
       [
         'import { Agent } from "../agent/agent.ts";',
@@ -82,17 +85,17 @@ test("ACP bridge files cannot directly construct runtime owners", () => {
     );
     assert(
       violations.some((violation) => violation.message.includes("ACP bridge")),
-      `expected ACP bridge ownership violation:\n- ${
-        formatViolations(violations)
-      }`,
+      `expected ACP bridge ownership violation:\n- ${formatViolations(
+        violations,
+      )}`,
     );
     assertEquals(
       violations.some((violation) =>
-        violation.message.includes("direct new Agent")
+        violation.message.includes("direct new Agent"),
       ),
       true,
     );
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    nodeRuntime.removeSync(root, { recursive: true });
   }
 });

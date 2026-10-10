@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { decodeBase64, encodeBase64 } from "../compat/encoding.ts";
 import { fileURLToPath } from "../compat/path.ts";
 import * as path from "../compat/path.ts";
@@ -37,7 +38,8 @@ import {
   type CoreSkillView,
   type CoreTranscriptMessage,
   type CoreTransientPromptInput,
-  type CoreTransientPromptResult} from "./runtime.ts";
+  type CoreTransientPromptResult,
+} from "./runtime.ts";
 import { CoreSessionNotResidentError } from "./runtime_protocol.ts";
 import {
   Builder,
@@ -380,7 +382,8 @@ export function createProductionCoreExtensionHandler(
   const runCronJob = options.runCronJob;
   const triggerCronJob = options.triggerCronJob;
   const cronRunning = options.cronRunning ?? (() => false);
-  const knowledgeServiceFactory = options.knowledgeServiceFactory ??
+  const knowledgeServiceFactory =
+    options.knowledgeServiceFactory ??
     ((currentSettings: Settings) =>
       createKnowledgeBaseService(
         getSessionDir(currentSettings),
@@ -392,7 +395,8 @@ export function createProductionCoreExtensionHandler(
     knowledgeService ??= knowledgeServiceFactory(settings);
     return knowledgeService;
   };
-  const skillHubServiceFactory = options.skillHubServiceFactory ??
+  const skillHubServiceFactory =
+    options.skillHubServiceFactory ??
     ((currentSettings: Settings, workDir: string) => {
       const handles = currentSettings.skillHub?.officialHandles ?? [];
       return SkillHubService.forWorkDir(
@@ -404,20 +408,23 @@ export function createProductionCoreExtensionHandler(
     });
   let skillHubService: SkillHubService | undefined;
   let skillHubServiceKey = "";
-  const setSessionSkill = options.setSessionSkill ??
+  const setSessionSkill =
+    options.setSessionSkill ??
     ((sessionId: string) =>
       Promise.resolve({ sessionId, workDir: "", activeSkills: [] }));
-  const getSessionSkillState = options.getSessionSkillState ??
+  const getSessionSkillState =
+    options.getSessionSkillState ??
     ((sessionId: string) =>
       Promise.resolve({ sessionId, workDir: "", activeSkills: [] }));
   const getSkillHubService = (
     input: Record<string, unknown>,
   ): SkillHubService => {
-    const workDir = typeof input.workDir === "string"
-      ? input.workDir
-      : typeof input.cwd === "string"
-      ? input.cwd
-      : Deno.cwd();
+    const workDir =
+      typeof input.workDir === "string"
+        ? input.workDir
+        : typeof input.cwd === "string"
+          ? input.cwd
+          : nodeRuntime.cwd();
     const key = `${getSessionDir(settings)}:${workDir}`;
     if (skillHubService === undefined || skillHubServiceKey !== key) {
       skillHubService = skillHubServiceFactory(settings, workDir);
@@ -450,7 +457,7 @@ export function createProductionCoreExtensionHandler(
         const counts = projectSessionCounts(getSessionDir(settings));
         return {
           projects: projects.map((project) =>
-            projectResult(project, counts.get(project.id) ?? 0)
+            projectResult(project, counts.get(project.id) ?? 0),
           ),
         };
       }
@@ -505,7 +512,7 @@ export function createProductionCoreExtensionHandler(
       }
       case "doctor":
         return runDoctor(
-          typeof input.cwd === "string" ? input.cwd : Deno.cwd(),
+          typeof input.cwd === "string" ? input.cwd : nodeRuntime.cwd(),
           "",
         );
       case "manage.stats.summary": {
@@ -534,7 +541,8 @@ export function createProductionCoreExtensionHandler(
         const service = getSkillHubService(input);
         return {
           markets: service.markets(),
-          defaultMarket: settings.skillHub?.defaultMarket?.trim() ||
+          defaultMarket:
+            settings.skillHub?.defaultMarket?.trim() ||
             defaultSettings().skillHub?.defaultMarket ||
             "skillhub.cn",
         };
@@ -577,9 +585,8 @@ export function createProductionCoreExtensionHandler(
             cursor: typeof input.cursor === "string" ? input.cursor : undefined,
             sort: typeof input.sort === "string" ? input.sort : undefined,
             order: typeof input.order === "string" ? input.order : undefined,
-            category: typeof input.category === "string"
-              ? input.category
-              : undefined,
+            category:
+              typeof input.category === "string" ? input.category : undefined,
           },
         );
       }
@@ -651,9 +658,8 @@ export function createProductionCoreExtensionHandler(
         const request: InstallRequest = {
           market: skillHubMarket(input, settings),
           id,
-          version: typeof input.version === "string"
-            ? input.version
-            : undefined,
+          version:
+            typeof input.version === "string" ? input.version : undefined,
           scope,
           targetDir,
           overwrite: input.overwrite === true,
@@ -662,10 +668,10 @@ export function createProductionCoreExtensionHandler(
         const activated = input.activate === true;
         const session = activated
           ? await setSessionSkill(
-            requiredString(input, "sessionId"),
-            result.name,
-            true,
-          )
+              requiredString(input, "sessionId"),
+              result.name,
+              true,
+            )
           : undefined;
         return {
           install: result,
@@ -696,9 +702,10 @@ export function createProductionCoreExtensionHandler(
         const activeName = index.state(market, id)?.name ?? "";
         const scope = typeof input.scope === "string" ? input.scope.trim() : "";
         getSkillHubService(input).uninstall(market, id, scope);
-        const session = activeName === ""
-          ? undefined
-          : await setSessionSkill(sessionId, activeName, false);
+        const session =
+          activeName === ""
+            ? undefined
+            : await setSessionSkill(sessionId, activeName, false);
         return {
           uninstalled: true,
           ...(session === undefined ? {} : { session }),
@@ -819,7 +826,9 @@ export function createProductionCoreExtensionHandler(
         const filename = requiredString(input, "filename");
         const kind = input.kind === undefined ? "file" : input.kind;
         if (
-          kind !== "file" && kind !== "image" && kind !== "audio" &&
+          kind !== "file" &&
+          kind !== "image" &&
+          kind !== "audio" &&
           kind !== "video"
         ) {
           throw new Error("attachment kind is not supported");
@@ -829,15 +838,21 @@ export function createProductionCoreExtensionHandler(
           getSessionDir(settings),
           defaultAttachmentPolicy(),
         );
-        const record = await service.acceptArtifact(sessionId, runId, {
-          origin: "acp",
-          reference: `acp://${filename}`,
-          kind,
-          filename,
-          mediaType: typeof input.mediaType === "string" ? input.mediaType : "",
-          sizeHint: content.byteLength,
-          open: () => ({ bytes: content }),
-        }, signal);
+        const record = await service.acceptArtifact(
+          sessionId,
+          runId,
+          {
+            origin: "acp",
+            reference: `acp://${filename}`,
+            kind,
+            filename,
+            mediaType:
+              typeof input.mediaType === "string" ? input.mediaType : "",
+            sizeHint: content.byteLength,
+            open: () => ({ bytes: content }),
+          },
+          signal,
+        );
         return {
           attachmentId: record.id,
           filename: record.filename,
@@ -915,7 +930,9 @@ export function createProductionCoreExtensionHandler(
 
 function extensionParams(value: unknown): Record<string, unknown> {
   if (
-    value === undefined || value === null || typeof value !== "object" ||
+    value === undefined ||
+    value === null ||
+    typeof value !== "object" ||
     Array.isArray(value)
   ) {
     throw new Error("Core extension params must be an object");
@@ -923,10 +940,7 @@ function extensionParams(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function requiredString(
-  params: Record<string, unknown>,
-  key: string,
-): string {
+function requiredString(params: Record<string, unknown>, key: string): string {
   const value = params[key];
   if (typeof value !== "string" || value.trim() === "") {
     throw new Error(`${key} is required`);
@@ -961,9 +975,8 @@ function expertContext(params: Record<string, unknown>): {
   cwd: string;
 } {
   const rawScope = params.scope;
-  const scope = rawScope === undefined || rawScope === ""
-    ? SCOPE_GLOBAL
-    : rawScope;
+  const scope =
+    rawScope === undefined || rawScope === "" ? SCOPE_GLOBAL : rawScope;
   if (scope !== SCOPE_GLOBAL && scope !== SCOPE_PROJECT) {
     throw new Error(`expert scope ${String(scope)} is not writable`);
   }
@@ -1020,12 +1033,10 @@ function settingsPatch(
   }
   const next: Settings = {
     ...settings,
-    sandbox: settings.sandbox === undefined
-      ? undefined
-      : { ...settings.sandbox },
-    webSearch: settings.webSearch === undefined
-      ? undefined
-      : { ...settings.webSearch },
+    sandbox:
+      settings.sandbox === undefined ? undefined : { ...settings.sandbox },
+    webSearch:
+      settings.webSearch === undefined ? undefined : { ...settings.webSearch },
   };
   const updates: Record<string, unknown> = {};
   for (const field of fields) {
@@ -1044,7 +1055,10 @@ function settingsPatch(
       }
       case "defaultMode": {
         if (
-          raw !== "agent" && raw !== "plan" && raw !== "yolo" && raw !== "os"
+          raw !== "agent" &&
+          raw !== "plan" &&
+          raw !== "yolo" &&
+          raw !== "os"
         ) {
           throw new Error("defaultMode must be agent, plan, yolo, or os");
         }
@@ -1074,8 +1088,11 @@ function settingsPatch(
           throw new Error("sandboxEnabled must be boolean");
         }
         next.sandbox = {
-          ...(next.sandbox ??
-            { level: "off", enabled: false, allowNetwork: false }),
+          ...(next.sandbox ?? {
+            level: "off",
+            enabled: false,
+            allowNetwork: false,
+          }),
           enabled: raw,
         };
         updates.sandbox = next.sandbox;
@@ -1086,8 +1103,11 @@ function settingsPatch(
           throw new Error("sandboxLevel must be a non-empty string");
         }
         next.sandbox = {
-          ...(next.sandbox ??
-            { level: "off", enabled: false, allowNetwork: false }),
+          ...(next.sandbox ?? {
+            level: "off",
+            enabled: false,
+            allowNetwork: false,
+          }),
           level: raw.trim(),
         };
         updates.sandbox = next.sandbox;
@@ -1107,18 +1127,19 @@ function settingsPatch(
 }
 
 function memoryStore(input: Record<string, unknown>): MemoryStore {
-  const workDir = typeof input.cwd === "string"
-    ? input.cwd
-    : typeof input.workDir === "string"
-    ? input.workDir
-    : Deno.cwd();
+  const workDir =
+    typeof input.cwd === "string"
+      ? input.cwd
+      : typeof input.workDir === "string"
+        ? input.workDir
+        : nodeRuntime.cwd();
   return new MemoryStore(path.join(configDir(), "memory.md"), workDir);
 }
 
 function memoryUpdatedAt(memoryPath: string): string {
   if (memoryPath === "") return "";
   try {
-    return Deno.statSync(memoryPath).mtime?.toISOString() ?? "";
+    return nodeRuntime.statSync(memoryPath).mtime?.toISOString() ?? "";
   } catch {
     return "";
   }
@@ -1163,23 +1184,25 @@ function memoryPut(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 function skillHubWorkDir(input: Record<string, unknown>): string {
-  const value = typeof input.workDir === "string"
-    ? input.workDir
-    : typeof input.cwd === "string"
-    ? input.cwd
-    : Deno.cwd();
-  return value.trim() === "" ? Deno.cwd() : value;
+  const value =
+    typeof input.workDir === "string"
+      ? input.workDir
+      : typeof input.cwd === "string"
+        ? input.cwd
+        : nodeRuntime.cwd();
+  return value.trim() === "" ? nodeRuntime.cwd() : value;
 }
 
 function skillHubMarket(
   input: Record<string, unknown>,
   settings: Settings,
 ): "skillhub.cn" | "clawhub.ai" {
-  const value = typeof input.market === "string" && input.market.trim() !== ""
-    ? input.market.trim()
-    : settings.skillHub?.defaultMarket?.trim() ||
-      defaultSettings().skillHub?.defaultMarket ||
-      "skillhub.cn";
+  const value =
+    typeof input.market === "string" && input.market.trim() !== ""
+      ? input.market.trim()
+      : settings.skillHub?.defaultMarket?.trim() ||
+        defaultSettings().skillHub?.defaultMarket ||
+        "skillhub.cn";
   if (value !== "skillhub.cn" && value !== "clawhub.ai") {
     throw new Error(`unsupported skill market ${JSON.stringify(value)}`);
   }
@@ -1211,10 +1234,10 @@ function skillHubView(settings: Settings): Record<string, unknown> {
     apiTokenConfigured: skillHubSecretConfigured(market.apiToken),
   }));
   return {
-    defaultMarket: current.defaultMarket?.trim() || defaults.defaultMarket ||
-      "",
-    defaultInstallScope: current.defaultInstallScope?.trim() ||
-      defaults.defaultInstallScope || "",
+    defaultMarket:
+      current.defaultMarket?.trim() || defaults.defaultMarket || "",
+    defaultInstallScope:
+      current.defaultInstallScope?.trim() || defaults.defaultInstallScope || "",
     officialHandles: current.officialHandles ?? [],
     markets,
   };
@@ -1266,8 +1289,8 @@ function skillHubPatch(
   if (Object.hasOwn(fields, "officialHandles")) {
     if (
       !Array.isArray(fields.officialHandles) ||
-      fields.officialHandles.some((value) =>
-        typeof value !== "string" || value.trim() === ""
+      fields.officialHandles.some(
+        (value) => typeof value !== "string" || value.trim() === "",
       )
     ) {
       throw new Error("officialHandles must be an array of non-empty strings");
@@ -1276,19 +1299,25 @@ function skillHubPatch(
 
   let root: Record<string, unknown> = {};
   try {
-    const parsed = JSON.parse(Deno.readTextFileSync(globalSettingsPath()));
+    const parsed = JSON.parse(
+      nodeRuntime.readTextFileSync(globalSettingsPath()),
+    );
     if (
-      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
     ) {
       root = parsed as Record<string, unknown>;
     }
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err;
+    if (!(err instanceof nodeRuntime.errors.NotFound)) throw err;
   }
-  const current = root.skillHub !== null && typeof root.skillHub === "object" &&
-      !Array.isArray(root.skillHub)
-    ? { ...(root.skillHub as Record<string, unknown>) }
-    : {};
+  const current =
+    root.skillHub !== null &&
+    typeof root.skillHub === "object" &&
+    !Array.isArray(root.skillHub)
+      ? { ...(root.skillHub as Record<string, unknown>) }
+      : {};
   if (Object.hasOwn(fields, "defaultMarket")) {
     current.defaultMarket = (fields.defaultMarket as string).trim();
   }
@@ -1303,9 +1332,12 @@ function skillHubPatch(
       throw new Error("markets must be an array");
     }
     const existing = Array.isArray(current.markets)
-      ? current.markets.filter((value): value is Record<string, unknown> =>
-        value !== null && typeof value === "object" && !Array.isArray(value)
-      )
+      ? current.markets.filter(
+          (value): value is Record<string, unknown> =>
+            value !== null &&
+            typeof value === "object" &&
+            !Array.isArray(value),
+        )
       : [];
     const byId = new Map(
       existing.map((market) => [String(market.id ?? ""), market]),
@@ -1339,7 +1371,8 @@ function skillHubPatch(
       }
       if (market.clearApiToken === true) delete merged.apiToken;
       if (
-        Object.hasOwn(market, "enabled") && typeof market.enabled !== "boolean"
+        Object.hasOwn(market, "enabled") &&
+        typeof market.enabled !== "boolean"
       ) {
         throw new Error("enabled must be a boolean");
       }
@@ -1360,8 +1393,12 @@ function syncKnowledgeBaseSchedule(
   const store = cronStore(settings);
   const jobID = knowledgeBaseCronJobID(base.id);
   const raw = base.schedule.trim().toLowerCase();
-  const disabled = !base.enabled || raw === "" || raw === "manual" ||
-    raw === "off" || raw === "disabled";
+  const disabled =
+    !base.enabled ||
+    raw === "" ||
+    raw === "manual" ||
+    raw === "off" ||
+    raw === "disabled";
   if (disabled) {
     try {
       store.delete(jobID);
@@ -1425,18 +1462,16 @@ function knowledgeBaseSpec(
     schedule: base?.schedule ?? "",
     enabled: base?.enabled ?? true,
   };
-  for (
-    const field of [
-      "name",
-      "rootDir",
-      "preprocessProfile",
-      "provider",
-      "model",
-      "mode",
-      "thinkingLevel",
-      "schedule",
-    ] as const
-  ) {
+  for (const field of [
+    "name",
+    "rootDir",
+    "preprocessProfile",
+    "provider",
+    "model",
+    "mode",
+    "thinkingLevel",
+    "schedule",
+  ] as const) {
     if (raw[field] !== undefined) {
       if (typeof raw[field] !== "string") {
         throw new Error(`${field} must be a string`);
@@ -1472,7 +1507,7 @@ function knowledgeBaseView(
 function knowledgeBasesList(settings: Settings): Record<string, unknown> {
   return {
     knowledgeBases: listKnowledgeBases(getSessionDir(settings)).map((base) =>
-      knowledgeBaseView(settings, base)
+      knowledgeBaseView(settings, base),
     ),
   };
 }
@@ -1483,10 +1518,7 @@ function knowledgeBaseGet(
 ): Record<string, unknown> {
   return knowledgeBaseView(
     settings,
-    getKnowledgeBase(
-      getSessionDir(settings),
-      requiredString(input, "id"),
-    ),
+    getKnowledgeBase(getSessionDir(settings), requiredString(input, "id")),
   );
 }
 
@@ -1540,7 +1572,7 @@ function knowledgeBaseMCPApply(
   try {
     config = loadMCPConfig(globalMCPPath());
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err;
+    if (!(err instanceof nodeRuntime.errors.NotFound)) throw err;
     config = {};
   }
   const launcher = openSACLauncherCommand();
@@ -1548,13 +1580,7 @@ function knowledgeBaseMCPApply(
     name: `knowledge-${id}`,
     type: "stdio",
     command: launcher.command,
-    args: [
-      ...launcher.args,
-      "knowledge-mcp",
-      "serve",
-      "--knowledge-base",
-      id,
-    ],
+    args: [...launcher.args, "knowledge-mcp", "serve", "--knowledge-base", id],
     enabled,
   };
   const servers = config.mcpServers ?? [];
@@ -1568,7 +1594,7 @@ function knowledgeBaseMCPApply(
 }
 
 function openSACLauncherCommand(): { command: string; args: string[] } {
-  const executable = Deno.execPath();
+  const executable = nodeRuntime.execPath();
   const name = path.basename(executable).toLowerCase();
   if (name === "node" || name.startsWith("node.")) {
     return {
@@ -1587,9 +1613,10 @@ function knowledgeBaseQuery(
   const id = requiredString(input, "id");
   const query = typeof input.query === "string" ? input.query.trim() : "";
   if (query === "") throw new Error("id and query are required");
-  let limit = typeof input.limit === "number" && Number.isFinite(input.limit)
-    ? Math.trunc(input.limit)
-    : 8;
+  let limit =
+    typeof input.limit === "number" && Number.isFinite(input.limit)
+      ? Math.trunc(input.limit)
+      : 8;
   if (limit <= 0) limit = 8;
   if (limit > 20) limit = 20;
   return {
@@ -1731,15 +1758,13 @@ function cronCreate(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   cronFields(input, false);
-  const workDir = typeof input.workDir === "string"
-    ? input.workDir
-    : typeof input.cwd === "string"
-    ? input.cwd
-    : Deno.cwd();
-  const job = cronJobFromInput(
-    { enabled: true, workDir },
-    input,
-  );
+  const workDir =
+    typeof input.workDir === "string"
+      ? input.workDir
+      : typeof input.cwd === "string"
+        ? input.cwd
+        : nodeRuntime.cwd();
+  const job = cronJobFromInput({ enabled: true, workDir }, input);
   return { job: cronJobView(cronStore(settings).create(job)) };
 }
 
@@ -1770,8 +1795,7 @@ async function cronRun(
   input: Record<string, unknown>,
   signal: AbortSignal,
   runCronJob:
-    | ((job: CronJob, signal: AbortSignal) => Promise<string>)
-    | undefined,
+    ((job: CronJob, signal: AbortSignal) => Promise<string>) | undefined,
   triggerCronJob: ((id: string, signal: AbortSignal) => void) | undefined,
 ): Promise<Record<string, unknown>> {
   cronFields(input, true);
@@ -1793,9 +1817,10 @@ function deliveriesList(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   const sessionId = typeof input.sessionId === "string" ? input.sessionId : "";
-  const limit = typeof input.limit === "number" && Number.isFinite(input.limit)
-    ? Math.trunc(input.limit)
-    : 0;
+  const limit =
+    typeof input.limit === "number" && Number.isFinite(input.limit)
+      ? Math.trunc(input.limit)
+      : 0;
   const failures = listDeliveryFailures(
     getSessionDir(settings),
     sessionId,
@@ -1864,11 +1889,12 @@ function statsQuery(input: Record<string, unknown>): StatsQuery {
       query[field] = input[field] as string;
     }
   }
-  const group = typeof input.group === "string"
-    ? input.group.trim()
-    : typeof input.groupBy === "string"
-    ? input.groupBy.trim()
-    : "day";
+  const group =
+    typeof input.group === "string"
+      ? input.group.trim()
+      : typeof input.groupBy === "string"
+        ? input.groupBy.trim()
+        : "day";
   if (!["day", "1h", "week", "month"].includes(group)) {
     throw new Error("group must be one of day, 1h, week, month");
   }
@@ -1895,9 +1921,11 @@ function parseStatsDate(value: string, endOfDay: boolean): Date | null {
     const day = Number(dateOnly[3]);
     const date = new Date(Date.UTC(year, month - 1, day));
     if (
-      date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 ||
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
       date.getUTCDate() !== day
-    ) return null;
+    )
+      return null;
     if (endOfDay) date.setUTCDate(date.getUTCDate() + 1);
     return date;
   }
@@ -1908,9 +1936,9 @@ function parseStatsDate(value: string, endOfDay: boolean): Date | null {
 function openStatsDB(settings: Settings): StatsDB | null {
   const dbPath = path.join(getSessionDir(settings), "sessions.db");
   try {
-    Deno.statSync(dbPath);
+    nodeRuntime.statSync(dbPath);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return null;
+    if (err instanceof nodeRuntime.errors.NotFound) return null;
     throw err;
   }
   return StatsDB.open(dbPath);
@@ -1997,10 +2025,9 @@ function setMCP(
   if (!Array.isArray(serversRaw)) throw new Error("servers array is required");
   const target = mcpTarget(settings, input);
   const existing = loadMCPConfigAtPath(target.path);
-  const byName = new Map((existing.mcpServers ?? []).map((server) => [
-    server.name,
-    server,
-  ]));
+  const byName = new Map(
+    (existing.mcpServers ?? []).map((server) => [server.name, server]),
+  );
   const next: MCPServer[] = [];
   const seen = new Set<string>();
   for (const raw of serversRaw) {
@@ -2027,7 +2054,10 @@ function setMCP(
       }
       const type = fields.type.trim();
       if (
-        type !== "" && type !== "stdio" && type !== "http" && type !== "sse"
+        type !== "" &&
+        type !== "stdio" &&
+        type !== "http" &&
+        type !== "sse"
       ) {
         throw new Error(`server ${name}: type must be one of stdio, http, sse`);
       }
@@ -2060,7 +2090,8 @@ function setMCP(
       for (const rawPair of fields[field]) {
         const pair = requireObject(rawPair, `${field} entry`);
         if (
-          typeof pair.name !== "string" || pair.name.trim() === "" ||
+          typeof pair.name !== "string" ||
+          pair.name.trim() === "" ||
           typeof pair.value !== "string"
         ) {
           throw new Error(
@@ -2089,7 +2120,8 @@ function setMCP(
       );
     }
     if (
-      (type === "http" || type === "sse") && (server.url ?? "").trim() === ""
+      (type === "http" || type === "sse") &&
+      (server.url ?? "").trim() === ""
     ) {
       throw new Error(
         `server ${server.name}: ${type} transport requires a url`,
@@ -2124,7 +2156,7 @@ function loadMCPConfigAtPath(targetPath: string): MCPConfig {
     normalizeMCPConfig(config);
     return config;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return {};
+    if (err instanceof nodeRuntime.errors.NotFound) return {};
     throw new Error(`load MCP config: ${(err as Error).message}`);
   }
 }
@@ -2133,13 +2165,11 @@ function mcpTarget(
   settings: Settings,
   input: Record<string, unknown>,
 ): { scope: string; sessionId: string; path: string } {
-  const rawScope = typeof input.scope === "string"
-    ? input.scope.trim()
-    : "global";
+  const rawScope =
+    typeof input.scope === "string" ? input.scope.trim() : "global";
   const scope = rawScope === "" ? "global" : rawScope;
-  const sessionId = typeof input.sessionId === "string"
-    ? input.sessionId.trim()
-    : "";
+  const sessionId =
+    typeof input.sessionId === "string" ? input.sessionId.trim() : "";
   if (scope === "global") {
     return { scope, sessionId: "", path: globalMCPPath() };
   }
@@ -2158,9 +2188,8 @@ function listMCP(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   const scope = typeof input.scope === "string" ? input.scope.trim() : "global";
-  const sessionId = typeof input.sessionId === "string"
-    ? input.sessionId.trim()
-    : "";
+  const sessionId =
+    typeof input.sessionId === "string" ? input.sessionId.trim() : "";
   const resolvedScope = scope === "" ? "global" : scope;
   let targetPath: string;
   if (resolvedScope === "global") {
@@ -2178,7 +2207,7 @@ function listMCP(
   try {
     config = loadMCPConfig(targetPath);
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) config = {};
+    if (err instanceof nodeRuntime.errors.NotFound) config = {};
     else throw new Error(`load MCP config: ${(err as Error).message}`);
   }
   normalizeMCPConfig(config);
@@ -2222,7 +2251,7 @@ function listSkills(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   const cwd = typeof input.cwd === "string" ? input.cwd.trim() : "";
-  const target = cwd === "" ? Deno.cwd() : cwd;
+  const target = cwd === "" ? nodeRuntime.cwd() : cwd;
   if (!path.isAbsolute(target)) throw new Error("cwd must be an absolute path");
   const manager = createSkillsManager(
     getGlobalSkillsDir(settings),
@@ -2250,7 +2279,7 @@ function setSkill(
     throw new Error("name and enabled are required");
   }
   const cwd = typeof input.cwd === "string" ? input.cwd.trim() : "";
-  const target = cwd === "" ? Deno.cwd() : cwd;
+  const target = cwd === "" ? nodeRuntime.cwd() : cwd;
   if (!path.isAbsolute(target)) throw new Error("cwd must be an absolute path");
   const manager = createSkillsManager(
     getGlobalSkillsDir(settings),
@@ -2340,11 +2369,7 @@ const applicationSectionFields: Record<string, ReadonlySet<string>> = {
     "tmpSize",
     "protectGit",
   ]),
-  approval: new Set([
-    "bashWhitelist",
-    "bashBlacklist",
-    "confirmBeforeWrite",
-  ]),
+  approval: new Set(["bashWhitelist", "bashBlacklist", "confirmBeforeWrite"]),
 };
 
 function applicationPatch(
@@ -2359,31 +2384,33 @@ function applicationPatch(
   }
   const next: Settings = {
     ...settings,
-    contextFiles: settings.contextFiles === undefined
-      ? undefined
-      : { ...settings.contextFiles },
-    compaction: settings.compaction === undefined
-      ? undefined
-      : { ...settings.compaction },
-    toolExecution: settings.toolExecution === undefined
-      ? undefined
-      : { ...settings.toolExecution },
-    webSearch: settings.webSearch === undefined
-      ? undefined
-      : { ...settings.webSearch },
-    imageGeneration: settings.imageGeneration === undefined
-      ? undefined
-      : { ...settings.imageGeneration },
+    contextFiles:
+      settings.contextFiles === undefined
+        ? undefined
+        : { ...settings.contextFiles },
+    compaction:
+      settings.compaction === undefined
+        ? undefined
+        : { ...settings.compaction },
+    toolExecution:
+      settings.toolExecution === undefined
+        ? undefined
+        : { ...settings.toolExecution },
+    webSearch:
+      settings.webSearch === undefined ? undefined : { ...settings.webSearch },
+    imageGeneration:
+      settings.imageGeneration === undefined
+        ? undefined
+        : { ...settings.imageGeneration },
     retry: settings.retry === undefined ? undefined : { ...settings.retry },
-    statusLine: settings.statusLine === undefined
-      ? undefined
-      : { ...settings.statusLine },
-    sandbox: settings.sandbox === undefined
-      ? undefined
-      : { ...settings.sandbox },
-    approval: settings.approval === undefined
-      ? undefined
-      : { ...settings.approval },
+    statusLine:
+      settings.statusLine === undefined
+        ? undefined
+        : { ...settings.statusLine },
+    sandbox:
+      settings.sandbox === undefined ? undefined : { ...settings.sandbox },
+    approval:
+      settings.approval === undefined ? undefined : { ...settings.approval },
   };
   const raw = readRawGlobalSettings();
   const updates: Record<string, unknown> = {};
@@ -2411,9 +2438,10 @@ function applicationPatch(
       continue;
     }
     const currentRaw = raw[section];
-    const current = currentRaw === undefined || currentRaw === null
-      ? {}
-      : requireObject(currentRaw, `application section ${section}`);
+    const current =
+      currentRaw === undefined || currentRaw === null
+        ? {}
+        : requireObject(currentRaw, `application section ${section}`);
     const persisted = { ...current, ...fields };
     updates[section] = persisted;
     const target = next as unknown as Record<string, unknown>;
@@ -2720,9 +2748,8 @@ async function testProvider(
   input: Record<string, unknown>,
   providerFactory: typeof createProvider,
 ): Promise<Record<string, unknown>> {
-  const providerID = typeof input.provider === "string"
-    ? input.provider.trim()
-    : "";
+  const providerID =
+    typeof input.provider === "string" ? input.provider.trim() : "";
   if (providerID === "") throw new Error("provider is required");
   let modelID = typeof input.model === "string" ? input.model.trim() : "";
   if (modelID === "" && providerID === settings.defaultProvider) {
@@ -2733,28 +2760,29 @@ async function testProvider(
     created = providerFactory(settings, providerID, modelID);
   } catch (err) {
     throw new Error(
-      `provider test failed: ${
-        redactProviderError(settings, (err as Error).message)
-      }`,
+      `provider test failed: ${redactProviderError(
+        settings,
+        (err as Error).message,
+      )}`,
     );
   }
   const targetModel = created.model.id || modelID;
   const started = Date.now();
   try {
-    for await (
-      const event of created.provider.chat({
-        modelId: targetModel,
-        thinkingLevel: thinkingOff,
-        maxTokens: 1,
-        systemPrompt: "",
-        messages: [{
+    for await (const event of created.provider.chat({
+      modelId: targetModel,
+      thinkingLevel: thinkingOff,
+      maxTokens: 1,
+      systemPrompt: "",
+      messages: [
+        {
           role: "user",
           content: "ping",
           timestamp: new Date(),
-        }],
-        abort: AbortSignal.timeout(5_000),
-      })
-    ) {
+        },
+      ],
+      abort: AbortSignal.timeout(5_000),
+    })) {
       if (event.type === streamError) {
         return {
           ok: false,
@@ -2796,12 +2824,10 @@ async function testProvider(
 function redactProviderError(settings: Settings, message: string): string {
   let result = message;
   for (const provider of Object.values(settings.providers ?? {})) {
-    for (
-      const secret of [
-        provider.apiKey,
-        ...Object.values(provider.headers ?? {}),
-      ]
-    ) {
+    for (const secret of [
+      provider.apiKey,
+      ...Object.values(provider.headers ?? {}),
+    ]) {
       if (typeof secret === "string" && secret.length >= 4) {
         result = result.split(secret).join("***");
       }
@@ -2821,10 +2847,13 @@ async function discoverProvider(
   const apiKey = typeof input.apiKey === "string" ? input.apiKey : "";
   const httpProxy = typeof input.httpProxy === "string" ? input.httpProxy : "";
   const forceHTTP11 = input.forceHTTP11 === true;
-  const headers = input.headers !== undefined && input.headers !== null &&
-      typeof input.headers === "object" && !Array.isArray(input.headers)
-    ? input.headers as Record<string, string>
-    : undefined;
+  const headers =
+    input.headers !== undefined &&
+    input.headers !== null &&
+    typeof input.headers === "object" &&
+    !Array.isArray(input.headers)
+      ? (input.headers as Record<string, string>)
+      : undefined;
   try {
     const models = await discoverModels(AbortSignal.timeout(30_000), {
       api,
@@ -2875,13 +2904,15 @@ function saveProvider(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   const id = typeof input.id === "string" ? input.id.trim() : "";
-  const previousId = typeof input.previousId === "string"
-    ? input.previousId.trim()
-    : "";
+  const previousId =
+    typeof input.previousId === "string" ? input.previousId.trim() : "";
   const providerRaw = input.provider;
   if (
-    id === "" || providerRaw === undefined || providerRaw === null ||
-    typeof providerRaw !== "object" || Array.isArray(providerRaw) ||
+    id === "" ||
+    providerRaw === undefined ||
+    providerRaw === null ||
+    typeof providerRaw !== "object" ||
+    Array.isArray(providerRaw) ||
     Object.keys(providerRaw).length === 0
   ) {
     throw new Error("id and provider are required");
@@ -2891,22 +2922,22 @@ function saveProvider(
   }
   const fields = decodeProviderFields(providerRaw);
   const raw = readRawGlobalSettings();
-  const rawProviders = raw.providers === undefined
-    ? {}
-    : requireObject(raw.providers, "settings.providers");
+  const rawProviders =
+    raw.providers === undefined
+      ? {}
+      : requireObject(raw.providers, "settings.providers");
   const sourceId = previousId === "" ? id : previousId;
   if (
-    sourceId !== id && !Object.prototype.hasOwnProperty.call(
-      rawProviders,
-      sourceId,
-    )
+    sourceId !== id &&
+    !Object.prototype.hasOwnProperty.call(rawProviders, sourceId)
   ) {
     throw new Error(`provider ${JSON.stringify(sourceId)} is not configured`);
   }
   const existing = rawProviders[sourceId];
-  const entry: Record<string, unknown> = existing === undefined
-    ? {}
-    : { ...requireObject(existing, `provider ${sourceId}`) };
+  const entry: Record<string, unknown> =
+    existing === undefined
+      ? {}
+      : { ...requireObject(existing, `provider ${sourceId}`) };
   for (const key of Object.keys(fields)) delete entry[key];
   Object.assign(entry, fields);
   if (Object.prototype.hasOwnProperty.call(input, "apiKey")) {
@@ -2916,7 +2947,8 @@ function saveProvider(
     entry.apiKey = input.apiKey;
   }
   if (
-    sourceId !== id && Object.prototype.hasOwnProperty.call(rawProviders, id)
+    sourceId !== id &&
+    Object.prototype.hasOwnProperty.call(rawProviders, id)
   ) {
     throw new Error(`provider ${JSON.stringify(id)} already exists`);
   }
@@ -2940,9 +2972,10 @@ function deleteProvider(
     throw new Error("choose another default provider before deleting this one");
   }
   const raw = readRawGlobalSettings();
-  const rawProviders = raw.providers === undefined
-    ? {}
-    : requireObject(raw.providers, "settings.providers");
+  const rawProviders =
+    raw.providers === undefined
+      ? {}
+      : requireObject(raw.providers, "settings.providers");
   if (!Object.prototype.hasOwnProperty.call(rawProviders, id)) {
     throw new Error(
       `provider ${JSON.stringify(id)} has no global override to delete`,
@@ -2963,18 +2996,21 @@ function decodeProviderFields(raw: object): Record<string, unknown> {
       ["vendor", "baseUrl", "httpProxy", "api", "thinkingFormat"].includes(
         key,
       ) &&
-      value !== undefined && typeof value !== "string"
+      value !== undefined &&
+      typeof value !== "string"
     ) {
       throw new Error(`provider field ${key} must be a string`);
     }
     if (
       ["forceHTTP11", "cacheControl"].includes(key) &&
-      value !== undefined && typeof value !== "boolean"
+      value !== undefined &&
+      typeof value !== "boolean"
     ) {
       throw new Error(`provider field ${key} must be a boolean`);
     }
     if (
-      key === "maxImagesPerRequest" && value !== undefined &&
+      key === "maxImagesPerRequest" &&
+      value !== undefined &&
       typeof value !== "number"
     ) {
       throw new Error("provider field maxImagesPerRequest must be a number");
@@ -2993,7 +3029,9 @@ function decodeProviderFields(raw: object): Record<string, unknown> {
       const seen = new Set<string>();
       for (const model of value) {
         if (
-          model === null || typeof model !== "object" || Array.isArray(model)
+          model === null ||
+          typeof model !== "object" ||
+          Array.isArray(model)
         ) {
           throw new Error("each model must be an object");
         }
@@ -3016,9 +3054,9 @@ function decodeProviderFields(raw: object): Record<string, unknown> {
 function readRawGlobalSettings(): Record<string, unknown> {
   let text: string;
   try {
-    text = Deno.readTextFileSync(globalSettingsPath());
+    text = nodeRuntime.readTextFileSync(globalSettingsPath());
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return {};
+    if (err instanceof nodeRuntime.errors.NotFound) return {};
     throw new Error(`read global settings: ${(err as Error).message}`);
   }
   if (text.trim() === "") return {};
@@ -3035,9 +3073,7 @@ function requireObject(value: unknown, label: string): Record<string, unknown> {
 
 function maskProviderKey(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? "";
-  if (
-    trimmed === "" || trimmed.startsWith("${") || trimmed.startsWith("!")
-  ) {
+  if (trimmed === "" || trimmed.startsWith("${") || trimmed.startsWith("!")) {
     return null;
   }
   if (trimmed.length <= 6) return "***";
@@ -3045,10 +3081,12 @@ function maskProviderKey(value: string | undefined): string | null {
 }
 
 function envView(config = loadEnv()): Record<string, unknown> {
-  const variables = Object.keys(envList(config)).sort().map((name) => ({
-    name,
-    valueConfigured: true,
-  }));
+  const variables = Object.keys(envList(config))
+    .sort()
+    .map((name) => ({
+      name,
+      valueConfigured: true,
+    }));
   return { variables };
 }
 
@@ -3145,8 +3183,7 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
   #multiAgentEnabled = false;
   /** The running ESM continuation worker, if any. */
   #esmWorker:
-    | { runId: string; cancel: () => void; done: Promise<void> }
-    | undefined;
+    { runId: string; cancel: () => void; done: Promise<void> } | undefined;
   /** The ESM role agent currently executing, if any. */
   #esmActiveAgentId = "";
 
@@ -3173,15 +3210,17 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     this.#providerName = input.providerName;
     this.#modelID = input.modelID;
     this.#mode = input.mode ?? input.settings.defaultMode ?? "yolo";
-    this.#thinkingLevel = input.thinkingLevel ??
-      input.settings.defaultThinkingLevel ?? "";
+    this.#thinkingLevel =
+      input.thinkingLevel ?? input.settings.defaultThinkingLevel ?? "";
     this.#multiAgentEnabled = input.capabilities?.multiAgent === true;
-    this.#approvalPolicy = (input.approvalPolicy ?? "").trim() !== ""
-      ? (input.approvalPolicy as string)
-      : "runtime";
-    this.#questionPolicy = (input.questionPolicy ?? "").trim() !== ""
-      ? (input.questionPolicy as string)
-      : "runtime";
+    this.#approvalPolicy =
+      (input.approvalPolicy ?? "").trim() !== ""
+        ? (input.approvalPolicy as string)
+        : "runtime";
+    this.#questionPolicy =
+      (input.questionPolicy ?? "").trim() !== ""
+        ? (input.questionPolicy as string)
+        : "runtime";
     this.#providerFactory = input.providerFactory ?? createProvider;
     this.#reverseRequest = input.reverseRequest;
     this.#openExisting = input.openExisting === true;
@@ -3197,10 +3236,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     const manager = this.#openExisting
       ? openSessionForWorkDir(this.#workDir, sessionDir, this.sessionId)
       : openOrCreateSession({
-        workDir: this.#workDir,
-        sessionDir,
-        id: this.sessionId,
-      });
+          workDir: this.#workDir,
+          sessionDir,
+          id: this.sessionId,
+        });
     this.#manager = manager;
     return manager;
   }
@@ -3296,9 +3335,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     return { manager, runtime };
   }
 
-  async setSkillActive(
-    input: { name: string; active: boolean },
-  ): Promise<void> {
+  async setSkillActive(input: {
+    name: string;
+    active: boolean;
+  }): Promise<void> {
     const name = input.name.trim();
     if (name === "") throw new Error("skill name is required");
     if (input.active) this.#activeSkills.set(name, true);
@@ -3523,9 +3563,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
 
   #esmView(objective: Objective | null): CoreEsmView {
     return {
-      objective: objective === null || objective.esmId === ""
-        ? null
-        : esmObjectiveView(objective),
+      objective:
+        objective === null || objective.esmId === ""
+          ? null
+          : esmObjectiveView(objective),
       workerRunning: this.#esmWorker !== undefined,
       activeAgentId: this.#esmActiveAgentId,
     };
@@ -3641,9 +3682,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
             return;
           }
           if (result.error !== undefined && result.error !== null) {
-            const message = result.error instanceof Error
-              ? result.error.message
-              : String(result.error);
+            const message =
+              result.error instanceof Error
+                ? result.error.message
+                : String(result.error);
             queue.push({
               eventType: "esm_finished",
               payload: {
@@ -3725,9 +3767,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
       }
     }
     // The rule/extra context is Core-owned session state.
-    const extra = runtime.extraContext === ""
-      ? TRANSIENT_SYSTEM_HINT
-      : `${runtime.extraContext}\n\n${TRANSIENT_SYSTEM_HINT}`;
+    const extra =
+      runtime.extraContext === ""
+        ? TRANSIENT_SYSTEM_HINT
+        : `${runtime.extraContext}\n\n${TRANSIENT_SYSTEM_HINT}`;
     const agent = runtime.buildTransientAgent(registry, {
       id: "btw",
       provider: created.provider,
@@ -3859,10 +3902,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     // Core process through the shared lease-first recovery path, then retries,
     // so a restart surfaces a real recovery result instead of a raw
     // recovery-required error.
-    const admission = currentRuntimeLeaseBinding(sessionDir, this.sessionId) ===
-        null
-      ? await acquireExecutionAdmission(undefined, sessionDir, this.sessionId)
-      : null;
+    const admission =
+      currentRuntimeLeaseBinding(sessionDir, this.sessionId) === null
+        ? await acquireExecutionAdmission(undefined, sessionDir, this.sessionId)
+        : null;
     try {
       return await this.#promptOwned(input, manager, runtime, admission);
     } catch (error) {
@@ -3891,13 +3934,14 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
     const execution = createSessionExecutionRuntime(manager.getSessionDir());
     runtime.setExecution(execution);
     const preparedInputs = input.preparedInputs ?? [];
-    const submission = preparedInputs.length > 0
-      ? runtime.attachPreparedInput(
-        undefined,
-        input.text,
-        preparedInputs as PreparedInput[],
-      )
-      : await runtime.acceptInput(undefined, runId, input.text, []);
+    const submission =
+      preparedInputs.length > 0
+        ? runtime.attachPreparedInput(
+            undefined,
+            input.text,
+            preparedInputs as PreparedInput[],
+          )
+        : await runtime.acceptInput(undefined, runId, input.text, []);
     let userMessage;
     try {
       userMessage = runtime.buildUserMessage(undefined, submission);
@@ -3956,9 +4000,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
       let terminal = false;
       let terminalState: RunState = "completed";
       try {
-        for await (
-          const event of agent.runWithUserMessage(userMessage, signal)
-        ) {
+        for await (const event of agent.runWithUserMessage(
+          userMessage,
+          signal,
+        )) {
           // The durable Run's facts and its terminal assistant message are
           // staged by the shared execution observation (the same contract ACP
           // uses). Without it `FinishDurable` has no assistant message to
@@ -3985,9 +4030,10 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
             (event.type === EVENT_TOOL_APPROVAL_REQUEST ||
               event.type === EVENT_QUESTION_REQUEST)
           ) {
-            const requestId = event.type === EVENT_TOOL_APPROVAL_REQUEST
-              ? event.approvalId ?? `${runId}:approval`
-              : event.questionId ?? `${runId}:question`;
+            const requestId =
+              event.type === EVENT_TOOL_APPROVAL_REQUEST
+                ? (event.approvalId ?? `${runId}:approval`)
+                : (event.questionId ?? `${runId}:question`);
             const response = await reverseRequest(
               requestId,
               event.type === EVENT_TOOL_APPROVAL_REQUEST
@@ -4014,19 +4060,23 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
             }
             const result = response.result;
             if (event.type === EVENT_TOOL_APPROVAL_REQUEST) {
-              const approved = typeof result === "boolean"
-                ? result
-                : typeof result === "object" && result !== null &&
-                  (result as Record<string, unknown>).approved === true;
+              const approved =
+                typeof result === "boolean"
+                  ? result
+                  : typeof result === "object" &&
+                    result !== null &&
+                    (result as Record<string, unknown>).approved === true;
               agent.handleApprovalResponse(requestId, approved);
             } else {
-              const answer = typeof result === "string"
-                ? result
-                : typeof result === "object" && result !== null &&
-                    typeof (result as Record<string, unknown>).answer ===
-                      "string"
-                ? (result as Record<string, string>).answer
-                : "";
+              const answer =
+                typeof result === "string"
+                  ? result
+                  : typeof result === "object" &&
+                      result !== null &&
+                      typeof (result as Record<string, unknown>).answer ===
+                        "string"
+                    ? (result as Record<string, string>).answer
+                    : "";
               agent.handleQuestionResponse(requestId, answer);
             }
             continue;
@@ -4041,13 +4091,14 @@ class ProductionCoreSessionRuntime implements CoreSessionRuntime {
           if (event.type === EVENT_ERROR) payload.status = "failed";
           if (shared.terminal) {
             const status = payload.status;
-            terminalState = status === "cancelled" || status === "canceled"
-              ? "cancelled"
-              : status === "failed" || status === "error"
-              ? "failed"
-              : status === "timed_out"
-              ? "timed_out"
-              : "completed";
+            terminalState =
+              status === "cancelled" || status === "canceled"
+                ? "cancelled"
+                : status === "failed" || status === "error"
+                  ? "failed"
+                  : status === "timed_out"
+                    ? "timed_out"
+                    : "completed";
             // Commit the durable terminal transition *before* the terminal
             // event becomes visible to subscribers. A front end that reprints
             // on the terminal event (or reads the transcript right after the
@@ -4184,13 +4235,15 @@ export async function createCoreRuntimeHost(
   ): SessionRecord => {
     ensureOpen();
     const timestamp = now();
-    const explicit = sessionId.trim() !== ""
-      ? sessionId.trim()
-      : (input.sessionId ?? "").trim();
+    const explicit =
+      sessionId.trim() !== ""
+        ? sessionId.trim()
+        : (input.sessionId ?? "").trim();
     const resolvedId = explicit !== "" ? explicit : newId();
-    const resolvedSource = (input.source ?? "").trim() !== ""
-      ? (input.source as string)
-      : options.source;
+    const resolvedSource =
+      (input.source ?? "").trim() !== ""
+        ? (input.source as string)
+        : options.source;
     const view: CoreSessionView = {
       sessionId: resolvedId,
       workDir: input.workDir,
@@ -4200,17 +4253,19 @@ export async function createCoreRuntimeHost(
       mode: input.mode ?? "",
       thinkingLevel: input.thinkingLevel ?? "",
       capabilities: { ...(input.capabilities ?? {}) },
-      approvalPolicy: (input.approvalPolicy ?? "").trim() !== ""
-        ? (input.approvalPolicy as string)
-        : "runtime",
-      questionPolicy: (input.questionPolicy ?? "").trim() !== ""
-        ? (input.questionPolicy as string)
-        : "runtime",
+      approvalPolicy:
+        (input.approvalPolicy ?? "").trim() !== ""
+          ? (input.approvalPolicy as string)
+          : "runtime",
+      questionPolicy:
+        (input.questionPolicy ?? "").trim() !== ""
+          ? (input.questionPolicy as string)
+          : "runtime",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
     const createRuntime = openExisting
-      ? dependencies.openSessionRuntime ?? dependencies.createSessionRuntime
+      ? (dependencies.openSessionRuntime ?? dependencies.createSessionRuntime)
       : dependencies.createSessionRuntime;
     const runtime = createRuntime({
       sessionId: resolvedId,
@@ -4233,7 +4288,8 @@ export async function createCoreRuntimeHost(
       view.workDir = persisted.workDir;
     }
     if (
-      persisted?.mode !== undefined && persisted.mode.trim() !== "" &&
+      persisted?.mode !== undefined &&
+      persisted.mode.trim() !== "" &&
       (input.mode ?? "").trim() === ""
     ) {
       view.mode = persisted.mode;
@@ -4271,8 +4327,10 @@ export async function createCoreRuntimeHost(
     if (terminal && typeof payload.status === "string") {
       const status = payload.status;
       if (
-        status === "completed" || status === "cancelled" ||
-        status === "failed" || status === "timed_out"
+        status === "completed" ||
+        status === "cancelled" ||
+        status === "failed" ||
+        status === "timed_out"
       ) {
         run.status = status;
       }
@@ -4420,9 +4478,8 @@ export async function createCoreRuntimeHost(
     async listPersistedSessions(input) {
       await Promise.resolve();
       ensureOpen();
-      const workDir = (input.workDir ?? "").trim() !== ""
-        ? input.workDir!
-        : options.workDir;
+      const workDir =
+        (input.workDir ?? "").trim() !== "" ? input.workDir! : options.workDir;
       return listPersistedSessionInfos(
         workDir,
         getSessionDir(options.settings),
@@ -4474,7 +4531,7 @@ export async function createCoreRuntimeHost(
 
     async listSessionSkills(input) {
       const record = requireSession(input.sessionId);
-      return await record.runtime.listSkills?.() ?? [];
+      return (await record.runtime.listSkills?.()) ?? [];
     },
 
     async prepareInput(input) {
@@ -4490,30 +4547,32 @@ export async function createCoreRuntimeHost(
 
     async sessionCapabilities(input) {
       const record = requireSession(input.sessionId);
-      return await record.runtime.capabilityView?.() ?? {};
+      return (await record.runtime.capabilityView?.()) ?? {};
     },
 
     async sessionContext(input) {
       const record = requireSession(input.sessionId);
-      return await record.runtime.contextView?.() ?? {
-        ruleContent: "",
-        extraContext: "",
-      };
+      return (
+        (await record.runtime.contextView?.()) ?? {
+          ruleContent: "",
+          extraContext: "",
+        }
+      );
     },
 
     async setSessionContext(input) {
       const record = requireSession(input.sessionId);
       const setContext = record.runtime.setContext;
       if (setContext === undefined) {
-        throw new Error(
-          "session context is not available in the Core Runtime",
-        );
+        throw new Error("session context is not available in the Core Runtime");
       }
       await setContext.call(record.runtime, input);
-      return await record.runtime.contextView?.() ?? {
-        ruleContent: "",
-        extraContext: "",
-      };
+      return (
+        (await record.runtime.contextView?.()) ?? {
+          ruleContent: "",
+          extraContext: "",
+        }
+      );
     },
 
     async listExperts(input) {
@@ -4540,7 +4599,7 @@ export async function createCoreRuntimeHost(
 
     async expertState(input) {
       const record = requireSession(input.sessionId);
-      return await record.runtime.expertState?.() ?? { expertId: "" };
+      return (await record.runtime.expertState?.()) ?? { expertId: "" };
     },
 
     async setExpert(input) {
@@ -4550,9 +4609,11 @@ export async function createCoreRuntimeHost(
         throw new Error("expert binding is not available in the Core Runtime");
       }
       await setExpert.call(record.runtime, input.expertId);
-      return await record.runtime.expertState?.() ?? {
-        expertId: input.expertId,
-      };
+      return (
+        (await record.runtime.expertState?.()) ?? {
+          expertId: input.expertId,
+        }
+      );
     },
 
     async forkSession(input) {
@@ -4578,7 +4639,7 @@ export async function createCoreRuntimeHost(
     async listAgents(input) {
       await Promise.resolve();
       const record = requireSession(input.sessionId);
-      return await record.runtime.listAgents?.() ?? [];
+      return (await record.runtime.listAgents?.()) ?? [];
     },
 
     async destroyAgent(input) {
@@ -4607,7 +4668,7 @@ export async function createCoreRuntimeHost(
       await Promise.resolve();
       const record = requireSession(input.sessionId);
       return {
-        enabled: await record.runtime.delegateState?.() ?? false,
+        enabled: (await record.runtime.delegateState?.()) ?? false,
       };
     },
 
@@ -4629,11 +4690,13 @@ export async function createCoreRuntimeHost(
     async esmState(input) {
       await Promise.resolve();
       const record = requireSession(input.sessionId);
-      return await record.runtime.esmState?.() ?? {
-        objective: null,
-        workerRunning: false,
-        activeAgentId: "",
-      };
+      return (
+        (await record.runtime.esmState?.()) ?? {
+          objective: null,
+          workerRunning: false,
+          activeAgentId: "",
+        }
+      );
     },
 
     async esmUpdate(input) {
@@ -4746,9 +4809,10 @@ export async function createCoreRuntimeHost(
 
     async updateSettingsDocument(input) {
       await Promise.resolve();
-      const workDir = input.workDir === undefined || input.workDir === ""
-        ? options.workDir
-        : input.workDir;
+      const workDir =
+        input.workDir === undefined || input.workDir === ""
+          ? options.workDir
+          : input.workDir;
       const fresh = updateSettingsDocumentFor(
         input.scope,
         input.updates,
@@ -4802,8 +4866,9 @@ export async function createCoreRuntimeHost(
       return (async function* () {
         let position = cursor;
         while (true) {
-          const event = record.events.find((candidate) =>
-            candidate.runId === runId && candidate.sequence > position
+          const event = record.events.find(
+            (candidate) =>
+              candidate.runId === runId && candidate.sequence > position,
           );
           if (event !== undefined) {
             position = event.sequence;
@@ -4813,7 +4878,7 @@ export async function createCoreRuntimeHost(
           }
           if (run.status !== "running") return;
           await new Promise<void>((resolve) =>
-            record.eventWaiters.add(resolve)
+            record.eventWaiters.add(resolve),
           );
         }
       })();

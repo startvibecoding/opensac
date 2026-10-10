@@ -4,7 +4,8 @@
 
 import {
   type ExternalTool,
-  type ExternalToolPromptInfo} from "../../sdk/agent/external_tool.ts";
+  type ExternalToolPromptInfo,
+} from "../../sdk/agent/external_tool.ts";
 import { type ContentBlock } from "../../sdk/agent/types.ts";
 import { type ContentBlock as ProviderContentBlock } from "../provider/types.ts";
 import { type Tool, type ToolContext, type ToolResult } from "../tools/mod.ts";

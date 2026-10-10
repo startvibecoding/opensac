@@ -21,7 +21,8 @@ import {
   type SkillFile,
   type SkillId,
   type SkillSummary,
-  type UserSkillsQuery} from "./types.ts";
+  type UserSkillsQuery,
+} from "./types.ts";
 
 export const clawHubDefaultURL = "https://clawhub.ai";
 
@@ -72,14 +73,14 @@ export class ClawHubClient implements MarketClient {
     q: SearchQuery,
   ): Promise<SearchPage> {
     if ((q.query ?? "").trim() !== "") {
-      const response = await this.fetchJSON(
+      const response = (await this.fetchJSON(
         signal,
         "/api/v1/search",
         { q: [q.query ?? ""], limit: [String(boundedLimit(q.limit))] },
         q.query ?? "",
-      ) as { results?: unknown[] };
+      )) as { results?: unknown[] };
       const items = (response.results ?? []).map((raw) =>
-        summaryOf(parseClawHubSearchItem(raw))
+        summaryOf(parseClawHubSearchItem(raw)),
       );
       return {
         items,
@@ -96,14 +97,14 @@ export class ClawHubClient implements MarketClient {
     if (q.author) values.author = [q.author];
     if (q.verifiedOnly) values.verifiedOnly = ["true"];
     if (q.nonSuspiciousOnly) values.nonSuspiciousOnly = ["true"];
-    const response = await this.fetchJSON(
+    const response = (await this.fetchJSON(
       signal,
       "/api/v1/skills",
       values,
       q.author ?? "",
-    ) as { items?: unknown[]; nextCursor?: string };
+    )) as { items?: unknown[]; nextCursor?: string };
     const items = (response.items ?? []).map((raw) =>
-      clawHubItemSummary(parseClawHubItem(raw))
+      clawHubItemSummary(parseClawHubItem(raw)),
     );
     return {
       items,
@@ -153,12 +154,12 @@ export class ClawHubClient implements MarketClient {
     const values: Record<string, string[]> = {};
     if (version) values.version = [version];
     if (owner) values.owner = [owner];
-    const response = await this.fetchJSON(
+    const response = (await this.fetchJSON(
       signal,
       "/api/v1/skills/" + skillPath(slug) + "/files",
       values,
       slug,
-    ) as { files?: unknown[]; items?: unknown[] };
+    )) as { files?: unknown[]; items?: unknown[] };
     const files = (response.files ?? []).map(parseSkillFile);
     if (files.length > 0) return files;
     return (response.items ?? []).map(parseSkillFile);
@@ -179,10 +180,10 @@ export class ClawHubClient implements MarketClient {
     const values: Record<string, string[]> = {};
     if (version) values.version = [version];
     if (owner) values.owner = [owner];
-    const path = "/api/v1/skills/" + skillPath(slug) + "/files/" +
-      skillPath(filePath);
+    const path =
+      "/api/v1/skills/" + skillPath(slug) + "/files/" + skillPath(filePath);
     try {
-      const response = await this.fetchJSON(signal, path, values, slug) as {
+      const response = (await this.fetchJSON(signal, path, values, slug)) as {
         content?: string;
       };
       if (response.content) return response.content;
@@ -205,14 +206,16 @@ export class ClawHubClient implements MarketClient {
     const values: Record<string, string[]> = {};
     if (version) values.version = [version];
     if (owner) values.owner = [owner];
-    return [{
-      url: endpoint(
-        this.baseURL,
-        "/api/v1/skills/" + skillPath(slug) + "/download",
-        values,
-      ),
-      kind: "api",
-    }];
+    return [
+      {
+        url: endpoint(
+          this.baseURL,
+          "/api/v1/skills/" + skillPath(slug) + "/download",
+          values,
+        ),
+        kind: "api",
+      },
+    ];
   }
 
   async download(
@@ -373,11 +376,11 @@ export class ClawHubClient implements MarketClient {
     }
     if (refs.length === 0) refs.push(originalSlug);
     throw new Error(
-      `skill ${
-        JSON.stringify(originalSlug)
-      } on clawhub.ai is ambiguous; specify which one to install: ${
-        refs.join(", ")
-      }`,
+      `skill ${JSON.stringify(
+        originalSlug,
+      )} on clawhub.ai is ambiguous; specify which one to install: ${refs.join(
+        ", ",
+      )}`,
     );
   }
 
@@ -399,7 +402,10 @@ export function createClawHubClient(
 }
 
 export function skillPath(id: string): string {
-  return id.split("/").map((part) => encodeURIComponent(part)).join("/");
+  return id
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
 }
 
 export function clawSkillRef(id: string): { slug: string; owner: string } {

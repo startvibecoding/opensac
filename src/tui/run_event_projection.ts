@@ -76,10 +76,10 @@ export function coreEventToAgentEvent(
       questionText: stringOr(payload.questionText, ""),
       ...(Array.isArray(payload.questionOptions)
         ? {
-          questionOptions: payload.questionOptions.filter(
-            (entry): entry is string => typeof entry === "string",
-          ),
-        }
+            questionOptions: payload.questionOptions.filter(
+              (entry): entry is string => typeof entry === "string",
+            ),
+          }
         : {}),
       ...(typeof payload.questionContext === "string"
         ? { questionContext: payload.questionContext }

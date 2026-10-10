@@ -236,12 +236,14 @@ export class Editor {
     if (isEmpty && !this.#focus) {
       displayLines = [{ text: "", bufLine: 0, startCol: 0, endCol: 0 }];
     } else if (isEmpty) {
-      displayLines = [{
-        text: this.#renderEmptyLine(),
-        bufLine: 0,
-        startCol: 0,
-        endCol: 0,
-      }];
+      displayLines = [
+        {
+          text: this.#renderEmptyLine(),
+          bufLine: 0,
+          startCol: 0,
+          endCol: 0,
+        },
+      ];
     } else {
       displayLines = this.#buildDisplayLines(availW);
     }
@@ -276,10 +278,13 @@ export class Editor {
   #styleWidth(view: string): string {
     // Apply the padded background to each line, padded to the editor width.
     const inner = this.#width - 2;
-    return view.split("\n").map((line) => {
-      const pad = " ".repeat(Math.max(inner - displayWidth(line), 0));
-      return `${BG} ${line}${pad} ${RESET}`;
-    }).join("\n");
+    return view
+      .split("\n")
+      .map((line) => {
+        const pad = " ".repeat(Math.max(inner - displayWidth(line), 0));
+        return `${BG} ${line}${pad} ${RESET}`;
+      })
+      .join("\n");
   }
 
   #cursorDisplayLine(availW: number): number {
@@ -318,9 +323,9 @@ export class Editor {
     const dimText = `${DIM}${this.#placeholder}${RESET}`;
     if (!this.#cursorOn) return dimText;
     const runes = Array.from(this.#placeholder);
-    return `${REVERSE}${runes[0]}${RESET}${DIM}${
-      runes.slice(1).join("")
-    }${RESET}`;
+    return `${REVERSE}${runes[0]}${RESET}${DIM}${runes
+      .slice(1)
+      .join("")}${RESET}`;
   }
 
   #buildDisplayLines(availW: number): DisplayLine[] {
@@ -345,12 +350,14 @@ export function wrapLineSegments(
 ): DisplayLine[] {
   const runes = Array.from(line);
   if (width <= 0 || displayWidth(line) <= width) {
-    return [{
-      text: line,
-      bufLine,
-      startCol,
-      endCol: startCol + runes.length,
-    }];
+    return [
+      {
+        text: line,
+        bufLine,
+        startCol,
+        endCol: startCol + runes.length,
+      },
+    ];
   }
 
   const result: DisplayLine[] = [];

@@ -300,9 +300,10 @@ function cmdMode(host: CommandHost, parts: string[]): CommandResult {
     YOLO: "commands.permissions.yolo",
     OS: "commands.permissions.os",
   }[current];
-  const message = permission === undefined
-    ? tr.text("commands.current_mode", current)
-    : `${tr.text("commands.current_mode", current)}\n${tr.text(permission)}`;
+  const message =
+    permission === undefined
+      ? tr.text("commands.current_mode", current)
+      : `${tr.text("commands.current_mode", current)}\n${tr.text(permission)}`;
   return { message };
 }
 

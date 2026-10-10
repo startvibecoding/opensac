@@ -1,4 +1,4 @@
-// deno-lint-ignore-file
+/* eslint-disable */
 // Workflow DSL evaluator worker.
 //
 // This module runs the user-authored workflow JavaScript in an isolated worker
@@ -10,7 +10,9 @@
 self.onmessage = (event) => {
   const source = event.data.source;
 
-  const expr = (kind) => (...args) => ({ expr: kind, args });
+  const expr =
+    (kind) =>
+    (...args) => ({ expr: kind, args });
 
   function bodyNodes(value) {
     if (typeof value === "function") {
@@ -71,7 +73,9 @@ self.onmessage = (event) => {
       children: bodyNodes(body),
     };
     if (
-      body && typeof body === "object" && !Array.isArray(body) &&
+      body &&
+      typeof body === "object" &&
+      !Array.isArray(body) &&
       typeof body.concurrency === "number"
     ) {
       workflow.concurrency = Math.trunc(body.concurrency);
@@ -93,7 +97,7 @@ self.onmessage = (event) => {
       "log",
       "concurrency",
     ];
-    // deno-lint-ignore no-new-func
+    // eslint-disable-next-line no-new-func
     const fn = new Function(...params, source);
     fn(
       agent,

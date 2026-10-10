@@ -94,8 +94,8 @@ export function readSessionExecutionFacts(
     if (facts.activeRuns.length === 1) {
       const activeRunId = facts.activeRuns[0].id;
       facts.recovery = readSessionRunRecoveryTx(tx, activeRunId) ?? null;
-      facts.remoteRun = readLinkedResponseRunTx(tx, trimmed, activeRunId) ??
-        null;
+      facts.remoteRun =
+        readLinkedResponseRunTx(tx, trimmed, activeRunId) ?? null;
     }
 
     const record = leaseDAO.find(tx, trimmed);

@@ -33,7 +33,7 @@ test("isAbortError matches by name only, anywhere in the chain", () => {
 });
 
 test("isAbortLike finds a cancel through the whole cause chain", () => {
-  // Deno's default `signal.reason` and the provider sentinel both arrive below a
+  // Node's default `signal.reason` and the provider sentinel both arrive below a
   // generic top-level message.
   const shapes = [
     new Error("aborted"),
@@ -53,15 +53,13 @@ test("isAbortLike finds a cancel through the whole cause chain", () => {
 test("isAbortLike does not mistake a transient socket fault for a cancel", () => {
   // The narrow wording is load-bearing: a bare "aborted" substring match would
   // pull these off the retry path and terminalize a recoverable run.
-  for (
-    const message of [
-      "connection aborted",
-      "aborted stream read",
-      "upstream aborted the transfer",
-      "send request: fetch failed",
-      "connection reset by peer",
-    ]
-  ) {
+  for (const message of [
+    "connection aborted",
+    "aborted stream read",
+    "upstream aborted the transfer",
+    "send request: fetch failed",
+    "connection reset by peer",
+  ]) {
     assertEquals(isAbortLike(new Error(message)), false, message);
   }
 });
@@ -87,9 +85,11 @@ test("isTimeoutError matches the deadline names", () => {
 });
 
 test("isTimeoutLike reads wording through the chain", () => {
-  for (
-    const message of ["deadline exceeded", "request timed out", "idle timeout"]
-  ) {
+  for (const message of [
+    "deadline exceeded",
+    "request timed out",
+    "idle timeout",
+  ]) {
     assert(isTimeoutLike(new Error(message)), message);
     assert(
       isTimeoutLike(

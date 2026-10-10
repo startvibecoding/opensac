@@ -62,9 +62,8 @@ export class ExtendBudgetTool implements Tool {
     if (budget === undefined) {
       throw new Error("iteration budget renewal is not available for this run");
     }
-    const reason = typeof params["reason"] === "string"
-      ? params["reason"] as string
-      : "";
+    const reason =
+      typeof params["reason"] === "string" ? (params["reason"] as string) : "";
     if (reason.length === 0) {
       throw new Error("reason is required to request more turns");
     }

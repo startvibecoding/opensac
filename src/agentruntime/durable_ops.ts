@@ -80,9 +80,9 @@ export function recoverDurableRun(
         latest = listSessionRunEvents(sessionDir, run.sessionId);
       } catch (listErr) {
         throw new Error(
-          `record recovered run event: ${
-            errorMessage(err)
-          } (verify existing event: ${errorMessage(listErr)})`,
+          `record recovered run event: ${errorMessage(
+            err,
+          )} (verify existing event: ${errorMessage(listErr)})`,
         );
       }
       found = latest.some((existing) => existing.id === event.id);

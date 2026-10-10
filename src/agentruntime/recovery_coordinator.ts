@@ -50,13 +50,13 @@ export class RecoveryCoordinator {
 
   constructor(sessionDir: string, options: RecoveryCoordinatorOptions = {}) {
     this.sessionDir = sessionDir;
-    let scanIntervalMs = options.scanIntervalMs ??
-      defaultRecoveryScanIntervalMs;
+    let scanIntervalMs =
+      options.scanIntervalMs ?? defaultRecoveryScanIntervalMs;
     if (scanIntervalMs <= 0 || scanIntervalMs > defaultRecoveryScanIntervalMs) {
       scanIntervalMs = defaultRecoveryScanIntervalMs;
     }
-    let attemptTimeoutMs = options.attemptTimeoutMs ??
-      defaultRecoveryAttemptTimeoutMs;
+    let attemptTimeoutMs =
+      options.attemptTimeoutMs ?? defaultRecoveryAttemptTimeoutMs;
     if (
       attemptTimeoutMs <= 0 ||
       attemptTimeoutMs > defaultRecoveryAttemptTimeoutMs

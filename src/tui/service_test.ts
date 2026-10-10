@@ -20,9 +20,10 @@ test("fake TUIService admits a prompt and streams its run to a terminal event", 
     text: "hello",
   });
   const events: CoreRuntimeEvent[] = [];
-  for await (
-    const event of service.subscribeRunEvents(session.sessionId, accepted.runId)
-  ) {
+  for await (const event of service.subscribeRunEvents(
+    session.sessionId,
+    accepted.runId,
+  )) {
     events.push(event);
   }
   assertEquals(accepted.status, "running");
@@ -59,20 +60,20 @@ test("fake TUIService rejects unknown sessions with stable errors", async () => 
 
   await assertSessionError(() => service.openSession({ sessionId: missing }));
   await assertSessionError(() =>
-    service.prompt({ sessionId: missing, text: "hello" })
+    service.prompt({ sessionId: missing, text: "hello" }),
   );
   await assertSessionError(() =>
-    service.cancelRun({ sessionId: missing, runId: "run-1" })
+    service.cancelRun({ sessionId: missing, runId: "run-1" }),
   );
   await assertSessionError(() =>
-    service.setSessionConfig({ sessionId: missing, mode: "agent" })
+    service.setSessionConfig({ sessionId: missing, mode: "agent" }),
   );
   await assertSessionError(() =>
     service.setSkillActive({
       sessionId: missing,
       name: "skill",
       active: true,
-    })
+    }),
   );
   await assertSessionError(() => service.closeSession({ sessionId: missing }));
   await assertSessionError(() =>
@@ -81,7 +82,7 @@ test("fake TUIService rejects unknown sessions with stable errors", async () => 
       name: "a.png",
       mediaType: "image/png",
       contentBase64: "aGk=",
-    })
+    }),
   );
   await assertSessionError(() => service.capabilities({ sessionId: missing }));
 });
@@ -111,23 +112,22 @@ test("fake TUIService emits only events after the requested cursor", async () =>
     text: "hello",
   });
 
-  const collect = async (
-    cursor: number,
-  ): Promise<CoreRuntimeEvent[]> => {
+  const collect = async (cursor: number): Promise<CoreRuntimeEvent[]> => {
     const events: CoreRuntimeEvent[] = [];
-    for await (
-      const event of service.subscribeRunEvents(
-        session.sessionId,
-        accepted.runId,
-        cursor,
-      )
-    ) {
+    for await (const event of service.subscribeRunEvents(
+      session.sessionId,
+      accepted.runId,
+      cursor,
+    )) {
       events.push(event);
     }
     return events;
   };
 
-  assertEquals((await collect(0)).map((event) => event.sequence), [1, 2]);
+  assertEquals(
+    (await collect(0)).map((event) => event.sequence),
+    [1, 2],
+  );
   assertEquals(
     (await collect(1)).map((event) => event.eventType),
     ["run_finished"],
@@ -140,15 +140,8 @@ test("fake TUIService streams live emitted events until a terminal event", async
   const session = await service.createSession({ workDir: "/w" });
   service.emit(session.sessionId, "run-live", "run_started", { text: "x" });
 
-  const iterator = service.subscribeRunEvents(
-    session.sessionId,
-    "run-live",
-    0,
-  );
-  assertEquals(
-    (await iterator.next()).value?.eventType,
-    "run_started",
-  );
+  const iterator = service.subscribeRunEvents(session.sessionId, "run-live", 0);
+  assertEquals((await iterator.next()).value?.eventType, "run_started");
 
   // Events emitted after subscription are streamed live in order.
   const pending = iterator.next();
@@ -156,9 +149,15 @@ test("fake TUIService streams live emitted events until a terminal event", async
   assertEquals((await pending).value?.eventType, "tool_call");
 
   const pendingTerminal = iterator.next();
-  service.emit(session.sessionId, "run-live", "run_finished", {
-    status: "completed",
-  }, true);
+  service.emit(
+    session.sessionId,
+    "run-live",
+    "run_finished",
+    {
+      status: "completed",
+    },
+    true,
+  );
   assertEquals((await pendingTerminal).value?.eventType, "run_finished");
 
   // The stream completes after the terminal event.
@@ -177,23 +176,26 @@ test("fake TUIService cancelRun terminalizes a running run once", async () => {
   assertEquals(cancelled.status, "cancelled");
 
   const events: CoreRuntimeEvent[] = [];
-  for await (
-    const event of service.subscribeRunEvents(session.sessionId, "run-c")
-  ) {
+  for await (const event of service.subscribeRunEvents(
+    session.sessionId,
+    "run-c",
+  )) {
     events.push(event);
   }
-  assertEquals(events.map((event) => event.eventType), [
-    "run_started",
-    "run_finished",
-  ]);
+  assertEquals(
+    events.map((event) => event.eventType),
+    ["run_started", "run_finished"],
+  );
   assertEquals(events.at(-1)?.terminal, true);
 
   // A second cancel observes the terminal state without a new event.
   assertEquals(
-    (await service.cancelRun({
-      sessionId: session.sessionId,
-      runId: "run-c",
-    })).status,
+    (
+      await service.cancelRun({
+        sessionId: session.sessionId,
+        runId: "run-c",
+      })
+    ).status,
     "cancelled",
   );
 });
@@ -315,7 +317,10 @@ test("fake TUIService round-trips settings documents and the provider catalog", 
   );
 
   const catalog = await service.listProviders();
-  assertEquals(catalog.map((entry) => entry.id), ["test-provider"]);
+  assertEquals(
+    catalog.map((entry) => entry.id),
+    ["test-provider"],
+  );
   assertEquals(catalog[0].models, [{ id: "test-model", name: "Test Model" }]);
   await service.validateProviderModel({
     providerID: "test-provider",
@@ -372,7 +377,10 @@ test("fake TUIService tracks expert binding and forks child sessions", async () 
   const session = await service.createSession({ workDir: "/w" });
 
   const experts = await service.listExperts({ sessionId: session.sessionId });
-  assertEquals(experts.map((entry) => entry.name), ["demo-expert"]);
+  assertEquals(
+    experts.map((entry) => entry.name),
+    ["demo-expert"],
+  );
   const bundle = await service.showExpert({
     sessionId: session.sessionId,
     expertId: "demo-expert",
@@ -388,10 +396,9 @@ test("fake TUIService tracks expert binding and forks child sessions", async () 
     "expert bundle not found: missing",
   );
 
-  assertEquals(
-    await service.expertState({ sessionId: session.sessionId }),
-    { expertId: "" },
-  );
+  assertEquals(await service.expertState({ sessionId: session.sessionId }), {
+    expertId: "",
+  });
   assertEquals(
     await service.setExpert({
       sessionId: session.sessionId,
@@ -418,12 +425,10 @@ test("fake TUIService tracks expert binding and forks child sessions", async () 
   assertEquals(child.sessionId, "session-2");
   assertEquals(child.workDir, "/w");
   // The expert applies only to the child branch.
-  assertEquals(
-    await service.expertState({ sessionId: session.sessionId }),
-    { expertId: "demo-expert" },
-  );
-  assertEquals(
-    await service.expertState({ sessionId: child.sessionId }),
-    { expertId: "other-expert" },
-  );
+  assertEquals(await service.expertState({ sessionId: session.sessionId }), {
+    expertId: "demo-expert",
+  });
+  assertEquals(await service.expertState({ sessionId: child.sessionId }), {
+    expertId: "other-expert",
+  });
 });

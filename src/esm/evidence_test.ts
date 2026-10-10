@@ -25,16 +25,10 @@ test("FinalAssistantResponse prefers content and falls back to blocks", () => {
   ];
   assertEquals(finalAssistantResponse(messages), "block answer");
 
-  messages = [
-    ...messages,
-    { role: roleAssistant, content: "plain content" },
-  ];
+  messages = [...messages, { role: roleAssistant, content: "plain content" }];
   assertEquals(finalAssistantResponse(messages), "plain content");
 
-  assertEquals(
-    finalAssistantResponse([{ role: "user", content: "hi" }]),
-    "",
-  );
+  assertEquals(finalAssistantResponse([{ role: "user", content: "hi" }]), "");
 });
 
 test("EvidenceTracker counts unique tool calls and errors", () => {

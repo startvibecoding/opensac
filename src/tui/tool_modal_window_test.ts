@@ -8,6 +8,7 @@
 // streaming. The cache can therefore never drop, duplicate, reorder, or
 // stale-serve content.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { TUISession } from "./tui_session.ts";
 import { createFakeTUIService } from "./service.ts";
@@ -29,7 +30,7 @@ function makeSession(): TUISession {
       model: "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: nodeRuntime.cwd(),
       version: "test",
     },
     createFakeTUIService(),
@@ -62,11 +63,12 @@ function referenceBody(session: TUISession, spinner: string): string[] {
       const assistant = store.assistantRaw(i);
       const think = store.thinkRaw(i);
       const message = store.messages[i] ?? "";
-      text = assistant !== ""
-        ? `${tr.text("transcript.assistant_prefix")}\n${assistant}`
-        : think !== ""
-        ? `${tr.text("activity.thinking")}\n${think}`
-        : message;
+      text =
+        assistant !== ""
+          ? `${tr.text("transcript.assistant_prefix")}\n${assistant}`
+          : think !== ""
+            ? `${tr.text("activity.thinking")}\n${think}`
+            : message;
     }
     if (text.trim() !== "") parts.push(text);
   }
@@ -82,10 +84,7 @@ function referenceBody(session: TUISession, spinner: string): string[] {
 }
 
 /** The reference sub-agent tab body. */
-function referenceAgentBody(
-  session: TUISession,
-  agentId: string,
-): string[] {
+function referenceAgentBody(session: TUISession, agentId: string): string[] {
   const width = ToolModalState.contentWidthFor(session.termWidth);
   const lines = renderAgentActivity(
     session.controller.activities.get(agentId),
@@ -100,14 +99,14 @@ function referenceAgentBody(
 function fillTranscript(session: TUISession): void {
   const store = session.controller.store;
   store.addMessageRow("first user message", "plain");
-  store.appendToolExecutionStart("tc-1", "bash", { command: "deno task test" });
+  store.appendToolExecutionStart("tc-1", "bash", { command: "npm test" });
   store.appendToolResult({
     toolCallID: "tc-1",
     toolName: "bash",
-    toolArgs: { command: "deno task test" },
-    toolResult: `[runtime]\ntest output line one\n${
-      "x".repeat(140)
-    }\n[stderr]\n(no output)`,
+    toolArgs: { command: "npm test" },
+    toolResult: `[runtime]\ntest output line one\n${"x".repeat(
+      140,
+    )}\n[stderr]\n(no output)`,
   });
   store.appendAssistantDelta("a streamed assistant answer that wraps around");
   store.commitActiveStream();
@@ -171,7 +170,7 @@ test("tool modal window equals a naive full recomputation", () => {
     `the walk reached the top (offset ${previousOffset})`,
   );
   assert(
-    referenceBody(session, "").some((l) => l.includes("deno task test")),
+    referenceBody(session, "").some((l) => l.includes("npm test")),
     "the reference body carries the tool row",
   );
 });
@@ -182,7 +181,7 @@ test("tool modal matches the reference while the transcript streams", () => {
   fillTranscript(session);
   const store = session.controller.store;
   store.appendToolExecutionStart("tc-live", "bash", {
-    command: "deno task check",
+    command: "npm run check",
   });
   session.openToolModal();
   for (const spinner of ["⠋", "⠙", "⠹", ""]) {
@@ -239,11 +238,11 @@ test("tool modal sub-agent tab matches the reference body", () => {
   session.switchToolModalTarget(1);
   assertEquals(
     session.toolModalView(),
-    session.toolModalForTest().render(
-      referenceAgentBody(session, "worker-9"),
-      session.translator,
-      { availableHeight: panelHeight(session) },
-    ),
+    session
+      .toolModalForTest()
+      .render(referenceAgentBody(session, "worker-9"), session.translator, {
+        availableHeight: panelHeight(session),
+      }),
     "agent tab body equals the snapshot rendering",
   );
 });

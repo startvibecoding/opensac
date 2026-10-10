@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -19,7 +20,7 @@ import { workerTaskPrompt } from "./prompt.ts";
 import { test } from "#testing";
 
 function createTestStore(): { store: Store; sessionID: string } {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-esm-store-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-esm-store-" });
   return { store: new ESMStore(sessionDir), sessionID: "esm-session" };
 }
 
@@ -322,12 +323,9 @@ test("Store worker precheck rejection keeps objective active", () => {
     store.create(sessionID, "finish migration");
     let obj;
     for (let i = 1; i <= 4; i++) {
-      obj = store.rejectWorkerReport(
-        sessionID,
-        `run-${i}`,
-        "remaining work",
-        ["finish implementation"],
-      );
+      obj = store.rejectWorkerReport(sessionID, `run-${i}`, "remaining work", [
+        "finish implementation",
+      ]);
     }
     assertEquals(obj!.status, statusActive);
     assertEquals(obj!.rejectionCount, 4);

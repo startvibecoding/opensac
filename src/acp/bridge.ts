@@ -38,10 +38,10 @@ export class ACPBridge {
     this.#initialized = options.initialized ?? false;
     this.#writeLine = options.write;
     this.#stopEvents = this.#client.onEvent((event) =>
-      this.#forwardEvent(event)
+      this.#forwardEvent(event),
     );
     this.#stopReverse = this.#client.onReverseRequest((request) =>
-      this.#forwardReverseRequest(request)
+      this.#forwardReverseRequest(request),
     );
   }
 
@@ -130,14 +130,16 @@ export class ACPBridge {
         message?: unknown;
         data?: unknown;
       };
-      this.#client.respondToReverseRequest(coreError(
-        id,
-        typeof error.code === "number" ? error.code : -32000,
-        typeof error.message === "string"
-          ? error.message
-          : "ACP reverse request failed",
-        error.data,
-      ));
+      this.#client.respondToReverseRequest(
+        coreError(
+          id,
+          typeof error.code === "number" ? error.code : -32000,
+          typeof error.message === "string"
+            ? error.message
+            : "ACP reverse request failed",
+          error.data,
+        ),
+      );
       return;
     }
     this.#client.respondToReverseRequest(
@@ -171,26 +173,23 @@ export class ACPBridge {
 
   #write(
     value:
-      | ACPRPCResponse
-      | ReturnType<typeof mapCoreEventToACP>
-      | ACPRPCRequest,
+      ACPRPCResponse | ReturnType<typeof mapCoreEventToACP> | ACPRPCRequest,
   ): Promise<void> {
-    const line = "idRaw" in value
-      ? "method" in value && value.method !== ""
-        ? `${
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: value.idRaw === null ? null : JSON.parse(value.idRaw),
-            method: value.method,
-            ...(value.params === undefined ? {} : { params: value.params }),
-          })
-        }\n`
-        : `{"jsonrpc":"2.0","id":${value.idRaw ?? "null"},${
-          "error" in value
-            ? `"error":${JSON.stringify(value.error)}`
-            : `"result":${JSON.stringify(value.result ?? null)}`
-        }}\n`
-      : `${JSON.stringify(value)}\n`;
+    const line =
+      "idRaw" in value
+        ? "method" in value && value.method !== ""
+          ? `${JSON.stringify({
+              jsonrpc: "2.0",
+              id: value.idRaw === null ? null : JSON.parse(value.idRaw),
+              method: value.method,
+              ...(value.params === undefined ? {} : { params: value.params }),
+            })}\n`
+          : `{"jsonrpc":"2.0","id":${value.idRaw ?? "null"},${
+              "error" in value
+                ? `"error":${JSON.stringify(value.error)}`
+                : `"result":${JSON.stringify(value.result ?? null)}`
+            }}\n`
+        : `${JSON.stringify(value)}\n`;
     this.#writeQueue = this.#writeQueue.then(() => this.#writeLine(line));
     return this.#writeQueue;
   }

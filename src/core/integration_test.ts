@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { type ResolvedCoreConfig } from "./config.ts";
 import { CoreClient, type CoreLauncher } from "./client.ts";
@@ -16,10 +17,7 @@ import { test } from "#testing";
 
 const TEST_VERSION = "0.1.0-core-integration-test";
 const TEST_PROTOCOL_VERSION = 23;
-const PASSWORDS = [
-  "integration-password-one",
-  "integration-password-two",
-];
+const PASSWORDS = ["integration-password-one", "integration-password-two"];
 const EXPECTED_INFO: CoreInfo = {
   version: TEST_VERSION,
   protocolVersion: TEST_PROTOCOL_VERSION,
@@ -76,13 +74,13 @@ function clientOptions(
 async function withStateDir(
   test: (stateDir: string, paths: CorePaths) => Promise<void>,
 ): Promise<void> {
-  const stateDir = await Deno.makeTempDir({
+  const stateDir = await nodeRuntime.makeTempDir({
     prefix: "opensac-core-integration-",
   });
   try {
     await test(stateDir, CorePaths.fromStateDir(stateDir));
   } finally {
-    await Deno.remove(stateDir, { recursive: true });
+    await nodeRuntime.remove(stateDir, { recursive: true });
   }
 }
 
@@ -99,9 +97,7 @@ async function waitForRegistration(
   throw new Error("timed out waiting for Core registration");
 }
 
-async function assertLiveCore(
-  client: CoreClient,
-): Promise<void> {
+async function assertLiveCore(client: CoreClient): Promise<void> {
   assertEquals((await client.health()).healthy, true);
   assertEquals(await client.call<CoreInfo>(CORE_METHODS.info), EXPECTED_INFO);
 }
@@ -120,7 +116,10 @@ test("Core foundation exposes the locked, registered, authenticated client path"
       assertEquals(registration?.version, TEST_VERSION);
       assertEquals(registration?.protocolVersion, TEST_PROTOCOL_VERSION);
       assertEquals(registration?.port > 0, true);
-      assertEquals((await Deno.lstat(firstPaths.lockFile)).isDirectory, true);
+      assertEquals(
+        (await nodeRuntime.lstat(firstPaths.lockFile)).isDirectory,
+        true,
+      );
 
       const discovered = await client.discover();
       assertEquals(discovered.status, "ready");
@@ -253,15 +252,18 @@ test("the client that started the shared Core can exit without disconnecting ano
     };
     const launch: CoreLauncher = async () => {
       try {
-        const handle = await startCoreCommand({
-          ...commandOptions(stateDir),
-          config: openConfig,
-        }, {
-          createServer: (serverOptions: CoreServerOptions) => {
-            serverStarts++;
-            return new CoreServer(serverOptions);
+        const handle = await startCoreCommand(
+          {
+            ...commandOptions(stateDir),
+            config: openConfig,
           },
-        });
+          {
+            createServer: (serverOptions: CoreServerOptions) => {
+              serverStarts++;
+              return new CoreServer(serverOptions);
+            },
+          },
+        );
         handles.push(handle);
       } catch (error) {
         if (!(error instanceof CoreLockBusyError)) throw error;
@@ -285,8 +287,7 @@ test("the client that started the shared Core can exit without disconnecting ano
       }),
     );
     let survivorEvents:
-      | Awaited<ReturnType<CoreClient["connectEvents"]>>
-      | undefined;
+      Awaited<ReturnType<CoreClient["connectEvents"]>> | undefined;
     try {
       await launcherClient.ensureStarted();
       assertEquals(serverStarts, 1);
@@ -325,7 +326,7 @@ test("a core.shutdown request stops the Core command and releases ownership", as
   await withStateDir(async (stateDir, paths) => {
     const handle = await startCoreCommand(commandOptions(stateDir));
     try {
-      assert(await new CoreRegistry(paths).read() !== undefined);
+      assert((await new CoreRegistry(paths).read()) !== undefined);
 
       const client = new CoreClient(clientOptions(stateDir));
       try {
@@ -346,7 +347,7 @@ test("a core.shutdown request stops the Core command and releases ownership", as
     // The released lock lets a fresh Core own the same state directory.
     const second = await startCoreCommand(commandOptions(stateDir));
     try {
-      assert(await new CoreRegistry(paths).read() !== undefined);
+      assert((await new CoreRegistry(paths).read()) !== undefined);
     } finally {
       await second.stop();
     }

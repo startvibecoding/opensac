@@ -8,6 +8,7 @@
 // keep the same flag-wins-over-env resolution as the Go command.
 
 /** Options used to start an ACP stdio process (acp.RunOptions). */
+import { runtime } from "../platform/runtime.ts";
 export interface CLIOptions {
   // root / shared execution
   continueSession: boolean;
@@ -103,7 +104,7 @@ export function parseGoDurationMs(value: string): number {
 export function resolveACPTimeout(
   flagValue: string,
   envKey: string,
-  env: Record<string, string | undefined> = Deno.env.toObject(),
+  env: Record<string, string | undefined> = runtime.env.toObject(),
 ): number {
   for (const candidate of [flagValue, env[envKey] ?? ""]) {
     const ms = parseGoDurationMs(candidate);

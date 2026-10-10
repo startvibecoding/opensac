@@ -30,21 +30,24 @@ test("runtime lease renew keeps own expired row", () => {
     };
     leaseDAO.insert(database, stalled);
 
-    const renewed = leaseDAO.renew({
-      sessionId: "session-stalled",
-      ownerId: "owner-a",
-      ownerPid: 0,
-      ownerKind: "",
-      tokenHash: "token-a",
-      epoch: 1,
-      runId: "",
-      purpose: "",
-      state: "",
-      acquiredAt: 0,
-      heartbeatAt: 0,
-      expiresAt: 0,
-      updatedAt: 0,
-    }, 15);
+    const renewed = leaseDAO.renew(
+      {
+        sessionId: "session-stalled",
+        ownerId: "owner-a",
+        ownerPid: 0,
+        ownerKind: "",
+        tokenHash: "token-a",
+        epoch: 1,
+        runId: "",
+        purpose: "",
+        state: "",
+        acquiredAt: 0,
+        heartbeatAt: 0,
+        expiresAt: 0,
+        updatedAt: 0,
+      },
+      15,
+    );
     assertEquals(
       renewed,
       1,
@@ -74,21 +77,24 @@ test("runtime lease renew keeps own expired row", () => {
     );
     assertEquals(taken, 1, "Acquire takeover");
 
-    const displaced = leaseDAO.renew({
-      sessionId: "session-takeover",
-      ownerId: "owner-a",
-      ownerPid: 0,
-      ownerKind: "",
-      tokenHash: "token-a",
-      epoch: 1,
-      runId: "",
-      purpose: "",
-      state: "",
-      acquiredAt: 0,
-      heartbeatAt: 0,
-      expiresAt: 0,
-      updatedAt: 0,
-    }, 15);
+    const displaced = leaseDAO.renew(
+      {
+        sessionId: "session-takeover",
+        ownerId: "owner-a",
+        ownerPid: 0,
+        ownerKind: "",
+        tokenHash: "token-a",
+        epoch: 1,
+        runId: "",
+        purpose: "",
+        state: "",
+        acquiredAt: 0,
+        heartbeatAt: 0,
+        expiresAt: 0,
+        updatedAt: 0,
+      },
+      15,
+    );
     assertEquals(displaced, 0, "fencing must hold");
   } finally {
     closeTestDbs();

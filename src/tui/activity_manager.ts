@@ -110,11 +110,12 @@ export class ActivityManager {
     tool.endTime = Date.now();
     tool.result = result;
     tool.error = error;
-    tool.status = executionState === TOOL_EXECUTION_INTERRUPTED
-      ? "interrupted"
-      : error || executionState === TOOL_EXECUTION_FAILED
-      ? "error"
-      : "completed";
+    tool.status =
+      executionState === TOOL_EXECUTION_INTERRUPTED
+        ? "interrupted"
+        : error || executionState === TOOL_EXECUTION_FAILED
+          ? "error"
+          : "completed";
   }
 
   /**
@@ -132,8 +133,8 @@ export class ActivityManager {
    * Gets all active (running) tool executions.
    */
   getActiveTools(): ToolExecution[] {
-    return Array.from(this.#tools.values()).filter((t) =>
-      t.status === "running"
+    return Array.from(this.#tools.values()).filter(
+      (t) => t.status === "running",
     );
   }
 
@@ -181,10 +182,7 @@ export class ActivityManager {
   /**
    * Starts tracking a sub-agent task.
    */
-  startSubAgentTask(
-    id: string,
-    parentToolCallId: string,
-  ): void {
+  startSubAgentTask(id: string, parentToolCallId: string): void {
     if (this.#subAgents.has(id)) return;
 
     this.#subAgents.set(id, {
@@ -388,7 +386,7 @@ export function isParentTool(toolName: string): boolean {
  */
 function pathBaseName(p: string): string {
   const separator = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return separator >= 0 ? (p.slice(separator + 1) || p) : p;
+  return separator >= 0 ? p.slice(separator + 1) || p : p;
 }
 /**
  * Generates a display-friendly tool name.

@@ -17,7 +17,7 @@ export interface RetryConfig {
 }
 
 /**
- * A deliberate cancellation anywhere in the chain. Go/Deno call it several
+ * A deliberate cancellation anywhere in the chain. Go/Node call it several
  * things (`context canceled`, `The operation was aborted.`), and none of them
  * become retryable because a provider wrapped them in `fetch failed`.
  */
@@ -161,10 +161,11 @@ function classifyRetryError(err: unknown): string {
   if (reportsHttpStatus(lower, 524)) return "origin timeout (HTTP 524)";
   if (lower.includes("overloaded")) return "server overloaded";
   // Both spellings count: `isTimeoutLike` matches "timed out" as two words, which
-  // is exactly what Deno and undici emit, so reporting only "timeout" would show
+  // is exactly what Node and undici emit, so reporting only "timeout" would show
   // a raw fallback for a reason the classifier already recognised.
   if (
-    lower.includes("timeout") || lower.includes("timed out") ||
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
     chain.includes("DeadlineExceeded")
   ) {
     return "request timed out";
@@ -173,7 +174,8 @@ function classifyRetryError(err: unknown): string {
   if (lower.includes("connection reset")) return "connection reset";
   if (lower.includes("broken pipe")) return "broken pipe";
   if (
-    lower.includes("dns error") || lower.includes("failed to lookup address")
+    lower.includes("dns error") ||
+    lower.includes("failed to lookup address")
   ) {
     return "dns lookup failed";
   }
@@ -212,11 +214,11 @@ function reportsHttpStatus(lower: string, status: number): boolean {
  * exists purely so the reason shown to the user names the configuration problem
  * rather than hiding it behind "network request failed" or a wrong HTTP label.
  *
- * Deno blocks reserved ports and rejects malformed URLs at the fetch layer, and
+ * Node blocks reserved ports and rejects malformed URLs at the fetch layer, and
  * both arrive with the same `fetch failed` shape as a real network fault, so
  * they must be separated in the message. TLS text is
  * matched broadly (`certificate`, `tls handshake`, `ssl`, `self-signed`,
- * `hostname mismatch`) because Deno reports every certificate refusal inside a
+ * `hostname mismatch`) because Node reports every certificate refusal inside a
  * generic `fetch failed` whose only distinguishing words live on `cause`.
  */
 function permanentTransportReason(lower: string): string {
@@ -227,14 +229,17 @@ function permanentTransportReason(lower: string): string {
     return "invalid request URL";
   }
   if (
-    /scheme '[^']*' not supported|not supported url|unsupported url scheme/
-      .test(lower)
+    /scheme '[^']*' not supported|not supported url|unsupported url scheme/.test(
+      lower,
+    )
   ) {
     return "unsupported URL scheme";
   }
   if (
-    lower.includes("certificate") || lower.includes("tls handshake") ||
-    lower.includes("ssl") || /self.?signed/.test(lower) ||
+    lower.includes("certificate") ||
+    lower.includes("tls handshake") ||
+    lower.includes("ssl") ||
+    /self.?signed/.test(lower) ||
     lower.includes("hostname mismatch")
   ) {
     return "TLS certificate verification failed";

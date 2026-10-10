@@ -90,7 +90,8 @@ export class ToolModalState {
 
   /** Page size for the given available height. */
   pageSizeFor(hasTabs: boolean, availableHeight: number): number {
-    const pageSize = availableHeight -
+    const pageSize =
+      availableHeight -
       ToolModalState.chromeFor(hasTabs) -
       ToolModalState.verticalFrame();
     return pageSize < 1 ? 1 : pageSize;
@@ -169,9 +170,9 @@ export class ToolModalState {
     if (this.#targets.length > 1) {
       title += `  ${tr.text("tool.modal.switch_target_hint")}`;
     }
-    title += `  ${tr.text("tool.modal.page_hint")}  ${
-      tr.text("tool.modal.scroll_hint")
-    }  ${tr.text("tool.modal.close_hint")}`;
+    title += `  ${tr.text("tool.modal.page_hint")}  ${tr.text(
+      "tool.modal.scroll_hint",
+    )}  ${tr.text("tool.modal.close_hint")}`;
     title = truncateDisplay(title, contentWidth);
 
     const tabs = this.#renderTabs(contentWidth);
@@ -250,9 +251,7 @@ function frameBox(content: string, width: number, height: number): string {
     const pad = " ".repeat(Math.max(inner - 2 - displayWidth(l), 0));
     return `│ ${l}${pad} │`;
   });
-  return [
-    `╭${"─".repeat(inner)}╮`,
-    ...body,
-    `╰${"─".repeat(inner)}╯`,
-  ].join("\n");
+  return [`╭${"─".repeat(inner)}╮`, ...body, `╰${"─".repeat(inner)}╯`].join(
+    "\n",
+  );
 }

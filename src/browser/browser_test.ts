@@ -1,5 +1,6 @@
 // for the ported protocol/client surface.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { Image } from "imagescript";
 import { createManager } from "../skills/mod.ts";
@@ -38,15 +39,13 @@ test("built-in browser skill is discoverable", () => {
   assert(skill);
   assertEquals(skill.source, "builtin");
   const context = manager.buildSkillContext(SKILL_NAME);
-  for (
-    const want of [
-      "# Vibe Browser",
-      "`browser` tool",
-      "`snapshot`",
-      "`screenshot`",
-      "Never claim a UI state changed until you verify it",
-    ]
-  ) {
+  for (const want of [
+    "# Vibe Browser",
+    "`browser` tool",
+    "`snapshot`",
+    "`screenshot`",
+    "Never claim a UI state changed until you verify it",
+  ]) {
     assert(
       context.includes(want),
       `skill content missing ${JSON.stringify(want)}`,
@@ -55,7 +54,7 @@ test("built-in browser skill is discoverable", () => {
 });
 
 test("register and remove browser tool", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "browser-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "browser-" });
   const registry = createRegistry(tmp, undefined);
 
   registerTool(registry);
@@ -66,7 +65,7 @@ test("register and remove browser tool", () => {
 });
 
 test("screenshot tool result processes image", async () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "browser-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "browser-" });
   const registry = createRegistry(tmp, undefined);
   const tool = createTool(registry);
 

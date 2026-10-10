@@ -38,10 +38,13 @@ test("requestQuestion resolves to empty on context cancel", async () => {
   const chapter = new EventChannel();
   const controller = new AbortController();
   const ctx = createRunContext(controller.signal);
-  const pending = a.requestQuestion(ctx, sinkFor(chapter), "pick one", [
-    "a",
-    "b",
-  ], "");
+  const pending = a.requestQuestion(
+    ctx,
+    sinkFor(chapter),
+    "pick one",
+    ["a", "b"],
+    "",
+  );
 
   const ev = await chapter.next();
   assert(!ev.done, "expected a question request event");
@@ -171,11 +174,7 @@ test("request events do not park without a consumer when canceled", async () => 
     "",
   );
   assertEquals(answer, "");
-  assertEquals(
-    questionDelivered,
-    0,
-    "cancelled run must not deliver question",
-  );
+  assertEquals(questionDelivered, 0, "cancelled run must not deliver question");
 });
 
 test("sendEvent stops when run context is done", () => {
@@ -186,10 +185,13 @@ test("sendEvent stops when run context is done", () => {
   a.setRunContext(createRunContext(controller.signal));
 
   let delivered = 0;
-  const accepted = a.sendEvent(() => {
-    delivered += 1;
-    return true;
-  }, { type: 7, textDelta: "late" });
+  const accepted = a.sendEvent(
+    () => {
+      delivered += 1;
+      return true;
+    },
+    { type: 7, textDelta: "late" },
+  );
   assertEquals(accepted, false);
   assertEquals(delivered, 0);
 
@@ -209,7 +211,10 @@ test("sendEvent counts dropped events", () => {
   controller.abort();
   a.setRunContext(createRunContext(controller.signal));
   for (let i = 0; i < 3; i++) {
-    assertEquals(a.sendEvent(() => true, { type: 7 }), false);
+    assertEquals(
+      a.sendEvent(() => true, { type: 7 }),
+      false,
+    );
   }
   assertEquals(a.droppedEvents, 3);
 
@@ -221,7 +226,10 @@ test("sendEvent counts dropped events", () => {
 test("sendEvent does not require any message lock", () => {
   const a = createAgent({ id: "send-lock", mode: "yolo" }, undefined);
   a.setRunContext(createRunContext());
-  assertEquals(a.sendEvent(() => true, { type: 4 }), true);
+  assertEquals(
+    a.sendEvent(() => true, { type: 4 }),
+    true,
+  );
 });
 
 test("needsApproval method reads the agent's mode and rules", () => {

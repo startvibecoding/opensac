@@ -43,11 +43,13 @@ test("formatEditorContext labels untrusted metadata and bounds the selection", (
     path: "/work/a.ts",
     language: "typescript",
     selection: { startLine: 1, endLine: 2, text: "const x = 1;" },
-    diagnostics: [{
-      severity: "error",
-      line: 3,
-      message: "unused",
-    }],
+    diagnostics: [
+      {
+        severity: "error",
+        line: 3,
+        message: "unused",
+      },
+    ],
   });
   assertEquals(small.includes("## Editor context (untrusted metadata)"), true);
   assertEquals(small.includes("Path: /work/a.ts"), true);

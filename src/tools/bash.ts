@@ -1,15 +1,17 @@
 // (+ bash_unix.go / bash_windows.go).
 //
 // Executes shell commands, optionally in a sandbox, with sync and background
-// (`async=true`) modes. Go's `os/exec` maps to `Deno.Command`; `context.Context`
+// (`async=true`) modes. Go's `os/exec` maps to `nodeRuntime.Command`; `context.Context`
 // maps to an `AbortSignal`; sync-run timeouts map to `AbortSignal.timeout`
 // combined with the parent signal.
 //
-// Deviations: Deno has no `SysProcAttr.Setsid`, so cancellation kills the direct
+// Deviations: Node has no `SysProcAttr.Setsid`, so cancellation kills the direct
 // child rather than the whole process group (`killCommandProcess`); the 100 ms
 // `WaitDelay` after the shell exits is not modeled (stdio is read to EOF); the
 // Windows embedded-BusyBox path is not reproduced.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { ChildProcess, CommandStatus } from "../platform/runtime.ts";
 import { envList, loadEnv } from "../config/env.ts";
 import {
   isWindows,
@@ -173,9 +175,10 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
     ctx: ToolContext,
     params: Record<string, unknown>,
   ): Promise<ToolResult> {
-    let command = typeof params["command"] === "string"
-      ? params["command"] as string
-      : "";
+    let command =
+      typeof params["command"] === "string"
+        ? (params["command"] as string)
+        : "";
     if (command === "") {
       throw new Error("command is required");
     }
@@ -213,18 +216,17 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
       if (gitAccessFromContext(ctx.signal)) {
         const gitSB = sb as unknown as GitAccessSandbox;
         if (typeof gitSB.wrapCommandWithGitAccess !== "function") {
-          throw new Error(
-            "sandbox backend cannot grant one-shot Git access",
-          );
+          throw new Error("sandbox backend cannot grant one-shot Git access");
         }
         spec = gitSB.wrapCommandWithGitAccess(ctx.signal, shell, command, opts);
       } else {
         spec = sb.wrapCommand(ctx.signal, shell, command, opts);
       }
       const cleanupProvider = sb as unknown as CommandCleanupProvider;
-      const cleanup = typeof cleanupProvider.cleanupCommand === "function"
-        ? () => cleanupProvider.cleanupCommand(spec)
-        : undefined;
+      const cleanup =
+        typeof cleanupProvider.cleanupCommand === "function"
+          ? () => cleanupProvider.cleanupCommand(spec)
+          : undefined;
       const spawn: SpawnSpec = {
         program: spec.program,
         args: spec.args,
@@ -256,9 +258,10 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
   }
 
   /** Aligns the agent-level tool deadline with `execute`. */
-  executionTimeout(
-    params: Record<string, unknown>,
-  ): { durationMs: number; provided: boolean } {
+  executionTimeout(params: Record<string, unknown>): {
+    durationMs: number;
+    provided: boolean;
+  } {
     return { durationMs: this.defaultTimeout(params), provided: true };
   }
 
@@ -275,13 +278,11 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
   }
 
   baseEnv(): string[] {
-    const obj = Deno.env.toObject();
+    const obj = nodeRuntime.env.toObject();
     for (const [k, v] of Object.entries(this.executionEnvVars())) {
       obj[k] = v;
     }
-    return nonInteractiveEnv(
-      Object.entries(obj).map(([k, v]) => `${k}=${v}`),
-    );
+    return nonInteractiveEnv(Object.entries(obj).map(([k, v]) => `${k}=${v}`));
   }
 
   resolveShell(): string {
@@ -331,7 +332,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
       );
     }
     const signal = combineSignals(parentSignal, controller.signal);
-    let child: Deno.ChildProcess;
+    let child: ChildProcess;
     try {
       child = spawnChild(spec, signal);
     } catch (err) {
@@ -345,7 +346,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
     const stdoutDone = readCapped(child.stdout, stdoutBuf);
     const stderrDone = readCapped(child.stderr, stderrBuf);
 
-    let status: Deno.CommandStatus;
+    let status: CommandStatus;
     try {
       [status] = await Promise.all([child.status, stdoutDone, stderrDone]);
     } catch (err) {
@@ -359,7 +360,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
           success: false,
           code: null,
           signal: null,
-        } as unknown as Deno.CommandStatus;
+        } as unknown as CommandStatus;
       } else {
         if (timer !== undefined) clearTimeout(timer);
         cleanup?.();
@@ -403,7 +404,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
       );
     }
     const signal = combineSignals(parentSignal, controller.signal);
-    let child: Deno.ChildProcess;
+    let child: ChildProcess;
     try {
       child = spawnChild(spec, signal);
     } catch (err) {
@@ -429,7 +430,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
       const stdoutDone = readCapped(child.stdout, stdoutBuf);
       const stderrDone = readCapped(child.stderr, stderrBuf);
       let err: Error | null = null;
-      let status: Deno.CommandStatus;
+      let status: CommandStatus;
       try {
         [status] = await Promise.all([child.status, stdoutDone, stderrDone]);
       } catch (e) {
@@ -438,7 +439,7 @@ export class BashTool implements Tool, ExecutionTimeoutProvider {
           success: false,
           code: null,
           signal: null,
-        } as unknown as Deno.CommandStatus;
+        } as unknown as CommandStatus;
       }
       if (timer !== undefined) clearTimeout(timer);
       childDone = true;
@@ -485,9 +486,18 @@ export function buildBashResult(
   const out = stdout === "" ? "(no output)" : stdout;
   const err = stderr === "" ? "(no output)" : stderr;
   const build = (outBody: string, errBody: string) =>
-    "[runtime]\n" + runtimeLabel + "\n[command]\n" + command + "\n[cwd]\n" +
-    workDir + "\n[stdout]\n" + outBody + "\n[stderr]\n" + errBody +
-    "\n[exit_code]\n" + exitCode;
+    "[runtime]\n" +
+    runtimeLabel +
+    "\n[command]\n" +
+    command +
+    "\n[cwd]\n" +
+    workDir +
+    "\n[stdout]\n" +
+    outBody +
+    "\n[stderr]\n" +
+    errBody +
+    "\n[exit_code]\n" +
+    exitCode;
 
   const result = build(out, err);
   if (result.length <= MAX_BASH_RESULT_CHARS) return result;
@@ -495,8 +505,8 @@ export function buildBashResult(
   const note = "... (truncated)";
   // Everything but the two captured streams (markers, command, cwd, exit
   // code) is fixed and never truncated.
-  const budget = MAX_BASH_RESULT_CHARS -
-    (result.length - out.length - err.length);
+  const budget =
+    MAX_BASH_RESULT_CHARS - (result.length - out.length - err.length);
   // Each share must be able to hold the truncation note plus one kept byte.
   if (budget >= 4 * (note.length + 2)) {
     // A truncated stream keeps its trailing note inside its own share, so
@@ -519,8 +529,8 @@ export function buildBashResult(
 function spawnChild(
   spec: SpawnSpec,
   signal: AbortSignal | undefined,
-): Deno.ChildProcess {
-  const cmd = new Deno.Command(spec.program, {
+): ChildProcess {
+  const cmd = new nodeRuntime.Command(spec.program, {
     args: spec.args,
     cwd: spec.cwd,
     env: spec.env ? envRecord(spec.env) : undefined,

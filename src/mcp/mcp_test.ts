@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { RPCError } from "./rpc.ts";
 import {
@@ -127,17 +128,19 @@ test("isMCPMethodNotFound", () => {
 });
 
 test("MCP SSE rejects invalid message URL", async () => {
-  const registry = createRegistry(Deno.makeTempDirSync(), undefined);
+  const registry = createRegistry(runtime.makeTempDirSync(), undefined);
   let threw = false;
   try {
     await connectServers(
       new AbortController().signal,
-      [{
-        name: "invalid-sse",
-        type: "sse",
-        url: "http://127.0.0.1/events",
-        messageUrl: "file:///tmp/messages",
-      }],
+      [
+        {
+          name: "invalid-sse",
+          type: "sse",
+          url: "http://127.0.0.1/events",
+          messageUrl: "file:///tmp/messages",
+        },
+      ],
       registry,
       {},
     );
@@ -252,8 +255,7 @@ const mcpTestPNG = await makeTestPNG();
 const mcpTestPNGBase64 = encodeBase64(mcpTestPNG);
 
 test("MCP resource read result decodes blob", () => {
-  const raw =
-    `{"contents":[{"uri":"shot://1","mimeType":"image/png","blob":"${mcpTestPNGBase64}"}]}`;
+  const raw = `{"contents":[{"uri":"shot://1","mimeType":"image/png","blob":"${mcpTestPNGBase64}"}]}`;
   const out = JSON.parse(raw);
   assertEquals(out.contents.length, 1);
   assertEquals(out.contents[0].blob, mcpTestPNGBase64);

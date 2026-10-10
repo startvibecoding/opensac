@@ -66,21 +66,20 @@ export class MemoryTool implements Tool {
   }
 
   execute(_ctx: ToolContext, params: Record<string, unknown>): ToolResult {
-    const action = typeof params["action"] === "string"
-      ? params["action"] as string
-      : "";
-    const section = typeof params["section"] === "string"
-      ? params["section"] as string
-      : "";
-    const content = typeof params["content"] === "string"
-      ? params["content"] as string
-      : "";
-    const old = typeof params["old"] === "string"
-      ? params["old"] as string
-      : "";
-    const newText = typeof params["new"] === "string"
-      ? params["new"] as string
-      : "";
+    const action =
+      typeof params["action"] === "string" ? (params["action"] as string) : "";
+    const section =
+      typeof params["section"] === "string"
+        ? (params["section"] as string)
+        : "";
+    const content =
+      typeof params["content"] === "string"
+        ? (params["content"] as string)
+        : "";
+    const old =
+      typeof params["old"] === "string" ? (params["old"] as string) : "";
+    const newText =
+      typeof params["new"] === "string" ? (params["new"] as string) : "";
 
     switch (action) {
       case "read":

@@ -473,7 +473,7 @@ const currentSchema = currentSchemaTemplate.replace(
 );
 
 const requiredSchema: Record<string, string[]> = {
-  "sessions": [
+  sessions: [
     "id",
     "cwd",
     "timestamp",
@@ -486,7 +486,7 @@ const requiredSchema: Record<string, string[]> = {
     "fork_kind",
     "expert_id",
   ],
-  "entries": [
+  entries: [
     "seq",
     "session_id",
     "id",
@@ -495,7 +495,7 @@ const requiredSchema: Record<string, string[]> = {
     "timestamp",
     "data",
   ],
-  "request_stats": [
+  request_stats: [
     "id",
     "timestamp",
     "session_id",
@@ -507,7 +507,7 @@ const requiredSchema: Record<string, string[]> = {
     "total_tokens",
     "duration_ms",
   ],
-  "session_capabilities": [
+  session_capabilities: [
     "session_id",
     "mode",
     "display_mode",
@@ -519,7 +519,7 @@ const requiredSchema: Record<string, string[]> = {
     "a2a_master",
     "updated_at",
   ],
-  "conversation_turns": [
+  conversation_turns: [
     "id",
     "session_id",
     "intent_id",
@@ -530,7 +530,7 @@ const requiredSchema: Record<string, string[]> = {
     "started_at",
     "ended_at",
   ],
-  "session_fork_requests": [
+  session_fork_requests: [
     "id",
     "request_key_hash",
     "request_fingerprint",
@@ -538,7 +538,7 @@ const requiredSchema: Record<string, string[]> = {
     "child_session_id",
     "created_at",
   ],
-  "session_runtime_leases": [
+  session_runtime_leases: [
     "session_id",
     "owner_instance_id",
     "owner_pid",
@@ -553,7 +553,7 @@ const requiredSchema: Record<string, string[]> = {
     "expires_at",
     "updated_at",
   ],
-  "session_run_events": [
+  session_run_events: [
     "seq",
     "id",
     "session_id",
@@ -566,7 +566,7 @@ const requiredSchema: Record<string, string[]> = {
     "timestamp",
     "data",
   ],
-  "session_runs": [
+  session_runs: [
     "id",
     "session_id",
     "intent_id",
@@ -586,7 +586,7 @@ const requiredSchema: Record<string, string[]> = {
     "usage_json",
     "context_usage_json",
   ],
-  "session_run_recoveries": [
+  session_run_recoveries: [
     "run_id",
     "session_id",
     "state",
@@ -600,7 +600,7 @@ const requiredSchema: Record<string, string[]> = {
     "updated_at",
     "completed_at",
   ],
-  "session_execution_intents": [
+  session_execution_intents: [
     "id",
     "session_id",
     "source",
@@ -612,7 +612,7 @@ const requiredSchema: Record<string, string[]> = {
     "policy_json",
     "created_at",
   ],
-  "runtime_submissions": [
+  runtime_submissions: [
     "id",
     "session_id",
     "scope",
@@ -622,7 +622,7 @@ const requiredSchema: Record<string, string[]> = {
     "run_id",
     "created_at",
   ],
-  "input_resource_events": [
+  input_resource_events: [
     "id",
     "session_id",
     "resource_id",
@@ -632,7 +632,7 @@ const requiredSchema: Record<string, string[]> = {
     "timestamp",
     "data",
   ],
-  "delivery_intents": [
+  delivery_intents: [
     "id",
     "session_id",
     "run_id",
@@ -644,7 +644,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
-  "delivery_operations": [
+  delivery_operations: [
     "id",
     "intent_id",
     "operation_key",
@@ -667,7 +667,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
-  "input_resources": [
+  input_resources: [
     "id",
     "session_id",
     "run_id",
@@ -685,7 +685,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "metadata",
   ],
-  "session_capability_events": [
+  session_capability_events: [
     "seq",
     "id",
     "session_id",
@@ -699,7 +699,7 @@ const requiredSchema: Record<string, string[]> = {
     "timestamp",
     "data",
   ],
-  "response_turns": [
+  response_turns: [
     "id",
     "session_id",
     "local_turn_id",
@@ -719,7 +719,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "completed_at",
   ],
-  "response_items": [
+  response_items: [
     "id",
     "session_id",
     "local_turn_id",
@@ -733,7 +733,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
-  "tool_execution_records": [
+  tool_execution_records: [
     "id",
     "session_id",
     "local_turn_id",
@@ -752,7 +752,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "completed_at",
   ],
-  "response_runs": [
+  response_runs: [
     "id",
     "session_id",
     "local_run_id",
@@ -768,7 +768,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
-  "response_session_state": [
+  response_session_state: [
     "session_id",
     "state_mode",
     "previous_response_id",
@@ -779,7 +779,7 @@ const requiredSchema: Record<string, string[]> = {
     "version",
     "updated_at",
   ],
-  "cron_jobs": [
+  cron_jobs: [
     "id",
     "session_id",
     "name",
@@ -798,7 +798,7 @@ const requiredSchema: Record<string, string[]> = {
     "last_status",
     "last_error",
   ],
-  "session_esm_objectives": [
+  session_esm_objectives: [
     "session_id",
     "esm_id",
     "objective",
@@ -822,7 +822,7 @@ const requiredSchema: Record<string, string[]> = {
     "recovery_count",
     "recovery_reason",
   ],
-  "session_attachments": [
+  session_attachments: [
     "id",
     "session_id",
     "run_id",
@@ -838,7 +838,7 @@ const requiredSchema: Record<string, string[]> = {
     "expires_at",
     "metadata",
   ],
-  "attachment_deliveries": [
+  attachment_deliveries: [
     "id",
     "attachment_id",
     "run_id",
@@ -850,7 +850,7 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
-  "session_esm_guidance": [
+  session_esm_guidance: [
     "id",
     "session_id",
     "objective_version",
@@ -859,25 +859,11 @@ const requiredSchema: Record<string, string[]> = {
     "created_at",
     "consumed_at",
   ],
-  "projects": ["id", "name", "created_at", "updated_at"],
-  "session_metadata": [
-    "session_id",
-    "project_id",
-    "pinned",
-    "updated_at",
-  ],
-  "session_channel_tools": [
-    "session_id",
-    "tool_name",
-    "enabled",
-    "updated_at",
-  ],
-  "session_channel_tool_generations": [
-    "session_id",
-    "generation",
-    "updated_at",
-  ],
-  "sub_session": [
+  projects: ["id", "name", "created_at", "updated_at"],
+  session_metadata: ["session_id", "project_id", "pinned", "updated_at"],
+  session_channel_tools: ["session_id", "tool_name", "enabled", "updated_at"],
+  session_channel_tool_generations: ["session_id", "generation", "updated_at"],
+  sub_session: [
     "id",
     "cwd",
     "timestamp",
@@ -890,7 +876,7 @@ const requiredSchema: Record<string, string[]> = {
     "fork_kind",
     "expert_id",
   ],
-  "sub_entries": [
+  sub_entries: [
     "seq",
     "session_id",
     "id",
@@ -934,9 +920,9 @@ export function ensureCurrentSchema(db: DB): void {
     if (missing.length > 0) {
       throw schemaIncompatible(
         new Error(
-          `database schema is incompatible: table ${table} is missing columns ${
-            missing.join(", ")
-          }`,
+          `database schema is incompatible: table ${table} is missing columns ${missing.join(
+            ", ",
+          )}`,
         ),
       );
     }
@@ -952,9 +938,7 @@ function countTables(db: DB): number {
 }
 
 function tableColumns(db: DB, table: string): Set<string> {
-  const rows = db.query<Record<string, unknown>>(
-    `PRAGMA table_info(${table})`,
-  );
+  const rows = db.query<Record<string, unknown>>(`PRAGMA table_info(${table})`);
   return new Set(rows.map((row) => String(row["name"])));
 }
 

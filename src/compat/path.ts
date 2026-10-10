@@ -1,14 +1,14 @@
-// Project-owned replacement for the JSR `@std/path` module.
+// Project-owned replacement for the third-party standard `path` module.
 //
-// This repository targets the Node runtime and does not depend on Deno's
-// package registry, so `node:path` and `node:url` provide the same surface.
+// This repository targets the Node runtime and uses only Node built-ins, so
+// `node:path` and `node:url` provide the same surface.
 // `node:path` is a CommonJS `export =` module, so its members are re-exported
 // explicitly here (a bare `export *` would not surface them). Add a member here
-// (backed by a Node builtin) rather than reintroducing a `jsr:` import.
+// (backed by a Node builtin) rather than adding a dependency.
 //
-// `fromFileUrl`/`toFileUrl` mirror `@std/path`'s names over the Node functions
-// `fileURLToPath`/`pathToFileURL`; `SEPARATOR` mirrors `@std/path`'s platform
-// separator constant.
+// `fromFileUrl`/`toFileUrl` mirror the standard names over the Node functions
+// `fileURLToPath`/`pathToFileURL`; `SEPARATOR` mirrors the platform separator
+// constant.
 
 import * as nodePath from "node:path";
 import * as nodeUrl from "node:url";

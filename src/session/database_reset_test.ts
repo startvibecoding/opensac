@@ -4,6 +4,7 @@
 // canonical session row is written directly through the DAO, which is the same
 // durable state the Manager persists.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { SessionDAO } from "../dao/mod.ts";
@@ -51,12 +52,12 @@ function backupSessionIds(backupPath: string): string[] {
 }
 
 test("reset database creates a fresh database when absent", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const report = resetDatabase(dir);
     assertEquals(report.databaseBackup, "");
     assertEquals(report.archived.length, 0);
-    assert(Deno.statSync(rootDatabasePath(dir)).isFile);
+    assert(runtime.statSync(rootDatabasePath(dir)).isFile);
     assertEquals(listSessionIds(dir).length, 0);
   } finally {
     closeAll();
@@ -64,25 +65,25 @@ test("reset database creates a fresh database when absent", () => {
 });
 
 test("reset database moves database and preserves previous sessions", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     seedSession(dir, "previous-session");
     closeDatabases();
 
     const dbPath = rootDatabasePath(dir);
     // A leftover sidecar must travel with the database.
-    Deno.writeTextFileSync(dbPath + "-wal", "stale");
+    runtime.writeTextFileSync(dbPath + "-wal", "stale");
 
     const report = resetDatabase(dir);
     assert(report.databaseBackup !== "");
     assertEquals(path.dirname(report.databaseBackup), dir);
-    assert(Deno.statSync(report.databaseBackup).isFile);
-    assert(Deno.statSync(report.databaseBackup + "-wal").isFile);
+    assert(runtime.statSync(report.databaseBackup).isFile);
+    assert(runtime.statSync(report.databaseBackup + "-wal").isFile);
     // The stale sidecar must not be left next to the fresh database.
     const freshWal = dbPath + "-wal";
     if (fileExists(freshWal)) {
       assert(
-        Deno.readTextFileSync(freshWal) !== "stale",
+        runtime.readTextFileSync(freshWal) !== "stale",
         "stale sidecar inherited by the fresh database",
       );
     }
@@ -92,20 +93,18 @@ test("reset database moves database and preserves previous sessions", () => {
     // The fresh database is empty...
     assertEquals(listSessionIds(dir).length, 0);
     // ...while the backup still holds the previous session.
-    assertEquals(backupSessionIds(report.databaseBackup), [
-      "previous-session",
-    ]);
+    assertEquals(backupSessionIds(report.databaseBackup), ["previous-session"]);
   } finally {
     closeAll();
   }
 });
 
 test("reset database archives orphaned sidecars", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
     for (const suffix of databaseSidecarSuffixes) {
-      Deno.writeTextFileSync(dbPath + suffix, "leftover");
+      runtime.writeTextFileSync(dbPath + suffix, "leftover");
     }
 
     const report = resetDatabase(dir);
@@ -119,26 +118,26 @@ test("reset database archives orphaned sidecars", () => {
       assert(!fileExists(dbPath + suffix), `${dbPath}${suffix} survived`);
       const destination = archivedBySource.get(dbPath + suffix);
       assert(destination !== undefined, `${dbPath}${suffix} not archived`);
-      assert(Deno.statSync(destination!).isFile);
+      assert(runtime.statSync(destination!).isFile);
     }
-    assert(Deno.statSync(dbPath).isFile);
+    assert(runtime.statSync(dbPath).isFile);
   } finally {
     closeAll();
   }
 });
 
 test("move database files rolls back with the main file first", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
     const sources = [dbPath, dbPath + "-wal", dbPath + "-shm"];
     for (const source of sources) {
-      Deno.writeTextFileSync(source, path.basename(source));
+      runtime.writeTextFileSync(source, path.basename(source));
     }
     const backupPath = path.join(dir, "sessions.db.pure-test.bak");
     // The -shm destination is an existing directory, so its rename fails while
     // the first two moves already succeeded.
-    Deno.mkdirSync(backupPath + "-shm");
+    runtime.mkdirSync(backupPath + "-shm");
 
     let caught: unknown;
     try {
@@ -150,7 +149,7 @@ test("move database files rolls back with the main file first", () => {
     const moveError = caught as DatabaseMoveError;
     assert(String(moveError.message).includes(dbPath + "-shm"));
     for (const source of [dbPath, dbPath + "-wal"]) {
-      assert(Deno.statSync(source).isFile, `${source} not restored`);
+      assert(runtime.statSync(source).isFile, `${source} not restored`);
     }
     assertEquals(moveError.restored.length, 2);
     assertEquals(moveError.restored[0].to, dbPath);
@@ -162,13 +161,13 @@ test("move database files rolls back with the main file first", () => {
 });
 
 test("reset backup path avoids occupied names", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
     const dbPath = rootDatabasePath(dir);
     const stamp = utcStamp();
     const occupied = `${dbPath}.pure-${stamp}.bak`;
-    Deno.writeTextFileSync(occupied, "x");
-    Deno.writeTextFileSync(occupied + "-wal", "x");
+    runtime.writeTextFileSync(occupied, "x");
+    runtime.writeTextFileSync(occupied + "-wal", "x");
 
     const candidate = resetBackupPath(dbPath);
     assert(candidate !== occupied);
@@ -183,16 +182,16 @@ test("reset backup path avoids occupied names", () => {
 });
 
 test("reset database reports what it left behind", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-reset-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-reset-" });
   try {
-    Deno.mkdirSync(path.join(dir, "artifacts", "attachment-1"), {
+    runtime.mkdirSync(path.join(dir, "artifacts", "attachment-1"), {
       recursive: true,
     });
-    Deno.writeFileSync(
+    runtime.writeFileSync(
       path.join(dir, "artifacts", "attachment-1", "content"),
       new Uint8Array(4096),
     );
-    Deno.writeTextFileSync(path.join(dir, "notes.txt"), "keep me");
+    runtime.writeTextFileSync(path.join(dir, "notes.txt"), "keep me");
 
     const report: ResetReport = resetDatabase(dir);
     const byName = new Map<string, LeftBehindEntry>();
@@ -217,10 +216,10 @@ test("reset database reports what it left behind", () => {
 
 function fileExists(p: string): boolean {
   try {
-    Deno.statSync(p);
+    runtime.statSync(p);
     return true;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
+    if (err instanceof runtime.errors.NotFound) return false;
     throw err;
   }
 }
@@ -228,9 +227,9 @@ function fileExists(p: string): boolean {
 function utcStamp(): string {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, "0");
-  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${
-    pad(now.getUTCDate())
-  }T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${
-    pad(now.getUTCSeconds())
-  }Z`;
+  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(
+    now.getUTCDate(),
+  )}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(
+    now.getUTCSeconds(),
+  )}Z`;
 }

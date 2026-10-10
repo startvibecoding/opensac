@@ -5,6 +5,7 @@
 // retained as a detached remote execution. `context.Context` maps to
 // `AbortSignal`, so `context.DeadlineExceeded` maps to a `TimeoutError` reason.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import { createManager } from "../session/manager.ts";
 import {
@@ -24,7 +25,7 @@ import {
 import { test } from "#testing";
 
 function initRecoveryTestSession(sessionDir: string, id: string): void {
-  const manager = createManager(Deno.makeTempDirSync(), sessionDir);
+  const manager = createManager(runtime.makeTempDirSync(), sessionDir);
   manager.initWithID(id);
 }
 
@@ -59,45 +60,42 @@ function makeRun(overrides: Partial<DurableRun>): DurableRun {
   };
 }
 
-test(
-  "acquireExecutionAdmissionRecoversOrphanBeforeReturningGuard",
-  async () => {
-    const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
+test("acquireExecutionAdmissionRecoversOrphanBeforeReturningGuard", async () => {
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-admission-" });
+  try {
+    initRecoveryTestSession(sessionDir, "admission-recovery");
+    new RunStore(sessionDir).create(
+      makeRun({
+        id: "stale",
+        sessionId: "admission-recovery",
+        source: "tui",
+        status: "running",
+        startedAt: new Date(),
+      }),
+    );
+    const guard = await acquireExecutionAdmission(
+      undefined,
+      sessionDir,
+      "admission-recovery",
+      {},
+    );
     try {
-      initRecoveryTestSession(sessionDir, "admission-recovery");
-      new RunStore(sessionDir).create(
-        makeRun({
-          id: "stale",
-          sessionId: "admission-recovery",
-          source: "tui",
-          status: "running",
-          startedAt: new Date(),
-        }),
-      );
-      const guard = await acquireExecutionAdmission(
-        undefined,
-        sessionDir,
-        "admission-recovery",
-        {},
-      );
-      try {
-        const binding = guard.binding();
-        assertEquals(binding.purpose, "admission");
-        assertEquals(binding.runId, "");
-        const stale = getSessionRun(sessionDir, "stale");
-        assert(stale !== undefined, "stale run missing");
-        assertEquals(stale!.status, "failed");
-      } finally {
-        guard.release();
-      }
+      const binding = guard.binding();
+      assertEquals(binding.purpose, "admission");
+      assertEquals(binding.runId, "");
+      const stale = getSessionRun(sessionDir, "stale");
+      assert(stale !== undefined, "stale run missing");
+      assertEquals(stale!.status, "failed");
     } finally {
-      closeDatabases();
+      guard.release();
     }
-  },
-);
+  } finally {
+    closeDatabases();
+  }
+});
 
 test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-admission-" });
   try {
     initRecoveryTestSession(sessionDir, "admission-owned");
     const owner = sessionAcquireExecutionAdmission(
@@ -144,7 +142,7 @@ test("acquireExecutionAdmissionDoesNotDisplaceLiveOwner", async () => {
 });
 
 test("acquireExecutionAdmissionRetainsVerifiedRemoteRun", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-admission-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-admission-" });
   try {
     initRecoveryTestSession(sessionDir, "admission-remote");
     const now = new Date();

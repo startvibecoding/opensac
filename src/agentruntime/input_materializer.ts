@@ -10,6 +10,8 @@
 // maps to `Uint8Array`; `io.ReadCloser` maps to a byte stream; `time.Time` maps
 // to `Date`; SHA-256/HMAC use `node:crypto`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { FsFile } from "../platform/runtime.ts";
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import * as path from "../compat/path.ts";
 import {
@@ -33,7 +35,8 @@ import {
 import { detectContentType } from "./media_type.ts";
 import {
   type KnowledgeBaseReference,
-  type KnowledgeCapsule} from "./knowledge_context.ts";
+  type KnowledgeCapsule,
+} from "./knowledge_context.ts";
 
 const VALID_INPUT_KINDS: ReadonlySet<string> = new Set([
   ATTACHMENT_IMAGE,
@@ -55,9 +58,7 @@ export interface InputIngress {
   filenameHint: string;
   mediaTypeHint: string;
   sizeHint: number;
-  open: (
-    signal: AbortSignal | undefined,
-  ) => InputStream | Promise<InputStream>;
+  open: (signal: AbortSignal | undefined) => InputStream | Promise<InputStream>;
 }
 
 /** The authenticated one-shot stream supplied by an adapter. */
@@ -183,16 +184,18 @@ export class InputMaterializer {
       throw new Error("input work directory is required");
     }
     if (
-      policy.maxImageBytes <= 0 || policy.maxFileBytes <= 0 ||
+      policy.maxImageBytes <= 0 ||
+      policy.maxFileBytes <= 0 ||
       policy.maxImagePixels <= 0
     ) {
       throw new Error("input resource limits must be positive");
     }
     this.sessionDir = path.normalize(sessionDir);
     this.workDir = path.normalize(workDir);
-    this.policy = policy.draftMaxAge > 0
-      ? policy
-      : { ...policy, draftMaxAge: 24 * 60 * 60 * 1000 };
+    this.policy =
+      policy.draftMaxAge > 0
+        ? policy
+        : { ...policy, draftMaxAge: 24 * 60 * 60 * 1000 };
   }
 
   /** The configured local resource limits. */
@@ -224,9 +227,10 @@ export class InputMaterializer {
       if (existing !== undefined) return existing;
     }
 
-    const maxBytes = ingress.kind === ATTACHMENT_IMAGE
-      ? this.policy.maxImageBytes
-      : this.policy.maxFileBytes;
+    const maxBytes =
+      ingress.kind === ATTACHMENT_IMAGE
+        ? this.policy.maxImageBytes
+        : this.policy.maxFileBytes;
     if (ingress.sizeHint > maxBytes) {
       throw new Error(`input exceeds ${maxBytes} bytes`);
     }
@@ -235,24 +239,24 @@ export class InputMaterializer {
     const resourceId = generateID();
     validatePathComponent(resourceId);
     const dir = path.join(root, resourceId);
-    await Deno.mkdir(dir, { mode: 0o700 });
+    await nodeRuntime.mkdir(dir, { mode: 0o700 });
     const removeResource = () => {
       try {
-        Deno.removeSync(dir, { recursive: true });
+        nodeRuntime.removeSync(dir, { recursive: true });
       } catch {
         // already gone
       }
     };
     let tmpName: string;
     try {
-      tmpName = await Deno.makeTempFile({ dir, prefix: ".incoming-" });
+      tmpName = await nodeRuntime.makeTempFile({ dir, prefix: ".incoming-" });
     } catch (err) {
       removeResource();
       throw new Error(`create input temporary file: ${err}`);
     }
     const cleanup = () => {
       try {
-        Deno.removeSync(tmpName);
+        nodeRuntime.removeSync(tmpName);
       } catch {
         // already gone
       }
@@ -322,7 +326,7 @@ export class InputMaterializer {
     filename = canonicalInputFilename(filename, mediaType);
     const finalPath = path.join(dir, filename);
     try {
-      await Deno.rename(tmpName, finalPath);
+      await nodeRuntime.rename(tmpName, finalPath);
     } catch (err) {
       removeResource();
       throw new Error(`commit input: ${err}`);
@@ -430,11 +434,7 @@ export class InputMaterializer {
     validatePathComponent(resourceId);
     let relativePath = "";
     writeRootDatabase(this.sessionDir, (tx) => {
-      const record = new InputResourceDAO(null).find(
-        tx,
-        sessionId,
-        resourceId,
-      );
+      const record = new InputResourceDAO(null).find(tx, sessionId, resourceId);
       if (record === undefined) {
         throw new Error(`input resource ${resourceId} not found`);
       }
@@ -467,9 +467,9 @@ export class InputMaterializer {
     if (relativePath !== "") {
       const resourcePath = this.resourcePath(relativePath);
       try {
-        Deno.removeSync(path.dirname(resourcePath), { recursive: true });
+        nodeRuntime.removeSync(path.dirname(resourcePath), { recursive: true });
       } catch (err) {
-        if (!(err instanceof Deno.errors.NotFound)) throw err;
+        if (!(err instanceof nodeRuntime.errors.NotFound)) throw err;
       }
     }
   }
@@ -490,15 +490,17 @@ export class InputMaterializer {
         try {
           const resolved = this.resourcePath(record.relativePath);
           try {
-            Deno.statSync(resolved);
+            nodeRuntime.statSync(resolved);
           } catch (err) {
-            if (err instanceof Deno.errors.NotFound) missing = true;
+            if (err instanceof nodeRuntime.errors.NotFound) missing = true;
           }
         } catch {
           // invalid relative path: treated like a path error, not a missing file
         }
         if (
-          missing && record.status !== "deleted" && record.status !== "missing"
+          missing &&
+          record.status !== "deleted" &&
+          record.status !== "missing"
         ) {
           new InputResourceDAO(null).updateStatus(
             tx,
@@ -547,9 +549,9 @@ export class InputMaterializer {
     for (const item of remove) {
       const resourcePath = this.resourcePath(item.relativePath);
       try {
-        Deno.removeSync(path.dirname(resourcePath), { recursive: true });
+        nodeRuntime.removeSync(path.dirname(resourcePath), { recursive: true });
       } catch (err) {
-        if (!(err instanceof Deno.errors.NotFound)) throw err;
+        if (!(err instanceof nodeRuntime.errors.NotFound)) throw err;
       }
     }
     return remove.length;
@@ -590,10 +592,10 @@ export class InputMaterializer {
   }
 
   private async inputRoot(): Promise<string> {
-    const workDir = await Deno.realPath(this.workDir);
+    const workDir = await nodeRuntime.realPath(this.workDir);
     const root = path.join(workDir, ".opensac", "tmp", "inputs");
-    await Deno.mkdir(root, { recursive: true, mode: 0o700 });
-    const resolvedRoot = await Deno.realPath(root);
+    await nodeRuntime.mkdir(root, { recursive: true, mode: 0o700 });
+    const resolvedRoot = await nodeRuntime.realPath(root);
     const rel = path.relative(workDir, resolvedRoot);
     if (isEscaping(rel)) {
       throw new Error("input root escaped Runtime work directory");
@@ -653,16 +655,16 @@ export class InputMaterializer {
   private installationKey(): Uint8Array {
     if (this.#itemKeyKey !== null) return new Uint8Array(this.#itemKeyKey);
     const keyPath = path.join(this.sessionDir, ".runtime-input-key");
-    Deno.mkdirSync(this.sessionDir, { recursive: true, mode: 0o700 });
-    let file: Deno.FsFile | null = null;
+    nodeRuntime.mkdirSync(this.sessionDir, { recursive: true, mode: 0o700 });
+    let file: FsFile | null = null;
     try {
-      file = Deno.openSync(keyPath, {
+      file = nodeRuntime.openSync(keyPath, {
         write: true,
         createNew: true,
         mode: 0o600,
       });
     } catch (err) {
-      if (!(err instanceof Deno.errors.AlreadyExists)) {
+      if (!(err instanceof nodeRuntime.errors.AlreadyExists)) {
         throw new Error(`open Runtime input key: ${err}`);
       }
       file = null;
@@ -678,7 +680,7 @@ export class InputMaterializer {
       this.#itemKeyKey = key;
       return new Uint8Array(key);
     }
-    const key = Deno.readFileSync(keyPath);
+    const key = nodeRuntime.readFileSync(keyPath);
     if (key.length !== 32) {
       throw new Error(`Runtime input key has invalid length ${key.length}`);
     }
@@ -697,7 +699,7 @@ export class InputMaterializer {
       let status = "available";
       try {
         const resolved = this.resourcePath(record.relativePath);
-        const info = Deno.statSync(resolved);
+        const info = nodeRuntime.statSync(resolved);
         if (!info.isFile) status = "missing";
       } catch {
         status = "missing";
@@ -779,7 +781,7 @@ async function copyInputStream(
   stream: InputStream,
   maxBytes: number,
 ): Promise<{ written: number; digest: string }> {
-  const file = await Deno.open(targetPath, {
+  const file = await nodeRuntime.open(targetPath, {
     write: true,
     create: true,
     truncate: true,
@@ -790,15 +792,13 @@ async function copyInputStream(
   const limit = maxBytes + 1;
   try {
     let remaining = limit;
-    const source = stream.bytes !== undefined
-      ? singleChunk(stream.bytes)
-      : stream.stream;
+    const source =
+      stream.bytes !== undefined ? singleChunk(stream.bytes) : stream.stream;
     if (source === undefined) throw new Error("input source is empty");
     for await (const chunk of source) {
       if (remaining <= 0) break;
-      const take = chunk.length > remaining
-        ? chunk.subarray(0, remaining)
-        : chunk;
+      const take =
+        chunk.length > remaining ? chunk.subarray(0, remaining) : chunk;
       let offset = 0;
       while (offset < take.length) {
         const n = await file.write(take.subarray(offset));
@@ -865,7 +865,7 @@ interface ImageConfig {
  * identify (an extensionless WebP over an opaque transport).
  */
 export async function detectInputMediaType(filePath: string): Promise<string> {
-  const file = await Deno.open(filePath, { read: true });
+  const file = await nodeRuntime.open(filePath, { read: true });
   let head: Uint8Array;
   try {
     const buf = new Uint8Array(512);
@@ -876,7 +876,8 @@ export async function detectInputMediaType(filePath: string): Promise<string> {
   }
   const detected = detectContentType(head);
   if (
-    detected !== "application/octet-stream" && detected !== "application/zip"
+    detected !== "application/octet-stream" &&
+    detected !== "application/zip"
   ) {
     return detected;
   }
@@ -900,7 +901,7 @@ export async function detectInputMediaType(filePath: string): Promise<string> {
 async function decodeImageConfig(
   filePath: string,
 ): Promise<ImageConfig | null> {
-  const file = await Deno.open(filePath, { read: true });
+  const file = await nodeRuntime.open(filePath, { read: true });
   let data: Uint8Array;
   try {
     const buf = new Uint8Array(64 * 1024);
@@ -923,8 +924,11 @@ function parseImageConfig(data: Uint8Array): ImageConfig | null {
   }
   if (
     data.length >= 10 &&
-    data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 &&
-    data[3] === 0x38 && (data[4] === 0x37 || data[4] === 0x39) &&
+    data[0] === 0x47 &&
+    data[1] === 0x49 &&
+    data[2] === 0x46 &&
+    data[3] === 0x38 &&
+    (data[4] === 0x37 || data[4] === 0x39) &&
     data[5] === 0x61
   ) {
     return {
@@ -939,20 +943,29 @@ function parseImageConfig(data: Uint8Array): ImageConfig | null {
     return null;
   }
   if (
-    data.length >= 30 && data[0] === 0x52 && data[1] === 0x49 &&
-    data[2] === 0x46 && data[3] === 0x46 && data[8] === 0x57 &&
-    data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50
+    data.length >= 30 &&
+    data[0] === 0x52 &&
+    data[1] === 0x49 &&
+    data[2] === 0x46 &&
+    data[3] === 0x46 &&
+    data[8] === 0x57 &&
+    data[9] === 0x45 &&
+    data[10] === 0x42 &&
+    data[11] === 0x50
   ) {
     const fourcc = String.fromCharCode(data[12], data[13], data[14], data[15]);
     if (fourcc === "VP8 ") {
       return {
-        width: (readUint16LE(data, 26)) & 0x3fff,
-        height: (readUint16LE(data, 28)) & 0x3fff,
+        width: readUint16LE(data, 26) & 0x3fff,
+        height: readUint16LE(data, 28) & 0x3fff,
         format: "webp",
       };
     }
     if (fourcc === "VP8L") {
-      const b0 = data[21], b1 = data[22], b2 = data[23], b3 = data[24];
+      const b0 = data[21],
+        b1 = data[22],
+        b2 = data[23],
+        b3 = data[24];
       return {
         width: (b0 | ((b1 & 0x3f) << 8)) + 1,
         height: (((b1 & 0xc0) >> 6) | (b2 << 2) | ((b3 & 0x0f) << 10)) + 1,
@@ -981,14 +994,19 @@ function parseJPEGDimensions(
     }
     const marker = data[i + 1];
     if (
-      marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)
+      marker === 0xd8 ||
+      marker === 0x01 ||
+      (marker >= 0xd0 && marker <= 0xd7)
     ) {
       i += 2;
       continue;
     }
     const len = (data[i + 2] << 8) | data[i + 3];
     if (
-      marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 &&
+      marker >= 0xc0 &&
+      marker <= 0xcf &&
+      marker !== 0xc4 &&
+      marker !== 0xc8 &&
       marker !== 0xcc
     ) {
       const height = (data[i + 5] << 8) | data[i + 6];

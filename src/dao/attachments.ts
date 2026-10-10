@@ -29,7 +29,7 @@ const columns = `id, session_id AS sessionId, run_id AS runId, origin, kind,
   expires_at AS expiresAt, metadata`;
 
 export class AttachmentDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -71,10 +71,7 @@ export class AttachmentDAO {
   }
 
   /** Lists the rows of one session filtered by status in creation order. */
-  listBySessionStatus(
-    sessionId: string,
-    status: string,
-  ): AttachmentRecord[] {
+  listBySessionStatus(sessionId: string, status: string): AttachmentRecord[] {
     return queryAll<AttachmentRecord>(
       this.requireDb(),
       `SELECT ${columns} FROM session_attachments

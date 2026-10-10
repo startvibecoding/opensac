@@ -42,7 +42,7 @@ const turnColumns = `id, session_id AS sessionId, intent_id AS intentId, kind,
   ended_at AS endedAt`;
 
 export class ConversationTurnDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -103,12 +103,14 @@ export class ConversationTurnDAO {
   }
 
   openCount(executor: DB, sessionId: string): number {
-    return queryOptional<{ n: number }>(
-      executor,
-      `SELECT COUNT(*) AS n FROM conversation_turns
+    return (
+      queryOptional<{ n: number }>(
+        executor,
+        `SELECT COUNT(*) AS n FROM conversation_turns
        WHERE session_id = ? AND status = ?`,
-      [sessionId, "open"],
-    )?.n ?? 0;
+        [sessionId, "open"],
+      )?.n ?? 0
+    );
   }
 
   reopen(executor: DB, turn: ConversationTurnRecord): void {

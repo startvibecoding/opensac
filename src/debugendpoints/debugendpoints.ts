@@ -6,9 +6,11 @@
 // The Go-style URL paths and the `VIBECODING_PPROF_ADDR` env override are kept
 // as compatibility surface so existing local tooling keeps working. Go's CPU/
 // heap profiles and execution traces are Go-runtime specific and have no direct
-// Deno equivalent; those endpoints report 501 rather than fabricating a
-// profile. For native Deno profiling use `--inspect` / the inspector protocol.
+// Node equivalent; those endpoints report 501 rather than fabricating a
+// profile. For native Node profiling use `--inspect` / the inspector protocol.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { HttpServer } from "../platform/runtime.ts";
 import { SQLITE_EXPVAR_KEY, sqliteStatsSnapshot } from "../db/mod.ts";
 
 /** Keeps debug profiling local-only by default. */
@@ -21,7 +23,7 @@ let started = false;
 let startedAddr = "";
 
 function listenAddr(): string {
-  const addr = (Deno.env.get(ADDR_ENV) ?? "").trim();
+  const addr = (nodeRuntime.env.get(ADDR_ENV) ?? "").trim();
   return addr === "" ? DEFAULT_ADDR : addr;
 }
 
@@ -56,9 +58,9 @@ export function createDebugHandler(): (req: Request) => Response {
         "<html><head><title>/debug/pprof/</title></head>",
         "<body>",
         "<h1>/debug/pprof/</h1>",
-        "<p>Deno runtime debug endpoints:</p>",
+        "<p>Node runtime debug endpoints:</p>",
         '<ul><li><a href="/debug/vars">/debug/vars</a></li></ul>',
-        "<p>Go CPU/heap profiles and execution traces are not available under Deno.</p>",
+        "<p>Go CPU/heap profiles and execution traces are not available here.</p>",
         "</body></html>",
       ].join("\n");
       return new Response(body, {
@@ -66,12 +68,14 @@ export function createDebugHandler(): (req: Request) => Response {
       });
     }
     if (
-      p === "/debug/pprof/cmdline" || p === "/debug/pprof/symbol" ||
-      p === "/debug/pprof/profile" || p === "/debug/pprof/trace"
+      p === "/debug/pprof/cmdline" ||
+      p === "/debug/pprof/symbol" ||
+      p === "/debug/pprof/profile" ||
+      p === "/debug/pprof/trace"
     ) {
       const url = new URL(req.url);
       if (p === "/debug/pprof/cmdline") {
-        return new Response(Deno.args.join("\u0000"), {
+        return new Response(nodeRuntime.args.join("\u0000"), {
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         });
       }
@@ -81,13 +85,10 @@ export function createDebugHandler(): (req: Request) => Response {
         });
       }
       void url;
-      return new Response(
-        "Go pprof profiles/traces are not available under Deno\n",
-        {
-          status: 501,
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        },
-      );
+      return new Response("Go pprof profiles/traces are not available here\n", {
+        status: 501,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
     return new Response("404 page not found\n", { status: 404 });
   };
@@ -97,9 +98,11 @@ export function createDebugHandler(): (req: Request) => Response {
  * Starts the debug HTTP server once per process. Returns the bound address and
  * whether this call started it.
  */
-export function start(
-  logWriter?: (msg: string) => void,
-): { addr: string; startedNow: boolean; error?: Error } {
+export async function start(logWriter?: (msg: string) => void): Promise<{
+  addr: string;
+  startedNow: boolean;
+  error?: Error;
+}> {
   void logWriter;
   if (started) {
     return { addr: startedAddr, startedNow: false };
@@ -107,9 +110,25 @@ export function start(
 
   const addr = listenAddr();
   const { hostname, port } = splitAddr(addr);
-  let server: Deno.HttpServer;
+  let bound: { hostname?: string; port?: number } | undefined;
+  let resolveBound!: () => void;
+  const boundReady = new Promise<void>((resolve) => {
+    resolveBound = resolve;
+  });
+  let server: HttpServer;
   try {
-    server = Deno.serve({ hostname, port }, createDebugHandler());
+    server = nodeRuntime.serve(
+      {
+        hostname,
+        port,
+        onListen: (address) => {
+          bound = address;
+          resolveBound();
+        },
+        onError: () => resolveBound(),
+      },
+      createDebugHandler(),
+    );
   } catch (err) {
     return {
       addr: "",
@@ -117,14 +136,16 @@ export function start(
       error: new Error(`listen ${addr}: ${(err as Error).message}`),
     };
   }
-  const bound = server.addr as { hostname?: string; port?: number };
+  await boundReady;
   if (
-    bound && typeof bound.hostname === "string" &&
+    bound &&
+    typeof bound.hostname === "string" &&
     typeof bound.port === "number"
   ) {
-    const host = bound.hostname === "0.0.0.0" || bound.hostname === "::"
-      ? "127.0.0.1"
-      : bound.hostname;
+    const host =
+      bound.hostname === "0.0.0.0" || bound.hostname === "::"
+        ? "127.0.0.1"
+        : bound.hostname;
     startedAddr = `${host}:${bound.port}`;
   } else {
     startedAddr = addr;
@@ -136,9 +157,11 @@ export function start(
 }
 
 /** Starts the local debug server, logging the bound address once. */
-export function startDebugServer(w?: (msg: string) => void): void {
+export async function startDebugServer(
+  w?: (msg: string) => void,
+): Promise<void> {
   const write = w ?? (() => {});
-  const { addr, startedNow, error } = start(write);
+  const { addr, startedNow, error } = await start(write);
   if (error) {
     write(`[DEBUG] debug server unavailable: ${error.message}\n`);
     return;

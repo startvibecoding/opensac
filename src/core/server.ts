@@ -1,3 +1,5 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { Addr, HttpServer, NetAddr } from "../platform/runtime.ts";
 import { CORE_CLIENT_ID_HEADER, CoreAuth } from "./auth.ts";
 import { assertResolvedCoreConfig } from "./config.ts";
 import {
@@ -47,7 +49,7 @@ export interface CoreServerOptions {
 /** A running Core HTTP listener. */
 export interface CoreServerHandle {
   /** The actual address selected by the operating system. */
-  readonly address: Deno.NetAddr;
+  readonly address: NetAddr;
   /** A URL that can be used by local HTTP clients. */
   readonly url: string;
   /** Gracefully stops only this HTTP server. Safe to call repeatedly. */
@@ -63,8 +65,10 @@ export interface CoreServerStartFailure {
 }
 
 /** Raised when CoreServer cannot prove that a partial listener was stopped. */
-export class CoreServerStartError extends Error
-  implements CoreServerStartFailure {
+export class CoreServerStartError
+  extends Error
+  implements CoreServerStartFailure
+{
   readonly listenerMayBeAlive = true;
   readonly cleanupError?: unknown;
 
@@ -101,7 +105,7 @@ const CORE_FEATURES = [
  * The HTTP transport for the Core protocol.
  *
  * Discovery, registration, locking, and process cleanup intentionally remain
- * outside this class. It owns only the Deno HTTP listener and its request
+ * outside this class. It owns only the Node HTTP listener and its request
  * projection.
  */
 export class CoreServer {
@@ -113,12 +117,13 @@ export class CoreServer {
   constructor(options: CoreServerOptions) {
     this.#options = options;
     this.#events = options.events ?? new CoreEventStream();
-    this.#dispatcher = options.runtime === undefined
-      ? undefined
-      : new CoreRuntimeDispatcher({
-        host: options.runtime,
-        events: this.#events,
-      });
+    this.#dispatcher =
+      options.runtime === undefined
+        ? undefined
+        : new CoreRuntimeDispatcher({
+            host: options.runtime,
+            events: this.#events,
+          });
   }
 
   /** Starts the listener, or returns the already-started listener handle. */
@@ -137,16 +142,16 @@ export class CoreServer {
       );
     }
 
-    let resolveAddress!: (address: Deno.NetAddr) => void;
+    let resolveAddress!: (address: NetAddr) => void;
     let rejectAddress!: (error: unknown) => void;
-    const addressReady = new Promise<Deno.NetAddr>((resolve, reject) => {
+    const addressReady = new Promise<NetAddr>((resolve, reject) => {
       resolveAddress = resolve;
       rejectAddress = reject;
     });
 
-    let server: Deno.HttpServer;
+    let server: HttpServer;
     try {
-      server = Deno.serve(
+      server = nodeRuntime.serve(
         {
           hostname: config.host,
           port: config.port,
@@ -157,11 +162,15 @@ export class CoreServer {
               rejectAddress(error);
             }
           },
+          // node:http reports a bind failure (e.g. EADDRINUSE) asynchronously
+          // through the server's `error` event, so surface it as a rejection
+          // instead of leaving `addressReady` pending forever.
+          onError: (error) => rejectAddress(error),
         },
         (request) => this.#handleRequest(request),
       );
     } catch (error) {
-      // Deno.serve reports bind failures synchronously. There is no listener
+      // nodeRuntime.serve reports bind failures synchronously. There is no listener
       // to await in that case, so do not leave an unobserved rejected promise.
       throw error;
     }
@@ -203,7 +212,7 @@ export class CoreServer {
       if (signal.aborted) abortListener();
     }
 
-    let address: Deno.NetAddr;
+    let address: NetAddr;
     try {
       address = await addressReady;
     } catch (error) {
@@ -266,18 +275,13 @@ export class CoreServer {
       if (request.method !== "GET") return methodNotAllowed(["GET"]);
       const client = resolveClientIdentity(request);
       this.#events.registerClient(client.clientId, client.remoteAddress);
-      const upgraded = Deno.upgradeWebSocket(request);
+      const upgraded = nodeRuntime.upgradeWebSocket(request);
       this.#attachEventSocket(upgraded.socket, client.clientId);
       return upgraded.response;
     }
 
     if (pathname !== "/rpc") {
-      return jsonRpcErrorResponse(
-        null,
-        -32601,
-        "Not found",
-        404,
-      );
+      return jsonRpcErrorResponse(null, -32601, "Not found", 404);
     }
 
     if (!CoreAuth.authenticate(request, this.#options.config)) {
@@ -314,11 +318,9 @@ export class CoreServer {
     // attribution. It is registered conditionally (see `registerRpcClient`):
     // the row survives while the client owns subscriptions and drops when its
     // last one releases, so a stateless HTTP caller never leaves a ghost.
-    const response = await this.#dispatch(
-      message,
-      request.signal,
-      { clientId: resolveClientIdentity(request).clientId },
-    );
+    const response = await this.#dispatch(message, request.signal, {
+      clientId: resolveClientIdentity(request).clientId,
+    });
     if (!("id" in message)) {
       // JSON-RPC notifications are one-way and must not receive a response
       // envelope. The method still runs so health/info remain useful to
@@ -455,15 +457,15 @@ export class CoreServer {
 }
 
 class CoreHttpServerHandle implements CoreServerHandle {
-  readonly address: Deno.NetAddr;
+  readonly address: NetAddr;
   readonly url: string;
-  readonly #server: Deno.HttpServer;
+  readonly #server: HttpServer;
   readonly #cleanup: () => Promise<void>;
   #stopPromise: Promise<void> | undefined;
 
   constructor(
-    server: Deno.HttpServer,
-    address: Deno.NetAddr,
+    server: HttpServer,
+    address: NetAddr,
     url: string,
     cleanup: () => Promise<void>,
   ) {
@@ -504,18 +506,25 @@ class CoreHttpServerHandle implements CoreServerHandle {
  * sends no header gets a generated id, which keeps a plain HTTP or legacy client
  * observable for its own connection lifetime.
  */
-function resolveClientIdentity(
-  request: Request,
-): { clientId: string; remoteAddress?: string } {
-  const clientId = request.headers.get(CORE_CLIENT_ID_HEADER)?.trim() ||
+function resolveClientIdentity(request: Request): {
+  clientId: string;
+  remoteAddress?: string;
+} {
+  const clientId =
+    request.headers.get(CORE_CLIENT_ID_HEADER)?.trim() ||
     `event-${crypto.randomUUID()}`;
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",").at(0)
+  const forwarded = request.headers
+    .get("x-forwarded-for")
+    ?.split(",")
+    .at(0)
     ?.trim();
   return {
     clientId,
-    ...(forwarded === undefined || forwarded === "" ? {} : {
-      remoteAddress: forwarded,
-    }),
+    ...(forwarded === undefined || forwarded === ""
+      ? {}
+      : {
+          remoteAddress: forwarded,
+        }),
   };
 }
 function isRequestOrNotification(
@@ -524,7 +533,7 @@ function isRequestOrNotification(
   return "method" in message;
 }
 
-function asNetAddress(address: Deno.Addr): Deno.NetAddr {
+function asNetAddress(address: Addr): NetAddr {
   if (
     address.transport !== "tcp" ||
     typeof address.hostname !== "string" ||
@@ -543,13 +552,9 @@ function buildServerUrl(hostname: string, port: number): string {
 }
 
 function methodNotAllowed(allow: string[]): Response {
-  return jsonRpcErrorResponse(
-    null,
-    -32600,
-    "Method not allowed",
-    405,
-    { allow: allow.join(", ") },
-  );
+  return jsonRpcErrorResponse(null, -32600, "Method not allowed", 405, {
+    allow: allow.join(", "),
+  });
 }
 
 function jsonRpcErrorResponse(
@@ -575,7 +580,7 @@ function jsonResponse(
 }
 
 function isExpectedShutdownError(error: unknown): boolean {
-  return error instanceof Deno.errors.BadResource;
+  return error instanceof nodeRuntime.errors.BadResource;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -583,6 +588,8 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 function abortReason(signal: AbortSignal): unknown {
-  return signal.reason ??
-    new DOMException("Core server startup aborted", "AbortError");
+  return (
+    signal.reason ??
+    new DOMException("Core server startup aborted", "AbortError")
+  );
 }

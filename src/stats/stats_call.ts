@@ -12,11 +12,11 @@ export type StatsCall =
   | { method: "byProvider"; query: Query }
   | { method: "byModel"; query: Query }
   | {
-    method: "recentFiltered";
-    query: Query;
-    page: number;
-    pageSize: number;
-  };
+      method: "recentFiltered";
+      query: Query;
+      page: number;
+      pageSize: number;
+    };
 
 /** Runs one call against a query surface. */
 export function runStatsCall(db: DB, call: StatsCall): unknown {

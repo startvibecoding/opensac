@@ -2,6 +2,7 @@
 // subcommand that exposes explicitly configured knowledge bases over the MCP
 // stdio transport.
 
+import { runtime } from "../platform/runtime.ts";
 import { getSessionDir, loadSettings } from "../config/mod.ts";
 import { KnowledgeMCPHandler } from "../agentruntime/knowledge_mcp.ts";
 import { serveStdio } from "../mcp/server.ts";
@@ -25,8 +26,8 @@ function lifetimeSignal(signal?: AbortSignal): AbortSignal {
   }
   const onTerminate = () => controller.abort();
   try {
-    Deno.addSignalListener("SIGINT", onTerminate);
-    Deno.addSignalListener("SIGTERM", onTerminate);
+    runtime.addSignalListener("SIGINT", onTerminate);
+    runtime.addSignalListener("SIGTERM", onTerminate);
   } catch {
     // signal listeners are unavailable in some sandboxes; EOF still exits
   }
@@ -45,14 +46,11 @@ export async function executeKnowledgeMCPCommand(
   if (opts.knowledgeBases.length === 0) {
     throw new Error("at least one --knowledge-base ID is required");
   }
-  const handler = KnowledgeMCPHandler.create(
-    sessionDir,
-    opts.knowledgeBases,
-  );
+  const handler = KnowledgeMCPHandler.create(sessionDir, opts.knowledgeBases);
   await serveStdio(
     lifetimeSignal(opts.signal),
-    opts.stdin ?? Deno.stdin.readable,
-    opts.stdout ?? Deno.stdout.writable,
+    opts.stdin ?? runtime.stdin.readable,
+    opts.stdout ?? runtime.stdout.writable,
     handler,
   );
 }

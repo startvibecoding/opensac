@@ -3,6 +3,7 @@
 // print/unattended run policy travels on the Core-owned session, and
 // `root_print.ts` contains no Builder/ExecutionRuntime construction.
 
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -125,7 +126,7 @@ function printOptions(overrides: Partial<PrintOptions> = {}): PrintOptions {
     model: "test-model",
     mode: "yolo",
     thinking: "",
-    workDir: Deno.cwd(),
+    workDir: runtime.cwd(),
     json: false,
     writeOut: () => {},
     writeError: () => {},
@@ -263,10 +264,7 @@ test("print mode fails with exit 1 when a tool needs approval", async () => {
     { settings: defaultSettings(), service: scripted.service },
   );
   assertEquals(result.exitCode, 1);
-  assertStringIncludes(
-    err.join("\n"),
-    "tool approval required in print mode",
-  );
+  assertStringIncludes(err.join("\n"), "tool approval required in print mode");
   // The pending decision is answered unattended so the Core run is never wedged.
   assertEquals(scripted.answers, [
     { requestId: "ap-1", kind: "approval", approved: false },
@@ -381,14 +379,16 @@ test("print mode mints a fresh session per run when no resume flag is given", as
   // With no `-c`/`-r`/`--session`, print keeps the Go setupSession default: one
   // fresh Core-owned session per run. The resume flags are covered by the
   // dedicated tests below, so this one pins only the no-flag path.
-  const terminal: ScriptEvent[] = [{
-    eventType: "run_finished",
-    payload: {
-      status: "completed",
-      agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+  const terminal: ScriptEvent[] = [
+    {
+      eventType: "run_finished",
+      payload: {
+        status: "completed",
+        agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+      },
+      terminal: true,
     },
-    terminal: true,
-  }];
+  ];
   const first = scriptedService({ events: terminal });
   await runPrintAction(printOptions(), {
     settings: defaultSettings(),
@@ -409,25 +409,25 @@ test("print mode mints a fresh session per run when no resume flag is given", as
 });
 
 test("root_print has no Builder/ExecutionRuntime construction left", () => {
-  const violations = tuiBoundaryViolations(projectRoot).filter((violation) =>
-    violation.file === "src/cli/root_print.ts"
+  const violations = tuiBoundaryViolations(projectRoot).filter(
+    (violation) => violation.file === "src/cli/root_print.ts",
   );
   assertEquals(
     violations,
     [],
     `root_print boundary violations: ${JSON.stringify(violations)}`,
   );
-  const src = Deno.readTextFileSync(join(projectRoot, "src/cli/root_print.ts"));
-  for (
-    const pattern of [
-      /\bnew\s+Builder\s*\(/,
-      /\bnew\s+ExecutionRuntime\s*\(/,
-      /\bcreateSessionExecutionRuntime\s*\(/,
-      /\bcreateSessionRunDescriptor\s*\(/,
-      /session_runtime/,
-      /execution\.ts/,
-    ]
-  ) {
+  const src = runtime.readTextFileSync(
+    join(projectRoot, "src/cli/root_print.ts"),
+  );
+  for (const pattern of [
+    /\bnew\s+Builder\s*\(/,
+    /\bnew\s+ExecutionRuntime\s*\(/,
+    /\bcreateSessionExecutionRuntime\s*\(/,
+    /\bcreateSessionRunDescriptor\s*\(/,
+    /session_runtime/,
+    /execution\.ts/,
+  ]) {
     assertEquals(pattern.exec(src), null, `root_print.ts matches ${pattern}`);
   }
 });
@@ -490,7 +490,7 @@ test("print mode keeps retry progress and provider errors visible", async () => 
 test("print -c continues this directory's newest session", async () => {
   const fake = createFakeTUIService();
   // An earlier conversation in the same directory, as a previous run left it.
-  const earlier = await fake.createSession({ workDir: Deno.cwd() });
+  const earlier = await fake.createSession({ workDir: runtime.cwd() });
   fake.seedTranscript(earlier.sessionId, [
     { role: "user", text: "the earlier turn" },
   ]);
@@ -504,10 +504,10 @@ test("print -c continues this directory's newest session", async () => {
       return fake.openSession(input);
     },
   };
-  const result = await runPrintAction(
-    printOptions({ continueSession: true }),
-    { settings: defaultSettings(), service },
-  );
+  const result = await runPrintAction(printOptions({ continueSession: true }), {
+    settings: defaultSettings(),
+    service,
+  });
   assertEquals(result.exitCode, 0);
   assertEquals(
     opens.map((o) => o.sessionId),
@@ -523,23 +523,25 @@ test("print -c continues this directory's newest session", async () => {
 /** One already-terminal run stream, for tests that only assert session setup. */
 function settledScript(): Scripted {
   return scriptedService({
-    events: [{
-      eventType: "run_finished",
-      payload: {
-        status: "completed",
-        agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+    events: [
+      {
+        eventType: "run_finished",
+        payload: {
+          status: "completed",
+          agentEvent: { type: EVENT_RUN_FINISHED, status: TASK_SUCCESS },
+        },
+        terminal: true,
       },
-      terminal: true,
-    }],
+    ],
   });
 }
 
 test("print without -c/-r still creates a fresh session", async () => {
   const scripted = settledScript();
-  const result = await runPrintAction(
-    printOptions(),
-    { settings: defaultSettings(), service: scripted.service },
-  );
+  const result = await runPrintAction(printOptions(), {
+    settings: defaultSettings(),
+    service: scripted.service,
+  });
   assertEquals(result.exitCode, 0);
   assertEquals(scripted.creates.length, 1, "no resume flags, one new session");
 });

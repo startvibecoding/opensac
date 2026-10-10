@@ -1,5 +1,6 @@
 // Focused tests for the ported net/http DetectContentType sniffing subset.
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import { detectAttachmentMediaType, detectContentType } from "./media_type.ts";
 import { test } from "#testing";
@@ -46,8 +47,8 @@ test("DetectContentTypeSniffsCommonMedia", () => {
 });
 
 test("DetectAttachmentMediaTypeReadsFileBytes", async () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-media-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-media-" });
   const file = `${dir}/pixel.png`;
-  await Deno.writeFile(file, onePixelPng);
+  await runtime.writeFile(file, onePixelPng);
   assertEquals(await detectAttachmentMediaType(file), "image/png");
 });

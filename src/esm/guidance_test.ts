@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { formatTime } from "./store.ts";
 import { roleWorker, Supervisor } from "./runtime_core.ts";
@@ -49,7 +50,7 @@ test("Supervisor injects and consumes guidance for worker", async () => {
     const { objective: obj, error } = await supervisor.run(
       sessionID,
       "run-guidance",
-      Deno.makeTempDirSync(),
+      runtime.makeTempDirSync(),
       "yolo",
     );
     assertEquals(error, null);
@@ -76,7 +77,7 @@ test("Supervisor keeps guidance when role fails", async () => {
     const { error } = await supervisor.run(
       sessionID,
       "run-fail",
-      Deno.makeTempDirSync(),
+      runtime.makeTempDirSync(),
       "yolo",
     );
     assert(error !== null, "Run should surface the role failure");

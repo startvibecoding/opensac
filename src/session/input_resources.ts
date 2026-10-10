@@ -55,17 +55,20 @@ export function appendInputResourceEventTx(
     throw new Error("input resource event transaction is not available");
   }
   if (
-    event.id === "" || event.sessionId === "" || event.resourceId === "" ||
+    event.id === "" ||
+    event.sessionId === "" ||
+    event.resourceId === "" ||
     event.eventType === ""
   ) {
     throw new Error("input resource event identity and type are required");
   }
   const timestamp = event.timestamp ?? new Date();
-  const data = event.data === undefined
-    ? "{}"
-    : typeof event.data === "string"
-    ? event.data
-    : JSON.stringify(event.data);
+  const data =
+    event.data === undefined
+      ? "{}"
+      : typeof event.data === "string"
+        ? event.data
+        : JSON.stringify(event.data);
   new InputResourceDAO(null).appendEvent(tx, {
     id: event.id,
     sessionId: event.sessionId,

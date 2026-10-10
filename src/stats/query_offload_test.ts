@@ -2,6 +2,7 @@
 // worker and in-process paths must produce identical results, transport
 // failures fall back in-process, and query failures surface unchanged.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { openStandalone } from "../db/mod.ts";
@@ -39,8 +40,8 @@ function insert(db: DB, record: Partial<StatsRecord>): void {
 }
 
 function createSeededDB(): DB {
-  const dbPath = path.join(Deno.makeTempDirSync(), "sessions.db");
-  const f = Deno.openSync(dbPath, { create: true, write: true });
+  const dbPath = path.join(runtime.makeTempDirSync(), "sessions.db");
+  const f = runtime.openSync(dbPath, { create: true, write: true });
   f.close();
   const db = DB.open(dbPath);
   insert(db, { provider: "openai", model: "gpt-4", inputTokens: 100 });
@@ -158,9 +159,10 @@ test("inline executor surfaces query failures as rejections", async () => {
   // managed cache, turning the next statement into a real query error.
   const standaloneRaw = openStandalone(raw.path);
   const standalone = new DB(
-    wrapStandaloneDatabase(standaloneRaw) ?? (() => {
-      throw new Error("database is not open");
-    })(),
+    wrapStandaloneDatabase(standaloneRaw) ??
+      (() => {
+        throw new Error("database is not open");
+      })(),
     new StatsDAO(standaloneRaw),
   );
   const inline = createInlineStatsQueryExecutor(standalone);

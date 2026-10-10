@@ -6,7 +6,7 @@
 // AgentAdapter bridge are ported. `manager.ts` (AgentManager), `factory.ts`
 // (AgentFactory + public Builder registration), and `subagent.ts` (the
 // sub-agent tools) complete the Agent Core; the background Responses tool-call
-// methods remain deferred. See docs/proposal/go-to-deno-migration.md backlog
+// methods remain deferred. See docs/proposal/go-to-typescript-migration.md backlog
 // #19.
 
 export * from "./events.ts";

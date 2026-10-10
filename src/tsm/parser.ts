@@ -272,7 +272,8 @@ class BlockParser {
       return;
     }
     if (
-      trimmed[0] === "|" && this.pos + 1 < this.#lines.length &&
+      trimmed[0] === "|" &&
+      this.pos + 1 < this.#lines.length &&
       isTableSeparator(this.#lines[this.pos + 1])
     ) {
       this.parseTable(parent);
@@ -354,7 +355,8 @@ class BlockParser {
           peek++;
         }
         if (
-          peek < this.#lines.length && isIndentedCodeStart(this.#lines[peek])
+          peek < this.#lines.length &&
+          isIndentedCodeStart(this.#lines[peek])
         ) {
           codeLines.push("");
           this.pos++;
@@ -458,7 +460,8 @@ class BlockParser {
       listItem.append(para);
 
       if (
-        para.children.length > 0 && para.children[0].type === NodeType.Strong
+        para.children.length > 0 &&
+        para.children[0].type === NodeType.Strong
       ) {
         listItem.startsWithBold = true;
       }
@@ -522,7 +525,8 @@ class BlockParser {
       listItem.append(para);
 
       if (
-        para.children.length > 0 && para.children[0].type === NodeType.Strong
+        para.children.length > 0 &&
+        para.children[0].type === NodeType.Strong
       ) {
         listItem.startsWithBold = true;
       }
@@ -540,7 +544,8 @@ class BlockParser {
     this.pos++;
 
     if (
-      this.pos < this.#lines.length && isTableSeparator(this.#lines[this.pos])
+      this.pos < this.#lines.length &&
+      isTableSeparator(this.#lines[this.pos])
     ) {
       this.pos++;
     }
@@ -595,7 +600,8 @@ class BlockParser {
       if (isOrderedListStart(trimmed)) break;
       if (isIndentedCodeStart(line)) break;
       if (
-        trimmed[0] === "|" && this.pos + 1 < this.#lines.length &&
+        trimmed[0] === "|" &&
+        this.pos + 1 < this.#lines.length &&
         isTableSeparator(this.#lines[this.pos + 1])
       ) {
         break;
@@ -655,13 +661,18 @@ function isOrderedListStart(line: string): boolean {
   let i = 0;
   while (i < trimmed.length && trimmed[i] >= "0" && trimmed[i] <= "9") i++;
   if (i === 0 || i > 9 || i >= trimmed.length) return false;
-  return (trimmed[i] === "." || trimmed[i] === ")") && i + 1 < trimmed.length &&
-    trimmed[i + 1] === " ";
+  return (
+    (trimmed[i] === "." || trimmed[i] === ")") &&
+    i + 1 < trimmed.length &&
+    trimmed[i + 1] === " "
+  );
 }
 
-function parseOrderedListStart(
-  line: string,
-): { num: number; markerLen: number; content: string } {
+function parseOrderedListStart(line: string): {
+  num: number;
+  markerLen: number;
+  content: string;
+} {
   const trimmed = trimLeftSpaces(line);
   let i = 0;
   while (i < trimmed.length && trimmed[i] >= "0" && trimmed[i] <= "9") i++;
@@ -731,7 +742,8 @@ class InlineParser {
           break;
         case "~":
           if (
-            this.pos + 1 < this.#text.length && this.#text[this.pos + 1] === "~"
+            this.pos + 1 < this.#text.length &&
+            this.#text[this.pos + 1] === "~"
           ) {
             this.parseStrikethrough(parent);
           } else {
@@ -743,7 +755,8 @@ class InlineParser {
           break;
         case "!":
           if (
-            this.pos + 1 < this.#text.length && this.#text[this.pos + 1] === "["
+            this.pos + 1 < this.#text.length &&
+            this.#text[this.pos + 1] === "["
           ) {
             this.parseImage(parent);
           } else {
@@ -769,7 +782,8 @@ class InlineParser {
           break;
         case "\n":
           if (
-            this.pos >= 2 && this.#text[this.pos - 2] === " " &&
+            this.pos >= 2 &&
+            this.#text[this.pos - 2] === " " &&
             this.#text[this.pos - 1] === " "
           ) {
             removeTrailingSpaces(parent);
@@ -785,8 +799,15 @@ class InlineParser {
           while (this.pos < this.#text.length) {
             const c = this.#text[this.pos];
             if (
-              c === "`" || c === "*" || c === "_" || c === "~" || c === "[" ||
-              c === "!" || c === "<" || c === "\\" || c === "\n"
+              c === "`" ||
+              c === "*" ||
+              c === "_" ||
+              c === "~" ||
+              c === "[" ||
+              c === "!" ||
+              c === "<" ||
+              c === "\\" ||
+              c === "\n"
             ) {
               break;
             }
@@ -827,8 +848,10 @@ class InlineParser {
         if (endCount === backtickCount) {
           let code = this.#text.slice(start + backtickCount, this.pos);
           if (
-            code.length > 0 && code[0] === " " &&
-            code[code.length - 1] === " " && code.length > 2
+            code.length > 0 &&
+            code[0] === " " &&
+            code[code.length - 1] === " " &&
+            code.length > 2
           ) {
             code = code.slice(1, -1);
           }
@@ -870,7 +893,8 @@ class InlineParser {
         let endCount = 0;
         const endStart = searchPos;
         while (
-          searchPos < this.#text.length && this.#text[searchPos] === delim
+          searchPos < this.#text.length &&
+          this.#text[searchPos] === delim
         ) {
           endCount++;
           searchPos++;
@@ -878,9 +902,10 @@ class InlineParser {
         if (endCount >= count) {
           const innerText = this.#text.slice(this.pos, endStart);
           if (innerText !== "") {
-            const node = count === 2
-              ? createNode(NodeType.Strong)
-              : createNode(NodeType.Emphasis);
+            const node =
+              count === 2
+                ? createNode(NodeType.Strong)
+                : createNode(NodeType.Emphasis);
             parseInline(node, innerText);
             parent.append(node);
           }
@@ -1033,8 +1058,11 @@ function findClosingBracket(text: string, openPos: number): number {
 }
 
 function isURL(s: string): boolean {
-  return s.startsWith("http://") || s.startsWith("https://") ||
-    s.startsWith("ftp://");
+  return (
+    s.startsWith("http://") ||
+    s.startsWith("https://") ||
+    s.startsWith("ftp://")
+  );
 }
 
 function isEmail(s: string): boolean {

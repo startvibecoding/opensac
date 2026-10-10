@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { shellArgs } from "../platform/platform.ts";
 import { type CommandSpec, type ExecOpts, type Sandbox } from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
@@ -21,8 +22,8 @@ export class NoneSandbox implements Sandbox {
     if (opts.workDir) spec.cwd = opts.workDir;
 
     // Inherit full parent environment, then overlay opts.envVars.
-    const env = Object.entries(Deno.env.toObject()).map(([k, v]) =>
-      `${k}=${v}`
+    const env = Object.entries(runtime.env.toObject()).map(
+      ([k, v]) => `${k}=${v}`,
     );
     for (const [k, v] of Object.entries(opts.envVars ?? {})) {
       const prefix = `${k}=`;

@@ -2,6 +2,7 @@
 // Package ua provides User-Agent string generation for vibecoding.
 
 /** Set at build time. */
+import { runtime } from "../platform/runtime.ts";
 export let version = "dev";
 
 /** Sets the build version (mirrors assigning the Go package var in tests). */
@@ -17,10 +18,10 @@ export const DEFAULT_USER_AGENT = "Vibecoding Client";
  * `VIBECODING_USER_AGENT` environment variable.
  */
 export function userAgent(): string {
-  const override = Deno.env.get("VIBECODING_USER_AGENT");
+  const override = runtime.env.get("VIBECODING_USER_AGENT");
   if (override) return override;
 
-  return `${DEFAULT_USER_AGENT}/${version} (${Deno.build.os}; ${Deno.build.arch}; deno ${Deno.version.deno})`;
+  return `${DEFAULT_USER_AGENT}/${version} (${runtime.build.os}; ${runtime.build.arch}; node ${runtime.version.node})`;
 }
 
 /** Returns the User-Agent string for provider API calls. */

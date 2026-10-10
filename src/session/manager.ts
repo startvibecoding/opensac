@@ -6,7 +6,7 @@
 // optimistic leaf check. Listing, detail projection, and deletion helpers live
 // next to it.
 //
-// Deviations from Go: the `sync.RWMutex` is dropped (Deno is single-threaded
+// Deviations from Go: the `sync.RWMutex` is dropped (Node is single-threaded
 // and every method here is synchronous), `context.Context` is dropped (the DAO
 // layer is synchronous), and `errors.Is` sentinels map to typed `Error` classes.
 // `json.RawMessage` fields decode as plain JSON values.
@@ -17,6 +17,8 @@
 // `session_events.ts`; and the conversation-turn boundary is owned by
 // `conversation_turn.ts`. This file wires them together behind the Manager.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   BindingDAO,
@@ -185,10 +187,10 @@ export function encodePath(value: string): string {
   const bytes = new TextEncoder().encode(value);
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
-    /=+$/,
-    "",
-  );
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 /** Returns the encoded session directory path for a working directory. */
@@ -202,9 +204,9 @@ function sessionDirForCwd(cwd: string, sessionDir: string): string {
  */
 function formatStamp(ts: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${
-    pad(ts.getHours())
-  }${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
+  return `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${pad(
+    ts.getHours(),
+  )}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
 }
 
 function virtualSessionFile(sessionDir: string, id: string, ts: Date): string {
@@ -212,7 +214,7 @@ function virtualSessionFile(sessionDir: string, id: string, ts: Date): string {
 }
 
 function isNotFound(err: unknown): boolean {
-  return err instanceof Deno.errors.NotFound;
+  return err instanceof nodeRuntime.errors.NotFound;
 }
 
 function stringValue(value: string | null | undefined): string {
@@ -372,7 +374,7 @@ export class Manager {
 
       if (this.sessionDir.includes("channels")) {
         const dir = sessionDirForCwd(this.cwd, this.sessionDir);
-        Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
+        nodeRuntime.mkdirSync(dir, { recursive: true, mode: 0o700 });
         this.file = path.join(dir, `${formatStamp(now)}_${candidate}.db`);
         handlePath = this.file;
       }
@@ -757,7 +759,7 @@ export class Manager {
 
   /** Returns the bound expert bundle name ("" when unbound). */
   getExpertId(): string {
-    return this.header === null ? "" : this.header.expertId ?? "";
+    return this.header === null ? "" : (this.header.expertId ?? "");
   }
 
   /**
@@ -796,7 +798,8 @@ export class Manager {
       // Keep the in-memory manager truthful when persistence failed, without
       // overwriting a newer concurrent update.
       if (
-        this.header !== null && this.header.id === sessionId &&
+        this.header !== null &&
+        this.header.id === sessionId &&
         this.header.cwd === cwd
       ) {
         this.header.cwd = previousCwd;
@@ -937,10 +940,13 @@ export class Manager {
    */
   private resolveEntryWriteTarget(): EntryWriteTarget {
     const dbPath = resolveDBPath(this.file);
-    Deno.mkdirSync(path.dirname(dbPath), { recursive: true, mode: 0o700 });
+    nodeRuntime.mkdirSync(path.dirname(dbPath), {
+      recursive: true,
+      mode: 0o700,
+    });
     try {
-      Deno.statSync(dbPath);
-      const handle = Deno.openSync(dbPath, { write: true });
+      nodeRuntime.statSync(dbPath);
+      const handle = nodeRuntime.openSync(dbPath, { write: true });
       handle.close();
     } catch {
       // Missing file is fine — the DB layer creates it.
@@ -951,7 +957,7 @@ export class Manager {
       sessionID = this.header.id;
     } else {
       try {
-        sessionID = Deno.readTextFileSync(this.file).trim();
+        sessionID = nodeRuntime.readTextFileSync(this.file).trim();
       } catch (err) {
         if (isNotFound(err)) sessionID = sessionFileID(this.file);
         else throw err;
@@ -984,9 +990,9 @@ export class Manager {
           const expectedLeaf = meta.parentID ?? "";
           if (currentLeaf !== expectedLeaf) {
             throw new SessionModifiedError(
-              `expected leaf ${JSON.stringify(expectedLeaf)}, current leaf ${
-                JSON.stringify(currentLeaf)
-              }; reopen the session before writing`,
+              `expected leaf ${JSON.stringify(expectedLeaf)}, current leaf ${JSON.stringify(
+                currentLeaf,
+              )}; reopen the session before writing`,
             );
           }
         }
@@ -1056,9 +1062,9 @@ export class Manager {
         const expectedLeaf = batch[0].parentId ?? "";
         if (currentLeaf !== expectedLeaf) {
           throw new SessionModifiedError(
-            `expected leaf ${JSON.stringify(expectedLeaf)}, current leaf ${
-              JSON.stringify(currentLeaf)
-            }; reopen the session before writing`,
+            `expected leaf ${JSON.stringify(expectedLeaf)}, current leaf ${JSON.stringify(
+              currentLeaf,
+            )}; reopen the session before writing`,
           );
         }
         for (let i = 0; i < batch.length; i++) {
@@ -1081,7 +1087,7 @@ export class Manager {
   load(): void {
     let sessionID: string;
     try {
-      sessionID = Deno.readTextFileSync(this.file).trim();
+      sessionID = nodeRuntime.readTextFileSync(this.file).trim();
     } catch (err) {
       if (isNotFound(err)) sessionID = sessionFileID(this.file);
       else throw new Error(`read session handle file: ${err}`);
@@ -1162,7 +1168,7 @@ const maxEntriesPerTransaction = 64;
 
 /** Writes a session handle file holding the session ID. */
 function writeHandleFile(handlePath: string, sessionID: string): void {
-  const handle = Deno.openSync(handlePath, {
+  const handle = nodeRuntime.openSync(handlePath, {
     write: true,
     create: true,
     truncate: true,
@@ -1177,8 +1183,9 @@ function writeHandleFile(handlePath: string, sessionID: string): void {
 
 /** Reports whether an error is a UNIQUE failure on `<table>.id`. */
 function isUniqueSessionIDError(err: unknown, table: string): boolean {
-  const message = (err instanceof Error ? err.message : String(err))
-    .toLowerCase();
+  const message = (
+    err instanceof Error ? err.message : String(err)
+  ).toLowerCase();
   return message.includes(
     `unique constraint failed: ${table.toLowerCase()}.id`,
   );
@@ -1347,7 +1354,7 @@ export function latestModelChangeByID(
 
 function sessionDBExists(dbPath: string): boolean {
   try {
-    Deno.statSync(dbPath);
+    nodeRuntime.statSync(dbPath);
     return true;
   } catch (err) {
     if (isNotFound(err)) return false;
@@ -1357,23 +1364,21 @@ function sessionDBExists(dbPath: string): boolean {
 
 /** Finds the `.db` handle file that contains the given session ID. */
 export function findHandleForID(dir: string, sessionID: string): string {
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
-    entries = [...Deno.readDirSync(dir)];
+    entries = [...nodeRuntime.readDirSync(dir)];
   } catch {
     return "";
   }
   for (const entry of entries) {
     if (entry.isDirectory || !entry.name.endsWith(".db")) continue;
-    if (
-      entry.name === "sessions.db" || entry.name.startsWith("sessions.db-")
-    ) {
+    if (entry.name === "sessions.db" || entry.name.startsWith("sessions.db-")) {
       continue;
     }
     const filePath = path.join(dir, entry.name);
     let data: string;
     try {
-      data = Deno.readTextFileSync(filePath);
+      data = nodeRuntime.readTextFileSync(filePath);
     } catch {
       continue;
     }
@@ -1571,7 +1576,8 @@ function buildSessionDetails(sessions: SessionInfo[]): SessionDetail[] {
           if (text === "") {
             for (const block of entry.message.contents ?? []) {
               if (
-                block.type === "text" && block.text !== undefined &&
+                block.type === "text" &&
+                block.text !== undefined &&
                 block.text !== ""
               ) {
                 text = block.text;
@@ -1660,10 +1666,7 @@ function deleteSessionDataTx(tx: Tx, sessionID: string): void {
  * Deletes a session only after acquiring its shared mutation lease. Callers
  * that already hold a mutation lease use `deleteSessionWithMutation`.
  */
-export function deleteSession(
-  pathValue: string,
-  sessionDir: string,
-): void {
+export function deleteSession(pathValue: string, sessionDir: string): void {
   const target = deleteSessionTarget(pathValue, sessionDir);
   if (target.sessionID === "") {
     removeSessionHandle(target.cleanPath);
@@ -1722,9 +1725,7 @@ function deleteSessionTarget(
   const cleanPath = path.resolve(path.normalize(pathValue));
   const cleanSessionDir = path.resolve(path.normalize(sessionDir));
   const rel = path.relative(cleanSessionDir, cleanPath);
-  if (
-    rel === ".." || rel.startsWith(`..${path.SEPARATOR}`)
-  ) {
+  if (rel === ".." || rel.startsWith(`..${path.SEPARATOR}`)) {
     throw new Error(
       `session path ${pathValue} is outside session directory ${sessionDir}`,
     );
@@ -1741,7 +1742,7 @@ function deleteSessionTarget(
 
   let sessionID = "";
   try {
-    sessionID = Deno.readTextFileSync(cleanPath).trim();
+    sessionID = nodeRuntime.readTextFileSync(cleanPath).trim();
   } catch (err) {
     if (isNotFound(err)) sessionID = sessionFileID(cleanPath);
     else throw new Error(`read session handle ${cleanPath}: ${err}`);
@@ -1780,8 +1781,8 @@ function runtimeDatabaseIdentity(sessionDir: string): string {
 
 function removeSessionHandle(pathValue: string): void {
   try {
-    Deno.statSync(pathValue);
-    Deno.removeSync(pathValue);
+    nodeRuntime.statSync(pathValue);
+    nodeRuntime.removeSync(pathValue);
   } catch (err) {
     if (!isNotFound(err)) throw err;
   }

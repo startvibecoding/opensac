@@ -1,7 +1,9 @@
+import { runtime as nodeRuntime } from "../../platform/runtime.ts";
 import { type ResponsesConfig } from "../../config/mod.ts";
 import {
   type ResponsesHostedToolsConfig,
-  type ResponsesStructuredOutputConfig} from "../../config/settings.ts";
+  type ResponsesStructuredOutputConfig,
+} from "../../config/settings.ts";
 import { hostedToolType as coreHostedToolType } from "../hosted_tools.ts";
 import { type ChatParams, type Model, type ToolDefinition } from "../types.ts";
 import {
@@ -13,7 +15,8 @@ import {
 import {
   type ResponsesTextFormat,
   type ResponsesTool,
-  type ResponsesWireConfig} from "./responses.ts";
+  type ResponsesWireConfig,
+} from "./responses.ts";
 
 /**
  * Resolved from immutable model compatibility data for each request. Undefined
@@ -230,21 +233,24 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
       break;
     default:
       throw new Error(
-        `responses.stateMode ${
-          JSON.stringify(cfg.stateMode)
-        } is invalid; use replay, previous_response_id, or conversation`,
+        `responses.stateMode ${JSON.stringify(
+          cfg.stateMode,
+        )} is invalid; use replay, previous_response_id, or conversation`,
       );
   }
   if (
-    cfg.stateMode === "conversation" && (cfg.conversation ?? "").trim() === ""
+    cfg.stateMode === "conversation" &&
+    (cfg.conversation ?? "").trim() === ""
   ) {
     throw new Error(
       "responses.conversation is required when stateMode is conversation",
     );
   }
   if (
-    cfg.stateMode !== undefined && cfg.stateMode !== "" &&
-    cfg.stateMode !== "conversation" && (cfg.conversation ?? "").trim() !== ""
+    cfg.stateMode !== undefined &&
+    cfg.stateMode !== "" &&
+    cfg.stateMode !== "conversation" &&
+    (cfg.conversation ?? "").trim() !== ""
   ) {
     throw new Error("responses.conversation requires stateMode conversation");
   }
@@ -256,9 +262,9 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
       break;
     default:
       throw new Error(
-        `responses.truncation ${
-          JSON.stringify(cfg.truncation)
-        } is invalid; use auto or disabled`,
+        `responses.truncation ${JSON.stringify(
+          cfg.truncation,
+        )} is invalid; use auto or disabled`,
       );
   }
   switch (cfg.reasoningSummary ?? "") {
@@ -271,9 +277,9 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
       break;
     default:
       throw new Error(
-        `responses.reasoningSummary ${
-          JSON.stringify(cfg.reasoningSummary)
-        } is invalid; use auto, concise, detailed, none, or off`,
+        `responses.reasoningSummary ${JSON.stringify(
+          cfg.reasoningSummary,
+        )} is invalid; use auto, concise, detailed, none, or off`,
       );
   }
   switch (cfg.reasoningContext ?? "") {
@@ -284,9 +290,9 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
       break;
     default:
       throw new Error(
-        `responses.reasoningContext ${
-          JSON.stringify(cfg.reasoningContext)
-        } is invalid; use auto, current_turn, or all_turns`,
+        `responses.reasoningContext ${JSON.stringify(
+          cfg.reasoningContext,
+        )} is invalid; use auto, current_turn, or all_turns`,
       );
   }
   switch (cfg.reasoningMode ?? "") {
@@ -296,9 +302,9 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
       break;
     default:
       throw new Error(
-        `responses.reasoningMode ${
-          JSON.stringify(cfg.reasoningMode)
-        } is invalid; use standard or pro`,
+        `responses.reasoningMode ${JSON.stringify(
+          cfg.reasoningMode,
+        )} is invalid; use standard or pro`,
       );
   }
   switch (cfg.promptCacheMode ?? "") {
@@ -308,13 +314,14 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
       break;
     default:
       throw new Error(
-        `responses.promptCacheMode ${
-          JSON.stringify(cfg.promptCacheMode)
-        } is invalid; use implicit or explicit`,
+        `responses.promptCacheMode ${JSON.stringify(
+          cfg.promptCacheMode,
+        )} is invalid; use implicit or explicit`,
       );
   }
   if (
-    cfg.promptCacheTTL !== undefined && cfg.promptCacheTTL !== "" &&
+    cfg.promptCacheTTL !== undefined &&
+    cfg.promptCacheTTL !== "" &&
     cfg.promptCacheTTL.trim() !== cfg.promptCacheTTL
   ) {
     throw new Error(
@@ -328,20 +335,22 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
   for (const [key, value] of Object.entries(metadata)) {
     if (key.length === 0 || key.length > 64 || value.length > 512) {
       throw new Error(
-        `responses.metadata entry ${
-          JSON.stringify(key)
-        } exceeds key/value limits`,
+        `responses.metadata entry ${JSON.stringify(
+          key,
+        )} exceeds key/value limits`,
       );
     }
     const lower = key.toLowerCase();
     if (
-      lower.includes("token") || lower.includes("secret") ||
-      lower.includes("authorization") || lower.includes("api_key")
+      lower.includes("token") ||
+      lower.includes("secret") ||
+      lower.includes("authorization") ||
+      lower.includes("api_key")
     ) {
       throw new Error(
-        `responses.metadata key ${
-          JSON.stringify(key)
-        } is reserved for sensitive data`,
+        `responses.metadata key ${JSON.stringify(
+          key,
+        )} is reserved for sensitive data`,
       );
     }
   }
@@ -365,15 +374,16 @@ export function validateResponsesConfig(cfg: ResponsesConfig): void {
     );
   }
 
-  const structured: ResponsesStructuredOutputConfig = cfg.structuredOutput ??
-    {};
+  const structured: ResponsesStructuredOutputConfig =
+    cfg.structuredOutput ?? {};
   const schema = structured.schema;
   if (schema !== undefined) {
     if (!isValidJSONValue(schema)) {
       throw new Error("responses.structuredOutput.schema must be valid JSON");
     }
   } else if (
-    (structured.name ?? "") !== "" || (structured.description ?? "") !== "" ||
+    (structured.name ?? "") !== "" ||
+    (structured.description ?? "") !== "" ||
     structured.strict !== undefined
   ) {
     throw new Error(
@@ -425,7 +435,9 @@ export function validateStrictResponsesSchema(
   }
   const schema = value as Record<string, unknown>;
   const properties = schema["properties"];
-  const hasProperties = properties !== null && typeof properties === "object" &&
+  const hasProperties =
+    properties !== null &&
+    typeof properties === "object" &&
     !Array.isArray(properties);
   const typeName = typeof schema["type"] === "string" ? schema["type"] : "";
   if (path === "$" && typeName !== "object") {
@@ -450,11 +462,9 @@ export function validateStrictResponsesSchema(
       }
       required.add(rawName);
     }
-    for (
-      const [name, child] of Object.entries(
-        (properties ?? {}) as Record<string, unknown>,
-      )
-    ) {
+    for (const [name, child] of Object.entries(
+      (properties ?? {}) as Record<string, unknown>,
+    )) {
       if (!required.has(name)) {
         throw new Error(
           `${path}.properties.${name} must appear in required when strict=true`,
@@ -483,12 +493,10 @@ export function validateResponsesRemoteMCP(
   for (let index = 0; index < tools.length; index++) {
     const tool = tools[index];
     if (tool === undefined || Object.keys(tool).length === 0) continue;
-    const serverURL = typeof tool["server_url"] === "string"
-      ? tool["server_url"]
-      : "";
-    const connectorID = typeof tool["connector_id"] === "string"
-      ? tool["connector_id"]
-      : "";
+    const serverURL =
+      typeof tool["server_url"] === "string" ? tool["server_url"] : "";
+    const connectorID =
+      typeof tool["connector_id"] === "string" ? tool["connector_id"] : "";
     const trimmedURL = serverURL.trim();
     const trimmedConnector = connectorID.trim();
     if (trimmedURL === "" && trimmedConnector === "") {
@@ -510,7 +518,7 @@ export function validateResponsesRemoteMCP(
 export function validateRemoteMCPServerURL(raw: string, index = 0): void {
   validateRemoteMCPServerURLWithLookup(raw, index, (host) => {
     try {
-      return Deno.resolveDns(host, "A");
+      return nodeRuntime.resolveDns(host, "A");
     } catch {
       return Promise.resolve([]);
     }
@@ -529,7 +537,8 @@ export function validateRemoteMCPServerURLWithLookup(
     throw wrapMCPError(index, "server_url must be a public https URL");
   }
   if (
-    parsed.protocol !== "https:" || parsed.host === "" ||
+    parsed.protocol !== "https:" ||
+    parsed.host === "" ||
     parsed.username !== "" ||
     parsed.password !== ""
   ) {
@@ -602,7 +611,8 @@ export function isPrivateNetworkIP(ip: string): boolean {
     const lower = host.toLowerCase();
     if (lower === "::1" || lower === "::") return true;
     if (
-      lower.startsWith("fe80") || lower.startsWith("fc") ||
+      lower.startsWith("fe80") ||
+      lower.startsWith("fc") ||
       lower.startsWith("fd")
     ) {
       return true;
@@ -628,7 +638,8 @@ export function isPrivateNetworkIP(ip: string): boolean {
 
 export function supportsStore(model: Model | undefined): boolean {
   if (
-    model !== undefined && model.compat !== undefined &&
+    model !== undefined &&
+    model.compat !== undefined &&
     model.compat.supportsStore !== undefined
   ) {
     return model.compat.supportsStore;
@@ -638,7 +649,8 @@ export function supportsStore(model: Model | undefined): boolean {
 
 export function supportsStrictMode(model: Model | undefined): boolean {
   if (
-    model !== undefined && model.compat !== undefined &&
+    model !== undefined &&
+    model.compat !== undefined &&
     model.compat.supportsStrictMode !== undefined
   ) {
     return model.compat.supportsStrictMode;
@@ -651,8 +663,10 @@ export function responsesConfigTextFormat(
 ): ResponsesTextFormat | undefined {
   const schema = cfg.schema;
   if (
-    schema === undefined && (cfg.name ?? "") === "" &&
-    (cfg.description ?? "") === "" && cfg.strict === undefined
+    schema === undefined &&
+    (cfg.name ?? "") === "" &&
+    (cfg.description ?? "") === "" &&
+    cfg.strict === undefined
   ) {
     return undefined;
   }
@@ -695,8 +709,8 @@ export function responsesConfigHostedTools(
   };
   appendConfig(cfg.webSearch, "web_search");
   appendConfig(cfg.fileSearch, "file_search");
-  const codeInterpreter = cloneResponsesToolExtra(cfg.codeInterpreter ?? {}) ??
-    {};
+  const codeInterpreter =
+    cloneResponsesToolExtra(cfg.codeInterpreter ?? {}) ?? {};
   delete codeInterpreter["opensac"];
   appendConfig(codeInterpreter, "code_interpreter");
   // image_generation is intentionally not appended here. OpenSAC executes it only
@@ -735,8 +749,10 @@ export function responsesHostedPoliciesWithError(
   const result: Record<string, ResponsesHostedPolicy> = {};
   const rawValue = cfg.codeInterpreter?.["opensac"];
   if (
-    rawValue === null || typeof rawValue !== "object" ||
-    Array.isArray(rawValue) || Object.keys(rawValue).length === 0
+    rawValue === null ||
+    typeof rawValue !== "object" ||
+    Array.isArray(rawValue) ||
+    Object.keys(rawValue).length === 0
   ) {
     return result;
   }
@@ -795,7 +811,7 @@ export function cloneResponsesToolExtra(
       result[key] = value.map((item) =>
         item !== null && typeof item === "object" && !Array.isArray(item)
           ? cloneResponsesToolExtra(item as Record<string, unknown>)
-          : item
+          : item,
       );
     } else {
       result[key] = value;
@@ -840,23 +856,23 @@ export function validateResponsesCapabilitiesForRequest(
   const caps = resolveResponsesCapabilities(model);
   if (!caps.supportsResponses) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support the Responses API`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support the Responses API`,
     );
   }
   if (cfg.store !== undefined && !supportsStore(model)) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support configured store`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support configured store`,
     );
   }
   if ((cfg.promptCacheKey ?? "") !== "" && !supportsPromptCacheKey(model)) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support configured prompt_cache_key`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support configured prompt_cache_key`,
     );
   }
   if (
@@ -864,56 +880,59 @@ export function validateResponsesCapabilitiesForRequest(
     !supportsPromptCacheRetention(model)
   ) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support configured prompt_cache_retention`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support configured prompt_cache_retention`,
     );
   }
   if ((cfg.reasoningSummary ?? "") !== "" && !supportsReasoningSummary(model)) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support configured reasoning summary`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support configured reasoning summary`,
     );
   }
   if (
-    enforceBackground && cfg.background === true && !caps.supportsBackground
+    enforceBackground &&
+    cfg.background === true &&
+    !caps.supportsBackground
   ) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support background runs`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support background runs`,
     );
   }
   if (
-    cfg.stateMode === "previous_response_id" && !caps.supportsPreviousResponseID
+    cfg.stateMode === "previous_response_id" &&
+    !caps.supportsPreviousResponseID
   ) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support previous_response_id`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support previous_response_id`,
     );
   }
   if (cfg.stateMode === "conversation" && !caps.supportsConversation) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support conversation state`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support conversation state`,
     );
   }
   if ((cfg.serviceTier ?? "") !== "" && !caps.supportsServiceTier) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support service_tier`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support service_tier`,
     );
   }
   for (const include of cfg.include ?? []) {
     if (caps.include[include.trim()] !== true) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support include ${JSON.stringify(include)}`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support include ${JSON.stringify(include)}`,
       );
     }
   }
@@ -921,9 +940,9 @@ export function validateResponsesCapabilitiesForRequest(
     const supported = caps.hostedTools[tool.type];
     if (supported !== undefined && !supported) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support hosted tool ${JSON.stringify(tool.type)}`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support hosted tool ${JSON.stringify(tool.type)}`,
       );
     }
   }
@@ -938,31 +957,31 @@ export function validateResponsesCapabilitiesForRequest(
     const supported = caps.hostedTools[toolType];
     if (supported !== undefined && !supported) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support hosted tool ${JSON.stringify(toolType)}`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support hosted tool ${JSON.stringify(toolType)}`,
       );
     }
   }
   if (cfg.parallelToolCalls !== undefined && !caps.supportsParallelTools) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support parallel tool calls`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support parallel tool calls`,
     );
   }
   if (cfg.toolChoice !== undefined && !caps.supportsToolChoice) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support tool_choice`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support tool_choice`,
     );
   }
   if (cfg.structuredOutput !== undefined && !caps.supportsStructuredOutput) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support structured output`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support structured output`,
     );
   }
   if (
@@ -971,12 +990,12 @@ export function validateResponsesCapabilitiesForRequest(
     !supportsStrictMode(model)
   ) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support strict structured output`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support strict structured output`,
     );
   }
-  if (cfg.stateMode === "conversation" && (cfg.store !== true)) {
+  if (cfg.stateMode === "conversation" && cfg.store !== true) {
     throw new Error("Responses state mode conversation requires store=true");
   }
   if (
@@ -984,41 +1003,42 @@ export function validateResponsesCapabilitiesForRequest(
     !supportsStrictMode(model)
   ) {
     throw new Error(
-      `Responses capability error: model ${
-        JSON.stringify(modelID(model))
-      } does not support strict structured output`,
+      `Responses capability error: model ${JSON.stringify(
+        modelID(model),
+      )} does not support strict structured output`,
     );
   }
   const opts = params.responseOptions;
   if (opts !== undefined) {
     if (
-      (opts.previousResponseId ?? "") !== "" && !caps.supportsPreviousResponseID
+      (opts.previousResponseId ?? "") !== "" &&
+      !caps.supportsPreviousResponseID
     ) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support previous_response_id`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support previous_response_id`,
       );
     }
     if (opts.parallelTools !== undefined && !caps.supportsParallelTools) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support parallel tool calls`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support parallel tool calls`,
       );
     }
     if (opts.toolChoice !== undefined && !caps.supportsToolChoice) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support tool_choice`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support tool_choice`,
       );
     }
     if (opts.structuredOutput !== undefined && !caps.supportsStructuredOutput) {
       throw new Error(
-        `Responses capability error: model ${
-          JSON.stringify(modelID(model))
-        } does not support structured output`,
+        `Responses capability error: model ${JSON.stringify(
+          modelID(model),
+        )} does not support structured output`,
       );
     }
   }
@@ -1032,9 +1052,9 @@ export function validateResponsesCustomTool(tool: ToolDefinition): void {
   if (format === undefined || format === null) return;
   if (!isValidJSONValue(format)) {
     throw new Error(
-      `Responses custom tool ${
-        JSON.stringify(tool.name)
-      } format must be valid JSON`,
+      `Responses custom tool ${JSON.stringify(
+        tool.name,
+      )} format must be valid JSON`,
     );
   }
   const fmt = format as Record<string, unknown>;
@@ -1046,28 +1066,27 @@ export function validateResponsesCustomTool(tool: ToolDefinition): void {
       const syntax = fmt["syntax"];
       if (syntax !== "lark" && syntax !== "regex") {
         throw new Error(
-          `Responses custom tool ${
-            JSON.stringify(tool.name)
-          } grammar syntax must be lark or regex`,
+          `Responses custom tool ${JSON.stringify(
+            tool.name,
+          )} grammar syntax must be lark or regex`,
         );
       }
-      const definition = typeof fmt["definition"] === "string"
-        ? fmt["definition"]
-        : "";
+      const definition =
+        typeof fmt["definition"] === "string" ? fmt["definition"] : "";
       if (definition.trim() === "") {
         throw new Error(
-          `Responses custom tool ${
-            JSON.stringify(tool.name)
-          } grammar definition is required`,
+          `Responses custom tool ${JSON.stringify(
+            tool.name,
+          )} grammar definition is required`,
         );
       }
       return;
     }
     default:
       throw new Error(
-        `Responses custom tool ${
-          JSON.stringify(tool.name)
-        } format type must be text or grammar`,
+        `Responses custom tool ${JSON.stringify(
+          tool.name,
+        )} format type must be text or grammar`,
       );
   }
 }
@@ -1079,7 +1098,8 @@ export function modelID(model: Model | undefined): string {
 
 export function supportsPromptCacheKey(model: Model | undefined): boolean {
   if (
-    model !== undefined && model.compat !== undefined &&
+    model !== undefined &&
+    model.compat !== undefined &&
     model.compat.supportsPromptCacheKey !== undefined
   ) {
     return model.compat.supportsPromptCacheKey;
@@ -1091,7 +1111,8 @@ export function supportsPromptCacheRetention(
   model: Model | undefined,
 ): boolean {
   if (
-    model !== undefined && model.compat !== undefined &&
+    model !== undefined &&
+    model.compat !== undefined &&
     model.compat.supportsLongCacheRetention !== undefined
   ) {
     return model.compat.supportsLongCacheRetention;
@@ -1101,7 +1122,8 @@ export function supportsPromptCacheRetention(
 
 export function supportsReasoningSummary(model: Model | undefined): boolean {
   if (
-    model !== undefined && model.compat !== undefined &&
+    model !== undefined &&
+    model.compat !== undefined &&
     model.compat.supportsReasoningSummary !== undefined
   ) {
     return model.compat.supportsReasoningSummary;

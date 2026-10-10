@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -9,8 +10,7 @@ import { installSkill } from "./install.ts";
 import { jsonResponse, makeArchive, startServer } from "./test_helpers.ts";
 import { test } from "#testing";
 
-const ambiguousCustomMailPayload =
-  `{"code":"AMBIGUOUS_SKILL_SLUG","message":"Found multiple skills with the slug \\"custom-mail-fresh100\\"; specify which one you want to install:","slug":"custom-mail-fresh100","matches":[{"ownerHandle":"xuxuclassmate","slug":"custom-mail-fresh100","ref":"@xuxuclassmate/custom-mail-fresh100","url":"https://clawhub.ai/xuxuclassmate/skills/custom-mail-fresh100"},{"ownerHandle":"xuxuclassmate","slug":"custom-mail","ref":"@xuxuclassmate/custom-mail","url":"https://clawhub.ai/xuxuclassmate/skills/custom-mail"}]}`;
+const ambiguousCustomMailPayload = `{"code":"AMBIGUOUS_SKILL_SLUG","message":"Found multiple skills with the slug \\"custom-mail-fresh100\\"; specify which one you want to install:","slug":"custom-mail-fresh100","matches":[{"ownerHandle":"xuxuclassmate","slug":"custom-mail-fresh100","ref":"@xuxuclassmate/custom-mail-fresh100","url":"https://clawhub.ai/xuxuclassmate/skills/custom-mail-fresh100"},{"ownerHandle":"xuxuclassmate","slug":"custom-mail","ref":"@xuxuclassmate/custom-mail","url":"https://clawhub.ai/xuxuclassmate/skills/custom-mail"}]}`;
 
 test("ClawHubDetailResolvesAmbiguousSlug", async () => {
   const calls: string[] = [];
@@ -62,15 +62,22 @@ test("ClawHubDetailCachesResolvedOwner", async () => {
       market: "clawhub.ai",
       id: "custom-mail-fresh100",
     });
-    const files = await client.files(undefined, {
-      market: "clawhub.ai",
-      id: "custom-mail-fresh100",
-    }, "1.2.0");
+    const files = await client.files(
+      undefined,
+      {
+        market: "clawhub.ai",
+        id: "custom-mail-fresh100",
+      },
+      "1.2.0",
+    );
     assertEquals(files.length, 0);
-    const sources = client.downloadSources({
-      market: "clawhub.ai",
-      id: "custom-mail-fresh100",
-    }, "1.2.0");
+    const sources = client.downloadSources(
+      {
+        market: "clawhub.ai",
+        id: "custom-mail-fresh100",
+      },
+      "1.2.0",
+    );
     assertEquals(sources.length, 1);
     assertStringIncludes(sources[0].url, "owner=xuxuclassmate");
   } finally {
@@ -79,17 +86,16 @@ test("ClawHubDetailCachesResolvedOwner", async () => {
 });
 
 test("ClawHubAmbiguousSlugWithoutExactMatchReturnsHelpfulError", async () => {
-  const payload =
-    `{"code":"AMBIGUOUS_SKILL_SLUG","message":"Found multiple skills with the slug \\"custom-mail-fresh100\\"; specify which one you want to install:","slug":"custom-mail-fresh100","matches":[{"ownerHandle":"alice","slug":"other-mail","ref":"@alice/other-mail","url":"https://clawhub.ai/alice/skills/other-mail"},{"ownerHandle":"bob","slug":"something-else","ref":"@bob/something-else","url":"https://clawhub.ai/bob/skills/something-else"}]}`;
-  const server = await startServer(() =>
-    new Response(payload, { status: 409, statusText: "Conflict" })
+  const payload = `{"code":"AMBIGUOUS_SKILL_SLUG","message":"Found multiple skills with the slug \\"custom-mail-fresh100\\"; specify which one you want to install:","slug":"custom-mail-fresh100","matches":[{"ownerHandle":"alice","slug":"other-mail","ref":"@alice/other-mail","url":"https://clawhub.ai/alice/skills/other-mail"},{"ownerHandle":"bob","slug":"something-else","ref":"@bob/something-else","url":"https://clawhub.ai/bob/skills/something-else"}]}`;
+  const server = await startServer(
+    () => new Response(payload, { status: 409, statusText: "Conflict" }),
   );
   try {
     const error = await assertRejects(() =>
       createClawHubClient(server.url).detail(undefined, {
         market: "clawhub.ai",
         id: "custom-mail-fresh100",
-      })
+      }),
     );
     const message = (error as Error).message;
     assertStringIncludes(message, "@alice/other-mail");
@@ -136,14 +142,15 @@ test("ClawHubInstallResolvesAmbiguousSlugEndToEnd", async () => {
         market: "clawhub.ai",
         id: "custom-mail-fresh100",
         scope: "project",
-        targetDir: await Deno.makeTempDir(),
+        targetDir: await runtime.makeTempDir(),
       },
     );
     assert(result.installed);
     assertEquals(result.name, "custom-mail-fresh100");
-    const seen = calls.some((call) =>
-      call.endsWith("/download?owner=xuxuclassmate&version=1.2.0") ||
-      call.endsWith("/download?version=1.2.0&owner=xuxuclassmate")
+    const seen = calls.some(
+      (call) =>
+        call.endsWith("/download?owner=xuxuclassmate&version=1.2.0") ||
+        call.endsWith("/download?version=1.2.0&owner=xuxuclassmate"),
     );
     assert(seen, `owner-qualified download not attempted: ${calls.join(", ")}`);
   } finally {

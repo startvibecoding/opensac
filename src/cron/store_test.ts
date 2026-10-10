@@ -1,9 +1,10 @@
 //
 // The Go concurrency cases (two goroutines racing ClaimDue, 500 goroutines
-// minting IDs) reduce to deterministic sequential assertions because Deno is
+// minting IDs) reduce to deterministic sequential assertions because Node is
 // single-threaded: the claim is atomic at the SQL level, so a second claim in the
 // same thread must lose exactly as a racing goroutine would.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { createCronID, runningLeaseTimeoutMs } from "./cron.ts";
 import { createSQLiteCronStore, type SQLiteCronStore } from "./sqlite_store.ts";
@@ -11,7 +12,7 @@ import { test } from "#testing";
 
 function createStore(): SQLiteCronStore {
   return createSQLiteCronStore(
-    Deno.makeTempDirSync({ prefix: "opensac-cron-store-" }),
+    runtime.makeTempDirSync({ prefix: "opensac-cron-store-" }),
   );
 }
 
@@ -139,7 +140,7 @@ test("SQLiteCronStoreClaimDueReclaimsStaleRunning", () => {
 });
 
 test("SQLiteCronStorePersistence", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-cron-persist-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-cron-persist-" });
   const store1 = createSQLiteCronStore(dir);
   store1.create({ id: "j1", name: "persistent", prompt: "test" });
 

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { canonicalSandboxPath } from "./policy.ts";
 
@@ -11,7 +12,7 @@ export function protectedGitPaths(projectDir: string): string[] {
 
   let text = "";
   try {
-    text = Deno.readTextFileSync(gitEntry).trim();
+    text = runtime.readTextFileSync(gitEntry).trim();
   } catch {
     return paths;
   }

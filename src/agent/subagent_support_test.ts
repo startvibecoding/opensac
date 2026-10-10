@@ -127,10 +127,10 @@ test("RestrictMemberToolsFiltersAndDedupes", () => {
   // Empty request retains the declaration.
   assertEquals(restrictMemberTools([], ["a", "b"]), ["a", "b"]);
   // Unknown and duplicate names are dropped.
-  assertEquals(
-    restrictMemberTools(["a", "z", "a", "b"], ["a", "b"]),
-    ["a", "b"],
-  );
+  assertEquals(restrictMemberTools(["a", "z", "a", "b"], ["a", "b"]), [
+    "a",
+    "b",
+  ]);
 });
 
 test("BuildSubAgentTaskWrapsInstruction", () => {

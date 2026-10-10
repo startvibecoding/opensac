@@ -10,7 +10,8 @@ import {
 import {
   type ContentBlock,
   type Message,
-  type ToolDefinition} from "../provider/types.ts";
+  type ToolDefinition,
+} from "../provider/types.ts";
 import {
   createAssistantMessage,
   createToolResultMessage,
@@ -52,10 +53,12 @@ function assistantText(text: string): Message {
 }
 
 function toolCallMessage(id: string, name: string): Message {
-  return createAssistantMessage([{
-    type: "toolCall",
-    toolCall: { id, name, arguments: {} },
-  }]);
+  return createAssistantMessage([
+    {
+      type: "toolCall",
+      toolCall: { id, name, arguments: {} },
+    },
+  ]);
 }
 
 function imageBlock(data = "AAAA", mimeType = "image/png"): ContentBlock {
@@ -65,9 +68,11 @@ function imageBlock(data = "AAAA", mimeType = "image/png"): ContentBlock {
 // --- selectCacheMarkers / applyCacheMarkers (cache_test.go) ---
 
 test("selectCacheMarkers", () => {
-  const cases: Array<
-    { name: string; messages: Message[]; want: [number, number] }
-  > = [
+  const cases: Array<{
+    name: string;
+    messages: Message[];
+    want: [number, number];
+  }> = [
     { name: "empty messages", messages: [], want: [-1, -1] },
     { name: "single message", messages: [userMessage("Hello")], want: [-1, 0] },
     {
@@ -318,10 +323,12 @@ test("containsImageContent", () => {
   assertEquals(containsImageContent([{ type: "text", text: "hi" }]), false);
   assertEquals(containsImageContent([imageBlock()]), true);
   assertEquals(
-    containsImageContent([{
-      type: "image",
-      image: { data: "", mimeType: "image/png" },
-    }]),
+    containsImageContent([
+      {
+        type: "image",
+        image: { data: "", mimeType: "image/png" },
+      },
+    ]),
     true,
   );
 });
@@ -367,11 +374,13 @@ test("providerImageRequestBudget applies known provider limits", () => {
 });
 
 test("estimateChatRequestTokens grows with input", () => {
-  const tools: ToolDefinition[] = [{
-    name: "bash",
-    description: "run a command",
-    parameters: { type: "object" },
-  }];
+  const tools: ToolDefinition[] = [
+    {
+      name: "bash",
+      description: "run a command",
+      parameters: { type: "object" },
+    },
+  ];
   const empty = estimateChatRequestTokens("system", [], [], null);
   const withMsg = estimateChatRequestTokens(
     "system",

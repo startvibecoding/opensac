@@ -1,16 +1,18 @@
 # opensac
 
-opensac is MothX ported to Deno + TypeScript. This repository is the Deno/TS
-target of a 1:1 migration from the Go implementation at `/home/free/src/mothx`.
+OpenSAC is a terminal AI coding assistant. This repository is the TypeScript
+implementation, ported 1:1 from the Go implementation at
+`/home/free/src/mothx`, and runs on the **Node runtime** (the sources are plain
+TypeScript executed directly, with no build step for development).
 
 ## Status
 
-The Go→Deno port is functionally complete for the shipping surface: `src/`
-holds the agent core, runtime, providers, tools, sessions, TUI, CLI, ACP, and
-Core host, and CI runs `check`, `lint`, `fmt --check`, `test`, and
-`test:architecture` on every push and pull request. The dependency-ordered
-backlog and migration ledger live in
-[`docs/proposal/go-to-deno-migration.md`](docs/proposal/go-to-deno-migration.md).
+The Go port is functionally complete for the shipping surface: `src/` holds the
+agent core, runtime, providers, tools, sessions, TUI, CLI, ACP, and Core host,
+and CI runs `check`, `lint`, `fmt:check`, `test`, and `test:architecture` on
+every push and pull request. The dependency-ordered backlog and migration ledger
+live in
+[`docs/proposal/go-to-typescript-migration.md`](docs/proposal/go-to-typescript-migration.md).
 
 Not yet in this repository: the planned `desktop/` Electron app, the `pypi/`
 installer, a WebUI, and the bilingual `docs/en`/`docs/zh` trees. `AGENTS.md`
@@ -20,11 +22,11 @@ existing code.
 Local checks:
 
 ```bash
-deno task check          # type-check src/, sdk/, examples/, scripts/
-deno task lint           # deno lint
-deno fmt --check         # formatting
-deno task test           # full suite (includes src/architecture guards)
-deno task test:architecture  # boundary guards alone
+npm run check             # type-check src/, sdk/, examples/, scripts/
+npm run lint              # eslint
+npm run fmt:check         # formatting
+npm test                  # full suite (includes src/architecture guards)
+npm run test:architecture # boundary guards alone
 ```
 
 Ported packages (all type-checked, linted, and tested):
@@ -34,7 +36,7 @@ Ported packages (all type-checked, linted, and tested):
 | `internal/util` | `src/util` | UTF-8 truncation, symlink-aware path helpers |
 | `internal/version` | `src/version` | build/VCS version resolution |
 | `internal/ua` | `src/ua` | User-Agent strings |
-| `internal/platform` | `src/platform` | OS/arch, dirs, shells, sandbox paths |
+| `internal/platform` | `src/platform` | OS/arch, dirs, shells, sandbox paths, the Node runtime helpers |
 | `internal/systeminit` | `src/systeminit` | `/systeminit` prompt |
 | `internal/db` | `src/db` | process-wide SQLite lifecycle over `node:sqlite` |
 | `internal/sandbox` | `src/sandbox` | policy, git rules, manager, bwrap/seatbelt/windows backends |
@@ -48,13 +50,12 @@ Ported packages (all type-checked, linted, and tested):
 | `bootstrap` | `src/bootstrap` | provider bridge wiring `Builder.withProviderByName` to `src/provider` (builder hook deferred to `src/agent`) |
 
 TUI framework decision: the Go `bubbletea`/`lipgloss` TUI is replaced by **Ink
-(`npm:ink@^5`) + React 18 (`npm:react@^18`)**. `src/tui` holds the toolchain smoke
-test plus the scrollback/streaming skeleton (`markdown.ts` + `transcript.tsx`:
+(`ink@^5`) + React 18 (`react@^18`)**. `src/tui` holds the toolchain smoke test
+plus the scrollback/streaming skeleton (`markdown.ts` + `transcript.tsx`:
 completed blocks go to the terminal's own scrollback via `<Static>`, so
 selection/copy/wheel use the terminal natively; only the active streaming block
-stays in the managed view). The full transcript/input/agent wiring lands after
-`src/agent`/`src/agentruntime` are ported. See
-[`docs/proposal/go-to-deno-migration.md`](docs/proposal/go-to-deno-migration.md).
+stays in the managed view). See
+[`docs/proposal/go-to-typescript-migration.md`](docs/proposal/go-to-typescript-migration.md).
 
 The streaming-Markdown renderer `github.com/startvibecoding/GoStreamingMarkdown`
 is ported to `src/tsm` (`node`/`parser`/`renderer`/`stream`); it is byte-for-byte
@@ -63,34 +64,37 @@ one deliberate code-point deviation).
 
 ## Requirements
 
-Deno 2.9 or later (installed at `~/.deno/bin/deno`).
+Node.js 22.18 or later (for `node:sqlite` and `import.meta.main`), plus npm.
 
 ```sh
-deno --version
-deno upgrade   # if older than 2.9
+node --version   # >= 22.18
+npm --version
 ```
 
 ## Usage
 
 ```sh
-deno task check   # type check src/
-deno task test    # deno test -A
-deno task lint    # deno lint
-deno task fmt     # deno fmt
-deno task start   # run src/main.ts
-deno task build:node  # esbuild -> dist/node (platform-independent npm package)
- deno task pack:node   # build + npm pack into dist/npm/
+npm run check         # type check src/, sdk/, examples/, scripts/
+npm test              # node --test
+npm run lint          # eslint
+npm run fmt           # prettier --write
+npm start             # run src/main.ts
+npm run build:node    # esbuild -> dist/node (platform-independent npm package)
+npm run pack:node     # build + npm pack into dist/npm/
 ```
 
-Configuration lives in `deno.json` — tasks, formatter, linter, compiler options,
-and the import map. There is no build step for development: Deno runs TypeScript
-directly.
+There is no build step for development: Node strips TypeScript types directly,
+and a small loader (`scripts/loader/ts_loader.mjs`) transpiles the Ink `.tsx`
+sources. The toolchain lives in `package.json`, `tsconfig.json`, and
+`.prettierrc.json`; the Node runtime helpers every module imports live in
+`src/platform/runtime.ts` (with `runtime_core.ts`/`runtime_net.ts`), loaded by
+`scripts/test/preload.mjs` for tests and by `src/main.ts` for the CLI.
 
 ## Releases
 
 A `v*` git tag is the release. It is published as a **single,
 platform-independent npm package** (plain JavaScript, no per-platform
-binaries), bundled with [esbuild](https://esbuild.github.io/) and run on Node >= 22.5:
+binaries), bundled with [esbuild](https://esbuild.github.io/) and run on Node >= 22.18:
 
 ```sh
 make node-build                    # esbuild -> dist/node
@@ -109,8 +113,8 @@ image. `ghcr-publish.yml` still ships `ghcr.io/<owner>/opensac` for the shared
 Core host.
 
 > The earlier per-platform `opensac-installer-*` packages, their platform
-table (`scripts/platforms.ts`), and the `deno compile` binary pipeline have
-been removed; the single npm package is the only release artifact.
+> table, and the compiled-binary pipeline have been removed; the single npm
+> package is the only release artifact.
 
 ### Container image
 
@@ -133,20 +137,19 @@ authentication by default: set `core.auth` and a password in your own
 
 `src/db` owns the process-wide SQLite connection lifecycle and is the only
 module that opens, configures, caches, or closes a connection. It uses the
-`node:sqlite` driver built into Deno 2.9 (`DatabaseSync`), which exposes the
+`node:sqlite` driver built into Node 22.5+ (`DatabaseSync`), which exposes the
 SQLite result codes needed for the busy/read-only classification. All SQL
-construction and row mapping belongs to `src/dao` (not yet ported).
+construction and row mapping belongs to `src/dao`.
 
 ## Permissions
 
-Deno programs are sandboxed. Development tasks use `-A` for convenience; the
-published Node package runs on the Node runtime and needs no Deno permission
-flags.
+There is no permission sandbox on Node. The runtime helpers come from
+`src/platform/runtime.ts` over Node built-ins, and `scripts/test/preload.mjs`
+registers them for the test runner. No `--allow-*` flags are needed.
 
 ## Dependencies
 
 The project targets the **Node runtime**: it depends on `node:` builtins, npm
-packages, and the project-owned `src/compat/` shims that replaced JSR `@std/*`.
-There are no `jsr:` imports; the CLI parser is the project-owned
-`src/cli/command_parser.ts` and the package is bundled with esbuild. Imports are
-pinned in `deno.lock`, which should be committed.
+packages, and the project-owned `src/compat/` shims. The CLI parser is the
+project-owned `src/cli/command_parser.ts` and the package is bundled with
+esbuild. Imports are pinned in `package-lock.json`, which should be committed.

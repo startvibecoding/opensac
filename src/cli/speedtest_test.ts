@@ -20,7 +20,11 @@ import {
   type SpeedtestTarget,
 } from "./speedtest.ts";
 import { type Settings } from "../config/mod.ts";
-import { type Model, type Provider, type StreamEvent } from "../provider/mod.ts";
+import {
+  type Model,
+  type Provider,
+  type StreamEvent,
+} from "../provider/mod.ts";
 import { streamDone, streamTextDelta, streamUsage } from "../provider/mod.ts";
 import { test } from "#testing";
 
@@ -62,7 +66,10 @@ test("parseSpeedtestThinkingLevel accepts valid and rejects invalid", () => {
   assertRejects(() => {
     parseSpeedtestThinkingLevel("ultra");
     return Promise.reject(new Error("unreachable"));
-  }).then(() => {}, () => {});
+  }).then(
+    () => {},
+    () => {},
+  );
 });
 
 test("collectSpeedtestTargets filters unconfigured providers", () => {
@@ -169,19 +176,22 @@ test("printSpeedtestResults renders aligned columns", () => {
     modelId: "model-x",
     modelName: "",
   };
-  printSpeedtestResults((line) => void lines.push(line), [
-    {
-      target,
-      tokensPerSecond: 42.5,
-      networkLatencyMs: 12,
-      firstTokenLatencyMs: 300,
-      totalDurationMs: 1200,
-      outputTokens: 90,
-      estimatedTokens: true,
-      stopReason: "stop",
-      error: null,
-    },
-  ]);
+  printSpeedtestResults(
+    (line) => void lines.push(line),
+    [
+      {
+        target,
+        tokensPerSecond: 42.5,
+        networkLatencyMs: 12,
+        firstTokenLatencyMs: 300,
+        totalDurationMs: 1200,
+        outputTokens: 90,
+        estimatedTokens: true,
+        stopReason: "stop",
+        error: null,
+      },
+    ],
+  );
   const text = lines.join("\n");
   assert(text.includes("Provider"));
   assert(text.includes("Token/s"));

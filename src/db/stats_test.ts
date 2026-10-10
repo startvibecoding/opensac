@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   beginWaitStats,
@@ -61,7 +62,7 @@ test("sqlite stats snapshot reflects begin wait recording", () => {
 // The begin path is the only writer of the begin counters in production, so a
 // committed transaction must move them; without contention no retry may.
 test("runInTx records exactly one begin attempt", () => {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-db-stats-test-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-db-stats-test-" });
   const path = `${dir}/sessions.db`;
   try {
     const db = open(path);
@@ -85,6 +86,6 @@ test("runInTx records exactly one begin attempt", () => {
     );
   } finally {
     closeAll();
-    Deno.removeSync(dir, { recursive: true });
+    runtime.removeSync(dir, { recursive: true });
   }
 });

@@ -75,11 +75,7 @@ export function appendTurnEntryTx(
 
 /** Returns the current branch leaf, excluding the session header entry. */
 export function currentLeafTx(tx: Tx, sessionId: string): string {
-  return new ConversationTurnDAO(null).currentLeaf(
-    tx,
-    sessionId,
-    entrySession,
-  );
+  return new ConversationTurnDAO(null).currentLeaf(tx, sessionId, entrySession);
 }
 
 /** Atomically writes turn/start and its boundary row. */
@@ -101,10 +97,7 @@ export function startConversationTurn(
  * Shared transaction primitive used by standalone turn admission and atomic
  * durable Run admission. The caller owns lease validation and commit.
  */
-export function startConversationTurnTx(
-  tx: Tx,
-  turn: ConversationTurn,
-): void {
+export function startConversationTurnTx(tx: Tx, turn: ConversationTurn): void {
   if (turn.sessionId === "" || turn.id === "") {
     throw new Error("conversation turn ID and session ID are required");
   }
@@ -120,12 +113,11 @@ export function startConversationTurnTx(
   const state = fetched ?? { intentId: "", status: "", runId: "" };
   if (existing) {
     if (
-      state.intentId !== "" && turn.intentId !== "" &&
+      state.intentId !== "" &&
+      turn.intentId !== "" &&
       state.intentId !== turn.intentId
     ) {
-      throw new Error(
-        `conversation turn ${turn.id} belongs to another intent`,
-      );
+      throw new Error(`conversation turn ${turn.id} belongs to another intent`);
     }
     if (state.status === "open") {
       if (state.runId === turn.runId && turn.runId !== "") return;
@@ -232,19 +224,17 @@ export function listConversationTurns(
   return records.map(scanConversationTurnRecord);
 }
 
-export function scanConversationTurnRecord(
-  record: {
-    id: string;
-    sessionId: string;
-    intentId: string;
-    kind: string;
-    status: string;
-    startSeq: number;
-    endSeq: number | null;
-    startedAt: string;
-    endedAt: string | null;
-  },
-): ConversationTurn {
+export function scanConversationTurnRecord(record: {
+  id: string;
+  sessionId: string;
+  intentId: string;
+  kind: string;
+  status: string;
+  startSeq: number;
+  endSeq: number | null;
+  startedAt: string;
+  endedAt: string | null;
+}): ConversationTurn {
   return {
     id: record.id,
     sessionId: record.sessionId,
@@ -256,8 +246,7 @@ export function scanConversationTurnRecord(
     startSeq: record.startSeq,
     endSeq: record.endSeq,
     startedAt: parseSessionTimestamp(record.startedAt),
-    endedAt: record.endedAt === null
-      ? null
-      : parseSessionTimestamp(record.endedAt),
+    endedAt:
+      record.endedAt === null ? null : parseSessionTimestamp(record.endedAt),
   };
 }

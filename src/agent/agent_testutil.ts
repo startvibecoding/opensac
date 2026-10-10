@@ -1,6 +1,7 @@
 // Shared test fixtures for the src/agent ports of internal/agent. Not a test
-// file itself (the name does not match Deno's test discovery patterns).
+// file itself (the name does not match Node's test discovery patterns).
 
+import { runtime } from "../platform/runtime.ts";
 import { type Model } from "../provider/types.ts";
 import { createMockProvider, MockProvider } from "../provider/mock.ts";
 import { defaultSettings, type Settings } from "../config/settings.ts";
@@ -63,11 +64,11 @@ export function createTestFactoryAndManager(): [AgentFactory, AgentManager] {
     doneStream(),
   );
   const sandboxMgr: SandboxManager = createManager(
-    Deno.makeTempDirSync({ prefix: "opensac-agent-sandbox-" }),
+    runtime.makeTempDirSync({ prefix: "opensac-agent-sandbox-" }),
   );
   sandboxMgr.setLevel(Level.None);
   const settings: Settings = defaultSettings();
-  settings.sessionDir = Deno.makeTempDirSync({
+  settings.sessionDir = runtime.makeTempDirSync({
     prefix: "opensac-agent-sessions-",
   });
 

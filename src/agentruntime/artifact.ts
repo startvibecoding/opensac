@@ -6,10 +6,11 @@
 // module owns the collector, the `publish_artifact` tool, and artifact
 // classification.
 //
-// Deviations: `sync.Mutex` is dropped (Deno is single-threaded); `[]byte`/
+// Deviations: `sync.Mutex` is dropped (Node is single-threaded); `[]byte`/
 // `io.ReadCloser` map to `Uint8Array`/`ReadableStream`; `context.Context` maps
-// to an `AbortSignal`; `filepath` maps to `@std/path` plus `Deno.realPathSync`.
+// to an `AbortSignal`; `filepath` maps to `src/compat/path.ts` plus `nodeRuntime.realPathSync`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { type AttachmentKind, type SessionAttachment } from "./attachment.ts";
 import {
@@ -129,18 +130,16 @@ export class ArtifactCollector {
     }
     let resolvedWorkDir: string;
     try {
-      resolvedWorkDir = Deno.realPathSync(workDir);
+      resolvedWorkDir = nodeRuntime.realPathSync(workDir);
     } catch (err) {
-      throw new Error(
-        `resolve artifact work directory: ${errorMessage(err)}`,
-      );
+      throw new Error(`resolve artifact work directory: ${errorMessage(err)}`);
     }
     if (!path.isAbsolute(sourcePath)) {
       sourcePath = path.join(resolvedWorkDir, sourcePath);
     }
     let resolvedSource: string;
     try {
-      resolvedSource = Deno.realPathSync(sourcePath);
+      resolvedSource = nodeRuntime.realPathSync(sourcePath);
     } catch (err) {
       throw new Error(`resolve artifact path: ${errorMessage(err)}`);
     }
@@ -150,7 +149,7 @@ export class ArtifactCollector {
         "artifact path must stay within the Runtime work directory",
       );
     }
-    const info = Deno.statSync(resolvedSource);
+    const info = nodeRuntime.statSync(resolvedSource);
     if (!info.isFile) {
       throw new Error("artifact path must be a regular file");
     }
@@ -173,7 +172,7 @@ export class ArtifactCollector {
         mediaType,
         sizeHint: info.size,
         open: () => {
-          const file = Deno.openSync(resolvedSource, { read: true });
+          const file = nodeRuntime.openSync(resolvedSource, { read: true });
           return {
             stream: file.readable,
             filename,
@@ -214,9 +213,9 @@ export async function classifyArtifact(
     case ATTACHMENT_IMAGE:
       if (!isImage) {
         throw new Error(
-          `artifact requested as image but detected ${
-            JSON.stringify(mediaType)
-          }`,
+          `artifact requested as image but detected ${JSON.stringify(
+            mediaType,
+          )}`,
         );
       }
       return { kind: ATTACHMENT_IMAGE, mediaType };
@@ -225,18 +224,18 @@ export async function classifyArtifact(
     case ATTACHMENT_AUDIO:
       if (!lowerMedia.startsWith("audio/")) {
         throw new Error(
-          `artifact requested as audio but detected ${
-            JSON.stringify(mediaType)
-          }`,
+          `artifact requested as audio but detected ${JSON.stringify(
+            mediaType,
+          )}`,
         );
       }
       return { kind: ATTACHMENT_AUDIO, mediaType };
     case ATTACHMENT_VIDEO:
       if (!lowerMedia.startsWith("video/")) {
         throw new Error(
-          `artifact requested as video but detected ${
-            JSON.stringify(mediaType)
-          }`,
+          `artifact requested as video but detected ${JSON.stringify(
+            mediaType,
+          )}`,
         );
       }
       return { kind: ATTACHMENT_VIDEO, mediaType };
@@ -306,20 +305,14 @@ export class PublishArtifactTool implements Tool {
     params: Record<string, unknown>,
   ): Promise<ToolResult> {
     const p = typeof params["path"] === "string" ? params["path"] : "";
-    const filename = typeof params["filename"] === "string"
-      ? params["filename"]
-      : "";
+    const filename =
+      typeof params["filename"] === "string" ? params["filename"] : "";
     const kind = typeof params["kind"] === "string" ? params["kind"] : "";
-    const record = await this.collector.register(
-      p,
-      filename,
-      kind,
-      ctx.signal,
-    );
+    const record = await this.collector.register(p, filename, kind, ctx.signal);
     return createTextToolResult(
-      `Published generated ${record.kind} ${
-        JSON.stringify(record.filename)
-      } as attachment ${record.id}.`,
+      `Published generated ${record.kind} ${JSON.stringify(
+        record.filename,
+      )} as attachment ${record.id}.`,
     );
   }
 }

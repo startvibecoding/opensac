@@ -28,18 +28,18 @@ export interface SessionMetadata {
 }
 
 export function parseProjectTime(value: string): Date {
-  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(
-    value,
-  );
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
   if (match) {
-    return new Date(Date.UTC(
-      Number(match[1]),
-      Number(match[2]) - 1,
-      Number(match[3]),
-      Number(match[4]),
-      Number(match[5]),
-      Number(match[6]),
-    ));
+    return new Date(
+      Date.UTC(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        Number(match[4]),
+        Number(match[5]),
+        Number(match[6]),
+      ),
+    );
   }
   return new Date(value);
 }
@@ -62,10 +62,7 @@ export function listProjects(sessionDir: string): Project[] {
 }
 
 /** Creates a project and returns its persisted projection. */
-export function createProject(
-  sessionDir: string,
-  name: string,
-): Project {
+export function createProject(sessionDir: string, name: string): Project {
   name = name.trim();
   if (name === "") throw new Error("project name is required");
   const db = openRootDB(sessionDir);
@@ -93,11 +90,7 @@ export function renameProject(
   }
   const db = openRootDB(sessionDir);
   const now = new Date();
-  const changed = new ProjectDAO(db.db).updateName(
-    id,
-    name,
-    now.toISOString(),
-  );
+  const changed = new ProjectDAO(db.db).updateName(id, name, now.toISOString());
   if (changed === 0) throw new Error("project not found");
   // Go returns a zero CreatedAt here; an invalid Date mirrors that.
   return { id, name, createdAt: new Date(NaN), updatedAt: now };

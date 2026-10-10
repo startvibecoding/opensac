@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import {
   buildFileDiff,
   formatFileDiffSummary,
@@ -101,7 +102,7 @@ export class EditTool implements Tool {
     try {
       let data: Uint8Array;
       try {
-        data = Deno.readFileSync(p);
+        data = runtime.readFileSync(p);
       } catch (err) {
         throw new Error(`read file: ${messageOf(err)}`);
       }
@@ -119,12 +120,14 @@ export class EditTool implements Tool {
           throw new Error("invalid edit format");
         }
         const editMap = e as Record<string, unknown>;
-        const oldText = typeof editMap["oldText"] === "string"
-          ? editMap["oldText"] as string
-          : "";
-        const newText = typeof editMap["newText"] === "string"
-          ? editMap["newText"] as string
-          : "";
+        const oldText =
+          typeof editMap["oldText"] === "string"
+            ? (editMap["oldText"] as string)
+            : "";
+        const newText =
+          typeof editMap["newText"] === "string"
+            ? (editMap["newText"] as string)
+            : "";
         if (oldText === "") {
           throw new Error("oldText is required for each edit");
         }
@@ -174,9 +177,9 @@ export class EditTool implements Tool {
 
       const diff = buildFileDiff(p, originalContent, newContent);
       return createDiffToolResult(
-        `Applied ${edits.length} edit(s) to ${p}\n${
-          formatFileDiffSummary(diff)
-        }`,
+        `Applied ${edits.length} edit(s) to ${p}\n${formatFileDiffSummary(
+          diff,
+        )}`,
         diff,
       );
     } finally {

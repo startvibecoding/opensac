@@ -25,10 +25,7 @@ import {
 import { test } from "#testing";
 
 function assertClose(got: number, want: number, msg: string): void {
-  assert(
-    Math.abs(got - want) < 1e-12,
-    `${msg}: got ${got}, want ${want}`,
-  );
+  assert(Math.abs(got - want) < 1e-12, `${msg}: got ${got}, want ${want}`);
 }
 
 test("NewBaseProvider", () => {
@@ -54,10 +51,12 @@ test("GetModel", () => {
 });
 
 test("MockProvider", async () => {
-  const models: Model[] = [{
-    id: "model1",
-    name: "Model 1",
-  }] as unknown as Model[];
+  const models: Model[] = [
+    {
+      id: "model1",
+      name: "Model 1",
+    },
+  ] as unknown as Model[];
   const responses: StreamEvent[] = [
     { type: streamStart },
     { type: streamTextDelta, textDelta: "Hello" },
@@ -77,10 +76,12 @@ test("MockProvider", async () => {
 });
 
 test("MockProviderWithContext", async () => {
-  const models: Model[] = [{
-    id: "model1",
-    name: "Model 1",
-  }] as unknown as Model[];
+  const models: Model[] = [
+    {
+      id: "model1",
+      name: "Model 1",
+    },
+  ] as unknown as Model[];
   const responses: StreamEvent[] = [
     { type: streamStart },
     { type: streamTextDelta, textDelta: "Hello" },
@@ -92,9 +93,8 @@ test("MockProviderWithContext", async () => {
   controller.abort();
 
   const events: StreamEvent[] = [];
-  for await (
-    const event of p.chat({ abort: controller.signal } as ChatParams)
-  ) events.push(event);
+  for await (const event of p.chat({ abort: controller.signal } as ChatParams))
+    events.push(event);
 
   assert(events.some((e) => e.type === streamError));
 });

@@ -482,7 +482,8 @@ export class Supervisor {
       message: compactESMError(runErr),
     });
     if (req.role !== roleWorker) {
-      const review = titleESMRole(role) +
+      const review =
+        titleESMRole(role) +
         " sub-agent failed; completion candidate rejected: " +
         compactESMError(runErr);
       try {

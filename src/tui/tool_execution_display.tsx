@@ -60,7 +60,10 @@ export function CompactToolRow({
   return (
     <Text>
       <Text color={color}>{displayText}</Text>
-      <Text dimColor>{intentText}{timeStr}</Text>
+      <Text dimColor>
+        {intentText}
+        {timeStr}
+      </Text>
       {diffStr && <Text color="green">{diffStr}</Text>}
     </Text>
   );

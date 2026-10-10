@@ -1,8 +1,10 @@
 //
 // FileStore persists workflow state as JSON files. `os.CreateTemp` +
-// `os.Rename` map to `Deno.makeTempFile` + `Deno.rename`; `ctx.Err()` maps to
+// `os.Rename` map to `runtime.makeTempFile` + `runtime.rename`; `ctx.Err()` maps to
 // `signal.aborted`. JSON dates revive back into `Date` objects on load.
 
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   type AgentResult,
@@ -29,21 +31,21 @@ export class FileStore {
     if (state.id === "") {
       throw new Error("workflow state id is required");
     }
-    await Deno.mkdir(this.#dir, { recursive: true });
+    await runtime.mkdir(this.#dir, { recursive: true });
     const data = JSON.stringify(state, null, 2);
     const dest = this.#path(state.id);
-    const tmp = await Deno.makeTempFile({
+    const tmp = await runtime.makeTempFile({
       dir: this.#dir,
       prefix: ".tmp-",
       suffix: ".json",
     });
     try {
-      await Deno.writeTextFile(tmp, data);
-      await Deno.chmod(tmp, 0o644);
-      await Deno.rename(tmp, dest);
+      await runtime.writeTextFile(tmp, data);
+      await runtime.chmod(tmp, 0o644);
+      await runtime.rename(tmp, dest);
     } catch (err) {
       try {
-        await Deno.remove(tmp);
+        await runtime.remove(tmp);
       } catch {
         // Best effort cleanup.
       }
@@ -58,21 +60,21 @@ export class FileStore {
     if (id === "") {
       throw new Error("workflow run id is required");
     }
-    const data = await Deno.readTextFile(this.#path(id));
+    const data = await runtime.readTextFile(this.#path(id));
     return reviveRunState(JSON.parse(data) as Record<string, unknown>);
   }
 
   /** Lists persisted run states, newest first. */
   async list(signal?: AbortSignal): Promise<RunState[]> {
     throwIfAborted(signal);
-    let entries: Deno.DirEntry[];
+    let entries: DirEntry[];
     try {
       entries = [];
-      for await (const entry of Deno.readDir(this.#dir)) {
+      for await (const entry of runtime.readDir(this.#dir)) {
         entries.push(entry);
       }
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
+      if (err instanceof runtime.errors.NotFound) {
         return [];
       }
       throw err;
@@ -83,7 +85,9 @@ export class FileStore {
         continue;
       }
       try {
-        const data = await Deno.readTextFile(path.join(this.#dir, entry.name));
+        const data = await runtime.readTextFile(
+          path.join(this.#dir, entry.name),
+        );
         states.push(
           reviveRunState(JSON.parse(data) as Record<string, unknown>),
         );
@@ -112,9 +116,8 @@ function reviveAgentResult(raw: Record<string, unknown>): AgentResult {
   return {
     ...(raw as unknown as AgentResult),
     startedAt: toDate(raw.startedAt),
-    finishedAt: raw.finishedAt === undefined
-      ? undefined
-      : toDate(raw.finishedAt),
+    finishedAt:
+      raw.finishedAt === undefined ? undefined : toDate(raw.finishedAt),
   };
 }
 
@@ -122,9 +125,8 @@ function revivePhaseState(raw: Record<string, unknown>): PhaseState {
   return {
     ...(raw as unknown as PhaseState),
     startedAt: toDate(raw.startedAt),
-    finishedAt: raw.finishedAt === undefined
-      ? undefined
-      : toDate(raw.finishedAt),
+    finishedAt:
+      raw.finishedAt === undefined ? undefined : toDate(raw.finishedAt),
   };
 }
 
@@ -142,14 +144,13 @@ function reviveRunState(raw: Record<string, unknown>): RunState {
     ...(raw as unknown as RunState),
     startedAt: toDate(raw.startedAt),
     updatedAt: toDate(raw.updatedAt),
-    finishedAt: raw.finishedAt === undefined
-      ? undefined
-      : toDate(raw.finishedAt),
+    finishedAt:
+      raw.finishedAt === undefined ? undefined : toDate(raw.finishedAt),
     phases: (raw.phases as unknown[] | undefined)?.map((p) =>
-      revivePhaseState(p as Record<string, unknown>)
+      revivePhaseState(p as Record<string, unknown>),
     ),
     logs: (raw.logs as unknown[] | undefined)?.map((l) =>
-      reviveLog(l as Record<string, unknown>)
+      reviveLog(l as Record<string, unknown>),
     ),
     results,
   };

@@ -41,11 +41,7 @@ export function createSession(opts: CreateSessionOptions): Manager {
   const mgr = createManager(opts.workDir, opts.sessionDir ?? "");
   const channelType = (opts.channelType ?? "").trim();
   if (channelType !== "" && channelType !== "local") {
-    mgr.initWithIDAndBinding(
-      opts.id ?? "",
-      channelType,
-      opts.channelId ?? "",
-    );
+    mgr.initWithIDAndBinding(opts.id ?? "", channelType, opts.channelId ?? "");
     return mgr;
   }
   mgr.initWithID(opts.id ?? "");

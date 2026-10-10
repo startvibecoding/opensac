@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
 
@@ -74,7 +75,8 @@ function requiredInteger(
 function requiredPort(object: JsonObject): number {
   const value = object.port;
   if (
-    !Number.isInteger(value) || (value as number) < 0 ||
+    !Number.isInteger(value) ||
+    (value as number) < 0 ||
     (value as number) > 65535
   ) {
     throw new TypeError(
@@ -110,9 +112,10 @@ export function parseCoreRegistration(input: unknown): CoreRegistration {
   const protocolVersion = requiredInteger(input, "protocolVersion", 0);
   const pid = requiredInteger(input, "pid", 1);
   const host = requiredString(input, "host");
-  const connectHost = input.connectHost === undefined
-    ? undefined
-    : requiredString(input, "connectHost");
+  const connectHost =
+    input.connectHost === undefined
+      ? undefined
+      : requiredString(input, "connectHost");
   const port = requiredPort(input);
   const startedAt = requiredFiniteNumber(input, "startedAt");
 
@@ -132,14 +135,16 @@ function sameRegistration(
   left: CoreRegistration,
   right: CoreRegistration,
 ): boolean {
-  return left.id === right.id &&
+  return (
+    left.id === right.id &&
     left.version === right.version &&
     left.protocolVersion === right.protocolVersion &&
     left.pid === right.pid &&
     left.host === right.host &&
     left.connectHost === right.connectHost &&
     left.port === right.port &&
-    left.startedAt === right.startedAt;
+    left.startedAt === right.startedAt
+  );
 }
 
 /** Reads and writes the Core discovery registration for one state root. */
@@ -158,9 +163,9 @@ export class CoreRegistry {
   async read(): Promise<CoreRegistration | undefined> {
     let text: string;
     try {
-      text = await Deno.readTextFile(this.paths.registrationFile);
+      text = await runtime.readTextFile(this.paths.registrationFile);
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return undefined;
+      if (error instanceof runtime.errors.NotFound) return undefined;
       throw error;
     }
 
@@ -177,30 +182,27 @@ export class CoreRegistry {
   }
 
   /** Atomically replaces the registration with a complete JSON value. */
-  write(
-    registration: CoreRegistration,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  write(registration: CoreRegistration, signal?: AbortSignal): Promise<void> {
     return this.#enqueue(async () => {
       throwIfAborted(signal);
       const value = parseCoreRegistration(registration);
       await withRegistryMutationLock(this.paths, async () => {
         throwIfAborted(signal);
-        await Deno.mkdir(this.paths.stateDir, {
+        await runtime.mkdir(this.paths.stateDir, {
           recursive: true,
           mode: 0o700,
         });
 
-        const temporary = await Deno.makeTempFile({
+        const temporary = await runtime.makeTempFile({
           dir: this.paths.stateDir,
           prefix: ".core-registration-",
           suffix: ".tmp",
         });
         try {
           const data = `${JSON.stringify(value, null, 2)}\n`;
-          await Deno.writeTextFile(temporary, data);
-          await Deno.chmod(temporary, 0o600);
-          await Deno.rename(temporary, this.paths.registrationFile);
+          await runtime.writeTextFile(temporary, data);
+          await runtime.chmod(temporary, 0o600);
+          await runtime.rename(temporary, this.paths.registrationFile);
           throwIfAborted(signal);
         } catch (error) {
           await removeIfPresent(temporary);
@@ -252,21 +254,19 @@ async function withRegistryMutationLock<T>(
   paths: CorePaths,
   operation: () => Promise<T>,
 ): Promise<T> {
-  await Deno.mkdir(paths.stateDir, {
+  await runtime.mkdir(paths.stateDir, {
     recursive: true,
     mode: 0o700,
   });
   const lockDir = path.join(paths.stateDir, REGISTRY_MUTATION_LOCK);
-  const owner = await withRegistryTransitionLock(
-    paths,
-    () => acquireRegistryMutationLock(lockDir),
+  const owner = await withRegistryTransitionLock(paths, () =>
+    acquireRegistryMutationLock(lockDir),
   );
   try {
     return await operation();
   } finally {
-    await withRegistryTransitionLock(
-      paths,
-      () => releaseRegistryMutationLock(lockDir, owner.token),
+    await withRegistryTransitionLock(paths, () =>
+      releaseRegistryMutationLock(lockDir, owner.token),
     );
   }
 }
@@ -277,14 +277,14 @@ async function acquireRegistryMutationLock(
   for (let attempt = 0; attempt < 2; attempt++) {
     const owner: RegistryMutationOwner = {
       token: createMutationToken(),
-      pid: Deno.pid,
-      hostname: Deno.hostname(),
+      pid: runtime.pid,
+      hostname: runtime.hostname(),
       timestamp: Date.now(),
     };
     try {
-      await Deno.mkdir(lockDir, { mode: 0o700 });
+      await runtime.mkdir(lockDir, { mode: 0o700 });
     } catch (error) {
-      if (!(error instanceof Deno.errors.AlreadyExists)) throw error;
+      if (!(error instanceof runtime.errors.AlreadyExists)) throw error;
       let existing: RegistryMutationOwner | undefined;
       try {
         existing = await readRegistryMutationOwner(lockDir);
@@ -293,7 +293,7 @@ async function acquireRegistryMutationLock(
       }
       if (
         existing === undefined ||
-        existing.hostname !== Deno.hostname() ||
+        existing.hostname !== runtime.hostname() ||
         mutationProcessLiveness(existing.pid) !== "dead"
       ) {
         throw new CoreRegistryBusyError(lockDir, { cause: error });
@@ -307,16 +307,16 @@ async function acquireRegistryMutationLock(
       if (
         current === undefined ||
         current.token !== existing.token ||
-        current.hostname !== Deno.hostname() ||
+        current.hostname !== runtime.hostname() ||
         mutationProcessLiveness(current.pid) !== "dead"
       ) {
         throw new CoreRegistryBusyError(lockDir, { cause: error });
       }
       const quarantine = uniqueMutationSibling(lockDir, "stale");
       try {
-        await Deno.rename(lockDir, quarantine);
+        await runtime.rename(lockDir, quarantine);
       } catch (renameError) {
-        if (renameError instanceof Deno.errors.NotFound) continue;
+        if (renameError instanceof runtime.errors.NotFound) continue;
         throw new CoreRegistryBusyError(lockDir, { cause: renameError });
       }
       const claimed = await readRegistryMutationOwner(quarantine);
@@ -329,11 +329,11 @@ async function acquireRegistryMutationLock(
 
     try {
       const metadataPath = path.join(lockDir, REGISTRY_MUTATION_META);
-      await Deno.writeTextFile(
+      await runtime.writeTextFile(
         metadataPath,
         `${JSON.stringify(owner, null, 2)}\n`,
       );
-      await Deno.chmod(metadataPath, 0o600);
+      await runtime.chmod(metadataPath, 0o600);
       return owner;
     } catch (error) {
       await removeDirectoryBestEffort(lockDir);
@@ -343,14 +343,12 @@ async function acquireRegistryMutationLock(
   throw new CoreRegistryBusyError(lockDir);
 }
 
-async function recoverStaleRegistryReclaim(
-  lockDir: string,
-): Promise<void> {
+async function recoverStaleRegistryReclaim(lockDir: string): Promise<void> {
   const claimDir = path.join(lockDir, REGISTRY_RECLAIM_DIR);
   try {
-    await Deno.lstat(claimDir);
+    await runtime.lstat(claimDir);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw new CoreRegistryBusyError(lockDir, { cause: error });
   }
 
@@ -362,7 +360,7 @@ async function recoverStaleRegistryReclaim(
   }
   if (
     existing === undefined ||
-    existing.hostname !== Deno.hostname() ||
+    existing.hostname !== runtime.hostname() ||
     mutationProcessLiveness(existing.pid) !== "dead"
   ) {
     throw new CoreRegistryBusyError(lockDir);
@@ -372,9 +370,9 @@ async function recoverStaleRegistryReclaim(
   // operation, so this stale claim can be moved without displacing a new one.
   const quarantine = uniqueMutationSibling(claimDir, "stale-claim");
   try {
-    await Deno.rename(claimDir, quarantine);
+    await runtime.rename(claimDir, quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw new CoreRegistryBusyError(lockDir, { cause: error });
   }
   const claimed = await readRegistryMutationOwner(quarantine);
@@ -405,8 +403,8 @@ async function withRegistryTransitionLock<T>(
 
     const owner: RegistryMutationOwner = {
       token: createMutationToken(),
-      pid: Deno.pid,
-      hostname: Deno.hostname(),
+      pid: runtime.pid,
+      hostname: runtime.hostname(),
       timestamp: Date.now(),
     };
     if (!(await acquireRegistryTransitionIntent(paths, owner))) continue;
@@ -414,19 +412,19 @@ async function withRegistryTransitionLock<T>(
     let published = false;
     try {
       try {
-        await Deno.mkdir(transitionDir, { mode: 0o700 });
+        await runtime.mkdir(transitionDir, { mode: 0o700 });
       } catch (error) {
-        if (error instanceof Deno.errors.AlreadyExists) continue;
+        if (error instanceof runtime.errors.AlreadyExists) continue;
         throw error;
       }
 
       const metadataPath = path.join(transitionDir, REGISTRY_MUTATION_META);
       try {
-        await Deno.writeTextFile(
+        await runtime.writeTextFile(
           metadataPath,
           `${JSON.stringify(owner, null, 2)}\n`,
         );
-        await Deno.chmod(metadataPath, 0o600);
+        await runtime.chmod(metadataPath, 0o600);
       } catch (error) {
         await removeDirectoryBestEffort(transitionDir);
         throw error;
@@ -460,7 +458,7 @@ async function recoverExistingRegistryTransition(
 
   if (existing !== undefined) {
     if (
-      existing.hostname !== Deno.hostname() ||
+      existing.hostname !== runtime.hostname() ||
       mutationProcessLiveness(existing.pid) !== "dead"
     ) {
       return false;
@@ -483,7 +481,7 @@ async function recoverExistingRegistryTransition(
   }
   if (
     intent === undefined ||
-    intent.hostname !== Deno.hostname() ||
+    intent.hostname !== runtime.hostname() ||
     mutationProcessLiveness(intent.pid) !== "dead"
   ) {
     return false;
@@ -506,24 +504,24 @@ async function acquireRegistryTransitionIntent(
 ): Promise<boolean> {
   const intentPath = path.join(paths.stateDir, REGISTRY_TRANSITION_INTENT);
   for (let attempt = 0; attempt < 3; attempt++) {
-    const temporary = await Deno.makeTempFile({
+    const temporary = await runtime.makeTempFile({
       dir: paths.stateDir,
       prefix: ".core-registry-transition-intent-",
       suffix: ".tmp",
     });
     try {
-      await Deno.writeTextFile(
+      await runtime.writeTextFile(
         temporary,
         `${JSON.stringify(owner, null, 2)}\n`,
       );
-      await Deno.chmod(temporary, 0o600);
+      await runtime.chmod(temporary, 0o600);
       try {
         // Linking is a no-replace publication primitive. Unlike rename, it
         // cannot overwrite a live owner's intent during a race.
-        await Deno.link(temporary, intentPath);
+        await runtime.link(temporary, intentPath);
         return true;
       } catch (error) {
-        if (!(error instanceof Deno.errors.AlreadyExists)) throw error;
+        if (!(error instanceof runtime.errors.AlreadyExists)) throw error;
       }
     } finally {
       await removeIfPresent(temporary);
@@ -537,7 +535,7 @@ async function acquireRegistryTransitionIntent(
     }
     if (
       existing === undefined ||
-      existing.hostname !== Deno.hostname() ||
+      existing.hostname !== runtime.hostname() ||
       mutationProcessLiveness(existing.pid) !== "dead"
     ) {
       return false;
@@ -545,9 +543,9 @@ async function acquireRegistryTransitionIntent(
 
     const quarantine = uniqueMutationSibling(intentPath, "stale-intent");
     try {
-      await Deno.rename(intentPath, quarantine);
+      await runtime.rename(intentPath, quarantine);
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) continue;
+      if (error instanceof runtime.errors.NotFound) continue;
       return false;
     }
     const claimed = await readRegistryOwnerFile(
@@ -572,9 +570,9 @@ async function releaseRegistryTransitionIntent(
   if (current === undefined || current.token !== token) return;
   const quarantine = uniqueMutationSibling(intentPath, "release-intent");
   try {
-    await Deno.rename(intentPath, quarantine);
+    await runtime.rename(intentPath, quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw error;
   }
   const claimed = await readRegistryOwnerFile(
@@ -603,7 +601,7 @@ async function recoverIncompleteRegistryTransition(
     if (
       currentIntent === undefined ||
       currentIntent.token !== expected.token ||
-      currentIntent.hostname !== Deno.hostname() ||
+      currentIntent.hostname !== runtime.hostname() ||
       mutationProcessLiveness(currentIntent.pid) !== "dead"
     ) {
       return false;
@@ -614,10 +612,10 @@ async function recoverIncompleteRegistryTransition(
 
     const quarantine = uniqueMutationSibling(transitionDir, "stale-incomplete");
     try {
-      await Deno.rename(transitionDir, quarantine);
+      await runtime.rename(transitionDir, quarantine);
       moved = true;
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return false;
+      if (error instanceof runtime.errors.NotFound) return false;
       return false;
     }
 
@@ -626,10 +624,10 @@ async function recoverIncompleteRegistryTransition(
       // A legacy owner wrote metadata while the claim was being acquired. Do
       // not delete it; restore the directory when the original name is free.
       try {
-        await Deno.rename(quarantine, transitionDir);
+        await runtime.rename(quarantine, transitionDir);
         moved = false;
       } catch (error) {
-        if (!(error instanceof Deno.errors.NotFound)) return false;
+        if (!(error instanceof runtime.errors.NotFound)) return false;
       }
       return false;
     }
@@ -656,7 +654,7 @@ async function recoverStaleRegistryTransition(
     if (
       current === undefined ||
       current.token !== expected.token ||
-      current.hostname !== Deno.hostname() ||
+      current.hostname !== runtime.hostname() ||
       mutationProcessLiveness(current.pid) !== "dead"
     ) {
       return false;
@@ -664,10 +662,10 @@ async function recoverStaleRegistryTransition(
 
     const quarantine = uniqueMutationSibling(transitionDir, "stale-transition");
     try {
-      await Deno.rename(transitionDir, quarantine);
+      await runtime.rename(transitionDir, quarantine);
       moved = true;
     } catch (error) {
-      if (error instanceof Deno.errors.NotFound) return false;
+      if (error instanceof runtime.errors.NotFound) return false;
       throw new CoreRegistryBusyError(transitionDir, { cause: error });
     }
 
@@ -690,14 +688,14 @@ async function acquireTransitionReclaimClaim(
   for (let attempt = 0; attempt < 2; attempt++) {
     const owner: RegistryMutationOwner = {
       token: createMutationToken(),
-      pid: Deno.pid,
-      hostname: Deno.hostname(),
+      pid: runtime.pid,
+      hostname: runtime.hostname(),
       timestamp: Date.now(),
     };
     try {
-      await Deno.mkdir(claimDir, { mode: 0o700 });
+      await runtime.mkdir(claimDir, { mode: 0o700 });
     } catch (error) {
-      if (!(error instanceof Deno.errors.AlreadyExists)) throw error;
+      if (!(error instanceof runtime.errors.AlreadyExists)) throw error;
       let existing: RegistryMutationOwner | undefined;
       try {
         existing = await readRegistryMutationOwner(claimDir);
@@ -706,16 +704,16 @@ async function acquireTransitionReclaimClaim(
       }
       if (
         existing === undefined ||
-        existing.hostname !== Deno.hostname() ||
+        existing.hostname !== runtime.hostname() ||
         mutationProcessLiveness(existing.pid) !== "dead"
       ) {
         return undefined;
       }
       const quarantine = uniqueMutationSibling(claimDir, "stale-claim");
       try {
-        await Deno.rename(claimDir, quarantine);
+        await runtime.rename(claimDir, quarantine);
       } catch (renameError) {
-        if (renameError instanceof Deno.errors.NotFound) continue;
+        if (renameError instanceof runtime.errors.NotFound) continue;
         throw new CoreRegistryBusyError(claimDir, { cause: renameError });
       }
       const claimed = await readRegistryMutationOwner(quarantine);
@@ -727,14 +725,11 @@ async function acquireTransitionReclaimClaim(
     }
 
     try {
-      await Deno.writeTextFile(
+      await runtime.writeTextFile(
         path.join(claimDir, REGISTRY_MUTATION_META),
         `${JSON.stringify(owner, null, 2)}\n`,
       );
-      await Deno.chmod(
-        path.join(claimDir, REGISTRY_MUTATION_META),
-        0o600,
-      );
+      await runtime.chmod(path.join(claimDir, REGISTRY_MUTATION_META), 0o600);
       return owner;
     } catch (error) {
       await removeDirectoryBestEffort(claimDir);
@@ -760,9 +755,9 @@ async function releaseRegistryTransitionLock(
   if (!(await registryOwnerMatches(transitionDir, token))) return;
   const quarantine = uniqueMutationSibling(transitionDir, "release");
   try {
-    await Deno.rename(transitionDir, quarantine);
+    await runtime.rename(transitionDir, quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw error;
   }
   const claimed = await readRegistryMutationOwner(quarantine);
@@ -786,9 +781,9 @@ async function releaseRegistryMutationLock(
   if (current === undefined || current.token !== token) return;
   const quarantine = uniqueMutationSibling(lockDir, "release");
   try {
-    await Deno.rename(lockDir, quarantine);
+    await runtime.rename(lockDir, quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw error;
   }
   const claimed = await readRegistryMutationOwner(quarantine);
@@ -820,9 +815,9 @@ async function readRegistryOwnerFile(
 ): Promise<RegistryMutationOwner | undefined> {
   let text: string;
   try {
-    text = await Deno.readTextFile(filePath);
+    text = await runtime.readTextFile(filePath);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return undefined;
+    if (error instanceof runtime.errors.NotFound) return undefined;
     throw error;
   }
   let value: unknown;
@@ -840,10 +835,15 @@ async function readRegistryOwnerFile(
   const hostname = object.hostname;
   const timestamp = object.timestamp;
   if (
-    typeof token !== "string" || token.trim() === "" ||
-    typeof pid !== "number" || !Number.isInteger(pid) || pid < 1 ||
-    typeof hostname !== "string" || hostname.trim() === "" ||
-    typeof timestamp !== "number" || !Number.isFinite(timestamp) ||
+    typeof token !== "string" ||
+    token.trim() === "" ||
+    typeof pid !== "number" ||
+    !Number.isInteger(pid) ||
+    pid < 1 ||
+    typeof hostname !== "string" ||
+    hostname.trim() === "" ||
+    typeof timestamp !== "number" ||
+    !Number.isFinite(timestamp) ||
     timestamp < 0
   ) {
     throw new TypeError(`${label} metadata has an invalid shape`);
@@ -857,15 +857,15 @@ async function removeRegistrationAtomically(
 ): Promise<void> {
   const quarantine = uniqueMutationSibling(registrationFile, "remove");
   try {
-    await Deno.rename(registrationFile, quarantine);
+    await runtime.rename(registrationFile, quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw error;
   }
 
   let claimed: CoreRegistration;
   try {
-    const text = await Deno.readTextFile(quarantine);
+    const text = await runtime.readTextFile(quarantine);
     claimed = parseCoreRegistration(JSON.parse(text));
   } catch (error) {
     // A replacement that cannot be validated is never deleted. Restore it
@@ -886,11 +886,11 @@ async function restoreQuarantinedFile(
   originalPath: string,
 ): Promise<void> {
   try {
-    await Deno.link(quarantine, originalPath);
+    await runtime.link(quarantine, originalPath);
     await removeIfPresent(quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.AlreadyExists) return;
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.AlreadyExists) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw error;
   }
 }
@@ -902,21 +902,21 @@ async function restoreQuarantinedRegistration(
   try {
     // Linking is a no-replace operation. Unlike rename, it cannot overwrite a
     // newer registration that appeared while the quarantine was being checked.
-    await Deno.link(quarantine, registrationFile);
+    await runtime.link(quarantine, registrationFile);
     await removeIfPresent(quarantine);
   } catch (error) {
-    if (error instanceof Deno.errors.AlreadyExists) return;
-    if (error instanceof Deno.errors.NotFound) return;
+    if (error instanceof runtime.errors.AlreadyExists) return;
+    if (error instanceof runtime.errors.NotFound) return;
     throw error;
   }
 }
 
 function mutationProcessLiveness(pid: number): "alive" | "dead" | "unknown" {
   try {
-    Deno.kill(pid, 0);
+    runtime.kill(pid, 0);
     return "alive";
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return "dead";
+    if (error instanceof runtime.errors.NotFound) return "dead";
     return "unknown";
   }
 }
@@ -942,17 +942,17 @@ function uniqueMutationSibling(target: string, label: string): string {
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
-    await Deno.lstat(filePath);
+    await runtime.lstat(filePath);
     return true;
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return false;
+    if (error instanceof runtime.errors.NotFound) return false;
     throw error;
   }
 }
 
 async function removeDirectoryBestEffort(directory: string): Promise<void> {
   try {
-    await Deno.remove(directory, { recursive: true });
+    await runtime.remove(directory, { recursive: true });
   } catch {
     // A failed cleanup must not turn an already-claimed namespace into a
     // successful-looking mutation.
@@ -961,15 +961,17 @@ async function removeDirectoryBestEffort(directory: string): Promise<void> {
 
 async function removeIfPresent(filePath: string): Promise<void> {
   try {
-    await Deno.remove(filePath);
+    await runtime.remove(filePath);
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if (!(error instanceof runtime.errors.NotFound)) throw error;
   }
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
-    throw signal.reason ??
-      new DOMException("Core registry operation aborted", "AbortError");
+    throw (
+      signal.reason ??
+      new DOMException("Core registry operation aborted", "AbortError")
+    );
   }
 }

@@ -84,40 +84,42 @@ export class RuntimeRun {
   ): void {
     if (!this.sessionDir || !this.sessionId || !this.runId) return;
     if (this.execution === undefined) return;
-    recordDecisionEvent({
-      record: (event) => this.execution!.recordEvent(event),
-    }, {
-      request: { id, runId: this.runId, sessionId: this.sessionId, kind },
-      status,
-      value,
-      payload,
-      source: this.source,
-      mode: this.mode,
-    });
+    recordDecisionEvent(
+      {
+        record: (event) => this.execution!.recordEvent(event),
+      },
+      {
+        request: { id, runId: this.runId, sessionId: this.sessionId, kind },
+        status,
+        value,
+        payload,
+        source: this.source,
+        mode: this.mode,
+      },
+    );
   }
 
   resolveDecision(id: string, kind: DecisionKind, value: string): void {
-    this.decisions?.resolveWith({
-      id,
-      kind,
-      status: "resolved",
-      value,
-    }, () => {
-      this.persistDecision(id, kind, "resolved", value, { value });
-    });
+    this.decisions?.resolveWith(
+      {
+        id,
+        kind,
+        status: "resolved",
+        value,
+      },
+      () => {
+        this.persistDecision(id, kind, "resolved", value, { value });
+      },
+    );
   }
 
   clearDecisions(state: RunState): void {
     if (this.decisions === undefined) return;
     const status = decisionTerminalStatus(state);
     for (const request of this.decisions.clearRunWithValue(this.runId, "")) {
-      this.persistDecision(
-        request.id,
-        request.kind,
-        status,
-        "",
-        { reason: "Runtime run ended before the decision was resolved" },
-      );
+      this.persistDecision(request.id, request.kind, status, "", {
+        reason: "Runtime run ended before the decision was resolved",
+      });
     }
   }
 

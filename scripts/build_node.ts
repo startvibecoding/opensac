@@ -1,20 +1,20 @@
 // Builds the platform-independent npm package (a single ESM bundle) from the
-// Deno/TypeScript sources with esbuild. Replaces the old dnt pipeline; the
-// repository now has no `jsr:` imports, and the published artifact is plain JS
-// that runs on Node (>= 22.5, for `node:sqlite`).
+// TypeScript sources with esbuild. The repository uses only `node:` builtins and
+// npm packages, and the published artifact is plain JS that runs on Node
+// (>= 22.18, for `node:sqlite` and `import.meta.main`).
 //
-// esbuild resolves the project's imports natively now that the sources no
-// longer use `jsr:` specifiers: `node:` builtins and npm packages are left
-// external (declared as dependencies), and the project-owned `@opensac/*`
-// modules are aliased to their local files. `Deno` at runtime comes from
-// `@deno/shim-deno` plus `src/platform/node_compat.ts`, both bundled/declared.
+// esbuild resolves the project's imports natively: `node:` builtins and npm
+// packages are left external (declared as dependencies), and the project-owned
+// modules under `src/` resolve through their relative import paths. The Node
+// runtime helpers come from `src/platform/runtime.ts`, which is bundled into the
+// artifact.
 //
-// Run: `deno task build:node` (output: dist/node). This does NOT publish.
+// Run: `npm run build:node` (output: dist/node). This does NOT publish.
 
-import * as esbuild from "npm:esbuild@^0.28.2";
+import { runtime as nodeRuntime } from "../src/platform/runtime.ts";
+import * as esbuild from "esbuild";
 import { dirname, fromFileUrl, join, resolve } from "../src/compat/path.ts";
 import { resolveBuildVersion, toPackageVersion } from "./version.ts";
-import { isMainModule } from "../src/platform/node_compat.ts";
 
 /**
  * npm package name of the platform-independent package. The bare `opensac` is
@@ -40,7 +40,6 @@ const EXTERNAL = [
   "@jsquash/webp",
   "ws",
   "undici",
-  "@deno/shim-deno",
 ];
 
 /** Runtime resources copied beside the bundle; paths are relative to `src/`. */
@@ -56,17 +55,6 @@ const REPO_DIR = resolve(fromFileUrl(new URL("..", import.meta.url)));
 const OUT_DIR = join(REPO_DIR, "dist", "node");
 const OUT_BIN = join(OUT_DIR, "bin", "opensac.js");
 
-/** Local files the `@opensac/*` import-map aliases resolve to. */
-export function aliasMap(repoDir = REPO_DIR): Record<string, string> {
-  return {
-    "@opensac/path": join(repoDir, "src/compat/path.ts"),
-    "@opensac/path/posix": join(repoDir, "src/compat/path_posix.ts"),
-    "@opensac/assert": join(repoDir, "src/compat/assert.ts"),
-    "@opensac/encoding/base64": join(repoDir, "src/compat/encoding.ts"),
-    "@opensac/encoding/base64url": join(repoDir, "src/compat/encoding.ts"),
-  };
-}
-
 /** Metadata for the generated package manifest. */
 export function nodePackageJson(version: string, name = NODE_PACKAGE_NAME) {
   return {
@@ -81,11 +69,10 @@ export function nodePackageJson(version: string, name = NODE_PACKAGE_NAME) {
       url: "https://gitee.com/startvibecoding/opensac.git",
     },
     keywords: ["ai", "coding", "assistant", "terminal", "cli", "agent", "llm"],
-    engines: { node: ">=22.5" },
+    engines: { node: ">=22.18.0" },
     bin: { opensac: "bin/opensac.js" },
     files: ["bin/", "stats/", "context/", "platform/", "README.md"],
     dependencies: {
-      "@deno/shim-deno": "~0.18.0",
       "@jsquash/webp": "^1",
       imagescript: "^1",
       ink: "^5",
@@ -97,16 +84,16 @@ export function nodePackageJson(version: string, name = NODE_PACKAGE_NAME) {
 }
 
 async function copyResource(src: string, dest: string): Promise<void> {
-  const info = await Deno.stat(src).catch(() => null);
+  const info = await nodeRuntime.stat(src).catch(() => null);
   if (info === null) return;
   if (info.isDirectory) {
-    await Deno.mkdir(dest, { recursive: true });
-    for await (const entry of Deno.readDir(src)) {
+    await nodeRuntime.mkdir(dest, { recursive: true });
+    for await (const entry of nodeRuntime.readDir(src)) {
       await copyResource(join(src, entry.name), join(dest, entry.name));
     }
   } else {
-    await Deno.mkdir(dirname(dest), { recursive: true });
-    await Deno.copyFile(src, dest);
+    await nodeRuntime.mkdir(dirname(dest), { recursive: true });
+    await nodeRuntime.copyFile(src, dest);
   }
 }
 
@@ -122,21 +109,21 @@ async function copyAssets(): Promise<void> {
 
 async function main(): Promise<void> {
   let scope = "";
-  for (const arg of Deno.args) {
+  for (const arg of nodeRuntime.args) {
     if (arg.startsWith("--scope=")) scope = arg.slice("--scope=".length);
   }
   const version = toPackageVersion(await resolveBuildVersion(REPO_DIR));
   if (version === "") {
     console.error(
-      "Cannot determine a package version: no `v*` git tag and no deno.json version",
+      "Cannot determine a package version: no `v*` git tag and no package.json version",
     );
-    Deno.exit(1);
+    nodeRuntime.exit(1);
   }
   const name = scopedPackageName(NODE_PACKAGE_NAME, scope);
   console.error(`Building ${name}@${version} (Node/npm, esbuild) ...`);
 
-  await Deno.remove(OUT_DIR, { recursive: true }).catch(() => {});
-  await Deno.mkdir(join(OUT_DIR, "bin"), { recursive: true });
+  await nodeRuntime.remove(OUT_DIR, { recursive: true }).catch(() => {});
+  await nodeRuntime.mkdir(join(OUT_DIR, "bin"), { recursive: true });
 
   await esbuild.build({
     entryPoints: [join(REPO_DIR, "src/main.ts")],
@@ -148,29 +135,32 @@ async function main(): Promise<void> {
     jsx: "transform",
     jsxFactory: "React.createElement",
     jsxFragment: "React.Fragment",
-    alias: aliasMap(REPO_DIR),
     external: EXTERNAL,
     // The banner embeds the release version as the `OPENSAC_BUILD_VERSION`
     // default, the same value the old binary build baked in. The bundle's main
-    // guard uses `isMainModule(import.meta.url)`, which needs no define.
+    // guard uses `import.meta.main`, which Node provides natively and needs no
+    // define.
     define: {},
     banner: {
-      js: `#!/usr/bin/env node\nprocess.env.OPENSAC_BUILD_VERSION ??= ${
-        JSON.stringify(version)
-      };`,
+      js: `#!/usr/bin/env node\nprocess.env.OPENSAC_BUILD_VERSION ??= ${JSON.stringify(
+        version,
+      )};`,
     },
     legalComments: "none",
     logLevel: "info",
   });
 
-  await Deno.chmod(OUT_BIN, 0o755);
+  await nodeRuntime.chmod(OUT_BIN, 0o755);
   await copyAssets();
-  await Deno.copyFile(join(REPO_DIR, "README.md"), join(OUT_DIR, "README.md"));
-  await Deno.writeTextFile(
+  await nodeRuntime.copyFile(
+    join(REPO_DIR, "README.md"),
+    join(OUT_DIR, "README.md"),
+  );
+  await nodeRuntime.writeTextFile(
     join(OUT_DIR, "package.json"),
     `${JSON.stringify(nodePackageJson(version, name), null, 2)}\n`,
   );
   console.error(`Wrote ${OUT_DIR}`);
 }
 
-if (isMainModule(import.meta.url)) await main();
+if (import.meta.main) await main();

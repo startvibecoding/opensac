@@ -72,12 +72,14 @@ test("knowledge FTS CJK round trip", () => {
     const match = (query: string): string[] => {
       const terms = knowledgeFTSQuery(query);
       if (terms === "") return [];
-      return db.query<{ chunk_id: string }>(
-        `SELECT chunk_id FROM knowledge_chunk_fts
+      return db
+        .query<{ chunk_id: string }>(
+          `SELECT chunk_id FROM knowledge_chunk_fts
          WHERE knowledge_chunk_fts MATCH ?
          ORDER BY bm25(knowledge_chunk_fts)`,
-        terms,
-      ).map((r) => r.chunk_id);
+          terms,
+        )
+        .map((r) => r.chunk_id);
     };
     const cases: { query: string; want: string }[] = [
       { query: "知识库", want: "c1" },

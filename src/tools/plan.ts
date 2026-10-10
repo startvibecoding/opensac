@@ -70,16 +70,11 @@ export class PlanTool implements Tool {
     };
   }
 
-  execute(
-    _ctx: ToolContext,
-    params: Record<string, unknown>,
-  ): ToolResult {
-    const title = typeof params["title"] === "string"
-      ? params["title"] as string
-      : "";
-    const note = typeof params["note"] === "string"
-      ? params["note"] as string
-      : "";
+  execute(_ctx: ToolContext, params: Record<string, unknown>): ToolResult {
+    const title =
+      typeof params["title"] === "string" ? (params["title"] as string) : "";
+    const note =
+      typeof params["note"] === "string" ? (params["note"] as string) : "";
     const stepsRaw = params["steps"];
     if (!Array.isArray(stepsRaw) || stepsRaw.length === 0) {
       throw new Error("steps array is required and must not be empty");
@@ -96,15 +91,13 @@ export class PlanTool implements Tool {
         throw new Error(`step ${i}: invalid step format`);
       }
       const m = raw as Record<string, unknown>;
-      const stepTitle = typeof m["title"] === "string"
-        ? (m["title"] as string).trim()
-        : "";
+      const stepTitle =
+        typeof m["title"] === "string" ? (m["title"] as string).trim() : "";
       if (stepTitle === "") {
         throw new Error(`step ${i}: title is required`);
       }
-      const statusRaw = typeof m["status"] === "string"
-        ? m["status"] as string
-        : "";
+      const statusRaw =
+        typeof m["status"] === "string" ? (m["status"] as string) : "";
       const status = normalizePlanStatus(statusRaw);
       if (status === "") {
         throw new Error(

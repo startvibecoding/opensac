@@ -11,8 +11,8 @@
 // It is a module worker started from `new URL("./stats_worker.ts",
 // import.meta.url)` (query_offload.ts). Unlike the text-inlined
 // `src/workflow/js_worker.js`, a module worker keeps its imports — including
-// the DAO layer — and therefore needs `deno compile --include
-// src/stats/stats_worker.ts` to ship inside the compiled binary.
+// the DAO layer — so the build must include this module when copying worker
+// sources into the bundle.
 
 import { openReadOnlyStandalone } from "../db/mod.ts";
 import { StatsDAO, wrapStandaloneDatabase } from "../dao/mod.ts";

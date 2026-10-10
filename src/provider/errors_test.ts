@@ -121,14 +121,12 @@ test("isProviderTransportFailure recognizes every provider stage prefix", () => 
   const refused = new TypeError("fetch failed", {
     cause: new Error("Connection refused (os error 111)"),
   });
-  for (
-    const stage of [
-      "send request",
-      "send",
-      "stream read error",
-      "marshal request",
-    ]
-  ) {
+  for (const stage of [
+    "send request",
+    "send",
+    "stream read error",
+    "marshal request",
+  ]) {
     assert(
       isProviderTransportFailure(wrapError(stage, refused)),
       `stage prefix "${stage}" must classify as a transport fault`,

@@ -44,7 +44,10 @@ test("heading requires a space", () => {
 test("paragraph and hard break", () => {
   const doc = root("line1  \nline2");
   const p = doc.findChild(NodeType.Paragraph)!;
-  assertEquals(p.children.some((c) => c.type === NodeType.HardBreak), true);
+  assertEquals(
+    p.children.some((c) => c.type === NodeType.HardBreak),
+    true,
+  );
   assertEquals(p.textContent(), "line1\nline2\n");
 });
 
@@ -151,16 +154,19 @@ test("speculative emphasis rewrite on stream", () => {
   assertEquals(parse("a_", defaultOption()).textContent(), "a_\n");
   // Partial strong markup keeps its text visible.
   assert(
-    parse("Yeah, this is **cool", streamOption()).textContent().includes(
-      "cool",
-    ),
+    parse("Yeah, this is **cool", streamOption())
+      .textContent()
+      .includes("cool"),
   );
 });
 
 test("speculative disabled by default", () => {
   const doc = parse("Hello **wor", defaultOption());
   const p = doc.findChild(NodeType.Paragraph)!;
-  assertEquals(p.children.some((c) => c.type === NodeType.Strong), false);
+  assertEquals(
+    p.children.some((c) => c.type === NodeType.Strong),
+    false,
+  );
 });
 
 test("speculative table rewrite", () => {
@@ -295,12 +301,10 @@ test("wrapANSI word boundary", () => {
 test("wrapANSI splits overlong words instead of overflowing", () => {
   // A space-free CJK run and a single long styled span are both wider than
   // the wrap width; every produced line must fit inside it.
-  for (
-    const text of [
-      "这是一段中文里没有空格换行的长句子需要按单元格切开",
-      "\x1b[1m这是一个很长的加粗span跨越多个换行宽度才结束\x1b[0m尾",
-    ]
-  ) {
+  for (const text of [
+    "这是一段中文里没有空格换行的长句子需要按单元格切开",
+    "\x1b[1m这是一个很长的加粗span跨越多个换行宽度才结束\x1b[0m尾",
+  ]) {
     for (const line of wrapANSI(text, 10, "", 0).split("\n")) {
       assert(visualWidth(line) <= 10, `overflow: ${JSON.stringify(line)}`);
     }
@@ -325,9 +329,9 @@ test("wrapANSI re-opens the style state at each continuation line", () => {
   ).split("\n");
   for (const line of boldLines) {
     if (visualWidth(stripANSI(line)) === 0) continue;
-    const isMidSpan = /\b(words|must|stay|bold|across|the|wrap)\b/.test(
-      stripANSI(line),
-    ) && !stripANSI(line).startsWith("plain");
+    const isMidSpan =
+      /\b(words|must|stay|bold|across|the|wrap)\b/.test(stripANSI(line)) &&
+      !stripANSI(line).startsWith("plain");
     if (isMidSpan) assert(line.includes("\x1b[1m"), JSON.stringify(line));
   }
 });

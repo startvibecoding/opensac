@@ -5,7 +5,12 @@
 // `createAgentManager`, `createSession`, `DecisionService`). The canonical event
 // vocabulary arrives through `src/agentruntime/events.ts` instead.
 
-import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "../compat/assert.ts";
 import { fromFileUrl, join } from "../compat/path.ts";
 import {
   importSpecifiers,
@@ -41,12 +46,12 @@ test("TUI production graph has no runtime-owner bypass", () => {
 });
 
 test("TUI boundary rejects banned imports and constructions", () => {
-  const root = Deno.makeTempDirSync();
+  const root = nodeRuntime.makeTempDirSync();
   try {
     const tuiDir = join(root, "src/tui");
-    Deno.mkdirSync(tuiDir, { recursive: true });
-    Deno.mkdirSync(join(root, "src/cli"), { recursive: true });
-    Deno.writeTextFileSync(
+    nodeRuntime.mkdirSync(tuiDir, { recursive: true });
+    nodeRuntime.mkdirSync(join(root, "src/cli"), { recursive: true });
+    nodeRuntime.writeTextFileSync(
       join(tuiDir, "session.ts"),
       [
         'import { Builder } from "../agentruntime/session_runtime.ts";',
@@ -58,12 +63,12 @@ test("TUI boundary rejects banned imports and constructions", () => {
         "}",
       ].join("\n"),
     );
-    Deno.writeTextFileSync(
+    nodeRuntime.writeTextFileSync(
       join(root, "src/tui/service.ts"),
       'import { DecisionService } from "../agentruntime/decision.ts";\n' +
         "export const decisions = new DecisionService();\n",
     );
-    Deno.writeTextFileSync(
+    nodeRuntime.writeTextFileSync(
       join(root, "src/cli/root_tui.ts"),
       'import { createSession } from "../agentruntime/session_lifecycle.ts";\n' +
         "export const manager = createSession({ workDir: '.' });\n",
@@ -71,14 +76,12 @@ test("TUI boundary rejects banned imports and constructions", () => {
 
     const violations = productionViolations(root);
     const joined = formatViolations(violations);
-    for (
-      const specifier of [
-        "../agentruntime/session_runtime.ts",
-        "../session/manager.ts",
-        "../provider/factory/factory.ts",
-        "../agent/events.ts",
-      ]
-    ) {
+    for (const specifier of [
+      "../agentruntime/session_runtime.ts",
+      "../session/manager.ts",
+      "../provider/factory/factory.ts",
+      "../agent/events.ts",
+    ]) {
       assert(
         joined.includes(specifier),
         `expected banned import ${specifier} to be rejected:\n${joined}`,
@@ -94,13 +97,14 @@ test("TUI boundary rejects banned imports and constructions", () => {
     // The pure service port must not import runtime implementation modules at
     // all (`src/agentruntime/decision.ts` is rejected there too).
     assert(
-      violations.some((violation) =>
-        violation.file === "src/tui/service.ts" &&
-        violation.message.includes("../agentruntime/decision.ts")
+      violations.some(
+        (violation) =>
+          violation.file === "src/tui/service.ts" &&
+          violation.message.includes("../agentruntime/decision.ts"),
       ),
     );
   } finally {
-    Deno.removeSync(root, { recursive: true });
+    nodeRuntime.removeSync(root, { recursive: true });
   }
 });
 
@@ -113,14 +117,12 @@ test("TUISession and root_tui keep the ownership rules", () => {
     "dao/",
     "agent/",
   ];
-  for (
-    const rel of [
-      "src/tui/tui_session.ts",
-      "src/cli/root_tui.ts",
-      "src/cli/root_print.ts",
-    ]
-  ) {
-    const src = Deno.readTextFileSync(join(projectRoot, rel));
+  for (const rel of [
+    "src/tui/tui_session.ts",
+    "src/cli/root_tui.ts",
+    "src/cli/root_print.ts",
+  ]) {
+    const src = nodeRuntime.readTextFileSync(join(projectRoot, rel));
     for (const specifier of importSpecifiers(src)) {
       for (const forbidden of forbiddenSpecifiers) {
         assert(
@@ -131,15 +133,13 @@ test("TUISession and root_tui keep the ownership rules", () => {
     }
     // Runtime-owner constructions stay Core-owned (plan: Builder,
     // createAgentManager, createSession, DecisionService).
-    for (
-      const pattern of [
-        /\bnew\s+Builder\s*\(/,
-        /\bcreateAgentManager\s*\(/,
-        /(?<![.\w$])createSession\s*\(/,
-        /\bnew\s+DecisionService\s*\(/,
-        /\bloadSettingsWithMeta\s*\(/,
-      ]
-    ) {
+    for (const pattern of [
+      /\bnew\s+Builder\s*\(/,
+      /\bcreateAgentManager\s*\(/,
+      /(?<![.\w$])createSession\s*\(/,
+      /\bnew\s+DecisionService\s*\(/,
+      /\bloadSettingsWithMeta\s*\(/,
+    ]) {
       assertEquals(
         pattern.exec(src),
         null,

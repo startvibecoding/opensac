@@ -14,14 +14,11 @@ import { test } from "#testing";
 
 function makeController(): AppController {
   const translator = new Translator("en");
-  return new AppController(
-    translator,
-    {
-      onMessage: () => {},
-      scheduleRender: () => {},
-      deliverQuestion: () => {},
-    },
-  );
+  return new AppController(translator, {
+    onMessage: () => {},
+    scheduleRender: () => {},
+    deliverQuestion: () => {},
+  });
 }
 
 function capture(controller: AppController): string {
@@ -48,17 +45,14 @@ function capture(controller: AppController): string {
 test("active think block appears once, not twice", () => {
   const c = makeController();
   c.handleAgentEvent({ type: EVENT_TURN_START });
-  c.handleAgentEvent(
-    {
-      type: EVENT_THINK_DELTA,
-      thinkDelta: "let me reason about this carefully",
-    } as unknown as Parameters<AppController["handleAgentEvent"]>[0],
-  );
+  c.handleAgentEvent({
+    type: EVENT_THINK_DELTA,
+    thinkDelta: "let me reason about this carefully",
+  } as unknown as Parameters<AppController["handleAgentEvent"]>[0]);
 
   const frame = capture(c);
-  const occurrences = frame.split(
-    "let me reason about this carefully",
-  ).length - 1;
+  const occurrences =
+    frame.split("let me reason about this carefully").length - 1;
   assertEquals(occurrences, 1, `rendered ${occurrences} times:\n${frame}`);
 });
 

@@ -4,7 +4,12 @@
 // the file-diff and atomic-write helpers, the file-lock manager, the globset/
 // ignore helpers, and the job manager.
 
-import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import type { Manager as SkillsManager } from "../skills/mod.ts";
 import {
@@ -43,15 +48,15 @@ import {
 import { test } from "#testing";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync();
+  return nodeRuntime.makeTempDirSync();
 }
 
 function writeText(p: string, text: string): void {
-  Deno.writeTextFileSync(p, text);
+  nodeRuntime.writeTextFileSync(p, text);
 }
 
 function readText(p: string): string {
-  return Deno.readTextFileSync(p);
+  return nodeRuntime.readTextFileSync(p);
 }
 
 const ctx: ToolContext = {};
@@ -150,7 +155,7 @@ test("PlanTool rejects empty steps and bad status", async () => {
   const tool = new PlanTool(r);
   await expectRejects(() => tool.execute(ctx, { steps: [] }));
   await expectRejects(() =>
-    tool.execute(ctx, { steps: [{ title: "x", status: "bogus" }] })
+    tool.execute(ctx, { steps: [{ title: "x", status: "bogus" }] }),
   );
 });
 
@@ -231,13 +236,13 @@ test("EditTool rejects non-unique and missing oldText", async () => {
     tool.execute(ctx, {
       path: "e.txt",
       edits: [{ oldText: "x", newText: "y" }],
-    })
+    }),
   );
   await expectRejects(() =>
     tool.execute(ctx, {
       path: "e.txt",
       edits: [{ oldText: "zzz", newText: "y" }],
-    })
+    }),
   );
 });
 
@@ -254,7 +259,7 @@ test("EditTool rejects overlapping edits", async () => {
         { oldText: "abc", newText: "x" },
         { oldText: "bcd", newText: "y" },
       ],
-    })
+    }),
   );
 });
 
@@ -318,14 +323,14 @@ test("InsertTool rejects match position and out-of-range line", async () => {
       path: "file.txt",
       content: "x",
       position: { type: "after_match", match: "a" },
-    })
+    }),
   );
   await expectRejects(() =>
     tool.execute(ctx, {
       path: "file.txt",
       content: "x",
       position: { type: "before_line", line: 3 },
-    })
+    }),
   );
 });
 
@@ -334,7 +339,7 @@ test("FindTool finds files and respects maxDepth", async () => {
   writeText(path.join(dir, "test.txt"), "Hello");
   writeText(path.join(dir, "test.go"), "package main");
   const nested = path.join(dir, "nested");
-  Deno.mkdirSync(nested);
+  nodeRuntime.mkdirSync(nested);
   writeText(path.join(nested, "nested.go"), "package nested");
 
   const tool = new FindTool(createRegistry(dir, undefined));
@@ -351,7 +356,7 @@ test("FindTool finds files and respects maxDepth", async () => {
   assert(!depth.text.includes("nested.go"));
 
   await expectRejects(() =>
-    tool.execute(ctx, { pattern: "*.txt", path: "missing" })
+    tool.execute(ctx, { pattern: "*.txt", path: "missing" }),
   );
 });
 
@@ -394,8 +399,9 @@ test("GrepTool limits total results and falls back to literal", async () => {
     path: ".",
     maxResults: 3,
   });
-  const matches =
-    limited.text.split("\n").filter((l) => l.includes("match")).length;
+  const matches = limited.text
+    .split("\n")
+    .filter((l) => l.includes("match")).length;
   assertEquals(matches, 3);
   assertStringIncludes(limited.text, "truncated");
 
@@ -428,7 +434,7 @@ test("GrepTool skips oversized files instead of buffering them", async () => {
 test("LsTool lists directory entries", async () => {
   const dir = tempDir();
   writeText(path.join(dir, "a.txt"), "hi");
-  Deno.mkdirSync(path.join(dir, "sub"));
+  nodeRuntime.mkdirSync(path.join(dir, "sub"));
   const tool = new LsTool(createRegistry(dir, undefined));
   const result = await tool.execute(ctx, {});
   assertStringIncludes(result.text, "a.txt");
@@ -529,9 +535,12 @@ test("BashTool honors a parent abort signal", async () => {
     createJobManager(),
   );
   const controller = new AbortController();
-  const promise = tool.execute({ signal: controller.signal }, {
-    command: "sleep 5",
-  });
+  const promise = tool.execute(
+    { signal: controller.signal },
+    {
+      command: "sleep 5",
+    },
+  );
   controller.abort();
   const result = await promise;
   // The abort terminates the process; the result still carries diagnostics.
@@ -553,7 +562,7 @@ test("QuestionTool asks via the attached asker", async () => {
   assertStringIncludes(result.text, "User answered: Option A");
 
   await expectRejects(() =>
-    tool.execute({}, { question: "Pick", options: ["a"] })
+    tool.execute({}, { question: "Pick", options: ["a"] }),
   );
   await expectRejects(() => tool.execute({}, {}));
 });
@@ -570,8 +579,8 @@ test("SkillRefTool loads a reference from a fake manager", async () => {
     ref: "references/x.md",
   }) as ToolResult;
   assertEquals(result.text, "content!");
-  await expectRejects(async () =>
-    await tool.execute(ctx, { skill: "missing", ref: "a" })
+  await expectRejects(
+    async () => await tool.execute(ctx, { skill: "missing", ref: "a" }),
   );
 });
 
@@ -593,7 +602,7 @@ test("writeFileAtomic writes and leaves no temp file", () => {
   const file = path.join(dir, "out.txt");
   writeFileAtomic(file, new TextEncoder().encode("hello world"));
   assertEquals(readText(file), "hello world");
-  for (const entry of Deno.readDirSync(dir)) {
+  for (const entry of nodeRuntime.readDirSync(dir)) {
     assert(!entry.name.startsWith(".tmp-"), `leftover temp file ${entry.name}`);
   }
 });
@@ -710,14 +719,11 @@ test("default registries share a file lock manager", () => {
 
 test("RegistryResolvePath resolves and rejects escapes", async () => {
   const r = createRegistry("/home/user/project", undefined);
-  assertEquals(
-    r.resolvePath("src/main.go"),
-    "/home/user/project/src/main.go",
-  );
+  assertEquals(r.resolvePath("src/main.go"), "/home/user/project/src/main.go");
   assertEquals(r.resolvePath("/home/user/project"), "/home/user/project");
   await expectRejects(() => Promise.resolve(r.resolvePath("../../etc/passwd")));
   await expectRejects(() =>
-    Promise.resolve(r.resolvePath("/home/user/project2/file.txt"))
+    Promise.resolve(r.resolvePath("/home/user/project2/file.txt")),
   );
 });
 
@@ -804,7 +810,7 @@ test("GrepTool falls back to literal when a match request times out", async () =
   writeText(path.join(dir, "evil.txt"), "a".repeat(40) + "!\n");
   writeText(path.join(dir, "plain.txt"), "target line\n");
   const tool = new GrepTool(createRegistry(dir, undefined), {
-    matchTimeoutMs: 100,
+    matchTimeoutMs: 500,
   });
   const result = await tool.execute(ctx, { pattern: "(a|a)+$", path: "." });
   assertStringIncludes(
@@ -820,7 +826,7 @@ test("GrepTool literal fallback keeps finding literal matches after timeout", as
   writeText(path.join(dir, "a.txt"), "(a|a)+$ is here\n");
   writeText(path.join(dir, "b.txt"), "a".repeat(40) + "!\n");
   const tool = new GrepTool(createRegistry(dir, undefined), {
-    matchTimeoutMs: 100,
+    matchTimeoutMs: 500,
   });
   const result = await tool.execute(ctx, { pattern: "(a|a)+$", path: "." });
   assertStringIncludes(

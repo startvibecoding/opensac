@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import {
   close,
@@ -12,7 +13,7 @@ import {
 import { test } from "#testing";
 
 function tempDbPath(name: string): string {
-  const dir = Deno.makeTempDirSync({ prefix: "opensac-db-test-" });
+  const dir = runtime.makeTempDirSync({ prefix: "opensac-db-test-" });
   return `${dir}/${name}`;
 }
 
@@ -48,10 +49,10 @@ test("write runs a transaction and commits", () => {
     return 42;
   });
   assertEquals(result, 42);
-  assertEquals(db.query<{ a: number }>("SELECT a FROM t").map((r) => r.a), [
-    1,
-    2,
-  ]);
+  assertEquals(
+    db.query<{ a: number }>("SELECT a FROM t").map((r) => r.a),
+    [1, 2],
+  );
   closeAll();
 });
 
@@ -62,7 +63,7 @@ test("write rolls back on error", () => {
     runInTx(db, (conn) => {
       conn.run("INSERT INTO t VALUES (1)");
       throw new Error("boom");
-    })
+    }),
   );
   assertEquals(db.query("SELECT a FROM t"), []);
   closeAll();
@@ -73,9 +74,10 @@ test("schema-incompatible migration is backed up and rebuilt", () => {
   // The migrator creates the schema, but refuses a legacy database the way a
   // real migration would: on the rebuilt (empty) database it succeeds.
   const migrator = (conn: DB) => {
-    const hasLegacy = conn.query(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='legacy'",
-    ).length > 0;
+    const hasLegacy =
+      conn.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='legacy'",
+      ).length > 0;
     if (hasLegacy) throw schemaIncompatible(new Error("legacy schema"));
     conn.exec("CREATE TABLE legacy(a INTEGER)");
   };
@@ -90,7 +92,7 @@ test("schema-incompatible migration is backed up and rebuilt", () => {
   const recoveries = takeMigrationRecoveries();
   assertEquals(recoveries.length, 1);
   assert(recoveries[0].backupPath.endsWith(".bak"));
-  assert(Deno.statSync(recoveries[0].backupPath).isFile);
+  assert(runtime.statSync(recoveries[0].backupPath).isFile);
   // The rebuilt database is fresh: the legacy row is gone, the schema is new.
   assertEquals(rebuilt.query("SELECT a FROM legacy"), []);
   rebuilt.run("INSERT INTO legacy VALUES (7)");

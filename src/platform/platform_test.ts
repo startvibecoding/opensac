@@ -2,6 +2,7 @@
 // and the system prompt must resolve the same shell. These cover the resolver
 // policy directly, on any host, by injecting the platform-dependent inputs.
 
+import * as nodeRuntime from "./runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import {
   defaultShellForOS,
@@ -14,14 +15,16 @@ import { test } from "#testing";
 
 const BUSYBOX = "C:\\Users\\dev\\.opensac\\bin\\busybox64u.exe";
 
-function resolution(overrides: {
-  goos?: string;
-  busyboxPath?: string;
-  defaultShell?: string;
-  shellEnv?: string;
-  isValidShell?: (p: string) => boolean;
-  configuredShell?: string;
-} = {}) {
+function resolution(
+  overrides: {
+    goos?: string;
+    busyboxPath?: string;
+    defaultShell?: string;
+    shellEnv?: string;
+    isValidShell?: (p: string) => boolean;
+    configuredShell?: string;
+  } = {},
+) {
   return {
     goos: overrides.goos ?? "windows",
     busyboxPath: overrides.busyboxPath ?? "",
@@ -45,9 +48,7 @@ test("windows falls back to the platform default without busybox", () => {
     "powershell.exe",
   );
   assertEquals(
-    resolveShellForOS(
-      resolution({ busyboxPath: "", defaultShell: "cmd.exe" }),
-    ),
+    resolveShellForOS(resolution({ busyboxPath: "", defaultShell: "cmd.exe" })),
     "cmd.exe",
   );
 });
@@ -63,9 +64,7 @@ test("windows ignores SHELL so busybox stays authoritative", () => {
 
 test("non-windows honors a valid SHELL over the default", () => {
   assertEquals(
-    resolveShellForOS(
-      resolution({ goos: "linux", shellEnv: "/usr/bin/zsh" }),
-    ),
+    resolveShellForOS(resolution({ goos: "linux", shellEnv: "/usr/bin/zsh" })),
     "/usr/bin/zsh",
   );
 });
@@ -92,17 +91,18 @@ test("non-windows rejects an unknown or missing SHELL", () => {
 
 test("busybox is invoked with POSIX sh arguments", () => {
   assertEquals(shellArgs(BUSYBOX, "ls -la"), ["sh", "-c", "ls -la"]);
-  assertEquals(
-    shellArgs("C:\\ops\\busybox32u.exe", "echo hi"),
-    ["sh", "-c", "echo hi"],
-  );
+  assertEquals(shellArgs("C:\\ops\\busybox32u.exe", "echo hi"), [
+    "sh",
+    "-c",
+    "echo hi",
+  ]);
 });
 
 test("an explicit configured shell outranks every other rule", () => {
-  const dir = Deno.makeTempDirSync({ prefix: ".opensac-configured-" });
+  const dir = nodeRuntime.makeTempDirSync({ prefix: ".opensac-configured-" });
   try {
     const custom = `${dir}/myshell`;
-    Deno.writeTextFileSync(custom, "#!/bin/sh\n");
+    nodeRuntime.writeTextFileSync(custom, "#!/bin/sh\n");
 
     // Beats BusyBox on Windows, and beats $SHELL elsewhere.
     assertEquals(
@@ -122,7 +122,7 @@ test("an explicit configured shell outranks every other rule", () => {
       custom,
     );
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    nodeRuntime.removeSync(dir, { recursive: true });
   }
 });
 
@@ -148,22 +148,22 @@ test("a configured shell that does not exist falls back", () => {
 });
 
 test("isValidShell accepts a real shell file and rejects other names", () => {
-  const dir = Deno.makeTempDirSync({ prefix: ".opensac-shell-" });
+  const dir = nodeRuntime.makeTempDirSync({ prefix: ".opensac-shell-" });
   try {
     const shell = `${dir}/bash`;
-    Deno.writeTextFileSync(shell, "#!/bin/sh\n");
-    Deno.chmodSync(shell, 0o755);
+    nodeRuntime.writeTextFileSync(shell, "#!/bin/sh\n");
+    nodeRuntime.chmodSync(shell, 0o755);
     assert(isValidShell(shell));
     // A real file that is not a known shell name is still rejected.
-    Deno.writeTextFileSync(`${dir}/python3`, "");
+    nodeRuntime.writeTextFileSync(`${dir}/python3`, "");
     assert(!isValidShell(`${dir}/python3`));
     // A known shell name that does not exist is rejected.
     assert(!isValidShell(`${dir}/zsh`));
     // A directory named like a shell is rejected.
-    Deno.mkdirSync(`${dir}/ksh`);
+    nodeRuntime.mkdirSync(`${dir}/ksh`);
     assert(!isValidShell(`${dir}/ksh`));
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    nodeRuntime.removeSync(dir, { recursive: true });
   }
 });
 
@@ -212,23 +212,14 @@ test("default shell falls back zsh, fish, ash, sh when bash is absent", () => {
     host("linux", ["/bin/fish", "/bin/ash", "/bin/sh"]),
     "/bin/fish",
   );
-  assertEquals(
-    host("linux", ["/bin/ash", "/bin/sh"]),
-    "/bin/ash",
-  );
+  assertEquals(host("linux", ["/bin/ash", "/bin/sh"]), "/bin/ash");
   assertEquals(host("linux", ["/bin/sh"]), "/bin/sh");
 });
 
 test("default shell also searches /usr/bin", () => {
   // NixOS and HomeBSD-style layouts keep shells in /usr/bin.
-  assertEquals(
-    host("linux", ["/usr/bin/bash", "/bin/sh"]),
-    "/usr/bin/bash",
-  );
-  assertEquals(
-    host("linux", ["/usr/bin/zsh", "/bin/sh"]),
-    "/usr/bin/zsh",
-  );
+  assertEquals(host("linux", ["/usr/bin/bash", "/bin/sh"]), "/usr/bin/bash");
+  assertEquals(host("linux", ["/usr/bin/zsh", "/bin/sh"]), "/usr/bin/zsh");
 });
 
 test("default shell falls through to a PATH-resolved shell", () => {
@@ -252,10 +243,7 @@ test("default shell returns sh when nothing is installed", () => {
 });
 
 test("macOS keeps zsh ahead of Apple's bash", () => {
-  assertEquals(
-    host("darwin", ["/bin/zsh", "/bin/bash"]),
-    "/bin/zsh",
-  );
+  assertEquals(host("darwin", ["/bin/zsh", "/bin/bash"]), "/bin/zsh");
   // bash is still reached when zsh is absent.
   assertEquals(host("darwin", ["/bin/bash"]), "/bin/bash");
 });
@@ -271,12 +259,12 @@ test("windows and plan9 keep their dedicated shells", () => {
 
 test("ash is an accepted explicit SHELL", () => {
   // ash is a first-class fallback, so $SHELL=/bin/ash must not be rejected.
-  const dir = Deno.makeTempDirSync({ prefix: ".opensac-ash-" });
+  const dir = nodeRuntime.makeTempDirSync({ prefix: ".opensac-ash-" });
   try {
     const ash = `${dir}/ash`;
-    Deno.writeTextFileSync(ash, "#!/bin/sh\n");
+    nodeRuntime.writeTextFileSync(ash, "#!/bin/sh\n");
     assert(isValidShell(ash));
   } finally {
-    Deno.removeSync(dir, { recursive: true });
+    nodeRuntime.removeSync(dir, { recursive: true });
   }
 });

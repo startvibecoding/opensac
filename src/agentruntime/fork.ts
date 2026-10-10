@@ -14,10 +14,7 @@ export type ForkOptions = SessionForkOptions;
 export type ForkResult = SessionForkResult;
 
 /** Performs the canonical Session fork operation. */
-export function fork(
-  sessionDir: string,
-  options: ForkOptions,
-): ForkResult {
+export function fork(sessionDir: string, options: ForkOptions): ForkResult {
   return forkSession(sessionDir, options);
 }
 

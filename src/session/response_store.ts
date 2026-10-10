@@ -183,14 +183,17 @@ function redactArchiveValue(value: unknown): unknown {
   }
   if (value !== null && typeof value === "object") {
     const result: Record<string, unknown> = {};
-    for (
-      const [key, nested] of Object.entries(value as Record<string, unknown>)
-    ) {
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       const lower = key.toLowerCase().replace(/-/g, "_").replace(/ /g, "_");
       if (
-        lower.includes("authorization") || lower.includes("api_key") ||
-        lower.includes("token") || lower.includes("secret") ||
-        lower.includes("password") || lower.includes("cookie")
+        lower.includes("authorization") ||
+        lower.includes("api_key") ||
+        lower.includes("token") ||
+        lower.includes("secret") ||
+        lower.includes("password") ||
+        lower.includes("cookie")
       ) {
         if (isArchiveUsageCounter(lower, nested)) {
           result[key] = nested;
@@ -263,9 +266,10 @@ function responseTurnFromRecord(record: ResponseTurnRecord): ResponseTurn {
     requestSummary: decodeArchiveJSON(record.requestSummaryJson),
     responseSummary: decodeArchiveJSON(record.responseSummaryJson),
     createdAt: parseSessionTimestamp(record.createdAt),
-    completedAt: record.completedAt !== null && record.completedAt !== ""
-      ? parseSessionTimestamp(record.completedAt)
-      : null,
+    completedAt:
+      record.completedAt !== null && record.completedAt !== ""
+        ? parseSessionTimestamp(record.completedAt)
+        : null,
   };
 }
 
@@ -307,9 +311,10 @@ function toolExecutionFromRecord(
     providerMetadata: decodeArchiveJSON(record.providerMetadataJson),
     sideEffecting: record.sideEffecting,
     createdAt: parseSessionTimestamp(record.createdAt),
-    completedAt: record.completedAt !== null && record.completedAt !== ""
-      ? parseSessionTimestamp(record.completedAt)
-      : null,
+    completedAt:
+      record.completedAt !== null && record.completedAt !== ""
+        ? parseSessionTimestamp(record.completedAt)
+        : null,
   };
 }
 
@@ -394,10 +399,10 @@ export function saveResponseTurn(sessionDir: string, turn: ResponseTurn): void {
   } catch (err) {
     throw new Error(`response summary: ${(err as Error).message}`);
   }
-  const createdAt = turn.createdAt.getTime() === 0 ||
-      Number.isNaN(turn.createdAt.getTime())
-    ? new Date()
-    : turn.createdAt;
+  const createdAt =
+    turn.createdAt.getTime() === 0 || Number.isNaN(turn.createdAt.getTime())
+      ? new Date()
+      : turn.createdAt;
   writeRootDatabase(sessionDir, (tx) => {
     validateRuntimeLeaseTx(tx, sessionDir, turn.sessionId);
     new ResponseDAO(null).insertTurn(tx, {
@@ -447,7 +452,9 @@ export function saveResponseItem(
   item: ResponseItemArchive,
 ): void {
   if (
-    item.sessionId === "" || item.localTurnId === "" || item.itemType === ""
+    item.sessionId === "" ||
+    item.localTurnId === "" ||
+    item.itemType === ""
   ) {
     throw new Error("session ID, local turn ID and item type are required");
   }
@@ -460,15 +467,16 @@ export function saveResponseItem(
   if (sanitized === null) {
     throw new Error("sanitized item is required");
   }
-  const createdAt = item.createdAt.getTime() === 0 ||
-      Number.isNaN(item.createdAt.getTime())
-    ? new Date()
-    : item.createdAt;
+  const createdAt =
+    item.createdAt.getTime() === 0 || Number.isNaN(item.createdAt.getTime())
+      ? new Date()
+      : item.createdAt;
   let itemKey = item.itemKey;
   if (itemKey === "") {
-    itemKey = item.itemId !== ""
-      ? `${item.itemId}:${item.outputIndex}`
-      : `output:${item.outputIndex}`;
+    itemKey =
+      item.itemId !== ""
+        ? `${item.itemId}:${item.outputIndex}`
+        : `output:${item.outputIndex}`;
   }
   writeRootDatabase(sessionDir, (tx) => {
     validateRuntimeLeaseTx(tx, sessionDir, item.sessionId);
@@ -561,9 +569,8 @@ export function listResponseReplayTurns(
         identity.type === "function_call" ||
         identity.type === "custom_tool_call"
       ) {
-        let callId = typeof identity.call_id === "string"
-          ? identity.call_id
-          : "";
+        let callId =
+          typeof identity.call_id === "string" ? identity.call_id : "";
         if (callId === "" && typeof identity.id === "string") {
           callId = identity.id;
         }
@@ -605,17 +612,19 @@ export function claimToolExecutionRecord(
   record: ToolExecutionRecord,
 ): { record: ToolExecutionRecord; created: boolean } {
   if (
-    record.sessionId === "" || record.executionKey === "" ||
-    record.toolName === "" || record.argsHash === ""
+    record.sessionId === "" ||
+    record.executionKey === "" ||
+    record.toolName === "" ||
+    record.argsHash === ""
   ) {
     throw new Error(
       "session ID, execution key, tool name and args hash are required",
     );
   }
-  const createdAt = record.createdAt.getTime() === 0 ||
-      Number.isNaN(record.createdAt.getTime())
-    ? new Date()
-    : record.createdAt;
+  const createdAt =
+    record.createdAt.getTime() === 0 || Number.isNaN(record.createdAt.getTime())
+      ? new Date()
+      : record.createdAt;
   let resultSummary: Uint8Array | null;
   let providerMetadata: Uint8Array | null;
   try {
@@ -719,9 +728,9 @@ export function updateToolExecutionRecord(
     });
     if (count === 0) {
       throw new Error(
-        `tool execution ${
-          JSON.stringify(record.executionKey)
-        } is no longer writable`,
+        `tool execution ${JSON.stringify(
+          record.executionKey,
+        )} is no longer writable`,
       );
     }
   });
@@ -747,13 +756,12 @@ export function reclaimInterruptedToolExecution(
     validateRuntimeLeaseTx(tx, sessionDir, record.sessionId);
     const state = record.executionState;
     const sideEffecting = record.sideEffecting;
-    const eligible = (!sideEffecting &&
-      (state === "running" || state === "interrupted")) ||
+    const eligible =
+      (!sideEffecting && (state === "running" || state === "interrupted")) ||
       state === "retry_requested";
     if (!eligible) return;
-    const reason = state === "retry_requested"
-      ? "user_confirmed"
-      : "automatic_read_only";
+    const reason =
+      state === "retry_requested" ? "user_confirmed" : "automatic_read_only";
     let meta: Record<string, unknown> = {};
     const existing = decodeArchiveJSON(record.providerMetadataJson);
     if (existing !== null && typeof existing === "object") {
@@ -805,7 +813,9 @@ export function requestToolExecutionRecoveryRecords(
   providerCallIds: string[],
 ): { records: ToolExecutionRecord[]; count: number } {
   if (
-    sessionDir === "" || sessionId === "" || localTurnId === "" ||
+    sessionDir === "" ||
+    sessionId === "" ||
+    localTurnId === "" ||
     providerCallIds.length === 0
   ) {
     throw new Error("session, local turn and provider call IDs are required");
@@ -879,20 +889,25 @@ export function abandonInterruptedToolExecutionRecords(
 /** Upserts the durable state for a Responses background run. */
 export function saveResponseRun(sessionDir: string, run: ResponseRun): void {
   if (
-    run.sessionId === "" || run.localRunId === "" || run.provider === "" ||
-    run.api === "" || run.state === ""
+    run.sessionId === "" ||
+    run.localRunId === "" ||
+    run.provider === "" ||
+    run.api === "" ||
+    run.state === ""
   ) {
     throw new Error(
       "session ID, local run ID, provider, API and state are required",
     );
   }
-  const createdInvalid = run.createdAt.getTime() === 0 ||
-    Number.isNaN(run.createdAt.getTime());
+  const createdInvalid =
+    run.createdAt.getTime() === 0 || Number.isNaN(run.createdAt.getTime());
   const createdAt = createdInvalid ? new Date() : run.createdAt;
-  const updatedAt = createdInvalid ||
-      run.updatedAt.getTime() === 0 || Number.isNaN(run.updatedAt.getTime())
-    ? createdAt
-    : run.updatedAt;
+  const updatedAt =
+    createdInvalid ||
+    run.updatedAt.getTime() === 0 ||
+    Number.isNaN(run.updatedAt.getTime())
+      ? createdAt
+      : run.updatedAt;
   writeRootDatabase(sessionDir, (tx) => {
     validateRuntimeLeaseTx(tx, sessionDir, run.sessionId);
     new ResponseDAO(null).upsertRun(tx, {
@@ -971,8 +986,8 @@ export function compareAndSwapResponseSessionState(
   if (state.sessionId === "" || state.stateMode === "") {
     throw new Error("session ID and state mode are required");
   }
-  const invalid = state.updatedAt.getTime() === 0 ||
-    Number.isNaN(state.updatedAt.getTime());
+  const invalid =
+    state.updatedAt.getTime() === 0 || Number.isNaN(state.updatedAt.getTime());
   const updatedAt = invalid ? new Date() : state.updatedAt;
   let changed = false;
   writeRootDatabase(sessionDir, (tx) => {
@@ -993,17 +1008,21 @@ export function compareAndSwapResponseSessionState(
       changed = n === 1;
       return;
     }
-    const n = dao.updateSessionStateCAS(tx, {
-      sessionId: state.sessionId,
-      stateMode: state.stateMode,
-      previousResponseId: emptyToNull(state.previousResponseId),
-      conversationId: emptyToNull(state.conversationId),
-      provider: state.provider,
-      api: state.api,
-      model: state.model,
-      version: 0,
-      updatedAt: iso(updatedAt),
-    }, expectedVersion);
+    const n = dao.updateSessionStateCAS(
+      tx,
+      {
+        sessionId: state.sessionId,
+        stateMode: state.stateMode,
+        previousResponseId: emptyToNull(state.previousResponseId),
+        conversationId: emptyToNull(state.conversationId),
+        provider: state.provider,
+        api: state.api,
+        model: state.model,
+        version: 0,
+        updatedAt: iso(updatedAt),
+      },
+      expectedVersion,
+    );
     changed = n === 1;
   });
   return changed;

@@ -3,9 +3,10 @@
 // turn, not terminalize a live run.
 //
 // This drives the real Agent loop with a scripted provider that fails once with
-// the exact error shape Deno produces (the socket reason lives only on `cause`,
+// the exact error shape Node produces (the socket reason lives only on `cause`,
 // wrapped by the shared provider `wrapError`), then succeeds.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { type Provider } from "../provider/provider.ts";
 import {
@@ -91,9 +92,7 @@ function fetchFailedError(): Error {
   return wrapError("send request", raw);
 }
 
-async function collect(
-  events: AsyncIterable<Event>,
-): Promise<{
+async function collect(events: AsyncIterable<Event>): Promise<{
   status: TaskStatus | undefined;
   retries: Event[];
   statusMessages: string[];
@@ -123,12 +122,15 @@ test("a send request: fetch failed reports the reason and retries the turn", asy
       { type: streamDone, stopReason: "stop" },
     ],
   ]);
-  const agent: Agent = createAgentWithLoopConfig({
-    id: "transport-retry",
-    provider,
-    model: provider.models()[0],
-    mode: "yolo",
-  }, createRegistry(Deno.makeTempDirSync(), undefined));
+  const agent: Agent = createAgentWithLoopConfig(
+    {
+      id: "transport-retry",
+      provider,
+      model: provider.models()[0],
+      mode: "yolo",
+    },
+    createRegistry(runtime.makeTempDirSync(), undefined),
+  );
 
   const { status, retries, statusMessages, sawError } = await collect(
     agent.run("hello"),
@@ -140,10 +142,12 @@ test("a send request: fetch failed reports the reason and retries the turn", asy
   assert(retries.length >= 1, "one retry event is reported");
   // The user is told the actual reason, not the opaque "fetch failed".
   assert(
-    statusMessages.concat(retries.map((e) => e.statusMessage ?? "")).join("\n")
+    statusMessages
+      .concat(retries.map((e) => e.statusMessage ?? ""))
+      .join("\n")
       .includes("connection refused"),
-    `expected an actionable retry reason, got ${
-      JSON.stringify(statusMessages)
-    }`,
+    `expected an actionable retry reason, got ${JSON.stringify(
+      statusMessages,
+    )}`,
   );
 });

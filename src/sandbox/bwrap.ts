@@ -1,3 +1,4 @@
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { lookPathSync } from "../platform/platform.ts";
 import { normalizeTmpSize, pathsOverlap } from "./policy.ts";
@@ -6,7 +7,8 @@ import {
   type CommandSpec,
   type ExecOpts,
   type GitAccessSandbox,
-  type Options} from "./sandbox.ts";
+  type Options,
+} from "./sandbox.ts";
 import { Level } from "./sandbox.ts";
 
 /** Default tmpfs size used when no policy value is supplied. */
@@ -31,11 +33,21 @@ export interface BwrapCapabilities {
 
 /** Reports whether every capability OpenSAC relies on is present. */
 export function bwrapCapabilitiesComplete(caps: BwrapCapabilities): boolean {
-  return caps.unshareUser && caps.unsharePid && caps.unshareIpc &&
-    caps.unshareUts && caps.newSession && caps.dieWithParent &&
+  return (
+    caps.unshareUser &&
+    caps.unsharePid &&
+    caps.unshareIpc &&
+    caps.unshareUts &&
+    caps.newSession &&
+    caps.dieWithParent &&
     caps.mountProc &&
-    caps.mountDev && caps.mountTmpfs && caps.tmpfsSize && caps.mountBind &&
-    caps.changeDir && caps.hostname;
+    caps.mountDev &&
+    caps.mountTmpfs &&
+    caps.tmpfsSize &&
+    caps.mountBind &&
+    caps.changeDir &&
+    caps.hostname
+  );
 }
 
 /** Locates the bwrap binary, preferring well-known install locations. */
@@ -54,14 +66,14 @@ export function probeBwrapCapabilities(
 
   let output = "";
   try {
-    const result = new Deno.Command(p, {
+    const result = new nodeRuntime.Command(p, {
       args: ["--help"],
       stdout: "piped",
       stderr: "piped",
-    })
-      .outputSync();
+    }).outputSync();
     if (!result.success) return undefined;
-    output = new TextDecoder().decode(result.stdout) +
+    output =
+      new TextDecoder().decode(result.stdout) +
       new TextDecoder().decode(result.stderr);
   } catch {
     return undefined;
@@ -127,7 +139,7 @@ export class BwrapSandbox implements GitAccessSandbox {
     if (this.#available !== undefined) return this.#available;
 
     // bwrap is Linux only.
-    if (Deno.build.os !== "linux") {
+    if (nodeRuntime.build.os !== "linux") {
       return this.#markUnavailable("bubblewrap is only supported on Linux");
     }
     if (this.#bwrapPath === "") {
@@ -156,7 +168,7 @@ export class BwrapSandbox implements GitAccessSandbox {
       "test -r /proc/self/status && test -d /tmp && test -w /tmp",
     );
     try {
-      const result = new Deno.Command(this.#bwrapPath, {
+      const result = new nodeRuntime.Command(this.#bwrapPath, {
         args,
         stdout: "piped",
         stderr: "piped",
@@ -228,8 +240,8 @@ export class BwrapSandbox implements GitAccessSandbox {
     opts: ExecOpts,
   ): CommandSpec {
     const gitPaths = this.#gitPaths;
-    const deniedPaths = (this.#options.deniedPaths ?? []).filter((p) =>
-      !containsPath(gitPaths, p)
+    const deniedPaths = (this.#options.deniedPaths ?? []).filter(
+      (p) => !containsPath(gitPaths, p),
     );
     const allowedWrite = [...(this.#options.allowedWrite ?? [])];
     for (const p of gitPaths) {
@@ -301,22 +313,20 @@ export class BwrapSandbox implements GitAccessSandbox {
     }
 
     // Additional system paths.
-    for (
-      const p of [
-        "/etc/ld.so.cache",
-        "/etc/ssl",
-        "/etc/ca-certificates",
-        "/etc/resolv.conf",
-        "/etc/hosts",
-        "/etc/nsswitch.conf",
-      ]
-    ) {
+    for (const p of [
+      "/etc/ld.so.cache",
+      "/etc/ssl",
+      "/etc/ca-certificates",
+      "/etc/resolv.conf",
+      "/etc/hosts",
+      "/etc/nsswitch.conf",
+    ]) {
       if (existsSync(p)) args.push("--ro-bind", p, p);
     }
 
     // Home directory: tmpfs prevents access to the real home. This must be set
     // BEFORE the project bind if the project is under home.
-    const home = Deno.env.get("HOME") ?? "";
+    const home = nodeRuntime.env.get("HOME") ?? "";
     if (home !== "") args.push("--tmpfs", home);
 
     // Project directory binding (after the home tmpfs when nested under home).
@@ -358,7 +368,7 @@ export class BwrapSandbox implements GitAccessSandbox {
       let isDir = false;
       let exists = true;
       try {
-        isDir = Deno.lstatSync(p).isDirectory;
+        isDir = nodeRuntime.lstatSync(p).isDirectory;
       } catch {
         exists = false;
       }
@@ -407,13 +417,13 @@ export class BwrapSandbox implements GitAccessSandbox {
     ];
     const passVars = new Set(defaultPass);
 
-    const explicit = Deno.env.get("VIBECODING_SANDBOX_PASS_ENV") ?? "";
+    const explicit = nodeRuntime.env.get("VIBECODING_SANDBOX_PASS_ENV") ?? "";
     if (explicit !== "") {
       for (const name of explicit.split(",")) passVars.add(name.trim());
     }
 
     const env: string[] = [];
-    for (const [name, value] of Object.entries(Deno.env.toObject())) {
+    for (const [name, value] of Object.entries(nodeRuntime.env.toObject())) {
       if (passVars.has(name)) env.push(`${name}=${value}`);
     }
 
@@ -424,7 +434,7 @@ export class BwrapSandbox implements GitAccessSandbox {
     // Point HOME at the sandbox-isolated home (tmpfs over the real home) unless
     // the caller explicitly set it.
     if (!("HOME" in (opts.envVars ?? {}))) {
-      const home = Deno.env.get("HOME") ?? "";
+      const home = nodeRuntime.env.get("HOME") ?? "";
       env.push(home !== "" ? `HOME=${home}` : "HOME=/tmp");
     }
 
@@ -443,8 +453,8 @@ export function createBwrapSandbox(
 
 function existsSync(p: string, lstat = false): boolean {
   try {
-    if (lstat) Deno.lstatSync(p);
-    else Deno.statSync(p);
+    if (lstat) nodeRuntime.lstatSync(p);
+    else nodeRuntime.statSync(p);
     return true;
   } catch {
     return false;

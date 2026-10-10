@@ -5,10 +5,10 @@
 // and receives events.
 //
 // Deviations from Go: `gorilla/websocket` maps to the global `WebSocket`
-// (Deno); goroutine/channel plumbing (`readLoop`, `keepalive`, `pending`
+// (Node); goroutine/channel plumbing (`readLoop`, `keepalive`, `pending`
 // channels, `Events() <-chan`) maps to an event-loop-backed promise queue with
 // a bounded buffer and `nextEvent`; `sync.Mutex`/`atomic.Int64` are dropped
-// because Deno is single-threaded.
+// because Node is single-threaded.
 
 /** A CDP JSON message (command or response/event). */
 export interface CdpMessage {

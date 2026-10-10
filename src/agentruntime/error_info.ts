@@ -6,7 +6,7 @@
 //
 // Deviation: Go's `errors.Is(err, context.Canceled)` / `context.DeadlineExceeded`
 // map to `DOMException`/`Error` checks on `name === "AbortError"` /
-// `"TimeoutError"` because Deno has no `context` package. `net.Error` has no
+// `"TimeoutError"` because Node has no `context` package. `net.Error` has no
 // direct equivalent, so the network branch relies on the message heuristics the
 // Go branch already falls back to.
 
@@ -67,11 +67,7 @@ export const PHASE_TERMINALIZATION: RunPhase = "terminalization";
  * caller must first discover whether a previous submission exists.
  */
 export type RetryMode =
-  | "none"
-  | "automatic"
-  | "reconcile"
-  | "user"
-  | "decision_required";
+  "none" | "automatic" | "reconcile" | "user" | "decision_required";
 
 export const RETRY_NONE: RetryMode = "none";
 export const RETRY_AUTOMATIC: RetryMode = "automatic";
@@ -249,8 +245,8 @@ export function classifyError(
   if (!info.messageKey) info.messageKey = "run.error.failed";
   if (!info.retryMode) info.retryMode = retryModeForSafety(info);
   if (info.retryMode === RETRY_AUTOMATIC) info.retryMode = RETRY_USER;
-  info.retryable = info.retryMode === RETRY_USER ||
-    info.retryMode === RETRY_DECISION_REQUIRED;
+  info.retryable =
+    info.retryMode === RETRY_USER || info.retryMode === RETRY_DECISION_REQUIRED;
   if (!info.failureClass) info.failureClass = FAILURE_INTERNAL;
   return info;
 }
@@ -269,7 +265,9 @@ export function applyErrorDefaults(
   info.failureClass = cls;
   if (!info.messageKey) info.messageKey = key;
   info.retryMode = mode;
-  info.retryable = retryable || mode === RETRY_AUTOMATIC ||
+  info.retryable =
+    retryable ||
+    mode === RETRY_AUTOMATIC ||
     mode === RETRY_USER ||
     mode === RETRY_DECISION_REQUIRED;
   return info;
@@ -286,22 +284,18 @@ export function retryModeForSafety(info: ErrorInfo): RetryMode {
   return RETRY_AUTOMATIC;
 }
 
-function retryableErrorCode(
-  err: unknown,
-  status: number,
-): [string, string] {
+function retryableErrorCode(err: unknown, status: number): [string, string] {
   if (status === 429 || containsError(err, "429", "rate limit", "rate_limit")) {
     return ["rate_limited", "run.error.rateLimited"];
   }
   if (
-    status >= 500 || containsStatus(err, 500, 599) ||
+    status >= 500 ||
+    containsStatus(err, 500, 599) ||
     containsError(err, "overloaded", "server_error")
   ) {
     return ["provider_unavailable", "run.error.providerUnavailable"];
   }
-  if (
-    (status >= 400 && status < 500) || containsStatus(err, 400, 499)
-  ) {
+  if ((status >= 400 && status < 500) || containsStatus(err, 400, 499)) {
     return ["provider_request_failed", "run.error.providerRequestFailed"];
   }
   if (containsError(err, "connection", "dns", "eof")) {
@@ -363,19 +357,13 @@ const sensitiveDiagnosticPattern =
  * it before it enters durable run/session records. Provider responses are not
  * trusted to omit credentials or unbounded bodies.
  */
-export function diagnosticMessage(
-  err: unknown,
-  override?: string,
-): string {
+export function diagnosticMessage(err: unknown, override?: string): string {
   let diagnostic = trim(override);
   if (diagnostic === "" && err !== null && err !== undefined) {
     diagnostic = errorText(err).trim();
   }
   if (diagnostic === "") return "";
-  diagnostic = diagnostic.replace(
-    sensitiveDiagnosticPattern,
-    "$1$2[redacted]",
-  );
+  diagnostic = diagnostic.replace(sensitiveDiagnosticPattern, "$1$2[redacted]");
   if (diagnostic.length > maxDiagnosticLength) {
     diagnostic = diagnostic.slice(0, maxDiagnosticLength - 3) + "...";
   }

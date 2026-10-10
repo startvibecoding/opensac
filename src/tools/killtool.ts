@@ -45,10 +45,7 @@ export class KillTool implements Tool {
     };
   }
 
-  execute(
-    _ctx: ToolContext,
-    params: Record<string, unknown>,
-  ): ToolResult {
+  execute(_ctx: ToolContext, params: Record<string, unknown>): ToolResult {
     const jobIdParam = params["jobId"];
     if (typeof jobIdParam !== "number") {
       throw new Error("jobId is required");

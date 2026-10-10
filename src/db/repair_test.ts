@@ -13,9 +13,9 @@ test("describeIndexRepair names the path and quotes the cause", () => {
       cause: "database disk image is malformed",
       at: new Date("2026-01-01T00:00:00Z"),
     }),
-    `rebuilt stale SQLite indexes in /data/sessions.db after an integrity check reported ${
-      JSON.stringify("database disk image is malformed")
-    }`,
+    `rebuilt stale SQLite indexes in /data/sessions.db after an integrity check reported ${JSON.stringify(
+      "database disk image is malformed",
+    )}`,
   );
   assertEquals(
     describeIndexRepair({

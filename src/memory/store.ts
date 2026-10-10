@@ -2,6 +2,7 @@
 // Package memory implements persistent memory storage: a human-readable
 // Markdown file (memory.md) managed through the ACP management plane.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { configDir, projectPath, projectPathFor } from "../config/mod.ts";
 
@@ -16,12 +17,12 @@ export const defaultTemplate = `# Agent Memory
 `;
 
 function isNotExist(err: unknown): boolean {
-  return err instanceof Deno.errors.NotFound;
+  return err instanceof runtime.errors.NotFound;
 }
 
 function statExists(p: string): boolean {
   try {
-    Deno.statSync(p);
+    runtime.statSync(p);
     return true;
   } catch {
     return false;
@@ -99,7 +100,7 @@ export class Store {
 
     let data: string;
     try {
-      data = Deno.readTextFileSync(p);
+      data = runtime.readTextFileSync(p);
     } catch (err) {
       if (isNotExist(err)) {
         return { content: "", path: p, source };
@@ -201,8 +202,8 @@ export class Store {
 
   /** Writes content to path, creating parent dirs as needed. */
   #writeFile(p: string, content: string): void {
-    Deno.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
-    Deno.writeTextFileSync(p, content, { mode: 0o600 });
+    runtime.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
+    runtime.writeTextFileSync(p, content, { mode: 0o600 });
   }
 }
 
@@ -326,8 +327,14 @@ export function addToSection(
   const idx = content.indexOf(header);
   if (idx < 0) {
     // Section doesn't exist — append at end.
-    return trimRightNewlines(content) + "\n\n" + header + "\n\n" +
-      trimmedEntry + "\n";
+    return (
+      trimRightNewlines(content) +
+      "\n\n" +
+      header +
+      "\n\n" +
+      trimmedEntry +
+      "\n"
+    );
   }
 
   // Find the end of this section (next ## or EOF).
@@ -344,8 +351,12 @@ export function addToSection(
   if (nextSection >= 0) {
     // Insert before the next section.
     const insertPoint = sectionStart + nextSection;
-    return content.slice(0, insertPoint) + trimmedEntry + "\n" +
-      content.slice(insertPoint);
+    return (
+      content.slice(0, insertPoint) +
+      trimmedEntry +
+      "\n" +
+      content.slice(insertPoint)
+    );
   }
 
   // Append at end.

@@ -1,5 +1,5 @@
 //
-// Deno ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
+// Node ships no built-in fuzzer, so the Go fuzz target becomes a deterministic
 // property test over the same seeds plus generated inputs.
 
 import { assert } from "../compat/assert.ts";
@@ -7,9 +7,13 @@ import { sanitizeToolName } from "./mcp.ts";
 import { test } from "#testing";
 
 function* candidates(): Generator<string> {
-  for (
-    const seed of ["read_file", "MCP tool/1", "  ", "\x00name", "hello-world"]
-  ) {
+  for (const seed of [
+    "read_file",
+    "MCP tool/1",
+    "  ",
+    "\x00name",
+    "hello-world",
+  ]) {
     yield seed;
   }
   const alphabet = "abcXYZ019 _-/.\x00\u4e2d";
@@ -30,9 +34,9 @@ test("sanitizeToolName fuzz invariants", () => {
     for (const r of got) {
       assert(
         /^[a-zA-Z0-9_]$/.test(r),
-        `SanitizeToolName(${JSON.stringify(name)}) = ${
-          JSON.stringify(got)
-        } contains invalid character ${JSON.stringify(r)}`,
+        `SanitizeToolName(${JSON.stringify(name)}) = ${JSON.stringify(
+          got,
+        )} contains invalid character ${JSON.stringify(r)}`,
       );
     }
   }

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertFalse } from "../compat/assert.ts";
 import { DECISION_APPROVAL, DECISION_QUESTION } from "./decision.ts";
 import {
@@ -162,7 +163,9 @@ test("NewDecisionRecord shape by status", () => {
 });
 
 test("Load decision records by session and run", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-agentruntime-" });
+  const sessionDir = runtime.makeTempDirSync({
+    prefix: "opensac-agentruntime-",
+  });
   const sink = new SessionRunEventSink(sessionDir);
   const transitions = [
     {

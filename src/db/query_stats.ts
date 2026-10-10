@@ -1,6 +1,6 @@
 // Query-execution timing for the synchronous DAO layer.
 //
-// Go ran blocking `database/sql` calls on goroutines; the Deno port executes
+// Go ran blocking `database/sql` calls on goroutines; the Node port executes
 // every statement on the single-threaded event loop, so one slow query stalls
 // streaming, lease heartbeats, and every other session. These counters are the
 // slow-query baseline (P3-4 / §3.7): they surface the `slowQueryThresholdMs`

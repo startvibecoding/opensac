@@ -248,10 +248,7 @@ test("response DAO turn upsert, items, and replay ordering", () => {
 
     const replayItems = dao.listReplayItems(SESSION, 2);
     assertEquals(replayItems.length, 2, "the limit applies to replay items");
-    assertEquals(
-      dao.listReplayItems("other-session", 10).length,
-      0,
-    );
+    assertEquals(dao.listReplayItems("other-session", 10).length, 0);
   } finally {
     closeTestDbs();
   }
@@ -312,12 +309,10 @@ test("response DAO tool execution claim, update, reclaim, recover", () => {
       2,
       "running and interrupted rows both become retry_requested",
     );
-    const requested = dao.listRequestedToolRecoveries(
-      db,
-      SESSION,
-      "turn-1",
-      ["call-1", "call-3"],
-    );
+    const requested = dao.listRequestedToolRecoveries(db, SESSION, "turn-1", [
+      "call-1",
+      "call-3",
+    ]);
     assertEquals(
       requested.map((row) => row.executionKey),
       ["exec-1", "exec-3"],
@@ -351,10 +346,7 @@ test("response DAO tool execution claim, update, reclaim, recover", () => {
     );
     const abandoned = dao.findTool(db, "exec-4");
     assertEquals(abandoned?.executionState, "abandoned");
-    assertEquals(
-      abandoned?.completedAt,
-      "2026-01-01T00:09:00Z",
-    );
+    assertEquals(abandoned?.completedAt, "2026-01-01T00:09:00Z");
 
     assertEquals(dao.findTool(db, "missing"), undefined);
   } finally {

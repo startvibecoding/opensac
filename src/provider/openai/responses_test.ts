@@ -1,6 +1,7 @@
 // (non-session
 // cases) and the Responses API cases in provider_test.go.
 
+import { runtime } from "../../platform/runtime.ts";
 import { assert, assertEquals } from "../../compat/assert.ts";
 import { createProvider } from "../registry.ts";
 import {
@@ -64,7 +65,7 @@ function params(overrides: Partial<ChatParams> = {}): ChatParams {
 }
 
 function readResponsesFixture(name: string): string {
-  return Deno.readTextFileSync(
+  return runtime.readTextFileSync(
     new URL(`./testdata/responses/${name}`, import.meta.url),
   );
 }
@@ -359,24 +360,28 @@ test("OpenAIResponsesAPICustomToolRequestAndContinuation", () => {
   const req = buildResponsesRequest(
     p,
     params({
-      tools: [{
-        name: "shell_script",
-        description: "Execute a constrained script.",
-        kind: "custom",
-        format: { type: "grammar", syntax: "regex", definition: "[a-z]+" },
-      }],
+      tools: [
+        {
+          name: "shell_script",
+          description: "Execute a constrained script.",
+          kind: "custom",
+          format: { type: "grammar", syntax: "regex", definition: "[a-z]+" },
+        },
+      ],
       messages: [
         {
           role: "assistant",
-          contents: [{
-            type: "toolCall",
-            toolCall: {
-              id: "call_custom",
-              name: "shell_script",
-              kind: "custom",
-              input: "echo hello",
+          contents: [
+            {
+              type: "toolCall",
+              toolCall: {
+                id: "call_custom",
+                name: "shell_script",
+                kind: "custom",
+                input: "echo hello",
+              },
             },
-          }],
+          ],
           timestamp: new Date(),
         },
         (() => {
@@ -416,23 +421,17 @@ test("OpenAIResponsesAPICustomToolContentListOutput", () => {
   const p = createOpenAIProvider("fake-key", "https://api.test/v1", [
     model("responses-test"),
   ]);
-  const result = createToolResultMessage(
-    "call-custom",
-    "render",
-    "",
-    false,
-    [
-      { type: "text", text: "preview" },
-      {
-        type: "image",
-        image: { mimeType: "image/png", data: "aW1n", detail: "low" },
-      },
-      {
-        type: "file",
-        file: { id: "file_123", filename: "report.csv" },
-      },
-    ],
-  );
+  const result = createToolResultMessage("call-custom", "render", "", false, [
+    { type: "text", text: "preview" },
+    {
+      type: "image",
+      image: { mimeType: "image/png", data: "aW1n", detail: "low" },
+    },
+    {
+      type: "file",
+      file: { id: "file_123", filename: "report.csv" },
+    },
+  ]);
   result.toolKind = "custom";
   const items = convertResponsesInput(p, params({ messages: [result] }));
   assertEquals(items.length, 1);
@@ -460,12 +459,14 @@ test("OpenAIResponsesAPIRejectsInvalidCustomToolFormat", () => {
       p,
       p.getModel("responses-test"),
       params({
-        tools: [{
-          name: "shell_script",
-          description: "",
-          kind: "custom",
-          format: { type: "grammar", syntax: "invalid", definition: "x" },
-        }],
+        tools: [
+          {
+            name: "shell_script",
+            description: "",
+            kind: "custom",
+            format: { type: "grammar", syntax: "invalid", definition: "x" },
+          },
+        ],
       }),
     );
   } catch (err) {
@@ -630,12 +631,10 @@ test("OpenAIResponsesAPISupportsDoneOnlyTextEvent", async () => {
   const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   p.setUseResponsesAPI(true);
   let text = "";
-  for (
-    const event of await chatAndCollect(
-      p,
-      params({ messages: [createUserMessage("hello")] }),
-    )
-  ) {
+  for (const event of await chatAndCollect(
+    p,
+    params({ messages: [createUserMessage("hello")] }),
+  )) {
     if (event.type === streamTextDelta) text += event.textDelta;
   }
   assertEquals(text, "done-only");
@@ -648,12 +647,10 @@ test("OpenAIResponsesAPISupportsDoneOnlyRefusalEvent", async () => {
   const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
   p.setUseResponsesAPI(true);
   let text = "";
-  for (
-    const event of await chatAndCollect(
-      p,
-      params({ messages: [createUserMessage("hello")] }),
-    )
-  ) {
+  for (const event of await chatAndCollect(
+    p,
+    params({ messages: [createUserMessage("hello")] }),
+  )) {
     if (event.type === streamTextDelta) text += event.textDelta;
   }
   assertEquals(text, "cannot comply");
@@ -669,15 +666,13 @@ test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
   );
   p.setUseResponsesAPI(true);
   let reasoning = "";
-  for (
-    const event of await chatAndCollect(
-      p,
-      params({
-        messages: [createUserMessage("hello")],
-        thinkingLevel: thinkingLow,
-      }),
-    )
-  ) {
+  for (const event of await chatAndCollect(
+    p,
+    params({
+      messages: [createUserMessage("hello")],
+      thinkingLevel: thinkingLow,
+    }),
+  )) {
     if (event.type === streamThinkDelta) reasoning += event.thinkDelta;
   }
   assertEquals(reasoning, "think-only");
@@ -685,13 +680,15 @@ test("OpenAIResponsesAPISupportsDoneOnlyReasoningEvent", async () => {
 
 test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
   const { provider: p, requests } = createMockOpenAIProvider(
-    [model("responses-test", {
-      reasoning: true,
-      compat: {
-        supportsPromptCacheKey: false,
-        supportsReasoningSummary: false,
-      },
-    })],
+    [
+      model("responses-test", {
+        reasoning: true,
+        compat: {
+          supportsPromptCacheKey: false,
+          supportsReasoningSummary: false,
+        },
+      }),
+    ],
     "data: [DONE]\n",
   );
   p.setUseResponsesAPI(true);
@@ -711,9 +708,11 @@ test("OpenAIResponsesAPICompatDisablesOptionalParams", async () => {
 
 test("OpenAIResponsesAPILongCacheRetentionCompat", async () => {
   const { provider: p } = createMockOpenAIProvider(
-    [model("responses-test", {
-      compat: { supportsLongCacheRetention: false },
-    })],
+    [
+      model("responses-test", {
+        compat: { supportsLongCacheRetention: false },
+      }),
+    ],
     "data: [DONE]\n",
   );
   p.setUseResponsesAPI(true);

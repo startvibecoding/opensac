@@ -10,8 +10,16 @@
 // to `Uint8Array`; `io.ReadCloser` maps to a byte buffer; `context.Context`
 // maps to the optional `AbortSignal` threaded by `InputIngress.open`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import { createHash } from "node:crypto";
-import { isAbsolute, join, relative, resolve, SEPARATOR } from "../compat/path.ts";
+import {
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  SEPARATOR,
+} from "../compat/path.ts";
 import { decodeBase64 } from "../compat/encoding.ts";
 import {
   ATTACHMENT_AUDIO,
@@ -93,7 +101,8 @@ export function promptToIngresses(
         break;
       case "resource_link": {
         if (
-          (block.name ?? "").trim() === "" || (block.uri ?? "").trim() === ""
+          (block.name ?? "").trim() === "" ||
+          (block.uri ?? "").trim() === ""
         ) {
           throw new ACPPromptContentError(
             "resource_link requires name and uri",
@@ -119,7 +128,8 @@ export function promptToIngresses(
       }
       case "resource": {
         if (
-          (block.data ?? "").trim() === "" && (block.uri ?? "").trim() !== ""
+          (block.data ?? "").trim() === "" &&
+          (block.uri ?? "").trim() !== ""
         ) {
           const path = resolveACPResourcePath(
             block.uri ?? "",
@@ -185,15 +195,15 @@ export function resolveACPResourcePath(
   resourcePath = resolve(resourcePath);
   let resolved: string;
   try {
-    resolved = Deno.realPathSync(resourcePath);
+    resolved = nodeRuntime.realPathSync(resourcePath);
   } catch (error) {
     throw new ACPPromptContentError(
       `resolve resource path: ${errorMessage(error)}`,
     );
   }
-  let info: Deno.FileInfo;
+  let info: FileInfo;
   try {
-    info = Deno.statSync(resolved);
+    info = nodeRuntime.statSync(resolved);
   } catch (error) {
     throw new ACPPromptContentError(
       `stat resource path: ${errorMessage(error)}`,
@@ -207,14 +217,12 @@ export function resolveACPResourcePath(
     if (root.trim() === "") continue;
     let rootResolved = resolve(root);
     try {
-      rootResolved = Deno.realPathSync(rootResolved);
+      rootResolved = nodeRuntime.realPathSync(rootResolved);
     } catch {
       continue;
     }
     const rel = relative(rootResolved, resolved);
-    if (
-      rel !== ".." && !rel.startsWith(`..${SEPARATOR}`) && !isAbsolute(rel)
-    ) {
+    if (rel !== ".." && !rel.startsWith(`..${SEPARATOR}`) && !isAbsolute(rel)) {
       return resolved;
     }
   }
@@ -236,9 +244,9 @@ export function localACPIngress(
   index: number,
   reference: string,
 ): InputIngress {
-  let info: Deno.FileInfo;
+  let info: FileInfo;
   try {
-    info = Deno.statSync(path);
+    info = nodeRuntime.statSync(path);
   } catch (error) {
     throw new ACPPromptContentError(errorMessage(error));
   }
@@ -262,7 +270,7 @@ export function localACPIngress(
     mediaTypeHint: mediaType,
     sizeHint,
     open: async () => {
-      const bytes = await Deno.readFile(path);
+      const bytes = await nodeRuntime.readFile(path);
       return {
         bytes,
         filename: resolvedName,
@@ -394,9 +402,11 @@ export function acpPromptRequestSnapshot(
   return JSON.stringify({ text, resources, knowledge });
 }
 
-function parseResourceURI(
-  rawURI: string,
-): { scheme: string; host: string; path: string } {
+function parseResourceURI(rawURI: string): {
+  scheme: string;
+  host: string;
+  path: string;
+} {
   const schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(rawURI);
   if (schemeMatch === null) {
     return { scheme: "", host: "", path: decodePath(rawURI) };

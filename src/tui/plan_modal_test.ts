@@ -1,7 +1,12 @@
 // Ctrl+T plan modal: shows the current task plan in the same framed box as
 // the Ctrl+O tool modal.
 
-import { assert, assertEquals, assertStringIncludes } from "../compat/assert.ts";
+import { runtime } from "../platform/runtime.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "../compat/assert.ts";
 import { AppController } from "./app_controller.ts";
 import { Translator } from "./i18n.ts";
 import { TUISession } from "./tui_session.ts";
@@ -36,7 +41,7 @@ function harness(): {
       model: settings.defaultModel ?? "",
       mode: "yolo",
       thinking: "",
-      workDir: Deno.cwd(),
+      workDir: runtime.cwd(),
       version: "test",
     },
     createFakeTUIService(),

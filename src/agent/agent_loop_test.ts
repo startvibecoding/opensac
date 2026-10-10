@@ -5,6 +5,7 @@
 // success, and a run cancelled during the member wait terminalizes as
 // canceled).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { type Provider } from "../provider/provider.ts";
 import {
@@ -86,11 +87,11 @@ class ScriptedProvider implements Provider {
   }
 }
 
-async function collectTerminal(
-  events: AsyncIterable<Event>,
-): Promise<
-  { status: TaskStatus | undefined; reason: string; errorEvent: boolean }
-> {
+async function collectTerminal(events: AsyncIterable<Event>): Promise<{
+  status: TaskStatus | undefined;
+  reason: string;
+  errorEvent: boolean;
+}> {
   let status: TaskStatus | undefined;
   let reason = "";
   let errorEvent = false;
@@ -106,18 +107,23 @@ async function collectTerminal(
 }
 
 test("loop reports truncated output as incomplete", async () => {
-  const provider = new ScriptedProvider([[
-    { type: streamStart },
-    { type: streamTextDelta, textDelta: "partial answer that was cut off" },
-    { type: streamDone, stopReason: "length" },
-  ]]);
-  const agent: Agent = createAgentWithLoopConfig({
-    id: "truncated",
-    provider,
-    model: provider.models()[0],
-    mode: "yolo",
-    maxTokensUserSet: true,
-  }, createRegistry(Deno.makeTempDirSync(), undefined));
+  const provider = new ScriptedProvider([
+    [
+      { type: streamStart },
+      { type: streamTextDelta, textDelta: "partial answer that was cut off" },
+      { type: streamDone, stopReason: "length" },
+    ],
+  ]);
+  const agent: Agent = createAgentWithLoopConfig(
+    {
+      id: "truncated",
+      provider,
+      model: provider.models()[0],
+      mode: "yolo",
+      maxTokensUserSet: true,
+    },
+    createRegistry(runtime.makeTempDirSync(), undefined),
+  );
 
   const { status, reason } = await collectTerminal(
     agent.run("write a very long answer"),
@@ -141,22 +147,25 @@ test("loop marks a recovered turn a success", async () => {
     ],
   ]);
   let drains = 0;
-  const agent = createAgentWithLoopConfig({
-    id: "lead",
-    provider,
-    model: provider.models()[0],
-    mode: "yolo",
-    maxTokensUserSet: true,
-    getFollowUpMessages: () => {
-      drains++;
-      if (drains === 1) {
-        return [
-          createSystemInjectedUserMessage("[MEMBER_COMPLETION] finished"),
-        ];
-      }
-      return [];
+  const agent = createAgentWithLoopConfig(
+    {
+      id: "lead",
+      provider,
+      model: provider.models()[0],
+      mode: "yolo",
+      maxTokensUserSet: true,
+      getFollowUpMessages: () => {
+        drains++;
+        if (drains === 1) {
+          return [
+            createSystemInjectedUserMessage("[MEMBER_COMPLETION] finished"),
+          ];
+        }
+        return [];
+      },
     },
-  }, createRegistry(Deno.makeTempDirSync(), undefined));
+    createRegistry(runtime.makeTempDirSync(), undefined),
+  );
 
   const { status, reason, errorEvent } = await collectTerminal(
     agent.run("start"),
@@ -168,22 +177,27 @@ test("loop marks a recovered turn a success", async () => {
 });
 
 test("run cancelled during member wait terminalizes as canceled", async () => {
-  const provider = new ScriptedProvider([[
-    { type: streamStart },
-    { type: streamTextDelta, textDelta: "lead turn" },
-    { type: streamDone, stopReason: "stop" },
-  ]]);
+  const provider = new ScriptedProvider([
+    [
+      { type: streamStart },
+      { type: streamTextDelta, textDelta: "lead turn" },
+      { type: streamDone, stopReason: "stop" },
+    ],
+  ]);
   const mailbox = createMemberMailbox();
   mailbox.setRunningPredicate(() => true);
   const followUps = composeFollowUps(mailbox, undefined);
   const controller = new AbortController();
-  const agent = createAgentWithLoopConfig({
-    id: "lead",
-    provider,
-    model: provider.models()[0],
-    mode: "yolo",
-    getFollowUpMessages: (ctx) => followUps?.(ctx.signal) ?? null,
-  }, createRegistry(Deno.makeTempDirSync(), undefined));
+  const agent = createAgentWithLoopConfig(
+    {
+      id: "lead",
+      provider,
+      model: provider.models()[0],
+      mode: "yolo",
+      getFollowUpMessages: (ctx) => followUps?.(ctx.signal) ?? null,
+    },
+    createRegistry(runtime.makeTempDirSync(), undefined),
+  );
 
   setTimeout(() => controller.abort(), 200);
   const { status, reason } = await collectTerminal(

@@ -9,17 +9,9 @@
 // and removed (they had no remaining callers or tests).
 
 export type ActivityStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "error"
-  | "interrupted";
+  "pending" | "running" | "completed" | "error" | "interrupted";
 export type ActivityType =
-  | "tool"
-  | "thinking"
-  | "intermediate"
-  | "status"
-  | "plan";
+  "tool" | "thinking" | "intermediate" | "status" | "plan";
 
 export interface ActivityItem {
   id: string;

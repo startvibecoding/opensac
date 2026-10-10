@@ -131,7 +131,7 @@ const stateColumns = `session_id AS sessionId, state_mode AS stateMode,
   updated_at AS updatedAt`;
 
 export class ResponseDAO {
-    private readonly db: DB | null;
+  private readonly db: DB | null;
 
   constructor(db: DB | null) {
     this.db = db;
@@ -467,10 +467,7 @@ export class ResponseDAO {
     );
   }
 
-  insertSessionState(
-    executor: DB,
-    record: ResponseSessionStateRecord,
-  ): number {
+  insertSessionState(executor: DB, record: ResponseSessionStateRecord): number {
     return execChanges(
       executor,
       `INSERT INTO response_session_state

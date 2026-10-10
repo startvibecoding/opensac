@@ -48,7 +48,7 @@ test("ParseAuditReport rejects invalid verdict", () => {
 
 test("ParseAuditReport pass", () => {
   const report = parseAuditReport(
-    '{"verdict":"pass","review":"verified","requirements_checked":["req -> ok"],"missing_work":[],"evidence":["deno test"]}',
+    '{"verdict":"pass","review":"verified","requirements_checked":["req -> ok"],"missing_work":[],"evidence":["npm test"]}',
   );
   assertEquals(report.verdict, auditVerdictPass);
   assertEquals(report.review, "verified");
@@ -57,7 +57,7 @@ test("ParseAuditReport pass", () => {
 
 test("ParseRecoveryReport", () => {
   const report = parseRecoveryReport(
-    '{"decision":"resume","summary":"tests show the partial change is valid","evidence":["deno test ./..."],"remaining_work":["finish docs"],"blockers":[]}',
+    '{"decision":"resume","summary":"tests show the partial change is valid","evidence":["npm test ./..."],"remaining_work":["finish docs"],"blockers":[]}',
   );
   assertEquals(report.decision, recoveryDecisionResume);
   assert(report.summary !== "");

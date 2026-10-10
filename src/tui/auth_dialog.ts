@@ -15,13 +15,15 @@
 // the live session.
 //
 
+import { runtime } from "../platform/runtime.ts";
 import {
   type ModelCompat,
   type ModelConfig,
   type ProviderConfig,
   type ResponsesConfig,
   type ResponsesToolControlConfig,
-  type Settings} from "../config/settings.ts";
+  type Settings,
+} from "../config/settings.ts";
 import { defaultProviderConfigsAll } from "../config/settings.ts";
 import { presetModelConfig } from "../config/model_preset.ts";
 import { type DialogItem, type DialogPage } from "./dialog.ts";
@@ -195,14 +197,12 @@ const CREDENTIAL_FIELDS = fields(
   },
 );
 
-const PROTOCOL_FIELDS = fields(
-  {
-    label: "auth.field.base_url",
-    kind: "text",
-    store: "provider",
-    key: "baseUrl",
-  },
-);
+const PROTOCOL_FIELDS = fields({
+  label: "auth.field.base_url",
+  kind: "text",
+  store: "provider",
+  key: "baseUrl",
+});
 
 const NETWORK_FIELDS = fields(
   {
@@ -327,14 +327,12 @@ const MODEL_SAMPLING_FIELDS = fields(
   { label: "auth.field.top_p", kind: "float", store: "model", key: "topP" },
 );
 
-const MODEL_COST_FIELDS = fields(
-  {
-    label: "auth.field.cost_enabled",
-    kind: "bool",
-    store: "model",
-    key: "costEnabled",
-  },
-);
+const MODEL_COST_FIELDS = fields({
+  label: "auth.field.cost_enabled",
+  kind: "bool",
+  store: "model",
+  key: "costEnabled",
+});
 
 const MODEL_COST_DETAIL_FIELDS = fields(
   {
@@ -724,8 +722,8 @@ export class AuthDialog {
           hint: this.#fetchingModels
             ? tr.text("dialog.auth.fetch_models_loading")
             : this.#fetchError !== ""
-            ? this.#fetchError
-            : hint,
+              ? this.#fetchError
+              : hint,
           error: this.#error,
           items: this.fetchModelItems(),
         };
@@ -741,7 +739,8 @@ export class AuthDialog {
       default: {
         // Field-table views.
         const specs = FIELD_TABLE[this.#view] ?? [];
-        const includeCostDetails = this.#view === "model-cost" &&
+        const includeCostDetails =
+          this.#view === "model-cost" &&
           this.#currentModel()?.costEnabled === true;
         const allSpecs = includeCostDetails
           ? [...specs, ...MODEL_COST_DETAIL_FIELDS]
@@ -751,13 +750,14 @@ export class AuthDialog {
           hint,
           error: this.#error,
           items: [...this.fieldItems(allSpecs), this.#backItem()],
-          input: this.#paramField !== ""
-            ? {
-              prompt: tr.text(this.activeFieldLabel()),
-              value: this.#panel.inputValue,
-              masked: this.activeFieldMasks(),
-            }
-            : undefined,
+          input:
+            this.#paramField !== ""
+              ? {
+                  prompt: tr.text(this.activeFieldLabel()),
+                  value: this.#panel.inputValue,
+                  masked: this.activeFieldMasks(),
+                }
+              : undefined,
         };
       }
     }
@@ -840,12 +840,12 @@ export class AuthDialog {
 
   private credentialsSummary(): string {
     const tr = this.#host.translator;
-    const key = this.#provider.apiKey !== ""
-      ? maskSecret(this.#provider.apiKey)
-      : tr.text("auth.value.empty");
-    const vendor = this.#provider.vendor !== ""
-      ? `  vendor=${this.#provider.vendor}`
-      : "";
+    const key =
+      this.#provider.apiKey !== ""
+        ? maskSecret(this.#provider.apiKey)
+        : tr.text("auth.value.empty");
+    const vendor =
+      this.#provider.vendor !== "" ? `  vendor=${this.#provider.vendor}` : "";
     return `key=${key}${vendor}`;
   }
 
@@ -855,9 +855,10 @@ export class AuthDialog {
 
   private networkSummary(): string {
     const tr = this.#host.translator;
-    const proxy = this.#provider.httpProxy !== ""
-      ? shortUrl(this.#provider.httpProxy)
-      : tr.text("auth.value.none");
+    const proxy =
+      this.#provider.httpProxy !== ""
+        ? shortUrl(this.#provider.httpProxy)
+        : tr.text("auth.value.none");
     const h1 = this.#provider.forceHTTP11
       ? tr.text("auth.value.force_h1")
       : tr.text("auth.value.http2");
@@ -866,9 +867,10 @@ export class AuthDialog {
 
   private advancedSummary(): string {
     const tr = this.#host.translator;
-    const think = this.#provider.thinkingFormat !== ""
-      ? `  think=${this.#provider.thinkingFormat}`
-      : "";
+    const think =
+      this.#provider.thinkingFormat !== ""
+        ? `  think=${this.#provider.thinkingFormat}`
+        : "";
     const cache = triLabel(this.#provider.cacheControl, tr);
     const images = imageLimitLabel(this.#provider.maxImagesPerRequest);
     return `cache=${cache}  images=${images}${think}`;
@@ -908,10 +910,12 @@ export class AuthDialog {
     const tr = this.#host.translator;
     if (this.#fetchingModels) return [];
     if (this.#fetchedModels.length === 0) {
-      return [{
-        label: tr.text("dialog.auth.fetch_models_empty"),
-        value: "_empty",
-      }];
+      return [
+        {
+          label: tr.text("dialog.auth.fetch_models_empty"),
+          value: "_empty",
+        },
+      ];
     }
     return this.#fetchedModels.map((m) => ({
       label: m.id,
@@ -927,16 +931,16 @@ export class AuthDialog {
     return [
       {
         label: tr.text("auth.m_group.basics"),
-        description: `ctx=${intAuto(m.contextWindow)} max=${
-          intAuto(m.maxTokens)
-        }`,
+        description: `ctx=${intAuto(m.contextWindow)} max=${intAuto(
+          m.maxTokens,
+        )}`,
         value: "model-basics",
       },
       {
         label: tr.text("auth.m_group.capabilities"),
-        description: `${m.reasoning ? "reasoning " : ""}in=${
-          m.input.join(",")
-        }`,
+        description: `${m.reasoning ? "reasoning " : ""}in=${m.input.join(
+          ",",
+        )}`,
         value: "model-capabilities",
       },
       {
@@ -1224,9 +1228,10 @@ export class AuthDialog {
       if (trimmed === "") {
         store[key] = spec.kind === "float" ? null : 0;
       } else {
-        const parsed = spec.kind === "int"
-          ? Number.parseInt(trimmed, 10)
-          : Number.parseFloat(trimmed);
+        const parsed =
+          spec.kind === "int"
+            ? Number.parseInt(trimmed, 10)
+            : Number.parseFloat(trimmed);
         if (Number.isNaN(parsed)) {
           this.#error = tr.text(
             spec.kind === "int"
@@ -1302,7 +1307,7 @@ export class AuthDialog {
       let resolvedKey = apiKey;
       const envMatch = apiKey.match(/^\$\{([^}]+)}$/);
       if (envMatch) {
-        resolvedKey = Deno.env.get(envMatch[1]) ?? "";
+        resolvedKey = runtime.env.get(envMatch[1]) ?? "";
       }
 
       const api = this.#provider.api;
@@ -1432,9 +1437,8 @@ function responsesDraftFrom(cfg: ResponsesConfig | undefined): ResponsesDraft {
   const draft = blankResponses();
   if (cfg === undefined) return draft;
   draft.reasoningSummary = cfg.reasoningSummary ?? "";
-  draft.promptCacheEnabled = cfg.promptCacheEnabled === undefined
-    ? null
-    : cfg.promptCacheEnabled;
+  draft.promptCacheEnabled =
+    cfg.promptCacheEnabled === undefined ? null : cfg.promptCacheEnabled;
   draft.promptCacheKey = cfg.promptCacheKey ?? "";
   draft.promptCacheRetention = cfg.promptCacheRetention ?? "";
   draft.stateMode = cfg.stateMode ?? "";
@@ -1445,9 +1449,8 @@ function responsesDraftFrom(cfg: ResponsesConfig | undefined): ResponsesDraft {
   draft.include = [...(cfg.include ?? [])];
   draft.serviceTier = cfg.serviceTier ?? "";
   draft.toolChoice = cfg.toolControl?.choice ?? "";
-  draft.toolParallel = cfg.toolControl?.parallel === undefined
-    ? null
-    : cfg.toolControl.parallel;
+  draft.toolParallel =
+    cfg.toolControl?.parallel === undefined ? null : cfg.toolControl.parallel;
   draft.toolMaxCalls = cfg.toolControl?.maxCalls ?? 0;
   return draft;
 }
@@ -1579,9 +1582,8 @@ function responsesConfigFromDraft(draft: ResponsesDraft): ResponsesConfig {
   if (draft.toolMaxCalls > 0) toolControl.maxCalls = draft.toolMaxCalls;
   return {
     reasoningSummary: draft.reasoningSummary,
-    promptCacheEnabled: draft.promptCacheEnabled === null
-      ? undefined
-      : draft.promptCacheEnabled,
+    promptCacheEnabled:
+      draft.promptCacheEnabled === null ? undefined : draft.promptCacheEnabled,
     promptCacheKey: draft.promptCacheKey,
     promptCacheRetention: draft.promptCacheRetention,
     stateMode: draft.stateMode,
@@ -1648,7 +1650,8 @@ function compatConfigFromDraft(draft: CompatDraft): ModelCompat | undefined {
 }
 
 function hasAnyCompatValue(draft: CompatDraft): boolean {
-  return draft.thinkingFormat !== "" ||
+  return (
+    draft.thinkingFormat !== "" ||
     draft.requiresReasoningContentOnAssistant ||
     draft.requiresReasoningContentOnAssistantMessages ||
     draft.forceAdaptiveThinking ||
@@ -1666,7 +1669,8 @@ function hasAnyCompatValue(draft: CompatDraft): boolean {
     draft.sendSessionAffinityHeaders ||
     draft.supportsEagerToolInputStreaming !== null ||
     draft.supportsToolChoice !== null ||
-    draft.supportsParallelToolCalls !== null;
+    draft.supportsParallelToolCalls !== null
+  );
 }
 
 // ── value formatting ────────────────────────────────────────────────────────
@@ -1718,8 +1722,10 @@ function shortUrl(s: string): string {
 }
 
 function modelSummary(m: ModelDraft): string {
-  return `ctx=${intAuto(m.contextWindow)} max=${intAuto(m.maxTokens)}` +
-    `${m.reasoning ? " reasoning" : ""}`;
+  return (
+    `ctx=${intAuto(m.contextWindow)} max=${intAuto(m.maxTokens)}` +
+    `${m.reasoning ? " reasoning" : ""}`
+  );
 }
 
 function compatSummary(c: CompatDraft, tr: AuthTranslator): string {
@@ -1762,7 +1768,10 @@ function formatInputInitial(spec: FieldSpec, value: unknown): string {
 
 function parseTextValue(spec: FieldSpec, value: string): unknown {
   if (spec.key === "input") {
-    return value.split(",").map((s) => s.trim()).filter((s) => s !== "");
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s !== "");
   }
   return value;
 }

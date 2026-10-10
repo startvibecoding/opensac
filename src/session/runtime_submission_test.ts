@@ -1,5 +1,6 @@
 // Test for the ported internal/session/runtime_submission.go admission surface.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assertEquals, assertThrows } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { writeRootDatabase } from "./database.ts";
@@ -27,11 +28,12 @@ function runInput(
 }
 
 test("runtime submission reserve and lookup", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-session-",
+  });
   try {
-    writeRootDatabase(
-      sessionDir,
-      (tx) => reserveRuntimeSubmissionTx(tx, runInput({})),
+    writeRootDatabase(sessionDir, (tx) =>
+      reserveRuntimeSubmissionTx(tx, runInput({})),
     );
 
     const found = getRuntimeSubmission(
@@ -54,9 +56,8 @@ test("runtime submission reserve and lookup", () => {
     // An identical replay is a non-conflicting duplicate.
     const replay = assertThrows(
       () =>
-        writeRootDatabase(
-          sessionDir,
-          (tx) => reserveRuntimeSubmissionTx(tx, runInput({ id: "run-2" })),
+        writeRootDatabase(sessionDir, (tx) =>
+          reserveRuntimeSubmissionTx(tx, runInput({ id: "run-2" })),
         ),
       RuntimeSubmissionError,
     );
@@ -70,7 +71,8 @@ test("runtime submission reserve and lookup", () => {
           reserveRuntimeSubmissionTx(
             tx,
             runInput({ id: "run-3", submissionFingerprint: "fp-2" }),
-          )),
+          ),
+        ),
       RuntimeSubmissionError,
     );
     assertEquals((conflict as RuntimeSubmissionError).conflict, true);

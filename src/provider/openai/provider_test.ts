@@ -245,17 +245,21 @@ test("ConvertMessagesToolResultUsesTextContents", () => {
   );
   const messages = p.convertMessages(
     params({
-      messages: [{
-        role: "toolResult",
-        toolCallId: "call_1",
-        toolName: "bash",
-        contents: [{
-          type: "text",
-          text: "bash output from content block",
-          cache_control: { type: "ephemeral" },
-        }],
-        timestamp: new Date(),
-      }],
+      messages: [
+        {
+          role: "toolResult",
+          toolCallId: "call_1",
+          toolName: "bash",
+          contents: [
+            {
+              type: "text",
+              text: "bash output from content block",
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          timestamp: new Date(),
+        },
+      ],
     }),
     false,
   );
@@ -277,14 +281,16 @@ test("ConvertMessagesToolResultIncludesKimiToolName", () => {
   const messages = p.convertMessages(
     params({
       messages: [
-        createAssistantToolCall([{
-          type: "toolCall",
-          toolCall: {
-            id: "read:2",
-            name: "read",
-            arguments: { path: "main.go" },
+        createAssistantToolCall([
+          {
+            type: "toolCall",
+            toolCall: {
+              id: "read:2",
+              name: "read",
+              arguments: { path: "main.go" },
+            },
           },
-        }]),
+        ]),
         {
           role: "toolResult",
           toolCallId: "read:2",
@@ -335,18 +341,22 @@ test("ConvertMessagesImageDetailForOfficialProviders", async (t) => {
       const p = new Provider("openai", "", tt.baseURL, [], dummyClient());
       const messages = p.convertMessages(
         params({
-          messages: [{
-            role: "user",
-            contents: [{
-              type: "image",
-              image: {
-                mimeType: "image/png",
-                data: "abc123",
-                detail: tt.detail,
-              },
-            }],
-            timestamp: new Date(),
-          }],
+          messages: [
+            {
+              role: "user",
+              contents: [
+                {
+                  type: "image",
+                  image: {
+                    mimeType: "image/png",
+                    data: "abc123",
+                    detail: tt.detail,
+                  },
+                },
+              ],
+              timestamp: new Date(),
+            },
+          ],
         }),
         false,
       );
@@ -364,10 +374,12 @@ function imageMessages(count: number): Message[] {
   for (let i = 0; i < count; i++) {
     out.push({
       role: "user",
-      contents: [{
-        type: "image",
-        image: { mimeType: "image/png", data: `image-${i}` },
-      }],
+      contents: [
+        {
+          type: "image",
+          image: { mimeType: "image/png", data: `image-${i}` },
+        },
+      ],
       timestamp: new Date(),
     });
   }
@@ -433,7 +445,7 @@ test("OpenAICustomHeaders", async () => {
   );
   p.setHeaders({
     "X-Custom-Header": "custom-value",
-    "Authorization": "Bearer override-key",
+    Authorization: "Bearer override-key",
   });
   await chatAndCollect(
     p,
@@ -478,11 +490,13 @@ test("OpenAIChatParallelToolCallsRequest", async (t) => {
       const chatParams = params({
         modelId: "chat-test",
         messages: [createUserMessage("use the tool")],
-        tools: [{
-          name: "read",
-          description: "",
-          parameters: { type: "object" },
-        }],
+        tools: [
+          {
+            name: "read",
+            description: "",
+            parameters: { type: "object" },
+          },
+        ],
       });
       if (tt.responseValue !== undefined) {
         chatParams.responseOptions = { parallelTools: tt.responseValue };
@@ -507,26 +521,34 @@ test("OpenAIChatParsesMultipleToolCalls", async () => {
     name: string,
     args: string,
   ): string => {
-    return "data: " + JSON.stringify({
-      choices: [{
-        delta: {
-          tool_calls: [{
-            index,
-            id,
-            type: "function",
-            function: { name, arguments: args },
-          }],
-        },
-      }],
-    });
+    return (
+      "data: " +
+      JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index,
+                  id,
+                  type: "function",
+                  function: { name, arguments: args },
+                },
+              ],
+            },
+          },
+        ],
+      })
+    );
   };
-  const sse = [
-    toolChunk(0, "call_0", "read", `{"path":"a`),
-    toolChunk(1, "call_1", "read", `{"path":"b`),
-    toolChunk(0, "", "", `"}`),
-    toolChunk(1, "", "", `"}`),
-    "data: [DONE]",
-  ].join("\n") + "\n";
+  const sse =
+    [
+      toolChunk(0, "call_0", "read", `{"path":"a`),
+      toolChunk(1, "call_1", "read", `{"path":"b`),
+      toolChunk(0, "", "", `"}`),
+      toolChunk(1, "", "", `"}`),
+      "data: [DONE]",
+    ].join("\n") + "\n";
   const { provider: p } = createMockOpenAIProvider([model("chat-test")], sse);
   const events = await chatAndCollect(
     p,
@@ -535,9 +557,9 @@ test("OpenAIChatParsesMultipleToolCalls", async () => {
       messages: [createUserMessage("read both files")],
     }),
   );
-  const calls = events.filter((e) => e.type === streamToolCall).map((e) =>
-    e.toolCall!
-  );
+  const calls = events
+    .filter((e) => e.type === streamToolCall)
+    .map((e) => e.toolCall!);
   assertEquals(calls.length, 2);
   assertEquals(calls[0].id, "call_0");
   assertEquals(calls[0].name, "read");
@@ -595,36 +617,33 @@ test("QwenThinkingBudget", () => {
 });
 
 test("IsQwenModel", () => {
-  for (
-    const id of [
-      "qwen3.6-flash",
-      "qwen3.6-plus",
-      "qwen3.7-plus",
-      "qwen3.7-max",
-      "qwen3.8-max-preview",
-      "qwen/qwen3.7-plus",
-      "Qwen3.6-Max",
-    ]
-  ) {
+  for (const id of [
+    "qwen3.6-flash",
+    "qwen3.6-plus",
+    "qwen3.7-plus",
+    "qwen3.7-max",
+    "qwen3.8-max-preview",
+    "qwen/qwen3.7-plus",
+    "Qwen3.6-Max",
+  ]) {
     assertEquals(isQwenModel(id), true);
   }
-  for (
-    const id of [
-      "qwen3-coder-plus",
-      "qwen3-max-2026-01-23",
-      "qwen2.5-72b",
-      "deepseek-v4-flash",
-      "glm-5",
-    ]
-  ) {
+  for (const id of [
+    "qwen3-coder-plus",
+    "qwen3-max-2026-01-23",
+    "qwen2.5-72b",
+    "deepseek-v4-flash",
+    "glm-5",
+  ]) {
     assertEquals(isQwenModel(id), false);
   }
 });
 
 test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("deepseek-test", { reasoning: true }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [model("deepseek-test", { reasoning: true })],
+    "data: [DONE]\n",
+  );
   p.baseURL = p.baseURL + "/deepseek";
   let body = "";
   p.client = mockClient((req) => {
@@ -645,9 +664,10 @@ test("OpenAIThinkingFormatDeepSeekAutoDetect", async () => {
 });
 
 test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("deepseek-v4-flash", { reasoning: true }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [model("deepseek-v4-flash", { reasoning: true })],
+    "data: [DONE]\n",
+  );
   p.baseURL = p.baseURL + "/deepseek";
   let body = "";
   p.client = mockClient((req) => {
@@ -668,12 +688,15 @@ test("OpenAIThinkingFormatDeepSeekHighEffort", async () => {
 });
 
 test("OpenAIThinkingFormatFromModelCompat", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("compat-test", {
-      reasoning: true,
-      compat: { thinkingFormat: "deepseek" },
-    }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [
+      model("compat-test", {
+        reasoning: true,
+        compat: { thinkingFormat: "deepseek" },
+      }),
+    ],
+    "data: [DONE]\n",
+  );
   let body = "";
   p.client = mockClient((req) => {
     body = req.body;
@@ -721,9 +744,10 @@ test("OpenAIThinkingFormatQwen", async (t) => {
   ];
   for (const tc of cases) {
     await t.step(tc.name, async () => {
-      const { provider: p } = createMockOpenAIProvider([
-        model(tc.modelID, { reasoning: true }),
-      ], "data: [DONE]\n");
+      const { provider: p } = createMockOpenAIProvider(
+        [model(tc.modelID, { reasoning: true })],
+        "data: [DONE]\n",
+      );
       let body = "";
       p.client = mockClient((req) => {
         body = req.body;
@@ -749,9 +773,10 @@ test("OpenAIThinkingFormatQwen", async (t) => {
 // ─── max tokens / compat fields ──────────────────────────────────────────────
 
 test("OpenAIOmitsMaxTokensByDefault", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("gpt-test", { maxTokens: 64000 }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [model("gpt-test", { maxTokens: 64000 })],
+    "data: [DONE]\n",
+  );
   let body = "";
   p.client = mockClient((req) => {
     body = req.body;
@@ -770,9 +795,10 @@ test("OpenAIOmitsMaxTokensByDefault", async () => {
 });
 
 test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("gpt-5-mini", { maxTokens: 64000 }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [model("gpt-5-mini", { maxTokens: 64000 })],
+    "data: [DONE]\n",
+  );
   let body = "";
   p.client = mockClient((req) => {
     body = req.body;
@@ -792,15 +818,18 @@ test("OpenAIInfersMaxCompletionTokensForNewModels", async () => {
 });
 
 test("OpenAIModelCompatRequestFields", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("compat-fields", {
-      reasoning: true,
-      compat: {
-        maxTokensField: "max_completion_tokens",
-        supportsReasoningEffort: false,
-      },
-    }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [
+      model("compat-fields", {
+        reasoning: true,
+        compat: {
+          maxTokensField: "max_completion_tokens",
+          supportsReasoningEffort: false,
+        },
+      }),
+    ],
+    "data: [DONE]\n",
+  );
   let body = "";
   p.client = mockClient((req) => {
     body = req.body;
@@ -852,11 +881,14 @@ test("OpenAIRetriesUnsupportedMaxTokensWithCompletionTokens", async () => {
 });
 
 test("OpenAIRequiresReasoningContentOnAssistant", async () => {
-  const { provider: p } = createMockOpenAIProvider([
-    model("compat-reasoning", {
-      compat: { requiresReasoningContentOnAssistant: true },
-    }),
-  ], "data: [DONE]\n");
+  const { provider: p } = createMockOpenAIProvider(
+    [
+      model("compat-reasoning", {
+        compat: { requiresReasoningContentOnAssistant: true },
+      }),
+    ],
+    "data: [DONE]\n",
+  );
   let body = "";
   p.client = mockClient((req) => {
     body = req.body;
@@ -887,10 +919,16 @@ test("OpenAIRequiresReasoningContentOnAssistant", async () => {
 
 test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
   const messages: Message[] = [
-    createAssistantToolCall([{
-      type: "toolCall",
-      toolCall: { id: "read:26", name: "read", arguments: { path: "main.go" } },
-    }]),
+    createAssistantToolCall([
+      {
+        type: "toolCall",
+        toolCall: {
+          id: "read:26",
+          name: "read",
+          arguments: { path: "main.go" },
+        },
+      },
+    ]),
     createUserMessage("continue"),
   ];
   const got = normalizeToolResultSequence(messages);
@@ -905,10 +943,12 @@ test("NormalizeToolResultSequenceRepairsMissingKimiResponses", () => {
 
 test("NormalizeToolResultSequenceDoesNotDuplicateResults", () => {
   const messages: Message[] = [
-    createAssistantToolCall([{
-      type: "toolCall",
-      toolCall: { id: "call-1", name: "read" },
-    }]),
+    createAssistantToolCall([
+      {
+        type: "toolCall",
+        toolCall: { id: "call-1", name: "read" },
+      },
+    ]),
     createToolResultMessage("call-1", "read", "ok", false),
   ];
   assertEquals(normalizeToolResultSequence(messages).length, messages.length);
@@ -933,10 +973,12 @@ test("NormalizeToolResultSequenceOrdersAndFiltersResults", () => {
 
 test("NormalizeToolResultSequenceDropsOrphanedResults", () => {
   const messages: Message[] = [
-    createAssistantToolCall([{
-      type: "toolCall",
-      toolCall: { id: "call-1", name: "read" },
-    }]),
+    createAssistantToolCall([
+      {
+        type: "toolCall",
+        toolCall: { id: "call-1", name: "read" },
+      },
+    ]),
     createToolResultMessage("call-1", "read", "ok", false),
     createToolResultMessage("read:25", "read", "stale", false),
     createUserMessage("continue"),
@@ -955,7 +997,8 @@ test("OpenAIRequiresReasoningContentForKimiModels", () => {
 // ─── cache / tool call parsing ───────────────────────────────────────────────
 
 test("OpenAICache_CacheHit", async () => {
-  const sse = 'data: {"choices":[{"delta":{"content":"Hello"}}]}\n' +
+  const sse =
+    'data: {"choices":[{"delta":{"content":"Hello"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":5,"total_tokens":1005,"prompt_tokens_details":{"cached_tokens":750}}}\n' +
     "data: [DONE]\n";
   const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
@@ -969,7 +1012,8 @@ test("OpenAICache_CacheHit", async () => {
 });
 
 test("OpenAICache_NoCache", async () => {
-  const sse = 'data: {"choices":[{"delta":{"content":"Hi"}}]}\n' +
+  const sse =
+    'data: {"choices":[{"delta":{"content":"Hi"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":200,"completion_tokens":8,"total_tokens":208}}\n' +
     "data: [DONE]\n";
   const { provider: p } = createMockOpenAIProvider([model("mock")], sse);
@@ -982,7 +1026,8 @@ test("OpenAICache_NoCache", async () => {
 });
 
 test("OpenAICache_100Pct", async () => {
-  const sse = 'data: {"choices":[{"delta":{"content":"Full"}}]}\n' +
+  const sse =
+    'data: {"choices":[{"delta":{"content":"Full"}}]}\n' +
     'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":500,"completion_tokens":4,"total_tokens":504,"prompt_tokens_details":{"cached_tokens":500}}}\n' +
     "data: [DONE]\n";
   const { provider: p } = createMockOpenAIProvider([model("mock")], sse);

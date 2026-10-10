@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertThrows } from "../compat/assert.ts";
 import { type CronJob } from "./cron.ts";
 import { createSessionScopedStore } from "./session_store.ts";
@@ -7,7 +8,7 @@ import { test } from "#testing";
 
 function createStore(): SQLiteCronStore {
   return createSQLiteCronStore(
-    Deno.makeTempDirSync({ prefix: "opensac-cron-tool-" }),
+    runtime.makeTempDirSync({ prefix: "opensac-cron-tool-" }),
   );
 }
 
@@ -19,12 +20,15 @@ test("CronToolCreateOneShot", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
-  const result = tool.execute({}, {
-    action: "create",
-    name: "test-task",
-    prompt: "do something",
-    oneshot: true,
-  });
+  const result = tool.execute(
+    {},
+    {
+      action: "create",
+      name: "test-task",
+      prompt: "do something",
+      oneshot: true,
+    },
+  );
   assert(result.text !== "", "expected non-empty result");
 
   const jobs = store.list();
@@ -37,12 +41,15 @@ test("CronToolCreatePeriodic", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
-  const result = tool.execute({}, {
-    action: "create",
-    name: "daily-check",
-    prompt: "check status",
-    schedule: "@daily",
-  });
+  const result = tool.execute(
+    {},
+    {
+      action: "create",
+      name: "daily-check",
+      prompt: "check status",
+      schedule: "@daily",
+    },
+  );
   assert(result.text !== "", "expected non-empty result");
 
   const jobs = store.list();
@@ -59,12 +66,15 @@ test("CronToolCreateDefaultOneShot", () => {
   const store = createStore();
   const tool = createCronTool(store);
 
-  tool.execute({}, {
-    action: "create",
-    name: "default-task",
-    prompt: "do stuff",
-    // no schedule, no oneshot → should default to one-shot
-  });
+  tool.execute(
+    {},
+    {
+      action: "create",
+      name: "default-task",
+      prompt: "do stuff",
+      // no schedule, no oneshot → should default to one-shot
+    },
+  );
 
   const jobs = store.list();
   assert(jobs[0].oneShot, "expected default to be one-shot when no schedule");
@@ -131,20 +141,19 @@ test("CronToolRemove", () => {
 
 test("CronToolSessionScopedCreateAndDeleteByName", () => {
   const base = createStore();
-  const current = createSessionScopedStore(
-    base,
-    "session-a",
-    "/tmp/session-a",
-  );
+  const current = createSessionScopedStore(base, "session-a", "/tmp/session-a");
   const other = createSessionScopedStore(base, "session-b");
   const tool = createCronTool(current);
 
   other.create({ name: "other", prompt: "other", enabled: true });
-  tool.execute({}, {
-    action: "create",
-    name: "daily",
-    prompt: "summarize this session",
-  });
+  tool.execute(
+    {},
+    {
+      action: "create",
+      name: "daily",
+      prompt: "summarize this session",
+    },
+  );
 
   const jobs = current.list();
   assertEquals(jobs.length, 1);

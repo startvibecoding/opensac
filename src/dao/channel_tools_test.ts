@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { BindingDAO, type ChannelToolRecord, SessionDAO } from "./mod.ts";
 import { closeTestDbs, openTestDb } from "./test_util.ts";
@@ -11,7 +12,7 @@ test("channel tools generation", () => {
       db,
       "sessions",
       sessionId,
-      Deno.cwd(),
+      runtime.cwd(),
       "2026-01-01T00:00:00Z",
       "",
       1,

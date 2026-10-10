@@ -74,9 +74,8 @@ export function sessionListLastRun(
       status: acpRunStatus(run.status),
       startedAt: formatRFC3339(run.startedAt),
       active,
-      finishedAt: run.finishedAt !== null
-        ? formatRFC3339(run.finishedAt)
-        : null,
+      finishedAt:
+        run.finishedAt !== null ? formatRFC3339(run.finishedAt) : null,
     };
   }
   return result;

@@ -47,10 +47,10 @@ test("mapACPExtensionToCore maps attachment and project extensions", () => {
 
 test("mapACPExtensionToCore carries workspace cwd to memory handlers", () => {
   assertEquals(
-    mapACPExtensionToCore(
-      request("opensac/manage/memory/get", {}),
-      { source: "acp", workDir: "/workspace/project" },
-    ),
+    mapACPExtensionToCore(request("opensac/manage/memory/get", {}), {
+      source: "acp",
+      workDir: "/workspace/project",
+    }),
     {
       jsonrpc: "2.0",
       id: "ext-1",
@@ -86,10 +86,10 @@ test("mapACPExtensionToCore carries workspace cwd to cron creation", () => {
 
 test("mapACPExtensionToCore carries workspace cwd to SkillHub catalog handlers", () => {
   assertEquals(
-    mapACPExtensionToCore(
-      request("opensac/manage/skillhub/search", {}),
-      { source: "acp", workDir: "/workspace/project" },
-    ),
+    mapACPExtensionToCore(request("opensac/manage/skillhub/search", {}), {
+      source: "acp",
+      workDir: "/workspace/project",
+    }),
     {
       jsonrpc: "2.0",
       id: "ext-1",
@@ -98,10 +98,10 @@ test("mapACPExtensionToCore carries workspace cwd to SkillHub catalog handlers",
     },
   );
   assertEquals(
-    mapACPExtensionToCore(
-      request("opensac/manage/skillhub/get", {}),
-      { source: "acp", workDir: "/workspace/project" },
-    ).params,
+    mapACPExtensionToCore(request("opensac/manage/skillhub/get", {}), {
+      source: "acp",
+      workDir: "/workspace/project",
+    }).params,
     {},
   );
 });

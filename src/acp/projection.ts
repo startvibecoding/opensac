@@ -322,9 +322,7 @@ export function extractSamplingInput(params: unknown): {
   if (params === undefined || params === null) {
     return { prompt: "", systemPrompt: "", maxTokens };
   }
-  if (
-    typeof params !== "object" || Array.isArray(params)
-  ) {
+  if (typeof params !== "object" || Array.isArray(params)) {
     return {
       prompt: String(params).trim(),
       systemPrompt: "",
@@ -340,7 +338,9 @@ export function extractSamplingInput(params: unknown): {
   let systemPrompt = "";
   for (const message of messages) {
     if (
-      typeof message !== "object" || message === null || Array.isArray(message)
+      typeof message !== "object" ||
+      message === null ||
+      Array.isArray(message)
     ) {
       continue;
     }
@@ -357,7 +357,8 @@ export function extractSamplingInput(params: unknown): {
         }
         const block = item as Record<string, unknown>;
         if (
-          block.type === "text" && typeof block.text === "string" &&
+          block.type === "text" &&
+          typeof block.text === "string" &&
           block.text.trim() !== ""
         ) {
           texts.push(block.text);
@@ -472,9 +473,9 @@ export function acpToolImageContents(images: ToolImage[]): ToolCallContent[] {
     const decodedBytes = base64StdDecodedLen(image.data.length);
     if (decodedBytes > acpToolImageMaxBytes) {
       notes.push(
-        `image ${index + 1} not projected: ${mimeType} (${
-          acpByteSize(decodedBytes)
-        }) exceeds the ${acpByteSize(acpToolImageMaxBytes)} per-image limit`,
+        `image ${index + 1} not projected: ${mimeType} (${acpByteSize(
+          decodedBytes,
+        )}) exceeds the ${acpByteSize(acpToolImageMaxBytes)} per-image limit`,
       );
       continue;
     }
@@ -506,9 +507,10 @@ export function acpToolImageContents(images: ToolImage[]): ToolCallContent[] {
 }
 
 /** Decodes one optional `projectId` value (string, null, or absent). */
-export function acpOptionalProjectID(
-  raw: unknown,
-): { present: boolean; value: string } {
+export function acpOptionalProjectID(raw: unknown): {
+  present: boolean;
+  value: string;
+} {
   if (raw === undefined) return { present: false, value: "" };
   if (raw === null) return { present: true, value: "" };
   if (typeof raw !== "string") {

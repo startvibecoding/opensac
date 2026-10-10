@@ -3,7 +3,7 @@
 //
 // Go's RE2 never backtracks, so any pattern that compiled was safe to run.
 // JS `RegExp` is a backtracking engine: a short pathological pattern such as
-// `(a+)+$` can hang the single-threaded Deno event loop against a long line.
+// `(a+)+$` can hang the single-threaded Node event loop against a long line.
 // `compileUserRegExp` bounds the input and rejects the classic
 // catastrophic-backtracking shapes before compiling. It is defense in depth,
 // not a proof: the definitive isolation is running untrusted matching in a

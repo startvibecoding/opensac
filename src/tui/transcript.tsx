@@ -30,9 +30,11 @@ export interface TranscriptProps {
  * Renders a transcript: completed blocks through <Static> (scrollback) and the
  * active streaming block in the managed view.
  */
-export function Transcript(
-  { blocks, width, theme }: TranscriptProps,
-): React.ReactElement {
+export function Transcript({
+  blocks,
+  width,
+  theme,
+}: TranscriptProps): React.ReactElement {
   const completed = blocks.filter((b) => b.done);
   const active = blocks.filter((b) => !b.done);
 
@@ -63,7 +65,7 @@ export function Transcript(
         Text,
         { key: block.id },
         renderStreamingMarkdown(block.text, width, theme),
-      )
+      ),
     ),
   );
 }

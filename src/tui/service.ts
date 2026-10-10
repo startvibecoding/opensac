@@ -26,7 +26,8 @@ import {
   type CoreSessionCreateInput,
   type CoreSessionListEntry,
   type CoreSessionView,
-  type CoreTranscriptMessage} from "../core/runtime.ts";
+  type CoreTranscriptMessage,
+} from "../core/runtime.ts";
 import { CORE_ERROR_SESSION_NOT_RESIDENT } from "../core/runtime_protocol.ts";
 import { type Settings } from "../config/settings.ts";
 
@@ -231,10 +232,7 @@ export function sessionNotFoundError(sessionId: string): TUIServiceError {
  * It mirrors the Core message shape (`session <id> not found for cwd <dir>`),
  * which is what `isSessionNotFound` recognizes as a genuinely absent target.
  */
-export function sessionMissingError(
-  sessionId: string,
-  workDir: string,
-): Error {
+export function sessionMissingError(sessionId: string, workDir: string): Error {
   return new Error(`session ${sessionId} not found for cwd ${workDir}`);
 }
 
@@ -294,9 +292,7 @@ export function runNotFoundError(
   sessionId: string,
   runId: string,
 ): TUIServiceError {
-  return new TUIServiceError(
-    `TUI run not found: ${sessionId}/${runId}`,
-  );
+  return new TUIServiceError(`TUI run not found: ${sessionId}/${runId}`);
 }
 
 /** The decision vocabulary shared by every adapter (approval/question). */
@@ -332,8 +328,10 @@ export function decisionNotFoundError(requestId: string): TUIServiceError {
 
 /** Reports whether a failure is the stable unknown-decision error. */
 export function isDecisionNotFound(error: unknown): boolean {
-  return error instanceof TUIServiceError &&
-    error.message.startsWith("TUI decision not found:");
+  return (
+    error instanceof TUIServiceError &&
+    error.message.startsWith("TUI decision not found:")
+  );
 }
 
 /**
@@ -355,9 +353,9 @@ export interface TUIService {
   closeSession(input: { sessionId: string }): Promise<void>;
   deleteSession(input: { sessionId: string }): Promise<void>;
   /** Lists the persisted sessions of one working directory. */
-  listPersistedSessions(
-    input?: { workDir?: string },
-  ): Promise<TUISessionListEntry[]>;
+  listPersistedSessions(input?: {
+    workDir?: string;
+  }): Promise<TUISessionListEntry[]>;
   /**
    * Projects one session's durable conversation for a resume-time reprint.
    * It is the persisted branch, not the live event log, so it still returns
@@ -377,9 +375,7 @@ export interface TUIService {
   listSkills(input: { sessionId: string }): Promise<TUISkillView[]>;
   addAttachment(input: TUIAttachmentInput): Promise<TUIAttachmentView>;
   /** Lists the session's stored attachments (Core-owned projections). */
-  listAttachments(
-    input: { sessionId: string },
-  ): Promise<TUIAttachmentView[]>;
+  listAttachments(input: { sessionId: string }): Promise<TUIAttachmentView[]>;
   /** Materializes one input resource before a run exists. */
   prepareInput(input: TUIPrepareInput): Promise<TUIPreparedInput>;
   /** The secret-safe settings/provider/model projection. */
@@ -389,9 +385,7 @@ export interface TUIService {
    * global and project settings; `"global"` returns only the fields explicitly
    * present in the global settings file.
    */
-  getSettings(input?: {
-    scope?: TUISettingsReadScope;
-  }): Promise<Settings>;
+  getSettings(input?: { scope?: TUISettingsReadScope }): Promise<Settings>;
   /**
    * Applies one sparse settings patch (global or project scope) through the
    * Core so its runtime settings refresh with the on-disk files; returns the
@@ -411,13 +405,13 @@ export interface TUIService {
   /** Reads the environment-variable document. */
   listEnv(): Promise<Record<string, string>>;
   /** Replaces the environment-variable document. */
-  updateEnv(
-    input: { vars: Record<string, string> },
-  ): Promise<Record<string, string>>;
+  updateEnv(input: {
+    vars: Record<string, string>;
+  }): Promise<Record<string, string>>;
   /** Projects one session's rule/extra system-prompt context. */
-  getSessionContext(
-    input: { sessionId: string },
-  ): Promise<TUISessionContextView>;
+  getSessionContext(input: {
+    sessionId: string;
+  }): Promise<TUISessionContextView>;
   /** Updates one session's rule/extra system-prompt context. */
   setSessionContext(input: {
     sessionId: string;
@@ -425,13 +419,12 @@ export interface TUIService {
     extraContext?: string;
   }): Promise<TUISessionContextView>;
   /** Projects the discoverable expert bundles of one session. */
-  listExperts(
-    input: { sessionId: string },
-  ): Promise<TUIExpertSummaryView[]>;
+  listExperts(input: { sessionId: string }): Promise<TUIExpertSummaryView[]>;
   /** Resolves one expert bundle for display. */
-  showExpert(
-    input: { sessionId: string; expertId: string },
-  ): Promise<TUIExpertBundleView>;
+  showExpert(input: {
+    sessionId: string;
+    expertId: string;
+  }): Promise<TUIExpertBundleView>;
   /** Projects one session's resolved expert binding. */
   expertState(input: { sessionId: string }): Promise<TUIExpertStateView>;
   /** Binds or unbinds one session's expert (empty id unbinds). */
@@ -453,13 +446,12 @@ export interface TUIService {
   /** Destroys one managed agent and its children. */
   destroyAgent(input: { sessionId: string; agentId: string }): Promise<void>;
   /** Enables/disables the blocking delegate tool; returns the effective state. */
-  setDelegate(
-    input: { sessionId: string; enabled: boolean },
-  ): Promise<{ enabled: boolean }>;
+  setDelegate(input: {
+    sessionId: string;
+    enabled: boolean;
+  }): Promise<{ enabled: boolean }>;
   /** Projects the blocking delegate tool state. */
-  delegateState(
-    input: { sessionId: string },
-  ): Promise<{ enabled: boolean }>;
+  delegateState(input: { sessionId: string }): Promise<{ enabled: boolean }>;
   /** Enables/disables one named capability option (for example `browser`). */
   setCapability(input: {
     sessionId: string;
@@ -471,9 +463,7 @@ export interface TUIService {
   /** Applies one ESM supervisor mutation and re-projects the state. */
   esmCommand(input: TUIEsmCommandInput): Promise<TUIEsmView>;
   /** Starts (or reports) the ESM continuation worker of one session. */
-  esmContinue(
-    input: { sessionId: string },
-  ): Promise<TUIEsmContinuation>;
+  esmContinue(input: { sessionId: string }): Promise<TUIEsmContinuation>;
   /** Stops the running ESM continuation worker of one session. */
   esmStop(input: { sessionId: string }): Promise<void>;
   /** Runs one transient side query over a read-only tool registry. */
@@ -588,9 +578,7 @@ export function createFakeTUIService(): FakeTUIService {
   const sessions = new Map<string, FakeSession>();
   const runs = new Map<string, FakeRun>();
   const decisions = new Map<string, TUIDecisionRequest>();
-  const decisionListeners = new Set<
-    (request: TUIDecisionRequest) => void
-  >();
+  const decisionListeners = new Set<(request: TUIDecisionRequest) => void>();
   const connectionListeners = new Set<
     (state: TUICoreConnectionState) => void
   >();
@@ -600,11 +588,11 @@ export function createFakeTUIService(): FakeTUIService {
   let attachmentCount = 0;
   let resourceCount = 0;
   let tick = 0;
-  const skillCatalog: Array<
-    { name: string; source: string; description: string }
-  > = [
-    { name: "demo", source: "project", description: "Demo skill" },
-  ];
+  const skillCatalog: Array<{
+    name: string;
+    source: string;
+    description: string;
+  }> = [{ name: "demo", source: "project", description: "Demo skill" }];
   let settingsDoc: Settings = {
     defaultProvider: "test-provider",
     defaultModel: "test-model",
@@ -612,24 +600,28 @@ export function createFakeTUIService(): FakeTUIService {
     providers: {},
   };
   let envVars: Record<string, string> = {};
-  const providerCatalog: TUIProviderCatalogEntry[] = [{
-    id: "test-provider",
-    configured: true,
-    isDefault: true,
-    api: "openai-chat",
-    baseUrl: "https://example.invalid",
-    modelCount: 1,
-    models: [{ id: "test-model", name: "Test Model" }],
-  }];
+  const providerCatalog: TUIProviderCatalogEntry[] = [
+    {
+      id: "test-provider",
+      configured: true,
+      isDefault: true,
+      api: "openai-chat",
+      baseUrl: "https://example.invalid",
+      modelCount: 1,
+      models: [{ id: "test-model", name: "Test Model" }],
+    },
+  ];
   let transientAnswerValue = "stub answer";
-  const expertCatalog: TUIExpertSummaryView[] = [{
-    name: "demo-expert",
-    displayName: { zh: "演示专家", en: "Demo Expert" },
-    expertType: "agent",
-    source: "builtin",
-    invalid: false,
-    invalidReason: "",
-  }];
+  const expertCatalog: TUIExpertSummaryView[] = [
+    {
+      name: "demo-expert",
+      displayName: { zh: "演示专家", en: "Demo Expert" },
+      expertType: "agent",
+      source: "builtin",
+      invalid: false,
+      invalidReason: "",
+    },
+  ];
 
   const now = (): Date => new Date(BASE_TIME_MS + tick++);
   const runKey = (sessionId: string, runId: string): string =>
@@ -798,12 +790,14 @@ export function createFakeTUIService(): FakeTUIService {
         mode: input.mode ?? "yolo",
         thinkingLevel: input.thinkingLevel ?? "",
         capabilities: { ...(input.capabilities ?? {}) },
-        approvalPolicy: (input.approvalPolicy ?? "").trim() !== ""
-          ? (input.approvalPolicy as string)
-          : "runtime",
-        questionPolicy: (input.questionPolicy ?? "").trim() !== ""
-          ? (input.questionPolicy as string)
-          : "runtime",
+        approvalPolicy:
+          (input.approvalPolicy ?? "").trim() !== ""
+            ? (input.approvalPolicy as string)
+            : "runtime",
+        questionPolicy:
+          (input.questionPolicy ?? "").trim() !== ""
+            ? (input.questionPolicy as string)
+            : "runtime",
         createdAt,
         updatedAt: createdAt,
       };
@@ -827,9 +821,10 @@ export function createFakeTUIService(): FakeTUIService {
       return Promise.resolve(view);
     },
 
-    openSession(
-      input: { sessionId: string; workDir?: string },
-    ): Promise<TUISessionView> {
+    openSession(input: {
+      sessionId: string;
+      workDir?: string;
+    }): Promise<TUISessionView> {
       // Reopening a persisted session (the production host keeps the row
       // after `closeSession`) rebinds it instead of rejecting.
       const session = sessions.get(input.sessionId);
@@ -862,9 +857,9 @@ export function createFakeTUIService(): FakeTUIService {
       });
     },
 
-    getTranscript(
-      input: { sessionId: string },
-    ): Promise<TUITranscriptMessage[]> {
+    getTranscript(input: {
+      sessionId: string;
+    }): Promise<TUITranscriptMessage[]> {
       const session = sessions.get(input.sessionId);
       if (session === undefined || session.closed) {
         return Promise.reject(sessionNotFoundError(input.sessionId));
@@ -874,9 +869,9 @@ export function createFakeTUIService(): FakeTUIService {
       );
     },
 
-    listPersistedSessions(
-      input?: { workDir?: string },
-    ): Promise<TUISessionListEntry[]> {
+    listPersistedSessions(input?: {
+      workDir?: string;
+    }): Promise<TUISessionListEntry[]> {
       const workDir = (input?.workDir ?? "").trim();
       const entries = [...sessions.values()]
         .filter((session) => workDir === "" || session.view.workDir === workDir)
@@ -917,12 +912,7 @@ export function createFakeTUIService(): FakeTUIService {
         }
       }
       appendEvent(run, "run_started", { text: input.text }, false);
-      appendEvent(
-        run,
-        "run_finished",
-        { status: "completed" },
-        true,
-      );
+      appendEvent(run, "run_finished", { status: "completed" }, true);
       return Promise.resolve({
         sessionId: input.sessionId,
         runId,
@@ -947,9 +937,7 @@ export function createFakeTUIService(): FakeTUIService {
       }
     },
 
-    setSessionConfig(
-      input: TUISessionConfig,
-    ): Promise<TUISessionView> {
+    setSessionConfig(input: TUISessionConfig): Promise<TUISessionView> {
       return withSession(input.sessionId, (session) => {
         const view = session.view;
         if (input.mode !== undefined) view.mode = input.mode;
@@ -981,9 +969,7 @@ export function createFakeTUIService(): FakeTUIService {
       });
     },
 
-    listSkills(
-      input: { sessionId: string },
-    ): Promise<TUISkillView[]> {
+    listSkills(input: { sessionId: string }): Promise<TUISkillView[]> {
       return withSession(input.sessionId, (session) => {
         const views: TUISkillView[] = [];
         const seen = new Set<string>();
@@ -1017,18 +1003,18 @@ export function createFakeTUIService(): FakeTUIService {
         sandboxLevel: "",
         webSearchEnabled: false,
         skillsDisabled: [],
-        providers: [{
-          name: "test-provider",
-          apiKeyConfigured: true,
-          modelCount: 1,
-          models: [{ id: "test-model", name: "Test Model" }],
-        }],
+        providers: [
+          {
+            name: "test-provider",
+            apiKeyConfigured: true,
+            modelCount: 1,
+            models: [{ id: "test-model", name: "Test Model" }],
+          },
+        ],
       });
     },
 
-    getSettings(
-      input?: { scope?: TUISettingsReadScope },
-    ): Promise<Settings> {
+    getSettings(input?: { scope?: TUISettingsReadScope }): Promise<Settings> {
       void (input?.scope ?? "effective");
       const clone: Settings = {
         ...settingsDoc,
@@ -1060,21 +1046,23 @@ export function createFakeTUIService(): FakeTUIService {
     },
 
     listProviders(): Promise<TUIProviderCatalogEntry[]> {
-      return Promise.resolve(providerCatalog.map((entry) => ({
-        ...entry,
-        models: entry.models.map((model) => ({ ...model })),
-      })));
+      return Promise.resolve(
+        providerCatalog.map((entry) => ({
+          ...entry,
+          models: entry.models.map((model) => ({ ...model })),
+        })),
+      );
     },
 
     validateProviderModel(input: {
       providerID: string;
       modelID: string;
     }): Promise<void> {
-      const entry = providerCatalog.find((candidate) =>
-        candidate.id === input.providerID
+      const entry = providerCatalog.find(
+        (candidate) => candidate.id === input.providerID,
       );
-      const model = entry?.models.find((candidate) =>
-        candidate.id === input.modelID
+      const model = entry?.models.find(
+        (candidate) => candidate.id === input.modelID,
       );
       if (entry === undefined || model === undefined) {
         return Promise.reject(
@@ -1090,16 +1078,16 @@ export function createFakeTUIService(): FakeTUIService {
       return Promise.resolve({ ...envVars });
     },
 
-    updateEnv(
-      input: { vars: Record<string, string> },
-    ): Promise<Record<string, string>> {
+    updateEnv(input: {
+      vars: Record<string, string>;
+    }): Promise<Record<string, string>> {
       envVars = { ...input.vars };
       return Promise.resolve({ ...envVars });
     },
 
-    getSessionContext(
-      input: { sessionId: string },
-    ): Promise<TUISessionContextView> {
+    getSessionContext(input: {
+      sessionId: string;
+    }): Promise<TUISessionContextView> {
       return withSession(input.sessionId, (session) => ({
         ...session.context,
       }));
@@ -1121,22 +1109,22 @@ export function createFakeTUIService(): FakeTUIService {
       });
     },
 
-    listExperts(
-      input: { sessionId: string },
-    ): Promise<TUIExpertSummaryView[]> {
+    listExperts(input: { sessionId: string }): Promise<TUIExpertSummaryView[]> {
       return withSession(input.sessionId, () =>
         expertCatalog.map((entry) => ({
           ...entry,
           displayName: { ...entry.displayName },
-        })));
+        })),
+      );
     },
 
-    showExpert(
-      input: { sessionId: string; expertId: string },
-    ): Promise<TUIExpertBundleView> {
+    showExpert(input: {
+      sessionId: string;
+      expertId: string;
+    }): Promise<TUIExpertBundleView> {
       return withSession(input.sessionId, () => {
-        const entry = expertCatalog.find((candidate) =>
-          candidate.name === input.expertId
+        const entry = expertCatalog.find(
+          (candidate) => candidate.name === input.expertId,
         );
         if (entry === undefined) {
           throw new TUIServiceError(
@@ -1167,13 +1155,11 @@ export function createFakeTUIService(): FakeTUIService {
       return withSession(input.sessionId, (session) => {
         const nextID = input.expertId.trim();
         const currentID = session.expertId.trim();
-        if (
-          currentID !== "" && nextID !== "" && currentID !== nextID
-        ) {
+        if (currentID !== "" && nextID !== "" && currentID !== nextID) {
           throw new TUIServiceError(
-            `expert switch requires fork: ${JSON.stringify(currentID)} -> ${
-              JSON.stringify(nextID)
-            }`,
+            `expert switch requires fork: ${JSON.stringify(currentID)} -> ${JSON.stringify(
+              nextID,
+            )}`,
           );
         }
         session.expertId = nextID;
@@ -1239,21 +1225,17 @@ export function createFakeTUIService(): FakeTUIService {
       }
     },
 
-    listAttachments(
-      input: { sessionId: string },
-    ): Promise<TUIAttachmentView[]> {
-      return withSession(
-        input.sessionId,
-        (session) =>
-          session.attachments.map((attachment) => ({
-            ...attachment,
-          })),
+    listAttachments(input: {
+      sessionId: string;
+    }): Promise<TUIAttachmentView[]> {
+      return withSession(input.sessionId, (session) =>
+        session.attachments.map((attachment) => ({
+          ...attachment,
+        })),
       );
     },
 
-    addAttachment(
-      input: TUIAttachmentInput,
-    ): Promise<TUIAttachmentView> {
+    addAttachment(input: TUIAttachmentInput): Promise<TUIAttachmentView> {
       return withSession(input.sessionId, (session) => {
         attachmentCount++;
         const view: TUIAttachmentView = {
@@ -1267,36 +1249,28 @@ export function createFakeTUIService(): FakeTUIService {
       });
     },
 
-    capabilities(
-      input: { sessionId: string },
-    ): Promise<TUICapabilityView> {
+    capabilities(input: { sessionId: string }): Promise<TUICapabilityView> {
       return withSession(input.sessionId, (session) => {
         const view: TUICapabilityView = {};
-        for (
-          const [name, enabled] of Object.entries(session.view.capabilities)
-        ) {
+        for (const [name, enabled] of Object.entries(
+          session.view.capabilities,
+        )) {
           view[name] = { enabled, available: true };
         }
         return view;
       });
     },
 
-    listAgents(
-      input: { sessionId: string },
-    ): Promise<TUIAgentView[]> {
-      return withSession(
-        input.sessionId,
-        (session) =>
-          [...session.agents.values()].map((agent) => ({
-            ...agent,
-            children: [...agent.children],
-          })),
+    listAgents(input: { sessionId: string }): Promise<TUIAgentView[]> {
+      return withSession(input.sessionId, (session) =>
+        [...session.agents.values()].map((agent) => ({
+          ...agent,
+          children: [...agent.children],
+        })),
       );
     },
 
-    destroyAgent(
-      input: { sessionId: string; agentId: string },
-    ): Promise<void> {
+    destroyAgent(input: { sessionId: string; agentId: string }): Promise<void> {
       return withSession(input.sessionId, (session) => {
         if (!session.agents.delete(input.agentId)) {
           throw new TUIServiceError(`agent ${input.agentId} not found`);
@@ -1307,18 +1281,17 @@ export function createFakeTUIService(): FakeTUIService {
       });
     },
 
-    setDelegate(
-      input: { sessionId: string; enabled: boolean },
-    ): Promise<{ enabled: boolean }> {
+    setDelegate(input: {
+      sessionId: string;
+      enabled: boolean;
+    }): Promise<{ enabled: boolean }> {
       return withSession(input.sessionId, (session) => {
         session.delegateEnabled = input.enabled;
         return { enabled: session.delegateEnabled };
       });
     },
 
-    delegateState(
-      input: { sessionId: string },
-    ): Promise<{ enabled: boolean }> {
+    delegateState(input: { sessionId: string }): Promise<{ enabled: boolean }> {
       return withSession(input.sessionId, (session) => ({
         enabled: session.delegateEnabled,
       }));
@@ -1332,9 +1305,9 @@ export function createFakeTUIService(): FakeTUIService {
       return withSession(input.sessionId, (session) => {
         session.view.capabilities[input.id] = input.enabled;
         const view: TUICapabilityView = {};
-        for (
-          const [name, enabled] of Object.entries(session.view.capabilities)
-        ) {
+        for (const [name, enabled] of Object.entries(
+          session.view.capabilities,
+        )) {
           view[name] = { enabled, available: true };
         }
         return view;
@@ -1411,9 +1384,10 @@ export function createFakeTUIService(): FakeTUIService {
             }
             session.esmObjective = {
               ...objective,
-              progressSummary: (input.guide ?? "").trim() === ""
-                ? objective.progressSummary
-                : input.guide ?? "",
+              progressSummary:
+                (input.guide ?? "").trim() === ""
+                  ? objective.progressSummary
+                  : (input.guide ?? ""),
               updatedAt: new Date(BASE_TIME_MS + tick++).toISOString(),
             };
             break;
@@ -1426,9 +1400,7 @@ export function createFakeTUIService(): FakeTUIService {
       });
     },
 
-    esmContinue(
-      input: { sessionId: string },
-    ): Promise<TUIEsmContinuation> {
+    esmContinue(input: { sessionId: string }): Promise<TUIEsmContinuation> {
       const rejection = rejectUnknownSession(input.sessionId);
       if (rejection !== undefined) return rejection;
       const session = requireSession(input.sessionId);
@@ -1550,14 +1522,9 @@ export function createFakeTUIService(): FakeTUIService {
       return { ...view, children: [...view.children] };
     },
 
-    seedTranscript(
-      sessionId: string,
-      messages: TUITranscriptMessage[],
-    ): void {
+    seedTranscript(sessionId: string, messages: TUITranscriptMessage[]): void {
       const session = requireSession(sessionId);
-      session.transcript.push(
-        ...messages.map((message) => ({ ...message })),
-      );
+      session.transcript.push(...messages.map((message) => ({ ...message })));
       session.messageCount += messages.length;
     },
 
@@ -1578,10 +1545,13 @@ export function createFakeTUIService(): FakeTUIService {
 /** Projects the fake ESM session state into its neutral view. */
 function esmViewOf(session: FakeSession): TUIEsmView {
   return {
-    objective: session.esmObjective === null ? null : {
-      ...session.esmObjective,
-      remainingWork: [...session.esmObjective.remainingWork],
-    },
+    objective:
+      session.esmObjective === null
+        ? null
+        : {
+            ...session.esmObjective,
+            remainingWork: [...session.esmObjective.remainingWork],
+          },
     workerRunning: session.esmWorkerRunning,
     activeAgentId: session.esmActiveAgentId,
   };

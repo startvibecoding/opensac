@@ -13,8 +13,8 @@
 // (`handlePrompt`/`requestQuestion`/`requestPermission`). The stdio dispatch
 // loop (`Run`) and the `opensac/manage/*` plane land in later slices.
 //
-// Deviations (see docs/proposal/go-to-deno-migration.md):
-//   - Go's `sync.Mutex`/`sync.Once` are dropped; Deno's single-threaded event
+// Deviations (see docs/proposal/go-to-typescript-migration.md):
+//   - Go's `sync.Mutex`/`sync.Once` are dropped; Node's single-threaded event
 //     loop runs these handlers without interleaving.
 //   - `io.Writer` maps to a synchronous `AcpServerSink`, and `*bufio.Reader`
 //     to the ported `ACPLineReader`.
@@ -22,6 +22,7 @@
 //     echoing and pending-response correlation stay verbatim.
 //   - `time.Time` maps to `Date` and `time.Duration` to milliseconds.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { createHash } from "node:crypto";
 import { isAbortError, isTimeoutError } from "../util/errors.ts";
 import { isAbsolute, normalize } from "../compat/path.ts";
@@ -599,9 +600,9 @@ export class SessionProviderMismatchError extends Error {
     super(
       cause === undefined || cause === null
         ? "session provider mismatch"
-        : `session provider ${
-          JSON.stringify(sessionProvider)
-        } could not be selected: ${errorMessage(cause)}`,
+        : `session provider ${JSON.stringify(
+            sessionProvider,
+          )} could not be selected: ${errorMessage(cause)}`,
     );
     this.name = "SessionProviderMismatchError";
     this.sessionProvider = sessionProvider;
@@ -803,8 +804,8 @@ export class AcpServer {
   cronAgentMgr: AgentManager | null = null;
   /** Process-wide cached Runtime knowledge-base service. */
   knowledgeService:
-    | import("../agentruntime/knowledgebase.ts").KnowledgeBaseService
-    | null = null;
+    import("../agentruntime/knowledgebase.ts").KnowledgeBaseService | null =
+    null;
 
   // ─── transport and notification glue ──────────────────────────────────────
 
@@ -832,9 +833,10 @@ export class AcpServer {
     errResp: RPCError | null,
   ): void {
     if (idRaw === null || idRaw.trim() === "") return;
-    const body = errResp !== null
-      ? `"error":${JSON.stringify(acpErrorEnvelope(errResp))}`
-      : `"result":${JSON.stringify(result ?? null)}`;
+    const body =
+      errResp !== null
+        ? `"error":${JSON.stringify(acpErrorEnvelope(errResp))}`
+        : `"result":${JSON.stringify(result ?? null)}`;
     this.writeRaw(`{"jsonrpc":"2.0","id":${idRaw.trim()},${body}}\n`);
   }
 
@@ -1138,7 +1140,8 @@ export class AcpServer {
     this.initialized = true;
     this.clientCaps = decodeClientCapabilities(inRequest.clientCapabilities);
     if (
-      requestWorkspace(inRequest._meta) !== undefined && workspaceCwd !== ""
+      requestWorkspace(inRequest._meta) !== undefined &&
+      workspaceCwd !== ""
     ) {
       this.workspaceCwd = workspaceCwd;
       this.workspaceAdditionalDirectories = workspaceAdditionalDirectories;
@@ -1300,12 +1303,14 @@ export class AcpServer {
    */
   handleSetSessionMeta(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPSessionSetMetaRequest;
-    const sessionId = typeof inRequest.sessionId === "string"
-      ? inRequest.sessionId.trim()
-      : "";
+    const sessionId =
+      typeof inRequest.sessionId === "string" ? inRequest.sessionId.trim() : "";
     const raw = req.params;
-    const malformed = raw === undefined || raw === null ||
-      typeof raw !== "object" || Array.isArray(raw);
+    const malformed =
+      raw === undefined ||
+      raw === null ||
+      typeof raw !== "object" ||
+      Array.isArray(raw);
     if (malformed || sessionId === "") {
       this.writeResponse(
         req.idRaw,
@@ -1334,7 +1339,8 @@ export class AcpServer {
     let projectValue = "";
     if (inRequest.projectId !== undefined) {
       if (
-        inRequest.projectId !== null && typeof inRequest.projectId !== "string"
+        inRequest.projectId !== null &&
+        typeof inRequest.projectId !== "string"
       ) {
         this.writeResponse(
           req.idRaw,
@@ -1348,9 +1354,10 @@ export class AcpServer {
         return;
       }
       present = true;
-      projectValue = typeof inRequest.projectId === "string"
-        ? inRequest.projectId.trim()
-        : "";
+      projectValue =
+        typeof inRequest.projectId === "string"
+          ? inRequest.projectId.trim()
+          : "";
     }
     if (this.settings === null) {
       this.writeResponse(
@@ -1442,9 +1449,8 @@ export class AcpServer {
       stored = { ...merged, updatedAt: new Date() };
     }
     this.notifySessionMetaInfo(sessionId, stored);
-    const projectId = (stored.projectId ?? "") !== ""
-      ? stored.projectId!
-      : null;
+    const projectId =
+      (stored.projectId ?? "") !== "" ? stored.projectId! : null;
     const result: ACPSessionSetMetaResult = {
       pinned: stored.pinned,
       projectId,
@@ -1463,13 +1469,12 @@ export class AcpServer {
       title = latestSessionTitle(getSessionDir(this.settings), sessionId).name;
     }
     const meta: Record<string, unknown> = { pinned: metadata.pinned };
-    meta.projectId = (metadata.projectId ?? "") !== ""
-      ? metadata.projectId
-      : null;
-    const updatedAt = metadata.updatedAt !== undefined &&
-        !isZeroTime(metadata.updatedAt)
-      ? metadata.updatedAt
-      : new Date();
+    meta.projectId =
+      (metadata.projectId ?? "") !== "" ? metadata.projectId : null;
+    const updatedAt =
+      metadata.updatedAt !== undefined && !isZeroTime(metadata.updatedAt)
+        ? metadata.updatedAt
+        : new Date();
     this.notify(sessionId, {
       sessionUpdate: "session_info_update",
       title,
@@ -1479,9 +1484,7 @@ export class AcpServer {
   }
 
   /** Assembles the additive pinned/projectId keys of `_meta` for one page. */
-  sessionListMetadata(
-    sessionIds: string[],
-  ): Map<string, SessionMetadata> {
+  sessionListMetadata(sessionIds: string[]): Map<string, SessionMetadata> {
     if (this.settings === null || sessionIds.length === 0) return new Map();
     try {
       return listSessionMetadata(getSessionDir(this.settings), sessionIds);
@@ -1529,7 +1532,7 @@ export class AcpServer {
       counts = new Map();
     }
     const items = projects.map((project) =>
-      acpProjectResult(project, counts.get(project.id) ?? 0)
+      acpProjectResult(project, counts.get(project.id) ?? 0),
     );
     this.writeResponse(req.idRaw, { projects: items }, null);
   }
@@ -1537,11 +1540,13 @@ export class AcpServer {
   /** Serves `opensac/projects/create`. */
   handleProjectsCreate(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPProjectRequest;
-    const name = typeof inRequest.name === "string"
-      ? inRequest.name.trim()
-      : "";
-    const malformed = req.params === undefined || req.params === null ||
-      typeof req.params !== "object" || Array.isArray(req.params);
+    const name =
+      typeof inRequest.name === "string" ? inRequest.name.trim() : "";
+    const malformed =
+      req.params === undefined ||
+      req.params === null ||
+      typeof req.params !== "object" ||
+      Array.isArray(req.params);
     if (malformed || name === "") {
       this.writeResponse(
         req.idRaw,
@@ -1582,11 +1587,13 @@ export class AcpServer {
   handleProjectsRename(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPProjectRequest;
     const id = typeof inRequest.id === "string" ? inRequest.id.trim() : "";
-    const name = typeof inRequest.name === "string"
-      ? inRequest.name.trim()
-      : "";
-    const malformed = req.params === undefined || req.params === null ||
-      typeof req.params !== "object" || Array.isArray(req.params);
+    const name =
+      typeof inRequest.name === "string" ? inRequest.name.trim() : "";
+    const malformed =
+      req.params === undefined ||
+      req.params === null ||
+      typeof req.params !== "object" ||
+      Array.isArray(req.params);
     if (malformed || id === "" || name === "") {
       this.writeResponse(
         req.idRaw,
@@ -1631,8 +1638,11 @@ export class AcpServer {
   handleProjectsDelete(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPProjectRequest;
     const id = typeof inRequest.id === "string" ? inRequest.id.trim() : "";
-    const malformed = req.params === undefined || req.params === null ||
-      typeof req.params !== "object" || Array.isArray(req.params);
+    const malformed =
+      req.params === undefined ||
+      req.params === null ||
+      typeof req.params !== "object" ||
+      Array.isArray(req.params);
     if (malformed || id === "") {
       this.writeResponse(
         req.idRaw,
@@ -1678,8 +1688,11 @@ export class AcpServer {
    */
   handleWorkspaceExtend(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPWorkspaceExtendRequest;
-    const malformed = req.params === undefined || req.params === null ||
-      typeof req.params !== "object" || Array.isArray(req.params);
+    const malformed =
+      req.params === undefined ||
+      req.params === null ||
+      typeof req.params !== "object" ||
+      Array.isArray(req.params);
     const requestedRaw = Array.isArray(inRequest.additionalDirectories)
       ? inRequest.additionalDirectories
       : [];
@@ -1705,16 +1718,16 @@ export class AcpServer {
           acpStructuredRPCError(
             -32602,
             "workspace_directory_invalid",
-            `additional directory must be an absolute path: ${
-              JSON.stringify(raw)
-            }`,
+            `additional directory must be an absolute path: ${JSON.stringify(
+              raw,
+            )}`,
           ),
         );
         return;
       }
       let resolved: string;
       try {
-        resolved = Deno.realPathSync(filepathClean(value));
+        resolved = nodeRuntime.realPathSync(filepathClean(value));
       } catch {
         this.writeResponse(
           req.idRaw,
@@ -1729,7 +1742,7 @@ export class AcpServer {
       }
       let isDir = false;
       try {
-        isDir = Deno.statSync(resolved).isDirectory;
+        isDir = nodeRuntime.statSync(resolved).isDirectory;
       } catch {
         isDir = false;
       }
@@ -1740,9 +1753,9 @@ export class AcpServer {
           acpStructuredRPCError(
             -32602,
             "workspace_directory_unavailable",
-            `additional directory ${
-              JSON.stringify(value)
-            } is not an existing directory`,
+            `additional directory ${JSON.stringify(
+              value,
+            )} is not an existing directory`,
           ),
         );
         return;
@@ -1807,11 +1820,7 @@ export class AcpServer {
       cwd,
       additionalDirectories: merged,
     });
-    this.writeResponse(
-      req.idRaw,
-      { cwd, additionalDirectories: merged },
-      null,
-    );
+    this.writeResponse(req.idRaw, { cwd, additionalDirectories: merged }, null);
   }
 
   // ─── §4.4 decision deadline reminders ─────────────────────────────────────
@@ -2007,11 +2016,13 @@ export class AcpServer {
    */
   handleAttachmentList(req: ACPRPCRequest): void {
     const inRequest = (req.params ?? {}) as ACPAttachmentListRequest;
-    const malformed = req.params === undefined || req.params === null ||
-      typeof req.params !== "object" || Array.isArray(req.params);
-    const sessionId = typeof inRequest.sessionId === "string"
-      ? inRequest.sessionId.trim()
-      : "";
+    const malformed =
+      req.params === undefined ||
+      req.params === null ||
+      typeof req.params !== "object" ||
+      Array.isArray(req.params);
+    const sessionId =
+      typeof inRequest.sessionId === "string" ? inRequest.sessionId.trim() : "";
     if (malformed || sessionId === "") {
       this.writeResponse(
         req.idRaw,
@@ -2024,9 +2035,8 @@ export class AcpServer {
       );
       return;
     }
-    const status = typeof inRequest.status === "string"
-      ? inRequest.status.trim()
-      : "";
+    const status =
+      typeof inRequest.status === "string" ? inRequest.status.trim() : "";
     let filter = "";
     switch (status) {
       case "":
@@ -2045,9 +2055,9 @@ export class AcpServer {
           acpStructuredRPCError(
             -32602,
             "attachment_list_invalid_status",
-            `status ${
-              JSON.stringify(status)
-            } is not supported; use generated or input`,
+            `status ${JSON.stringify(
+              status,
+            )} is not supported; use generated or input`,
           ),
         );
         return;
@@ -2267,7 +2277,7 @@ export class AcpServer {
       allowedRoots.add(filepathClean(directory));
     }
     const filtered = details.filter((detail) =>
-      allowedRoots.has(filepathClean(detail.cwd))
+      allowedRoots.has(filepathClean(detail.cwd)),
     );
     this.writeSessionList(req, filtered, inRequest.cursor ?? "");
   }
@@ -2420,9 +2430,8 @@ export class AcpServer {
     const pageIDs = page.map((detail) => detail.id);
     const lastRuns = this.sessionListLastRun(pageIDs);
     const pageMetadata = this.sessionListMetadata(pageIDs);
-    const sessionDir = this.settings !== null
-      ? getSessionDir(this.settings)
-      : "";
+    const sessionDir =
+      this.settings !== null ? getSessionDir(this.settings) : "";
     const result: ACPListSessionsResult = { sessions: [] };
     for (const detail of page) {
       let title = detail.name;
@@ -2438,7 +2447,9 @@ export class AcpServer {
             modelProvider = binding.provider;
             modelID = binding.modelId;
           }
-        } catch { /* an unreadable binding keeps the list default */ }
+        } catch {
+          /* an unreadable binding keeps the list default */
+        }
         try {
           const mgr = openByIDExact(sessionDir, detail.id);
           const modeEntry = mgr.getLatestModeChange();
@@ -2447,7 +2458,9 @@ export class AcpServer {
           if (thinkingEntry !== null) {
             thoughtLevel = thinkingEntry.thinkingLevel;
           }
-        } catch { /* an unreadable session keeps the empty projection */ }
+        } catch {
+          /* an unreadable session keeps the empty projection */
+        }
       }
       if (modelProvider === "") modelProvider = this.providerName;
       if (modelID === "" && this.m !== null) modelID = this.m.id;
@@ -2456,9 +2469,8 @@ export class AcpServer {
         messageCount: detail.messageCount,
       };
       meta.pinned = metadata?.pinned ?? false;
-      meta.projectId = (metadata?.projectId ?? "") !== ""
-        ? metadata!.projectId
-        : null;
+      meta.projectId =
+        (metadata?.projectId ?? "") !== "" ? metadata!.projectId : null;
       const lastRun = lastRuns[detail.id];
       if (lastRun !== undefined) meta.lastRun = lastRun;
       let additionalDirectories: string[] = [];
@@ -3032,14 +3044,11 @@ export class AcpServer {
       switch (record.kind) {
         case DECISION_QUESTION: {
           const request = record.payload as QuestionRequest;
-          const projection = questionProjectionFor(
-            this.acpInitialized(),
-            {
-              question: request.question,
-              options: request.options ?? [],
-              explanation: request.explanation ?? "",
-            },
-          );
+          const projection = questionProjectionFor(this.acpInitialized(), {
+            question: request.question,
+            options: request.options ?? [],
+            explanation: request.explanation ?? "",
+          });
           let method = projection.method;
           let payload: unknown = projection.params;
           if (
@@ -3069,9 +3078,10 @@ export class AcpServer {
     const now = new Date();
     const expired = expiredDecisions(records, now);
     const pending = replayDecisionsAt(records, now);
-    const active = rt.execution !== null
-      ? rt.execution.active()
-      : { runId: "", active: false };
+    const active =
+      rt.execution !== null
+        ? rt.execution.active()
+        : { runId: "", active: false };
     if (expired.length > 0 || (!active.active && pending.size > 0)) {
       this.withSessionMutationLease(rt.id, () => {
         for (const record of expired) {
@@ -3112,11 +3122,7 @@ export class AcpServer {
   }
 
   /** Registers one pending decision against its session run. */
-  registerDecision(
-    sessionID: string,
-    id: string,
-    kind: DecisionKind,
-  ): void {
+  registerDecision(sessionID: string, id: string, kind: DecisionKind): void {
     if (id === "") return;
     const rt = this.sessionRuntime(sessionID);
     if (rt === null) return;
@@ -3211,7 +3217,10 @@ export class AcpServer {
     expiresAt: Date | undefined,
   ): void {
     if (
-      this.settings === null || sessionID === "" || runID === "" || id === ""
+      this.settings === null ||
+      sessionID === "" ||
+      runID === "" ||
+      id === ""
     ) {
       return;
     }
@@ -3463,16 +3472,18 @@ export class AcpServer {
         return false;
       }
       const record = jsonRecord(outcome.value);
-      const selected = record !== undefined
-        ? jsonRecord(record.outcome)
-        : undefined;
+      const selected =
+        record !== undefined ? jsonRecord(record.outcome) : undefined;
       let value = "deny";
       if (selected !== undefined) {
         value = typeof selected.optionId === "string" ? selected.optionId : "";
       }
       this.resolveDecision(sessionID, id, DECISION_APPROVAL, value, "resolved");
-      return selected !== undefined && selected.outcome === "selected" &&
-        selected.optionId === "allow-once";
+      return (
+        selected !== undefined &&
+        selected.outcome === "selected" &&
+        selected.optionId === "allow-once"
+      );
     } finally {
       stopDeadlineReminders();
     }
@@ -3538,7 +3549,8 @@ export class AcpServer {
       const candidate = this.providers[catalogName];
       if (
         catalogName.toLowerCase() !== name.toLowerCase() ||
-        candidate === null || candidate === undefined
+        candidate === null ||
+        candidate === undefined
       ) {
         continue;
       }
@@ -3558,9 +3570,9 @@ export class AcpServer {
     }
     if (this.settings === null) {
       throw new Error(
-        `ACP settings are required to construct provider ${
-          JSON.stringify(name)
-        }`,
+        `ACP settings are required to construct provider ${JSON.stringify(
+          name,
+        )}`,
       );
     }
     const created = createACPProvider(this.settings, name, modelId);
@@ -3688,8 +3700,8 @@ export class AcpServer {
       if (modelEntry.provider !== "") providerName = modelEntry.provider;
       modelId = modelEntry.modelId;
     }
-    const sameProvider = providerName.toLowerCase() ===
-      this.providerName.toLowerCase();
+    const sameProvider =
+      providerName.toLowerCase() === this.providerName.toLowerCase();
     let p: Provider;
     let model: Model;
     try {
@@ -3719,9 +3731,7 @@ export class AcpServer {
     }
     let thinking = this.thinkingLevel;
     const thinkingEntry = mgr.getLatestThinkingLevelChange();
-    if (
-      thinkingEntry !== null && thinkingEntry.thinkingLevel.trim() !== ""
-    ) {
+    if (thinkingEntry !== null && thinkingEntry.thinkingLevel.trim() !== "") {
       thinking = thinkingEntry.thinkingLevel;
     }
     const effectiveMode = runtime.resolvePolicy(mode, mode, MODE_YOLO).mode;
@@ -3879,15 +3889,11 @@ export class AcpServer {
     } = {},
   ): Record<string, unknown> {
     const result: Record<string, unknown> = { sessionId };
-    if (
-      opts.parentSessionId !== undefined && opts.parentSessionId !== ""
-    ) {
+    if (opts.parentSessionId !== undefined && opts.parentSessionId !== "") {
       result.parentSessionId = opts.parentSessionId;
     }
     if (opts.modes !== undefined) result.modes = opts.modes;
-    if (
-      opts.configOptions !== undefined && opts.configOptions.length > 0
-    ) {
+    if (opts.configOptions !== undefined && opts.configOptions.length > 0) {
       result.configOptions = opts.configOptions;
     }
     if (opts.history !== undefined && opts.history !== null) {
@@ -4128,7 +4134,8 @@ export class AcpServer {
     if (existing !== null) {
       const header = existing.mgr?.getHeader() ?? null;
       if (
-        existing.mgr === null || header === null ||
+        existing.mgr === null ||
+        header === null ||
         filepathClean(header.cwd) !== cwd
       ) {
         this.writeResponse(
@@ -4276,7 +4283,8 @@ export class AcpServer {
     if (existing !== null) {
       const header = existing.mgr?.getHeader() ?? null;
       if (
-        existing.mgr === null || header === null ||
+        existing.mgr === null ||
+        header === null ||
         filepathClean(header.cwd) !== cwd
       ) {
         this.writeResponse(
@@ -4350,9 +4358,7 @@ export class AcpServer {
   /** Handles `session/fork` (including the Runtime-owned expert switch). */
   async handleForkSession(req: ACPRPCRequest): Promise<void> {
     const inRequest = decodeForkSessionRequest(req.params);
-    if (
-      inRequest === null || (inRequest.sessionId ?? "").trim() === ""
-    ) {
+    if (inRequest === null || (inRequest.sessionId ?? "").trim() === "") {
       this.writeResponse(
         req.idRaw,
         null,
@@ -4391,9 +4397,7 @@ export class AcpServer {
       return;
     }
     const requestedParent = requestParentSessionID(inRequest._meta);
-    if (
-      requestedParent.trim() !== "" && requestedParent !== sourceSessionId
-    ) {
+    if (requestedParent.trim() !== "" && requestedParent !== sourceSessionId) {
       this.writeResponse(
         req.idRaw,
         null,
@@ -4432,10 +4436,7 @@ export class AcpServer {
       this.writeResponse(
         req.idRaw,
         null,
-        new RPCError(
-          -32602,
-          "fork request requires an idempotency requestId",
-        ),
+        new RPCError(-32602, "fork request requires an idempotency requestId"),
       );
       return;
     }
@@ -4452,9 +4453,9 @@ export class AcpServer {
         if (expertId !== "") {
           const bundle = inspectExpertBundle(resolved.cwd, expertId);
           if (bundle === null || bundle.invalid) {
-            let message = `expert bundle ${
-              JSON.stringify(expertId)
-            } is invalid`;
+            let message = `expert bundle ${JSON.stringify(
+              expertId,
+            )} is invalid`;
             if (bundle !== null && bundle.invalidReason.trim() !== "") {
               message += ": " + bundle.invalidReason;
             }
@@ -4462,11 +4463,7 @@ export class AcpServer {
             return;
           }
         }
-        result = forkSessionPrefixWithExpert(
-          sessionDir,
-          forkOptions,
-          expertId,
-        );
+        result = forkSessionPrefixWithExpert(sessionDir, forkOptions, expertId);
       } else {
         result = forkSessionPrefix(sessionDir, forkOptions);
       }
@@ -4564,16 +4561,15 @@ export class AcpServer {
   async handleSetConfigOption(req: ACPRPCRequest): Promise<void> {
     const inRequest = decodeSetConfigOptionRequest(req.params);
     if (
-      inRequest === null || (inRequest.sessionId ?? "").trim() === "" ||
-      (inRequest.configId ?? "").trim() === "" || inRequest.value === undefined
+      inRequest === null ||
+      (inRequest.sessionId ?? "").trim() === "" ||
+      (inRequest.configId ?? "").trim() === "" ||
+      inRequest.value === undefined
     ) {
       this.writeResponse(
         req.idRaw,
         null,
-        new RPCError(
-          -32602,
-          "sessionId, configId, and value are required",
-        ),
+        new RPCError(-32602, "sessionId, configId, and value are required"),
       );
       return;
     }
@@ -4637,9 +4633,8 @@ export class AcpServer {
           this.refreshSessionExpertTools(rt);
         });
       } else {
-        await this.withSessionMutationLeaseAsync(
-          sessionId,
-          () => runtime.setConfigOption(configId, value),
+        await this.withSessionMutationLeaseAsync(sessionId, () =>
+          runtime.setConfigOption(configId, value),
         );
       }
     } catch (error) {
@@ -4662,9 +4657,7 @@ export class AcpServer {
   /** Handles `session/set_mode`. */
   async handleSetMode(req: ACPRPCRequest): Promise<void> {
     const inRequest = decodeSetModeRequest(req.params);
-    if (
-      inRequest === null || (inRequest.sessionId ?? "").trim() === ""
-    ) {
+    if (inRequest === null || (inRequest.sessionId ?? "").trim() === "") {
       this.writeResponse(
         req.idRaw,
         null,
@@ -4696,9 +4689,8 @@ export class AcpServer {
     try {
       // SessionRuntime snapshots the binding for the active prompt; changing
       // the mode here therefore affects the next prompt and stays safe.
-      await this.withSessionMutationLeaseAsync(
-        sessionId,
-        () => runtime.setConfigOption(CONFIG_OPTION_MODE, modeId),
+      await this.withSessionMutationLeaseAsync(sessionId, () =>
+        runtime.setConfigOption(CONFIG_OPTION_MODE, modeId),
       );
     } catch (error) {
       this.writeResponse(
@@ -4893,7 +4885,10 @@ export class AcpServer {
     // /systeminit must also be able to write AGENTS.md, so upgrade plan mode to
     // agent for this prompt only.
     {
-      const fields = userText.trim().split(/\s+/).filter((part) => part !== "");
+      const fields = userText
+        .trim()
+        .split(/\s+/)
+        .filter((part) => part !== "");
       if (fields.length > 0 && fields[0] === systeminitCommand) {
         const extra = userText.trim().slice(systeminitCommand.length).trim();
         userText = systeminitPrompt(true, extra);
@@ -5249,9 +5244,9 @@ export class AcpServer {
           info = execution.recordFailure(error, { phase: PHASE_ADMISSION });
         } catch (observeError) {
           console.error(
-            `[acp] record agent build failure for ${runID}: ${
-              errorMessage(observeError)
-            }`,
+            `[acp] record agent build failure for ${runID}: ${errorMessage(
+              observeError,
+            )}`,
           );
         }
         console.error(
@@ -5300,9 +5295,9 @@ export class AcpServer {
                 }
               } catch (error) {
                 console.error(
-                  `[acp] observe agent event for ${runID}: ${
-                    errorMessage(error)
-                  }`,
+                  `[acp] observe agent event for ${runID}: ${errorMessage(
+                    error,
+                  )}`,
                 );
               }
             }
@@ -5344,7 +5339,8 @@ export class AcpServer {
               case EVENT_ERROR:
                 if (!terminalSeen) {
                   legacyTerminalSeen = true;
-                  runErr = coreEvent.error ??
+                  runErr =
+                    coreEvent.error ??
                     new Error("agent error event without error detail");
                   stopReason = normalizeStopReason(coreEvent.stopReason ?? "");
                 }
@@ -5365,9 +5361,9 @@ export class AcpServer {
               });
             } catch (error) {
               console.error(
-                `[acp] record interrupted stream for ${runID}: ${
-                  errorMessage(error)
-                }`,
+                `[acp] record interrupted stream for ${runID}: ${errorMessage(
+                  error,
+                )}`,
               );
             }
           }
@@ -5467,9 +5463,9 @@ export class AcpServer {
               this.notifyRunStatus(rt.id, runID, acpRunStatus(state));
             } catch (error) {
               console.error(
-                `[acp] project terminal run status ${runID}: ${
-                  errorMessage(error)
-                }`,
+                `[acp] project terminal run status ${runID}: ${errorMessage(
+                  error,
+                )}`,
               );
             }
             try {
@@ -5489,9 +5485,9 @@ export class AcpServer {
               runtimeRelease();
             } catch (error) {
               console.error(
-                `[acp] release prompt admission ${runID}: ${
-                  errorMessage(error)
-                }`,
+                `[acp] release prompt admission ${runID}: ${errorMessage(
+                  error,
+                )}`,
               );
             }
           }
@@ -5601,11 +5597,13 @@ export class AcpServer {
   /** Projects the available-commands catalog for one skills manager. */
   availableCommandsFor(manager: SkillsManager | null): AvailableCommand[] {
     if (manager === null || manager === undefined) return [];
-    const commands: AvailableCommand[] = [{
-      name: systeminitCommand,
-      description: "Initialize project guidance",
-      _meta: { [opensacExtensionNamespace]: { kind: "command" } },
-    }];
+    const commands: AvailableCommand[] = [
+      {
+        name: systeminitCommand,
+        description: "Initialize project guidance",
+        _meta: { [opensacExtensionNamespace]: { kind: "command" } },
+      },
+    ];
     for (const skill of manager.list()) {
       if (skill === null || skill === undefined || skill.name.trim() === "") {
         continue;
@@ -5647,7 +5645,10 @@ export class AcpServer {
     text: string,
   ): Promise<boolean> {
     if (rt === null || rt.runtime === null) return false;
-    const parts = text.trim().split(/\s+/).filter((part) => part !== "");
+    const parts = text
+      .trim()
+      .split(/\s+/)
+      .filter((part) => part !== "");
     if (parts.length === 0) return false;
     let name = "";
     if (parts.length === 1 && parts[0].startsWith("/skill:")) {
@@ -5688,9 +5689,12 @@ export class AcpServer {
 
   /** Emits one persisted provider message as its ACP transcript updates. */
   emitMessage(sessionId: string, msg: Message): void {
-    for (
-      const update of projectMessageUpdates(this.toolTitles, sessionId, msg, "")
-    ) {
+    for (const update of projectMessageUpdates(
+      this.toolTitles,
+      sessionId,
+      msg,
+      "",
+    )) {
       this.notify(sessionId, update);
     }
   }
@@ -6472,7 +6476,8 @@ function decodeSessionLifecycleRequest(
     );
   }
   if (
-    record._meta !== undefined && typeof record._meta === "object" &&
+    record._meta !== undefined &&
+    typeof record._meta === "object" &&
     record._meta !== null
   ) {
     request._meta = record._meta as RequestMeta;
@@ -6498,9 +6503,9 @@ function decodeDraftConfigOptionsRequest(
 function decodeLoadSessionRequest(
   params: unknown,
 ): ACPLoadSessionRequest | null {
-  const request = decodeSessionLifecycleRequest(params) as
-    | ACPLoadSessionRequest
-    | null;
+  const request = decodeSessionLifecycleRequest(
+    params,
+  ) as ACPLoadSessionRequest | null;
   if (request === null) return null;
   const record = params as Record<string, unknown>;
   if (typeof record.historyLimit === "number") {
@@ -6522,9 +6527,9 @@ function decodeResumeSessionRequest(
 function decodeForkSessionRequest(
   params: unknown,
 ): ACPForkSessionRequest | null {
-  const request = decodeSessionLifecycleRequest(params) as
-    | ACPForkSessionRequest
-    | null;
+  const request = decodeSessionLifecycleRequest(
+    params,
+  ) as ACPForkSessionRequest | null;
   if (request === null) return null;
   const record = params as Record<string, unknown>;
   if (typeof record.atSeq === "number") {
@@ -6547,9 +6552,9 @@ function decodeForkSessionRequest(
 function decodeSetConfigOptionRequest(
   params: unknown,
 ): ACPSetConfigOptionRequest | null {
-  const request = decodeSessionLifecycleRequest(params) as
-    | ACPSetConfigOptionRequest
-    | null;
+  const request = decodeSessionLifecycleRequest(
+    params,
+  ) as ACPSetConfigOptionRequest | null;
   if (request === null) return null;
   const record = params as Record<string, unknown>;
   if (typeof record.configId === "string") request.configId = record.configId;
@@ -6560,9 +6565,9 @@ function decodeSetConfigOptionRequest(
 
 /** Decodes a `session/set_mode` request; null marks malformed params. */
 function decodeSetModeRequest(params: unknown): ACPSetModeRequest | null {
-  const request = decodeSessionLifecycleRequest(params) as
-    | ACPSetModeRequest
-    | null;
+  const request = decodeSessionLifecycleRequest(
+    params,
+  ) as ACPSetModeRequest | null;
   if (request === null) return null;
   const record = params as Record<string, unknown>;
   if (typeof record.modeId === "string") request.modeId = record.modeId;
@@ -6608,13 +6613,15 @@ function decodeInitializeRequest(params: unknown): ACPInitializeRequest {
     request.clientCapabilities = record.clientCapabilities;
   }
   if (
-    record.clientInfo !== undefined && typeof record.clientInfo === "object" &&
+    record.clientInfo !== undefined &&
+    typeof record.clientInfo === "object" &&
     record.clientInfo !== null
   ) {
     request.clientInfo = record.clientInfo as ACPClientInfo;
   }
   if (
-    record._meta !== undefined && typeof record._meta === "object" &&
+    record._meta !== undefined &&
+    typeof record._meta === "object" &&
     record._meta !== null
   ) {
     request._meta = record._meta as RequestMeta;
@@ -6643,7 +6650,8 @@ function decodeClientCapabilities(raw: unknown): ACPClientCapabilities {
   }
   const elicitation = obj.elicitation;
   if (
-    elicitation !== null && typeof elicitation === "object" &&
+    elicitation !== null &&
+    typeof elicitation === "object" &&
     !Array.isArray(elicitation)
   ) {
     const e = elicitation as Record<string, unknown>;
@@ -6654,13 +6662,16 @@ function decodeClientCapabilities(raw: unknown): ACPClientCapabilities {
   }
   const session = obj.session;
   if (
-    session !== null && typeof session === "object" && !Array.isArray(session)
+    session !== null &&
+    typeof session === "object" &&
+    !Array.isArray(session)
   ) {
     const s = session as Record<string, unknown>;
     const out: ACPClientSessionCapabilities = {};
     const configOptions = s.configOptions;
     if (
-      configOptions !== null && typeof configOptions === "object" &&
+      configOptions !== null &&
+      typeof configOptions === "object" &&
       !Array.isArray(configOptions)
     ) {
       const c = configOptions as Record<string, unknown>;
@@ -6689,7 +6700,8 @@ export function acpFailureInfo(
   phase: RunPhase,
 ): ErrorInfo {
   if (
-    observed !== null && observed !== undefined &&
+    observed !== null &&
+    observed !== undefined &&
     displayErrorMessage(observed).trim() !== ""
   ) {
     return observed;
@@ -6775,7 +6787,8 @@ function decodeListSessionsRequest(
   }
   if (typeof record.query === "string") request.query = record.query;
   if (
-    record._meta !== undefined && typeof record._meta === "object" &&
+    record._meta !== undefined &&
+    typeof record._meta === "object" &&
     record._meta !== null
   ) {
     request._meta = record._meta as RequestMeta;
@@ -6784,9 +6797,7 @@ function decodeListSessionsRequest(
 }
 
 /** Decodes a `session/cancel` request; null marks malformed params. */
-function decodeCancelRequest(
-  params: unknown,
-): { sessionId?: string } | null {
+function decodeCancelRequest(params: unknown): { sessionId?: string } | null {
   if (params === undefined || params === null) return {};
   if (typeof params !== "object" || Array.isArray(params)) return null;
   const record = params as Record<string, unknown>;
@@ -6822,9 +6833,7 @@ function decodeSetWorkDirRequest(params: unknown): ACPSetWorkDirRequest | null {
 }
 
 /** Shared decode of the `{sessionId,cwd,title,_meta}` request envelope. */
-function decodeSessionRequest(
-  params: unknown,
-): Record<string, unknown> | null {
+function decodeSessionRequest(params: unknown): Record<string, unknown> | null {
   if (params === undefined || params === null) return {};
   if (typeof params !== "object" || Array.isArray(params)) return null;
   const record = params as Record<string, unknown>;
@@ -6835,7 +6844,8 @@ function decodeSessionRequest(
   if (typeof record.cwd === "string") request.cwd = record.cwd;
   if (typeof record.title === "string") request.title = record.title;
   if (
-    record._meta !== undefined && typeof record._meta === "object" &&
+    record._meta !== undefined &&
+    typeof record._meta === "object" &&
     record._meta !== null
   ) {
     request._meta = record._meta as RequestMeta;
@@ -6853,8 +6863,9 @@ function decodePromptRequest(params: unknown): ACPPromptRequest | null {
     request.sessionId = record.sessionId;
   }
   if (Array.isArray(record.prompt)) {
-    request.prompt = record.prompt.filter((block): block is ContentBlock =>
-      typeof block === "object" && block !== null && !Array.isArray(block)
+    request.prompt = record.prompt.filter(
+      (block): block is ContentBlock =>
+        typeof block === "object" && block !== null && !Array.isArray(block),
     );
   }
   if (Array.isArray(record.knowledgeBaseRefs)) {
@@ -6872,7 +6883,8 @@ function decodePromptRequest(params: unknown): ACPPromptRequest | null {
     request.knowledgeBaseRefs = refs;
   }
   if (
-    record._meta !== undefined && typeof record._meta === "object" &&
+    record._meta !== undefined &&
+    typeof record._meta === "object" &&
     record._meta !== null
   ) {
     request._meta = record._meta as RequestMeta;

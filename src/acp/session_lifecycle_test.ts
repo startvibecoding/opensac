@@ -5,6 +5,7 @@
 // internal/acp/acp.go). Fixtures create real persisted sessions in a temp
 // session directory and call the handlers directly.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -67,8 +68,8 @@ function parseMessages(output: string): Record<string, unknown>[] {
 
 /** Returns the JSON-RPC response (the message carrying result/error). */
 function responseOf(output: string): Record<string, unknown> {
-  const response = parseMessages(output).find((m) =>
-    "result" in m || "error" in m
+  const response = parseMessages(output).find(
+    (m) => "result" in m || "error" in m,
   );
   assert(response !== undefined, `no response in ${output}`);
   return response;
@@ -82,9 +83,9 @@ interface Fixture {
 }
 
 function createFixture(): Fixture {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-life-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-acp-life-" });
   const sessionDir = path.join(root, "sessions");
-  Deno.mkdirSync(sessionDir, { recursive: true });
+  nodeRuntime.mkdirSync(sessionDir, { recursive: true });
   const server = new AcpServer();
   server.settings = { sessionDir } as unknown as Settings;
   const sink = new SyncBuffer();
@@ -93,7 +94,7 @@ function createFixture(): Fixture {
 }
 
 function makeSession(sessionDir: string, workDir: string, id: string): string {
-  Deno.mkdirSync(workDir, { recursive: true });
+  nodeRuntime.mkdirSync(workDir, { recursive: true });
   const mgr = createSession({ workDir, sessionDir, id });
   return mgr.getHeader()!.id;
 }
@@ -132,8 +133,8 @@ test("session/list rejects a cwd outside the negotiated workspace", () => {
   const { server, sink, root } = createFixture();
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
-  Deno.mkdirSync(workA, { recursive: true });
-  Deno.mkdirSync(workB, { recursive: true });
+  nodeRuntime.mkdirSync(workA, { recursive: true });
+  nodeRuntime.mkdirSync(workB, { recursive: true });
   server.workspaceCwd = workA;
 
   server.handleListSessions(rpc(1, "session/list", { cwd: workB }));
@@ -233,7 +234,7 @@ test("opensac/session/setWorkDir guards and moves the session", async () => {
   const workA = path.join(root, "a");
   const workB = path.join(root, "b");
   const workD = path.join(root, "d");
-  Deno.mkdirSync(workD, { recursive: true });
+  nodeRuntime.mkdirSync(workD, { recursive: true });
   const id = makeSession(sessionDir, workA, "sess-wd");
 
   // Same cwd short-circuits without a mutation.
@@ -268,10 +269,7 @@ test("opensac/session/setWorkDir guards and moves the session", async () => {
     (responseOf(sink.toString()).result as Record<string, unknown>).cwd,
     workD,
   );
-  assertEquals(
-    openByIDExact(sessionDir, id).getHeader()!.cwd,
-    workD,
-  );
+  assertEquals(openByIDExact(sessionDir, id).getHeader()!.cwd, workD);
 
   // A directory outside the negotiated window is refused.
   server.workspaceCwd = root;

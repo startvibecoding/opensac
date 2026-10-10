@@ -50,7 +50,10 @@ test("commandSpecs keeps the Go spec table exactly", () => {
     "/help",
     "/quit",
   ];
-  assertEquals(commandSpecs.map((s) => s.name), expectedNames);
+  assertEquals(
+    commandSpecs.map((s) => s.name),
+    expectedNames,
+  );
   // Usage strings are protocol text and must remain English/unchanged.
   assertEquals(findCommandSpec("/mode")?.usage, "/mode [plan|agent|yolo|os]");
   assertEquals(

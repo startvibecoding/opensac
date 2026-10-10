@@ -2,6 +2,7 @@
 // Go's archive/zip is replaced with the local zip reader in ./zip.ts. The
 // streaming copy limit is preserved by bounding the buffered download.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { hasSkillFile, MetadataError, readMetadata } from "./local.ts";
 import {
@@ -10,7 +11,8 @@ import {
   type Market,
   type MarketClient,
   type SkillDetail,
-  type SkillId} from "./types.ts";
+  type SkillId,
+} from "./types.ts";
 import { createZip, readZipEntries, type ZipWriteEntry } from "./zip.ts";
 
 export const maxDownloadBytes = 50 << 20;
@@ -66,9 +68,9 @@ export async function installSkill(
   const market = request.market ?? client.market().id;
   if (market !== client.market().id) {
     throw new Error(
-      `client market ${
-        quote(client.market().id)
-      } does not match requested market ${quote(market)}`,
+      `client market ${quote(
+        client.market().id,
+      )} does not match requested market ${quote(market)}`,
     );
   }
   if (request.id === "" || request.targetDir === "") {
@@ -90,9 +92,9 @@ export async function installSkill(
   if (existing) {
     if (existing.market !== market || existing.id !== request.id) {
       throw new Error(
-        `skill ${
-          quote(name)
-        } is managed by ${existing.market}/${existing.id}, not ${market}/${request.id}`,
+        `skill ${quote(
+          name,
+        )} is managed by ${existing.market}/${existing.id}, not ${market}/${request.id}`,
       );
     }
     if (existing.version === version) {
@@ -113,9 +115,9 @@ export async function installSkill(
     }
   }
 
-  await Deno.mkdir(request.targetDir, { recursive: true });
+  await runtime.mkdir(request.targetDir, { recursive: true });
   const download = await client.download(signal, id, version);
-  const tempDir = await Deno.makeTempDir({
+  const tempDir = await runtime.makeTempDir({
     dir: request.targetDir,
     prefix: ".skillhub-download-",
   });
@@ -126,7 +128,7 @@ export async function installSkill(
     await extractZip(archivePath, extractDir);
     const sourceDir = skillRoot(extractDir);
     const stageDir = path.join(tempDir, "install");
-    await Deno.rename(sourceDir, stageDir);
+    await runtime.rename(sourceDir, stageDir);
     const metadata = {
       market,
       id: request.id,
@@ -138,7 +140,7 @@ export async function installSkill(
     writeMetadata(stageDir, metadata);
     replaceDirectory(destination, stageDir);
   } finally {
-    await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+    await runtime.remove(tempDir, { recursive: true }).catch(() => {});
   }
   return {
     name,
@@ -176,11 +178,11 @@ async function copyLimited(
     buffer.set(chunk, offset);
     offset += chunk.length;
   }
-  await Deno.writeFile(filePath, buffer, { createNew: true, mode: 0o600 });
+  await runtime.writeFile(filePath, buffer, { createNew: true, mode: 0o600 });
 }
 
 async function extractZip(archivePath: string, target: string): Promise<void> {
-  const data = await Deno.readFile(archivePath);
+  const data = await runtime.readFile(archivePath);
   let entries;
   try {
     entries = readZipEntries(data);
@@ -204,9 +206,9 @@ async function extractZip(archivePath: string, target: string): Promise<void> {
     }
     if (entry.uncompressedSize > maxFileBytes) {
       throw new InvalidArchiveError(
-        `skill archive is invalid: file ${
-          quote(entry.name)
-        } exceeds size limit`,
+        `skill archive is invalid: file ${quote(
+          entry.name,
+        )} exceeds size limit`,
       );
     }
     total += entry.uncompressedSize;
@@ -216,29 +218,34 @@ async function extractZip(archivePath: string, target: string): Promise<void> {
       );
     }
   }
-  await Deno.mkdir(target, { recursive: true });
+  await runtime.mkdir(target, { recursive: true });
   for (const entry of entries) {
     const entryPath = path.join(target, ...entry.name.split("/"));
     if (entry.isDir) {
-      await Deno.mkdir(entryPath, { recursive: true });
+      await runtime.mkdir(entryPath, { recursive: true });
       continue;
     }
-    await Deno.mkdir(path.dirname(entryPath), { recursive: true });
+    await runtime.mkdir(path.dirname(entryPath), { recursive: true });
     const content = await entry.read();
     if (content.length > maxFileBytes) {
       throw new InvalidArchiveError(
-        `skill archive is invalid: file ${
-          quote(entry.name)
-        } exceeds size limit`,
+        `skill archive is invalid: file ${quote(
+          entry.name,
+        )} exceeds size limit`,
       );
     }
-    await Deno.writeFile(entryPath, content, { createNew: true, mode: 0o644 });
+    await runtime.writeFile(entryPath, content, {
+      createNew: true,
+      mode: 0o644,
+    });
   }
 }
 
 function archivePathSafe(name: string): void {
   if (
-    name === "" || name.includes("\\") || path.isAbsolute(name) ||
+    name === "" ||
+    name.includes("\\") ||
+    path.isAbsolute(name) ||
     isWindowsDrivePath(name)
   ) {
     throw new InvalidArchiveError(
@@ -247,7 +254,8 @@ function archivePathSafe(name: string): void {
   }
   const clean = path.normalize(name.split("/").join(path.SEPARATOR));
   if (
-    clean === "." || clean === ".." ||
+    clean === "." ||
+    clean === ".." ||
     clean.startsWith(".." + path.SEPARATOR)
   ) {
     throw new InvalidArchiveError(
@@ -265,7 +273,7 @@ function isWindowsDrivePath(name: string): boolean {
 
 function skillRoot(extractDir: string): string {
   if (hasSkillFile(extractDir)) return extractDir;
-  const entries = [...Deno.readDirSync(extractDir)];
+  const entries = [...runtime.readDirSync(extractDir)];
   if (entries.length === 1 && entries[0].isDirectory) {
     const root = path.join(extractDir, entries[0].name);
     if (hasSkillFile(root)) return root;
@@ -280,7 +288,10 @@ function installName(detail: SkillDetail, id: string): string {
   if (name === "") name = id;
   name = path.basename(name.split("\\").join("/"));
   if (
-    name === "." || name === "" || name === ".." || name !== path.basename(name)
+    name === "." ||
+    name === "" ||
+    name === ".." ||
+    name !== path.basename(name)
   ) {
     throw new Error(`invalid skill name ${quote(name)}`);
   }
@@ -311,39 +322,39 @@ export function writeMetadata(
     null,
     2,
   );
-  Deno.writeTextFileSync(
+  runtime.writeTextFileSync(
     path.join(dir, ".opensac-skillhub.json"),
     payload + "\n",
   );
 }
 
 function replaceDirectory(destination: string, stage: string): void {
-  Deno.mkdirSync(path.dirname(destination), { recursive: true });
+  runtime.mkdirSync(path.dirname(destination), { recursive: true });
   let backup = "";
   if (exists(destination)) {
-    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(
-      "T",
-      "T",
-    );
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace("T", "T");
     backup = path.join(
       path.dirname(destination),
       ".backup",
       `${path.basename(destination)}-${stamp}`,
     );
-    Deno.mkdirSync(path.dirname(backup), { recursive: true });
-    Deno.renameSync(destination, backup);
+    runtime.mkdirSync(path.dirname(backup), { recursive: true });
+    runtime.renameSync(destination, backup);
   }
   try {
-    Deno.renameSync(stage, destination);
+    runtime.renameSync(stage, destination);
   } catch (error) {
-    if (backup !== "") Deno.renameSync(backup, destination);
+    if (backup !== "") runtime.renameSync(backup, destination);
     throw error;
   }
 }
 
 function exists(file: string): boolean {
   try {
-    Deno.statSync(file);
+    runtime.statSync(file);
     return true;
   } catch {
     return false;

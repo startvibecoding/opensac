@@ -15,10 +15,11 @@ export function filterSkills(
 ): SkillSummary[] {
   const needle = query.trim().toLowerCase();
   if (needle === "") return items;
-  return items.filter((item) =>
-    item.name.toLowerCase().includes(needle) ||
-    item.displayName.toLowerCase().includes(needle) ||
-    item.description.toLowerCase().includes(needle)
+  return items.filter(
+    (item) =>
+      item.name.toLowerCase().includes(needle) ||
+      item.displayName.toLowerCase().includes(needle) ||
+      item.description.toLowerCase().includes(needle),
   );
 }
 

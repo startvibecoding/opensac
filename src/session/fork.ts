@@ -174,13 +174,13 @@ interface ForkSourceFingerprint {
 type Phase1 =
   | { kind: "idempotent"; result: ForkResult }
   | {
-    kind: "snapshot";
-    copyEntries: ForkSourceEntry[];
-    turns: ReturnType<typeof scanTurn>[];
-    boundary: number;
-    forkKind: ForkKind;
-    snapshot: ForkSourceFingerprint;
-  };
+      kind: "snapshot";
+      copyEntries: ForkSourceEntry[];
+      turns: ReturnType<typeof scanTurn>[];
+      boundary: number;
+      forkKind: ForkKind;
+      snapshot: ForkSourceFingerprint;
+    };
 
 function scanTurn(record: ConversationTurnRecord) {
   const startedAt = parseSessionTimestamp(record.startedAt);
@@ -195,9 +195,8 @@ function scanTurn(record: ConversationTurnRecord) {
     startSeq: record.startSeq,
     endSeq: record.endSeq,
     startedAt,
-    endedAt: record.endedAt === null
-      ? null
-      : parseSessionTimestamp(record.endedAt),
+    endedAt:
+      record.endedAt === null ? null : parseSessionTimestamp(record.endedAt),
   };
 }
 
@@ -325,7 +324,8 @@ export function forkSession(
       validateRuntimeLeaseTx(tx, sessionDir, sourceId);
       const current = forkSourceFingerprintTx(tx, sourceId);
       if (
-        current.maxSeq !== snapshot.maxSeq || current.leaf !== snapshot.leaf ||
+        current.maxSeq !== snapshot.maxSeq ||
+        current.leaf !== snapshot.leaf ||
         current.openTurns !== snapshot.openTurns ||
         current.activeRuns !== snapshot.activeRuns
       ) {
@@ -335,9 +335,7 @@ export function forkSession(
         ) {
           throw new ForkSessionActiveError();
         }
-        throw new SessionModifiedError(
-          "source changed during fork snapshot",
-        );
+        throw new SessionModifiedError("source changed during fork snapshot");
       }
 
       let childId = generateID();
@@ -507,9 +505,10 @@ function hashForkRequest(requestId: string): string {
 }
 
 function forkFingerprint(options: ForkOptions): string {
-  const seq = options.atSeq !== undefined && options.atSeq !== null
-    ? String(options.atSeq)
-    : "";
+  const seq =
+    options.atSeq !== undefined && options.atSeq !== null
+      ? String(options.atSeq)
+      : "";
   // SQLite text values must not contain embedded NUL bytes: use a stable
   // printable delimiter for the idempotency snapshot instead.
   return `${options.sourceSessionId}|${seq}|${options.titleMode}`;
@@ -608,16 +607,15 @@ function resolveForkBoundaryTx(
   }
   if (message.message?.role !== "assistant") throw new ForkUnavailableError();
   for (const turn of turns) {
-    if (
-      turn.endSeq === null || atSeq < turn.startSeq || atSeq > turn.endSeq
-    ) {
+    if (turn.endSeq === null || atSeq < turn.startSeq || atSeq > turn.endSeq) {
       continue;
     }
     let lastMessageSeq = 0;
     let lastMessage: MessageEntry | null = null;
     for (const candidate of entries) {
       if (
-        candidate.seq < turn.startSeq || candidate.seq > turn.endSeq ||
+        candidate.seq < turn.startSeq ||
+        candidate.seq > turn.endSeq ||
         candidate.type !== entryMessage
       ) {
         continue;
@@ -632,11 +630,12 @@ function resolveForkBoundaryTx(
       lastMessage = candidateMessage;
     }
     if (
-      lastMessageSeq !== atSeq || lastMessage === null ||
+      lastMessageSeq !== atSeq ||
+      lastMessage === null ||
       lastMessage.message?.role !== "assistant" ||
       !hasAssistantText(lastMessage.message) ||
-      (lastMessage.message.contents?.length ?? 0) > 0 &&
-        hasToolCall(lastMessage.message.contents)
+      ((lastMessage.message.contents?.length ?? 0) > 0 &&
+        hasToolCall(lastMessage.message.contents))
     ) {
       throw new ForkUnavailableError();
     }
@@ -696,7 +695,8 @@ function resolveLegacyForkBoundaryTx(
       if (entry.type !== entryMessage) continue;
       const ts = parseSessionTimestamp(entry.timestamp);
       if (
-        isNaN(ts.getTime()) || ts.getTime() < window.start.getTime() ||
+        isNaN(ts.getTime()) ||
+        ts.getTime() < window.start.getTime() ||
         ts.getTime() > window.end.getTime()
       ) {
         continue;
@@ -724,7 +724,8 @@ function resolveLegacyForkBoundaryTx(
     let lastSeq = 0;
     for (const entry of entries) {
       if (
-        entry.seq < boundary.startSeq || entry.seq > boundary.endSeq ||
+        entry.seq < boundary.startSeq ||
+        entry.seq > boundary.endSeq ||
         entry.type !== entryMessage
       ) {
         continue;
@@ -742,7 +743,9 @@ function resolveLegacyForkBoundaryTx(
       }
     }
     if (
-      selectedSeq === 0 || selectedSeq !== lastSeq || selected === null ||
+      selectedSeq === 0 ||
+      selectedSeq !== lastSeq ||
+      selected === null ||
       selected.message?.role !== "assistant" ||
       !hasAssistantText(selected.message) ||
       hasToolCall(selected.message.contents)
@@ -813,9 +816,7 @@ function remapForkData(
         entry.previousCompactionId = remapEntryId(entry.previousCompactionId);
       }
       if (entry.lastSummarizedEntryId) {
-        entry.lastSummarizedEntryId = remapEntryId(
-          entry.lastSummarizedEntryId,
-        );
+        entry.lastSummarizedEntryId = remapEntryId(entry.lastSummarizedEntryId);
       }
       return JSON.stringify(entry);
     }

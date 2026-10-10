@@ -106,12 +106,11 @@ export function requestEditorContext(
 }
 
 /** Returns the trimmed client surface label carried by prompt metadata. */
-export function requestSurface(
-  meta: RequestMeta | undefined | null,
-): string {
+export function requestSurface(meta: RequestMeta | undefined | null): string {
   if (meta === undefined || meta === null) return "";
   if (
-    meta.opensac !== undefined && (meta.opensac.surface ?? "").trim() !== ""
+    meta.opensac !== undefined &&
+    (meta.opensac.surface ?? "").trim() !== ""
   ) {
     return (meta.opensac.surface ?? "").trim();
   }

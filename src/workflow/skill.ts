@@ -1,8 +1,10 @@
 //
-// `path/filepath` maps to `@std/path`; `os.OpenFile(..., O_EXCL)` maps to
-// `Deno.writeTextFile({ createNew: true })`. The bundled skill and progressive
+// `path/filepath` maps to `src/compat/path.ts`; `os.OpenFile(..., O_EXCL)` maps
+// to `nodeRuntime.writeTextFile({ createNew: true })`. The bundled skill and
+// progressive
 // reference content is copied verbatim so authoring guidance stays in sync.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 
 /** The workflow authoring skill slug. */
@@ -163,8 +165,7 @@ many numbered phases. Repeated agents keep a literal name and use key: "r" + i;
 so results are stored as phase.agent[r0], phase.agent[r1], and so on. Status workers
 should return exactly DONE or NEEDS_WORK. Use resultLatest for the newest instance.
 `,
-  "references/05-horizontal-collaboration.md":
-    `# Horizontal Multi-Agent Collaboration
+  "references/05-horizontal-collaboration.md": `# Horizontal Multi-Agent Collaboration
 
 Use parallel peer agents for independent opinions, then a reconciliation phase.
 
@@ -258,15 +259,15 @@ export async function ensureProjectSkill(
       return [candidate, false];
     }
   }
-  await Deno.mkdir(skillDir, { recursive: true });
+  await nodeRuntime.mkdir(skillDir, { recursive: true });
   let created = false;
   try {
-    await Deno.writeTextFile(upperPath, defaultSkillContent, {
+    await nodeRuntime.writeTextFile(upperPath, defaultSkillContent, {
       createNew: true,
     });
     created = true;
   } catch (err) {
-    if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
+    if (!(err instanceof nodeRuntime.errors.AlreadyExists)) throw err;
   }
   await ensureReferenceFiles(skillDir);
   return [upperPath, created];
@@ -276,21 +277,21 @@ async function ensureReferenceFiles(skillDir: string): Promise<void> {
   for (const [relPath, content] of Object.entries(defaultReferenceFiles)) {
     const filePath = path.join(skillDir, relPath);
     if (await pathExists(filePath)) continue;
-    await Deno.mkdir(path.dirname(filePath), { recursive: true });
+    await nodeRuntime.mkdir(path.dirname(filePath), { recursive: true });
     try {
-      await Deno.writeTextFile(filePath, content, { createNew: true });
+      await nodeRuntime.writeTextFile(filePath, content, { createNew: true });
     } catch (err) {
-      if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
+      if (!(err instanceof nodeRuntime.errors.AlreadyExists)) throw err;
     }
   }
 }
 
 async function pathExists(p: string): Promise<boolean> {
   try {
-    await Deno.stat(p);
+    await nodeRuntime.stat(p);
     return true;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
+    if (err instanceof nodeRuntime.errors.NotFound) return false;
     throw err;
   }
 }

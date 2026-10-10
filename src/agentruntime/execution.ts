@@ -7,7 +7,7 @@
 //
 // Deviations from Go: `context.Context` maps to `AbortSignal`, the
 // `chan struct{}` completion signal maps to a small `Done` handle, `sync.Mutex`
-// is unnecessary because Deno's event loop runs the synchronous store/DAO
+// is unnecessary because Node's event loop runs the synchronous store/DAO
 // methods without interleaving (the Go `TryLock` fast path therefore always
 // succeeds), `json.RawMessage` maps to decoded `unknown`, `time.Time` maps to
 // `Date`, `time.Duration` maps to milliseconds, and Go's `(value, error)` pairs
@@ -52,7 +52,10 @@ import {
   runAssistantEntryID,
   runTerminalEventID,
 } from "../session/run_user_message.ts";
-import { type DeliveryPlan, type OrderedDeliveryOperationPlan } from "./delivery.ts";
+import {
+  type DeliveryPlan,
+  type OrderedDeliveryOperationPlan,
+} from "./delivery.ts";
 import {
   applyErrorDefaults,
   classifyError,
@@ -242,7 +245,8 @@ export class ExecutionRuntime {
       throw new Error("delivery plan Run ID is required");
     }
     if (
-      !this.activeLocked(runId) || !this.durablePersisted ||
+      !this.activeLocked(runId) ||
+      !this.durablePersisted ||
       this.durable === null
     ) {
       throw new Error(`durable run is not active: ${runId}`);
@@ -260,10 +264,11 @@ export class ExecutionRuntime {
     ) {
       throw new Error("delivery plan identity does not match active Run");
     }
-    plan.intent.transportContext = plan.intent.transportContext &&
-        typeof plan.intent.transportContext === "object"
-      ? { ...(plan.intent.transportContext as Record<string, unknown>) }
-      : plan.intent.transportContext;
+    plan.intent.transportContext =
+      plan.intent.transportContext &&
+      typeof plan.intent.transportContext === "object"
+        ? { ...(plan.intent.transportContext as Record<string, unknown>) }
+        : plan.intent.transportContext;
     this.durable.deliveryPlan = {
       intent: { ...plan.intent },
       operations: plan.operations.map((op: OrderedDeliveryOperationPlan) => ({
@@ -285,7 +290,8 @@ export class ExecutionRuntime {
       throw new Error("runtime assistant entry must have assistant role");
     }
     if (
-      !this.activeLocked(runId) || !this.durablePersisted ||
+      !this.activeLocked(runId) ||
+      !this.durablePersisted ||
       this.durable === null
     ) {
       throw new Error(`durable run is not active: ${runId}`);
@@ -487,9 +493,9 @@ export class ExecutionRuntime {
         if (this.activeLocked(runId)) this.state = previous;
         if (rollbackErr !== null) {
           throw new Error(
-            `record execution ${state} event: ${
-              errorMessage(err)
-            } (rollback failed: ${errorMessage(rollbackErr)})`,
+            `record execution ${state} event: ${errorMessage(
+              err,
+            )} (rollback failed: ${errorMessage(rollbackErr)})`,
           );
         }
         throw new Error(
@@ -500,8 +506,11 @@ export class ExecutionRuntime {
   }
 
   activeLocked(runId: string): boolean {
-    return this.cancelFn !== null && !this.finished &&
-      (runId === "" || this.runId === runId);
+    return (
+      this.cancelFn !== null &&
+      !this.finished &&
+      (runId === "" || this.runId === runId)
+    );
   }
 
   /** Associates the core agent so cancellation can unblock agent waits. */
@@ -584,7 +593,9 @@ export class ExecutionRuntime {
     if (!isTerminalRunState(state)) {
       throw new Error(`execution terminal state is invalid: ${state}`);
     }
-    const durable = this.activeLocked(runId) && this.durablePersisted &&
+    const durable =
+      this.activeLocked(runId) &&
+      this.durablePersisted &&
       this.durable !== null;
     if (durable) {
       this.finishDurableLocked(runId, state, "", event);
@@ -619,7 +630,9 @@ export class ExecutionRuntime {
 
   /** Transitions the active run to an explicit terminal state. */
   finishWithState(runId: string, state: RunState): void {
-    const durable = this.activeLocked(runId) && this.durablePersisted &&
+    const durable =
+      this.activeLocked(runId) &&
+      this.durablePersisted &&
       this.durable !== null;
     if (durable) {
       const d = this.durable!;
@@ -730,9 +743,9 @@ export class ExecutionRuntime {
     } catch (err) {
       if (updateErr !== null) {
         throw new Error(
-          `${updateErr.message}; wait for execution shutdown: ${
-            errorMessage(err)
-          }`,
+          `${updateErr.message}; wait for execution shutdown: ${errorMessage(
+            err,
+          )}`,
         );
       }
       throw err;
@@ -822,7 +835,8 @@ export class ExecutionRuntime {
     const recorded = this.terminalEventRecorded;
     const atomicFinisher =
       store as unknown as DurableConversationTurnEventFinisher;
-    const atomicFinish = hasMethod(store, "finishRunAndConversationTurn") &&
+    const atomicFinish =
+      hasMethod(store, "finishRunAndConversationTurn") &&
       durableRun.conversationTurn;
 
     if (!recorded && !atomicFinish) {
@@ -877,15 +891,15 @@ export class ExecutionRuntime {
       } catch (err) {
         this.finishTerminalAttempt(
           new Error(
-            `finish shutdown durable run and conversation turn: ${
-              errorMessage(err)
-            }`,
+            `finish shutdown durable run and conversation turn: ${errorMessage(
+              err,
+            )}`,
           ),
         );
         throw new Error(
-          `finish shutdown durable run and conversation turn: ${
-            errorMessage(err)
-          }`,
+          `finish shutdown durable run and conversation turn: ${errorMessage(
+            err,
+          )}`,
         );
       }
       if (this.terminalEvent.id === "") this.terminalEvent.id = id;
@@ -1082,7 +1096,8 @@ export class ExecutionRuntime {
     event: RunEvent,
   ): { intent: ExecutionIntent; signal: AbortSignal } {
     if (
-      runInput.id === "" || runInput.sessionId === "" ||
+      runInput.id === "" ||
+      runInput.sessionId === "" ||
       runInput.intentId === ""
     ) {
       throw new Error(
@@ -1174,9 +1189,11 @@ export class ExecutionRuntime {
     const run = withConversationTurnID(runInput);
     const signal = this.begin(parent, run.id);
     if (hasMethod(store, "leaseLost")) {
-      const leaseLost = (store as unknown as {
-        leaseLost(sessionId: string): AbortSignal | undefined;
-      }).leaseLost(run.sessionId);
+      const leaseLost = (
+        store as unknown as {
+          leaseLost(sessionId: string): AbortSignal | undefined;
+        }
+      ).leaseLost(run.sessionId);
       this.watchLeaseLost(this.done, leaseLost);
     }
     this.durable = { ...run };
@@ -1267,8 +1284,7 @@ export class ExecutionRuntime {
     run: DurableRun,
     registrationErr: Error,
   ): Error {
-    const message =
-      `register local execution binding: ${registrationErr.message}`;
+    const message = `register local execution binding: ${registrationErr.message}`;
     try {
       this.finishDurable(run.id, RUN_STATE_FAILED, message, {
         sessionId: run.sessionId,
@@ -1330,8 +1346,9 @@ export class ExecutionRuntime {
     const signal = this.begin(parent, runInput.id);
     if (hasMethod(store, "prepareExistingExecution")) {
       try {
-        (store as unknown as DurableExecutionOwnershipStore)
-          .prepareExistingExecution(runInput.sessionId, runInput.id);
+        (
+          store as unknown as DurableExecutionOwnershipStore
+        ).prepareExistingExecution(runInput.sessionId, runInput.id);
       } catch (err) {
         this.finishInMemory(runInput.id, RUN_STATE_FAILED, true);
         throw new Error(
@@ -1351,9 +1368,11 @@ export class ExecutionRuntime {
     this.durablePersisted = true;
     this.startEvent = startEvent;
     if (hasMethod(store, "leaseLost")) {
-      const leaseLost = (store as unknown as {
-        leaseLost(sessionId: string): AbortSignal | undefined;
-      }).leaseLost(run.sessionId);
+      const leaseLost = (
+        store as unknown as {
+          leaseLost(sessionId: string): AbortSignal | undefined;
+        }
+      ).leaseLost(run.sessionId);
       this.watchLeaseLost(this.done, leaseLost);
     }
     try {
@@ -1497,9 +1516,11 @@ export class ExecutionRuntime {
         const store = this.runStore();
         if (store !== null && hasMethod(store, "leaseLost")) {
           const sessionId = this.durable?.sessionId ?? "";
-          lost = (store as unknown as {
-            leaseLost(sessionId: string): AbortSignal | undefined;
-          }).leaseLost(sessionId);
+          lost = (
+            store as unknown as {
+              leaseLost(sessionId: string): AbortSignal | undefined;
+            }
+          ).leaseLost(sessionId);
         }
         const stop = await waitDelayOrAbort(delay, controller.signal, lost);
         if (stop === "abort") {
@@ -1530,8 +1551,11 @@ export class ExecutionRuntime {
   }
 
   private canRetryTerminalPersistence(runId: string, state: RunState): boolean {
-    return this.activeLocked(runId) && this.terminalEventSet &&
-      this.terminalState === state;
+    return (
+      this.activeLocked(runId) &&
+      this.terminalEventSet &&
+      this.terminalState === state
+    );
   }
 
   private startTerminalPersistenceRetry(
@@ -1542,8 +1566,10 @@ export class ExecutionRuntime {
   ): void {
     event.data = cloneUnknown(event.data);
     if (
-      this.terminalRetryRunning || !this.activeLocked(runId) ||
-      !this.terminalEventSet || this.terminalState !== state
+      this.terminalRetryRunning ||
+      !this.activeLocked(runId) ||
+      !this.terminalEventSet ||
+      this.terminalState !== state
     ) {
       return;
     }
@@ -1553,9 +1579,11 @@ export class ExecutionRuntime {
     const sessionId = this.durable?.sessionId ?? "";
     let lost: AbortSignal | undefined;
     if (store !== null && hasMethod(store, "leaseLost") && sessionId !== "") {
-      lost = (store as unknown as {
-        leaseLost(sessionId: string): AbortSignal | undefined;
-      }).leaseLost(sessionId);
+      lost = (
+        store as unknown as {
+          leaseLost(sessionId: string): AbortSignal | undefined;
+        }
+      ).leaseLost(sessionId);
     }
     void (async () => {
       try {
@@ -1572,7 +1600,8 @@ export class ExecutionRuntime {
           if (
             failed instanceof RuntimeLeaseLostError ||
             !this.canRetryTerminalPersistence(runId, state)
-          ) return;
+          )
+            return;
           const stop = await waitDelayOrAbort(
             delay,
             done?.promise !== undefined ? doneAbortPromise(done!) : undefined,
@@ -1684,8 +1713,9 @@ export class ExecutionRuntime {
     if (!prepared) {
       if (store !== null && hasMethod(store, "markTerminalizing")) {
         try {
-          (store as unknown as DurableTerminalPersistenceStore)
-            .markTerminalizing(runId, message);
+          (
+            store as unknown as DurableTerminalPersistenceStore
+          ).markTerminalizing(runId, message);
         } catch (err) {
           this.finishTerminalAttempt(toError(err));
           throw new Error(
@@ -1698,7 +1728,8 @@ export class ExecutionRuntime {
     }
     const atomicFinisher =
       store as unknown as DurableConversationTurnEventFinisher;
-    const atomicFinish = hasMethod(store, "finishRunAndConversationTurn") &&
+    const atomicFinish =
+      hasMethod(store, "finishRunAndConversationTurn") &&
       durableRun.conversationTurn;
 
     if (!recorded && !atomicFinish) {
@@ -1757,7 +1788,8 @@ export class ExecutionRuntime {
         projector.project(event, id);
       }
     } else if (
-      durableRun.conversationTurn && hasMethod(store, "finishConversationTurn")
+      durableRun.conversationTurn &&
+      hasMethod(store, "finishConversationTurn")
     ) {
       const turnStore = store as unknown as DurableConversationTurnFinisher;
       try {
@@ -1864,7 +1896,8 @@ export class ExecutionRuntime {
       case EVENT_THINK_DELTA:
       case EVENT_HOSTED_ITEM:
         if (
-          (ev.thinkDelta ?? "").trim() !== "" || ev.hostedItem !== undefined
+          (ev.thinkDelta ?? "").trim() !== "" ||
+          ev.hostedItem !== undefined
         ) {
           this.facts.partialOutput = true;
         }
@@ -2054,9 +2087,8 @@ export class ExecutionRuntime {
 
   private persistErrorInfo(run: DurableRun, info: ErrorInfo): void {
     const store = this.runStore();
-    if (
-      store === null || !hasMethod(store, "updateErrorInfo") || run.id === ""
-    ) return;
+    if (store === null || !hasMethod(store, "updateErrorInfo") || run.id === "")
+      return;
     try {
       (store as unknown as DurableRunMetadataStore).updateErrorInfo(
         run.id,
@@ -2069,9 +2101,8 @@ export class ExecutionRuntime {
 
   private clearRetryProgress(run: DurableRun): void {
     const store = this.runStore();
-    if (
-      store === null || !hasMethod(store, "updateProgress") || run.id === ""
-    ) return;
+    if (store === null || !hasMethod(store, "updateProgress") || run.id === "")
+      return;
     try {
       (store as unknown as DurableRunMetadataStore).updateProgress(run.id, {});
     } catch (err) {
@@ -2088,7 +2119,8 @@ export class ExecutionRuntime {
     const binding = ownershipStore.executionBinding(run.sessionId, run.id);
     if (binding === null) return;
     if (
-      binding.purpose !== "execution" || binding.sessionId !== run.sessionId ||
+      binding.purpose !== "execution" ||
+      binding.sessionId !== run.sessionId ||
       binding.runId !== run.id
     ) {
       throw new RuntimeLeaseRunMismatchError(run.id);
@@ -2096,9 +2128,9 @@ export class ExecutionRuntime {
     let bound: RuntimeLeaseBinding = binding;
     let releaseLease: (() => void) | null = null;
     if (hasMethod(store, "retainExecutionLease")) {
-      const retention =
-        (store as unknown as DurableExecutionLeaseRetentionStore)
-          .retainExecutionLease(run.sessionId, run.id);
+      const retention = (
+        store as unknown as DurableExecutionLeaseRetentionStore
+      ).retainExecutionLease(run.sessionId, run.id);
       if (retention.retained && retention.binding !== null) {
         bound = retention.binding;
         releaseLease = retention.release;
@@ -2185,7 +2217,10 @@ interface DurableExecutionOwnershipStore {
 }
 
 interface DurableExecutionLeaseRetentionStore {
-  retainExecutionLease(sessionId: string, runId: string): {
+  retainExecutionLease(
+    sessionId: string,
+    runId: string,
+  ): {
     binding: RuntimeLeaseBinding | null;
     release: (() => void) | null;
     retained: boolean;
@@ -2376,7 +2411,8 @@ export function inspectSessionExecution(
   }
   const localBinding = currentRuntimeLeaseBinding(sessionDir, sessionId);
   if (
-    localBinding !== null && sameLeaseIdentity(localBinding, lease) &&
+    localBinding !== null &&
+    sameLeaseIdentity(localBinding, lease) &&
     lease.purpose === "execution"
   ) {
     snapshot.state = SESSION_EXECUTION_INCONSISTENT;
@@ -2404,7 +2440,8 @@ export function registeredLocalExecution(
   };
   const entry = localExecutionRegistry.get(executionRegistrationKey(binding));
   if (
-    entry === undefined || entry.runtime === null ||
+    entry === undefined ||
+    entry.runtime === null ||
     entry.binding.ownerInstanceId !== binding.ownerInstanceId ||
     entry.binding.tokenHash !== binding.tokenHash ||
     entry.binding.purpose !== binding.purpose
@@ -2419,10 +2456,12 @@ function sameLeaseIdentity(
   binding: RuntimeLeaseBinding,
   lease: RuntimeLeaseSnapshot,
 ): boolean {
-  return binding.sessionId === lease.sessionId &&
+  return (
+    binding.sessionId === lease.sessionId &&
     binding.ownerInstanceId === lease.ownerInstanceId &&
     binding.tokenHash === lease.tokenHash &&
-    binding.epoch === lease.epoch;
+    binding.epoch === lease.epoch
+  );
 }
 
 export function isRemoteResponseTerminal(state: string): boolean {

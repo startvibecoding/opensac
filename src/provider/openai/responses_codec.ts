@@ -14,7 +14,8 @@ import {
   type ResponsesCompletedObject,
   type ResponsesOutputItem,
   type ResponsesSSEEvent,
-  type ResponsesUsage} from "./responses.ts";
+  type ResponsesUsage,
+} from "./responses.ts";
 
 export const responsesMaxCanonicalItemBytes = 128 * 1024;
 export const responsesMaxMetadataBytes = 16 * 1024;
@@ -358,8 +359,7 @@ export class ResponsesNormalizer {
         );
         if (item.type === "") item.type = "custom_tool_call";
         item.input =
-          this.arguments(event.item_id ?? "", event.output_index ?? 0) ??
-            "";
+          this.arguments(event.item_id ?? "", event.output_index ?? 0) ?? "";
         break;
       }
       case "response.custom_tool_call_input.done": {
@@ -381,8 +381,7 @@ export class ResponsesNormalizer {
         );
         if (item.type === "") item.type = "custom_tool_call";
         item.input =
-          this.arguments(event.item_id ?? "", event.output_index ?? 0) ??
-            "";
+          this.arguments(event.item_id ?? "", event.output_index ?? 0) ?? "";
         break;
       }
       default:
@@ -415,8 +414,8 @@ export class ResponsesNormalizer {
     this.response.usage = response.usage;
     this.response.error = response.error;
     if (response.incomplete_details !== undefined) {
-      this.response.incompleteReason = response.incomplete_details?.reason ??
-        "";
+      this.response.incompleteReason =
+        response.incomplete_details?.reason ?? "";
     }
     const output = response.output ?? [];
     for (let index = 0; index < output.length; index++) {
@@ -459,7 +458,8 @@ export class ResponsesNormalizer {
       for (const existingKey of this.items.keys()) {
         const existing = this.items.get(existingKey);
         if (
-          existing !== undefined && existing.outputIndex === item.outputIndex
+          existing !== undefined &&
+          existing.outputIndex === item.outputIndex
         ) {
           key = existingKey;
           break;
@@ -590,9 +590,9 @@ export class ResponsesNormalizer {
   unsupportedError(): Error | undefined {
     if (this.response.unsupportedItemTypes.length === 0) return undefined;
     return new Error(
-      `${errResponsesComputerUseUnsupported.message}: item type ${
-        JSON.stringify(this.response.unsupportedItemTypes[0])
-      }`,
+      `${errResponsesComputerUseUnsupported.message}: item type ${JSON.stringify(
+        this.response.unsupportedItemTypes[0],
+      )}`,
     );
   }
 
@@ -754,9 +754,8 @@ export function collectResponsesAttachments(
   if (kind !== "") {
     let attachmentURL = typeof typed["url"] === "string" ? typed["url"] : "";
     if (attachmentURL === "") {
-      attachmentURL = typeof typed["file_url"] === "string"
-        ? typed["file_url"]
-        : "";
+      attachmentURL =
+        typeof typed["file_url"] === "string" ? typed["file_url"] : "";
     }
     attachmentURL = safeResponsesAttachmentURL(attachmentURL);
     let name = typeof typed["title"] === "string" ? typed["title"] : "";
@@ -765,9 +764,8 @@ export function collectResponsesAttachments(
     }
     let ref = typeof typed["file_id"] === "string" ? typed["file_id"] : "";
     if (ref === "") {
-      ref = typeof typed["container_id"] === "string"
-        ? typed["container_id"]
-        : "";
+      ref =
+        typeof typed["container_id"] === "string" ? typed["container_id"] : "";
     }
     // Keep text annotations even when a gateway omits the URL or file reference.
     // Their offsets/title/type remain useful provenance and allow a later
@@ -775,7 +773,8 @@ export function collectResponsesAttachments(
     const hasStart = "start_index" in typed;
     const hasEnd = "end_index" in typed;
     if (
-      attachmentURL !== "" || ref !== "" ||
+      attachmentURL !== "" ||
+      ref !== "" ||
       (kind === "citation" && (hasStart || hasEnd))
     ) {
       const key = `${kind}\x00${attachmentURL}\x00${ref}`;
@@ -830,7 +829,8 @@ export function safeResponsesAttachmentURL(raw: string): string {
     return "";
   }
   if (
-    parsed.protocol !== "https:" || parsed.host === "" ||
+    parsed.protocol !== "https:" ||
+    parsed.host === "" ||
     parsed.username !== "" ||
     parsed.password !== ""
   ) {
@@ -850,7 +850,7 @@ export function safeResponsesAttachmentURL(raw: string): string {
 }
 
 function sha256Hex(text: string): string {
-  // Go uses crypto/sha256 synchronously. Deno's WebCrypto SubtleCrypto is
+  // Go uses crypto/sha256 synchronously. Node's WebCrypto SubtleCrypto is
   // async, so use node:crypto's synchronous createHash for byte-accurate
   // digests in the same call sites (dedup keys and truncation metadata).
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -976,7 +976,8 @@ export function responsesArgumentsText(raw: unknown): string {
 export function responsesEventItemRaw(raw: string): string {
   const envelope = parseJsonRecord(raw);
   if (
-    envelope !== undefined && envelope["item"] !== undefined &&
+    envelope !== undefined &&
+    envelope["item"] !== undefined &&
     envelope["item"] !== null
   ) {
     return JSON.stringify(envelope["item"]);
@@ -1048,9 +1049,9 @@ export function redactResponsesValue(value: unknown): unknown {
   }
   if (value !== null && typeof value === "object") {
     const result: Record<string, unknown> = {};
-    for (
-      const [key, nested] of Object.entries(value as Record<string, unknown>)
-    ) {
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       if (isSensitiveResponsesKey(key)) {
         result[key] = "[REDACTED]";
         continue;
@@ -1063,23 +1064,21 @@ export function redactResponsesValue(value: unknown): unknown {
 }
 
 export function isSensitiveResponsesKey(key: string): boolean {
-  const normalized = key.toLowerCase().replaceAll("-", "_").replaceAll(
-    " ",
-    "_",
-  );
-  for (
-    const marker of [
-      "authorization",
-      "api_key",
-      "apikey",
-      "access_token",
-      "refresh_token",
-      "secret",
-      "password",
-      "cookie",
-      "credential",
-    ]
-  ) {
+  const normalized = key
+    .toLowerCase()
+    .replaceAll("-", "_")
+    .replaceAll(" ", "_");
+  for (const marker of [
+    "authorization",
+    "api_key",
+    "apikey",
+    "access_token",
+    "refresh_token",
+    "secret",
+    "password",
+    "cookie",
+    "credential",
+  ]) {
     if (normalized.includes(marker)) return true;
   }
   return false;
@@ -1128,7 +1127,8 @@ function isPrivateNetworkIP(host: string): boolean {
     const lower = host.toLowerCase();
     if (lower === "::1" || lower === "::") return true;
     if (
-      lower.startsWith("fe80") || lower.startsWith("fc") ||
+      lower.startsWith("fe80") ||
+      lower.startsWith("fc") ||
       lower.startsWith("fd")
     ) {
       return true;

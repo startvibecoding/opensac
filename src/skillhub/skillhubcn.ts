@@ -18,7 +18,8 @@ import {
   type SkillFile,
   type SkillId,
   type SkillSummary,
-  type UserSkillsQuery} from "./types.ts";
+  type UserSkillsQuery,
+} from "./types.ts";
 
 export const skillHubDefaultURL = "https://api.skillhub.cn";
 export const skillHubDownloadBaseURL =
@@ -71,7 +72,7 @@ export class SkillHubClient implements MarketClient {
         signal,
       );
       const items = (response.results ?? []).map((raw) =>
-        skillHubItemSummary(parseSkillHubItem(raw))
+        skillHubItemSummary(parseSkillHubItem(raw)),
       );
       return { items, total: items.length, page: 1, pageSize: limit };
     }
@@ -87,16 +88,12 @@ export class SkillHubClient implements MarketClient {
       code?: number;
       message?: string;
       data?: { total?: number; skills?: unknown[] };
-    }>(
-      this.httpClient,
-      endpoint(this.baseURL, "/api/skills", values),
-      signal,
-    );
+    }>(this.httpClient, endpoint(this.baseURL, "/api/skills", values), signal);
     if ((response.code ?? 0) !== 0) {
       throw new Error(`SkillHub list: ${response.message ?? ""}`);
     }
     const items = (response.data?.skills ?? []).map((raw) =>
-      skillHubItemSummary(parseSkillHubItem(raw))
+      skillHubItemSummary(parseSkillHubItem(raw)),
     );
     return { items, total: response.data?.total ?? 0, page, pageSize: limit };
   }
@@ -118,7 +115,7 @@ export class SkillHubClient implements MarketClient {
       signal,
     );
     let items = (response.skills ?? []).map((raw) =>
-      skillHubItemSummary(parseSkillHubItem(raw))
+      skillHubItemSummary(parseSkillHubItem(raw)),
     );
     if (q.query) items = filterSkills(items, q.query);
     return { items, total: response.count ?? 0, page, pageSize: limit };
@@ -166,10 +163,7 @@ export class SkillHubClient implements MarketClient {
     return (response.files ?? []).map(parseSkillFile);
   }
 
-  evaluation(
-    signal: AbortSignal | undefined,
-    id: SkillId,
-  ): Promise<unknown> {
+  evaluation(signal: AbortSignal | undefined, id: SkillId): Promise<unknown> {
     return getJSON<unknown>(
       this.httpClient,
       endpoint(
@@ -186,8 +180,11 @@ export class SkillHubClient implements MarketClient {
     return [
       { url: endpoint(this.baseURL, "/api/v1/download", values), kind: "api" },
       {
-        url: trimRight(this.downloadURL, "/") + "/skills/" +
-          encodeURIComponent(id.id) + ".zip",
+        url:
+          trimRight(this.downloadURL, "/") +
+          "/skills/" +
+          encodeURIComponent(id.id) +
+          ".zip",
         kind: "cdn",
         fallback: true,
       },
@@ -206,8 +203,11 @@ export class SkillHubClient implements MarketClient {
       const body = await downloadStream(this.httpClient, primary, signal);
       return { body, meta: { sourceUrl: primary } };
     } catch (error) {
-      const fallback = trimRight(this.downloadURL, "/") + "/skills/" +
-        encodeURIComponent(id.id) + ".zip";
+      const fallback =
+        trimRight(this.downloadURL, "/") +
+        "/skills/" +
+        encodeURIComponent(id.id) +
+        ".zip";
       try {
         const body = await downloadStream(this.httpClient, fallback, signal);
         return { body, meta: { sourceUrl: fallback } };
@@ -228,17 +228,15 @@ export class SkillHubClient implements MarketClient {
   ): Promise<SearchPage> {
     const response = await getJSON<{ items?: unknown[]; skills?: unknown[] }>(
       this.httpClient,
-      endpoint(
-        this.baseURL,
-        "/api/v1/showcase/" + encodeURIComponent(kind),
-        { limit: [String(boundedLimit(q.limit))] },
-      ),
+      endpoint(this.baseURL, "/api/v1/showcase/" + encodeURIComponent(kind), {
+        limit: [String(boundedLimit(q.limit))],
+      }),
       signal,
     );
     let rawItems = response.items ?? [];
     if (rawItems.length === 0) rawItems = response.skills ?? [];
     const items = rawItems.map((raw) =>
-      skillHubItemSummary(parseSkillHubItem(raw))
+      skillHubItemSummary(parseSkillHubItem(raw)),
     );
     return {
       items,
@@ -327,10 +325,10 @@ export function parseSkillHubItem(raw: unknown): SkillHubItem {
     source: str(o.source),
     publisher: hasPublisher
       ? {
-        name: str(publisher.name),
-        verified: publisher.verified === true,
-        certifiedName: str(publisher.certifiedName),
-      }
+          name: str(publisher.name),
+          verified: publisher.verified === true,
+          certifiedName: str(publisher.certifiedName),
+        }
       : undefined,
     downloads: num(o.downloads),
     installs: num(o.installs),

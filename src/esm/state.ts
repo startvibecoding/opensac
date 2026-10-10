@@ -62,8 +62,10 @@ export function hasObjective(obj: Objective | null | undefined): boolean {
 
 /** Reports whether TUI idle continuation may start a new agent run. */
 export function canAutoRun(obj: Objective | null | undefined): boolean {
-  return obj != null &&
-    (obj.status === statusActive || obj.status === statusCompleteCandidate);
+  return (
+    obj != null &&
+    (obj.status === statusActive || obj.status === statusCompleteCandidate)
+  );
 }
 
 /**

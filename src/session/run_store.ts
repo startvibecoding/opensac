@@ -117,8 +117,9 @@ function requireConn(db: Database): NonNullable<Database["db"]> {
  * an opaque constraint failure.
  */
 export function isActiveRunConflictError(err: unknown): boolean {
-  const message = (err instanceof Error ? err.message : String(err))
-    .toLowerCase();
+  const message = (
+    err instanceof Error ? err.message : String(err)
+  ).toLowerCase();
   return message.includes("unique constraint failed: session_runs.session_id");
 }
 
@@ -182,19 +183,18 @@ interface PreparedRun {
 
 function prepareRun(run: SessionRun): PreparedRun {
   run.attempt = run.attempt <= 0 ? 1 : run.attempt;
-  if (
-    !(run.startedAt instanceof Date) || isNaN(run.startedAt.getTime())
-  ) {
+  if (!(run.startedAt instanceof Date) || isNaN(run.startedAt.getTime())) {
     run.startedAt = new Date();
   }
   if (!(run.updatedAt instanceof Date) || isNaN(run.updatedAt.getTime())) {
     run.updatedAt = run.startedAt;
   }
-  const finishedAt = run.finishedAt !== null &&
-      run.finishedAt !== undefined &&
-      !isNaN(run.finishedAt.getTime())
-    ? run.finishedAt.toISOString()
-    : null;
+  const finishedAt =
+    run.finishedAt !== null &&
+    run.finishedAt !== undefined &&
+    !isNaN(run.finishedAt.getTime())
+      ? run.finishedAt.toISOString()
+      : null;
   return { run, finishedAt };
 }
 
@@ -418,11 +418,12 @@ export function finishSessionRunAndConversationTurn(
     validateRuntimeLeaseTx(tx, sessionDir, run.sessionId);
     const dao = new RunDAO(null);
     const allowed = allowedRunPredecessors(run.status);
-    const finished = run.finishedAt !== null &&
-        run.finishedAt !== undefined &&
-        !isNaN(run.finishedAt.getTime())
-      ? run.finishedAt.toISOString()
-      : null;
+    const finished =
+      run.finishedAt !== null &&
+      run.finishedAt !== undefined &&
+      !isNaN(run.finishedAt.getTime())
+        ? run.finishedAt.toISOString()
+        : null;
     const changed = dao.updateStatus(
       tx,
       run.id,
@@ -439,9 +440,9 @@ export function finishSessionRunAndConversationTurn(
       }
       if (record.status !== run.status) {
         throw new Error(
-          `invalid session run transition ${JSON.stringify(record.status)} -> ${
-            JSON.stringify(run.status)
-          }`,
+          `invalid session run transition ${JSON.stringify(record.status)} -> ${JSON.stringify(
+            run.status,
+          )}`,
         );
       }
     }
@@ -522,9 +523,10 @@ export function sessionRunFromRecord(record: SessionRunRecord): SessionRun {
     status: record.status,
     startedAt: parseSessionTimestamp(record.startedAt),
     updatedAt: parseSessionTimestamp(record.updatedAt),
-    finishedAt: record.finishedAt !== null && record.finishedAt !== ""
-      ? parseSessionTimestamp(record.finishedAt)
-      : null,
+    finishedAt:
+      record.finishedAt !== null && record.finishedAt !== ""
+        ? parseSessionTimestamp(record.finishedAt)
+        : null,
     error: record.error,
     errorInfo: decodeJSON(record.errorInfoJson),
     progress: decodeJSON(record.progressJson),
@@ -670,9 +672,10 @@ export function updateSessionRunStatus(
   if (runId === "" || status === "") {
     throw new Error("run ID and status are required");
   }
-  const finishedValue = finishedAt !== null && !isNaN(finishedAt.getTime())
-    ? finishedAt.toISOString()
-    : "";
+  const finishedValue =
+    finishedAt !== null && !isNaN(finishedAt.getTime())
+      ? finishedAt.toISOString()
+      : "";
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new RunDAO(null);
     const sessionId = dao.sessionId(tx, runId);
@@ -697,9 +700,9 @@ export function updateSessionRunStatus(
       }
       if (record.status === status) return;
       throw new Error(
-        `invalid session run transition ${JSON.stringify(record.status)} -> ${
-          JSON.stringify(status)
-        }`,
+        `invalid session run transition ${JSON.stringify(record.status)} -> ${JSON.stringify(
+          status,
+        )}`,
       );
     }
   });

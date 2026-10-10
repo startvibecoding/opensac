@@ -219,7 +219,8 @@ export class Scheduler {
     for (const job of jobs) {
       if (!(job.enabled ?? false)) continue;
       if (
-        (job.lastStatus ?? "") === "running" && !this.isStaleRunning(job, now)
+        (job.lastStatus ?? "") === "running" &&
+        !this.isStaleRunning(job, now)
       ) {
         continue;
       }
@@ -281,9 +282,11 @@ export class Scheduler {
 
   /** Reports whether a persisted running claim has outlived its lease. */
   isStaleRunning(job: CronJob, now: Date): boolean {
-    return (job.lastStatus ?? "") === "running" &&
+    return (
+      (job.lastStatus ?? "") === "running" &&
       (job.lastRun ?? null) !== null &&
-      now.getTime() - job.lastRun!.getTime() >= runningLeaseTimeoutMs;
+      now.getTime() - job.lastRun!.getTime() >= runningLeaseTimeoutMs
+    );
   }
 
   /** Runs a cron job by spawning a sub-agent. */
@@ -403,7 +406,9 @@ export class Scheduler {
         policyErr = asError(err);
       }
       if (
-        sess !== null && (job.sessionId ?? "") !== "" && this.sessionDir !== ""
+        sess !== null &&
+        (job.sessionId ?? "") !== "" &&
+        this.sessionDir !== ""
       ) {
         const result = resolvePolicyFromSession(
           this.sessionDir,
@@ -428,7 +433,9 @@ export class Scheduler {
       }
 
       if (
-        lastErr === null && sess !== null && (job.sessionId ?? "") !== "" &&
+        lastErr === null &&
+        sess !== null &&
+        (job.sessionId ?? "") !== "" &&
         this.sessionDir !== ""
       ) {
         runId = "cron_" + generateID();
@@ -489,9 +496,10 @@ export class Scheduler {
             execution.setAgent(a);
           }
           try {
-            for await (
-              const event of a.inner.run(job.prompt ?? "", runCtxSignal)
-            ) {
+            for await (const event of a.inner.run(
+              job.prompt ?? "",
+              runCtxSignal,
+            )) {
               if (event.type === EVENT_TEXT_DELTA) {
                 response += event.textDelta ?? "";
               }
@@ -508,15 +516,17 @@ export class Scheduler {
       }
 
       if (execution !== null) {
-        const status: RunState = lastErr !== null
-          ? RUN_STATE_FAILED
-          : RUN_STATE_COMPLETED;
+        const status: RunState =
+          lastErr !== null ? RUN_STATE_FAILED : RUN_STATE_COMPLETED;
         const message = lastErr !== null ? lastErr.message : "";
-        const data = message === "" ? runData : {
-          cronJobId: job.id ?? "",
-          cronJobName: job.name ?? "",
-          error: message,
-        };
+        const data =
+          message === ""
+            ? runData
+            : {
+                cronJobId: job.id ?? "",
+                cronJobName: job.name ?? "",
+                error: message,
+              };
         try {
           execution.finishDurable(runId, status, message, {
             sessionId: job.sessionId!,
@@ -622,7 +632,8 @@ export class Scheduler {
     const job = this.store.get(trimmed);
     const now = new Date();
     if (
-      (job.lastStatus ?? "") === "running" && !this.isStaleRunning(job, now)
+      (job.lastStatus ?? "") === "running" &&
+      !this.isStaleRunning(job, now)
     ) {
       throw new JobAlreadyRunningError(trimmed);
     }
@@ -711,10 +722,7 @@ export class Scheduler {
     if (schedule === "") schedule = MAINTENANCE_STORAGE_RECONCILE_SCHEDULE;
     if (existing !== null) {
       if ((existing.schedule ?? "") === schedule) return;
-      const updated = normalizeMaintenanceSchedule(
-        { ...existing },
-        schedule,
-      );
+      const updated = normalizeMaintenanceSchedule({ ...existing }, schedule);
       if (updated === null) return;
       try {
         this.store.update(updated);
@@ -776,9 +784,9 @@ export function normalizeMaintenanceSchedule(
     if (schedule !== MAINTENANCE_STORAGE_RECONCILE_SCHEDULE) {
       logCron(
         "invalid maintenance schedule",
-        `${
-          JSON.stringify(schedule)
-        } (using ${MAINTENANCE_STORAGE_RECONCILE_SCHEDULE})`,
+        `${JSON.stringify(
+          schedule,
+        )} (using ${MAINTENANCE_STORAGE_RECONCILE_SCHEDULE})`,
       );
       try {
         return normalizeJobSchedule({

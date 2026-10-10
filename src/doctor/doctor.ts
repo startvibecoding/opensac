@@ -4,12 +4,14 @@
 // separate diagnostic implementations.
 //
 // Deliberate deviations from Go: `runtime.Version()` (the Go toolchain version)
-// has no TypeScript equivalent, so the "Deno version" check reports
-// `Deno.version.deno`; `exec.LookPath` maps to `platform.lookPathSync`;
-// `os.Stat`/`os.IsNotExist` map to `Deno.statSync` plus `Deno.errors.NotFound`;
+// has no TypeScript equivalent, so the "Node version" check reports
+// `nodeRuntime.version.node`; `exec.LookPath` maps to `platform.lookPathSync`;
+// `os.Stat`/`os.IsNotExist` map to `nodeRuntime.statSync` plus `nodeRuntime.errors.NotFound`;
 // `error` results map to thrown `Error`s at the few failure boundaries; and the
 // config helpers are the free functions ported in `src/config`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { FileInfo } from "../platform/runtime.ts";
 import path from "node:path";
 import {
   configDir,
@@ -55,7 +57,7 @@ export interface Response {
 /** Performs all doctor checks for cwd. An empty cwd means the process cwd. */
 export function run(cwd: string, version: string): Response {
   if (version.trim() === "") version = appversion.current();
-  if (cwd === "") cwd = Deno.cwd();
+  if (cwd === "") cwd = nodeRuntime.cwd();
   try {
     cwd = path.resolve(cwd);
   } catch {
@@ -131,10 +133,10 @@ function checkEnvironment(cwd: string): Check[] {
       detail: `${platform.os()}/${platform.arch()}`,
     },
     {
-      id: "environment.deno",
+      id: "environment.runtime",
       status: STATUS_OK,
-      title: "Deno version",
-      detail: Deno.version.deno,
+      title: "Node version",
+      detail: nodeRuntime.version.typescript,
     },
   ];
   const home = platform.homeDir();
@@ -292,9 +294,10 @@ function checkConfigFiles(
     });
   }
   const parseStatus = settingsErr !== undefined ? STATUS_ERROR : STATUS_OK;
-  const parseDetail = settingsErr !== undefined
-    ? "failed to parse settings"
-    : "loaded successfully";
+  const parseDetail =
+    settingsErr !== undefined
+      ? "failed to parse settings"
+      : "loaded successfully";
   checks.push({
     id: "config.parse",
     status: parseStatus,
@@ -322,56 +325,66 @@ export function validateProvider(
   modelID: string,
 ): Check[] {
   if (settings === undefined) {
-    return [{
-      id: "provider.default",
-      status: STATUS_ERROR,
-      title: "Default provider",
-      detail: "settings unavailable",
-      fix: "Fix settings.json syntax",
-    }];
+    return [
+      {
+        id: "provider.default",
+        status: STATUS_ERROR,
+        title: "Default provider",
+        detail: "settings unavailable",
+        fix: "Fix settings.json syntax",
+      },
+    ];
   }
   const name = providerName.trim();
   const model = modelID.trim();
   if (name === "") {
-    return [{
-      id: "provider.default",
-      status: STATUS_ERROR,
-      title: "Default provider",
-      detail: "no default provider configured",
-      fix: "Set defaultProvider in settings.json",
-    }];
+    return [
+      {
+        id: "provider.default",
+        status: STATUS_ERROR,
+        title: "Default provider",
+        detail: "no default provider configured",
+        fix: "Set defaultProvider in settings.json",
+      },
+    ];
   }
   if (
     getProviderConfig(settings, name) === undefined &&
     defaultProviderConfig(name) === undefined
   ) {
-    return [{
-      id: "provider.default",
-      status: STATUS_ERROR,
-      title: "Default provider",
-      detail: name + ": unknown provider",
-      fix: "Add the provider to settings.json",
-    }];
+    return [
+      {
+        id: "provider.default",
+        status: STATUS_ERROR,
+        title: "Default provider",
+        detail: name + ": unknown provider",
+        fix: "Add the provider to settings.json",
+      },
+    ];
   }
   const pc = resolveProviderConfig(name, settings);
   if (pc === undefined || (pc.baseUrl ?? "").trim() === "") {
-    return [{
-      id: "provider.default",
-      status: STATUS_ERROR,
-      title: "Default provider",
-      detail: name + ": missing base URL",
-      fix: "Set " + name + ".baseUrl",
-    }];
+    return [
+      {
+        id: "provider.default",
+        status: STATUS_ERROR,
+        title: "Default provider",
+        detail: name + ": missing base URL",
+        fix: "Set " + name + ".baseUrl",
+      },
+    ];
   }
   const apiKey = resolveKey(settings, name).trim();
   if (apiKey === "" || apiKey.startsWith("${") || apiKey.startsWith("!")) {
-    return [{
-      id: "provider.default",
-      status: STATUS_ERROR,
-      title: "Default provider",
-      detail: name + ": missing API key",
-      fix: "Set " + name + ".apiKey or " + apiKeyEnv(name, pc),
-    }];
+    return [
+      {
+        id: "provider.default",
+        status: STATUS_ERROR,
+        title: "Default provider",
+        detail: name + ": missing API key",
+        fix: "Set " + name + ".apiKey or " + apiKeyEnv(name, pc),
+      },
+    ];
   }
 
   try {
@@ -401,21 +414,25 @@ export function validateProvider(
         },
       ];
     }
-    return [{
-      id: "provider.default",
-      status: STATUS_ERROR,
-      title: "Default provider",
-      detail: name + ": configuration is unusable",
-      fix: "Check the provider base URL and configuration",
-    }];
+    return [
+      {
+        id: "provider.default",
+        status: STATUS_ERROR,
+        title: "Default provider",
+        detail: name + ": configuration is unusable",
+        fix: "Check the provider base URL and configuration",
+      },
+    ];
   }
 
-  const checks: Check[] = [{
-    id: "provider.default",
-    status: STATUS_OK,
-    title: "Default provider",
-    detail: name,
-  }];
+  const checks: Check[] = [
+    {
+      id: "provider.default",
+      status: STATUS_OK,
+      title: "Default provider",
+      detail: name,
+    },
+  ];
   if (model !== "") {
     checks.push({
       id: "model.default",
@@ -468,7 +485,7 @@ function checkEnvironmentOverrides(): Check[] {
   ];
   const checks: Check[] = [];
   for (const override of overrides) {
-    if ((Deno.env.get(override.env) ?? "") !== "") {
+    if ((nodeRuntime.env.get(override.env) ?? "") !== "") {
       checks.push({
         id: "environment." + stableID(override.env),
         status: STATUS_WARN,
@@ -483,19 +500,29 @@ function checkEnvironmentOverrides(): Check[] {
 function checkSandbox(settings: Settings | undefined): Check[] {
   const bwrap = platform.lookPathSync("bwrap");
   if (bwrap !== null && bwrap !== "") {
-    return appendSandboxConfig([{
-      id: "sandbox",
-      status: STATUS_OK,
-      title: "Sandbox",
-      detail: bwrap,
-    }], settings);
+    return appendSandboxConfig(
+      [
+        {
+          id: "sandbox",
+          status: STATUS_OK,
+          title: "Sandbox",
+          detail: bwrap,
+        },
+      ],
+      settings,
+    );
   }
-  return appendSandboxConfig([{
-    id: "sandbox",
-    status: STATUS_WARN,
-    title: "Sandbox",
-    detail: "bwrap not found",
-  }], settings);
+  return appendSandboxConfig(
+    [
+      {
+        id: "sandbox",
+        status: STATUS_WARN,
+        title: "Sandbox",
+        detail: "bwrap not found",
+      },
+    ],
+    settings,
+  );
 }
 
 function appendSandboxConfig(
@@ -505,12 +532,15 @@ function appendSandboxConfig(
   if (settings === undefined) return checks;
   const enabled = settings.sandbox?.enabled ?? false;
   const level = valueOr(settings.sandbox?.level ?? "", "none");
-  return [...checks, {
-    id: "sandbox.config",
-    status: STATUS_OK,
-    title: "Sandbox config",
-    detail: `enabled=${enabled}, level=${level}`,
-  }];
+  return [
+    ...checks,
+    {
+      id: "sandbox.config",
+      status: STATUS_OK,
+      title: "Sandbox config",
+      detail: `enabled=${enabled}, level=${level}`,
+    },
+  ];
 }
 
 function checkShell(settings: Settings | undefined): Check[] {
@@ -520,28 +550,34 @@ function checkShell(settings: Settings | undefined): Check[] {
   // resolver, so surface it here instead of letting every command quietly run
   // in a different shell than the user asked for.
   if (configured !== "" && configured !== shell) {
-    return [{
-      id: "environment.shell",
-      status: STATUS_WARN,
-      title: "Shell",
-      detail: `configured ${configured} (not found)`,
-      fix: "Set settings.shellPath to an existing shell, or clear it",
-    }];
+    return [
+      {
+        id: "environment.shell",
+        status: STATUS_WARN,
+        title: "Shell",
+        detail: `configured ${configured} (not found)`,
+        fix: "Set settings.shellPath to an existing shell, or clear it",
+      },
+    ];
   }
   if (statExists(shell) === undefined) {
-    return [{
-      id: "environment.shell",
-      status: STATUS_WARN,
-      title: "Shell",
-      detail: shell + " (not found)",
-    }];
+    return [
+      {
+        id: "environment.shell",
+        status: STATUS_WARN,
+        title: "Shell",
+        detail: shell + " (not found)",
+      },
+    ];
   }
-  return [{
-    id: "environment.shell",
-    status: STATUS_OK,
-    title: "Shell",
-    detail: shell,
-  }];
+  return [
+    {
+      id: "environment.shell",
+      status: STATUS_OK,
+      title: "Shell",
+      detail: shell,
+    },
+  ];
 }
 
 function checkMCP(cwd: string): Check[] {
@@ -549,21 +585,25 @@ function checkMCP(cwd: string): Check[] {
   try {
     servers = mcp.loadConfiguredServers(cwd);
   } catch {
-    return [{
-      id: "mcp",
-      status: STATUS_ERROR,
-      title: "MCP",
-      detail: "MCP configuration could not be loaded",
-      fix: "Fix mcp.json syntax",
-    }];
+    return [
+      {
+        id: "mcp",
+        status: STATUS_ERROR,
+        title: "MCP",
+        detail: "MCP configuration could not be loaded",
+        fix: "Fix mcp.json syntax",
+      },
+    ];
   }
   if (servers.length === 0) {
-    return [{
-      id: "mcp",
-      status: STATUS_SKIP,
-      title: "MCP",
-      detail: "none configured",
-    }];
+    return [
+      {
+        id: "mcp",
+        status: STATUS_SKIP,
+        title: "MCP",
+        detail: "none configured",
+      },
+    ];
   }
   const checks: Check[] = [];
   for (const server of servers) {
@@ -617,12 +657,14 @@ function checkSessions(settings: Settings | undefined): Check {
 
 function checkSkills(cwd: string, settings: Settings | undefined): Check[] {
   if (settings === undefined) {
-    return [{
-      id: "skills",
-      status: STATUS_SKIP,
-      title: "Skills",
-      detail: "settings unavailable",
-    }];
+    return [
+      {
+        id: "skills",
+        status: STATUS_SKIP,
+        title: "Skills",
+        detail: "settings unavailable",
+      },
+    ];
   }
   const p = getGlobalSkillsDir(settings);
   const globalStat = statResult(p);
@@ -630,29 +672,35 @@ function checkSkills(cwd: string, settings: Settings | undefined): Check[] {
     return [{ id: "skills", status: STATUS_OK, title: "Skills", detail: p }];
   }
   if (!globalStat.notExist && globalStat.error !== undefined) {
-    return [{
-      id: "skills",
-      status: STATUS_ERROR,
-      title: "Skills",
-      detail: globalStat.error.message,
-    }];
+    return [
+      {
+        id: "skills",
+        status: STATUS_ERROR,
+        title: "Skills",
+        detail: globalStat.error.message,
+      },
+    ];
   }
   for (const projectPath of skills.projectSkillDirs(cwd)) {
     if (statExists(projectPath) !== undefined) {
-      return [{
-        id: "skills",
-        status: STATUS_OK,
-        title: "Skills",
-        detail: projectPath,
-      }];
+      return [
+        {
+          id: "skills",
+          status: STATUS_OK,
+          title: "Skills",
+          detail: projectPath,
+        },
+      ];
     }
   }
-  return [{
-    id: "skills",
-    status: STATUS_SKIP,
-    title: "Skills",
-    detail: p + " (not created)",
-  }];
+  return [
+    {
+      id: "skills",
+      status: STATUS_SKIP,
+      title: "Skills",
+      detail: p + " (not created)",
+    },
+  ];
 }
 
 function checkContext(cwd: string, settings: Settings | undefined): Check[] {
@@ -686,7 +734,8 @@ function checkContext(cwd: string, settings: Settings | undefined): Check[] {
     }
   }
   if (
-    checks.length === 0 || checks[checks.length - 1].id !== "context.project"
+    checks.length === 0 ||
+    checks[checks.length - 1].id !== "context.project"
   ) {
     checks.push({
       id: "context.project",
@@ -764,20 +813,20 @@ function valueOr(value: string, fallback: string): string {
 }
 
 interface StatResult {
-  info?: Deno.FileInfo;
+  info?: FileInfo;
   notExist: boolean;
   error?: Error;
 }
 
 function statResult(p: string): StatResult {
   try {
-    return { info: Deno.statSync(p), notExist: false };
+    return { info: nodeRuntime.statSync(p), notExist: false };
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return { notExist: true };
+    if (err instanceof nodeRuntime.errors.NotFound) return { notExist: true };
     return { notExist: false, error: err as Error };
   }
 }
 
-function statExists(p: string): Deno.FileInfo | undefined {
+function statExists(p: string): FileInfo | undefined {
   return statResult(p).info;
 }

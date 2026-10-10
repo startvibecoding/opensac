@@ -46,10 +46,7 @@ test("tuiTranslatorFromSettings falls back to auto with a warning on invalid val
     const translator = tuiTranslatorFromSettings(settingsWith("fr"));
     const expected = resolveLanguage("auto", new Date(), localTimeZone());
     assertEquals(translator.language, expected);
-    assertEquals(
-      capture.errors,
-      [`Warning: invalid tuilang "fr"; using auto`],
-    );
+    assertEquals(capture.errors, [`Warning: invalid tuilang "fr"; using auto`]);
   } finally {
     capture.restore();
   }

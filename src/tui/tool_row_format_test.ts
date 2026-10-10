@@ -207,16 +207,12 @@ test("empty summary falls back to ellipsis", () => {
   assertEquals(row, "[ls] ...");
 });
 
-const bashResult = (
-  stdout: string,
-  stderr = "(no output)",
-  exitCode = 0,
-) =>
+const bashResult = (stdout: string, stderr = "(no output)", exitCode = 0) =>
   [
     "[runtime]",
     "bash",
     "[command]",
-    "deno task check",
+    "npm run check",
     "[cwd]",
     "/w",
     "[stdout]",
@@ -233,13 +229,13 @@ test("compact bash row excerpts stdout, never the section markers", () => {
     tr,
     input({
       toolName: "bash",
-      toolArgs: { command: "deno task check" },
+      toolArgs: { command: "npm run check" },
       summary: full,
       fullContent: full,
     }),
     true,
   );
-  assertEquals(row, "[bash] deno task check (succeeded) hello from stdout");
+  assertEquals(row, "[bash] npm run check (succeeded) hello from stdout");
   assert(!row.includes("[runtime]"), row);
   assert(!row.includes("[stdout]"), row);
 });
@@ -313,13 +309,13 @@ test("full bash row keeps the whole structured result", () => {
     tr,
     input({
       toolName: "bash",
-      toolArgs: { command: "deno task check" },
+      toolArgs: { command: "npm run check" },
       summary: full,
       fullContent: full,
     }),
     false,
   );
-  assertEquals(row, `[bash] deno task check (succeeded)\n${full}`);
+  assertEquals(row, `[bash] npm run check (succeeded)\n${full}`);
 });
 
 test("running rows prefix the spinner before the running label", () => {

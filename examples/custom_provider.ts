@@ -3,7 +3,7 @@
 // This example implements the public `Provider` interface directly (no HTTP,
 // no API key needed) so you can see the full SDK surface end to end:
 //
-//   deno run -A examples/custom_provider.ts
+//   node --import ./scripts/test/preload.mjs examples/custom_provider.ts
 //
 // It imports the repository's `bootstrap.ts` facade, which registers the
 // internal agent builder behind `newBuilder().build()`. External programs
@@ -52,9 +52,9 @@ class EchoProvider implements Provider {
 
   async *chat(params: ChatParams): AsyncIterable<StreamEvent> {
     yield { type: streamStart };
-    const lastUser = [...params.messages].reverse().find((m) =>
-      m.role === roleUser
-    );
+    const lastUser = [...params.messages]
+      .reverse()
+      .find((m) => m.role === roleUser);
     yield {
       type: streamTextDelta,
       textDelta: `You said: ${lastUser?.content ?? "(nothing)"}`,
@@ -78,12 +78,12 @@ const agent = newBuilder()
   .withProvider(new EchoProvider())
   .withModel("echo-1")
   .withMode("yolo")
-  .withWorkDir(Deno.cwd())
+  .withWorkDir(process.cwd())
   .build();
 
 for await (const event of agent.run("hello from the SDK")) {
   if (event.type === eventTextDelta) {
-    Deno.stdout.writeSync(new TextEncoder().encode(event.textDelta ?? ""));
+    process.stdout.write(new TextEncoder().encode(event.textDelta ?? ""));
   } else if (event.type === eventAgentEnd) {
     console.log("\n[agent finished]");
   }

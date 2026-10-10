@@ -26,7 +26,8 @@ import {
   EVENT_THINK_DELTA,
   EVENT_TOOL_CALL,
   EVENT_TOOL_EXECUTION_END,
-  type TaskStatus} from "../agent/events.ts";
+  type TaskStatus,
+} from "../agent/events.ts";
 import {
   createRoleIncompleteError,
   EvidenceTracker,
@@ -60,7 +61,8 @@ export interface ESMRoleEventSink {
  * reported events into canonical Core run events.
  */
 export class AgentManagerESMAdapter
-  implements RuntimeAdapter, RuntimeEventSink {
+  implements RuntimeAdapter, RuntimeEventSink
+{
   #manager: AgentManager;
   #sink: ESMRoleEventSink;
   #workDir: string;

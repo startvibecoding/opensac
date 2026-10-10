@@ -154,7 +154,9 @@ export function createDeliveryPlanTx(
   intent.runId = intent.runId.trim();
   intent.platform = intent.platform.trim();
   if (
-    intent.id === "" || intent.sessionId === "" || intent.runId === "" ||
+    intent.id === "" ||
+    intent.sessionId === "" ||
+    intent.runId === "" ||
     intent.platform === ""
   ) {
     throw new Error(
@@ -169,21 +171,21 @@ export function createDeliveryPlanTx(
     throw new Error("new delivery intent status must be pending");
   }
   if (
-    !(intent.createdAt instanceof Date) || isNaN(intent.createdAt.getTime())
+    !(intent.createdAt instanceof Date) ||
+    isNaN(intent.createdAt.getTime())
   ) {
     intent.createdAt = new Date();
   }
   if (
-    !(intent.updatedAt instanceof Date) || isNaN(intent.updatedAt.getTime())
+    !(intent.updatedAt instanceof Date) ||
+    isNaN(intent.updatedAt.getTime())
   ) {
     intent.updatedAt = intent.createdAt;
   }
   const transportContext = normalizedRunJSON(intent.transportContext);
   const runExists = dao.runExists(tx, intent.sessionId, intent.runId);
   if (!runExists) {
-    throw new Error(
-      `delivery Run ${intent.runId} does not belong to session`,
-    );
+    throw new Error(`delivery Run ${intent.runId} does not belong to session`);
   }
   const changed = dao.insertIntent(tx, {
     id: intent.id,
@@ -221,8 +223,8 @@ export function createDeliveryPlanTx(
     }
   }
 
-  const operations = [...plan.operations].sort((a, b) =>
-    a.sequence - b.sequence
+  const operations = [...plan.operations].sort(
+    (a, b) => a.sequence - b.sequence,
   );
   const seenKeys = new Set<string>();
   const seenSequences = new Set<number>();
@@ -235,9 +237,12 @@ export function createDeliveryPlanTx(
     operation.idempotencyKey = operation.idempotencyKey.trim();
     operation.payloadDigest = operation.payloadDigest.trim();
     if (
-      operation.id === "" || operation.operationKey === "" ||
-      operation.operationKind === "" || operation.sequence <= 0 ||
-      operation.idempotencyKey === "" || operation.payloadDigest === ""
+      operation.id === "" ||
+      operation.operationKey === "" ||
+      operation.operationKind === "" ||
+      operation.sequence <= 0 ||
+      operation.idempotencyKey === "" ||
+      operation.payloadDigest === ""
     ) {
       throw new Error(
         "delivery operation identity, key, kind, sequence, idempotency key, and digest are required",
@@ -245,9 +250,9 @@ export function createDeliveryPlanTx(
     }
     if (seenKeys.has(operation.operationKey)) {
       throw new Error(
-        `duplicate delivery operation key ${
-          JSON.stringify(operation.operationKey)
-        }`,
+        `duplicate delivery operation key ${JSON.stringify(
+          operation.operationKey,
+        )}`,
       );
     }
     if (seenSequences.has(operation.sequence)) {
@@ -329,9 +334,9 @@ export function createDeliveryPlanTx(
       );
       if (existingRecord === undefined) {
         throw new Error(
-          `delivery operation ${
-            JSON.stringify(operation.operationKey)
-          } conflicts with existing projection`,
+          `delivery operation ${JSON.stringify(
+            operation.operationKey,
+          )} conflicts with existing projection`,
         );
       }
       if (
@@ -344,9 +349,9 @@ export function createDeliveryPlanTx(
         existingRecord.payloadDigest !== operation.payloadDigest
       ) {
         throw new Error(
-          `delivery operation ${
-            JSON.stringify(operation.operationKey)
-          } conflicts with existing projection`,
+          `delivery operation ${JSON.stringify(
+            operation.operationKey,
+          )} conflicts with existing projection`,
         );
       }
     }
@@ -401,7 +406,8 @@ export function claimDeliveryOperation(
     if (dependency === undefined) throw new DeliveryOperationAbsentError();
     const intentStatus = dependency.intentStatus;
     if (
-      intentStatus === "delivered" || intentStatus === "failed" ||
+      intentStatus === "delivered" ||
+      intentStatus === "failed" ||
       intentStatus === "cancelled"
     ) {
       throw new DeliveryOperationBusyError();
@@ -474,8 +480,10 @@ export function updateDeliveryOperation(
     if (currentRecord === undefined) throw new DeliveryOperationAbsentError();
     if (
       currentRecord.status === status &&
-      (status === "uploaded" || status === "delivered" ||
-        status === "unsupported" || status === "failed" ||
+      (status === "uploaded" ||
+        status === "delivered" ||
+        status === "unsupported" ||
+        status === "failed" ||
         status === "uncertain") &&
       currentRecord.providerAssetId === providerAssetId.trim() &&
       currentRecord.providerMessageId === providerMessageId.trim() &&
@@ -579,12 +587,7 @@ export function reopenFailedDeliveryOperation(
   let reopened = false;
   writeRootDatabase(sessionDir, (tx) => {
     const dao = new DeliveryDAO(null);
-    const changed = dao.reopenTransientFailure(
-      tx,
-      operationId,
-      stamp,
-      stamp,
-    );
+    const changed = dao.reopenTransientFailure(tx, operationId, stamp, stamp);
     if (changed !== 1) return;
     reopened = true;
     const intentId = dao.intentId(tx, operationId);
@@ -755,20 +758,18 @@ export function validDeliveryOperationStatus(status: string): boolean {
   ].includes(status);
 }
 
-function deliveryIntentFromRecord(
-  record: {
-    id: string;
-    sessionId: string;
-    runId: string;
-    platform: string;
-    targetId: string;
-    replyMessageId: string;
-    transportContext: string;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-  },
-): DeliveryIntent {
+function deliveryIntentFromRecord(record: {
+  id: string;
+  sessionId: string;
+  runId: string;
+  platform: string;
+  targetId: string;
+  replyMessageId: string;
+  transportContext: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}): DeliveryIntent {
   return {
     id: record.id,
     sessionId: record.sessionId,
@@ -783,32 +784,30 @@ function deliveryIntentFromRecord(
   };
 }
 
-function deliveryOperationFromRecord(
-  record: {
-    id: string;
-    intentId: string;
-    operationKey: string;
-    artifactId: string | null;
-    operationKind: string;
-    sequence: number;
-    dependsOn: string | null;
-    idempotencyKey: string;
-    payloadDigest: string;
-    status: string;
-    providerAssetId: string;
-    providerMessageId: string;
-    providerState: string;
-    attemptCount: number;
-    nextAttemptAt: number | null;
-    failureCode: string;
-    retryWindowStartedAt: string | null;
-    leaseOwner: string;
-    leaseEpoch: number;
-    leaseExpiresAt: number | null;
-    createdAt: string;
-    updatedAt: string;
-  },
-): DeliveryOperation {
+function deliveryOperationFromRecord(record: {
+  id: string;
+  intentId: string;
+  operationKey: string;
+  artifactId: string | null;
+  operationKind: string;
+  sequence: number;
+  dependsOn: string | null;
+  idempotencyKey: string;
+  payloadDigest: string;
+  status: string;
+  providerAssetId: string;
+  providerMessageId: string;
+  providerState: string;
+  attemptCount: number;
+  nextAttemptAt: number | null;
+  failureCode: string;
+  retryWindowStartedAt: string | null;
+  leaseOwner: string;
+  leaseEpoch: number;
+  leaseExpiresAt: number | null;
+  createdAt: string;
+  updatedAt: string;
+}): DeliveryOperation {
   return {
     id: record.id,
     intentId: record.intentId,
@@ -824,14 +823,13 @@ function deliveryOperationFromRecord(
     providerMessageId: record.providerMessageId,
     providerState: decodeJSONColumn(record.providerState),
     attemptCount: record.attemptCount,
-    nextAttemptAt: record.nextAttemptAt === null
-      ? null
-      : new Date(record.nextAttemptAt),
+    nextAttemptAt:
+      record.nextAttemptAt === null ? null : new Date(record.nextAttemptAt),
     failureCode: record.failureCode,
-    retryWindowStartedAt: record.retryWindowStartedAt === null ||
-        record.retryWindowStartedAt === ""
-      ? null
-      : parseSessionTimestamp(record.retryWindowStartedAt),
+    retryWindowStartedAt:
+      record.retryWindowStartedAt === null || record.retryWindowStartedAt === ""
+        ? null
+        : parseSessionTimestamp(record.retryWindowStartedAt),
     leaseOwner: record.leaseOwner,
     leaseEpoch: record.leaseEpoch,
     createdAt: parseSessionTimestamp(record.createdAt),

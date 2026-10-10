@@ -68,7 +68,8 @@ export function applyWorkerResult(
   try {
     report = parseWorkerReport(result.response);
   } catch (err) {
-    const reason = "worker report was not structured: " +
+    const reason =
+      "worker report was not structured: " +
       (err instanceof Error ? err.message : String(err));
     const next = store.rejectWorkerReport(sessionID, runID, reason, null);
     return {
@@ -190,7 +191,8 @@ export function applyReviewResult(
   try {
     report = parseAuditReport(result.response);
   } catch (err) {
-    const review = titleESMRole(role) +
+    const review =
+      titleESMRole(role) +
       " report was not structured; completion candidate rejected: " +
       (err instanceof Error ? err.message : String(err));
     const next = store.rejectCompletionCandidateForRun(
@@ -285,8 +287,9 @@ export function invalidWorkerCandidateReason(
     if (report.blockers.length > 0) {
       contradictions.push(formatItemDetail("blockers", report.blockers));
     }
-    return "worker proposed completion while reporting " +
-      contradictions.join("; ");
+    return (
+      "worker proposed completion while reporting " + contradictions.join("; ")
+    );
   }
   if (result.toolCalls === 0) {
     return "worker proposed completion without any tool-backed inspection or validation";

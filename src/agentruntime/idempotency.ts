@@ -16,8 +16,7 @@ import { getDurableRun } from "./run_queries.ts";
  * Means a submission key was reused for a different request or admission
  * scope. Callers must not silently start another Run.
  */
-export class IdempotencyKeyConflictError
-  extends RuntimeSubmissionConflictError {
+export class IdempotencyKeyConflictError extends RuntimeSubmissionConflictError {
   override name = "IdempotencyKeyConflictError";
 }
 
@@ -68,7 +67,8 @@ export function findIdempotentRun(
   );
   if (submission !== null) {
     if (
-      submission.requestFingerprint !== "" && fingerprint !== "" &&
+      submission.requestFingerprint !== "" &&
+      fingerprint !== "" &&
       submission.requestFingerprint !== fingerprint
     ) {
       throw new IdempotencyKeyConflictError();
@@ -101,7 +101,8 @@ export function findIdempotentRun(
       throw new IdempotencyKeyConflictError();
     }
     if (
-      requestFingerprint !== "" && fingerprint !== "" &&
+      requestFingerprint !== "" &&
+      fingerprint !== "" &&
       requestFingerprint !== fingerprint
     ) {
       throw new IdempotencyKeyConflictError();

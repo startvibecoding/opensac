@@ -1,10 +1,11 @@
 // internal/cron/cron_test.go, internal/cron/manage_runnow_test.go, and
 //
 // The Go concurrency cases (20 racing Start/Stop goroutines) reduce to
-// deterministic assertions because Deno is single-threaded: `start()` performs
+// deterministic assertions because Node is single-threaded: `start()` performs
 // its synchronous prologue before any await, and `stop()` awaits the loop and
 // every in-flight job.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import {
   assert,
   assertEquals,
@@ -42,7 +43,7 @@ import { test } from "#testing";
 
 function createStore(): SQLiteCronStore {
   return createSQLiteCronStore(
-    Deno.makeTempDirSync({ prefix: "opensac-cron-sched-" }),
+    nodeRuntime.makeTempDirSync({ prefix: "opensac-cron-sched-" }),
   );
 }
 
@@ -295,16 +296,10 @@ test("SchedulerHandlerUsesCanonicalCronCompletionLifecycle", async () => {
     enabled: true,
   });
   const called = deferred<CronJob>();
-  const scheduler = createScheduler(
-    store,
-    null,
-    3_600_000,
-    "",
-    (job) => {
-      called.resolve(job);
-      return { handled: true, response: "maintained", error: null };
-    },
-  );
+  const scheduler = createScheduler(store, null, 3_600_000, "", (job) => {
+    called.resolve(job);
+    return { handled: true, response: "maintained", error: null };
+  });
   scheduler.runNow("maintenance");
   const got = await called.promise;
   assertEquals(got.id, "maintenance");
@@ -337,10 +332,10 @@ test("NormalizeJobSchedule", () => {
   assertEquals(job.nextRun, null);
 
   assertThrows(() =>
-    normalizeJobSchedule({ name: "n", prompt: "p", mode: "turbo" })
+    normalizeJobSchedule({ name: "n", prompt: "p", mode: "turbo" }),
   );
   assertThrows(() =>
-    normalizeJobSchedule({ name: "n", prompt: "p", schedule: "@every soon" })
+    normalizeJobSchedule({ name: "n", prompt: "p", schedule: "@every soon" }),
   );
   assertThrows(() => normalizeJobSchedule(undefined as unknown as CronJob));
 });
@@ -363,7 +358,7 @@ test("SchedulerRunNowExecutesAndNotifiesJobObserver", async () => {
   });
   const sessionObserver = deferred<string>();
   scheduler.setCompletionObserver((sessionId) =>
-    sessionObserver.resolve(sessionId)
+    sessionObserver.resolve(sessionId),
   );
 
   // RunNow works without start (no scheduler loop involved).
@@ -416,7 +411,9 @@ test("SchedulerRunNowErrors", () => {
 // --- Maintenance projection tests ---
 
 test("SchedulerStartProjectsMaintenanceJobOnce", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-maint-",
+  });
   const first = createScheduler(
     createSQLiteCronStore(sessionDir),
     null,
@@ -451,7 +448,9 @@ test("SchedulerStartProjectsMaintenanceJobOnce", async () => {
 });
 
 test("DisabledMaintenancePolicyRemovesTheProjection", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-maint-",
+  });
   const store = createSQLiteCronStore(sessionDir);
   store.create({
     id: "cron-keep",
@@ -477,12 +476,7 @@ test("DisabledMaintenancePolicyRemovesTheProjection", async () => {
   store.get(maintenanceStorageReconcileJobID());
   await on.stop();
 
-  const restarted = createScheduler(
-    store,
-    null,
-    3_600_000,
-    sessionDir,
-  );
+  const restarted = createScheduler(store, null, 3_600_000, sessionDir);
   restarted.setMaintenancePolicy({
     reclaimAttachmentStorage: false,
     storageReconcileSchedule: "",
@@ -495,7 +489,9 @@ test("DisabledMaintenancePolicyRemovesTheProjection", async () => {
 });
 
 test("MaintenanceScheduleOverrideKeepsRunHistory", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-maint-",
+  });
   const store = createSQLiteCronStore(sessionDir);
   const runAt = new Date(Date.now() - 2 * 3_600_000);
   const stored = normalizeJobSchedule({
@@ -512,12 +508,7 @@ test("MaintenanceScheduleOverrideKeepsRunHistory", async () => {
   });
   store.create(stored);
 
-  const scheduler = createScheduler(
-    store,
-    null,
-    3_600_000,
-    sessionDir,
-  );
+  const scheduler = createScheduler(store, null, 3_600_000, sessionDir);
   scheduler.setMaintenancePolicy({
     reclaimAttachmentStorage: true,
     storageReconcileSchedule: "@every 6h",
@@ -538,14 +529,11 @@ test("MaintenanceScheduleOverrideKeepsRunHistory", async () => {
 });
 
 test("InvalidMaintenanceScheduleFallsBackToDefault", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-maint-",
+  });
   const store = createSQLiteCronStore(sessionDir);
-  const scheduler = createScheduler(
-    store,
-    null,
-    3_600_000,
-    sessionDir,
-  );
+  const scheduler = createScheduler(store, null, 3_600_000, sessionDir);
   scheduler.setMaintenancePolicy({
     reclaimAttachmentStorage: true,
     storageReconcileSchedule: "@every soon",
@@ -561,7 +549,9 @@ test("InvalidMaintenanceScheduleFallsBackToDefault", async () => {
 });
 
 test("MaintenanceJobCompletesThroughTheRuntimeNotAnAgent", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-maint-",
+  });
   const aged = writeMaintenanceArtifactDirectory(
     sessionDir,
     "0123456789abcdef",
@@ -569,16 +559,10 @@ test("MaintenanceJobCompletesThroughTheRuntimeNotAnAgent", async () => {
 
   const store = createSQLiteCronStore(sessionDir);
   let handlerCalls = 0;
-  const scheduler = createScheduler(
-    store,
-    null,
-    3_600_000,
-    sessionDir,
-    () => {
-      handlerCalls += 1;
-      return { handled: false, response: "", error: null };
-    },
-  );
+  const scheduler = createScheduler(store, null, 3_600_000, sessionDir, () => {
+    handlerCalls += 1;
+    return { handled: false, response: "", error: null };
+  });
   scheduler.start();
   try {
     scheduler.runNow(maintenanceStorageReconcileJobID());
@@ -589,7 +573,7 @@ test("MaintenanceJobCompletesThroughTheRuntimeNotAnAgent", async () => {
     );
     assertEquals(completed.lastError, "");
     assertEquals(completed.runCount, 1);
-    assertThrows(() => Deno.statSync(aged), Deno.errors.NotFound);
+    assertThrows(() => nodeRuntime.statSync(aged), nodeRuntime.errors.NotFound);
     assertEquals(handlerCalls, 0);
   } finally {
     await scheduler.stop();
@@ -598,7 +582,9 @@ test("MaintenanceJobCompletesThroughTheRuntimeNotAnAgent", async () => {
 });
 
 test("UnknownMaintenanceJobCannotRunItsPrompt", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-maint-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-maint-",
+  });
   const store = createSQLiteCronStore(sessionDir);
   const id = MAINTENANCE_CRON_JOB_PREFIX + "not-implemented";
   const job = normalizeJobSchedule({
@@ -610,12 +596,7 @@ test("UnknownMaintenanceJobCannotRunItsPrompt", async () => {
     enabled: true,
   });
   store.create(job);
-  const scheduler = createScheduler(
-    store,
-    null,
-    3_600_000,
-    sessionDir,
-  );
+  const scheduler = createScheduler(store, null, 3_600_000, sessionDir);
   try {
     scheduler.runNow(id);
     const failed = await waitForStatus(store, id, "failed");
@@ -634,12 +615,12 @@ function writeMaintenanceArtifactDirectory(
   id: string,
 ): string {
   const dir = path.join(sessionDir, "artifacts", id);
-  Deno.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  nodeRuntime.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, "content");
-  Deno.writeTextFileSync(file, "stale bytes");
+  nodeRuntime.writeTextFileSync(file, "stale bytes");
   const stamp = new Date(Date.now() - 30 * 24 * 3_600_000);
-  Deno.utimeSync(file, stamp, stamp);
-  Deno.utimeSync(dir, stamp, stamp);
+  nodeRuntime.utimeSync(file, stamp, stamp);
+  nodeRuntime.utimeSync(dir, stamp, stamp);
   return file;
 }
 
@@ -680,7 +661,7 @@ function cronTestFactory(
 }
 
 test("SchedulerLocalJobWaitsForSessionRuntimeLock", async () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "opensac-cron-lock-" });
+  const tmp = nodeRuntime.makeTempDirSync({ prefix: "opensac-cron-lock-" });
   const mgr = createManager(tmp, tmp);
   mgr.init();
   const sessionID = mgr.getHeader()!.id;
@@ -694,17 +675,16 @@ test("SchedulerLocalJobWaitsForSessionRuntimeLock", async () => {
   });
 
   const model = cronTestModel();
-  const mock = createMockProvider("mock", [model], [
-    { type: streamTextDelta, textDelta: "done" },
-    { type: streamDone, stopReason: "stop" },
-  ]);
-  const factory = cronTestFactory(tmp, mock, model);
-  const sched = createScheduler(
-    store,
-    createAgentManager(factory),
-    1_000,
-    tmp,
+  const mock = createMockProvider(
+    "mock",
+    [model],
+    [
+      { type: streamTextDelta, textDelta: "done" },
+      { type: streamDone, stopReason: "stop" },
+    ],
   );
+  const factory = cronTestFactory(tmp, mock, model);
+  const sched = createScheduler(store, createAgentManager(factory), 1_000, tmp);
   let completions = 0;
   sched.setCompletionObserver(() => {
     completions++;
@@ -751,8 +731,10 @@ test("SchedulerLocalJobWaitsForSessionRuntimeLock", async () => {
 });
 
 test("SchedulerBoundChannelJobUsesForcedRuntimePolicy", async () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-cron-bound-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "opensac-cron-work-" });
+  const sessionDir = nodeRuntime.makeTempDirSync({
+    prefix: "opensac-cron-bound-",
+  });
+  const workDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-cron-work-" });
   const bound = createBound(workDir, sessionDir, "wechat", "cron-policy-user");
   const boundID = bound.getHeader()!.id;
   const store = createSQLiteCronStore(sessionDir);
@@ -767,10 +749,14 @@ test("SchedulerBoundChannelJobUsesForcedRuntimePolicy", async () => {
   });
 
   const model = cronTestModel();
-  const mock = createMockProvider("mock", [model], [
-    { type: streamTextDelta, textDelta: "done" },
-    { type: streamDone, stopReason: "stop" },
-  ]);
+  const mock = createMockProvider(
+    "mock",
+    [model],
+    [
+      { type: streamTextDelta, textDelta: "done" },
+      { type: streamDone, stopReason: "stop" },
+    ],
+  );
   const factory = cronTestFactory(sessionDir, mock, model);
   const scheduler = createScheduler(
     store,

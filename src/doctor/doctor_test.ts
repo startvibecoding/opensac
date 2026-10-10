@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertStrictEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -19,13 +20,13 @@ import {
 import { test } from "#testing";
 
 function withEnv(name: string, value: string, fn: () => void): void {
-  const previous = Deno.env.get(name);
-  Deno.env.set(name, value);
+  const previous = runtime.env.get(name);
+  runtime.env.set(name, value);
   try {
     fn();
   } finally {
-    if (previous === undefined) Deno.env.delete(name);
-    else Deno.env.set(name, previous);
+    if (previous === undefined) runtime.env.delete(name);
+    else runtime.env.set(name, previous);
   }
 }
 
@@ -37,8 +38,8 @@ function checkByID(result: Response, id: string): Check {
 }
 
 test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
-  const configDir = Deno.makeTempDirSync();
-  const workDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const workDir = runtime.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const settings = defaultSettings();
     settings.defaultProvider = "doctor-test";
@@ -65,12 +66,12 @@ test("RunReportsMissingProviderKeyWithoutLeakingConfiguredValue", () => {
 });
 
 test("RunUsesProjectSettingsForRequestedCWD", () => {
-  const configDir = Deno.makeTempDirSync();
-  const workDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const workDir = runtime.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const projectDir = path.join(workDir, projectDirName);
-    Deno.mkdirSync(projectDir, { recursive: true });
-    Deno.writeTextFileSync(
+    runtime.mkdirSync(projectDir, { recursive: true });
+    runtime.writeTextFileSync(
       path.join(projectDir, "settings.json"),
       `{
   "defaultProvider": "project-provider",
@@ -119,8 +120,8 @@ test("ValidateProviderReportsMissingModelWhenNoModelCanBeSelected", () => {
 });
 
 test("RunNeverSerializesAPIKey", () => {
-  const configDir = Deno.makeTempDirSync();
-  const workDir = Deno.makeTempDirSync();
+  const configDir = runtime.makeTempDirSync();
+  const workDir = runtime.makeTempDirSync();
   withEnv("OPENSAC_DIR", configDir, () => {
     const apiKey = "doctor-test-secret-value";
     const settings = defaultSettings();

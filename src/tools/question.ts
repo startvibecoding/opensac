@@ -78,9 +78,10 @@ export class QuestionTool implements Tool {
     ctx: ToolContext,
     params: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const question = typeof params["question"] === "string"
-      ? params["question"] as string
-      : "";
+    const question =
+      typeof params["question"] === "string"
+        ? (params["question"] as string)
+        : "";
     if (question === "") {
       throw new Error("question is required");
     }
@@ -99,9 +100,10 @@ export class QuestionTool implements Tool {
       options.push(opt.trim());
     }
 
-    const explanation = typeof params["context"] === "string"
-      ? params["context"] as string
-      : "";
+    const explanation =
+      typeof params["context"] === "string"
+        ? (params["context"] as string)
+        : "";
 
     const asker = questionAskerFromContext(ctx);
     if (!asker) {
@@ -110,12 +112,7 @@ export class QuestionTool implements Tool {
       );
     }
 
-    const answer = await asker.askQuestion(
-      ctx,
-      question,
-      options,
-      explanation,
-    );
+    const answer = await asker.askQuestion(ctx, question, options, explanation);
     if (answer === "") {
       throw new Error("no answer received (user may have aborted)");
     }

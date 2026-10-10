@@ -19,9 +19,6 @@ permissions:
   contents: write
 
 env:
-  # Pinned so a release is reproducible and matches the version this repository
-  # is developed against; setup-deno also caches DENO_DIR between runs.
-  DENO_VERSION: "2.9.7"
   NODE_VERSION: "22"
 
 jobs:
@@ -37,20 +34,19 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
-      - name: Set up Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Verify the tag is the version a build embeds
         run: |
           set -euo pipefail
-          version="$(deno run -A scripts/version.ts)"
+          version="$(node scripts/version.ts)"
           echo "tag=${RELEASE_TAG} build version=${version}"
           if [ "${version}" != "${RELEASE_TAG}" ]; then
             echo "::error::the newest v* tag (${version}) is not ${RELEASE_TAG};" \
@@ -59,10 +55,10 @@ jobs:
           fi
 
       - name: Build the platform-independent npm package
-        run: deno task build:node
+        run: npm run build:node
 
       - name: Pack the npm tarball
-        run: deno task pack:node
+        run: npm run pack:node
 
       - name: Checksum the artifact
         run: |

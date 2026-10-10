@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals, assertRejects } from "../compat/assert.ts";
 import { defaultSettings } from "../config/settings.ts";
 import {
@@ -91,7 +92,7 @@ test("runInteractiveAction requires a terminal instead of crashing Ink", async (
           model: "",
           mode: "",
           thinking: "",
-          workDir: Deno.cwd(),
+          workDir: runtime.cwd(),
         },
         defaultSettings(),
         { isTerminal: () => false },
@@ -127,8 +128,8 @@ test("tuiResumeOptions maps the session flags the TUI resumes from", () => {
     { continueLast: false, resumeSession: "" },
   );
   // No flags at all keeps the default fresh-session behaviour.
-  assertEquals(
-    tuiResumeOptions({}),
-    { continueLast: false, resumeSession: "" },
-  );
+  assertEquals(tuiResumeOptions({}), {
+    continueLast: false,
+    resumeSession: "",
+  });
 });

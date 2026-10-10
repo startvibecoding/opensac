@@ -252,15 +252,19 @@ export class Dialog {
       const value = this.#inputActive ? this.#inputValue : page.input.value;
       // Mask ordinary secrets, but leave ${ENV} references readable so users
       // can keep an existing env-based binding untouched.
-      const keepReadable = page.input.masked === true &&
-        value.startsWith("${") && value.endsWith("}");
-      const shown = page.input.masked === true && value !== "" && !keepReadable
-        ? "*".repeat(Array.from(value).length)
-        : value;
+      const keepReadable =
+        page.input.masked === true &&
+        value.startsWith("${") &&
+        value.endsWith("}");
+      const shown =
+        page.input.masked === true && value !== "" && !keepReadable
+          ? "*".repeat(Array.from(value).length)
+          : value;
       const cursor = this.#inputActive ? `${ACCENT}█${RESET}` : "";
-      const placeholder = shown === "" && page.input.placeholder !== undefined
-        ? `${DIM}${page.input.placeholder}${RESET}`
-        : "";
+      const placeholder =
+        shown === "" && page.input.placeholder !== undefined
+          ? `${DIM}${page.input.placeholder}${RESET}`
+          : "";
       lines.push(
         truncateDisplay(
           `${page.input.prompt} ${shown}${cursor}${placeholder}`,
@@ -283,9 +287,8 @@ export class Dialog {
       const [start, end] = visibleRange(this.#cursor, items.length, limit);
       for (let i = start; i < end; i++) {
         const item = items[i];
-        const pointer = i === this.#cursor
-          ? `${ACCENT}${BOLD}› ${RESET}`
-          : "  ";
+        const pointer =
+          i === this.#cursor ? `${ACCENT}${BOLD}› ${RESET}` : "  ";
         const marker = item.current === true ? "* " : "  ";
         lines.push(
           truncateDisplay(`${pointer}${marker}${item.label}`, contentWidth),
@@ -321,9 +324,10 @@ export class Dialog {
   #filtered(items: DialogItem[]): DialogItem[] {
     if (this.#search === "") return items;
     const query = this.#search.toLowerCase();
-    return items.filter((item) =>
-      item.label.toLowerCase().includes(query) ||
-      item.value.toLowerCase().includes(query)
+    return items.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.value.toLowerCase().includes(query),
     );
   }
 
@@ -362,11 +366,9 @@ export function frame(lines: string[], width: number): string {
     const pad = " ".repeat(Math.max(inner - displayWidth(line), 0));
     return `│ ${line}${pad} │`;
   });
-  return [
-    `╭${"─".repeat(inner)}╮`,
-    ...body,
-    `╰${"─".repeat(inner)}╯`,
-  ].join("\n");
+  return [`╭${"─".repeat(inner)}╮`, ...body, `╰${"─".repeat(inner)}╯`].join(
+    "\n",
+  );
 }
 
 /** Normalizes an age into a short human string (Go formatAgeWithTranslator). */

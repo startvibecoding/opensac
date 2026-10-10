@@ -54,12 +54,14 @@ test("CoreEventStream correlates a reverse request with its response", async () 
   const response = stream.request("approval-1", "approval.request", {
     sessionId: "session-1",
   });
-  assertEquals(requests, [{
-    jsonrpc: "2.0",
-    id: "approval-1",
-    method: "approval.request",
-    params: { sessionId: "session-1" },
-  }]);
+  assertEquals(requests, [
+    {
+      jsonrpc: "2.0",
+      id: "approval-1",
+      method: "approval.request",
+      params: { sessionId: "session-1" },
+    },
+  ]);
 
   stream.respond(coreResult("approval-1", { approved: true }));
   assertEquals(await response, {
@@ -84,10 +86,12 @@ test("CoreEventStream keeps an RPC-channel attribution until its release", async
 
     stream.attributeSubscription("session-1", "run-1", "rpc-1");
     const listed = stream.listClients().find((c) => c.clientId === "rpc-1");
-    assertEquals(listed?.subscriptions, [{
-      sessionId: "session-1",
-      runId: "run-1",
-    }]);
+    assertEquals(listed?.subscriptions, [
+      {
+        sessionId: "session-1",
+        runId: "run-1",
+      },
+    ]);
 
     // Attribution rows receive no events: the client's live socket iterator
     // is the only delivery path, so publish must not enqueue into them.

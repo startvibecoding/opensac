@@ -136,12 +136,14 @@ export async function recoverOrphanedRunsWithTrigger(
         attempts[index] = { index, run, action: "", err: abortError(ctx) };
         continue;
       }
-      const reason = trigger === "periodic"
-        ? "execution owner lease expired while run was active"
-        : "server restarted while run was active";
-      const attemptCtx: CombinedSignal = attemptTimeoutMs > 0
-        ? combineSignals(ctx, attemptTimeoutMs)
-        : { signal: ctx, cleanup: () => {} };
+      const reason =
+        trigger === "periodic"
+          ? "execution owner lease expired while run was active"
+          : "server restarted while run was active";
+      const attemptCtx: CombinedSignal =
+        attemptTimeoutMs > 0
+          ? combineSignals(ctx, attemptTimeoutMs)
+          : { signal: ctx, cleanup: () => {} };
       try {
         const action = await recoverOrphanedRun(
           attemptCtx.signal,
@@ -323,7 +325,8 @@ async function recoverOrphanedRun(
   }
   if (
     (trigger === "startup" || trigger === "periodic") &&
-    facts.recovery !== null && facts.recovery.state === "failed" &&
+    facts.recovery !== null &&
+    facts.recovery.state === "failed" &&
     facts.recovery.nextRetryAt !== null &&
     facts.databaseNow.getTime() < facts.recovery.nextRetryAt.getTime()
   ) {
@@ -353,9 +356,12 @@ async function recoverOrphanedRun(
     const binding = guard.binding();
     if (facts.activeRuns.length === 0) return "";
     if (
-      facts.activeRuns.length !== 1 || facts.activeRuns[0].id !== run.id ||
-      facts.lease === null || !facts.lease.valid ||
-      facts.lease.purpose !== "recovery" || facts.lease.runId !== run.id ||
+      facts.activeRuns.length !== 1 ||
+      facts.activeRuns[0].id !== run.id ||
+      facts.lease === null ||
+      !facts.lease.valid ||
+      facts.lease.purpose !== "recovery" ||
+      facts.lease.runId !== run.id ||
       facts.lease.ownerInstanceId !== binding.ownerInstanceId ||
       facts.lease.tokenHash !== binding.tokenHash ||
       facts.lease.epoch !== binding.epoch
@@ -379,9 +385,8 @@ async function recoverOrphanedRun(
         abortError(ctx),
       );
     }
-    const action = policy !== null
-      ? policy(run)
-      : defaultRunRecoveryAction(facts);
+    const action =
+      policy !== null ? policy(run) : defaultRunRecoveryAction(facts);
     if (action === RECOVERY_KEEP_REMOTE) {
       markSessionRunRecoveryDetached(sessionDir, run.sessionId, run.id);
       return RECOVERY_KEEP_REMOTE;
@@ -530,18 +535,20 @@ function recoveryDecisionResolutionEvents(
       reason,
       code: reasonCode,
     });
-    result.push(sessionRunEventFromRuntime({
-      id: `recovery_decision_${run.id}_${id}`,
-      sessionId: run.sessionId,
-      runId: run.id,
-      eventType,
-      source: "agentruntime",
-      status: "cancelled",
-      model: run.model,
-      mode: run.mode,
-      timestamp: new Date(),
-      data: decisionEventEnvelope(record),
-    }));
+    result.push(
+      sessionRunEventFromRuntime({
+        id: `recovery_decision_${run.id}_${id}`,
+        sessionId: run.sessionId,
+        runId: run.id,
+        eventType,
+        source: "agentruntime",
+        status: "cancelled",
+        model: run.model,
+        mode: run.mode,
+        timestamp: new Date(),
+        data: decisionEventEnvelope(record),
+      }),
+    );
   }
   return result;
 }
@@ -557,7 +564,8 @@ export function defaultRunRecoveryAction(
   if (
     run.source !== "responses_background" ||
     remote.sessionId !== run.sessionId ||
-    remote.responseId === "" || remote.provider === "" ||
+    remote.responseId === "" ||
+    remote.provider === "" ||
     remote.api !== "openai-responses"
   ) {
     return RECOVERY_FAIL_LOCAL;

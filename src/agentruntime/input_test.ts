@@ -3,6 +3,8 @@
 // (`AcceptProviderAttachment`, artifact collection) land with the
 // `SessionRuntime` slice; these cover the Runtime-owned private store directly.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { FsFile } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import {
   ATTACHMENT_FILE,
@@ -21,8 +23,8 @@ function inputTestSession(): {
   workDir: string;
   sessionId: string;
 } {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-input-" });
-  const workDir = Deno.makeTempDirSync({ prefix: "opensac-work-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-input-" });
+  const workDir = nodeRuntime.makeTempDirSync({ prefix: "opensac-work-" });
   const manager = createManager(workDir, root);
   manager.init();
   return { root, workDir, sessionId: manager.getHeader()!.id };
@@ -50,7 +52,7 @@ async function publishTestArtifact(
   return record;
 }
 
-async function readAll(file: Deno.FsFile): Promise<Uint8Array> {
+async function readAll(file: FsFile): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   const buf = new Uint8Array(64 * 1024);
   while (true) {
@@ -108,7 +110,7 @@ test("ArtifactOpenRejectsPrivateStoreTampering", async () => {
       "original",
     );
     const path = service.storagePath(record.storageKey);
-    await Deno.writeTextFile(path, "tampered");
+    await nodeRuntime.writeTextFile(path, "tampered");
     const err = await assertRejects(() => service.Open(sessionId, record.id));
     assert(String(err).includes("hash mismatch"));
   } finally {
@@ -146,7 +148,7 @@ test("ArtifactCleanupExpiresPrivateContent", async () => {
     // The content file is gone.
     let exists = true;
     try {
-      await Deno.stat(service.storagePath(record.storageKey));
+      await nodeRuntime.stat(service.storagePath(record.storageKey));
     } catch {
       exists = false;
     }
@@ -169,7 +171,7 @@ test("AcceptArtifactRejectsUnsupportedKindAndKindMismatch", async () => {
         mediaType: "text/plain",
         sizeHint: 1,
         open: () => ({ bytes: new Uint8Array([1]) }),
-      })
+      }),
     );
     // Non-image bytes requested as an image are rejected by sniffing.
     await assertRejects(() =>
@@ -181,7 +183,7 @@ test("AcceptArtifactRejectsUnsupportedKindAndKindMismatch", async () => {
         mediaType: "image/png",
         sizeHint: 5,
         open: () => ({ bytes: new TextEncoder().encode("hello") }),
-      })
+      }),
     );
   } finally {
     closeDatabases();

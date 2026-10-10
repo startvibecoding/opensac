@@ -1,3 +1,5 @@
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { projectPathFor } from "../config/mod.ts";
 import { configDir } from "../platform/platform.ts";
@@ -67,7 +69,7 @@ export class Center {
       }
     }
     return [...summaries.values()].sort((a, b) =>
-      a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
     );
   }
 
@@ -102,8 +104,11 @@ export class Center {
 export function validateBundleName(name: string): string | null {
   if (name.trim() === "") return "expert name 不能为空";
   if (
-    name !== path.basename(name) || name.includes("/") || name.includes("\\") ||
-    name === "." || name === ".."
+    name !== path.basename(name) ||
+    name.includes("/") ||
+    name.includes("\\") ||
+    name === "." ||
+    name === ".."
   ) {
     return `invalid expert name ${quote(name)}`;
   }
@@ -117,9 +122,9 @@ export function validateBundleNameOrThrow(name: string): void {
 
 export function listOSLayer(dir: string, source: string): Summary[] {
   if (dir === "") return [];
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
-    entries = [...Deno.readDirSync(dir)];
+    entries = [...runtime.readDirSync(dir)];
   } catch {
     return []; // missing/unreadable directory = empty layer
   }
@@ -129,7 +134,7 @@ export function listOSLayer(dir: string, source: string): Summary[] {
     const name = entry.name;
     let data: string;
     try {
-      data = Deno.readTextFileSync(path.join(dir, name, manifestFileName));
+      data = runtime.readTextFileSync(path.join(dir, name, manifestFileName));
     } catch {
       continue; // no expert.json: not an expert bundle
     }
@@ -177,7 +182,7 @@ export function summaryFromManifest(
 
 function isFile(p: string): boolean {
   try {
-    return !Deno.statSync(p).isDirectory;
+    return !runtime.statSync(p).isDirectory;
   } catch {
     return false;
   }

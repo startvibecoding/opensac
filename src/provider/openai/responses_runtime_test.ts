@@ -6,6 +6,7 @@
 // Manager; foreign-key enforcement is off and a session with no lease row skips
 // lease validation, so these tests use a literal session ID.
 
+import { runtime as nodeRuntime } from "../../platform/runtime.ts";
 import { assert, assertEquals } from "../../compat/assert.ts";
 import { closeAll } from "../../db/mod.ts";
 import { getResponseTurn } from "../../session/mod.ts";
@@ -51,7 +52,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "opensac-responses-runtime-" });
+  return nodeRuntime.makeTempDirSync({ prefix: "opensac-responses-runtime-" });
 }
 
 test("ResponsesRunManagerStartGetAndCancel", async () => {
@@ -75,7 +76,8 @@ test("ResponsesRunManagerStartGetAndCancel", async () => {
         return jsonResponse({ id: "resp-1", status: "completed" });
       }
       if (
-        method === "POST" && req.url.endsWith("/v1/responses/resp-1/cancel")
+        method === "POST" &&
+        req.url.endsWith("/v1/responses/resp-1/cancel")
       ) {
         cancelReceived = true;
         return jsonResponse({ id: "resp-1", status: "cancelling" });
@@ -114,22 +116,20 @@ test("ResponsesRunManagerStartGetAndCancel", async () => {
 });
 
 test("ResponsesRunManagerStartUsesConfiguredRetryAndIdempotency", async () => {
-  for (
-    const tc of [
-      {
-        name: "enabled",
-        retryEnabled: true,
-        wantAttempts: 2,
-        wantError: false,
-      },
-      {
-        name: "disabled",
-        retryEnabled: false,
-        wantAttempts: 1,
-        wantError: true,
-      },
-    ]
-  ) {
+  for (const tc of [
+    {
+      name: "enabled",
+      retryEnabled: true,
+      wantAttempts: 2,
+      wantError: false,
+    },
+    {
+      name: "disabled",
+      retryEnabled: false,
+      wantAttempts: 1,
+      wantError: true,
+    },
+  ]) {
     const sessionDir = tempDir();
     const sessionId = `session-retry-${tc.name}`;
     try {

@@ -14,7 +14,8 @@ import {
   type MarketInfo,
   type SearchPage,
   type SkillDetail,
-  type SkillSummary} from "../skillhub/mod.ts";
+  type SkillSummary,
+} from "../skillhub/mod.ts";
 import { test } from "#testing";
 
 const tr = new Translator("en");
@@ -65,17 +66,15 @@ class FakeHost implements SkillHubPanelHost {
       },
     ]);
   }
-  search(
-    market: Market,
-    query: { query?: string },
-  ): Promise<SearchPage> {
+  search(market: Market, query: { query?: string }): Promise<SearchPage> {
     this.searches.push({ market, query: query.query ?? "" });
     const items = [summary(), summary({ id: "other", name: "Other" })];
-    const filtered = (query.query ?? "") === ""
-      ? items
-      : items.filter((i) =>
-        i.name.toLowerCase().includes((query.query ?? "").toLowerCase())
-      );
+    const filtered =
+      (query.query ?? "") === ""
+        ? items
+        : items.filter((i) =>
+            i.name.toLowerCase().includes((query.query ?? "").toLowerCase()),
+          );
     return Promise.resolve({ items: filtered, total: filtered.length });
   }
   official(): Promise<SearchPage> {
@@ -185,9 +184,10 @@ test("skillhub panel opens detail on Enter and installs via scope picker", async
   page = panel.page();
   assertEquals(page.title, tr.text("skillhub.panel.detail_title"));
   assertEquals(
-    page.body?.some((l) =>
-      l.includes("Installed demo (project)") ||
-      l.includes("installed: project")
+    page.body?.some(
+      (l) =>
+        l.includes("Installed demo (project)") ||
+        l.includes("installed: project"),
     ),
     true,
     `body was:\n${(page.body ?? []).join("\n")}`,

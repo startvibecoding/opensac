@@ -5,6 +5,7 @@
 // layout. They are split out of the Manager so the session-level wrappers over
 // the DAO layer can build on them.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   closeAll,
@@ -55,10 +56,10 @@ export function parseSessionTimestamp(timestamp: string): Date {
 /** Reports whether the sessions.db file exists in a session root. */
 function sessionDBExists(dbPath: string): boolean {
   try {
-    Deno.statSync(dbPath);
+    nodeRuntime.statSync(dbPath);
     return true;
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
+    if (err instanceof nodeRuntime.errors.NotFound) return false;
     throw err;
   }
 }
@@ -69,9 +70,7 @@ function sessionDBExists(dbPath: string): boolean {
  * read-only listing surfaces. Callers must not close the returned managed
  * handle.
  */
-export function openExistingSessionDB(
-  sessionDir: string,
-): Database | null {
+export function openExistingSessionDB(sessionDir: string): Database | null {
   if (sessionDir === "") {
     sessionDir = platformSessionDir();
   }

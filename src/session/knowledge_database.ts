@@ -4,6 +4,8 @@
 // SQLite file beside sessions.db; it is never attached to the canonical
 // session database.
 
+import { runtime } from "../platform/runtime.ts";
+import type { DirEntry, FileInfo } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { close, type DB, openWithOptions } from "../db/mod.ts";
 import { type Database, type Tx, wrapDatabase } from "../dao/mod.ts";
@@ -41,10 +43,13 @@ function normalizeKnowledgeBaseDatabaseID(value: string): string {
   const trimmed = value.trim();
   if (trimmed === "") throw new KnowledgeBaseNotFoundError();
   for (const ch of trimmed) {
-    if (
-      !(ch >= "a" && ch <= "z" || ch >= "A" && ch <= "Z" ||
-        ch >= "0" && ch <= "9" || ch === "_" || ch === "-")
-    ) {
+    if (!(
+      (ch >= "a" && ch <= "z") ||
+      (ch >= "A" && ch <= "Z") ||
+      (ch >= "0" && ch <= "9") ||
+      ch === "_" ||
+      ch === "-"
+    )) {
       throw new Error("invalid knowledge base database identity");
     }
   }
@@ -63,11 +68,11 @@ function openKnowledgeBaseDatabase(
 ): { db: Database; path: string } {
   const dbPath = knowledgeBaseDatabasePath(sessionDir, knowledgeBaseID);
   if (!create) {
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = Deno.lstatSync(dbPath);
+      info = runtime.lstatSync(dbPath);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) {
+      if (err instanceof runtime.errors.NotFound) {
         throw new KnowledgeBaseNotFoundError();
       }
       throw new Error(`stat knowledge base database: ${err}`);
@@ -116,11 +121,7 @@ export function writeKnowledgeBaseDatabase(
   create: boolean,
   fn: (tx: Tx) => void,
 ): void {
-  const { db } = openKnowledgeBaseDatabase(
-    sessionDir,
-    knowledgeBaseID,
-    create,
-  );
+  const { db } = openKnowledgeBaseDatabase(sessionDir, knowledgeBaseID, create);
   db.runInTx(fn);
 }
 
@@ -130,18 +131,16 @@ export function listKnowledgeBaseDatabaseIDs(sessionDir: string): string[] {
     path.dirname(rootDBPath(sessionDir)),
     knowledgeBaseDatabaseDirectoryName,
   );
-  let entries: Deno.DirEntry[];
+  let entries: DirEntry[];
   try {
-    entries = [...Deno.readDirSync(dir)];
+    entries = [...runtime.readDirSync(dir)];
   } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return [];
+    if (err instanceof runtime.errors.NotFound) return [];
     throw new Error(`list knowledge base databases: ${err}`);
   }
   const ids: string[] = [];
   for (const entry of entries) {
-    if (
-      entry.isSymlink || entry.isDirectory || !entry.name.endsWith(".db")
-    ) {
+    if (entry.isSymlink || entry.isDirectory || !entry.name.endsWith(".db")) {
       continue;
     }
     const id = entry.name.slice(0, -".db".length);
@@ -150,9 +149,9 @@ export function listKnowledgeBaseDatabaseIDs(sessionDir: string): string[] {
     } catch {
       continue;
     }
-    let info: Deno.FileInfo;
+    let info: FileInfo;
     try {
-      info = Deno.lstatSync(path.join(dir, entry.name));
+      info = runtime.lstatSync(path.join(dir, entry.name));
     } catch {
       continue;
     }
@@ -172,9 +171,9 @@ export function deleteKnowledgeBaseDatabase(
   close(dbPath);
   for (const target of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
     try {
-      Deno.removeSync(target);
+      runtime.removeSync(target);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) continue;
+      if (err instanceof runtime.errors.NotFound) continue;
       throw new Error(`remove knowledge base database: ${err}`);
     }
   }

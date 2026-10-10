@@ -4,6 +4,7 @@
 // the `SessionRuntime` slice), matching `delivery_store_test.ts`. Go's
 // `(DeliveryResult, error)` executor returns map to `DeliveryExecutorOutcome`.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import {
@@ -81,7 +82,9 @@ function operation(overrides: Partial<DeliveryOperation>): DeliveryOperation {
 }
 
 function fixture(): { sessionDir: string; sessionId: string } {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-coordinator-" });
+  const sessionDir = runtime.makeTempDirSync({
+    prefix: "opensac-coordinator-",
+  });
   const sessionId = "coord-session";
   const now = new Date();
   createSessionRun(

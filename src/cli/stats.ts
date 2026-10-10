@@ -3,6 +3,7 @@
 // tables directly in the terminal. The browser opener is best-effort and
 // never fatal, matching the Go command.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import {
   type Aggregate,
@@ -87,8 +88,7 @@ async function runStatsServer(
     try {
       await openURL(url);
     } catch (err) {
-      const writeError = options.writeError ??
-        ((line) => console.error(line));
+      const writeError = options.writeError ?? ((line) => console.error(line));
       writeError(
         `stats dashboard: could not open browser: ${(err as Error).message}`,
       );
@@ -99,7 +99,7 @@ async function runStatsServer(
     await options.serve(server);
     return;
   }
-  server.start();
+  await server.start();
   await server.finished();
 }
 
@@ -121,21 +121,11 @@ export function printStatsCLI(
   rows.push(`Output tokens: ${formatStatsInt(summary.outputTokens)}`);
   rows.push(`Total tokens: ${formatStatsInt(summary.totalTokens)}`);
 
-  appendAggregates(
-    rows,
-    "By Provider",
-    "Provider",
-    byProvider,
-    5,
-    (a) => a.protocol === "" ? a.vendor : `${a.vendor} (${a.protocol})`,
+  appendAggregates(rows, "By Provider", "Provider", byProvider, 5, (a) =>
+    a.protocol === "" ? a.vendor : `${a.vendor} (${a.protocol})`,
   );
-  appendAggregates(
-    rows,
-    "By Model",
-    "Model",
-    byModel,
-    5,
-    (a) => a.model !== "" ? a.model : a.label,
+  appendAggregates(rows, "By Model", "Model", byModel, 5, (a) =>
+    a.model !== "" ? a.model : a.label,
   );
 
   rows.push("");
@@ -155,15 +145,17 @@ export function printStatsCLI(
       ].join("\t"),
     );
     for (const item of recent.items) {
-      rows.push([
-        formatStatsTime(item.timestamp),
-        emptyDash(item.vendor),
-        emptyDash(item.protocol),
-        emptyDash(item.model),
-        formatStatsInt(item.inputTokens),
-        formatStatsInt(item.outputTokens),
-        formatStatsDuration(item.durationMs),
-      ].join("\t"));
+      rows.push(
+        [
+          formatStatsTime(item.timestamp),
+          emptyDash(item.vendor),
+          emptyDash(item.protocol),
+          emptyDash(item.model),
+          formatStatsInt(item.inputTokens),
+          formatStatsInt(item.outputTokens),
+          formatStatsDuration(item.durationMs),
+        ].join("\t"),
+      );
     }
   }
 
@@ -184,18 +176,18 @@ function appendAggregates(
     rows.push("  No data");
     return;
   }
-  rows.push(
-    [labelHeader, "Requests", "Input", "Output", "Total"].join("\t"),
-  );
+  rows.push([labelHeader, "Requests", "Input", "Output", "Total"].join("\t"));
   for (let i = 0; i < Math.min(limit, aggregates.length); i++) {
     const row = aggregates[i];
-    rows.push([
-      emptyDash(labelFn(row)),
-      formatStatsInt(row.requests),
-      formatStatsInt(row.inputTokens),
-      formatStatsInt(row.outputTokens),
-      formatStatsInt(row.totalTokens),
-    ].join("\t"));
+    rows.push(
+      [
+        emptyDash(labelFn(row)),
+        formatStatsInt(row.requests),
+        formatStatsInt(row.inputTokens),
+        formatStatsInt(row.outputTokens),
+        formatStatsInt(row.totalTokens),
+      ].join("\t"),
+    );
   }
 }
 
@@ -212,10 +204,12 @@ function alignColumns(lines: string[]): string[] {
   }
   return split.map((cells) => {
     if (cells.length < 2) return cells.join("");
-    return cells.map((cell, i) => {
-      if (i === cells.length - 1) return cell;
-      return cell.padEnd(widths[i] + 2, " ");
-    }).join("");
+    return cells
+      .map((cell, i) => {
+        if (i === cells.length - 1) return cell;
+        return cell.padEnd(widths[i] + 2, " ");
+      })
+      .join("");
   });
 }
 
@@ -227,11 +221,11 @@ function formatStatsTime(t: Date): string {
   if (t.getTime() === 0) return "-";
   const pad = (n: number) => String(n).padStart(2, "0");
   const local = new Date(t);
-  return `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${
-    pad(local.getDate())
-  } ${pad(local.getHours())}:${pad(local.getMinutes())}:${
-    pad(local.getSeconds())
-  }`;
+  return `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(
+    local.getDate(),
+  )} ${pad(local.getHours())}:${pad(local.getMinutes())}:${pad(
+    local.getSeconds(),
+  )}`;
 }
 
 function formatStatsDuration(ms: number): string {
@@ -250,7 +244,9 @@ export async function openInDefaultBrowser(url: string): Promise<void> {
   for (const [program, ...args] of candidates) {
     const resolved = resolveOpener(program);
     if (resolved === null) continue;
-    const child = new Deno.Command(resolved, { args: [...args, url] }).spawn();
+    const child = new runtime.Command(resolved, {
+      args: [...args, url],
+    }).spawn();
     await child.status;
     return;
   }
@@ -258,16 +254,16 @@ export async function openInDefaultBrowser(url: string): Promise<void> {
 }
 
 function browserCommands(): string[][] {
-  switch (Deno.build.os) {
+  switch (runtime.build.os) {
     case "darwin":
       return [["open"]];
     case "windows":
       // `cmd /c start` is the canonical default-handler path; rundll32 stays
       // as a fallback for hosts where START is unavailable.
-      return [["cmd.exe", "/c", "start", ""], [
-        "rundll32.exe",
-        "url.dll,FileProtocolHandler",
-      ]];
+      return [
+        ["cmd.exe", "/c", "start", ""],
+        ["rundll32.exe", "url.dll,FileProtocolHandler"],
+      ];
     default:
       return [["xdg-open"], ["gio", "open"], ["sensible-browser"]];
   }
@@ -283,17 +279,17 @@ function resolveOpener(program: string): string | null {
   if (program.includes("/") || program.includes("\\")) {
     return isFile(program) ? program : null;
   }
-  const pathEnv = Deno.env.get("PATH") ?? "";
-  const windows = Deno.build.os === "windows";
+  const pathEnv = runtime.env.get("PATH") ?? "";
+  const windows = runtime.build.os === "windows";
   const sep = windows ? ";" : ":";
   const exts = windows
     ? [
-      "",
-      ...(Deno.env.get("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
-        .split(";")
-        .map((e) => e.trim())
-        .filter((e) => e !== ""),
-    ]
+        "",
+        ...(runtime.env.get("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
+          .split(";")
+          .map((e) => e.trim())
+          .filter((e) => e !== ""),
+      ]
     : [""];
   for (const dir of pathEnv.split(sep)) {
     if (dir === "") continue;
@@ -307,7 +303,7 @@ function resolveOpener(program: string): string | null {
 
 function isFile(p: string): boolean {
   try {
-    return Deno.statSync(p).isFile;
+    return runtime.statSync(p).isFile;
   } catch {
     return false;
   }

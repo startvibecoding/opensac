@@ -21,20 +21,24 @@ import { statusCanceled, statusDone, statusError } from "./types.ts";
 import { test } from "#testing";
 
 test("lint tool validates JavaScript source without running agents", async () => {
-  const result = await createLintTool().execute({}, {
-    source:
-      `workflow("lint me", {phases:[phase("scan", agent("handler-audit", {key:"r0", mode:"plan", tools:["read","grep"], prompt:"Audit handler."})), phase("verify", agent("cross-check", {mode:"plan", prompt:resultKey("scan.handler-audit","r0")}))]});`,
-  });
+  const result = await createLintTool().execute(
+    {},
+    {
+      source: `workflow("lint me", {phases:[phase("scan", agent("handler-audit", {key:"r0", mode:"plan", tools:["read","grep"], prompt:"Audit handler."})), phase("verify", agent("cross-check", {mode:"plan", prompt:resultKey("scan.handler-audit","r0")}))]});`,
+    },
+  );
   const parsed = JSON.parse(result.text) as LintResult;
   assert(parsed.valid, `lint invalid: ${JSON.stringify(parsed)}`);
   assertEquals(parsed.status, statusDone);
 });
 
 test("lint tool reports workflow errors", async () => {
-  const result = await createLintTool().execute({}, {
-    source:
-      `workflow("bad", {phases:[phase("verify", agent("check", {prompt:result("scan.missing")}))]});`,
-  });
+  const result = await createLintTool().execute(
+    {},
+    {
+      source: `workflow("bad", {phases:[phase("verify", agent("check", {prompt:result("scan.missing")}))]});`,
+    },
+  );
   const parsed = JSON.parse(result.text) as LintResult;
   assert(!parsed.valid, "expected invalid lint result");
   assertStringIncludes(
@@ -81,9 +85,8 @@ test("cancel tool cancels active run", async () => {
 });
 
 test("cancel tool rejects inactive run", async () => {
-  await assertRejects(
-    () =>
-      createCancelTool(createActiveRegistry()).execute({}, { id: "missing" }),
+  await assertRejects(() =>
+    createCancelTool(createActiveRegistry()).execute({}, { id: "missing" }),
   );
 });
 
@@ -93,8 +96,5 @@ test("lint workflow source times out runaway source", async () => {
   assert(!res.valid, `lint result = ${JSON.stringify(res)}, want invalid`);
   assertEquals(res.status, statusError);
   assertEquals(res.error, "workflow source evaluation timed out");
-  assert(
-    Date.now() - started < 5000,
-    "lint ran despite the 50ms budget",
-  );
+  assert(Date.now() - started < 5000, "lint ran despite the 50ms budget");
 });

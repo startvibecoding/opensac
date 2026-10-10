@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals, assertRejects } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { CorePaths } from "./paths.ts";
@@ -7,12 +8,14 @@ import { test } from "#testing";
 async function withStateDir(
   test: (paths: CorePaths, registry: CoreRegistry) => Promise<void>,
 ): Promise<void> {
-  const stateDir = await Deno.makeTempDir({ prefix: "opensac-core-registry-" });
+  const stateDir = await runtime.makeTempDir({
+    prefix: "opensac-core-registry-",
+  });
   try {
     const paths = CorePaths.fromStateDir(stateDir);
     await test(paths, new CoreRegistry(paths));
   } finally {
-    await Deno.remove(stateDir, { recursive: true });
+    await runtime.remove(stateDir, { recursive: true });
   }
 }
 
@@ -24,7 +27,7 @@ function registration(
     id,
     version: "0.1.0",
     protocolVersion: 1,
-    pid: Deno.pid,
+    pid: runtime.pid,
     host: "127.0.0.1",
     port: 4096,
     startedAt: 1_700_000_000_000,
@@ -33,7 +36,7 @@ function registration(
 }
 
 test("CorePaths.fromStateDir does not create state", async () => {
-  const parent = await Deno.makeTempDir({ prefix: "opensac-core-paths-" });
+  const parent = await runtime.makeTempDir({ prefix: "opensac-core-paths-" });
   try {
     const stateDir = path.join(parent, "state");
     const paths = CorePaths.fromStateDir(stateDir);
@@ -45,7 +48,7 @@ test("CorePaths.fromStateDir does not create state", async () => {
     assertEquals(await exists(paths.registrationFile), false);
     assertEquals(await exists(paths.lockFile), false);
   } finally {
-    await Deno.remove(parent, { recursive: true });
+    await runtime.remove(parent, { recursive: true });
   }
 });
 
@@ -55,20 +58,23 @@ test("CoreRegistry writes one complete atomic JSON registration", async () => {
     await registry.write(value);
 
     assertEquals(await registry.read(), value);
-    const raw = await Deno.readTextFile(paths.registrationFile);
+    const raw = await runtime.readTextFile(paths.registrationFile);
     assertEquals(JSON.parse(raw), value);
     assertEquals(raw.includes("passwords"), false);
 
     const entries = [];
-    for await (const entry of Deno.readDir(paths.stateDir)) {
+    for await (const entry of runtime.readDir(paths.stateDir)) {
       entries.push(entry.name);
     }
-    assertEquals(entries.filter((name) => name !== "core.json"), []);
+    assertEquals(
+      entries.filter((name) => name !== "core.json"),
+      [],
+    );
   });
 });
 
 test("CoreRegistry creates a missing state directory only on write", async () => {
-  const parent = await Deno.makeTempDir({ prefix: "opensac-core-write-" });
+  const parent = await runtime.makeTempDir({ prefix: "opensac-core-write-" });
   try {
     const paths = CorePaths.fromStateDir(path.join(parent, "nested", "state"));
     const registry = new CoreRegistry(paths);
@@ -76,25 +82,25 @@ test("CoreRegistry creates a missing state directory only on write", async () =>
     assertEquals(await exists(paths.stateDir), false);
 
     await registry.write(registration("new-core"));
-    assertEquals((await Deno.stat(paths.stateDir)).isDirectory, true);
+    assertEquals((await runtime.stat(paths.stateDir)).isDirectory, true);
     assertEquals((await registry.read())?.id, "new-core");
   } finally {
-    await Deno.remove(parent, { recursive: true });
+    await runtime.remove(parent, { recursive: true });
   }
 });
 
 test("CoreRegistry rejects malformed and secret-bearing registrations", async () => {
   await withStateDir(async (paths, registry) => {
     await assertRejects(() =>
-      registry.write({ id: 1 } as unknown as CoreRegistration)
+      registry.write({ id: 1 } as unknown as CoreRegistration),
     );
     await assertRejects(() =>
       registry.write({
         ...registration("core-a"),
         passwords: ["do-not-write"],
-      } as unknown as CoreRegistration)
+      } as unknown as CoreRegistration),
     );
-    await Deno.writeTextFile(paths.registrationFile, "{");
+    await runtime.writeTextFile(paths.registrationFile, "{");
     await assertRejects(() => registry.read());
   });
 });
@@ -166,28 +172,28 @@ test("stale reclaim takeover cannot displace a replacement claim", async () => {
       ".core-registry-mutation.lock",
     );
     const reclaimDir = path.join(mutationLock, "reclaim");
-    await Deno.mkdir(reclaimDir, { recursive: true, mode: 0o700 });
-    await Deno.writeTextFile(
+    await runtime.mkdir(reclaimDir, { recursive: true, mode: 0o700 });
+    await runtime.writeTextFile(
       path.join(mutationLock, "owner.json"),
       JSON.stringify({
         token: "stale-guard",
         pid: 999_999_99,
-        hostname: Deno.hostname(),
+        hostname: runtime.hostname(),
         timestamp: 1,
       }),
     );
-    await Deno.writeTextFile(
+    await runtime.writeTextFile(
       path.join(reclaimDir, "owner.json"),
       JSON.stringify({
         token: "stale-reclaim",
         pid: 999_999_98,
-        hostname: Deno.hostname(),
+        hostname: runtime.hostname(),
         timestamp: 1,
       }),
     );
 
-    const originalRename = Deno.rename;
-    const originalWriteTextFile = Deno.writeTextFile;
+    const originalRename = runtime.rename;
+    const originalWriteTextFile = runtime.writeTextFile;
     let releaseFirstClaim!: () => void;
     let signalFirstClaim!: () => void;
     const firstClaimGate = new Promise<void>((resolve) => {
@@ -222,7 +228,7 @@ test("stale reclaim takeover cannot displace a replacement claim", async () => {
     let newClaimCreated = false;
     let replacementMoved = false;
 
-    Deno.rename = (async (oldPath: string, newPath: string) => {
+    runtime.rename = (async (oldPath: string, newPath: string) => {
       if (oldPath === reclaimDir && claimRenameCount++ === 0) {
         signalFirstClaim();
         await firstClaimGate;
@@ -239,9 +245,9 @@ test("stale reclaim takeover cannot displace a replacement claim", async () => {
         await mainRenameGate;
       }
       return originalRename(oldPath, newPath);
-    }) as typeof Deno.rename;
-    Deno.writeTextFile = (async (
-      ...args: Parameters<typeof Deno.writeTextFile>
+    }) as typeof runtime.rename;
+    runtime.writeTextFile = (async (
+      ...args: Parameters<typeof runtime.writeTextFile>
     ) => {
       const [target] = args;
       const result = await originalWriteTextFile(...args);
@@ -250,7 +256,7 @@ test("stale reclaim takeover cannot displace a replacement claim", async () => {
         signalNewClaim();
       }
       return result;
-    }) as typeof Deno.writeTextFile;
+    }) as typeof runtime.writeTextFile;
 
     const first = new CoreRegistry(paths).write(registration("first-core"));
     await firstClaimSeen;
@@ -282,8 +288,8 @@ test("stale reclaim takeover cannot displace a replacement claim", async () => {
       releaseFirstClaim();
       releaseMainRename();
       releaseReplacement();
-      Deno.rename = originalRename;
-      Deno.writeTextFile = originalWriteTextFile;
+      runtime.rename = originalRename;
+      runtime.writeTextFile = originalWriteTextFile;
     }
   });
 });
@@ -294,19 +300,19 @@ test("concurrent stale mutation-guard recovery has one active owner", async () =
       paths.stateDir,
       ".core-registry-mutation.lock",
     );
-    await Deno.mkdir(mutationLock, { mode: 0o700 });
-    await Deno.writeTextFile(
+    await runtime.mkdir(mutationLock, { mode: 0o700 });
+    await runtime.writeTextFile(
       path.join(mutationLock, "owner.json"),
       JSON.stringify({
         token: "stale-guard",
         pid: 999_999_99,
-        hostname: Deno.hostname(),
+        hostname: runtime.hostname(),
         timestamp: 1,
       }),
     );
 
-    const originalRename = Deno.rename;
-    const originalMakeTempFile = Deno.makeTempFile;
+    const originalRename = runtime.rename;
+    const originalMakeTempFile = runtime.makeTempFile;
     let releaseFirstRename!: () => void;
     let signalFirstRename!: () => void;
     const firstRenameGate = new Promise<void>((resolve) => {
@@ -333,16 +339,18 @@ test("concurrent stale mutation-guard recovery has one active owner", async () =
     let maxActiveMutations = 0;
     let pauseFirstMutation = true;
 
-    Deno.rename = (async (oldPath: string, newPath: string) => {
+    runtime.rename = (async (oldPath: string, newPath: string) => {
       if (oldPath === mutationLock && renameCount++ === 0) {
         signalFirstRename();
         await firstRenameGate;
       }
       return originalRename(oldPath, newPath);
-    }) as typeof Deno.rename;
-    Deno.makeTempFile = (async (
-      options?: { dir?: string; prefix?: string; suffix?: string },
-    ) => {
+    }) as typeof runtime.rename;
+    runtime.makeTempFile = (async (options?: {
+      dir?: string;
+      prefix?: string;
+      suffix?: string;
+    }) => {
       const file = await originalMakeTempFile(options);
       if (
         options?.dir === paths.stateDir &&
@@ -363,7 +371,7 @@ test("concurrent stale mutation-guard recovery has one active owner", async () =
         }
       }
       return file;
-    }) as typeof Deno.makeTempFile;
+    }) as typeof runtime.makeTempFile;
 
     const first = new CoreRegistry(paths).write(registration("first-core"));
     await firstRenameSeen;
@@ -386,7 +394,10 @@ test("concurrent stale mutation-guard recovery has one active owner", async () =
         releaseFirstRename();
         await Promise.race([
           secondMutationSeen,
-          first.then(() => "settled", () => "settled"),
+          first.then(
+            () => "settled",
+            () => "settled",
+          ),
         ]);
         releaseFirstMutation();
       } else {
@@ -401,8 +412,8 @@ test("concurrent stale mutation-guard recovery has one active owner", async () =
       pauseFirstMutation = false;
       releaseFirstRename();
       releaseFirstMutation();
-      Deno.rename = originalRename;
-      Deno.makeTempFile = originalMakeTempFile;
+      runtime.rename = originalRename;
+      runtime.makeTempFile = originalMakeTempFile;
     }
   });
 });
@@ -423,10 +434,12 @@ test("CoreRegistry readers never observe partial replacement JSON", async () => 
 
     try {
       for (let i = 0; i < 40; i++) {
-        await registry.write(registration(`replacement-${i}`, {
-          version: "0.1.0",
-          startedAt: 1_700_000_000_000 + i,
-        }));
+        await registry.write(
+          registration(`replacement-${i}`, {
+            version: "0.1.0",
+            startedAt: 1_700_000_000_000 + i,
+          }),
+        );
       }
     } finally {
       running = false;
@@ -438,7 +451,7 @@ test("CoreRegistry readers never observe partial replacement JSON", async () => 
 test("CoreRegistry read returns undefined only for a missing file", async () => {
   await withStateDir(async (paths, registry) => {
     assertEquals(await registry.read(), undefined);
-    await Deno.writeTextFile(
+    await runtime.writeTextFile(
       paths.registrationFile,
       JSON.stringify({ id: "x" }),
     );
@@ -450,17 +463,17 @@ async function replaceRegistrationAtomically(
   registrationFile: string,
   value: CoreRegistration,
 ): Promise<void> {
-  const temporary = await Deno.makeTempFile({
+  const temporary = await runtime.makeTempFile({
     dir: path.dirname(registrationFile),
     prefix: ".test-registration-",
     suffix: ".tmp",
   });
   try {
-    await Deno.writeTextFile(temporary, JSON.stringify(value));
-    await Deno.rename(temporary, registrationFile);
+    await runtime.writeTextFile(temporary, JSON.stringify(value));
+    await runtime.rename(temporary, registrationFile);
   } finally {
     try {
-      await Deno.remove(temporary);
+      await runtime.remove(temporary);
     } catch {
       // Best-effort cleanup after the atomic replacement.
     }
@@ -469,10 +482,10 @@ async function replaceRegistrationAtomically(
 
 async function exists(path: string): Promise<boolean> {
   try {
-    await Deno.lstat(path);
+    await runtime.lstat(path);
     return true;
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return false;
+    if (error instanceof runtime.errors.NotFound) return false;
     throw error;
   }
 }

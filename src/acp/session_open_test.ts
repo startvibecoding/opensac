@@ -7,6 +7,7 @@
 // constructs a provider catalog, `configureSessionBindings` deliberately leaves
 // those runtimes unbound (the documented unit-fixture behavior).
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import { AcpServer, type AcpServerSink, ACPSessionRuntime } from "./server.ts";
@@ -62,8 +63,8 @@ function parseMessages(output: string): Record<string, unknown>[] {
 }
 
 function responseOf(output: string): Record<string, unknown> {
-  const response = parseMessages(output).find((m) =>
-    "result" in m || "error" in m
+  const response = parseMessages(output).find(
+    (m) => "result" in m || "error" in m,
   );
   assert(response !== undefined, `no response in ${output}`);
   return response;
@@ -84,11 +85,11 @@ interface Fixture {
 }
 
 function createFixture(): Fixture {
-  const root = Deno.makeTempDirSync({ prefix: "opensac-acp-open-" });
+  const root = nodeRuntime.makeTempDirSync({ prefix: "opensac-acp-open-" });
   const sessionDir = path.join(root, "sessions");
-  Deno.mkdirSync(sessionDir, { recursive: true });
+  nodeRuntime.mkdirSync(sessionDir, { recursive: true });
   const workDir = path.join(root, "work");
-  Deno.mkdirSync(workDir, { recursive: true });
+  nodeRuntime.mkdirSync(workDir, { recursive: true });
   const server = new AcpServer();
   server.settings = { sessionDir } as unknown as Settings;
   const sink = new SyncBuffer();
@@ -97,7 +98,7 @@ function createFixture(): Fixture {
 }
 
 function makeSession(sessionDir: string, workDir: string, id: string): string {
-  Deno.mkdirSync(workDir, { recursive: true });
+  nodeRuntime.mkdirSync(workDir, { recursive: true });
   const mgr = createSession({ workDir, sessionDir, id });
   return mgr.getHeader()!.id;
 }
@@ -107,9 +108,7 @@ function completeTurn(sessionDir: string, workDir: string, id: string): void {
   const mgr = createSession({ workDir, sessionDir, id });
   mgr.startConversationTurn("turn-1", "intent-1", "run-1");
   mgr.appendMessage(createUserMessage("hello"));
-  mgr.appendMessage(
-    createAssistantMessage([{ type: "text", text: "world" }]),
-  );
+  mgr.appendMessage(createAssistantMessage([{ type: "text", text: "world" }]));
   mgr.endConversationTurn("turn-1", "completed", "stop");
 }
 
@@ -146,12 +145,10 @@ test("session/new creates a runtime and projects modes", async () => {
     availableModes: { id: string; name: string }[];
   };
   assertEquals(modes.availableModes.length, 4);
-  assertEquals(modes.availableModes.map((m) => m.id), [
-    "agent",
-    "plan",
-    "yolo",
-    "os",
-  ]);
+  assertEquals(
+    modes.availableModes.map((m) => m.id),
+    ["agent", "plan", "yolo", "os"],
+  );
   assert(server.sessionRuntime(sessionId) !== null);
 });
 
@@ -199,7 +196,7 @@ test("session/load rejects an open session with a foreign cwd", async () => {
   const opened = responseOf(sink.toString()).result as Record<string, unknown>;
   const id = opened.sessionId as string;
   const other = path.join(root, "other");
-  Deno.mkdirSync(other, { recursive: true });
+  nodeRuntime.mkdirSync(other, { recursive: true });
   sink.reset();
   await server.handleLoadSession(
     rpc(2, "session/load", { sessionId: id, cwd: other }),
@@ -255,7 +252,7 @@ test("session/fork rejects a cwd that differs from the parent", async () => {
   const { server, sink, sessionDir, workDir, root } = createFixture();
   const parent = makeSession(sessionDir, workDir, "sess-parent2");
   const other = path.join(root, "other2");
-  Deno.mkdirSync(other, { recursive: true });
+  nodeRuntime.mkdirSync(other, { recursive: true });
   await server.handleForkSession(
     rpc(1, "session/fork", { sessionId: parent, cwd: other }),
   );
@@ -292,8 +289,8 @@ test("session/set_mode updates an open session", async () => {
   );
   const result = responseOf(sink.toString()).result as Record<string, unknown>;
   assertEquals(result, {});
-  const updates = parseMessages(sink.toString()).filter((m) =>
-    m.method === "session/update"
+  const updates = parseMessages(sink.toString()).filter(
+    (m) => m.method === "session/update",
   );
   assert(
     updates.some((m) => {
@@ -396,8 +393,8 @@ test("notifyAvailableCommandsFor emits a session/update", () => {
     list: () => [{ name: "alpha", description: "first" }],
   } as unknown as SkillsManager;
   server.notifyAvailableCommandsFor("sess-1", manager);
-  const updates = parseMessages(sink.toString()).filter((m) =>
-    m.method === "session/update"
+  const updates = parseMessages(sink.toString()).filter(
+    (m) => m.method === "session/update",
   );
   assertEquals(updates.length, 1);
   const params = updates[0].params as {
@@ -438,8 +435,8 @@ test("MCP notifications project an additive tool-call update", () => {
       progress: 1,
     },
   );
-  const updates = parseMessages(sink.toString()).filter((m) =>
-    m.method === "session/update"
+  const updates = parseMessages(sink.toString()).filter(
+    (m) => m.method === "session/update",
   );
   assertEquals(updates.length, 2);
   const first = (updates[0].params as { update: Record<string, unknown> })
@@ -460,8 +457,8 @@ test("MCP notifications are deduplicated per server", () => {
   server.handleMCPNotification("sess-1", "demo", "notifications/message", {});
   sink.reset();
   server.handleMCPNotification("sess-1", "demo", "notifications/message", {});
-  const updates = parseMessages(sink.toString()).filter((m) =>
-    m.method === "session/update"
+  const updates = parseMessages(sink.toString()).filter(
+    (m) => m.method === "session/update",
   );
   assertEquals(updates.length, 1);
   assertEquals(

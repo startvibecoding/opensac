@@ -159,11 +159,11 @@ export function formatESMPanelUpdateTime(
   let ago = now.getTime() - updatedAt.getTime();
   if (ago < 0) ago = 0;
   const pad = (n: number) => String(n).padStart(2, "0");
-  const local = `${updatedAt.getFullYear()}-${pad(updatedAt.getMonth() + 1)}-${
-    pad(updatedAt.getDate())
-  } ${pad(updatedAt.getHours())}:${pad(updatedAt.getMinutes())}:${
-    pad(updatedAt.getSeconds())
-  }`;
+  const local = `${updatedAt.getFullYear()}-${pad(updatedAt.getMonth() + 1)}-${pad(
+    updatedAt.getDate(),
+  )} ${pad(updatedAt.getHours())}:${pad(updatedAt.getMinutes())}:${pad(
+    updatedAt.getSeconds(),
+  )}`;
   return `${local} (${formatDuration(ago)} ago)`;
 }
 

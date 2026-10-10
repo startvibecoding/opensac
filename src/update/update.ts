@@ -3,6 +3,7 @@
 // npm registry. It never blocks the user: network checks run in the background
 // and failures only affect the update notification.
 
+import { runtime } from "../platform/runtime.ts";
 import * as path from "../compat/path.ts";
 import { configDir } from "../config/settings.ts";
 import { userAgent } from "../ua/ua.ts";
@@ -35,7 +36,7 @@ export function setNow(fn: () => Date): void {
 
 /** Returns the npm registry endpoint for the latest dist-tag. */
 export function registryURL(): string {
-  const u = Deno.env.get("VIBECODING_NPM_REGISTRY");
+  const u = runtime.env.get("VIBECODING_NPM_REGISTRY");
   if (u) {
     return u.replace(/\/+$/, "") + "/" + PACKAGE_NAME + "/latest";
   }
@@ -55,7 +56,7 @@ export function readCache(): CacheEntry {
   let c: CacheEntry = { checked_at: "" };
   let data: string;
   try {
-    data = Deno.readTextFileSync(cachePath());
+    data = runtime.readTextFileSync(cachePath());
   } catch {
     return c;
   }
@@ -63,9 +64,8 @@ export function readCache(): CacheEntry {
     const parsed = JSON.parse(data);
     if (parsed && typeof parsed === "object") {
       c = {
-        checked_at: typeof parsed.checked_at === "string"
-          ? parsed.checked_at
-          : "",
+        checked_at:
+          typeof parsed.checked_at === "string" ? parsed.checked_at : "",
       };
     }
   } catch {
@@ -82,8 +82,11 @@ export function writeCache(c: CacheEntry): void {
     return;
   }
   try {
-    Deno.mkdirSync(path.dirname(cachePath()), { recursive: true, mode: 0o755 });
-    Deno.writeTextFileSync(cachePath(), data, { mode: 0o644 });
+    runtime.mkdirSync(path.dirname(cachePath()), {
+      recursive: true,
+      mode: 0o755,
+    });
+    runtime.writeTextFileSync(cachePath(), data, { mode: 0o644 });
   } catch {
     // ignore
   }
@@ -91,9 +94,9 @@ export function writeCache(c: CacheEntry): void {
 
 /** Returns the update reminder text for current and latest. */
 export function notice(current: string, latest: string): string {
-  return `✨ Update available: ${normalize(current)} → ${
-    normalize(latest)
-  }\n   Run: npm install -g ${PACKAGE_NAME}@latest`;
+  return `✨ Update available: ${normalize(current)} → ${normalize(
+    latest,
+  )}\n   Run: npm install -g ${PACKAGE_NAME}@latest`;
 }
 
 function checkedAtDate(c: CacheEntry): Date {
@@ -156,7 +159,7 @@ export async function fetchLatest(abort?: AbortSignal): Promise<string> {
     method: "GET",
     headers: {
       "User-Agent": userAgent(),
-      "Accept": "application/json",
+      Accept: "application/json",
     },
     signal,
   });
@@ -164,9 +167,8 @@ export async function fetchLatest(abort?: AbortSignal): Promise<string> {
     throw new Error(`npm registry: status ${resp.status}`);
   }
   const payload = await resp.json();
-  const version = payload && typeof payload === "object"
-    ? String(payload.version ?? "")
-    : "";
+  const version =
+    payload && typeof payload === "object" ? String(payload.version ?? "") : "";
   if (version === "") {
     throw new Error("npm registry: empty version");
   }
@@ -174,7 +176,7 @@ export async function fetchLatest(abort?: AbortSignal): Promise<string> {
 }
 
 function checksDisabled(): boolean {
-  return (Deno.env.get("VIBECODING_NO_UPDATE_CHECK") ?? "") !== "";
+  return (runtime.env.get("VIBECODING_NO_UPDATE_CHECK") ?? "") !== "";
 }
 
 /** Reports whether current is a real release version worth checking. */

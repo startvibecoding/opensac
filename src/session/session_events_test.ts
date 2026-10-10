@@ -5,6 +5,7 @@
 // Manager is replaced with direct DAO entry persistence and the portable
 // session_events functions.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll } from "../db/mod.ts";
 import { ConversationTurnDAO } from "../dao/mod.ts";
@@ -26,7 +27,7 @@ import {
 import { test } from "#testing";
 
 function tempDir(): string {
-  return Deno.makeTempDirSync({ prefix: "opensac-session-" });
+  return runtime.makeTempDirSync({ prefix: "opensac-session-" });
 }
 
 function appendMessageEntry(

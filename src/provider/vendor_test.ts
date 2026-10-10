@@ -8,11 +8,13 @@ function cfg(partial: Partial<ProviderConfig>): ProviderConfig {
 }
 
 test("ResolveAdapterConfigExplicitVendor", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    vendor: "deepseek",
-    baseUrl: "https://example.com/v1",
-    api: "openai-chat",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      vendor: "deepseek",
+      baseUrl: "https://example.com/v1",
+      api: "openai-chat",
+    }),
+  );
   assertEquals(resolved.vendor, "deepseek");
   assertEquals(resolved.thinkingFormat, "deepseek");
 });
@@ -37,21 +39,25 @@ test("ResolveAdapterConfigResponsesVendorsDefaultAPI", () => {
 });
 
 test("ResolveAdapterConfigBaseURLDetect", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    baseUrl: "https://api.deepseek.com/anthropic",
-    api: "anthropic-messages",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      baseUrl: "https://api.deepseek.com/anthropic",
+      api: "anthropic-messages",
+    }),
+  );
   assertEquals(resolved.vendor, "deepseek");
   assertEquals(resolved.thinkingFormat, "deepseek");
 });
 
 test("ResolveAdapterConfigPreservesExplicitThinkingFormat", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    vendor: "deepseek",
-    baseUrl: "https://api.deepseek.com",
-    api: "openai-chat",
-    thinkingFormat: "openai",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      vendor: "deepseek",
+      baseUrl: "https://api.deepseek.com",
+      api: "openai-chat",
+      thinkingFormat: "openai",
+    }),
+  );
   assertEquals(resolved.thinkingFormat, "openai");
 });
 
@@ -64,58 +70,65 @@ test("ResolveAdapterConfigGenericFallback", () => {
 });
 
 test("ResolveAdapterConfigGoogleGemini", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
+    }),
+  );
   assertEquals(resolved.vendor, "google-gemini");
   assertEquals(resolved.api, "google-gemini");
 });
 
 test("ResolveAdapterConfigGoogleVertex", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    baseUrl:
-      "https://aiplatform.googleapis.com/v1/projects/test/locations/global/publishers/google/models",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      baseUrl:
+        "https://aiplatform.googleapis.com/v1/projects/test/locations/global/publishers/google/models",
+    }),
+  );
   assertEquals(resolved.vendor, "google-vertex");
   assertEquals(resolved.api, "google-vertex");
 });
 
 test("ResolveAdapterConfigExplicitVendorKimi", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    vendor: "kimi",
-    baseUrl: "https://api.kimi.com/coding",
-    api: "anthropic-messages",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      vendor: "kimi",
+      baseUrl: "https://api.kimi.com/coding",
+      api: "anthropic-messages",
+    }),
+  );
   assertEquals(resolved.vendor, "kimi");
   assertEquals(resolved.thinkingFormat, "");
 });
 
 test("ResolveAdapterConfigExplicitVendorZai", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    vendor: "zai",
-    baseUrl: "https://api.z.ai/api/coding/paas/v4",
-    api: "openai-chat",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      vendor: "zai",
+      baseUrl: "https://api.z.ai/api/coding/paas/v4",
+      api: "openai-chat",
+    }),
+  );
   assertEquals(resolved.vendor, "zai");
   assertEquals(resolved.thinkingFormat, "zai");
 });
 
 test("ResolveAdapterConfigBaseURLDetectKimi", () => {
-  for (
-    const url of ["https://api.moonshot.cn/v1", "https://api.kimi.com/coding"]
-  ) {
+  for (const url of [
+    "https://api.moonshot.cn/v1",
+    "https://api.kimi.com/coding",
+  ]) {
     const resolved = resolveAdapterConfig(cfg({ baseUrl: url }));
     assertEquals(resolved.vendor, "kimi", url);
   }
 });
 
 test("ResolveAdapterConfigBaseURLDetectZai", () => {
-  for (
-    const url of [
-      "https://api.z.ai/api/coding/paas/v4",
-      "https://open.bigmodel.cn/api/coding/paas/v4",
-    ]
-  ) {
+  for (const url of [
+    "https://api.z.ai/api/coding/paas/v4",
+    "https://open.bigmodel.cn/api/coding/paas/v4",
+  ]) {
     const resolved = resolveAdapterConfig(cfg({ baseUrl: url }));
     assertEquals(resolved.vendor, "zai", url);
     assertEquals(resolved.thinkingFormat, "zai", url);
@@ -146,12 +159,10 @@ test("VendorFromBaseURLDetectsGoogleAdapters", () => {
 });
 
 test("ResolveAdapterConfigBaseURLDetectAgnes", () => {
-  for (
-    const [url, vendor] of [
-      ["https://apihub.agnes-ai.com/v1", "agnes"],
-      ["https://api.agnes-ai.cn/v1", "agnes"],
-    ]
-  ) {
+  for (const [url, vendor] of [
+    ["https://apihub.agnes-ai.com/v1", "agnes"],
+    ["https://api.agnes-ai.cn/v1", "agnes"],
+  ]) {
     const resolved = resolveAdapterConfig(
       cfg({ baseUrl: url, api: "openai-chat" }),
     );
@@ -161,28 +172,34 @@ test("ResolveAdapterConfigBaseURLDetectAgnes", () => {
 });
 
 test("ResolveAdapterConfigExplicitVendorAgnes", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    vendor: "Agnes",
-    baseUrl: "https://apihub.agnes-ai.com/v1",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      vendor: "Agnes",
+      baseUrl: "https://apihub.agnes-ai.com/v1",
+    }),
+  );
   assertEquals(resolved.vendor, "agnes");
   assertEquals(resolved.api, "openai-chat");
 });
 
 test("ResolveAdapterConfigExplicitVendorAMDRadeon", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    vendor: "amd-radeon",
-    baseUrl: "https://developer.amd.com.cn/radeon/api/v1",
-    api: "openai-chat",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      vendor: "amd-radeon",
+      baseUrl: "https://developer.amd.com.cn/radeon/api/v1",
+      api: "openai-chat",
+    }),
+  );
   assertEquals(resolved.vendor, "amd-radeon");
   assertEquals(resolved.api, "openai-chat");
 });
 
 test("ResolveAdapterConfigBaseURLDetectAMDRadeon", () => {
-  const resolved = resolveAdapterConfig(cfg({
-    baseUrl: "https://developer.amd.com.cn/radeon/api/v1",
-  }));
+  const resolved = resolveAdapterConfig(
+    cfg({
+      baseUrl: "https://developer.amd.com.cn/radeon/api/v1",
+    }),
+  );
   assertEquals(resolved.vendor, "amd-radeon");
   assertEquals(resolved.api, "openai-chat");
 });

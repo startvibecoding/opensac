@@ -1,6 +1,7 @@
 //
-// `net/http/httptest` maps to `Deno.serve` on an ephemeral localhost port.
+// `net/http/httptest` maps to `nodeRuntime.serve` on an ephemeral localhost port.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { createNoneSandbox } from "../sandbox/mod.ts";
 import { createRegistry, type Tool } from "../tools/mod.ts";
@@ -13,12 +14,25 @@ interface TestServer {
   close: () => Promise<void>;
 }
 
-function startServer(
+async function startServer(
   handler: (req: RPCRequest, raw: Request) => unknown | Promise<unknown>,
-): TestServer {
+): Promise<TestServer> {
   const ac = new AbortController();
-  const server = Deno.serve(
-    { hostname: "127.0.0.1", port: 0, signal: ac.signal },
+  let port = 0;
+  let resolvePort!: () => void;
+  const portReady = new Promise<void>((resolve) => {
+    resolvePort = resolve;
+  });
+  const server = nodeRuntime.serve(
+    {
+      hostname: "127.0.0.1",
+      port: 0,
+      signal: ac.signal,
+      onListen: (address) => {
+        port = address.port;
+        resolvePort();
+      },
+    },
     async (raw) => {
       let req: RPCRequest;
       try {
@@ -31,9 +45,9 @@ function startServer(
       return Response.json(result);
     },
   );
-  const addr = server.addr as Deno.NetAddr;
+  await portReady;
   return {
-    url: `http://127.0.0.1:${addr.port}`,
+    url: `http://127.0.0.1:${port}`,
     close: async () => {
       ac.abort();
       await server.finished;
@@ -49,7 +63,7 @@ test("connect MCPServers HTTP registers and executes", async () => {
   let sampled = false;
   let notified = false;
 
-  const srv = startServer((req) => {
+  const srv = await startServer((req) => {
     switch (req.method) {
       case "initialize":
         return ok(req.id, { protocolVersion: "2025-11-25" });
@@ -57,11 +71,13 @@ test("connect MCPServers HTTP registers and executes", async () => {
         return ok(req.id, {});
       case "tools/list":
         return ok(req.id, {
-          tools: [{
-            name: "echo",
-            description: "echo tool",
-            inputSchema: { type: "object" },
-          }],
+          tools: [
+            {
+              name: "echo",
+              description: "echo tool",
+              inputSchema: { type: "object" },
+            },
+          ],
         });
       case "resources/list":
         return ok(req.id, {
@@ -80,10 +96,12 @@ test("connect MCPServers HTTP registers and executes", async () => {
       case "prompts/get":
         return ok(req.id, {
           description: "prompt-desc",
-          messages: [{
-            role: "user",
-            content: { type: "text", text: "prompt-text" },
-          }],
+          messages: [
+            {
+              role: "user",
+              content: { type: "text", text: "prompt-text" },
+            },
+          ],
         });
       case "sampling/createMessage":
         sampled = true;
@@ -100,7 +118,10 @@ test("connect MCPServers HTTP registers and executes", async () => {
     }
   });
 
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    nodeRuntime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.registerDefaults();
 
   const callbacks: Callbacks = {
@@ -166,13 +187,16 @@ test("connect MCPServers HTTP registers and executes", async () => {
 
 test("MCP HTTP session id header round trip", async () => {
   const sid = "sid-123";
-  const srv = startServer((req, raw) => {
+  const srv = await startServer((req, raw) => {
     const headers: Record<string, string> = {};
     if (!raw.headers.get("Mcp-Session-Id")) headers["Mcp-Session-Id"] = sid;
     return Response.json(ok(req.id, { tools: [] }), { headers });
   });
 
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    nodeRuntime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   registry.registerDefaults();
   let clients;
   try {
@@ -190,7 +214,7 @@ test("MCP HTTP session id header round trip", async () => {
 });
 
 test("MCP HTTP rejects mismatched response id", async () => {
-  const srv = startServer(() => {
+  const srv = await startServer(() => {
     // Echo a *string* id, which never matches the numeric request id.
     return { jsonrpc: "2.0", id: "1", result: {} };
   });
@@ -221,7 +245,7 @@ test("MCP HTTP rejects mismatched response id", async () => {
 test("MCP HTTP propagates runtime operation id", async () => {
   const operationID = "tool:stable-mcp-operation";
   let seen = "";
-  const srv = startServer((req, raw) => {
+  const srv = await startServer((req, raw) => {
     seen = raw.headers.get("Idempotency-Key") ?? "";
     return ok(req.id, {});
   });
@@ -245,7 +269,7 @@ test("MCP HTTP close cancels in-flight request", async () => {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   const started = Promise.withResolvers<void>();
-  const srv = startServer(async () => {
+  const srv = await startServer(async () => {
     started.resolve();
     await gate;
     return new Response("{}", {
@@ -254,11 +278,12 @@ test("MCP HTTP close cancels in-flight request", async () => {
   });
   const client = new Client("cancel-http", "http", {});
   client.httpURL = srv.url;
-  const done = client.callHTTP(
-    new AbortController().signal,
-    "tools/list",
-    undefined,
-  ).then(() => "ok", (err: Error) => err.message);
+  const done = client
+    .callHTTP(new AbortController().signal, "tools/list", undefined)
+    .then(
+      () => "ok",
+      (err: Error) => err.message,
+    );
   await started.promise;
   client.close();
   const outcome = await done;
@@ -268,7 +293,7 @@ test("MCP HTTP close cancels in-flight request", async () => {
 });
 
 test("connect MCP servers returns resource discovery error", async () => {
-  const srv = startServer((req) => {
+  const srv = await startServer((req) => {
     switch (req.method) {
       case "initialize":
         return ok(req.id, { protocolVersion: "2025-11-25" });
@@ -284,7 +309,10 @@ test("connect MCP servers returns resource discovery error", async () => {
         return ok(req.id, {});
     }
   });
-  const registry = createRegistry(Deno.makeTempDirSync(), createNoneSandbox());
+  const registry = createRegistry(
+    nodeRuntime.makeTempDirSync(),
+    createNoneSandbox(),
+  );
   try {
     let threw = false;
     try {

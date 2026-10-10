@@ -10,7 +10,8 @@
 
 import {
   type BeforeToolCallContext,
-  type ToolCallBlockResult} from "../agent/agent.ts";
+  type ToolCallBlockResult,
+} from "../agent/agent.ts";
 import type { ExecutionPolicy } from "./source.ts";
 
 /** CommandRisk is the unattended-execution risk assigned to a bash command. */
@@ -41,9 +42,8 @@ export function evaluateToolCall(
   if (!policy.hasForcedMode() || toolName !== "bash") {
     return ALLOW;
   }
-  const command = typeof args?.["command"] === "string"
-    ? args["command"] as string
-    : "";
+  const command =
+    typeof args?.["command"] === "string" ? (args["command"] as string) : "";
   if (classifyBashCommand(command) !== COMMAND_RISK_HIGH) {
     return ALLOW;
   }
@@ -155,8 +155,11 @@ function containsHighRiskBash(command: string): boolean {
           return true;
         }
         break;
-      case base === "sudo" || base === "su" || base === "shutdown" ||
-        base === "reboot" || base === "halt":
+      case base === "sudo" ||
+        base === "su" ||
+        base === "shutdown" ||
+        base === "reboot" ||
+        base === "halt":
         return true;
       case base === "killall":
         return true;
@@ -198,13 +201,15 @@ function containsHighRiskBash(command: string): boolean {
     }
 
     if (
-      token === ">" && i + 1 < tokens.length &&
+      token === ">" &&
+      i + 1 < tokens.length &&
       tokens[i + 1].startsWith("/dev/")
     ) {
       return true;
     }
     if (
-      token === "|" && i + 1 < tokens.length &&
+      token === "|" &&
+      i + 1 < tokens.length &&
       isShellExecutable(executableBase(tokens[i + 1]))
     ) {
       return true;
@@ -365,7 +370,8 @@ function segmentHasFlag(
       return true;
     }
     if (
-      token.startsWith("-") && !token.startsWith("--") &&
+      token.startsWith("-") &&
+      !token.startsWith("--") &&
       token.slice(1).includes(shortFlag)
     ) {
       return true;
@@ -420,8 +426,7 @@ function segmentContainsForcedGitClean(
 export function beforeToolCallForPolicy(
   policy: ExecutionPolicy,
   adapterHook?:
-    | ((ctx: BeforeToolCallContext) => ToolCallBlockResult | undefined)
-    | null,
+    ((ctx: BeforeToolCallContext) => ToolCallBlockResult | undefined) | null,
 ): ((ctx: BeforeToolCallContext) => ToolCallBlockResult | undefined) | null {
   if (
     !policy.hasForcedMode() &&

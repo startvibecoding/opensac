@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import {
   createSessionExecutionRuntime,
@@ -71,12 +72,12 @@ test("createSessionRunDescriptor preserves adapter policy", async () => {
 });
 
 test("createSessionExecutionRuntime wires the shared run persistence", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "session-run-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "session-run-" });
   try {
     const execution = createSessionExecutionRuntime(sessionDir);
     assertEquals(execution.active().active, false);
     assertEquals(execution.active().runId, "");
   } finally {
-    Deno.removeSync(sessionDir, { recursive: true });
+    runtime.removeSync(sessionDir, { recursive: true });
   }
 });

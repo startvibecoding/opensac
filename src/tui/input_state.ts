@@ -56,8 +56,8 @@ export class InputState {
     this.translator = options.translator;
     this.editor = new Editor({
       width: options.width,
-      placeholder: options.placeholder ??
-        this.translator.text("input.placeholder"),
+      placeholder:
+        options.placeholder ?? this.translator.text("input.placeholder"),
     });
     this.suggest = new Suggest(options.width, 8);
     this.updateSuggestions();
@@ -225,7 +225,8 @@ export class InputState {
           return { kind: "none" };
         }
         if (
-          this.suggestionsVisible && this.commandNameInputActive() &&
+          this.suggestionsVisible &&
+          this.commandNameInputActive() &&
           this.applySelectedSuggestion()
         ) {
           return { kind: "none" };
@@ -305,7 +306,9 @@ export class InputState {
         this.editor.handleKey(name);
         this.updateSuggestions();
         if (
-          name !== "left" && name !== "right" && name !== "home" &&
+          name !== "left" &&
+          name !== "right" &&
+          name !== "home" &&
           name !== "end"
         ) {
           this.resetHistoryNavigation();

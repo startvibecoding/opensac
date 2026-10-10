@@ -93,11 +93,7 @@ export class CoreEventStream {
     return () => this.#eventListeners.delete(listener);
   }
 
-  replay(
-    sessionId: string,
-    runId: string,
-    cursor = 0,
-  ): CoreRuntimeEvent[] {
+  replay(sessionId: string, runId: string, cursor = 0): CoreRuntimeEvent[] {
     this.#assertOpen();
     return (this.#events.get(this.#key(sessionId, runId)) ?? [])
       .filter((event) => event.sequence > cursor)
@@ -116,8 +112,7 @@ export class CoreEventStream {
     }
     const queue = this.replay(sessionId, runId, cursor);
     let resolveNext:
-      | ((result: IteratorResult<CoreRuntimeEvent>) => void)
-      | undefined;
+      ((result: IteratorResult<CoreRuntimeEvent>) => void) | undefined;
     let finished = false;
 
     const finish = (): void => {

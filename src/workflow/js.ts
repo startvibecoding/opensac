@@ -1,7 +1,7 @@
 // (the JavaScript workflow DSL evaluator).
 //
 // The Go implementation evaluates the DSL inside a `goja` VM and interrupts a
-// runaway script. Deno has no interruptible in-process VM, so the DSL runs in
+// runaway script. Node has no interruptible in-process VM, so the DSL runs in
 // an isolated worker (js_worker.js, loaded as text and started from a data:
 // URL) that is terminated on abort or when the wall-clock evaluation budget
 // expires. The worker only builds the node graph; worker agents run natively
@@ -46,13 +46,16 @@ export interface JsExpr {
 
 /** Reports whether a value is a deferred workflow expression. */
 export function isJsExpr(value: unknown): value is JsExpr {
-  return typeof value === "object" && value !== null &&
+  return (
+    typeof value === "object" &&
+    value !== null &&
     typeof (value as { expr?: unknown }).expr === "string" &&
-    Array.isArray((value as { args?: unknown }).args);
+    Array.isArray((value as { args?: unknown }).args)
+  );
 }
 
-const workerUrl = "data:application/javascript," +
-  encodeURIComponent(workerSource);
+const workerUrl =
+  "data:application/javascript," + encodeURIComponent(workerSource);
 
 /** Evaluates a workflow source with the default run evaluation budget. */
 export function evalJsWorkflow(
@@ -101,8 +104,7 @@ export function evalJsWorkflowWithin(
     worker.onmessage = (event: MessageEvent) => {
       if (settled) return;
       const data = event.data as
-        | { ok: true; workflow: unknown }
-        | { ok: false; error: string };
+        { ok: true; workflow: unknown } | { ok: false; error: string };
       if (data.ok) {
         settled = true;
         cleanup();
@@ -151,9 +153,10 @@ function normalizeNode(raw: unknown): JsNode {
   return {
     kind: typeof node.kind === "string" ? node.kind : "",
     name: typeof node.name === "string" ? node.name : "",
-    opts: (typeof node.opts === "object" && node.opts !== null)
-      ? node.opts as Record<string, unknown>
-      : {},
+    opts:
+      typeof node.opts === "object" && node.opts !== null
+        ? (node.opts as Record<string, unknown>)
+        : {},
     children: Array.isArray(node.children)
       ? node.children.map(normalizeNode)
       : [],

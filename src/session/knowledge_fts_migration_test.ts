@@ -4,6 +4,7 @@
 // reindexed in place so Chinese phrase queries match afterwards, without
 // touching graph rows or the active snapshot.
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { closeAll, openStandalone } from "../db/mod.ts";
 import {
@@ -20,8 +21,8 @@ import { test } from "#testing";
 const knowledgeStoreSchemaVersion = 2;
 
 test("knowledge store migrates legacy fts to bigram index", () => {
-  const sessionDir = Deno.makeTempDirSync({ prefix: "opensac-session-" });
-  const rootDir = Deno.makeTempDirSync({ prefix: "opensac-root-" });
+  const sessionDir = runtime.makeTempDirSync({ prefix: "opensac-session-" });
+  const rootDir = runtime.makeTempDirSync({ prefix: "opensac-root-" });
   try {
     const baseID = "kb-legacy-fts";
     const dbPath = knowledgeBaseDatabasePath(sessionDir, baseID);
@@ -89,7 +90,7 @@ test("knowledge store migrates legacy fts to bigram index", () => {
     assert(ftsText !== "知识库是一个可重建的图谱索引系统");
   } finally {
     closeAll();
-    Deno.removeSync(sessionDir, { recursive: true });
-    Deno.removeSync(rootDir, { recursive: true });
+    runtime.removeSync(sessionDir, { recursive: true });
+    runtime.removeSync(rootDir, { recursive: true });
   }
 });

@@ -11,6 +11,7 @@
 // argument (`{ camelCaseFlag: value }`), so every action below reads from that
 // object rather than treating the value as a positional parameter.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { Command } from "./command_parser.ts";
 import {
   type CLIOptions,
@@ -72,10 +73,7 @@ function boolSetter(
 }
 
 /** Maps resolved CLI flags into the ACP RunOptions contract. */
-export function acpRunOptions(
-  flags: CLIOptions,
-  version: string,
-): RunOptions {
+export function acpRunOptions(flags: CLIOptions, version: string): RunOptions {
   return {
     version,
     provider: flags.provider,
@@ -189,7 +187,8 @@ export function createACPCommand(version: string): Command {
     flags,
     "Enable configured web search provider for this ACP run",
   );
-  cmd.description("Run the Agent Client Protocol stdio server")
+  cmd
+    .description("Run the Agent Client Protocol stdio server")
     .noExit()
     .option(
       "--permission-timeout <duration>",
@@ -228,7 +227,7 @@ export function createACPCommand(version: string): Command {
       try {
         await runACPCore(acpRunOptions(flags, version));
       } catch (error) {
-        if (isStartupError(error)) Deno.exit(1);
+        if (isStartupError(error)) nodeRuntime.exit(1);
         throw error;
       }
     });
@@ -267,16 +266,17 @@ export function createCoreCommand(
   version = currentVersion(),
   runners: CoreCommandRunners = {},
 ): Command {
-  const start = runners.start ??
-    ((v: string) => runCoreCommand({ version: v }));
+  const start =
+    runners.start ?? ((v: string) => runCoreCommand({ version: v }));
   const stop = runners.stop ?? ((v: string) => stopCoreCommand({ version: v }));
-  const status = runners.status ??
-    ((v: string) => statusCoreCommand({ version: v }));
-  const launch = runners.launch ??
-    ((v: string) => launchCoreCommand({ version: v }));
-  const restart = runners.restart ??
-    ((v: string) => restartCoreCommand({ version: v }));
-  const pair = runners.pair ??
+  const status =
+    runners.status ?? ((v: string) => statusCoreCommand({ version: v }));
+  const launch =
+    runners.launch ?? ((v: string) => launchCoreCommand({ version: v }));
+  const restart =
+    runners.restart ?? ((v: string) => restartCoreCommand({ version: v }));
+  const pair =
+    runners.pair ??
     ((v: string, options: CorePairRunOptions) =>
       pairCoreCommand({
         version: v,
@@ -294,7 +294,7 @@ export function createCoreCommand(
   // host while `opensac core stop` dispatches to `stop`.
   command.action(async () => {
     const exitCode = await start(version);
-    if (exitCode !== 0) Deno.exit(exitCode);
+    if (exitCode !== 0) nodeRuntime.exit(exitCode);
   });
   command.command("status", createCoreStatusCommand(status, version));
   command.command("start", createCoreStartCommand(launch, version));
@@ -319,7 +319,7 @@ function createCoreStatusCommand(
         const outcome = await status(version);
         console.log(formatCoreStatus(outcome, flags.json === true));
         return outcome.running ? 0 : 1;
-      }, "opensac core status")
+      }, "opensac core status"),
     ) as unknown as Command;
 }
 
@@ -338,7 +338,7 @@ function createCoreStartCommand(
           formatCoreStart(await launch(version), flags.json === true),
         );
         return 0;
-      }, "opensac core start")
+      }, "opensac core start"),
     ) as unknown as Command;
 }
 
@@ -357,7 +357,7 @@ function createCoreRestartCommand(
           formatCoreRestart(await restart(version), flags.json === true),
         );
         return 0;
-      }, "opensac core restart")
+      }, "opensac core restart"),
     ) as unknown as Command;
 }
 
@@ -381,15 +381,14 @@ function createCorePairCommand(
     .option("--json", "Print one machine-readable JSON result")
     .action((flags: ParsedFlags) =>
       runAndPrint(async () => {
-        const password = typeof flags.password === "string"
-          ? flags.password
-          : undefined;
+        const password =
+          typeof flags.password === "string" ? flags.password : undefined;
         const outcome = await pair(version, {
           ...(password === undefined ? {} : { password }),
         });
         console.log(formatCorePair(outcome, flags.json === true));
         return 0;
-      }, "opensac core pair")
+      }, "opensac core pair"),
     ) as unknown as Command;
 }
 
@@ -406,7 +405,7 @@ function createCoreListCommand(
       runAndPrint(async () => {
         console.log(formatCoreList(await list(version), flags.json === true));
         return 0;
-      }, "opensac core list")
+      }, "opensac core list"),
     ) as unknown as Command;
 }
 
@@ -417,14 +416,14 @@ async function runAndPrint(
 ): Promise<void> {
   try {
     const exitCode = await operation();
-    if (exitCode !== 0) Deno.exit(exitCode);
+    if (exitCode !== 0) nodeRuntime.exit(exitCode);
   } catch (error) {
     console.error(
       `${label} failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );
-    Deno.exit(1);
+    nodeRuntime.exit(1);
   }
 }
 
@@ -443,9 +442,10 @@ export function formatCoreStatus(
     );
   }
   if (outcome.running && outcome.startedAt !== undefined) {
-    const uptime = outcome.uptimeMs === undefined
-      ? ""
-      : ` (up ${formatUptime(outcome.uptimeMs)})`;
+    const uptime =
+      outcome.uptimeMs === undefined
+        ? ""
+        : ` (up ${formatUptime(outcome.uptimeMs)})`;
     lines.push(
       `  Started:  ${new Date(outcome.startedAt).toISOString()}${uptime}`,
     );
@@ -463,9 +463,10 @@ export function formatCoreStart(
   json: boolean,
 ): string {
   if (json) return JSON.stringify(outcome);
-  const verb = outcome.status === "started"
-    ? "OpenSAC Core started"
-    : "OpenSAC Core is already running";
+  const verb =
+    outcome.status === "started"
+      ? "OpenSAC Core started"
+      : "OpenSAC Core is already running";
   return `${verb} at ${outcome.url} (PID ${outcome.pid}).`;
 }
 
@@ -490,8 +491,8 @@ export function formatCorePair(
   const auth = !outcome.auth
     ? "disabled (unauthenticated local clients)"
     : outcome.verified
-    ? "enabled (candidate password accepted)"
-    : "enabled (configured client password accepted)";
+      ? "enabled (candidate password accepted)"
+      : "enabled (configured client password accepted)";
   return [
     `Paired with the running OpenSAC Core at ${outcome.url} (PID ${outcome.pid}).`,
     `  Version:  ${outcome.version} (protocol ${outcome.protocolVersion})`,
@@ -512,18 +513,18 @@ export function formatCoreList(
     `OpenSAC Core at ${outcome.url} (PID ${outcome.pid}) has ${outcome.clients.length} connected client(s):`,
   ];
   for (const client of outcome.clients) {
-    const remote = client.remoteAddress === undefined
-      ? ""
-      : ` from ${client.remoteAddress}`;
-    const subs = client.subscriptions.length === 0
-      ? "no subscriptions"
-      : client.subscriptions
-        .map((sub) => `${sub.sessionId}/${sub.runId}`)
-        .join(", ");
+    const remote =
+      client.remoteAddress === undefined ? "" : ` from ${client.remoteAddress}`;
+    const subs =
+      client.subscriptions.length === 0
+        ? "no subscriptions"
+        : client.subscriptions
+            .map((sub) => `${sub.sessionId}/${sub.runId}`)
+            .join(", ");
     lines.push(
-      `  ${client.clientId}${remote} since ${
-        new Date(client.connectedAt).toISOString()
-      } (${subs})`,
+      `  ${client.clientId}${remote} since ${new Date(
+        client.connectedAt,
+      ).toISOString()} (${subs})`,
     );
   }
   return lines.join("\n");
@@ -679,16 +680,20 @@ function createSpeedtestCommand(): any {
     runs: 3,
     thinking: "off",
   };
-  const str = (key: string, flag: string): OptionAction => (f: ParsedFlags) => {
-    if (typeof f[flag] === "string") {
-      (flags as Record<string, unknown>)[key] = f[flag];
-    }
-  };
-  const num = (key: string, flag: string): OptionAction => (f: ParsedFlags) => {
-    if (typeof f[flag] === "number") {
-      (flags as Record<string, unknown>)[key] = f[flag];
-    }
-  };
+  const str =
+    (key: string, flag: string): OptionAction =>
+    (f: ParsedFlags) => {
+      if (typeof f[flag] === "string") {
+        (flags as Record<string, unknown>)[key] = f[flag];
+      }
+    };
+  const num =
+    (key: string, flag: string): OptionAction =>
+    (f: ParsedFlags) => {
+      if (typeof f[flag] === "number") {
+        (flags as Record<string, unknown>)[key] = f[flag];
+      }
+    };
   return new Command()
     .description(
       "Benchmark configured providers and models (streaming tokens/s)",
@@ -795,24 +800,23 @@ export function createRootCommand(version = currentVersion()): Command {
     "Enable configured web search provider for this run",
   );
 
-  root
-    .arguments("[prompt...]")
-    .action(async (...args: unknown[]) => {
-      // The parser passes (options, ...positionals) to the action; the last
-      // positional here is the flags object, preceding entries are the prompt
-      // words.
-      const values = args.filter((a) => typeof a === "string") as string[];
-      const prompt = values.join(" ");
-      if (flags.print) {
-        const { runPrintAction } = await import("./root_print.ts");
-        const { loadSettings } = await import("../config/mod.ts");
-        const result = await runPrintAction({
+  root.arguments("[prompt...]").action(async (...args: unknown[]) => {
+    // The parser passes (options, ...positionals) to the action; the last
+    // positional here is the flags object, preceding entries are the prompt
+    // words.
+    const values = args.filter((a) => typeof a === "string") as string[];
+    const prompt = values.join(" ");
+    if (flags.print) {
+      const { runPrintAction } = await import("./root_print.ts");
+      const { loadSettings } = await import("../config/mod.ts");
+      const result = await runPrintAction(
+        {
           prompt,
           provider: flags.provider,
           model: flags.model,
           mode: flags.mode,
           thinking: flags.thinking,
-          workDir: Deno.cwd(),
+          workDir: nodeRuntime.cwd(),
           json: flags.json,
           multiAgent: flags.multiAgent,
           delegate: flags.delegate,
@@ -822,18 +826,21 @@ export function createRootCommand(version = currentVersion()): Command {
           continueSession: flags.continueSession,
           resume: flags.resume,
           session: flags.session,
-        }, { settings: loadSettings() });
-        Deno.exit(result.exitCode);
-      }
-      const { runInteractiveAction } = await import("./root_tui.ts");
-      const { loadSettings } = await import("../config/mod.ts");
-      try {
-        await runInteractiveAction({
+        },
+        { settings: loadSettings() },
+      );
+      nodeRuntime.exit(result.exitCode);
+    }
+    const { runInteractiveAction } = await import("./root_tui.ts");
+    const { loadSettings } = await import("../config/mod.ts");
+    try {
+      await runInteractiveAction(
+        {
           provider: flags.provider,
           model: flags.model,
           mode: flags.mode,
           thinking: flags.thinking,
-          workDir: Deno.cwd(),
+          workDir: nodeRuntime.cwd(),
           multiAgent: flags.multiAgent,
           delegate: flags.delegate,
           workflows: flags.workflows,
@@ -842,14 +849,16 @@ export function createRootCommand(version = currentVersion()): Command {
           continueSession: flags.continueSession,
           resume: flags.resume,
           session: flags.session,
-        }, loadSettings());
-      } catch (error) {
-        // Startup errors (provider/config/session) surface as a clean message,
-        // not an unhandled rejection.
-        console.error(`error: ${(error as Error).message}`);
-        Deno.exit(1);
-      }
-    });
+        },
+        loadSettings(),
+      );
+    } catch (error) {
+      // Startup errors (provider/config/session) surface as a clean message,
+      // not an unhandled rejection.
+      console.error(`error: ${(error as Error).message}`);
+      nodeRuntime.exit(1);
+    }
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyRoot = root as any;

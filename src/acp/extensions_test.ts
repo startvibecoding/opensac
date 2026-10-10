@@ -1,6 +1,7 @@
 // Tests for the pure ACP extension projections
 // (internal/acp/extensions.go).
 
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import { type Project } from "../session/projects.ts";
 import {
@@ -38,7 +39,7 @@ test("acpProjectResult formats dates and honors the optional count", () => {
 });
 
 test("sessionListLastRun degrades to an empty projection", () => {
-  const sessionDir = Deno.makeTempDirSync();
+  const sessionDir = runtime.makeTempDirSync();
   assertEquals(sessionListLastRun(sessionDir, []), {});
   assertEquals(sessionListLastRun(sessionDir, ["missing-1"]), {});
 });

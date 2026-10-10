@@ -58,10 +58,7 @@ export function register(name: string, factory: ProviderFactory): void {
 }
 
 /** Creates a provider using the global registry. */
-export function createProvider(
-  name: string,
-  cfg: ProviderConfig,
-): Provider {
+export function createProvider(name: string, cfg: ProviderConfig): Provider {
   return globalRegistry.create(name, cfg);
 }
 

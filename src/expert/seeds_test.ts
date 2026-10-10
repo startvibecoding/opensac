@@ -74,31 +74,29 @@ test("software company seed", () => {
   }
 
   // Lead SOP must carry the full orchestration specification (proposal §7).
-  for (
-    const want of [
-      "subagent_spawn",
-      "subagent_wait",
-      "subagent_status",
-      "subagent_send",
-      "subagent_destroy",
-      "禁止代写",
-      "禁止模拟",
-      "已由系统绑定",
-      "非重叠",
-      "反射式",
-      "写集不相交",
-      "⚡",
-      "🔧",
-      "🏗️",
-      "📋",
-      "最多 2 轮",
-      "TL;DR",
-      "文件清单",
-      "下一步建议",
-      "deliverables/software-company/",
-      "hub-and-spoke",
-    ]
-  ) {
+  for (const want of [
+    "subagent_spawn",
+    "subagent_wait",
+    "subagent_status",
+    "subagent_send",
+    "subagent_destroy",
+    "禁止代写",
+    "禁止模拟",
+    "已由系统绑定",
+    "非重叠",
+    "反射式",
+    "写集不相交",
+    "⚡",
+    "🔧",
+    "🏗️",
+    "📋",
+    "最多 2 轮",
+    "TL;DR",
+    "文件清单",
+    "下一步建议",
+    "deliverables/software-company/",
+    "hub-and-spoke",
+  ]) {
     assert(lead.prompt.includes(want), `lead SOP missing ${want}`);
   }
   const pm = b.defs.get("software-product-manager")!.prompt;
@@ -106,27 +104,23 @@ test("software company seed", () => {
     assert(pm.includes(want), `PM prompt missing ${want}`);
   }
   const arch = b.defs.get("software-architect")!.prompt;
-  for (
-    const want of [
-      "decision-complete",
-      "文件级改动清单",
-      "接口签名",
-      "数据结构",
-      "任务分解",
-    ]
-  ) {
+  for (const want of [
+    "decision-complete",
+    "文件级改动清单",
+    "接口签名",
+    "数据结构",
+    "任务分解",
+  ]) {
     assert(arch.includes(want), `architect prompt missing ${want}`);
   }
   const eng = b.defs.get("software-engineer")!;
-  for (
-    const want of [
-      "ALL-AT-ONCE",
-      "脚手架",
-      "GLOBAL_CONSISTENCY_CHECK",
-      "IS_PASS",
-      "设计文档",
-    ]
-  ) {
+  for (const want of [
+    "ALL-AT-ONCE",
+    "脚手架",
+    "GLOBAL_CONSISTENCY_CHECK",
+    "IS_PASS",
+    "设计文档",
+  ]) {
     assert(eng.prompt.includes(want), `engineer prompt missing ${want}`);
   }
   assertEquals(eng.meta.mode, "yolo");
@@ -154,16 +148,14 @@ test("frontend developer seed", () => {
   assert(def !== undefined, "Defs missing frontend-developer");
   assertEquals(def.role, roleLead);
   assertEquals(def.displayName, "前小端");
-  for (
-    const field of [
-      { label: "name", value: def.meta.name },
-      { label: "description", value: def.meta.description },
-      { label: "role", value: def.meta.role },
-      { label: "emoji", value: def.meta.emoji },
-      { label: "color", value: def.meta.color },
-      { label: "vibe", value: def.meta.vibe },
-    ]
-  ) {
+  for (const field of [
+    { label: "name", value: def.meta.name },
+    { label: "description", value: def.meta.description },
+    { label: "role", value: def.meta.role },
+    { label: "emoji", value: def.meta.emoji },
+    { label: "color", value: def.meta.color },
+    { label: "vibe", value: def.meta.vibe },
+  ]) {
     assert(field.value !== "", `frontmatter ${field.label} empty`);
   }
   for (const want of ["组件化", "可访问性", "性能"]) {

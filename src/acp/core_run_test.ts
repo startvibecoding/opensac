@@ -1,4 +1,5 @@
-// deno-lint-ignore-file require-await -- async fake client models the Core seam
+/* eslint-disable @typescript-eslint/require-await */ // async fake client models the Core seam
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { coreResult } from "../core/protocol.ts";
 import { privateCoreConfig } from "../core/private_core.ts";
@@ -114,7 +115,7 @@ test("default ACP dependencies select a private Core only for --standalone", () 
 });
 
 test("standalone ACP dependencies own and clean up a private Core", async () => {
-  const parentDir = await Deno.makeTempDir({
+  const parentDir = await nodeRuntime.makeTempDir({
     prefix: "opensac-acp-standalone-",
   });
   let ownedPromise: Promise<CoreCommandHandle> | undefined;
@@ -144,13 +145,13 @@ test("standalone ACP dependencies own and clean up a private Core", async () => 
     // The private Core exited cleanly and its state directory was removed;
     // the shared Core's state was never involved.
     assertEquals(await core.done, 0);
-    for await (const _entry of Deno.readDir(parentDir)) {
+    for await (const _entry of nodeRuntime.readDir(parentDir)) {
       throw new Error("private Core state directory was not cleaned up");
     }
     await client.close();
   } finally {
     const core = await ownedPromise;
     if (core !== undefined) await core.stop();
-    await Deno.remove(parentDir, { recursive: true });
+    await nodeRuntime.remove(parentDir, { recursive: true });
   }
 });

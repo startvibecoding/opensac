@@ -5,10 +5,12 @@
 //   - Daemon mode: communicates with a vibe-browser daemon over a Unix socket
 //
 // Deviations from Go: `context.Context` maps to `AbortSignal`; `net.Dial` maps
-// to `Deno.connect({transport:"unix"})`; `log/slog` logging is dropped;
+// to `runtime.connect({transport:"unix"})`; `log/slog` logging is dropped;
 // `os.FindProcess` liveness probing falls back to a Linux `/proc` check
-// because Deno exposes no portable signal-0 probe.
+// because Node exposes no portable signal-0 probe.
 
+import { runtime } from "../platform/runtime.ts";
+import type { Conn } from "../platform/runtime.ts";
 import { Browser } from "./ops.ts";
 import { discoverCdpUrl, launch } from "./chrome.ts";
 import {
@@ -18,7 +20,8 @@ import {
   type NavigationOptions,
   type Response as ProtocolResponse,
   type ScreenshotOptions,
-  type SnapshotOptions} from "./protocol.ts";
+  type SnapshotOptions,
+} from "./protocol.ts";
 import { type BrowserType } from "./protocol.ts";
 
 /** Options configures the client behavior. */
@@ -93,8 +96,8 @@ export class Client {
     if (o.launch) {
       launchOpts.browser = o.launch.browser ?? launchOpts.browser;
       launchOpts.headless = o.launch.headless ?? launchOpts.headless;
-      launchOpts.executablePath = o.launch.executablePath ??
-        launchOpts.executablePath;
+      launchOpts.executablePath =
+        o.launch.executablePath ?? launchOpts.executablePath;
       launchOpts.args = o.launch.args;
       launchOpts.proxy = o.launch.proxy;
       launchOpts.userDataDir = o.launch.userDataDir;
@@ -333,11 +336,7 @@ export class Client {
 
   async eval(expression: string, signal?: AbortSignal): Promise<unknown> {
     if (this.#daemon) {
-      return await this.#daemonValue<unknown>(
-        "eval",
-        { expression },
-        signal,
-      );
+      return await this.#daemonValue<unknown>("eval", { expression }, signal);
     }
     return await this.#browser!.evalJs(expression, signal);
   }
@@ -472,10 +471,7 @@ export class Client {
     return await this.#browser!.waitMs(ms, signal);
   }
 
-  async waitForSelector(
-    selector: string,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  async waitForSelector(selector: string, signal?: AbortSignal): Promise<void> {
     if (this.#daemon) {
       return await this.#daemonExec("wait_for_selector", { selector }, signal);
     }
@@ -684,7 +680,7 @@ export class Client {
   }
 
   async #daemonSend(
-    conn: Deno.Conn,
+    conn: Conn,
     action: string,
     extra: Record<string, unknown> | undefined,
     signal?: AbortSignal,
@@ -693,7 +689,9 @@ export class Client {
       id: `r${Date.now() % 1000000}`,
       action,
     };
-    if (extra) { for (const [k, v] of Object.entries(extra)) req[k] = v; }
+    if (extra) {
+      for (const [k, v] of Object.entries(extra)) req[k] = v;
+    }
 
     await conn.write(new TextEncoder().encode(JSON.stringify(req) + "\n"));
 
@@ -748,17 +746,20 @@ async function readWithAbort(
       reject(new DOMException("Aborted", "AbortError"));
     };
     signal.addEventListener("abort", onAbort, { once: true });
-    reader.read().then((result) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", onAbort);
-      resolve(result);
-    }, (err) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", onAbort);
-      reject(err);
-    });
+    reader.read().then(
+      (result) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        resolve(result);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
   });
 }
 
@@ -776,8 +777,8 @@ function decodeDaemonBytes(data: string | number[] | undefined): Uint8Array {
 async function dialDaemon(
   signal: AbortSignal | undefined,
   path: string,
-): Promise<Deno.Conn> {
-  if (!signal) return await Deno.connect({ transport: "unix", path });
+): Promise<Conn> {
+  if (!signal) return await runtime.connect({ transport: "unix", path });
   return await new Promise((resolve, reject) => {
     let settled = false;
     const onAbort = () => {
@@ -786,31 +787,34 @@ async function dialDaemon(
       reject(new DOMException("Aborted", "AbortError"));
     };
     signal.addEventListener("abort", onAbort, { once: true });
-    Deno.connect({ transport: "unix", path }).then((conn) => {
-      if (settled) {
-        try {
-          conn.close();
-        } catch {
-          // ignore
+    runtime.connect({ transport: "unix", path }).then(
+      (conn) => {
+        if (settled) {
+          try {
+            conn.close();
+          } catch {
+            // ignore
+          }
+          return;
         }
-        return;
-      }
-      settled = true;
-      signal.removeEventListener("abort", onAbort);
-      resolve(conn);
-    }, (err) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", onAbort);
-      reject(err);
-    });
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        resolve(conn);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
   });
 }
 
 async function dialDaemonTimeout(
   path: string,
   timeoutMs: number,
-): Promise<Deno.Conn> {
+): Promise<Conn> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -831,14 +835,17 @@ export function parsePid(data: Uint8Array): number {
 
 /** Returns the default daemon socket directory. */
 export function getSocketDir(): string {
-  const dir = Deno.env.get("VIBE_BROWSER_SOCKET_DIR");
+  const dir = runtime.env.get("VIBE_BROWSER_SOCKET_DIR");
   if (dir) return dir;
-  const tmp = Deno.env.get("TMPDIR") || Deno.env.get("TMP") ||
-    Deno.env.get("TEMP") || "/tmp";
-  if (Deno.build.os === "windows") return `${tmp}/vibe-browser`;
-  const xdg = Deno.env.get("XDG_RUNTIME_DIR");
+  const tmp =
+    runtime.env.get("TMPDIR") ||
+    runtime.env.get("TMP") ||
+    runtime.env.get("TEMP") ||
+    "/tmp";
+  if (runtime.build.os === "windows") return `${tmp}/vibe-browser`;
+  const xdg = runtime.env.get("XDG_RUNTIME_DIR");
   if (xdg) return `${xdg}/vibe-browser`;
-  const home = Deno.env.get("HOME");
+  const home = runtime.env.get("HOME");
   if (home) return `${home}/.vibe-browser`;
   return `${tmp}/vibe-browser`;
 }
@@ -850,13 +857,13 @@ export function isDaemonRunning(
   socketDir: string,
 ): boolean {
   try {
-    Deno.statSync(socketPath);
+    runtime.statSync(socketPath);
   } catch {
     return false;
   }
   let pid: number;
   try {
-    pid = parsePid(Deno.readFileSync(`${socketDir}/${session}.pid`));
+    pid = parsePid(runtime.readFileSync(`${socketDir}/${session}.pid`));
   } catch {
     return false;
   }
@@ -866,17 +873,17 @@ export function isDaemonRunning(
 /** Checks if a process with the given PID exists. */
 export function isProcessAlive(pid: number): boolean {
   if (pid <= 0) return false;
-  if (Deno.build.os === "windows") return true;
-  if (Deno.build.os === "linux") {
+  if (runtime.build.os === "windows") return true;
+  if (runtime.build.os === "linux") {
     try {
-      Deno.statSync(`/proc/${pid}`);
+      runtime.statSync(`/proc/${pid}`);
       return true;
     } catch {
       return false;
     }
   }
   try {
-    Deno.kill(pid, "SIGCONT");
+    runtime.kill(pid, "SIGCONT");
     return true;
   } catch {
     return false;

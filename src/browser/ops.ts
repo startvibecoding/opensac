@@ -360,9 +360,8 @@ export class Browser {
     signal?: AbortSignal,
   ): Promise<void> {
     const button = opts?.button || "left";
-    const clickCount = opts?.clickCount && opts.clickCount > 0
-      ? opts.clickCount
-      : 1;
+    const clickCount =
+      opts?.clickCount && opts.clickCount > 0 ? opts.clickCount : 1;
     const client = this.#getClient();
     await client.send(
       "Input.dispatchMouseEvent",
@@ -690,7 +689,9 @@ export class Browser {
         params.clip = { x, y, width, height, scale: 1 };
       }
       if (
-        opts.clipWidth && opts.clipWidth > 0 && opts.clipHeight &&
+        opts.clipWidth &&
+        opts.clipWidth > 0 &&
+        opts.clipHeight &&
         opts.clipHeight > 0
       ) {
         params.clip = {
@@ -871,20 +872,25 @@ export class Browser {
     timeout = 0,
     signal?: AbortSignal,
   ): Promise<void> {
-    await this.#poll(timeout, signal, async () => {
-      const msg = await this.#getClient().send(
-        "Runtime.evaluate",
-        {
-          expression: `document.querySelector(${
-            JSON.stringify(selector)
-          }) !== null`,
-          returnByValue: true,
-        },
-        signal,
-      );
-      const result = (msg.result ?? {}) as { result?: { value?: boolean } };
-      return result.result?.value === true;
-    }, () => `waitForSelector: timeout waiting for ${selector}`);
+    await this.#poll(
+      timeout,
+      signal,
+      async () => {
+        const msg = await this.#getClient().send(
+          "Runtime.evaluate",
+          {
+            expression: `document.querySelector(${JSON.stringify(
+              selector,
+            )}) !== null`,
+            returnByValue: true,
+          },
+          signal,
+        );
+        const result = (msg.result ?? {}) as { result?: { value?: boolean } };
+        return result.result?.value === true;
+      },
+      () => `waitForSelector: timeout waiting for ${selector}`,
+    );
   }
 
   async waitForText(
@@ -892,15 +898,20 @@ export class Browser {
     timeout = 0,
     signal?: AbortSignal,
   ): Promise<void> {
-    await this.#poll(timeout, signal, async () => {
-      const msg = await this.#getClient().send(
-        "Runtime.evaluate",
-        { expression: "document.body.innerText", returnByValue: true },
-        signal,
-      );
-      const result = (msg.result ?? {}) as { result?: { value?: string } };
-      return (result.result?.value ?? "").includes(text);
-    }, () => `waitForText: timeout waiting for "${text}"`);
+    await this.#poll(
+      timeout,
+      signal,
+      async () => {
+        const msg = await this.#getClient().send(
+          "Runtime.evaluate",
+          { expression: "document.body.innerText", returnByValue: true },
+          signal,
+        );
+        const result = (msg.result ?? {}) as { result?: { value?: string } };
+        return (result.result?.value ?? "").includes(text);
+      },
+      () => `waitForText: timeout waiting for "${text}"`,
+    );
   }
 
   async waitForUrl(
@@ -908,14 +919,19 @@ export class Browser {
     timeout = 0,
     signal?: AbortSignal,
   ): Promise<void> {
-    await this.#poll(timeout, signal, async () => {
-      try {
-        const current = await this.getUrl(signal);
-        return current.includes(urlPattern);
-      } catch {
-        return false;
-      }
-    }, () => `waitForURL: timeout waiting for ${urlPattern}`);
+    await this.#poll(
+      timeout,
+      signal,
+      async () => {
+        try {
+          const current = await this.getUrl(signal);
+          return current.includes(urlPattern);
+        } catch {
+          return false;
+        }
+      },
+      () => `waitForURL: timeout waiting for ${urlPattern}`,
+    );
   }
 
   async #poll(
@@ -998,8 +1014,7 @@ export function truncateHtml(html: string, opts?: HTMLOptions): string {
   const byteCut = maxBytes > 0 && totalBytes > maxBytes;
   if (!charCut && !byteCut) return html;
 
-  const notice =
-    `[truncated: ${totalBytes} bytes total, ${totalChars} chars total, use a narrower selector or GetText]`;
+  const notice = `[truncated: ${totalBytes} bytes total, ${totalChars} chars total, use a narrower selector or GetText]`;
 
   let prefix = html;
   if (charCut) {
@@ -1017,8 +1032,10 @@ export function truncateHtml(html: string, opts?: HTMLOptions): string {
     return runeAlignedPrefix(prefix, maxBytes - byteLength(notice)) + notice;
   }
   if (maxBytes >= byteLength(shortNotice)) {
-    return runeAlignedPrefix(prefix, maxBytes - byteLength(shortNotice)) +
-      shortNotice;
+    return (
+      runeAlignedPrefix(prefix, maxBytes - byteLength(shortNotice)) +
+      shortNotice
+    );
   }
   return runeAlignedPrefix(prefix, maxBytes);
 }
@@ -1141,7 +1158,7 @@ export function formatAxTree(nodes: AxNode[], opts?: SnapshotOptions): string {
 
 async function createTarget(host: string, port: number): Promise<Target> {
   const resp = await fetch(`http://${host}:${port}/json/new?about:blank`);
-  return targetFrom(await resp.json() as Partial<Target>);
+  return targetFrom((await resp.json()) as Partial<Target>);
 }
 
 function targetFrom(t: Partial<Target>): Target {

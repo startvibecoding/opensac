@@ -55,20 +55,12 @@ class FakeEventConnection implements TUICoreEventConnection {
     return this.#alive;
   }
 
-  subscribe(
-    sessionId: string,
-    runId: string,
-    cursor = 0,
-  ): Promise<void> {
+  subscribe(sessionId: string, runId: string, cursor = 0): Promise<void> {
     this.subscribed.push({ sessionId, runId, cursor });
     return Promise.resolve();
   }
 
-  replay(
-    _sessionId: string,
-    _runId: string,
-    cursor = 0,
-  ): Promise<unknown> {
+  replay(_sessionId: string, _runId: string, cursor = 0): Promise<unknown> {
     const rows = this.nextReplayed ?? this.replayed;
     this.nextReplayed = undefined;
     return Promise.resolve(rows.filter((entry) => entry.sequence > cursor));
@@ -81,9 +73,7 @@ class FakeEventConnection implements TUICoreEventConnection {
     return () => this.#listeners.delete(listener);
   }
 
-  onRequest(
-    _listener: (request: CoreRpcRequest) => void,
-  ): () => void {
+  onRequest(_listener: (request: CoreRpcRequest) => void): () => void {
     return () => {};
   }
 
@@ -151,9 +141,8 @@ function fakeClient(
       );
     },
     connectEvents(): Promise<TUICoreEventConnection> {
-      const connection = options.freshEvents === true
-        ? new FakeEventConnection()
-        : events;
+      const connection =
+        options.freshEvents === true ? new FakeEventConnection() : events;
       if (options.freshEvents === true) options.onEvents?.(connection);
       eventConnections.push(connection);
       const failure = options.failWith?.("connectEvents");
@@ -174,21 +163,20 @@ test("core TUIService forwards session creation without adapter defaults", async
     providerName: "test-provider",
     modelID: "test-model",
   });
-  assertEquals(client.calls, [{
-    method: "session.create",
-    params: {
-      workDir: "/workspace/project",
-      providerName: "test-provider",
-      modelID: "test-model",
+  assertEquals(client.calls, [
+    {
+      method: "session.create",
+      params: {
+        workDir: "/workspace/project",
+        providerName: "test-provider",
+        modelID: "test-model",
+      },
     },
-  }]);
+  ]);
   assertEquals(view.sessionId, "session-1");
   assertEquals(view.capabilities, { multiAgent: true });
   // Wire timestamps revive into Date values.
-  assertEquals(
-    view.createdAt.toISOString(),
-    "2026-01-01T00:00:00.000Z",
-  );
+  assertEquals(view.createdAt.toISOString(), "2026-01-01T00:00:00.000Z");
 
   // Optional policy fields travel only when the caller set them; effective
   // defaults stay Core-owned.
@@ -265,9 +253,12 @@ test("core TUIService maps prompt, cancel, and config calls to Core methods", as
 
 test("core TUIService rethrows prompt errors unchanged", async () => {
   const marker = new Error("provider exploded");
-  const client = fakeClient({}, {
-    failWith: (method) => method === "session.prompt" ? marker : undefined,
-  });
+  const client = fakeClient(
+    {},
+    {
+      failWith: (method) => (method === "session.prompt" ? marker : undefined),
+    },
+  );
   const service = createCoreClientTUIService(client);
 
   let caught: unknown;
@@ -310,12 +301,17 @@ test("core TUIService starts event streams from the requested cursor", async () 
   const service = createCoreClientTUIService(client);
 
   const events: CoreRuntimeEvent[] = [];
-  for await (
-    const event of service.subscribeRunEvents("session-1", "run-1", 1)
-  ) {
+  for await (const event of service.subscribeRunEvents(
+    "session-1",
+    "run-1",
+    1,
+  )) {
     events.push(event);
   }
-  assertEquals(events.map((entry) => entry.sequence), [2]);
+  assertEquals(
+    events.map((entry) => entry.sequence),
+    [2],
+  );
   assertEquals(client.events.subscribed, [
     { sessionId: "session-1", runId: "run-1", cursor: 1 },
   ]);
@@ -371,9 +367,11 @@ test("core TUIService gives up on a run stream that keeps dropping", async () =>
   const service = createCoreClientTUIService(client);
 
   const error = await assertRejects(async () => {
-    for await (
-      const _delivered of service.subscribeRunEvents("session-1", "run-1", 0)
-    ) {
+    for await (const _delivered of service.subscribeRunEvents(
+      "session-1",
+      "run-1",
+      0,
+    )) {
       // Unreachable: no connection ever delivers an event.
       void _delivered;
     }
@@ -428,33 +426,35 @@ test("core TUIService projects the secret-safe settings view", async () => {
       sandboxLevel: "strict",
       webSearchEnabled: false,
       skillsDisabled: [],
-      providers: [{
-        name: "test-provider",
-        maskedKey: "sk-***redacted",
-        apiKeyConfigured: true,
-        modelCount: 1,
-        models: [{ id: "test-model", name: "Test Model" }],
-      }],
+      providers: [
+        {
+          name: "test-provider",
+          maskedKey: "sk-***redacted",
+          apiKeyConfigured: true,
+          modelCount: 1,
+          models: [{ id: "test-model", name: "Test Model" }],
+        },
+      ],
     },
   });
   const service = createCoreClientTUIService(client);
 
   const view = await service.settings();
   assertEquals(view.defaultProvider, "test-provider");
-  assertEquals(view.providers, [{
-    name: "test-provider",
-    apiKeyConfigured: true,
-    modelCount: 1,
-    models: [{ id: "test-model", name: "Test Model" }],
-  }]);
-  // The projection only carries masked credential state, never raw secrets.
-  assertEquals(
-    JSON.stringify(view).includes("sk-***redacted"),
-    false,
-  );
-  assertEquals(client.calls.map((call) => call.method), [
-    "manage.settings.get",
+  assertEquals(view.providers, [
+    {
+      name: "test-provider",
+      apiKeyConfigured: true,
+      modelCount: 1,
+      models: [{ id: "test-model", name: "Test Model" }],
+    },
   ]);
+  // The projection only carries masked credential state, never raw secrets.
+  assertEquals(JSON.stringify(view).includes("sk-***redacted"), false);
+  assertEquals(
+    client.calls.map((call) => call.method),
+    ["manage.settings.get"],
+  );
 });
 
 test("core TUIService maps skill activation onto the Core skill method", async () => {
@@ -478,10 +478,10 @@ test("core TUIService maps skill activation onto the Core skill method", async (
     active: true,
   });
   assertEquals(view.sessionId, "session-1");
-  assertEquals(client.calls.map((call) => call.method), [
-    "session.skill.set",
-    "session.config.get",
-  ]);
+  assertEquals(
+    client.calls.map((call) => call.method),
+    ["session.skill.set", "session.config.get"],
+  );
   assertEquals(client.calls[0].params, {
     sessionId: "session-1",
     name: "review",
@@ -489,27 +489,31 @@ test("core TUIService maps skill activation onto the Core skill method", async (
   });
 
   const skills = await service.listSkills({ sessionId: "session-1" });
-  assertEquals(skills, [{
-    name: "review",
-    source: "project",
-    description: "Review skill",
-    active: true,
-  }]);
+  assertEquals(skills, [
+    {
+      name: "review",
+      source: "project",
+      description: "Review skill",
+      active: true,
+    },
+  ]);
 });
 
 test("core TUIService lists attachments for the session", async () => {
   const client = fakeClient({
     "attachment.list": {
-      attachments: [{
-        attachmentId: "att-1",
-        filename: "notes.txt",
-        kind: "file",
-        mediaType: "text/plain",
-        size: 12,
-        status: "ready",
-        runId: "run-1",
-        createdAt: "2026-01-01T00:00:00.000Z",
-      }],
+      attachments: [
+        {
+          attachmentId: "att-1",
+          filename: "notes.txt",
+          kind: "file",
+          mediaType: "text/plain",
+          size: 12,
+          status: "ready",
+          runId: "run-1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
     },
   });
   const service = createCoreClientTUIService(client);
@@ -517,12 +521,14 @@ test("core TUIService lists attachments for the session", async () => {
   const attachments = await service.listAttachments({
     sessionId: "session-1",
   });
-  assertEquals(attachments, [{
-    attachmentId: "att-1",
-    name: "notes.txt",
-    mediaType: "text/plain",
-    size: 12,
-  }]);
+  assertEquals(attachments, [
+    {
+      attachmentId: "att-1",
+      name: "notes.txt",
+      mediaType: "text/plain",
+      size: 12,
+    },
+  ]);
   // The Core scopes attachment reads by session (work directory stays Core-side).
   assertEquals(client.calls[0], {
     method: "attachment.list",
@@ -601,8 +607,11 @@ test("core TUIService rejects malformed Core views", async () => {
 });
 
 test("core TUIService maps missing timestamps to the provided clock", async () => {
-  const { createdAt: _createdAt, updatedAt: _updatedAt, ...withoutDates } =
-    SESSION_VIEW;
+  const {
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    ...withoutDates
+  } = SESSION_VIEW;
   const client = fakeClient({ "session.create": withoutDates });
   const service = createCoreClientTUIService(client, {
     now: () => new Date("2026-02-01T00:00:00.000Z"),
@@ -664,15 +673,17 @@ test("core TUIService reads and updates settings documents through the Core", as
 
 test("core TUIService projects the provider catalog and validates pairs", async () => {
   const client = fakeClient({
-    "model.catalog": [{
-      id: "test-provider",
-      configured: true,
-      isDefault: true,
-      api: "openai-chat",
-      baseUrl: "https://example.invalid",
-      modelCount: 1,
-      models: [{ id: "test-model", name: "Test Model" }],
-    }],
+    "model.catalog": [
+      {
+        id: "test-provider",
+        configured: true,
+        isDefault: true,
+        api: "openai-chat",
+        baseUrl: "https://example.invalid",
+        modelCount: 1,
+        models: [{ id: "test-model", name: "Test Model" }],
+      },
+    ],
     "model.validate": null,
   });
   const service = createCoreClientTUIService(client, { workDir: "/w" });
@@ -701,14 +712,17 @@ test("core TUIService projects the provider catalog and validates pairs", async 
 });
 
 test("core TUIService rethrows provider validation errors with the raw cause", async () => {
-  const client = fakeClient({}, {
-    failWith: (method) =>
-      method === "model.validate"
-        ? new Error(
-          "unknown provider: nope (add it to settings.json providers section)",
-        )
-        : undefined,
-  });
+  const client = fakeClient(
+    {},
+    {
+      failWith: (method) =>
+        method === "model.validate"
+          ? new Error(
+              "unknown provider: nope (add it to settings.json providers section)",
+            )
+          : undefined,
+    },
+  );
   const service = createCoreClientTUIService(client);
   await assertRejects(
     () =>
@@ -754,26 +768,30 @@ test("core TUIService round-trips env and session context documents", async () =
 
 test("core TUIService maps expert commands and forks onto Core methods", async () => {
   const client = fakeClient({
-    "expert.list": [{
-      name: "demo-expert",
-      displayName: { zh: "演示专家", en: "Demo Expert" },
-      expertType: "team",
-      source: "builtin",
-      invalid: false,
-      invalidReason: "",
-    }],
+    "expert.list": [
+      {
+        name: "demo-expert",
+        displayName: { zh: "演示专家", en: "Demo Expert" },
+        expertType: "team",
+        source: "builtin",
+        invalid: false,
+        invalidReason: "",
+      },
+    ],
     "expert.show": {
       name: "demo-expert",
       displayName: { zh: "演示专家", en: "Demo Expert" },
       expertType: "team",
       invalid: false,
       invalidReason: "",
-      members: [{
-        id: "lead",
-        name: { zh: "领队", en: "Lead" },
-        profession: { zh: "工程", en: "Engineering" },
-        role: "lead",
-      }],
+      members: [
+        {
+          id: "lead",
+          name: { zh: "领队", en: "Lead" },
+          profession: { zh: "工程", en: "Engineering" },
+          role: "lead",
+        },
+      ],
     },
     "expert.state": { expertId: "demo-expert" },
     "expert.set": { expertId: "" },
@@ -799,10 +817,9 @@ test("core TUIService maps expert commands and forks onto Core methods", async (
   });
   assertEquals(bundle.members[0].role, "lead");
 
-  assertEquals(
-    await service.expertState({ sessionId: "session-1" }),
-    { expertId: "demo-expert" },
-  );
+  assertEquals(await service.expertState({ sessionId: "session-1" }), {
+    expertId: "demo-expert",
+  });
   assertEquals(
     await service.setExpert({ sessionId: "session-1", expertId: "" }),
     { expertId: "" },
@@ -880,12 +897,14 @@ test("core TUIService maps agent, delegate, ESM, transient, and compact calls to
     now: () => new Date("2026-01-03T00:00:00.000Z"),
   });
 
-  assertEquals(await service.listAgents({ sessionId: "session-1" }), [{
-    id: "a1",
-    parent: "",
-    children: ["a2"],
-    state: "running",
-  }]);
+  assertEquals(await service.listAgents({ sessionId: "session-1" }), [
+    {
+      id: "a1",
+      parent: "",
+      children: ["a2"],
+      state: "running",
+    },
+  ]);
   await service.destroyAgent({ sessionId: "session-1", agentId: "a1" });
   assertEquals(
     await service.setDelegate({ sessionId: "session-1", enabled: true }),
@@ -931,19 +950,22 @@ test("core TUIService maps agent, delegate, ESM, transient, and compact calls to
   });
 
   // Every capability maps to exactly one neutral Core method.
-  assertEquals(client.calls.map((entry) => entry.method), [
-    "agent.list",
-    "agent.destroy",
-    "delegate.set",
-    "delegate.get",
-    "session.capability.set",
-    "esm.state",
-    "esm.update",
-    "esm.continue",
-    "esm.stop",
-    "transient.prompt",
-    "session.compact",
-  ]);
+  assertEquals(
+    client.calls.map((entry) => entry.method),
+    [
+      "agent.list",
+      "agent.destroy",
+      "delegate.set",
+      "delegate.get",
+      "session.capability.set",
+      "esm.state",
+      "esm.update",
+      "esm.continue",
+      "esm.stop",
+      "transient.prompt",
+      "session.compact",
+    ],
+  );
   assertEquals(client.calls[5].params, { sessionId: "session-1" });
   assertEquals(client.calls[6].params, {
     sessionId: "session-1",

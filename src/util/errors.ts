@@ -45,7 +45,7 @@ export function isTimeoutError(err: unknown): boolean {
  * Broad cancellation detection for retry decisions: matches a deliberate abort
  * anywhere in the `cause` chain, by error name or by a distinctive phrase.
  *
- * It must read the whole chain rather than only the top message, because Deno
+ * It must read the whole chain rather than only the top message, because Node
  * surfaces a cancelled fetch as `TypeError: "fetch failed"` whose real reason is
  * a `DOMException("Aborted", "AbortError")` or the default `signal.reason`
  * ("The signal has been aborted") on `cause`, and every provider yields a
@@ -81,6 +81,9 @@ export function isTimeoutLike(err: unknown): boolean {
     return true;
   }
   const s = errText(err).toLowerCase();
-  return s.includes("deadline exceeded") || s.includes("timed out") ||
-    s.includes("timeout");
+  return (
+    s.includes("deadline exceeded") ||
+    s.includes("timed out") ||
+    s.includes("timeout")
+  );
 }

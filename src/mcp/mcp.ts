@@ -2,13 +2,15 @@
 // Deliberate deviations from the Go original:
 //   - `context.Context` maps to `AbortSignal`; timeouts use `AbortSignal.timeout`.
 //   - goroutines/channels map to Promises plus async stream readers.
-//   - `*exec.Cmd`/`io.WriteCloser` map to `Deno.ChildProcess` and its stdin
+//   - `*exec.Cmd`/`io.WriteCloser` map to `ChildProcess` and its stdin
 //     writer; `net/http.Client` maps to `fetch`.
 //   - build-time image preprocessing (`imageproc.PrepareBytes`) is async, so the
 //     image-projection helpers and tool `execute` return Promises.
-//   - environment maps use a `Record<string, string>` (Deno's `Deno.Command`
+//   - environment maps use a `Record<string, string>` (Node's `nodeRuntime.Command`
 //     env shape) instead of a `[]string`.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
+import type { ChildProcess } from "../platform/runtime.ts";
 import {
   defaultPolicy,
   type Mode,
@@ -150,7 +152,7 @@ function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
 }
 
 function isWindows(): boolean {
-  return Deno.build.os === "windows";
+  return nodeRuntime.build.os === "windows";
 }
 
 /** Reads newline-delimited text from a byte stream. */
@@ -183,7 +185,7 @@ async function* readLines(
 export class Client {
   name: string;
   readonly transport: string;
-  private cmd?: Deno.ChildProcess;
+  private cmd?: ChildProcess;
   // The members below are package-visible (Go has no `private`) so the
   // translated in-package tests can construct and drive a Client directly.
   stdinWriter?: WritableStreamDefaultWriter<Uint8Array>;
@@ -256,18 +258,17 @@ export class Client {
     return combineSignals(ctx, this.context());
   }
 
-  attachStdio(
-    cmd: Deno.ChildProcess,
-    stdout: ReadableStream<Uint8Array>,
-  ): void {
+  attachStdio(cmd: ChildProcess, stdout: ReadableStream<Uint8Array>): void {
     this.cmd = cmd;
     this.stdinWriter = cmd.stdin!.getWriter();
     void this.readLoop(stdout);
-    void cmd.status.then(() => {
-      this.closePending(new Error(`MCP server ${this.name} exited`));
-    }).catch(() => {
-      this.closePending(new Error(`MCP server ${this.name} exited`));
-    });
+    void cmd.status
+      .then(() => {
+        this.closePending(new Error(`MCP server ${this.name} exited`));
+      })
+      .catch(() => {
+        this.closePending(new Error(`MCP server ${this.name} exited`));
+      });
   }
 
   private toResponse(msg: RPCRequest): McpResponse {
@@ -522,8 +523,9 @@ export class Client {
     if (
       result !== undefined &&
       result !== null &&
-      !(typeof result === "object" &&
-        Object.keys(result as object).length === 0)
+      !(
+        typeof result === "object" && Object.keys(result as object).length === 0
+      )
     ) {
       this.removePending(key);
       return result;
@@ -592,7 +594,7 @@ export class Client {
     const target = this.transport === "sse" ? this.messageURL : this.httpURL;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "Accept": "application/json, text/event-stream",
+      Accept: "application/json, text/event-stream",
       ...this.headers,
     };
     if (operationID) headers["Idempotency-Key"] = operationID;
@@ -638,9 +640,9 @@ export class Client {
       rpcResponseIDKey(rpcResp.id) !== String(id)
     ) {
       throw new Error(
-        `JSON-RPC response id ${
-          JSON.stringify(rpcResp.id)
-        } does not match request id ${id}`,
+        `JSON-RPC response id ${JSON.stringify(
+          rpcResp.id,
+        )} does not match request id ${id}`,
       );
     }
     if (rpcResp.error !== undefined && rpcResp.error !== null) {
@@ -669,18 +671,16 @@ export class Client {
     await this.writeChain;
   }
 
-  private async postRPCMessage(
-    ctx: AbortSignal,
-    msg: unknown,
-  ): Promise<void> {
+  private async postRPCMessage(ctx: AbortSignal, msg: unknown): Promise<void> {
     const data = JSON.stringify(msg);
-    const target = this.transport === "sse" && this.messageURL
-      ? this.messageURL
-      : this.httpURL;
+    const target =
+      this.transport === "sse" && this.messageURL
+        ? this.messageURL
+        : this.httpURL;
     const signal = this.requestSignal(ctx);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "Accept": "application/json",
+      Accept: "application/json",
       ...this.headers,
     };
     if (this.sessionID) headers["Mcp-Session-Id"] = this.sessionID;
@@ -784,8 +784,8 @@ export class Client {
         return;
       case "sampling/createMessage":
         if (this.callbacks.onSamplingCreateMessage) {
-          const { result, error } = await this.callbacks
-            .onSamplingCreateMessage(
+          const { result, error } =
+            await this.callbacks.onSamplingCreateMessage(
               this.context(),
               this.name,
               msg.params,
@@ -935,9 +935,9 @@ export class Client {
     };
     return [
       image,
-      `[Image: ${result.mimeType} ${result.meta.width}x${result.meta.height}, ${
-        mcpFormatBytes(result.meta.bytes)
-      }]`,
+      `[Image: ${result.mimeType} ${result.meta.width}x${result.meta.height}, ${mcpFormatBytes(
+        result.meta.bytes,
+      )}]`,
     ];
   }
 }
@@ -1097,9 +1097,9 @@ async function createMCPClient(
       return await createMCPHTTPClient(ctx, cfg, true, callbacks);
     default:
       throw new Error(
-        `unsupported MCP transport ${JSON.stringify(cfg.type)} for server ${
-          JSON.stringify(cfg.name)
-        }`,
+        `unsupported MCP transport ${JSON.stringify(cfg.type)} for server ${JSON.stringify(
+          cfg.name,
+        )}`,
       );
   }
 }
@@ -1121,16 +1121,16 @@ async function createMCPStdioClient(
     resolvedCommand = resolveMCPCommand(command, env);
   } catch (err) {
     throw new Error(
-      `resolve MCP server ${JSON.stringify(cfg.name)} command ${
-        JSON.stringify(command)
-      }: ${(err as Error).message}`,
+      `resolve MCP server ${JSON.stringify(cfg.name)} command ${JSON.stringify(
+        command,
+      )}: ${(err as Error).message}`,
     );
   }
 
   const client = new Client(cfg.name, "stdio", callbacks, ctx);
-  let cmd: Deno.ChildProcess;
+  let cmd: ChildProcess;
   try {
-    cmd = new Deno.Command(resolvedCommand, {
+    cmd = new nodeRuntime.Command(resolvedCommand, {
       args: cfg.args ?? [],
       env,
       stdin: "piped",
@@ -1143,7 +1143,7 @@ async function createMCPStdioClient(
       `start MCP server ${JSON.stringify(cfg.name)}: ${(err as Error).message}`,
     );
   }
-  client.attachStdio(cmd, cmd.stdout);
+  client.attachStdio(cmd, cmd.stdout!);
 
   try {
     await client.call(
@@ -1172,7 +1172,7 @@ export function mergeMCPEnvironment(
   overrides: MCPKeyValueLike[],
 ): Record<string, string> {
   const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(Deno.env.toObject())) env[k] = v;
+  for (const [k, v] of Object.entries(nodeRuntime.env.toObject())) env[k] = v;
   const canonical = new Map<string, string>();
   for (const key of Object.keys(env)) {
     canonical.set(normalizeMCPEnvName(key), key);
@@ -1181,7 +1181,9 @@ export function mergeMCPEnvironment(
     const name = (override.name ?? "").trim();
     if (name === "") throw new Error("environment variable name is empty");
     if (
-      name.includes("=") || name.includes("\0") || override.value.includes("\0")
+      name.includes("=") ||
+      name.includes("\0") ||
+      override.value.includes("\0")
     ) {
       throw new Error(`invalid environment variable ${JSON.stringify(name)}`);
     }
@@ -1255,10 +1257,10 @@ function mcpCommandCandidates(
 }
 
 function checkMCPExecutable(path: string): void {
-  const info = Deno.statSync(path);
+  const info = nodeRuntime.statSync(path);
   if (info.isDirectory) throw new Error("path is a directory");
   if (!isWindows() && ((info.mode ?? 0) & 0o111) === 0) {
-    throw new Deno.errors.PermissionDenied("permission denied");
+    throw new nodeRuntime.errors.PermissionDenied("permission denied");
   }
 }
 
@@ -1283,9 +1285,9 @@ async function createMCPHTTPClient(
   const rawURL = (cfg.url ?? "").trim();
   if (rawURL === "") {
     throw new Error(
-      `MCP server ${
-        JSON.stringify(cfg.name)
-      } url is required for ${cfg.type} transport`,
+      `MCP server ${JSON.stringify(
+        cfg.name,
+      )} url is required for ${cfg.type} transport`,
     );
   }
   let parsedURL: URL;
@@ -1317,9 +1319,9 @@ async function createMCPHTTPClient(
     if (msgURL === "") {
       client.close();
       throw new Error(
-        `MCP server ${
-          JSON.stringify(cfg.name)
-        } messageUrl is required for sse transport`,
+        `MCP server ${JSON.stringify(
+          cfg.name,
+        )} messageUrl is required for sse transport`,
       );
     }
     let parsedMessageURL: URL;
@@ -1328,9 +1330,9 @@ async function createMCPHTTPClient(
     } catch {
       client.close();
       throw new Error(
-        `MCP server ${
-          JSON.stringify(cfg.name)
-        } messageUrl must be a valid http(s) URL`,
+        `MCP server ${JSON.stringify(
+          cfg.name,
+        )} messageUrl must be a valid http(s) URL`,
       );
     }
     if (
@@ -1339,9 +1341,9 @@ async function createMCPHTTPClient(
     ) {
       client.close();
       throw new Error(
-        `MCP server ${
-          JSON.stringify(cfg.name)
-        } messageUrl must be a valid http(s) URL`,
+        `MCP server ${JSON.stringify(
+          cfg.name,
+        )} messageUrl must be a valid http(s) URL`,
       );
     }
     client.messageURL = msgURL;
@@ -1393,9 +1395,9 @@ class MCPTool implements Tool {
   }
 
   promptSnippet(): string {
-    return `${this.toolName}: MCP tool ${
-      JSON.stringify(this.info.name)
-    } from server ${JSON.stringify(this.client.name)}`;
+    return `${this.toolName}: MCP tool ${JSON.stringify(
+      this.info.name,
+    )} from server ${JSON.stringify(this.client.name)}`;
   }
 
   promptGuidelines(): string[] {
@@ -1451,9 +1453,9 @@ class MCPResourceTool implements Tool {
   }
 
   promptSnippet(): string {
-    return `${this.toolName}: MCP resource reader for ${
-      JSON.stringify(this.info.uri)
-    } on ${JSON.stringify(this.client.name)}`;
+    return `${this.toolName}: MCP resource reader for ${JSON.stringify(
+      this.info.uri,
+    )} on ${JSON.stringify(this.client.name)}`;
   }
 
   promptGuidelines(): string[] {
@@ -1511,9 +1513,9 @@ class MCPPromptTool implements Tool {
   }
 
   promptSnippet(): string {
-    return `${this.toolName}: MCP prompt ${
-      JSON.stringify(this.info.name)
-    } from server ${JSON.stringify(this.client.name)}`;
+    return `${this.toolName}: MCP prompt ${JSON.stringify(
+      this.info.name,
+    )} from server ${JSON.stringify(this.client.name)}`;
   }
 
   promptGuidelines(): string[] {
@@ -1549,8 +1551,8 @@ function createMCPTool(
   info: MCPToolInfo,
   existing: Set<string>,
 ): Tool {
-  const base = "mcp_" + sanitizeToolName(client.name) + "_" +
-    sanitizeToolName(info.name);
+  const base =
+    "mcp_" + sanitizeToolName(client.name) + "_" + sanitizeToolName(info.name);
   return new MCPTool(client, info, uniqueToolName(base, existing));
 }
 
@@ -1561,7 +1563,8 @@ function createMCPResourceTool(
 ): Tool {
   let id = info.name;
   if ((id ?? "").trim() === "") id = info.uri;
-  const base = "mcp_" +
+  const base =
+    "mcp_" +
     sanitizeToolName(client.name) +
     "_resource_" +
     sanitizeToolName(id ?? "");
@@ -1573,7 +1576,10 @@ function createMCPPromptTool(
   info: MCPPromptInfo,
   existing: Set<string>,
 ): Tool {
-  const base = "mcp_" + sanitizeToolName(client.name) + "_prompt_" +
+  const base =
+    "mcp_" +
+    sanitizeToolName(client.name) +
+    "_prompt_" +
     sanitizeToolName(info.name);
   return new MCPPromptTool(client, info, uniqueToolName(base, existing));
 }
@@ -1609,7 +1615,8 @@ export function mcpContentToText(blocks: MCPContentBlock[]): string {
         break;
       default:
         if (
-          block.type === "json" && block.json !== undefined &&
+          block.type === "json" &&
+          block.json !== undefined &&
           block.json !== null
         ) {
           parts.push(
@@ -1689,7 +1696,8 @@ export function extractSamplingPrompt(params: unknown): string {
         const block = item as Record<string, unknown>;
         const blockType = block["type"];
         if (
-          typeof blockType === "string" && blockType !== "" &&
+          typeof blockType === "string" &&
+          blockType !== "" &&
           blockType !== "text"
         ) {
           continue;

@@ -1,3 +1,4 @@
+import { runtime } from "../platform/runtime.ts";
 import { assertEquals } from "../compat/assert.ts";
 import { roleWorker, Supervisor } from "./runtime_core.ts";
 import { statusActive } from "./state.ts";
@@ -16,13 +17,13 @@ test("TUI and ACP adapters continue the same persisted objective", async () => {
     const first = await new Supervisor({ store, adapter: tui }).run(
       sessionID,
       "tui-run",
-      Deno.makeTempDirSync(),
+      runtime.makeTempDirSync(),
       "agent",
     );
     const second = await new Supervisor({ store, adapter: acp }).run(
       sessionID,
       "acp-run",
-      Deno.makeTempDirSync(),
+      runtime.makeTempDirSync(),
       "agent",
     );
     assertEquals(first.objective!.status, statusActive);

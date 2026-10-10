@@ -183,15 +183,17 @@ test("BuilderBuildUsesRegisteredBuilder", () => {
     const provider: Provider = {
       chat: async function* () {},
       name: () => "test",
-      models: () => [{
-        id: "m1",
-        name: "m1",
-        provider: "test",
-        reasoning: false,
-        input: ["text"],
-        contextWindow: 1000,
-        maxTokens: 100,
-      }],
+      models: () => [
+        {
+          id: "m1",
+          name: "m1",
+          provider: "test",
+          reasoning: false,
+          input: ["text"],
+          contextWindow: 1000,
+          maxTokens: 100,
+        },
+      ],
       getModel: () => undefined,
     };
     const a = newBuilder().withProvider(provider).withWorkDir("/tmp").build();

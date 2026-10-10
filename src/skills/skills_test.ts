@@ -1,5 +1,6 @@
 // (representative subset).
 
+import { runtime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import * as path from "../compat/path.ts";
 import {
@@ -22,12 +23,12 @@ function writeSkill(
   refs: Record<string, string> = {},
 ): void {
   const sd = path.join(dir, name);
-  Deno.mkdirSync(sd, { recursive: true });
-  Deno.writeTextFileSync(path.join(sd, "SKILL.md"), content);
+  runtime.mkdirSync(sd, { recursive: true });
+  runtime.writeTextFileSync(path.join(sd, "SKILL.md"), content);
   for (const [rel, c] of Object.entries(refs)) {
     const p = path.join(sd, rel);
-    Deno.mkdirSync(path.dirname(p), { recursive: true });
-    Deno.writeTextFileSync(p, c);
+    runtime.mkdirSync(path.dirname(p), { recursive: true });
+    runtime.writeTextFileSync(p, c);
   }
 }
 
@@ -70,7 +71,7 @@ test("load discovers built-in skills", () => {
 });
 
 test("loadFromDir loads skill and its references", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(
     dir,
@@ -92,7 +93,7 @@ test("loadFromDir loads skill and its references", () => {
 });
 
 test("project dirs precedence overrides same name", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   const globalDir = path.join(tmp, "global");
   const projDir = path.join(tmp, "proj");
   writeSkill(globalDir, "dup", "# Global\n");
@@ -103,7 +104,7 @@ test("project dirs precedence overrides same name", () => {
 });
 
 test("get/list/listBySource/names", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(dir, "b", "# B\n");
   writeSkill(dir, "a", "# A\n");
@@ -176,7 +177,7 @@ test("parseReferences", () => {
 });
 
 test("buildSkillContext with references", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(
     dir,
@@ -203,7 +204,7 @@ test("buildSkillContext with references", () => {
 });
 
 test("loadReference direct file and path escape", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   const dir = path.join(tmp, "skills");
   writeSkill(dir, "d", "# D\n", { "references/extra.md": "EXTRA" });
   const m = createManager("", [dir]);
@@ -222,22 +223,22 @@ test("buildAllSkillsContext includes built-ins", () => {
 });
 
 test("createProjectSkillsDir", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   createProjectSkillsDir(tmp);
-  assert(Deno.statSync(path.join(tmp, ".skills")).isDirectory);
+  assert(runtime.statSync(path.join(tmp, ".skills")).isDirectory);
 });
 
 test("load applies global disabled skills", () => {
-  const tmp = Deno.makeTempDirSync({ prefix: "skills-" });
+  const tmp = runtime.makeTempDirSync({ prefix: "skills-" });
   const configDir = path.join(tmp, "config");
-  Deno.mkdirSync(configDir, { recursive: true });
-  const prev = Deno.env.get("OPENSAC_DIR");
-  Deno.env.set("OPENSAC_DIR", configDir);
+  runtime.mkdirSync(configDir, { recursive: true });
+  const prev = runtime.env.get("OPENSAC_DIR");
+  runtime.env.set("OPENSAC_DIR", configDir);
   try {
     const dir = path.join(tmp, "skills");
     writeSkill(dir, "keep", "# Keep\n");
     writeSkill(dir, "drop", "# Drop\n");
-    Deno.writeTextFileSync(
+    runtime.writeTextFileSync(
       path.join(configDir, "settings.json"),
       JSON.stringify({ skills: { disabled: ["drop"] } }),
     );
@@ -252,8 +253,8 @@ test("load applies global disabled skills", () => {
     m.setDisabledSkills([]);
     assert(m.get("drop"));
   } finally {
-    if (prev === undefined) Deno.env.delete("OPENSAC_DIR");
-    else Deno.env.set("OPENSAC_DIR", prev);
+    if (prev === undefined) runtime.env.delete("OPENSAC_DIR");
+    else runtime.env.set("OPENSAC_DIR", prev);
   }
 });
 

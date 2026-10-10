@@ -35,10 +35,7 @@ export function extractCorePassword(request: Request): string {
  * query parameters and request/JSON-RPC parameters are never consulted.
  */
 export class CoreAuth {
-  static authenticate(
-    request: Request,
-    config: ResolvedCoreConfig,
-  ): boolean {
+  static authenticate(request: Request, config: ResolvedCoreConfig): boolean {
     if (!config.auth) return true;
 
     const password = extractCorePassword(request);

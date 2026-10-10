@@ -1,4 +1,4 @@
-// deno-lint-ignore-file
+/* eslint-disable */
 // Bounded user-pattern matching worker.
 //
 // JS `RegExp` backtracks, so a pattern that passed the shape screen in

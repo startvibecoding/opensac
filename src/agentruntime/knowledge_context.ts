@@ -57,9 +57,7 @@ export interface KnowledgeCapsule {
  * capsules are skipped and an all-empty input formats to the empty string,
  * mirroring Go's `formatKnowledgeCapsules`.
  */
-export function formatKnowledgeCapsules(
-  capsules: KnowledgeCapsule[],
-): string {
+export function formatKnowledgeCapsules(capsules: KnowledgeCapsule[]): string {
   if (capsules.length === 0) return "";
   const builder: string[] = [];
   builder.push("[Runtime-managed knowledge-base references]");

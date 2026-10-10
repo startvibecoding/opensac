@@ -109,20 +109,14 @@ test("normalizeToolCallArguments decodes and preserves invalid input", () => {
     name: "bash",
     arguments: "{not json",
   };
-  assertThrows(
-    () => normalizeToolCallArguments(tc),
-    Error,
-  );
+  assertThrows(() => normalizeToolCallArguments(tc), Error);
   assertEquals(tc.invalidArguments, "{not json");
   assertEquals(tc.arguments, {});
 });
 
 test("retryCompatibilityStatus formats attempt and wait", () => {
   assertEquals(retryCompatibilityStatus(0, 0, 0), "Retrying...");
-  assertEquals(
-    retryCompatibilityStatus(1, 3, 0),
-    "Retrying (attempt 1/3)...",
-  );
+  assertEquals(retryCompatibilityStatus(1, 3, 0), "Retrying (attempt 1/3)...");
   assertEquals(
     retryCompatibilityStatus(2, 5, 1000),
     "Retrying (attempt 2/5); waiting 1s...",
@@ -148,9 +142,9 @@ test("buildOutputRecoveryMessage quotes the tail", () => {
     true,
   );
   const long = buildOutputRecoveryMessage("x".repeat(2000));
-  const marker = long.split("<previous_response_suffix>\n")[1].split(
-    "\n</previous_response_suffix>",
-  )[0];
+  const marker = long
+    .split("<previous_response_suffix>\n")[1]
+    .split("\n</previous_response_suffix>")[0];
   assertEquals(marker.length, 1200);
 });
 
@@ -178,19 +172,24 @@ test("replayTextContent", () => {
   assertEquals(replayTextContent(createUserMessage("hi")), "hi");
   assertEquals(
     replayTextContent(
-      createAssistantMessage([{ type: "text", text: "a" }, {
-        type: "text",
-        text: "b",
-      }]),
+      createAssistantMessage([
+        { type: "text", text: "a" },
+        {
+          type: "text",
+          text: "b",
+        },
+      ]),
     ),
     "a\nb",
   );
   assertEquals(
     replayTextContent(
-      createAssistantMessage([{
-        type: "toolCall",
-        toolCall: { id: "1", name: "x" },
-      }]),
+      createAssistantMessage([
+        {
+          type: "toolCall",
+          toolCall: { id: "1", name: "x" },
+        },
+      ]),
     ),
     undefined,
   );
@@ -214,19 +213,17 @@ test("usageStatsProviderName prefers vendor", () => {
 });
 
 test("isReadOnlyToolName / isSideEffectingToolName", () => {
-  for (
-    const name of [
-      "read",
-      "grep",
-      "find",
-      "ls",
-      "jobs",
-      "skill_ref",
-      "question",
-      "plan",
-      " READ ",
-    ]
-  ) {
+  for (const name of [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "jobs",
+    "skill_ref",
+    "question",
+    "plan",
+    " READ ",
+  ]) {
     assertEquals(isReadOnlyToolName(name), true, name);
   }
   assertEquals(isReadOnlyToolName("bash"), false);
@@ -241,8 +238,10 @@ test("toolExecutionResultSummary round-trips", () => {
     isError: true,
   });
   assertEquals(
-    parseToolExecutionResultSummary({ content: "", isError: false }).content
-      .startsWith("A prior tool execution"),
+    parseToolExecutionResultSummary({
+      content: "",
+      isError: false,
+    }).content.startsWith("A prior tool execution"),
     true,
   );
   assertEquals(

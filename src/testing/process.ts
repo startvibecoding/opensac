@@ -2,13 +2,14 @@
 //
 // Several guards (ACP stdio framing, Core host lifecycle, launcher resolution)
 // are only meaningful across a process boundary, so they spawn this repository's
-// entry point again. Under the Deno CLI that was `deno run -A src/main.ts`; the
-// toolchain is now Node, so the equivalent is `node <entry>` — Node needs no
-// permission flags, and TypeScript sources run directly via type stripping.
+// entry point again. The toolchain is Node, so the equivalent of the old Node
+// invocation is `node <entry>` — Node needs no permission flags, and TypeScript
+// sources run directly via type stripping.
 //
-// The helper keeps the shape the tests already use (`Deno.Command`-like args,
+// The helper keeps the shape the tests already use (`nodeRuntime.Command`-like args,
 // piped stdout/stderr, exit status) so migrating a call site is a one-line swap.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +21,7 @@ export const cliEntry = fileURLToPath(
   new URL("../../src/main.ts", import.meta.url),
 );
 
-/** Absolute path of the test preload that installs the `Deno` global. */
+/** Absolute path of the test preload that installs the `Node` global. */
 export const preloadEntry = fileURLToPath(
   new URL("../../scripts/test/preload.mjs", import.meta.url),
 );
@@ -48,7 +49,7 @@ export interface RunOptions {
 
 /**
  * Spawns the CLI entry (`src/main.ts`) with the given arguments in a fresh Node
- * process, with the `Deno` compat global preloaded.
+ * process, with the `Node` compat global preloaded.
  */
 export function runCli(
   args: string[],
@@ -59,7 +60,7 @@ export function runCli(
 
 /**
  * Spawns an arbitrary script/module with the given arguments, preloading the
- * `Deno` compat global so the child sees the same runtime surface as the parent.
+ * `Node` compat global so the child sees the same runtime surface as the parent.
  */
 export function runScript(
   scriptPath: string,
@@ -92,12 +93,12 @@ export function spawnCaptured(
 
     let stdout = "";
     let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
+    child.stdout!.setEncoding("utf8");
+    child.stderr!.setEncoding("utf8");
+    child.stdout!.on("data", (chunk: string) => {
       stdout += chunk;
     });
-    child.stderr.on("data", (chunk: string) => {
+    child.stderr!.on("data", (chunk: string) => {
       stderr += chunk;
     });
 
@@ -116,7 +117,7 @@ export function spawnCaptured(
     });
 
     if (options.stdin != null) {
-      child.stdin.end(options.stdin);
+      child.stdin!.end(options.stdin);
     }
   });
 }

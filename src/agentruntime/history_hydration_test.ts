@@ -2,6 +2,7 @@
 // with the replayed conversation history before the next user message, or the
 // follow-up turn loses all prior context.
 
+import { runtime as nodeRuntime } from "../platform/runtime.ts";
 import { assert, assertEquals } from "../compat/assert.ts";
 import { Builder, SessionRuntime } from "./session_runtime.ts";
 import { SOURCE_TUI } from "./source.ts";
@@ -15,7 +16,7 @@ import { createUserMessage } from "../provider/types.ts";
 import { test } from "#testing";
 
 test("buildAgent hydrates the agent with prior session messages", async () => {
-  const workDir = await Deno.makeTempDir();
+  const workDir = await nodeRuntime.makeTempDir();
   const settings = defaultSettings();
   const manager = createSession({ workDir });
 
@@ -67,11 +68,11 @@ test("buildAgent hydrates the agent with prior session messages", async () => {
   assert(entryIDs.length === messages.length);
 
   await runtime.shutdown();
-  await Deno.remove(workDir, { recursive: true });
+  await nodeRuntime.remove(workDir, { recursive: true });
 });
 
 test("buildAgent without hydrateHistory leaves history empty", async () => {
-  const workDir = await Deno.makeTempDir();
+  const workDir = await nodeRuntime.makeTempDir();
   const settings = defaultSettings();
   const manager = createSession({ workDir });
   manager.appendMessages([createUserMessage("earlier turn")]);
@@ -113,5 +114,5 @@ test("buildAgent without hydrateHistory leaves history empty", async () => {
   assertEquals(agent.getMessages().length, 0);
 
   await runtime.shutdown();
-  await Deno.remove(workDir, { recursive: true });
+  await nodeRuntime.remove(workDir, { recursive: true });
 });

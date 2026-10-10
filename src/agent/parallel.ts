@@ -6,9 +6,9 @@
 //
 // Deviation: Go's goroutine fan-out maps to async workers; fn returns a
 // Promise and the helper is awaited. This helper is deliberately kept as the
-// one concurrency primitive instead of `@std/async`'s `pooledMap`: tool
+// one concurrency primitive rather than a general-purpose pool helper: tool
 // dispatch requires both input-order results and full drain of every item
-// (one result per provider tool call), which `pooledMap` does not guarantee.
+// (one result per provider tool call), which a general pool does not guarantee.
 
 import { defaultToolExecutionMaxConcurrency } from "../config/settings.ts";
 
